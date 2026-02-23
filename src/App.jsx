@@ -2841,7 +2841,7 @@ function NotesUI({
               type="button"
               onClick={() => setShowMultiColorPop((v) => !v)}
               className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
-              title="Color"
+              title={t("color")}
             >
               🎨 Color
             </button>
@@ -3383,7 +3383,7 @@ function NotesUI({
                               ? "bg-indigo-600 text-white border-indigo-600"
                               : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
                           }`}
-                          title="Text note"
+                          title={t("textNote")}
                         >
                           📝
                         </button>
@@ -3395,7 +3395,7 @@ function NotesUI({
                               ? "bg-indigo-600 text-white border-indigo-600"
                               : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
                           }`}
-                          title="Checklist"
+                          title={t("checklist")}
                         >
                           ✅
                         </button>
@@ -3407,7 +3407,7 @@ function NotesUI({
                               ? "bg-indigo-600 text-white border-indigo-600"
                               : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
                           }`}
-                          title="Drawing"
+                          title={t("drawing")}
                         >
                           🖌️
                         </button>
@@ -3419,7 +3419,7 @@ function NotesUI({
                         type="button"
                         onClick={() => setShowColorPop((v) => !v)}
                         className="w-6 h-6 rounded-full border-2 border-[var(--border-light)] hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 flex items-center justify-center"
-                        title="Color"
+                        title={t("color")}
                         style={{
                           backgroundColor:
                             composerColor === "default"
@@ -3492,7 +3492,7 @@ function NotesUI({
                       <button
                         onClick={() => composerFileRef.current?.click()}
                         className="px-2 py-1 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 flex-shrink-0 text-lg"
-                        title="Add images"
+                        title={t("addImages")}
                       >
                         🖼️
                       </button>
@@ -7438,7 +7438,7 @@ export default function App() {
                     type="button"
                     onClick={() => setShowModalColorPop((v) => !v)}
                     className="w-6 h-6 rounded-full border-2 border-[var(--border-light)] hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 flex items-center justify-center"
-                    title="Color"
+                    title={t("color")}
                     style={{
                       backgroundColor:
                         mColor === "default"
@@ -7507,7 +7507,7 @@ export default function App() {
                   <button
                     onClick={() => modalFileRef.current?.click()}
                     className="px-2 py-1 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-lg"
-                    title="Add images"
+                    title={t("addImages")}
                   >
                     🖼️
                   </button>
