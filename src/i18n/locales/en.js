@@ -16,4 +16,6 @@ searchOrAskAi: "Search or Ask AI...",
 password: "Password",
 passwordMin6: "Password (min 6 chars)",
 loginFailed: "Login failed",
+  passwordMin6Error: "Password must be at least 6 characters.",
+  passwordsDoNotMatch: "Passwords do not match.",
 };

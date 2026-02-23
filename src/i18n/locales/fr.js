@@ -16,4 +16,6 @@ searchOrAskAi: "Rechercher ou demander à l'IA...",
 password: "Mot de passe",
 passwordMin6: "Mot de passe (min 6 caractères)",
 loginFailed: "Échec de la connexion",
+  passwordMin6Error: "Le mot de passe doit contenir au moins 6 caractères.",
+  passwordsDoNotMatch: "Les mots de passe ne correspondent pas.",
 };

@@ -1747,9 +1747,9 @@ function LoginView({
     e.preventDefault();
     try {
       const res = await onLogin(email.trim(), pw);
-      if (!res.ok) setErr(res.error || "Login failed");
+      if (!res.ok) setErr(res.error || t("loginFailed"));
     } catch (er) {
-      setErr(er.message || "Login failed");
+      setErr(er.message || t("loginFailed"));
     }
   };
 
@@ -1772,7 +1772,7 @@ function LoginView({
         <input
           type="password"
           className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          placeholder="Password"
+          placeholder={t("password")}
           value={pw}
           onChange={(e) => setPw(e.target.value)}
           required
@@ -1812,8 +1812,8 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (pw.length < 6) return setErr("Password must be at least 6 characters.");
-    if (pw !== pw2) return setErr("Passwords do not match.");
+    if (pw.length < 6) return setErr(t("passwordMin6Error"));
+    if (pw !== pw2) return setErr(t("passwordsDoNotMatch"));
     try {
       const res = await onRegister(name.trim() || "User", email.trim(), pw);
       if (!res.ok) setErr(res.error || "Registration failed");
@@ -1848,7 +1848,7 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin }) {
         <input
           type="password"
           className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          placeholder="Password (min 6 chars)"
+          placeholder={t("passwordMin6")}
           value={pw}
           onChange={(e) => setPw(e.target.value)}
           required
@@ -1887,9 +1887,9 @@ function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin }) {
     e.preventDefault();
     try {
       const res = await onLoginWithKey(key.trim());
-      if (!res.ok) setErr(res.error || "Login failed");
+      if (!res.ok) setErr(res.error || t("loginFailed"));
     } catch (er) {
-      setErr(er.message || "Login failed");
+      setErr(er.message || t("loginFailed"));
     }
   };
 
@@ -2491,7 +2491,7 @@ function AdminPanel({
               />
               <input
                 type="password"
-                placeholder="Password"
+                placeholder={t("password")}
                 value={newUserForm.password}
                 onChange={(e) =>
                   setNewUserForm((prev) => ({
