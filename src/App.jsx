@@ -1755,7 +1755,7 @@ function LoginView({
 
   return (
     <AuthShell
-      title="Sign in to your account"
+      title={t("signInToYourAccount")}
       dark={dark}
       onToggleDark={onToggleDark}
     >
@@ -1764,7 +1764,7 @@ function LoginView({
           type="text"
           autoComplete="username"
           className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          placeholder="Username"
+          placeholder={t("username")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -1781,9 +1781,7 @@ function LoginView({
         <button
           type="submit"
           className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-        >
-          Sign In
-        </button>
+        >{t("signIn")}</button>
       </form>
 
       <div className="mt-4 text-sm flex justify-between items-center">
@@ -1795,9 +1793,7 @@ function LoginView({
             Create account
           </button>
         )}
-        <button className="text-indigo-600 hover:underline" onClick={goSecret}>
-          Forgot username/password?
-        </button>
+        <button className="text-indigo-600 hover:underline" onClick={goSecret}>{t("forgotUsernamePassword")}</button>
       </div>
     </AuthShell>
   );
@@ -1840,7 +1836,7 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin }) {
           type="text"
           autoComplete="username"
           className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          placeholder="Username"
+          placeholder={t("username")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -2482,7 +2478,7 @@ function AdminPanel({
               />
               <input
                 type="text"
-                placeholder="Username"
+                placeholder={t("username")}
                 value={newUserForm.email}
                 onChange={(e) =>
                   setNewUserForm((prev) => ({ ...prev, email: e.target.value }))
@@ -3718,7 +3714,7 @@ function AdminView({ dark }) {
             <thead>
               <tr className="text-left border-b border-[var(--border-light)]">
                 <th className="py-2 pr-3">Name</th>
-                <th className="py-2 pr-3">Email / Username</th>
+                <th className="py-2 pr-3">{t("emailOrUsername")}</th>
                 <th className="py-2 pr-3">Notes</th>
                 <th className="py-2 pr-3">Storage</th>
                 <th className="py-2 pr-3">Admin</th>
@@ -5670,7 +5666,7 @@ export default function App() {
         `Secret Key:\n${data.key}\n\n` +
         `Instructions:\n` +
         `1) Go to the login page.\n` +
-        `2) Click "Forgot username/password?".\n` +
+        `2) Click t("forgotUsernamePassword").\n` +
         `3) Choose "Sign in with Secret Key" and paste this key.\n`;
       downloadText(fname, content);
       alert("Secret key downloaded. Store it in a safe place.");
@@ -7691,7 +7687,7 @@ export default function App() {
                                 updateDropdownPosition();
                                 searchUsers(collaboratorUsername || "");
                               }}
-                              placeholder="Search by username or email"
+                              placeholder={t("searchByUsernameOrEmail")}
                               className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-transparent"
                               onKeyDown={(e) => {
                                 if (
