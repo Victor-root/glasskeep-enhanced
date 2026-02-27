@@ -787,8 +787,8 @@ function formatEditedStamp(iso) {
   const month = d.toLocaleString([], { month: "short" });
   const day = d.getDate();
   if (d.getFullYear() === now.getFullYear()) return `${month} ${day}`;
-  const yy = String(d.getFullYear()).slice(-2);
-  return `${month} ${day}, '${yy}`;
+  const yyyy = String(d.getFullYear());
+  return `${day} ${month} ${yyyy}`;
 }
 
 /** ---------- Global CSS injection ---------- */
