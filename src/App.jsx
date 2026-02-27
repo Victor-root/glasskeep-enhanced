@@ -2230,7 +2230,7 @@ function SettingsPanel({
                         onConfirm: async () => {
                           setLocalAiEnabled(true);
                           showToast(
-                            "AI Assistant enabled. Model will download on first use.",
+                            t("aiAssistantEnabledModelDownload"),
                             "success",
                           );
                         },
