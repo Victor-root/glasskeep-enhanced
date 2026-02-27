@@ -4,6 +4,15 @@
 > The changes also provide reusable **i18n groundwork** so other languages can be added more easily in the future.
 A sleek, Keep-style notes app with Markdown, checklists, images, tag chips, color themes, dark mode, drag-and-drop reordering, import/export, auth, and a glassy UI — built with Vite + React and a tiny Express + SQLite API.
 
+## Adding a new language
+
+1. Copy `src/i18n/locales/en.js` to a new file, for example `it.js`
+2. Translate the values
+3. Import the new locale in `src/i18n/index.js`
+4. Extend the language detection logic
+5. Rebuild the app
+
+If a key is missing, English should be used as fallback.
 ---
 **Web App Screenshots**
 
