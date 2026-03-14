@@ -1136,10 +1136,10 @@ function ChecklistRow({
     : "opacity-0 group-hover:opacity-100";
 
   return (
-    <div className="flex items-start gap-3 md:gap-2 group min-w-0">
+    <div className="flex items-start gap-1.5 sm:gap-3 md:gap-2 group min-w-0">
       <input
         type="checkbox"
-        className={`mt-0.5 shrink-0 ${boxSize} cursor-pointer`}
+        className={`mt-px shrink-0 ${boxSize} cursor-pointer`}
         checked={!!item.done}
         onChange={(e) => {
           e.stopPropagation();
