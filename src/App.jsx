@@ -992,18 +992,20 @@ html:not(.dark) .note-content pre .code-copy-btn {
 .masonry-grid { column-gap: 0.75rem; column-count: 2; }
 @media (min-width: 640px) { .masonry-grid { column-count: 2; } }
 @media (min-width: 768px) { .masonry-grid { column-count: 3; } }
-@media (min-width: 1024px) { .masonry-grid { column-count: 4; } }
-@media (min-width: 1280px) { .masonry-grid { column-count: 5; } }
-@media (min-width: 1536px) { .masonry-grid { column-count: 6; } }
+@media (min-width: 1090px) { .masonry-grid { column-count: 4; } }
+@media (min-width: 1340px) { .masonry-grid { column-count: 5; } }
+@media (min-width: 1588px) { .masonry-grid { column-count: 6; } }
+@media (min-width: 1836px) { .masonry-grid { column-count: 7; } }
 
 /* Pinned cards flex layout */
 .pinned-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-start; }
 .pinned-grid > div { width: calc(50% - 0.375rem); }
 @media (min-width: 640px) { .pinned-grid > div { width: calc(50% - 0.375rem); } }
 @media (min-width: 768px) { .pinned-grid > div { width: calc(33.333% - 0.5rem); } }
-@media (min-width: 1024px) { .pinned-grid > div { width: calc(25% - 0.5625rem); } }
-@media (min-width: 1280px) { .pinned-grid > div { width: calc(20% - 0.6rem); } }
-@media (min-width: 1536px) { .pinned-grid > div { width: calc(16.666% - 0.625rem); } }
+@media (min-width: 1090px) { .pinned-grid > div { width: calc(25% - 0.5625rem); } }
+@media (min-width: 1340px) { .pinned-grid > div { width: calc(20% - 0.6rem); } }
+@media (min-width: 1588px) { .pinned-grid > div { width: calc(16.666% - 0.625rem); } }
+@media (min-width: 1836px) { .pinned-grid > div { width: calc(14.2857% - 0.6429rem); } }
 
 /* New grid layout to place notes row-wise (left-to-right, top-to-bottom) */
 /* Keep-like masonry using CSS Grid with JS-calculated row spans (preserves horizontal order) */
