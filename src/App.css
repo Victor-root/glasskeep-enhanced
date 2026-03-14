@@ -40,3 +40,15 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Code blocks inside notes: wrap text instead of horizontal scroll */
+.note-content pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: hidden;
+  margin: 0.25rem 0;
+}
+
+.note-content code {
+  word-break: break-word;
+}
