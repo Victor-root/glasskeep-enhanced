@@ -935,6 +935,11 @@ body {
     margin-bottom: 0.75rem;
   }
 
+  /* Mobile: pinned grid 2 columns */
+  .pinned-grid > div {
+    width: calc(50% - 0.375rem);
+  }
+
 
   /* Hide PAGE scrollbars on mobile (keep scrolling) */
   html, body {
