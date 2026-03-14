@@ -1689,7 +1689,7 @@ function NoteCard({
           openModal(n.id);
         }
       }}
-      className={`note-card glass-card rounded-xl p-3 mb-3 cursor-pointer transform hover:scale-[1.02] transition-transform duration-200 relative min-h-[54px] group ${
+      className={`note-card glass-card rounded-xl p-3 mb-3 cursor-pointer transform hover:scale-[1.02] transition-transform duration-200 relative min-h-[54px] overflow-hidden group ${
         multiMode && selected
           ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent"
           : ""
