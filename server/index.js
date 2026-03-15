@@ -120,6 +120,12 @@ CREATE TABLE IF NOT EXISTS note_collaborators (
   FOREIGN KEY(added_by) REFERENCES users(id) ON DELETE CASCADE,
   UNIQUE(note_id, user_id)
 );
+
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id INTEGER PRIMARY KEY,
+  settings_json TEXT NOT NULL DEFAULT '{}',
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 `);
 
 // Tiny migrations (safe to run repeatedly)
@@ -273,6 +279,11 @@ const insertUser = db.prepare(
 })();
 const getUserById = db.prepare("SELECT * FROM users WHERE id = ?");
 const getNoteById = db.prepare("SELECT * FROM notes WHERE id = ?");
+const getUserSettings = db.prepare("SELECT settings_json FROM user_settings WHERE user_id = ?");
+const upsertUserSettings = db.prepare(
+  `INSERT INTO user_settings (user_id, settings_json) VALUES (?, ?)
+   ON CONFLICT(user_id) DO UPDATE SET settings_json = excluded.settings_json`
+);
 
 // Notes statements
 const listNotes = db.prepare(
@@ -975,6 +986,25 @@ app.post("/api/notes/import", auth, (req, res) => {
   });
   tx(src);
   res.json({ ok: true, imported: src.length });
+});
+
+// ---------- User Settings ----------
+app.get("/api/user/settings", auth, (req, res) => {
+  const row = getUserSettings.get(req.user.id);
+  res.json(row ? JSON.parse(row.settings_json) : {});
+});
+
+app.patch("/api/user/settings", auth, (req, res) => {
+  const incoming = req.body;
+  if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) {
+    return res.status(400).json({ error: "Invalid settings object" });
+  }
+  // Merge with existing settings
+  const row = getUserSettings.get(req.user.id);
+  const current = row ? JSON.parse(row.settings_json) : {};
+  const merged = { ...current, ...incoming };
+  upsertUserSettings.run(req.user.id, JSON.stringify(merged));
+  res.json(merged);
 });
 
 // ---------- Admin ----------
