@@ -923,6 +923,18 @@ body {
 /* Hide scrollbars on mobile (keep scrolling) */
 @media (max-width: 639px) {
 
+  /* Mobile: notes grid 2 columns */
+  .masonry-grid {
+    column-count: 2;
+    column-gap: 0.75rem;
+  }
+  .masonry-grid > * {
+    break-inside: avoid;
+    display: inline-block;
+    width: 100%;
+    margin-bottom: 0.75rem;
+  }
+
   /* Mobile: pinned grid 2 columns */
   .pinned-grid > div {
     width: calc(50% - 0.375rem);
@@ -977,13 +989,13 @@ html:not(.dark) .note-content pre .code-copy-btn {
 
 .dragging { opacity: 0.5; transform: scale(1.05); }
 .drag-over { outline: 2px dashed rgba(99,102,241,.6); outline-offset: 6px; }
-.masonry-grid { display: grid; grid-template-columns: repeat(2, 1fr); grid-auto-rows: 10px; column-gap: 0.75rem; }
-@media (min-width: 640px) { .masonry-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 768px) { .masonry-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1090px) { .masonry-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (min-width: 1340px) { .masonry-grid { grid-template-columns: repeat(5, 1fr); } }
-@media (min-width: 1588px) { .masonry-grid { grid-template-columns: repeat(6, 1fr); } }
-@media (min-width: 1836px) { .masonry-grid { grid-template-columns: repeat(7, 1fr); } }
+.masonry-grid { column-gap: 0.75rem; column-count: 2; }
+@media (min-width: 640px) { .masonry-grid { column-count: 2; } }
+@media (min-width: 768px) { .masonry-grid { column-count: 3; } }
+@media (min-width: 1090px) { .masonry-grid { column-count: 4; } }
+@media (min-width: 1340px) { .masonry-grid { column-count: 5; } }
+@media (min-width: 1588px) { .masonry-grid { column-count: 6; } }
+@media (min-width: 1836px) { .masonry-grid { column-count: 7; } }
 
 /* Pinned cards flex layout */
 .pinned-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-start; }
@@ -3784,7 +3796,6 @@ function NotesUI({
                 </h2>
               ))}
             <div
-              ref={listView ? undefined : masonryRef}
               className={
                 listView ? "max-w-2xl mx-auto space-y-6" : "masonry-grid"
               }
@@ -4159,9 +4170,6 @@ export default function App() {
   // Image Viewer state (fullscreen)
   const [imgViewOpen, setImgViewOpen] = useState(false);
   const [imgViewIndex, setImgViewIndex] = useState(0);
-
-  // Masonry grid ref
-  const masonryRef = useRef(null);
 
   // Drag
   const dragId = useRef(null);
@@ -6425,36 +6433,14 @@ export default function App() {
     }
   };
 
-  /** -------- Masonry layout (CSS Grid row-span) -------- */
-  useLayoutEffect(() => {
-    const grid = masonryRef.current;
-    if (!grid || grid.children.length === 0) return;
-    const ROW_H = 10;
-    const GAP = 12;
-    // Temporarily use auto rows so we can measure natural heights
-    grid.style.gridAutoRows = "auto";
-    for (const item of grid.children) {
-      item.style.gridRowEnd = "";
-    }
-    // Read all natural heights
-    const heights = Array.from(grid.children, (item) => item.scrollHeight);
-    // Switch back to 10px rows and apply spans
-    grid.style.gridAutoRows = "10px";
-    Array.from(grid.children).forEach((item, i) => {
-      item.style.gridRowEnd = `span ${Math.ceil((heights[i] + GAP) / ROW_H)}`;
-    });
-  });
-
   /** -------- Drag & Drop reorder (cards) -------- */
-  const moveWithin = (arr, itemId, targetId, placeAfter) => {
+  const swapWithin = (arr, itemId, targetId) => {
     const a = arr.slice();
     const from = a.indexOf(itemId);
-    let to = a.indexOf(targetId);
+    const to = a.indexOf(targetId);
     if (from === -1 || to === -1) return arr;
-    a.splice(from, 1);
-    to = a.indexOf(targetId);
-    if (placeAfter) to += 1;
-    a.splice(to, 0, itemId);
+    a[from] = targetId;
+    a[to] = itemId;
     return a;
   };
   const onDragStart = (id, ev) => {
@@ -6480,28 +6466,14 @@ export default function App() {
     if (!dragged || String(dragged) === String(overId)) return;
     if (dragGroup.current !== group) return;
 
-    const rect = ev.currentTarget.getBoundingClientRect();
-    const midpoint = rect.top + rect.height / 2;
-    const placeAfter = ev.clientY > midpoint;
-
     const pinnedIds = notes.filter((n) => n.pinned).map((n) => String(n.id));
     const otherIds = notes.filter((n) => !n.pinned).map((n) => String(n.id));
     let newPinned = pinnedIds,
       newOthers = otherIds;
     if (group === "pinned")
-      newPinned = moveWithin(
-        pinnedIds,
-        String(dragged),
-        String(overId),
-        placeAfter,
-      );
+      newPinned = swapWithin(pinnedIds, String(dragged), String(overId));
     else
-      newOthers = moveWithin(
-        otherIds,
-        String(dragged),
-        String(overId),
-        placeAfter,
-      );
+      newOthers = swapWithin(otherIds, String(dragged), String(overId));
 
     // Optimistic update
     const byId = new Map(notes.map((n) => [String(n.id), n]));
