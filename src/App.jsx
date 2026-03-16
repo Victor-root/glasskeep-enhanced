@@ -2166,7 +2166,7 @@ function TagSidebar({
           ><ArchiveSidebarIcon />{t("archivedNotes")}</button>
 
           {/* User tags */}
-          {activeTagFilters.length > 0 && (
+          {activeTagFilters.length > 1 && (
             <div className="px-3 py-1 mb-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
               <span>🔀 {activeTagFilters.length} tag{activeTagFilters.length > 1 ? "s" : ""} actif{activeTagFilters.length > 1 ? "s" : ""}</span>
               <button
@@ -2185,7 +2185,7 @@ function TagSidebar({
             return (
               <button
                 key={tag}
-                className={`w-full text-left px-3 py-2 rounded-md mb-1 flex items-center justify-between ${active ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+                className={`w-full text-left px-3 py-2 rounded-md mb-1 flex items-center justify-between cursor-pointer ${active ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
                 onClick={(e) => {
                   onSelect(tag, e);
                   // Ne ferme la sidebar que si c'est un clic simple (pas Ctrl/Cmd+clic)
