@@ -925,14 +925,9 @@ body {
 
   /* Mobile: notes grid 2 columns */
   .masonry-grid {
-    column-count: 2;
-    column-gap: 0.75rem;
-  }
-  .masonry-grid > * {
-    break-inside: avoid;
-    display: inline-block;
-    width: 100%;
-    margin-bottom: 0.75rem;
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: 10px;
+    gap: 0 0.75rem;
   }
 
   /* Mobile: pinned grid 2 columns */
@@ -989,13 +984,14 @@ html:not(.dark) .note-content pre .code-copy-btn {
 
 .dragging { opacity: 0.5; transform: scale(1.05); }
 .drag-over { outline: 2px dashed rgba(99,102,241,.6); outline-offset: 6px; }
-.masonry-grid { column-gap: 0.75rem; column-count: 2; }
-@media (min-width: 640px) { .masonry-grid { column-count: 2; } }
-@media (min-width: 768px) { .masonry-grid { column-count: 3; } }
-@media (min-width: 1090px) { .masonry-grid { column-count: 4; } }
-@media (min-width: 1340px) { .masonry-grid { column-count: 5; } }
-@media (min-width: 1588px) { .masonry-grid { column-count: 6; } }
-@media (min-width: 1836px) { .masonry-grid { column-count: 7; } }
+.masonry-grid { display: grid; grid-template-columns: repeat(2, 1fr); grid-auto-rows: 10px; gap: 0 0.75rem; }
+@media (min-width: 640px) { .masonry-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 768px) { .masonry-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1090px) { .masonry-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 1340px) { .masonry-grid { grid-template-columns: repeat(5, 1fr); } }
+@media (min-width: 1588px) { .masonry-grid { grid-template-columns: repeat(6, 1fr); } }
+@media (min-width: 1836px) { .masonry-grid { grid-template-columns: repeat(7, 1fr); } }
+.masonry-grid > .masonry-item > .note-card { margin-bottom: 0; }
 
 /* Pinned cards flex layout */
 .pinned-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-start; }
@@ -1007,9 +1003,6 @@ html:not(.dark) .note-content pre .code-copy-btn {
 @media (min-width: 1588px) { .pinned-grid > div { width: calc(16.666% - 0.625rem); } }
 @media (min-width: 1836px) { .pinned-grid > div { width: calc(14.2857% - 0.6429rem); } }
 
-/* New grid layout to place notes row-wise (left-to-right, top-to-bottom) */
-/* Keep-like masonry using CSS Grid with JS-calculated row spans (preserves horizontal order) */
- 
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.5); border-radius: 10px; }
@@ -3799,13 +3792,14 @@ function NotesUI({
                 </h2>
               ))}
             <div
+              ref={listView ? undefined : masonryRef}
               className={
                 listView ? "max-w-2xl mx-auto space-y-6" : "masonry-grid"
               }
             >
               {others.map((n) => (
+                <div key={n.id} className={listView ? undefined : "masonry-item"}>
                 <NoteCard
-                  key={n.id}
                   n={n}
                   dark={dark}
                   openModal={openModal}
@@ -3827,6 +3821,7 @@ function NotesUI({
                   onUpdateChecklistItem={onUpdateChecklistItem}
                   currentUser={currentUser}
                 />
+                </div>
               ))}
             </div>
           </section>
@@ -4172,6 +4167,9 @@ export default function App() {
   // Image Viewer state (fullscreen)
   const [imgViewOpen, setImgViewOpen] = useState(false);
   const [imgViewIndex, setImgViewIndex] = useState(0);
+
+  // Masonry grid ref for dynamic row-span calculation
+  const masonryRef = useRef(null);
 
   // Drag
   const dragId = useRef(null);
@@ -6436,6 +6434,29 @@ export default function App() {
   };
 
   /** -------- Drag & Drop reorder (cards) -------- */
+  // Masonry layout: measure children and set grid-row spans
+  useEffect(() => {
+    const grid = masonryRef.current;
+    if (!grid) return;
+    const ROW_H = 10; // must match grid-auto-rows
+    const GAP = 12; // row gap in px (0.75rem ≈ 12px)
+    const resizeAll = () => {
+      for (const item of grid.children) {
+        // Reset span so we measure natural height
+        item.style.gridRowEnd = "";
+        const card = item.querySelector(".note-card");
+        const h = card ? card.getBoundingClientRect().height : item.scrollHeight;
+        const span = Math.ceil((h + GAP) / ROW_H);
+        item.style.gridRowEnd = `span ${span}`;
+      }
+    };
+    // Run once + observe for changes
+    resizeAll();
+    const ro = new ResizeObserver(resizeAll);
+    ro.observe(grid);
+    return () => ro.disconnect();
+  });
+
   const moveWithin = (arr, itemId, targetId, placeAfter) => {
     const a = arr.slice();
     const from = a.indexOf(itemId);
