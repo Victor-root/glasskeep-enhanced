@@ -4654,7 +4654,8 @@ export default function App() {
           !Number.isNaN(apos) &&
           !Number.isNaN(bpos)
         ) {
-          return bpos - apos; // higher position first (most recent/top)
+          const posDiff = bpos - apos;
+          if (posDiff !== 0) return posDiff; // higher position first (most recent/top)
         }
         const at = new Date(a?.updated_at || a?.timestamp || 0).getTime();
         const bt = new Date(b?.updated_at || b?.timestamp || 0).getTime();
