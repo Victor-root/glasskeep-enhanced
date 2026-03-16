@@ -2481,7 +2481,7 @@ function SettingsPanel({
                   onResetNoteOrder?.(overridePositions);
                 }}
               >
-                {t("confirm") || "OK"}
+                {t("confirm")}
               </button>
             </div>
           </div>

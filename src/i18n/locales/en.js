@@ -4,6 +4,7 @@ export const en = {
   save: "Save",
   delete: "Delete",
   cancel: "Cancel",
+  confirm: "Confirm",
   close: "Close",
   searchPlaceholder: "Search notes...",
   pinned: "Pinned",
