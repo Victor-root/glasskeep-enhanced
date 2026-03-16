@@ -11,6 +11,7 @@ import { askAI } from "./ai";
 import { marked as markedParser } from "marked";
 import DrawingCanvas from "./DrawingCanvas";
 import { t } from "./i18n";
+import Masonry from "react-masonry-css";
 
 function trColorName(name) {
   const v = String(name || "").trim().toLowerCase();
@@ -923,18 +924,6 @@ body {
 /* Hide scrollbars on mobile (keep scrolling) */
 @media (max-width: 639px) {
 
-  /* Mobile: notes grid 2 columns */
-  .masonry-grid {
-    column-count: 2;
-    column-gap: 0.75rem;
-  }
-  .masonry-grid > * {
-    break-inside: avoid;
-    display: inline-block;
-    width: 100%;
-    margin-bottom: 0.75rem;
-  }
-
   /* Mobile: pinned grid 2 columns */
   .pinned-grid > div {
     width: calc(50% - 0.375rem);
@@ -989,13 +978,9 @@ html:not(.dark) .note-content pre .code-copy-btn {
 
 .dragging { opacity: 0.5; transform: scale(1.05); }
 .drag-over { outline: 2px dashed rgba(99,102,241,.6); outline-offset: 6px; }
-.masonry-grid { column-gap: 0.75rem; column-count: 2; }
-@media (min-width: 640px) { .masonry-grid { column-count: 2; } }
-@media (min-width: 768px) { .masonry-grid { column-count: 3; } }
-@media (min-width: 1090px) { .masonry-grid { column-count: 4; } }
-@media (min-width: 1340px) { .masonry-grid { column-count: 5; } }
-@media (min-width: 1588px) { .masonry-grid { column-count: 6; } }
-@media (min-width: 1836px) { .masonry-grid { column-count: 7; } }
+.masonry-grid { display: flex; margin-left: -0.75rem; width: auto; }
+.masonry-grid-column { padding-left: 0.75rem; background-clip: padding-box; }
+.masonry-grid-column > div { margin-bottom: 0.75rem; }
 
 /* Pinned cards flex layout */
 .pinned-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-start; }
@@ -3795,38 +3780,69 @@ function NotesUI({
                   {t("others")}
                 </h2>
               ))}
-            <div
-              className={
-                listView ? "max-w-2xl mx-auto space-y-6" : "masonry-grid"
-              }
-            >
-              {others.map((n) => (
-                <div key={n.id}>
-                <NoteCard
-                  n={n}
-                  dark={dark}
-                  openModal={openModal}
-                  togglePin={togglePin}
-                  multiMode={multiMode}
-                  selected={selectedIds.includes(String(n.id))}
-                  onToggleSelect={onToggleSelect}
-                  disablePin={
-                    "ontouchstart" in window ||
-                    navigator.maxTouchPoints > 0 ||
-                    activeTagFilter === "ARCHIVED"
-                  }
-                  onDragStart={onDragStart}
-                  onDragOver={onDragOver}
-                  onDragLeave={onDragLeave}
-                  onDrop={onDrop}
-                  onDragEnd={onDragEnd}
-                  isOnline={isOnline}
-                  onUpdateChecklistItem={onUpdateChecklistItem}
-                  currentUser={currentUser}
-                />
-                </div>
-              ))}
-            </div>
+            {listView ? (
+              <div className="max-w-2xl mx-auto space-y-6">
+                {others.map((n) => (
+                  <div key={n.id}>
+                  <NoteCard
+                    n={n}
+                    dark={dark}
+                    openModal={openModal}
+                    togglePin={togglePin}
+                    multiMode={multiMode}
+                    selected={selectedIds.includes(String(n.id))}
+                    onToggleSelect={onToggleSelect}
+                    disablePin={
+                      "ontouchstart" in window ||
+                      navigator.maxTouchPoints > 0 ||
+                      activeTagFilter === "ARCHIVED"
+                    }
+                    onDragStart={onDragStart}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                    onDragEnd={onDragEnd}
+                    isOnline={isOnline}
+                    onUpdateChecklistItem={onUpdateChecklistItem}
+                    currentUser={currentUser}
+                  />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Masonry
+                breakpointCols={{default: 4, 1836: 7, 1588: 6, 1340: 5, 1090: 4, 768: 3, 640: 2, 0: 2}}
+                className="masonry-grid"
+                columnClassName="masonry-grid-column"
+              >
+                {others.map((n) => (
+                  <div key={n.id}>
+                  <NoteCard
+                    n={n}
+                    dark={dark}
+                    openModal={openModal}
+                    togglePin={togglePin}
+                    multiMode={multiMode}
+                    selected={selectedIds.includes(String(n.id))}
+                    onToggleSelect={onToggleSelect}
+                    disablePin={
+                      "ontouchstart" in window ||
+                      navigator.maxTouchPoints > 0 ||
+                      activeTagFilter === "ARCHIVED"
+                    }
+                    onDragStart={onDragStart}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                    onDragEnd={onDragEnd}
+                    isOnline={isOnline}
+                    onUpdateChecklistItem={onUpdateChecklistItem}
+                    currentUser={currentUser}
+                  />
+                  </div>
+                ))}
+              </Masonry>
+            )}
           </section>
         )}
 
