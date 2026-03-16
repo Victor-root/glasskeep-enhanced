@@ -6435,26 +6435,34 @@ export default function App() {
 
   /** -------- Drag & Drop reorder (cards) -------- */
   // Masonry layout: measure children and set grid-row spans
-  useEffect(() => {
+  useLayoutEffect(() => {
     const grid = masonryRef.current;
     if (!grid) return;
     const ROW_H = 10; // must match grid-auto-rows
     const GAP = 12; // row gap in px (0.75rem ≈ 12px)
+    let rafId = 0;
     const resizeAll = () => {
-      for (const item of grid.children) {
-        // Reset span so we measure natural height
-        item.style.gridRowEnd = "";
-        const card = item.querySelector(".note-card");
-        const h = card ? card.getBoundingClientRect().height : item.scrollHeight;
-        const span = Math.ceil((h + GAP) / ROW_H);
-        item.style.gridRowEnd = `span ${span}`;
-      }
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        for (const item of grid.children) {
+          // Reset span so we measure natural height
+          item.style.gridRowEnd = "";
+        }
+        // Force layout read after all resets
+        for (const item of grid.children) {
+          const card = item.querySelector(".note-card");
+          const h = card ? card.getBoundingClientRect().height : item.scrollHeight;
+          const newSpan = `span ${Math.ceil((h + GAP) / ROW_H)}`;
+          if (item.style.gridRowEnd !== newSpan) {
+            item.style.gridRowEnd = newSpan;
+          }
+        }
+      });
     };
-    // Run once + observe for changes
     resizeAll();
     const ro = new ResizeObserver(resizeAll);
     ro.observe(grid);
-    return () => ro.disconnect();
+    return () => { ro.disconnect(); cancelAnimationFrame(rafId); };
   });
 
   const moveWithin = (arr, itemId, targetId, placeAfter) => {
