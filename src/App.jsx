@@ -3811,7 +3811,7 @@ function NotesUI({
               </div>
             ) : (
               <Masonry
-                breakpointCols={{default: 4, 1836: 7, 1588: 6, 1340: 5, 1090: 4, 768: 3, 640: 2, 0: 2}}
+                breakpointCols={{default: 7, 1835: 6, 1587: 5, 1339: 4, 1089: 3, 767: 2}}
                 className="masonry-grid"
                 columnClassName="masonry-grid-column"
               >
