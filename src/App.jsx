@@ -2166,15 +2166,6 @@ function TagSidebar({
           ><ArchiveSidebarIcon />{t("archivedNotes")}</button>
 
           {/* User tags */}
-          {activeTagFilters.length > 1 && (
-            <div className="px-3 py-1 mb-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
-              <span>🔀 {activeTagFilters.length} tag{activeTagFilters.length > 1 ? "s" : ""} actif{activeTagFilters.length > 1 ? "s" : ""}</span>
-              <button
-                onClick={() => onSelect(null)}
-                className="text-xs underline hover:no-underline"
-              >tout effacer</button>
-            </div>
-          )}
           {tagsWithCounts.map(({ tag, count }) => {
             const active =
               activeTagFilters.length > 0
@@ -2202,6 +2193,15 @@ function TagSidebar({
           })}
           {tagsWithCounts.length === 0 && (
             <p className="text-sm text-gray-500 mt-2">{t("noTagsYet")}</p>
+          )}
+          {activeTagFilters.length > 1 && (
+            <div className="px-3 py-1 mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
+              <span>🔀 {activeTagFilters.length} tags actifs</span>
+              <button
+                onClick={() => onSelect(null)}
+                className="text-xs underline hover:no-underline cursor-pointer"
+              >tout effacer</button>
+            </div>
           )}
         </nav>
 
