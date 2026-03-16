@@ -2239,6 +2239,7 @@ function SettingsPanel({
   setLocalAiEnabled,
   showGenericConfirm,
   showToast,
+  onResetNoteOrder,
 }) {
   // Prevent body scroll when settings panel is open
   React.useEffect(() => {
@@ -2341,6 +2342,22 @@ function SettingsPanel({
               >
                 <div className="font-medium">{t("downloadSecretKeyTxt")}</div>
                 <div className="text-sm text-gray-500">{t("downloadEncryptionKeyBackup")}</div>
+              </button>
+
+              <button
+                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                onClick={() => {
+                  showGenericConfirm?.(
+                    t("resetNoteOrderConfirm"),
+                    () => {
+                      onClose();
+                      onResetNoteOrder?.();
+                    }
+                  );
+                }}
+              >
+                <div className="font-medium">{t("resetNoteOrder")}</div>
+                <div className="text-sm text-gray-500">{t("resetNoteOrderDesc")}</div>
               </button>
             </div>
           </div>
@@ -6449,6 +6466,35 @@ export default function App() {
     }
   };
 
+  /** -------- Reset note order -------- */
+  const resetNoteOrder = async () => {
+    const sorted = notes.slice().sort((a, b) => {
+      const ap = a?.pinned ? 1 : 0;
+      const bp = b?.pinned ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      const aUpd = new Date(a?.updated_at || a?.timestamp || 0).getTime();
+      const bUpd = new Date(b?.updated_at || b?.timestamp || 0).getTime();
+      if (aUpd !== bUpd) return bUpd - aUpd;
+      const aCre = new Date(a?.created_at || 0).getTime();
+      const bCre = new Date(b?.created_at || 0).getTime();
+      return bCre - aCre;
+    });
+    setNotes(sorted);
+    const pinnedIds = sorted.filter((n) => n.pinned).map((n) => String(n.id));
+    const otherIds = sorted.filter((n) => !n.pinned).map((n) => String(n.id));
+    try {
+      await api("/notes/reorder", {
+        method: "POST",
+        token,
+        body: { pinnedIds, otherIds },
+      });
+      showToast?.(t("noteOrderReset"));
+    } catch (e) {
+      console.error("Reset order failed:", e);
+      loadNotes().catch(() => {});
+    }
+  };
+
   /** -------- Drag & Drop reorder (cards) -------- */
   const swapWithin = (arr, itemId, targetId) => {
     const a = arr.slice();
@@ -8254,6 +8300,7 @@ export default function App() {
         setLocalAiEnabled={setLocalAiEnabled}
         showGenericConfirm={showGenericConfirm}
         showToast={showToast}
+        onResetNoteOrder={resetNoteOrder}
       />
 
       {/* Admin Panel */}
