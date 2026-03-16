@@ -977,14 +977,13 @@ html:not(.dark) .note-content pre .code-copy-btn {
 
 .dragging { opacity: 0.5; transform: scale(1.05); }
 .drag-over { outline: 2px dashed rgba(99,102,241,.6); outline-offset: 6px; }
-.masonry-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-start; }
-.masonry-grid > div { width: calc(50% - 0.375rem); }
-@media (min-width: 640px) { .masonry-grid > div { width: calc(50% - 0.375rem); } }
-@media (min-width: 768px) { .masonry-grid > div { width: calc(33.333% - 0.5rem); } }
-@media (min-width: 1090px) { .masonry-grid > div { width: calc(25% - 0.5625rem); } }
-@media (min-width: 1340px) { .masonry-grid > div { width: calc(20% - 0.6rem); } }
-@media (min-width: 1588px) { .masonry-grid > div { width: calc(16.666% - 0.625rem); } }
-@media (min-width: 1836px) { .masonry-grid > div { width: calc(14.2857% - 0.6429rem); } }
+.masonry-grid { display: grid; grid-template-columns: repeat(2, 1fr); grid-auto-rows: 10px; column-gap: 0.75rem; }
+@media (min-width: 640px) { .masonry-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 768px) { .masonry-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1090px) { .masonry-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 1340px) { .masonry-grid { grid-template-columns: repeat(5, 1fr); } }
+@media (min-width: 1588px) { .masonry-grid { grid-template-columns: repeat(6, 1fr); } }
+@media (min-width: 1836px) { .masonry-grid { grid-template-columns: repeat(7, 1fr); } }
 
 /* Pinned cards flex layout */
 .pinned-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-start; }
@@ -3785,6 +3784,7 @@ function NotesUI({
                 </h2>
               ))}
             <div
+              ref={listView ? undefined : masonryRef}
               className={
                 listView ? "max-w-2xl mx-auto space-y-6" : "masonry-grid"
               }
@@ -4159,6 +4159,9 @@ export default function App() {
   // Image Viewer state (fullscreen)
   const [imgViewOpen, setImgViewOpen] = useState(false);
   const [imgViewIndex, setImgViewIndex] = useState(0);
+
+  // Masonry grid ref
+  const masonryRef = useRef(null);
 
   // Drag
   const dragId = useRef(null);
@@ -6421,6 +6424,26 @@ export default function App() {
       alert(e.message || t("failedTogglePin"));
     }
   };
+
+  /** -------- Masonry layout (CSS Grid row-span) -------- */
+  useLayoutEffect(() => {
+    const grid = masonryRef.current;
+    if (!grid || grid.children.length === 0) return;
+    const ROW_H = 10;
+    const GAP = 12;
+    // Temporarily use auto rows so we can measure natural heights
+    grid.style.gridAutoRows = "auto";
+    for (const item of grid.children) {
+      item.style.gridRowEnd = "";
+    }
+    // Read all natural heights
+    const heights = Array.from(grid.children, (item) => item.scrollHeight);
+    // Switch back to 10px rows and apply spans
+    grid.style.gridAutoRows = "10px";
+    Array.from(grid.children).forEach((item, i) => {
+      item.style.gridRowEnd = `span ${Math.ceil((heights[i] + GAP) / ROW_H)}`;
+    });
+  });
 
   /** -------- Drag & Drop reorder (cards) -------- */
   const moveWithin = (arr, itemId, targetId, placeAfter) => {
