@@ -2241,6 +2241,9 @@ function SettingsPanel({
   showToast,
   onResetNoteOrder,
 }) {
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [overridePositions, setOverridePositions] = useState(true);
+
   // Prevent body scroll when settings panel is open
   React.useEffect(() => {
     if (open) {
@@ -2347,13 +2350,8 @@ function SettingsPanel({
               <button
                 className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
-                  showGenericConfirm?.(
-                    t("resetNoteOrderConfirm"),
-                    () => {
-                      onClose();
-                      onResetNoteOrder?.();
-                    }
-                  );
+                  setOverridePositions(true);
+                  setResetDialogOpen(true);
                 }}
               >
                 <div className="font-medium">{t("resetNoteOrder")}</div>
@@ -2438,6 +2436,57 @@ function SettingsPanel({
           </div>
         </div>
       </div>
+
+      {/* Reset Note Order Dialog */}
+      {resetDialogOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setResetDialogOpen(false)}
+          />
+          <div
+            className="glass-card rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative"
+            style={{
+              backgroundColor: dark
+                ? "rgba(40,40,40,0.95)"
+                : "rgba(255,255,255,0.95)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-2">{t("resetNoteOrder")}</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              {t("resetNoteOrderConfirm")}
+            </p>
+            <label className="flex items-center gap-2 cursor-pointer mb-5">
+              <input
+                type="checkbox"
+                checked={overridePositions}
+                onChange={(e) => setOverridePositions(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span className="text-sm">{t("resetNoteOrderOverridePositions")}</span>
+            </label>
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
+                onClick={() => setResetDialogOpen(false)}
+              >
+                {t("cancel")}
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+                onClick={() => {
+                  setResetDialogOpen(false);
+                  onClose();
+                  onResetNoteOrder?.(overridePositions);
+                }}
+              >
+                {t("confirm") || "OK"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -6467,7 +6516,7 @@ export default function App() {
   };
 
   /** -------- Reset note order -------- */
-  const resetNoteOrder = async () => {
+  const resetNoteOrder = async (overridePositions = true) => {
     const sorted = notes.slice().sort((a, b) => {
       const ap = a?.pinned ? 1 : 0;
       const bp = b?.pinned ? 1 : 0;
@@ -6479,6 +6528,15 @@ export default function App() {
       const bCre = new Date(b?.created_at || 0).getTime();
       return bCre - aCre;
     });
+
+    // Assign new position values so the order persists across reloads
+    if (overridePositions) {
+      const now = Date.now();
+      sorted.forEach((n, i) => {
+        n.position = now - i;
+      });
+    }
+
     setNotes(sorted);
     const pinnedIds = sorted.filter((n) => n.pinned).map((n) => String(n.id));
     const otherIds = sorted.filter((n) => !n.pinned).map((n) => String(n.id));
@@ -6488,6 +6546,20 @@ export default function App() {
         token,
         body: { pinnedIds, otherIds },
       });
+
+      // Persist new positions to each note on the server
+      if (overridePositions) {
+        await Promise.all(
+          sorted.map((n) =>
+            api(`/notes/${n.id}`, {
+              method: "PATCH",
+              token,
+              body: { position: n.position },
+            }).catch(() => {})
+          )
+        );
+      }
+
       showToast?.(t("noteOrderReset"));
     } catch (e) {
       console.error("Reset order failed:", e);
