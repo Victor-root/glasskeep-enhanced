@@ -923,13 +923,6 @@ body {
 /* Hide scrollbars on mobile (keep scrolling) */
 @media (max-width: 639px) {
 
-  /* Mobile: notes grid 2 columns */
-  .masonry-grid {
-    grid-template-columns: repeat(2, 1fr);
-    grid-auto-rows: 10px;
-    gap: 0 0.75rem;
-  }
-
   /* Mobile: pinned grid 2 columns */
   .pinned-grid > div {
     width: calc(50% - 0.375rem);
@@ -984,14 +977,14 @@ html:not(.dark) .note-content pre .code-copy-btn {
 
 .dragging { opacity: 0.5; transform: scale(1.05); }
 .drag-over { outline: 2px dashed rgba(99,102,241,.6); outline-offset: 6px; }
-.masonry-grid { display: grid; grid-template-columns: repeat(2, 1fr); grid-auto-rows: 10px; gap: 0 0.75rem; }
-@media (min-width: 640px) { .masonry-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 768px) { .masonry-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1090px) { .masonry-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (min-width: 1340px) { .masonry-grid { grid-template-columns: repeat(5, 1fr); } }
-@media (min-width: 1588px) { .masonry-grid { grid-template-columns: repeat(6, 1fr); } }
-@media (min-width: 1836px) { .masonry-grid { grid-template-columns: repeat(7, 1fr); } }
-.masonry-grid > .masonry-item > .note-card { margin-bottom: 0; }
+.masonry-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-start; }
+.masonry-grid > div { width: calc(50% - 0.375rem); }
+@media (min-width: 640px) { .masonry-grid > div { width: calc(50% - 0.375rem); } }
+@media (min-width: 768px) { .masonry-grid > div { width: calc(33.333% - 0.5rem); } }
+@media (min-width: 1090px) { .masonry-grid > div { width: calc(25% - 0.5625rem); } }
+@media (min-width: 1340px) { .masonry-grid > div { width: calc(20% - 0.6rem); } }
+@media (min-width: 1588px) { .masonry-grid > div { width: calc(16.666% - 0.625rem); } }
+@media (min-width: 1836px) { .masonry-grid > div { width: calc(14.2857% - 0.6429rem); } }
 
 /* Pinned cards flex layout */
 .pinned-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-start; }
@@ -3792,13 +3785,12 @@ function NotesUI({
                 </h2>
               ))}
             <div
-              ref={listView ? undefined : masonryRef}
               className={
                 listView ? "max-w-2xl mx-auto space-y-6" : "masonry-grid"
               }
             >
               {others.map((n) => (
-                <div key={n.id} className={listView ? undefined : "masonry-item"}>
+                <div key={n.id}>
                 <NoteCard
                   n={n}
                   dark={dark}
@@ -4167,9 +4159,6 @@ export default function App() {
   // Image Viewer state (fullscreen)
   const [imgViewOpen, setImgViewOpen] = useState(false);
   const [imgViewIndex, setImgViewIndex] = useState(0);
-
-  // Masonry grid ref for dynamic row-span calculation
-  const masonryRef = useRef(null);
 
   // Drag
   const dragId = useRef(null);
@@ -6434,37 +6423,6 @@ export default function App() {
   };
 
   /** -------- Drag & Drop reorder (cards) -------- */
-  // Masonry layout: measure children and set grid-row spans
-  useLayoutEffect(() => {
-    const grid = masonryRef.current;
-    if (!grid) return;
-    const ROW_H = 10; // must match grid-auto-rows
-    const GAP = 12; // row gap in px (0.75rem ≈ 12px)
-    let rafId = 0;
-    const resizeAll = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        for (const item of grid.children) {
-          // Reset span so we measure natural height
-          item.style.gridRowEnd = "";
-        }
-        // Force layout read after all resets
-        for (const item of grid.children) {
-          const card = item.querySelector(".note-card");
-          const h = card ? card.getBoundingClientRect().height : item.scrollHeight;
-          const newSpan = `span ${Math.ceil((h + GAP) / ROW_H)}`;
-          if (item.style.gridRowEnd !== newSpan) {
-            item.style.gridRowEnd = newSpan;
-          }
-        }
-      });
-    };
-    resizeAll();
-    const ro = new ResizeObserver(resizeAll);
-    ro.observe(grid);
-    return () => { ro.disconnect(); cancelAnimationFrame(rafId); };
-  });
-
   const moveWithin = (arr, itemId, targetId, placeAfter) => {
     const a = arr.slice();
     const from = a.indexOf(itemId);
