@@ -8633,8 +8633,8 @@ export default function App() {
 
   return (
     <>
-      {/* Decorative floating background — fixed wallpaper, z-1 keeps it below all UI */}
-      <div aria-hidden="true" style={{position:"fixed",inset:0,zIndex:1,pointerEvents:"none",overflow:"hidden"}}>
+      {/* Decorative floating background — fixed wallpaper, z-1 keeps it below all UI (desktop only) */}
+      <div aria-hidden="true" style={{position:"fixed",inset:0,zIndex:1,pointerEvents:"none",overflow:"hidden",display:windowWidth<700?"none":undefined}}>
         {/* Colonne gauche */}
         <div className="login-deco-card" style={{"--rot":"-12deg","--dur":"7s","--delay":"0s",top:"5%",left:"2%",borderTop:"3px solid rgba(99,102,241,0.7)"}}>
           <div className="deco-title" style={{background:"rgba(99,102,241,0.5)"}}/>
