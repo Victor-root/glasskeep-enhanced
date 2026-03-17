@@ -1714,6 +1714,17 @@ function NoteCard({
         if (!multiMode) onDragEnd(e);
       }}
       onClick={(e) => {
+        // If clicking a link in the note preview, open in new tab and don't open modal
+        const a = e.target.closest("a[href]");
+        if (a) {
+          const href = a.getAttribute("href") || "";
+          if (/^(https?:|mailto:|tel:)/i.test(href)) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.open(href, "_blank", "noopener,noreferrer");
+            return;
+          }
+        }
         if (multiMode) {
           // In multi-select mode, clicking anywhere toggles selection
           e.stopPropagation();
