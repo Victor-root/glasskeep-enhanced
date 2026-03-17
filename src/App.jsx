@@ -7327,7 +7327,7 @@ export default function App() {
             >
               <div className="flex flex-wrap items-center gap-2">
                 <input
-                  className={`flex-[1_0_50%] min-w-[240px] shrink-0 bg-transparent text-2xl font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none pr-2 ${
+                  className={`flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 bg-transparent text-xl sm:text-2xl font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none pr-2 ${
                     !isOnline ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                   value={mTitle}
