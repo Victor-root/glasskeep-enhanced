@@ -1156,7 +1156,7 @@ function ChecklistRow({
 
   const removeSize =
     size === "lg"
-      ? "w-5 h-5 text-base"
+      ? "w-6 h-6 text-lg font-semibold"
       : size === "sm"
         ? "w-5 h-5 text-xs md:w-4 md:h-4"
         : "w-6 h-6 text-sm md:w-5 md:h-5";
@@ -1198,11 +1198,11 @@ function ChecklistRow({
 
       {(showRemove || !readOnly) && (
         <button
-          className={`${removeVisibility} transition-opacity text-gray-500 hover:text-red-600 rounded-full border border-[var(--border-light)] flex items-center justify-center ${removeSize}`}
+          className={`${removeVisibility} transition-opacity text-gray-500 hover:text-red-600 rounded-full border border-[var(--border-light)] flex items-center justify-center cursor-pointer ${removeSize}`}
           title={t("removeItem")}
           onClick={onRemove}
         >
-          ×
+          ✕
         </button>
       )}
     </div>
@@ -7624,7 +7624,7 @@ export default function App() {
                             onDragOver={(e) => onChecklistDragOver(it.id, e)}
                             onDragLeave={onChecklistDragLeave}
                             onDrop={(e) => onChecklistDrop(it.id, e)}
-                            className="group flex items-start gap-2"
+                            className="group flex items-center gap-2"
                           >
                             {/* Drag handle */}
                             <div
@@ -7712,7 +7712,7 @@ export default function App() {
                                     el.classList.remove("drag-over");
                                   });
                               }}
-                              className="flex items-center justify-center py-1 px-1 mt-0.5 cursor-grab active:cursor-grabbing opacity-40 group-hover:opacity-70 transition-opacity"
+                              className="flex items-center justify-center px-1 cursor-grab active:cursor-grabbing opacity-40 group-hover:opacity-70 transition-opacity"
                               style={{ touchAction: "none" }}
                             >
                               <div className="grid grid-cols-2 gap-0.5">
