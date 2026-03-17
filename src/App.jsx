@@ -1947,7 +1947,7 @@ function AuthShell({ title, dark, onToggleDark, children }) {
           <div className="deco-line" style={{width:"62%"}}/>
         </div>
       </div>
-      <div className="w-full max-w-md">
+      <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-6">
           <img
             src="/pwa-192.png"
