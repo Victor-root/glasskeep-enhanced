@@ -6672,7 +6672,6 @@ export default function App() {
             : n,
         ),
       );
-      closeModal();
     } catch (e) {
       alert(e.message || t("failedSaveNote"));
     } finally {
