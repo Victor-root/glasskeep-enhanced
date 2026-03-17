@@ -3139,10 +3139,38 @@ function NotesUI({
   isAiLoading,
   aiLoadingProgress,
   onAiSearch,
+  // header auto-hide (mobile)
+  windowWidth,
 }) {
   // Multi-select color popover (local UI state)
   const multiColorBtnRef = useRef(null);
   const [showMultiColorPop, setShowMultiColorPop] = useState(false);
+
+  // Header auto-hide on scroll (mobile only)
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastScrollYRef = useRef(0);
+  useEffect(() => {
+    if (windowWidth >= 700) {
+      setHeaderVisible(true);
+      return;
+    }
+    const scrollContainer = document.querySelector(".min-h-screen");
+    if (!scrollContainer) return;
+    const onScroll = () => {
+      const y = scrollContainer.scrollTop;
+      const delta = y - lastScrollYRef.current;
+      if (y < 10) {
+        setHeaderVisible(true);
+      } else if (delta > 4) {
+        setHeaderVisible(false);
+      } else if (delta < -4) {
+        setHeaderVisible(true);
+      }
+      lastScrollYRef.current = y;
+    };
+    scrollContainer.addEventListener("scroll", onScroll, { passive: true });
+    return () => scrollContainer.removeEventListener("scroll", onScroll);
+  }, [windowWidth]);
   const tagLabel =
     activeTagFilter === ALL_IMAGES
       ? t("allImages")
@@ -4455,32 +4483,6 @@ export default function App() {
   // Checklist item drag (for modal reordering)
   const checklistDragId = useRef(null);
 
-  // Header auto-hide on scroll (mobile)
-  const [headerVisible, setHeaderVisible] = useState(true);
-  const lastScrollYRef = useRef(0);
-
-  useEffect(() => {
-    if (windowWidth >= 700) {
-      setHeaderVisible(true);
-      return;
-    }
-    const scrollContainer = document.querySelector(".min-h-screen");
-    if (!scrollContainer) return;
-    const onScroll = () => {
-      const y = scrollContainer.scrollTop;
-      const delta = y - lastScrollYRef.current;
-      if (y < 10) {
-        setHeaderVisible(true);
-      } else if (delta > 4) {
-        setHeaderVisible(false);
-      } else if (delta < -4) {
-        setHeaderVisible(true);
-      }
-      lastScrollYRef.current = y;
-    };
-    scrollContainer.addEventListener("scroll", onScroll, { passive: true });
-    return () => scrollContainer.removeEventListener("scroll", onScroll);
-  }, [windowWidth]);
 
   // Header menu refs + state
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
@@ -8913,6 +8915,8 @@ export default function App() {
         openAdminPanel={openAdminPanel}
         // Settings panel
         openSettingsPanel={openSettingsPanel}
+        // header auto-hide (mobile)
+        windowWidth={windowWidth}
       />
       {modal}
 
