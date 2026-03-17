@@ -2072,6 +2072,22 @@ function TagSidebar({
   const isAllNotes = activeTag === null && activeTagFilters.length === 0;
   const isAllImages = activeTag === ALL_IMAGES;
 
+  // Suppress slide animation when sidebar first becomes permanent (server load)
+  const hasBeenPermanentRef = useRef(permanent);
+  const [skipTransition, setSkipTransition] = useState(false);
+  useLayoutEffect(() => {
+    if (permanent && !hasBeenPermanentRef.current) {
+      hasBeenPermanentRef.current = true;
+      setSkipTransition(true);
+    }
+  }, [permanent]);
+  useEffect(() => {
+    if (skipTransition) {
+      // Re-enable transitions after the browser has painted the instant position
+      requestAnimationFrame(() => setSkipTransition(false));
+    }
+  }, [skipTransition]);
+
   return (
     <>
       {open && !permanent && (
@@ -2083,7 +2099,7 @@ function TagSidebar({
         />
       )}
       <aside
-        className={`fixed top-0 left-0 z-40 h-full shadow-2xl transition-transform duration-200 ${permanent || open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed top-0 left-0 z-40 h-full shadow-2xl ${skipTransition ? "" : "transition-transform duration-200 "}${permanent || open ? "translate-x-0" : "-translate-x-full"}`}
         style={{
           width: permanent ? `${width}px` : "288px",
           backgroundColor: dark ? "#222222" : "rgba(255,255,255,0.95)",
@@ -4117,9 +4133,10 @@ export default function App() {
   const [alwaysShowSidebarOnWide, setAlwaysShowSidebarOnWide] = useState(() => {
     try {
       const stored = localStorage.getItem("sidebarAlwaysVisible");
-      return stored === null ? true : stored === "true";
+      // Use localStorage value if available, otherwise null (wait for server)
+      return stored !== null ? stored === "true" : null;
     } catch (e) {
-      return true;
+      return null;
     }
   });
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -4348,7 +4365,37 @@ export default function App() {
   }, [listView]);
   const onToggleViewMode = () => setListView((v) => !v);
 
-  // Save sidebar settings
+  // Load user settings from server on login
+  const sidebarSettingsLoadedRef = useRef(false);
+  useEffect(() => {
+    if (!token) return;
+    sidebarSettingsLoadedRef.current = false;
+    // Immediately hide sidebar while loading server preference
+    try {
+      if (localStorage.getItem("sidebarAlwaysVisible") === null) {
+        setAlwaysShowSidebarOnWide(null);
+      }
+    } catch (e) {}
+    (async () => {
+      try {
+        const settings = await api("/user/settings", { token });
+        if (settings && typeof settings.alwaysShowSidebarOnWide === "boolean") {
+          setAlwaysShowSidebarOnWide(settings.alwaysShowSidebarOnWide);
+          localStorage.setItem("sidebarAlwaysVisible", String(settings.alwaysShowSidebarOnWide));
+        } else {
+          // No server setting yet — default to true (new user)
+          setAlwaysShowSidebarOnWide(true);
+        }
+      } catch (e) {
+        // Network error — default to true
+        setAlwaysShowSidebarOnWide((prev) => prev === null ? true : prev);
+      } finally {
+        sidebarSettingsLoadedRef.current = true;
+      }
+    })();
+  }, [token]);
+
+  // Save sidebar settings to localStorage and server
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -4356,6 +4403,15 @@ export default function App() {
         String(alwaysShowSidebarOnWide),
       );
     } catch (e) {}
+    // Only sync to server after initial load from server is done
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { alwaysShowSidebarOnWide },
+      }).catch(() => {});
+    }
   }, [alwaysShowSidebarOnWide]);
 
   useEffect(() => {
