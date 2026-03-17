@@ -841,17 +841,38 @@ html.dark {
   --border-light: var(--border-dark);
 }
 body {
-  background-color: var(--bg-light);
+  background: linear-gradient(135deg, #f0e8ff 0%, #e8f4fd 50%, #fde8f0 100%);
+  background-attachment: fixed;
   color: var(--text-light);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+html.dark body {
+  background: var(--bg-dark);
+  background-attachment: fixed;
 }
 .glass-card {
   background-color: var(--card-bg-light);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border-light);
+  box-shadow: 0 4px 24px rgba(139, 92, 246, 0.07);
   transition: all 0.3s ease;
   break-inside: avoid;
+}
+header.glass-card {
+  background: linear-gradient(
+    90deg,
+    rgba(99, 102, 241, 0.07) 0%,
+    rgba(168, 85, 247, 0.07) 50%,
+    rgba(236, 72, 153, 0.05) 100%
+  ), var(--card-bg-light);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.18);
+  box-shadow: 0 2px 20px rgba(139, 92, 246, 0.10);
+}
+html.dark header.glass-card {
+  background: var(--card-bg-light);
+  border-bottom: 1px solid var(--border-light);
+  box-shadow: none;
 }
 .note-content p { margin-bottom: 0.5rem; }
 .note-content h1, .note-content h2, .note-content h3 { margin-bottom: 0.75rem; font-weight: 600; }
@@ -2206,7 +2227,7 @@ function TagSidebar({
         className={`fixed top-0 left-0 z-40 h-full shadow-2xl ${skipTransition ? "" : "transition-transform duration-200 "}${permanent || open ? "translate-x-0" : "-translate-x-full"}`}
         style={{
           width: permanent ? `${width}px` : "288px",
-          backgroundColor: dark ? "#222222" : "rgba(255,255,255,0.95)",
+          backgroundColor: dark ? "#222222" : "rgba(240,232,255,0.97)",
           borderRight: "1px solid var(--border-light)",
         }}
         aria-hidden={!(permanent || open)}
