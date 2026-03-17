@@ -1013,6 +1013,45 @@ html:not(.dark) .note-content pre .code-copy-btn {
   border-radius: .5rem;
   font-size: .85rem;
 }
+
+/* Login decorative floating cards */
+@keyframes floatCard {
+  0%   { transform: translateY(0px) rotate(var(--rot)); }
+  50%  { transform: translateY(-18px) rotate(var(--rot)); }
+  100% { transform: translateY(0px) rotate(var(--rot)); }
+}
+.login-deco-card {
+  position: absolute;
+  pointer-events: none;
+  background-color: var(--card-bg-light);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-light);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  opacity: 0.55;
+  animation: floatCard var(--dur, 6s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  width: 160px;
+}
+html.dark .login-deco-card {
+  opacity: 0.35;
+}
+.login-deco-card .deco-title {
+  height: 10px;
+  border-radius: 4px;
+  background: var(--text-light);
+  opacity: 0.25;
+  margin-bottom: 10px;
+  width: 70%;
+}
+.login-deco-card .deco-line {
+  height: 7px;
+  border-radius: 4px;
+  background: var(--text-light);
+  opacity: 0.15;
+  margin-bottom: 7px;
+}
 `;
 
 /** ---------- Image compression (client) ---------- */
@@ -1826,7 +1865,43 @@ function NoteCard({
 /** ---------- Auth Shell ---------- */
 function AuthShell({ title, dark, onToggleDark, children }) {
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+      {/* Decorative floating note cards */}
+      <div aria-hidden="true">
+        <div className="login-deco-card" style={{"--rot":"-12deg","--dur":"7s","--delay":"0s",top:"8%",left:"6%"}}>
+          <div className="deco-title"/>
+          <div className="deco-line" style={{width:"90%"}}/>
+          <div className="deco-line" style={{width:"75%"}}/>
+          <div className="deco-line" style={{width:"60%"}}/>
+        </div>
+        <div className="login-deco-card" style={{"--rot":"5deg","--dur":"9s","--delay":"-2s",top:"42%",left:"3%"}}>
+          <div className="deco-title"/>
+          <div className="deco-line" style={{width:"85%"}}/>
+          <div className="deco-line" style={{width:"55%"}}/>
+        </div>
+        <div className="login-deco-card" style={{"--rot":"8deg","--dur":"8s","--delay":"-4s",bottom:"10%",left:"9%"}}>
+          <div className="deco-title"/>
+          <div className="deco-line" style={{width:"80%"}}/>
+          <div className="deco-line" style={{width:"65%"}}/>
+          <div className="deco-line" style={{width:"45%"}}/>
+        </div>
+        <div className="login-deco-card" style={{"--rot":"6deg","--dur":"10s","--delay":"-1s",top:"6%",right:"7%"}}>
+          <div className="deco-title"/>
+          <div className="deco-line" style={{width:"88%"}}/>
+          <div className="deco-line" style={{width:"70%"}}/>
+        </div>
+        <div className="login-deco-card" style={{"--rot":"-8deg","--dur":"7.5s","--delay":"-3s",top:"38%",right:"4%"}}>
+          <div className="deco-title"/>
+          <div className="deco-line" style={{width:"90%"}}/>
+          <div className="deco-line" style={{width:"60%"}}/>
+          <div className="deco-line" style={{width:"78%"}}/>
+        </div>
+        <div className="login-deco-card" style={{"--rot":"-15deg","--dur":"11s","--delay":"-5s",bottom:"8%",right:"8%"}}>
+          <div className="deco-title"/>
+          <div className="deco-line" style={{width:"75%"}}/>
+          <div className="deco-line" style={{width:"50%"}}/>
+        </div>
+      </div>
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold">Glass Keep</h1>
