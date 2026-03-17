@@ -311,7 +311,6 @@ JWT_SECRET=${jwt_secret}
 DB_FILE=${DATA_DIR}/notes.db
 ADMIN_EMAILS=admin
 ALLOW_REGISTRATION=true
-DEFAULT_LANG=${GLASSKEEP_LANG}
 EOF
     chmod 600 "$ENV_FILE"
     # shellcheck disable=SC2059
