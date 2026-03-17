@@ -637,6 +637,7 @@ app.post("/api/notes", auth, (req, res) => {
     pinned: !!n.pinned,
     position: n.position,
     timestamp: n.timestamp,
+    user_id: n.user_id,
   });
 });
 

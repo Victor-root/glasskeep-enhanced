@@ -6631,9 +6631,9 @@ export default function App() {
         // In archived view, show all notes (they're already filtered by the backend)
         // Just apply search filter
       } else if (activeTagFilters.length > 0) {
-        // Multi-tag filter : la note doit contenir TOUS les tags sélectionnés
+        // Multi-tag filter : la note doit contenir AU MOINS UN des tags sélectionnés
         const noteTags = (n.tags || []).map((t) => String(t).toLowerCase());
-        if (!activeTagFilters.every((f) => noteTags.includes(f.toLowerCase()))) {
+        if (!activeTagFilters.some((f) => noteTags.includes(f.toLowerCase()))) {
           return false;
         }
       } else if (
