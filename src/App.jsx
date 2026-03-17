@@ -1149,14 +1149,14 @@ function ChecklistRow({
 
   const boxSize =
     size === "lg"
-      ? "h-7 w-7 md:h-6 md:w-6"
+      ? "h-4 w-4"
       : size === "sm"
         ? "h-4 w-4 md:h-3.5 md:w-3.5"
         : "h-3.5 w-3.5 sm:h-5 sm:w-5 md:h-4 md:w-4";
 
   const removeSize =
     size === "lg"
-      ? "w-7 h-7 text-base md:w-6 md:h-6"
+      ? "w-5 h-5 text-base"
       : size === "sm"
         ? "w-5 h-5 text-xs md:w-4 md:h-4"
         : "w-6 h-6 text-sm md:w-5 md:h-5";
@@ -1166,10 +1166,10 @@ function ChecklistRow({
     : "opacity-0 group-hover:opacity-100";
 
   return (
-    <div className="flex items-start gap-1.5 sm:gap-3 md:gap-2 group min-w-0">
+    <div className="flex items-center gap-1.5 sm:gap-3 md:gap-2 group min-w-0">
       <input
         type="checkbox"
-        className={`mt-1 sm:mt-0.5 shrink-0 ${boxSize} ${preview ? "pointer-events-none" : "cursor-pointer"}`}
+        className={`shrink-0 ${boxSize} ${preview ? "pointer-events-none" : "cursor-pointer"}`}
         checked={!!item.done}
         onChange={(e) => {
           e.stopPropagation();
