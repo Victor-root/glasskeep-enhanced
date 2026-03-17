@@ -11,6 +11,7 @@ import { askAI } from "./ai";
 import { marked as markedParser } from "marked";
 import DrawingCanvas from "./DrawingCanvas";
 import { t } from "./i18n";
+import Masonry from "react-masonry-css";
 
 function trColorName(name) {
   const v = String(name || "").trim().toLowerCase();
@@ -923,24 +924,6 @@ body {
 /* Hide scrollbars on mobile (keep scrolling) */
 @media (max-width: 639px) {
 
-  /* Mobile: notes grid 2 columns */
-  .masonry-grid {
-    column-count: 2;
-    column-gap: 0.75rem;
-  }
-  .masonry-grid > * {
-    break-inside: avoid;
-    display: inline-block;
-    width: 100%;
-    margin-bottom: 0.75rem;
-  }
-
-  /* Mobile: pinned grid 2 columns */
-  .pinned-grid > div {
-    width: calc(50% - 0.375rem);
-  }
-
-
   /* Hide PAGE scrollbars on mobile (keep scrolling) */
   html, body {
     scrollbar-width: none;      /* Firefox */
@@ -989,27 +972,10 @@ html:not(.dark) .note-content pre .code-copy-btn {
 
 .dragging { opacity: 0.5; transform: scale(1.05); }
 .drag-over { outline: 2px dashed rgba(99,102,241,.6); outline-offset: 6px; }
-.masonry-grid { column-gap: 0.75rem; column-count: 2; }
-@media (min-width: 640px) { .masonry-grid { column-count: 2; } }
-@media (min-width: 768px) { .masonry-grid { column-count: 3; } }
-@media (min-width: 1090px) { .masonry-grid { column-count: 4; } }
-@media (min-width: 1340px) { .masonry-grid { column-count: 5; } }
-@media (min-width: 1588px) { .masonry-grid { column-count: 6; } }
-@media (min-width: 1836px) { .masonry-grid { column-count: 7; } }
+.masonry-grid { display: flex; margin-left: -0.75rem; width: auto; }
+.masonry-grid-column { padding-left: 0.75rem; background-clip: padding-box; }
+.masonry-grid-column > div { margin-bottom: 0.75rem; }
 
-/* Pinned cards flex layout */
-.pinned-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-start; }
-.pinned-grid > div { width: calc(50% - 0.375rem); }
-@media (min-width: 640px) { .pinned-grid > div { width: calc(50% - 0.375rem); } }
-@media (min-width: 768px) { .pinned-grid > div { width: calc(33.333% - 0.5rem); } }
-@media (min-width: 1090px) { .pinned-grid > div { width: calc(25% - 0.5625rem); } }
-@media (min-width: 1340px) { .pinned-grid > div { width: calc(20% - 0.6rem); } }
-@media (min-width: 1588px) { .pinned-grid > div { width: calc(16.666% - 0.625rem); } }
-@media (min-width: 1836px) { .pinned-grid > div { width: calc(14.2857% - 0.6429rem); } }
-
-/* New grid layout to place notes row-wise (left-to-right, top-to-bottom) */
-/* Keep-like masonry using CSS Grid with JS-calculated row spans (preserves horizontal order) */
- 
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.5); border-radius: 10px; }
@@ -2257,7 +2223,11 @@ function SettingsPanel({
   setLocalAiEnabled,
   showGenericConfirm,
   showToast,
+  onResetNoteOrder,
 }) {
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [overridePositions, setOverridePositions] = useState(true);
+
   // Prevent body scroll when settings panel is open
   React.useEffect(() => {
     if (open) {
@@ -2360,6 +2330,17 @@ function SettingsPanel({
                 <div className="font-medium">{t("downloadSecretKeyTxt")}</div>
                 <div className="text-sm text-gray-500">{t("downloadEncryptionKeyBackup")}</div>
               </button>
+
+              <button
+                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                onClick={() => {
+                  setOverridePositions(true);
+                  setResetDialogOpen(true);
+                }}
+              >
+                <div className="font-medium">{t("resetNoteOrder")}</div>
+                <div className="text-sm text-gray-500">{t("resetNoteOrderDesc")}</div>
+              </button>
             </div>
           </div>
 
@@ -2439,6 +2420,57 @@ function SettingsPanel({
           </div>
         </div>
       </div>
+
+      {/* Reset Note Order Dialog */}
+      {resetDialogOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setResetDialogOpen(false)}
+          />
+          <div
+            className="glass-card rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative"
+            style={{
+              backgroundColor: dark
+                ? "rgba(40,40,40,0.95)"
+                : "rgba(255,255,255,0.95)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-2">{t("resetNoteOrder")}</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              {t("resetNoteOrderConfirm")}
+            </p>
+            <label className="flex items-center gap-2 cursor-pointer mb-5">
+              <input
+                type="checkbox"
+                checked={overridePositions}
+                onChange={(e) => setOverridePositions(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span className="text-sm">{t("resetNoteOrderOverridePositions")}</span>
+            </label>
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
+                onClick={() => setResetDialogOpen(false)}
+              >
+                {t("cancel")}
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+                onClick={() => {
+                  setResetDialogOpen(false);
+                  onClose();
+                  onResetNoteOrder?.(overridePositions);
+                }}
+              >
+                {t("confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -3749,38 +3781,69 @@ function NotesUI({
                 {t("pinned")}
               </h2>
             )}
-            <div
-              className={
-                listView ? "max-w-2xl mx-auto space-y-6" : "pinned-grid"
-              }
-            >
-              {pinned.map((n) => (
-                <div key={n.id}>
-                <NoteCard
-                  n={n}
-                  dark={dark}
-                  openModal={openModal}
-                  togglePin={togglePin}
-                  multiMode={multiMode}
-                  selected={selectedIds.includes(String(n.id))}
-                  onToggleSelect={onToggleSelect}
-                  disablePin={
-                    "ontouchstart" in window ||
-                    navigator.maxTouchPoints > 0 ||
-                    activeTagFilter === "ARCHIVED"
-                  }
-                  onDragStart={onDragStart}
-                  onDragOver={onDragOver}
-                  onDragLeave={onDragLeave}
-                  onDrop={onDrop}
-                  onDragEnd={onDragEnd}
-                  isOnline={isOnline}
-                  onUpdateChecklistItem={onUpdateChecklistItem}
-                  currentUser={currentUser}
-                />
-                </div>
-              ))}
-            </div>
+            {listView ? (
+              <div className="max-w-2xl mx-auto space-y-6">
+                {pinned.map((n) => (
+                  <div key={n.id}>
+                  <NoteCard
+                    n={n}
+                    dark={dark}
+                    openModal={openModal}
+                    togglePin={togglePin}
+                    multiMode={multiMode}
+                    selected={selectedIds.includes(String(n.id))}
+                    onToggleSelect={onToggleSelect}
+                    disablePin={
+                      "ontouchstart" in window ||
+                      navigator.maxTouchPoints > 0 ||
+                      activeTagFilter === "ARCHIVED"
+                    }
+                    onDragStart={onDragStart}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                    onDragEnd={onDragEnd}
+                    isOnline={isOnline}
+                    onUpdateChecklistItem={onUpdateChecklistItem}
+                    currentUser={currentUser}
+                  />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Masonry
+                breakpointCols={{default: 7, 1835: 6, 1587: 5, 1339: 4, 1089: 3, 767: 2}}
+                className="masonry-grid"
+                columnClassName="masonry-grid-column"
+              >
+                {pinned.map((n) => (
+                  <div key={n.id}>
+                  <NoteCard
+                    n={n}
+                    dark={dark}
+                    openModal={openModal}
+                    togglePin={togglePin}
+                    multiMode={multiMode}
+                    selected={selectedIds.includes(String(n.id))}
+                    onToggleSelect={onToggleSelect}
+                    disablePin={
+                      "ontouchstart" in window ||
+                      navigator.maxTouchPoints > 0 ||
+                      activeTagFilter === "ARCHIVED"
+                    }
+                    onDragStart={onDragStart}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                    onDragEnd={onDragEnd}
+                    isOnline={isOnline}
+                    onUpdateChecklistItem={onUpdateChecklistItem}
+                    currentUser={currentUser}
+                  />
+                  </div>
+                ))}
+              </Masonry>
+            )}
           </section>
         )}
 
@@ -3798,37 +3861,69 @@ function NotesUI({
                   {t("others")}
                 </h2>
               ))}
-            <div
-              className={
-                listView ? "max-w-2xl mx-auto space-y-6" : "masonry-grid"
-              }
-            >
-              {others.map((n) => (
-                <NoteCard
-                  key={n.id}
-                  n={n}
-                  dark={dark}
-                  openModal={openModal}
-                  togglePin={togglePin}
-                  multiMode={multiMode}
-                  selected={selectedIds.includes(String(n.id))}
-                  onToggleSelect={onToggleSelect}
-                  disablePin={
-                    "ontouchstart" in window ||
-                    navigator.maxTouchPoints > 0 ||
-                    activeTagFilter === "ARCHIVED"
-                  }
-                  onDragStart={onDragStart}
-                  onDragOver={onDragOver}
-                  onDragLeave={onDragLeave}
-                  onDrop={onDrop}
-                  onDragEnd={onDragEnd}
-                  isOnline={isOnline}
-                  onUpdateChecklistItem={onUpdateChecklistItem}
-                  currentUser={currentUser}
-                />
-              ))}
-            </div>
+            {listView ? (
+              <div className="max-w-2xl mx-auto space-y-6">
+                {others.map((n) => (
+                  <div key={n.id}>
+                  <NoteCard
+                    n={n}
+                    dark={dark}
+                    openModal={openModal}
+                    togglePin={togglePin}
+                    multiMode={multiMode}
+                    selected={selectedIds.includes(String(n.id))}
+                    onToggleSelect={onToggleSelect}
+                    disablePin={
+                      "ontouchstart" in window ||
+                      navigator.maxTouchPoints > 0 ||
+                      activeTagFilter === "ARCHIVED"
+                    }
+                    onDragStart={onDragStart}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                    onDragEnd={onDragEnd}
+                    isOnline={isOnline}
+                    onUpdateChecklistItem={onUpdateChecklistItem}
+                    currentUser={currentUser}
+                  />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Masonry
+                breakpointCols={{default: 7, 1835: 6, 1587: 5, 1339: 4, 1089: 3, 767: 2}}
+                className="masonry-grid"
+                columnClassName="masonry-grid-column"
+              >
+                {others.map((n) => (
+                  <div key={n.id}>
+                  <NoteCard
+                    n={n}
+                    dark={dark}
+                    openModal={openModal}
+                    togglePin={togglePin}
+                    multiMode={multiMode}
+                    selected={selectedIds.includes(String(n.id))}
+                    onToggleSelect={onToggleSelect}
+                    disablePin={
+                      "ontouchstart" in window ||
+                      navigator.maxTouchPoints > 0 ||
+                      activeTagFilter === "ARCHIVED"
+                    }
+                    onDragStart={onDragStart}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                    onDragEnd={onDragEnd}
+                    isOnline={isOnline}
+                    onUpdateChecklistItem={onUpdateChecklistItem}
+                    currentUser={currentUser}
+                  />
+                  </div>
+                ))}
+              </Masonry>
+            )}
           </section>
         )}
 
@@ -4654,7 +4749,8 @@ export default function App() {
           !Number.isNaN(apos) &&
           !Number.isNaN(bpos)
         ) {
-          return bpos - apos; // higher position first (most recent/top)
+          const posDiff = bpos - apos;
+          if (posDiff !== 0) return posDiff; // higher position first (most recent/top)
         }
         const at = new Date(a?.updated_at || a?.timestamp || 0).getTime();
         const bt = new Date(b?.updated_at || b?.timestamp || 0).getTime();
@@ -6444,16 +6540,66 @@ export default function App() {
     }
   };
 
+  /** -------- Reset note order -------- */
+  const resetNoteOrder = async (overridePositions = true) => {
+    const sorted = notes.slice().sort((a, b) => {
+      const ap = a?.pinned ? 1 : 0;
+      const bp = b?.pinned ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      const aUpd = new Date(a?.updated_at || a?.timestamp || 0).getTime();
+      const bUpd = new Date(b?.updated_at || b?.timestamp || 0).getTime();
+      if (aUpd !== bUpd) return bUpd - aUpd;
+      const aCre = new Date(a?.created_at || 0).getTime();
+      const bCre = new Date(b?.created_at || 0).getTime();
+      return bCre - aCre;
+    });
+
+    // Assign new position values so the order persists across reloads
+    if (overridePositions) {
+      const now = Date.now();
+      sorted.forEach((n, i) => {
+        n.position = now - i;
+      });
+    }
+
+    setNotes(sorted);
+    const pinnedIds = sorted.filter((n) => n.pinned).map((n) => String(n.id));
+    const otherIds = sorted.filter((n) => !n.pinned).map((n) => String(n.id));
+    try {
+      await api("/notes/reorder", {
+        method: "POST",
+        token,
+        body: { pinnedIds, otherIds },
+      });
+
+      // Persist new positions to each note on the server
+      if (overridePositions) {
+        await Promise.all(
+          sorted.map((n) =>
+            api(`/notes/${n.id}`, {
+              method: "PATCH",
+              token,
+              body: { position: n.position },
+            }).catch(() => {})
+          )
+        );
+      }
+
+      showToast?.(t("noteOrderReset"));
+    } catch (e) {
+      console.error("Reset order failed:", e);
+      loadNotes().catch(() => {});
+    }
+  };
+
   /** -------- Drag & Drop reorder (cards) -------- */
-  const moveWithin = (arr, itemId, targetId, placeAfter) => {
+  const swapWithin = (arr, itemId, targetId) => {
     const a = arr.slice();
     const from = a.indexOf(itemId);
-    let to = a.indexOf(targetId);
+    const to = a.indexOf(targetId);
     if (from === -1 || to === -1) return arr;
-    a.splice(from, 1);
-    to = a.indexOf(targetId);
-    if (placeAfter) to += 1;
-    a.splice(to, 0, itemId);
+    a[from] = targetId;
+    a[to] = itemId;
     return a;
   };
   const onDragStart = (id, ev) => {
@@ -6479,28 +6625,14 @@ export default function App() {
     if (!dragged || String(dragged) === String(overId)) return;
     if (dragGroup.current !== group) return;
 
-    const rect = ev.currentTarget.getBoundingClientRect();
-    const midpoint = rect.top + rect.height / 2;
-    const placeAfter = ev.clientY > midpoint;
-
     const pinnedIds = notes.filter((n) => n.pinned).map((n) => String(n.id));
     const otherIds = notes.filter((n) => !n.pinned).map((n) => String(n.id));
     let newPinned = pinnedIds,
       newOthers = otherIds;
     if (group === "pinned")
-      newPinned = moveWithin(
-        pinnedIds,
-        String(dragged),
-        String(overId),
-        placeAfter,
-      );
+      newPinned = swapWithin(pinnedIds, String(dragged), String(overId));
     else
-      newOthers = moveWithin(
-        otherIds,
-        String(dragged),
-        String(overId),
-        placeAfter,
-      );
+      newOthers = swapWithin(otherIds, String(dragged), String(overId));
 
     // Optimistic update
     const byId = new Map(notes.map((n) => [String(n.id), n]));
@@ -8266,6 +8398,7 @@ export default function App() {
         setLocalAiEnabled={setLocalAiEnabled}
         showGenericConfirm={showGenericConfirm}
         showToast={showToast}
+        onResetNoteOrder={resetNoteOrder}
       />
 
       {/* Admin Panel */}
