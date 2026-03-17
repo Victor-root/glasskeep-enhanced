@@ -5418,6 +5418,23 @@ export default function App() {
     return () => document.removeEventListener("keydown", onKey);
   }, [activeId, imgViewOpen]);
 
+  // Close note modal with Android back button (popstate)
+  useEffect(() => {
+    const onPopState = () => {
+      if (modalHistoryRef.current) {
+        modalHistoryRef.current = false;
+        setOpen(false);
+        setActiveId(null);
+        setViewMode(true);
+        setModalMenuOpen(false);
+        setConfirmDeleteOpen(false);
+        setShowModalFmt(false);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   // Auto-resize composer textarea
   useEffect(() => {
     if (!contentRef.current) return;
@@ -6265,6 +6282,8 @@ export default function App() {
   // Track initial state when opening modal to detect if user actually edited
   // Must be defined before openModal
   const initialModalStateRef = useRef(null);
+  // Track if we pushed a history entry for the modal (Android back button support)
+  const modalHistoryRef = useRef(false);
 
   const openModal = (id) => {
     const n = notes.find((x) => String(x.id) === String(id));
@@ -6313,6 +6332,8 @@ export default function App() {
     setViewMode(true);
     setModalMenuOpen(false);
     setOpen(true);
+    window.history.pushState({ noteModal: true }, "");
+    modalHistoryRef.current = true;
   };
 
   // Check if note is collaborative (has collaborators or is owned by someone else)
@@ -6645,6 +6666,10 @@ export default function App() {
         .catch((e) => console.error("Final save on close failed:", e));
     }
 
+    if (modalHistoryRef.current) {
+      modalHistoryRef.current = false;
+      window.history.back();
+    }
     setOpen(false);
     setActiveId(null);
     setViewMode(true);
