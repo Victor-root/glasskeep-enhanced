@@ -1000,10 +1000,15 @@ html:not(.dark) .note-content pre .code-copy-btn {
 .masonry-grid-column { padding-left: 0.75rem; background-clip: padding-box; }
 .masonry-grid-column > div { margin-bottom: 0.75rem; }
 
-::-webkit-scrollbar { width: 8px; }
+/* === Scrollbars thématiques === */
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.5); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.7); }
+::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #c4b5fd 0%, #7c3aed 100%); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #ddd6fe 0%, #6d28d9 100%); }
+* { scrollbar-width: thin; scrollbar-color: #a78bfa transparent; }
+.dark * { scrollbar-color: #7c3aed transparent; }
+.dark ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #7c3aed 0%, #4c1d95 100%); }
+.dark ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #8b5cf6 0%, #5b21b6 100%); }
 
 /* clamp for text preview */
 .line-clamp-6 {
