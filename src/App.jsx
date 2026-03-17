@@ -1667,7 +1667,7 @@ function NoteCard({
   const isChecklist = n.type === "checklist";
   const isDraw = n.type === "draw";
   const previewText = useMemo(() => n.content || "", [n.content]);
-  const MAX_CHARS = 600;
+  const MAX_CHARS = 350;
   const isLong = previewText.length > MAX_CHARS;
   const displayText = isLong
     ? previewText.slice(0, MAX_CHARS).trimEnd() + "…"
@@ -1829,7 +1829,8 @@ function NoteCard({
 
       {!isChecklist && !isDraw ? (
         <div
-          className="text-sm break-words whitespace-pre-wrap line-clamp-[16] note-content note-content--dense"
+          className="text-sm break-words whitespace-pre-wrap overflow-hidden note-content note-content--dense"
+          style={{ maxHeight: "280px" }}
           dangerouslySetInnerHTML={{ __html: marked.parse(displayText || "") }}
         />
       ) : isDraw ? (
