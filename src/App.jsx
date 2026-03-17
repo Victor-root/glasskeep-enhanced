@@ -199,6 +199,25 @@ const bgFor = (colorKey, dark) =>
   (dark ? DARK_COLORS : LIGHT_COLORS)[colorKey] ||
   (dark ? DARK_COLORS.default : LIGHT_COLORS.default);
 
+const SCROLL_COLORS = {
+  default: ["#a78bfa","#e3d0ff","#7c3aed","#3b0764"],
+  red:     ["#f87171","#fee2e2","#dc2626","#450a0a"],
+  yellow:  ["#fbbf24","#fef9c3","#ca8a04","#422006"],
+  green:   ["#4ade80","#dcfce7","#16a34a","#052e16"],
+  blue:    ["#60a5fa","#dbeafe","#2563eb","#1e3a8a"],
+  purple:  ["#a78bfa","#ede9fe","#7c3aed","#2e1065"],
+  peach:   ["#fb923c","#ffedd5","#ea580c","#431407"],
+  sage:    ["#86efac","#f0fdf4","#4ade80","#052e16"],
+  mint:    ["#34d399","#d1fae5","#059669","#022c22"],
+  sky:     ["#38bdf8","#e0f2fe","#0284c7","#082f49"],
+  sand:    ["#fbbf24","#fef3c7","#b45309","#1c1917"],
+  mauve:   ["#c084fc","#f3e8ff","#a855f7","#2e1065"],
+};
+const scrollColorsFor = (colorKey, dark) => {
+  const [lt, lk, dt, dk] = SCROLL_COLORS[colorKey] || SCROLL_COLORS.default;
+  return dark ? { thumb: dt, track: dk } : { thumb: lt, track: lk };
+};
+
 /** ---------- Modal light boost ---------- */
 const parseRGBA = (str) => {
   const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/.exec(
@@ -957,12 +976,14 @@ html.dark header.glass-card {
   body::-webkit-scrollbar {
     display: none;              /* Chrome/Safari/Brave */
   }
-  .mobile-hide-scrollbar {
-    scrollbar-width: none;      /* Firefox */
-    -ms-overflow-style: none;   /* IE/Edge legacy */
-  }
-  .mobile-hide-scrollbar::-webkit-scrollbar {
-    display: none;              /* Chrome/Safari/Brave */
+  @media (max-width: 639px) {
+    .mobile-hide-scrollbar {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .mobile-hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
   }
 }
 
@@ -1002,13 +1023,18 @@ html:not(.dark) .note-content pre .code-copy-btn {
 
 /* === Scrollbars thématiques === */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-track { background: #e3d0ff; }
 ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #c4b5fd 0%, #7c3aed 100%); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #ddd6fe 0%, #6d28d9 100%); }
-* { scrollbar-width: thin; scrollbar-color: #a78bfa transparent; }
-.dark * { scrollbar-color: #7c3aed transparent; }
+* { scrollbar-width: thin; scrollbar-color: #a78bfa #e3d0ff; }
+.dark * { scrollbar-color: #7c3aed #3b0764; }
+.dark ::-webkit-scrollbar-track { background: #3b0764; }
 .dark ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #7c3aed 0%, #4c1d95 100%); }
 .dark ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #8b5cf6 0%, #5b21b6 100%); }
+/* Modal — scrollbar adaptée à la couleur de la note */
+.modal-scroll-themed::-webkit-scrollbar-track { background: var(--sb-track); }
+.modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 10px; }
+.modal-scroll-themed::-webkit-scrollbar-thumb:hover { filter: brightness(1.15); }
 
 /* clamp for text preview */
 .line-clamp-6 {
@@ -7236,7 +7262,8 @@ export default function App() {
           {/* Scroll container */}
           <div
             ref={modalScrollRef}
-            className="relative flex-1 min-h-0 overflow-y-auto overflow-x-auto mobile-hide-scrollbar"
+            className="relative flex-1 min-h-0 overflow-y-auto overflow-x-auto mobile-hide-scrollbar modal-scroll-themed"
+            style={(() => { const sc = scrollColorsFor(mColor, dark); return { scrollbarColor: `${sc.thumb} ${sc.track}`, '--sb-thumb': sc.thumb, '--sb-track': sc.track }; })()}
           >
             {/* Sticky header (kept single line on desktop, wraps on mobile) */}
             <div
