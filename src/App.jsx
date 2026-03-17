@@ -1901,6 +1901,29 @@ function AuthShell({ title, dark, onToggleDark, children }) {
           <div className="deco-line" style={{width:"75%"}}/>
           <div className="deco-line" style={{width:"50%"}}/>
         </div>
+        {/* Extra cards — visible only on md+ screens to fill the gap */}
+        <div className="login-deco-card hidden md:block" style={{"--rot":"10deg","--dur":"8.5s","--delay":"-1.5s",top:"18%",left:"22%",borderTop:"3px solid rgba(249,115,22,0.7)"}}>
+          <div className="deco-title" style={{background:"rgba(249,115,22,0.5)"}}/>
+          <div className="deco-line" style={{width:"82%"}}/>
+          <div className="deco-line" style={{width:"64%"}}/>
+          <div className="deco-line" style={{width:"50%"}}/>
+        </div>
+        <div className="login-deco-card hidden md:block" style={{"--rot":"-6deg","--dur":"9.5s","--delay":"-6s",bottom:"20%",left:"20%",borderTop:"3px solid rgba(14,165,233,0.7)"}}>
+          <div className="deco-title" style={{background:"rgba(14,165,233,0.5)"}}/>
+          <div className="deco-line" style={{width:"88%"}}/>
+          <div className="deco-line" style={{width:"58%"}}/>
+        </div>
+        <div className="login-deco-card hidden md:block" style={{"--rot":"-9deg","--dur":"10.5s","--delay":"-2.5s",top:"14%",right:"20%",borderTop:"3px solid rgba(132,204,22,0.7)"}}>
+          <div className="deco-title" style={{background:"rgba(132,204,22,0.5)"}}/>
+          <div className="deco-line" style={{width:"76%"}}/>
+          <div className="deco-line" style={{width:"92%"}}/>
+          <div className="deco-line" style={{width:"55%"}}/>
+        </div>
+        <div className="login-deco-card hidden md:block" style={{"--rot":"7deg","--dur":"8s","--delay":"-7s",bottom:"18%",right:"18%",borderTop:"3px solid rgba(244,63,94,0.7)"}}>
+          <div className="deco-title" style={{background:"rgba(244,63,94,0.5)"}}/>
+          <div className="deco-line" style={{width:"80%"}}/>
+          <div className="deco-line" style={{width:"62%"}}/>
+        </div>
       </div>
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
