@@ -5100,6 +5100,16 @@ export default function App() {
     return () => document.removeEventListener("keydown", onKey);
   }, [imgViewOpen, mImages, imgViewIndex]);
 
+  // Close note modal with Escape key
+  useEffect(() => {
+    if (activeId == null) return;
+    const onKey = (e) => {
+      if (e.key === "Escape" && !imgViewOpen) closeModal();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [activeId, imgViewOpen]);
+
   // Auto-resize composer textarea
   useEffect(() => {
     if (!contentRef.current) return;
