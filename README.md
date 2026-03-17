@@ -2,6 +2,20 @@
 
 A sleek, Keep-style notes app with Markdown, checklists, images, tag chips, color themes, dark mode, drag-and-drop reordering, import/export, auth, and a glassy UI — built with Vite + React and a tiny Express + SQLite API.
 
+## Internationalization (i18n)
+
+The app auto-detects the browser language and currently supports **English** (default) and **French**. No external library is required — a lightweight `t()` helper reads flat translation dictionaries.
+
+### Adding a new language
+
+1. Copy `src/i18n/locales/en.js` to a new file (e.g. `it.js`)
+2. Translate every value
+3. Import the new locale in `src/i18n/index.js`
+4. Extend the `detectLanguage()` function
+5. Rebuild the app
+
+If a translation key is missing, the English value is used as fallback.
+
 ---
 **Web App Screenshots**
 

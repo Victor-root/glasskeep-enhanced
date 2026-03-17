@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 /**
  * AI Assistant Module (Server-side implementation)
  * This calls the backend AI endpoint instead of running inference in the browser.
@@ -30,7 +32,7 @@ export async function initAI(onProgress) {
 export async function askAI(question, notes, onProgress) {
   const token = getAuthToken();
   if (!token) {
-    throw new Error("You must be logged in to use the AI Assistant.");
+    throw new Error(t("mustBeLoggedInForAiAssistant"));
   }
 
   // We can still simulate "starting" if we want, or just call the API

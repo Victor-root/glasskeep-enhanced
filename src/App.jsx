@@ -1,8 +1,53 @@
-import React, { useEffect, useMemo, useRef, useState, useLayoutEffect, useCallback } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useLayoutEffect,
+  useCallback,
+} from "react";
 import { createPortal } from "react-dom";
 import { askAI } from "./ai";
 import { marked as markedParser } from "marked";
 import DrawingCanvas from "./DrawingCanvas";
+import { t } from "./i18n";
+
+function trColorName(name) {
+  const v = String(name || "").trim().toLowerCase();
+  const map = {
+    "default": "colorDefault",
+    "red": "colorRed",
+    "orange": "colorOrange",
+    "yellow": "colorYellow",
+    "green": "colorGreen",
+    "teal": "colorTeal",
+    "cyan": "colorCyan",
+    "blue": "colorBlue",
+    "dark blue": "colorDarkBlue",
+    "darkblue": "colorDarkBlue",
+    "indigo": "colorIndigo",
+    "purple": "colorPurple",
+    "deep purple": "colorDeepPurple",
+    "deeppurple": "colorDeepPurple",
+    "pink": "colorPink",
+    "brown": "colorBrown",
+    "gray": "colorGray",
+    "grey": "colorGray",
+    "light gray": "colorLightGray",
+    "light grey": "colorLightGray",
+    "dark gray": "colorDarkGray",
+    "dark grey": "colorDarkGray",
+    "black": "colorBlack",
+    "white": "colorWhite",
+    "peach": "colorPeach",
+    "sage": "colorSage",
+    "mint": "colorMint",
+    "sky": "colorSky",
+    "sand": "colorSand",
+  };
+  return map[v] ? t(map[v]) : name;
+}
+
 
 // Ensure we can call marked.parse(...)
 const marked =
@@ -58,9 +103,11 @@ async function api(path, { method = "GET", body, token } = {}) {
       }
 
       // Dispatch a custom event so the app can handle it
-      window.dispatchEvent(new CustomEvent('auth-expired'));
+      window.dispatchEvent(new CustomEvent("auth-expired"));
 
-      const err = new Error(data?.error || "Session expired. Please log in again.");
+      const err = new Error(
+        data?.error || t("sessionExpired"),
+      );
       err.status = res.status;
       err.isAuthError = true;
       throw err;
@@ -74,8 +121,8 @@ async function api(path, { method = "GET", body, token } = {}) {
     return data;
   } catch (error) {
     // Handle network errors, timeouts, etc.
-    if (error.name === 'AbortError') {
-      const err = new Error("Request timeout. Please check your connection.");
+    if (error.name === "AbortError") {
+      const err = new Error(t("requestTimeout"));
       err.status = 408;
       err.isNetworkError = true;
       throw err;
@@ -87,8 +134,8 @@ async function api(path, { method = "GET", body, token } = {}) {
     }
 
     // Handle fetch failures (network errors, CORS, etc.)
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      const err = new Error("Network error. Please check your connection.");
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      const err = new Error(t("networkError"));
       err.status = 0;
       err.isNetworkError = true;
       throw err;
@@ -145,14 +192,17 @@ const COLOR_ORDER = [
   "sand",
   "mauve",
 ];
-const solid = (rgba) => (typeof rgba === "string" ? rgba.replace("0.6", "1") : rgba);
+const solid = (rgba) =>
+  typeof rgba === "string" ? rgba.replace("0.6", "1") : rgba;
 const bgFor = (colorKey, dark) =>
   (dark ? DARK_COLORS : LIGHT_COLORS)[colorKey] ||
   (dark ? DARK_COLORS.default : LIGHT_COLORS.default);
 
 /** ---------- Modal light boost ---------- */
 const parseRGBA = (str) => {
-  const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/.exec(str || "");
+  const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/.exec(
+    str || "",
+  );
   if (!m) return { r: 255, g: 255, b: 255, a: 0.85 };
   return { r: +m[1], g: +m[2], b: +m[3], a: m[4] ? +m[4] : 1 };
 };
@@ -174,51 +224,140 @@ const ALL_IMAGES = "__ALL_IMAGES__";
 
 /** ---------- Icons ---------- */
 const PinOutline = () => (
-  <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="1.5">
+  <svg
+    className="w-5 h-5"
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+  >
     <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.5V22H12.5V16H18V14L16,12Z" />
   </svg>
 );
 const PinFilled = () => (
-  <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-    fill="currentColor">
+  <svg
+    className="w-5 h-5"
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+  >
     <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.5V22H12.5V16H18V14L16,12Z" />
   </svg>
 );
 const Trash = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path strokeLinecap="round" strokeLinejoin="round"
-      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.109 1.02.17M4.772 5.79c.338-.061.678-.118 1.02-.17m12.456 0L18.16 19.24A2.25 2.25 0 0 1 15.916 21.5H8.084A2.25 2.25 0 0 1 5.84 19.24L4.772 5.79m12.456 0a48.108 48.108 0 0 0-12.456 0M10 5V4a2 2 0 1 1 4 0v1" />
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.109 1.02.17M4.772 5.79c.338-.061.678-.118 1.02-.17m12.456 0L18.16 19.24A2.25 2.25 0 0 1 15.916 21.5H8.084A2.25 2.25 0 0 1 5.84 19.24L4.772 5.79m12.456 0a48.108 48.108 0 0 0-12.456 0M10 5V4a2 2 0 1 1 4 0v1"
+    />
   </svg>
 );
 const Sun = () => (
-  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <svg
+    className="h-6 w-6"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+  >
     <line x1="12" y1="2" x2="12" y2="4" strokeWidth="2" strokeLinecap="round" />
-    <line x1="12" y1="20" x2="12" y2="22" strokeWidth="2" strokeLinecap="round" />
-    <line x1="20" y1="12" x2="22" y2="12" strokeWidth="2" strokeLinecap="round" />
+    <line
+      x1="12"
+      y1="20"
+      x2="12"
+      y2="22"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <line
+      x1="20"
+      y1="12"
+      x2="22"
+      y2="12"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
     <line x1="2" y1="12" x2="4" y2="12" strokeWidth="2" strokeLinecap="round" />
-    <line x1="17.657" y1="6.343" x2="18.364" y2="5.636" strokeWidth="2" strokeLinecap="round" />
-    <line x1="5.636" y1="18.364" x2="6.343" y2="17.657" strokeWidth="2" strokeLinecap="round" />
-    <line x1="17.657" y1="17.657" x2="18.364" y2="18.364" strokeWidth="2" strokeLinecap="round" />
-    <line x1="5.636" y1="5.636" x2="6.343" y2="6.343" strokeWidth="2" strokeLinecap="round" />
+    <line
+      x1="17.657"
+      y1="6.343"
+      x2="18.364"
+      y2="5.636"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <line
+      x1="5.636"
+      y1="18.364"
+      x2="6.343"
+      y2="17.657"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <line
+      x1="17.657"
+      y1="17.657"
+      x2="18.364"
+      y2="18.364"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <line
+      x1="5.636"
+      y1="5.636"
+      x2="6.343"
+      y2="6.343"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
     <circle cx="12" cy="12" r="4" strokeWidth="2" />
   </svg>
 );
 const Moon = () => (
-  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9 9 0 008.354-5.646z" />
+  <svg
+    className="h-6 w-6"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9 9 0 008.354-5.646z"
+    />
   </svg>
 );
 const ImageIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+  >
     <path d="M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1z" />
     <path d="M8 11l2.5 3 3.5-4 4 5" />
     <circle cx="8" cy="8" r="1.5" />
   </svg>
 );
 const GalleryIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <rect x="3" y="3" width="8" height="8" rx="1" />
     <rect x="13" y="3" width="8" height="8" rx="1" />
     <rect x="3" y="13" width="8" height="8" rx="1" />
@@ -230,77 +369,178 @@ const GalleryIcon = () => (
   </svg>
 );
 const CloseIcon = () => (
-  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6l-12 12" />
+  <svg
+    className="w-6 h-6"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.4"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M6 6l12 12M18 6l-12 12"
+    />
   </svg>
 );
 const DownloadIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M7 10l5 5m0 0l5-5m-5 5V3" />
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M7 10l5 5m0 0l5-5m-5 5V3"
+    />
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 21h14" />
   </svg>
 );
 const ArrowLeft = () => (
-  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="w-6 h-6"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
   </svg>
 );
 const ArrowRight = () => (
-  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="w-6 h-6"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
   </svg>
 );
 const Kebab = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    aria-hidden="true"
+  >
     <circle cx="12" cy="5" r="1.5" />
     <circle cx="12" cy="12" r="1.5" />
     <circle cx="12" cy="19" r="1.5" />
   </svg>
 );
 const Hamburger = () => (
-  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="w-6 h-6"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16" />
   </svg>
 );
 // Formatting "Aa" icon
 const FormatIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+  >
     <path strokeLinecap="round" d="M3 19h18M10 17V7l-3 8m10 2V7l-3 8" />
   </svg>
 );
 
 // Settings icon
 const SettingsIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+  <svg
+    className="w-4 h-4"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+    />
   </svg>
 );
 
 // Grid view icon
 const GridIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+  <svg
+    className="w-4 h-4"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+    />
   </svg>
 );
 
 // List view icon
 const ListIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+  <svg
+    className="w-4 h-4"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M4 6h16M4 10h16M4 14h16M4 18h16"
+    />
   </svg>
 );
 
 // Sun icon (light mode)
 const SunIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="w-4 h-4"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <circle cx="12" cy="12" r="5" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
+    />
   </svg>
 );
 
 const Sparkles = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
     <path d="M5 3v4" />
     <path d="M19 17v4" />
@@ -311,44 +551,100 @@ const Sparkles = () => (
 
 // Moon icon (dark mode)
 const MoonIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9 9 0 008.354-5.646z" />
+  <svg
+    className="w-4 h-4"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9 9 0 008.354-5.646z"
+    />
   </svg>
 );
 
 // Multi-select icon (checkbox)
 const CheckSquareIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="w-4 h-4"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 11l3 3L22 4" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"
+    />
   </svg>
 );
 
 // Admin/Shield icon
 const ShieldIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+  <svg
+    className="w-4 h-4"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+    />
   </svg>
 );
 
 // Sign out/Logout icon
 const LogOutIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+  <svg
+    className="w-4 h-4"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+    />
   </svg>
 );
 
 // Archive icon
 const ArchiveIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+  <svg
+    className="w-4 h-4"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+    />
   </svg>
 );
 
 // Pin icon (using the same icon as individual notes)
 const PinIcon = () => (
-  <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="1.5">
+  <svg
+    className="w-4 h-4"
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+  >
     <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.5V22H12.5V16H18V14L16,12Z" />
   </svg>
 );
@@ -386,7 +682,7 @@ const mdForDownload = (n) => {
       "",
       `> _${n.images.length} image(s) attached)_ ${n.images
         .map((im) => im.name || "image")
-        .join(", ")}`
+        .join(", ")}`,
     );
   }
   lines.push("");
@@ -394,21 +690,32 @@ const mdForDownload = (n) => {
 };
 
 const sanitizeFilename = (name, fallback = "note") =>
-  (name || fallback).toString().trim().replace(/[\/\\?%*:|"<>]/g, "-").slice(0, 64);
+  (name || fallback)
+    .toString()
+    .trim()
+    .replace(/[\/\\?%*:|"<>]/g, "-")
+    .slice(0, 64);
 const downloadText = (filename, content) => {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = filename; document.body.appendChild(a);
-  a.click(); a.remove(); URL.revokeObjectURL(url);
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 };
 const downloadDataUrl = async (filename, dataUrl) => {
   const res = await fetch(dataUrl);
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); a.remove();
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
   URL.revokeObjectURL(url);
 };
 
@@ -416,8 +723,12 @@ const downloadDataUrl = async (filename, dataUrl) => {
 const triggerBlobDownload = (filename, blob) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = filename; document.body.appendChild(a);
-  a.click(); a.remove(); URL.revokeObjectURL(url);
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 };
 
 // Lazy-load JSZip for generating ZIP files client-side
@@ -428,10 +739,10 @@ async function ensureJSZip() {
     s.src = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
     s.async = true;
     s.onload = resolve;
-    s.onerror = () => reject(new Error("Failed to load JSZip."));
+    s.onerror = () => reject(new Error(t("failedLoadJszip")));
     document.head.appendChild(s);
   });
-  if (!window.JSZip) throw new Error("JSZip not available");
+  if (!window.JSZip) throw new Error(t("jszipNotAvailable"));
   return window.JSZip;
 }
 
@@ -464,17 +775,20 @@ function formatEditedStamp(iso) {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate();
 
-  const timeStr = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const timeStr = d.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
 
-  if (sameYMD(d, now)) return `Today, ${timeStr}`;
+  if (sameYMD(d, now)) return `${t("todayLabel")}, ${timeStr}`;
   const yest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  if (sameYMD(d, yest)) return `Yesterday, ${timeStr}`;
+  if (sameYMD(d, yest)) return `${t("yesterdayLabel")}, ${timeStr}`;
 
   const month = d.toLocaleString([], { month: "short" });
   const day = d.getDate();
-  if (d.getFullYear() === now.getFullYear()) return `${month} ${day}`;
-  const yy = String(d.getFullYear()).slice(-2);
-  return `${month} ${day}, '${yy}`;
+  if (d.getFullYear() === now.getFullYear()) return `${day} ${month}`;
+  const yyyy = String(d.getFullYear());
+  return `${day} ${month} ${yyyy}`;
 }
 
 /** ---------- Global CSS injection ---------- */
@@ -733,14 +1047,14 @@ function ChecklistRow({
           className={`flex-1 bg-transparent text-sm focus:outline-none border-b border-transparent focus:border-[var(--border-light)] pb-0.5 ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
           value={item.text}
           onChange={(e) => onChange?.(e.target.value)}
-          placeholder="List item"
+          placeholder={t("listItem")}
         />
       )}
 
       {(showRemove || !readOnly) && (
         <button
           className={`${removeVisibility} transition-opacity text-gray-500 hover:text-red-600 rounded-full border border-[var(--border-light)] flex items-center justify-center ${removeSize}`}
-          title="Remove item"
+          title={t("removeItem")}
           onClick={onRemove}
         >
           ×
@@ -753,15 +1067,20 @@ const ColorDot = ({ name, selected, onClick, darkMode }) => (
   <button
     type="button"
     onClick={onClick}
-    title={name}
+    title={trColorName(name)}
+    aria-label={trColorName(name)}
     className={`w-6 h-6 rounded-full border-2 border-transparent focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${name === "default" ? "flex items-center justify-center" : ""} ${selected ? "ring-2 ring-indigo-500" : ""}`}
     style={{
-      backgroundColor: name === "default" ? "transparent" : solid(bgFor(name, darkMode)),
+      backgroundColor:
+        name === "default" ? "transparent" : solid(bgFor(name, darkMode)),
       borderColor: name === "default" ? "#d1d5db" : "transparent",
     }}
   >
     {name === "default" && (
-      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: darkMode ? "#1f2937" : "#fff" }} />
+      <div
+        className="w-4 h-4 rounded-full"
+        style={{ backgroundColor: darkMode ? "#1f2937" : "#fff" }}
+      />
     )}
   </button>
 );
@@ -770,7 +1089,8 @@ const ColorDot = ({ name, selected, onClick, darkMode }) => (
 function wrapSelection(value, start, end, before, after, placeholder = "text") {
   const hasSel = start !== end;
   const sel = hasSel ? value.slice(start, end) : placeholder;
-  const newText = value.slice(0, start) + before + sel + after + value.slice(end);
+  const newText =
+    value.slice(0, start) + before + sel + after + value.slice(end);
   const s = start + before.length;
   const e = s + sel.length;
   return { text: newText, range: [s, e] };
@@ -805,7 +1125,12 @@ function toggleList(value, start, end, kind /* 'ul' | 'ol' */) {
   let newLines;
   if (kind === "ul") {
     if (allUL) newLines = lines.map((ln) => ln.replace(/^\s*[-*+]\s+/, ""));
-    else newLines = lines.map((ln) => (nonEmpty(ln) ? `- ${ln.replace(/^\s*[-*+]\s+/, "").replace(/^\s*\d+\.\s+/, "")}` : ln));
+    else
+      newLines = lines.map((ln) =>
+        nonEmpty(ln)
+          ? `- ${ln.replace(/^\s*[-*+]\s+/, "").replace(/^\s*\d+\.\s+/, "")}`
+          : ln,
+      );
   } else {
     if (allOL) {
       newLines = lines.map((ln) => ln.replace(/^\s*\d+\.\s+/, ""));
@@ -814,7 +1139,7 @@ function toggleList(value, start, end, kind /* 'ul' | 'ol' */) {
       newLines = lines.map((ln) =>
         nonEmpty(ln)
           ? `${i++}. ${ln.replace(/^\s*[-*+]\s+/, "").replace(/^\s*\d+\.\s+/, "")}`
-          : ln
+          : ln,
       );
     }
   }
@@ -822,7 +1147,8 @@ function toggleList(value, start, end, kind /* 'ul' | 'ol' */) {
   const replaced = newLines.join("\n");
   const newText = value.slice(0, from) + replaced + value.slice(to);
   const delta = replaced.length - segment.length;
-  const newStart = start + (kind === "ol" && !allOL ? 3 : kind === "ul" && !allUL ? 2 : 0);
+  const newStart =
+    start + (kind === "ol" && !allOL ? 3 : kind === "ul" && !allUL ? 2 : 0);
   const newEnd = end + delta;
   return { text: newText, range: [newStart, newEnd] };
 }
@@ -907,22 +1233,44 @@ function handleSmartEnter(value, start, end) {
 function FormatToolbar({ dark, onAction }) {
   const base = `fmt-btn ${dark ? "hover:bg-white/10" : "hover:bg-black/5"}`;
   return (
-    <div className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}>
+    <div
+      className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
+    >
       <div className="flex flex-wrap gap-1">
-        <button className={base} onClick={() => onAction("h1")}>H1</button>
-        <button className={base} onClick={() => onAction("h2")}>H2</button>
-        <button className={base} onClick={() => onAction("h3")}>H3</button>
+        <button className={base} onClick={() => onAction("h1")}>
+          H1
+        </button>
+        <button className={base} onClick={() => onAction("h2")}>
+          H2
+        </button>
+        <button className={base} onClick={() => onAction("h3")}>
+          H3
+        </button>
         <span className="mx-1 opacity-40">|</span>
-        <button className={base} onClick={() => onAction("bold")}><strong>B</strong></button>
-        <button className={base} onClick={() => onAction("italic")}><em>I</em></button>
-        <button className={base} onClick={() => onAction("strike")}><span className="line-through">S</span></button>
-        <button className={base} onClick={() => onAction("code")}>`code`</button>
-        <button className={base} onClick={() => onAction("codeblock")}>&lt;/&gt;</button>
+        <button className={base} onClick={() => onAction("bold")}>
+          <strong>B</strong>
+        </button>
+        <button className={base} onClick={() => onAction("italic")}>
+          <em>I</em>
+        </button>
+        <button className={base} onClick={() => onAction("strike")}>
+          <span className="line-through">S</span>
+        </button>
+        <button className={base} onClick={() => onAction("code")}>
+          `code`
+        </button>
+        <button className={base} onClick={() => onAction("codeblock")}>
+          &lt;/&gt;
+        </button>
         <span className="mx-1 opacity-40">|</span>
-        <button className={base} onClick={() => onAction("quote")}>&gt;</button>
-        <button className={base} onClick={() => onAction("ul")}>• list</button>
-        <button className={base} onClick={() => onAction("ol")}>1. list</button>
-        <button className={base} onClick={() => onAction("link")}>🔗</button>
+        <button className={base} onClick={() => onAction("quote")}>
+          &gt;
+        </button>
+        <button className={base} onClick={() => onAction("ul")}>{t("bulletListLabel")}</button>
+        <button className={base} onClick={() => onAction("ol")}>{t("orderedListLabel")}</button>
+        <button className={base} onClick={() => onAction("link")}>
+          🔗
+        </button>
       </div>
     </div>
   );
@@ -989,7 +1337,7 @@ function Popover({ anchorRef, open, onClose, children, offset = 8 }) {
     >
       {children}
     </div>,
-    document.body
+    document.body,
   );
 }
 
@@ -1001,7 +1349,7 @@ function DrawingPreview({ data, width, height, darkMode = false }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
 
     // Parse drawing data
     let paths = [];
@@ -1010,7 +1358,7 @@ function DrawingPreview({ data, width, height, darkMode = false }) {
     let firstPageHeight = 600; // Height of first page for filtering
     try {
       let parsedData;
-      if (typeof data === 'string') {
+      if (typeof data === "string") {
         parsedData = JSON.parse(data) || [];
       } else {
         parsedData = data;
@@ -1020,10 +1368,18 @@ function DrawingPreview({ data, width, height, darkMode = false }) {
       if (Array.isArray(parsedData)) {
         // Old format: just an array of paths
         paths = parsedData;
-      } else if (parsedData && typeof parsedData === 'object' && Array.isArray(parsedData.paths)) {
+      } else if (
+        parsedData &&
+        typeof parsedData === "object" &&
+        Array.isArray(parsedData.paths)
+      ) {
         // New format: object with paths and dimensions
         paths = parsedData.paths;
-        if (parsedData.dimensions && parsedData.dimensions.width && parsedData.dimensions.height) {
+        if (
+          parsedData.dimensions &&
+          parsedData.dimensions.width &&
+          parsedData.dimensions.height
+        ) {
           originalWidth = parsedData.dimensions.width;
           originalHeight = parsedData.dimensions.height;
           // First page height: use originalHeight if stored, otherwise estimate
@@ -1048,24 +1404,24 @@ function DrawingPreview({ data, width, height, darkMode = false }) {
 
     // Filter paths to only show those in the first page (y coordinate < firstPageHeight)
     // For preview, we only want to show the first page
-    paths = paths.filter(path => {
+    paths = paths.filter((path) => {
       if (!path.points || path.points.length === 0) return false;
       // Check if any point in the path is within the first page
-      return path.points.some(point => point.y < firstPageHeight);
+      return path.points.some((point) => point.y < firstPageHeight);
     });
 
     // Convert black/white strokes based on current theme for optimal contrast
-    paths = paths.map(path => {
+    paths = paths.map((path) => {
       // Only convert black/white strokes for better contrast, keep other colors as-is
       if (darkMode) {
         // In dark mode, ensure black strokes are white for visibility
-        if (path.color === '#000000') {
-          return { ...path, color: '#FFFFFF' };
+        if (path.color === "#000000") {
+          return { ...path, color: "#FFFFFF" };
         }
       } else {
         // In light mode, ensure white strokes are black for visibility
-        if (path.color === '#FFFFFF') {
-          return { ...path, color: '#000000' };
+        if (path.color === "#FFFFFF") {
+          return { ...path, color: "#000000" };
         }
       }
       return path;
@@ -1089,30 +1445,30 @@ function DrawingPreview({ data, width, height, darkMode = false }) {
 
     if (paths.length === 0) {
       // Draw a subtle placeholder
-      ctx.strokeStyle = '#e5e7eb';
+      ctx.strokeStyle = "#e5e7eb";
       ctx.lineWidth = 2;
       ctx.setLineDash([5, 5]);
       ctx.strokeRect(10, 10, previewWidth - 20, previewHeight - 20);
 
-      ctx.fillStyle = '#9ca3af';
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Empty', previewWidth / 2, previewHeight / 2 + 3);
+      ctx.fillStyle = "#9ca3af";
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Empty", previewWidth / 2, previewHeight / 2 + 3);
       return;
     }
 
     // Draw paths at scaled size
-    paths.forEach(path => {
+    paths.forEach((path) => {
       if (path.points && path.points.length > 0) {
         ctx.strokeStyle = path.color;
         ctx.lineWidth = Math.max(1, path.size * scale);
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
 
-        if (path.tool === 'eraser') {
-          ctx.globalCompositeOperation = 'destination-out';
+        if (path.tool === "eraser") {
+          ctx.globalCompositeOperation = "destination-out";
         } else {
-          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalCompositeOperation = "source-over";
         }
 
         ctx.beginPath();
@@ -1123,7 +1479,7 @@ function DrawingPreview({ data, width, height, darkMode = false }) {
         }
 
         ctx.stroke();
-        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalCompositeOperation = "source-over";
       }
     });
   }, [data, width, height, darkMode]);
@@ -1135,7 +1491,7 @@ function DrawingPreview({ data, width, height, darkMode = false }) {
         width={width}
         height={height}
         className="block"
-        style={{ maxWidth: '100%', maxHeight: '100%' }}
+        style={{ maxWidth: "100%", maxHeight: "100%" }}
       />
     </div>
   );
@@ -1143,27 +1499,34 @@ function DrawingPreview({ data, width, height, darkMode = false }) {
 
 /** ---------- Note Card ---------- */
 function NoteCard({
-  n, dark,
-  openModal, togglePin,
+  n,
+  dark,
+  openModal,
+  togglePin,
   // multi-select
   multiMode = false,
   selected = false,
-  onToggleSelect = () => { },
+  onToggleSelect = () => {},
   disablePin = false,
-  onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
   // online status
   isOnline = true,
   // checklist update callback
   onUpdateChecklistItem,
   currentUser,
 }) {
-
   const isChecklist = n.type === "checklist";
   const isDraw = n.type === "draw";
   const previewText = useMemo(() => mdToPlain(n.content || ""), [n.content]);
   const MAX_CHARS = 600;
   const isLong = previewText.length > MAX_CHARS;
-  const displayText = isLong ? previewText.slice(0, MAX_CHARS).trimEnd() + "…" : previewText;
+  const displayText = isLong
+    ? previewText.slice(0, MAX_CHARS).trimEnd() + "…"
+    : previewText;
 
   const total = (n.items || []).length;
   const done = (n.items || []).filter((i) => i.done).length;
@@ -1173,7 +1536,8 @@ function NoteCard({
     return a.done ? 1 : -1; // Unchecked (false) comes before checked (true)
   });
   const visibleItems = sortedItems.slice(0, 8);
-  const extraCount = total > visibleItems.length ? total - visibleItems.length : 0;
+  const extraCount =
+    total > visibleItems.length ? total - visibleItems.length : 0;
 
   const imgs = n.images || [];
   const mainImg = imgs[0];
@@ -1188,11 +1552,21 @@ function NoteCard({
   return (
     <div
       draggable={!multiMode}
-      onDragStart={(e) => { if (!multiMode) onDragStart(n.id, e); }}
-      onDragOver={(e) => { if (!multiMode) onDragOver(n.id, group, e); }}
-      onDragLeave={(e) => { if (!multiMode) onDragLeave(e); }}
-      onDrop={(e) => { if (!multiMode) onDrop(n.id, group, e); }}
-      onDragEnd={(e) => { if (!multiMode) onDragEnd(e); }}
+      onDragStart={(e) => {
+        if (!multiMode) onDragStart(n.id, e);
+      }}
+      onDragOver={(e) => {
+        if (!multiMode) onDragOver(n.id, group, e);
+      }}
+      onDragLeave={(e) => {
+        if (!multiMode) onDragLeave(e);
+      }}
+      onDrop={(e) => {
+        if (!multiMode) onDrop(n.id, group, e);
+      }}
+      onDragEnd={(e) => {
+        if (!multiMode) onDragEnd(e);
+      }}
       onClick={(e) => {
         if (multiMode) {
           // In multi-select mode, clicking anywhere toggles selection
@@ -1203,8 +1577,11 @@ function NoteCard({
           openModal(n.id);
         }
       }}
-      className={`note-card glass-card rounded-xl p-4 mb-6 cursor-pointer transform hover:scale-[1.02] transition-transform duration-200 relative min-h-[54px] group ${multiMode && selected ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent' : ''
-        }`}
+      className={`note-card glass-card rounded-xl p-4 mb-6 cursor-pointer transform hover:scale-[1.02] transition-transform duration-200 relative min-h-[54px] group ${
+        multiMode && selected
+          ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent"
+          : ""
+      }`}
       style={{ backgroundColor: bgFor(n.color, dark) }}
       data-id={n.id}
       data-group={group}
@@ -1213,18 +1590,29 @@ function NoteCard({
         <div className="absolute top-3 right-3 flex items-center gap-2">
           {/* Modern checkbox */}
           <div
-            className={`w-6 h-6 rounded-md border-2 flex items-center justify-center cursor-pointer transition-all ${selected
-              ? 'bg-indigo-500 border-indigo-500 text-white'
-              : 'border-gray-300 dark:border-gray-500 bg-white/80 dark:bg-gray-700/80 hover:border-indigo-400'
-              }`}
+            className={`w-6 h-6 rounded-md border-2 flex items-center justify-center cursor-pointer transition-all ${
+              selected
+                ? "bg-indigo-500 border-indigo-500 text-white"
+                : "border-gray-300 dark:border-gray-500 bg-white/80 dark:bg-gray-700/80 hover:border-indigo-400"
+            }`}
             onClick={(e) => {
               e.stopPropagation();
               onToggleSelect?.(n.id, !selected);
             }}
           >
             {selected && (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={3}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             )}
           </div>
@@ -1232,16 +1620,22 @@ function NoteCard({
       )}
       {/* Collaboration icon - bottom right - show if note has collaborators (empty array means has collaborators) or if user is viewing a note they don't own */}
       {/* Show icon if note has collaborators (empty array) or if user is viewing someone else's note */}
-      {((n.collaborators !== undefined && n.collaborators !== null) || (n.user_id && currentUser && n.user_id !== currentUser.id)) && (
+      {((n.collaborators !== undefined && n.collaborators !== null) ||
+        (n.user_id && currentUser && n.user_id !== currentUser.id)) && (
         <div className="absolute bottom-3 right-3 z-10">
-          <div
-            className="relative"
-            title="Collaborated note"
-          >
-            <svg className="w-5 h-5 text-black dark:text-white" fill="currentColor" viewBox="0 0 20 20">
+          <div className="relative" title={t("collaboratedNote")}>
+            <svg
+              className="w-5 h-5 text-black dark:text-white"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
               <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
             </svg>
-            <svg className="w-3 h-3 absolute -top-1 -right-1 text-black dark:text-white" fill="currentColor" viewBox="0 0 20 20">
+            <svg
+              className="w-3 h-3 absolute -top-1 -right-1 text-black dark:text-white"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
               <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
             </svg>
           </div>
@@ -1254,10 +1648,14 @@ function NoteCard({
             style={{ backgroundColor: bgFor(n.color, dark) }}
           />
           <button
-            aria-label={n.pinned ? "Unpin note" : "Pin note"}
-            onClick={(e) => { if (disablePin) return; e.stopPropagation(); togglePin(n.id, !n.pinned); }}
+            aria-label={n.pinned ? t("unpinNote") : t("pinNote")}
+            onClick={(e) => {
+              if (disablePin) return;
+              e.stopPropagation();
+              togglePin(n.id, !n.pinned);
+            }}
             className="relative rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            title={n.pinned ? "Unpin" : "Pin"}
+            title={n.pinned ? t("unpin") : t("pin")}
             disabled={!!disablePin}
           >
             {n.pinned ? <PinFilled /> : <PinOutline />}
@@ -1265,15 +1663,20 @@ function NoteCard({
         </div>
       )}
 
-      {n.title && <h3 className="font-bold text-lg mb-2 break-words">{n.title}</h3>}
+      {n.title && (
+        <h3 className="font-bold text-lg mb-2 break-words">{n.title}</h3>
+      )}
 
       {mainImg && (
         <div className="mb-3 relative overflow-hidden rounded-lg border border-[var(--border-light)]">
-          <img src={mainImg.src} alt={mainImg.name || "note image"} className="w-full h-40 object-cover" />
+          <img
+            src={mainImg.src}
+            alt={mainImg.name || t("noteImage")}
+            className="w-full h-40 object-cover"
+          />
           {imgs.length > 1 && (
             <span className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">
-              +{imgs.length - 1} more
-            </span>
+              {t("moreItems").replace("{count}", String(imgs.length - 1))}</span>
           )}
         </div>
       )}
@@ -1283,7 +1686,12 @@ function NoteCard({
           {displayText}
         </div>
       ) : isDraw ? (
-        <DrawingPreview data={n.content} width={100} height={150} darkMode={dark} />
+        <DrawingPreview
+          data={n.content}
+          width={100}
+          height={150}
+          darkMode={dark}
+        />
       ) : (
         <div className="space-y-2">
           {visibleItems.map((it) => (
@@ -1300,9 +1708,13 @@ function NoteCard({
             />
           ))}
           {extraCount > 0 && (
-            <div className="text-xs text-gray-600 dark:text-gray-300">+{extraCount} more…</div>
+            <div className="text-xs text-gray-600 dark:text-gray-300">
+              {t("moreItems").replace("{count}", String(extraCount))}
+            </div>
           )}
-          <div className="text-xs text-gray-600 dark:text-gray-300">{done}/{total} completed</div>
+          <div className="text-xs text-gray-600 dark:text-gray-300">
+            {t("completedFraction").replace("{done}", String(done)).replace("{total}", String(total))}
+          </div>
         </div>
       )}
 
@@ -1341,9 +1753,9 @@ function AuthShell({ title, dark, onToggleDark, children }) {
           <button
             onClick={onToggleDark}
             className={`inline-flex items-center gap-2 text-sm ${dark ? "text-gray-300" : "text-gray-700"} hover:underline`}
-            title="Toggle dark mode"
+            title={t("toggleDarkMode")}
           >
-            {dark ? <Moon /> : <Sun />} Toggle theme
+            {dark ? <Moon /> : <Sun />} {t("toggleTheme")}
           </button>
         </div>
       </div>
@@ -1352,7 +1764,14 @@ function AuthShell({ title, dark, onToggleDark, children }) {
 }
 
 /** ---------- Login / Register / Secret Login ---------- */
-function LoginView({ dark, onToggleDark, onLogin, goRegister, goSecret, allowRegistration }) {
+function LoginView({
+  dark,
+  onToggleDark,
+  onLogin,
+  goRegister,
+  goSecret,
+  allowRegistration,
+}) {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
@@ -1361,20 +1780,24 @@ function LoginView({ dark, onToggleDark, onLogin, goRegister, goSecret, allowReg
     e.preventDefault();
     try {
       const res = await onLogin(email.trim(), pw);
-      if (!res.ok) setErr(res.error || "Login failed");
+      if (!res.ok) setErr(res.error || t("loginFailed"));
     } catch (er) {
-      setErr(er.message || "Login failed");
+      setErr(er.message || t("loginFailed"));
     }
   };
 
   return (
-    <AuthShell title="Sign in to your account" dark={dark} onToggleDark={onToggleDark}>
+    <AuthShell
+      title={t("signInToYourAccount")}
+      dark={dark}
+      onToggleDark={onToggleDark}
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
           type="text"
           autoComplete="username"
           className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          placeholder="Username"
+          placeholder={t("username")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -1382,26 +1805,26 @@ function LoginView({ dark, onToggleDark, onLogin, goRegister, goSecret, allowReg
         <input
           type="password"
           className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          placeholder="Password"
+          placeholder={t("password")}
           value={pw}
           onChange={(e) => setPw(e.target.value)}
           required
         />
         {err && <p className="text-red-600 text-sm">{err}</p>}
-        <button type="submit" className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-          Sign In
-        </button>
+        <button
+          type="submit"
+          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >{t("signIn")}</button>
       </form>
 
       <div className="mt-4 text-sm flex justify-between items-center">
         {allowRegistration && (
-          <button className="text-indigo-600 hover:underline" onClick={goRegister}>
-            Create account
-          </button>
+          <button
+            className="text-indigo-600 hover:underline"
+            onClick={goRegister}
+          >{t("createAccount")}</button>
         )}
-        <button className="text-indigo-600 hover:underline" onClick={goSecret}>
-          Forgot username/password?
-        </button>
+        <button className="text-indigo-600 hover:underline" onClick={goSecret}>{t("forgotUsernamePassword")}</button>
       </div>
     </AuthShell>
   );
@@ -1416,23 +1839,27 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (pw.length < 6) return setErr("Password must be at least 6 characters.");
-    if (pw !== pw2) return setErr("Passwords do not match.");
+    if (pw.length < 6) return setErr(t("passwordMin6Error"));
+    if (pw !== pw2) return setErr(t("passwordsDoNotMatch"));
     try {
       const res = await onRegister(name.trim() || "User", email.trim(), pw);
-      if (!res.ok) setErr(res.error || "Registration failed");
+      if (!res.ok) setErr(res.error || t("registrationFailed"));
     } catch (er) {
-      setErr(er.message || "Registration failed");
+      setErr(er.message || t("registrationFailed"));
     }
   };
 
   return (
-    <AuthShell title="Create a new account" dark={dark} onToggleDark={onToggleDark}>
+    <AuthShell
+      title={t("createNewAccount")}
+      dark={dark}
+      onToggleDark={onToggleDark}
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
           type="text"
           className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          placeholder="Name"
+          placeholder={t("name")}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -1440,7 +1867,7 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin }) {
           type="text"
           autoComplete="username"
           className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          placeholder="Username"
+          placeholder={t("username")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -1448,7 +1875,7 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin }) {
         <input
           type="password"
           className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          placeholder="Password (min 6 chars)"
+          placeholder={t("passwordMin6")}
           value={pw}
           onChange={(e) => setPw(e.target.value)}
           required
@@ -1456,21 +1883,20 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin }) {
         <input
           type="password"
           className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          placeholder="Confirm password"
+          placeholder={t("confirmPassword")}
           value={pw2}
           onChange={(e) => setPw2(e.target.value)}
           required
         />
         {err && <p className="text-red-600 text-sm">{err}</p>}
-        <button type="submit" className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-          Create Account
-        </button>
+        <button
+          type="submit"
+          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >{t("createAccount")}</button>
       </form>
       <div className="mt-4 text-sm text-center">
         Already have an account?{" "}
-        <button className="text-indigo-600 hover:underline" onClick={goLogin}>
-          Sign in
-        </button>
+        <button className="text-indigo-600 hover:underline" onClick={goLogin}>{t("signInLower")}</button>
       </div>
     </AuthShell>
   );
@@ -1484,39 +1910,52 @@ function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin }) {
     e.preventDefault();
     try {
       const res = await onLoginWithKey(key.trim());
-      if (!res.ok) setErr(res.error || "Login failed");
+      if (!res.ok) setErr(res.error || t("loginFailed"));
     } catch (er) {
-      setErr(er.message || "Login failed");
+      setErr(er.message || t("loginFailed"));
     }
   };
 
   return (
-    <AuthShell title="Sign in with Secret Key" dark={dark} onToggleDark={onToggleDark}>
+    <AuthShell
+      title={t("signInWithSecretKey")}
+      dark={dark}
+      onToggleDark={onToggleDark}
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         <textarea
           className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[100px] text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-          placeholder="Paste your secret key here"
+          placeholder={t("pasteSecretKeyHere")}
           value={key}
           onChange={(e) => setKey(e.target.value)}
           required
         />
         {err && <p className="text-red-600 text-sm">{err}</p>}
-        <button type="submit" className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-          Sign In with Secret Key
-        </button>
+        <button
+          type="submit"
+          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >{t("signInWithSecretKey")}</button>
       </form>
       <div className="mt-4 text-sm text-center">
         Remember your credentials?{" "}
-        <button className="text-indigo-600 hover:underline" onClick={goLogin}>
-          Sign in with email & password
-        </button>
+        <button className="text-indigo-600 hover:underline" onClick={goLogin}>{t("signInWithEmailPassword")}</button>
       </div>
     </AuthShell>
   );
 }
 
 /** ---------- Tag Sidebar / Drawer ---------- */
-function TagSidebar({ open, onClose, tagsWithCounts, activeTag, onSelect, dark, permanent = false, width = 288, onResize }) {
+function TagSidebar({
+  open,
+  onClose,
+  tagsWithCounts,
+  activeTag,
+  onSelect,
+  dark,
+  permanent = false,
+  width = 288,
+  onResize,
+}) {
   const isAllNotes = activeTag === null;
   const isAllImages = activeTag === ALL_IMAGES;
 
@@ -1525,25 +1964,27 @@ function TagSidebar({ open, onClose, tagsWithCounts, activeTag, onSelect, dark, 
       {open && !permanent && (
         <div
           className="fixed inset-0 z-30 bg-black/30"
-          onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
         />
       )}
       <aside
         className={`fixed top-0 left-0 z-40 h-full shadow-2xl transition-transform duration-200 ${permanent || open ? "translate-x-0" : "-translate-x-full"}`}
         style={{
-          width: permanent ? `${width}px` : '288px',
+          width: permanent ? `${width}px` : "288px",
           backgroundColor: dark ? "#222222" : "rgba(255,255,255,0.95)",
-          borderRight: "1px solid var(--border-light)"
+          borderRight: "1px solid var(--border-light)",
         }}
         aria-hidden={!(permanent || open)}
       >
         <div className="p-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Tags</h3>
+          <h3 className="text-lg font-semibold">{t("tags")}</h3>
           {!permanent && (
             <button
               className="p-2 rounded hover:bg-black/5 dark:hover:bg-white/10"
               onClick={onClose}
-              title="Close"
+              title={t("close")}
             >
               <CloseIcon />
             </button>
@@ -1552,37 +1993,45 @@ function TagSidebar({ open, onClose, tagsWithCounts, activeTag, onSelect, dark, 
         <nav className="p-2 overflow-y-auto h-[calc(100%-56px)]">
           {/* Notes (All) */}
           <button
-            className={`w-full text-left px-3 py-2 rounded-md mb-1 ${isAllNotes ? (dark ? "bg-white/10" : "bg-black/5") : (dark ? "hover:bg-white/10" : "hover:bg-black/5")}`}
-            onClick={() => { onSelect(null); onClose(); }}
-          >
-            Notes (All)
-          </button>
+            className={`w-full text-left px-3 py-2 rounded-md mb-1 ${isAllNotes ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+            onClick={() => {
+              onSelect(null);
+              onClose();
+            }}
+          >{t("notesAll")}</button>
 
           {/* All Images */}
           <button
-            className={`w-full text-left px-3 py-2 rounded-md mb-2 ${isAllImages ? (dark ? "bg-white/10" : "bg-black/5") : (dark ? "hover:bg-white/10" : "hover:bg-black/5")}`}
-            onClick={() => { onSelect(ALL_IMAGES); onClose(); }}
-          >
-            All Images
-          </button>
+            className={`w-full text-left px-3 py-2 rounded-md mb-2 ${isAllImages ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+            onClick={() => {
+              onSelect(ALL_IMAGES);
+              onClose();
+            }}
+          >{t("allImages")}</button>
 
           {/* Archived Notes */}
           <button
-            className={`w-full text-left px-3 py-2 rounded-md mb-2 ${activeTag === 'ARCHIVED' ? (dark ? "bg-white/10" : "bg-black/5") : (dark ? "hover:bg-white/10" : "hover:bg-black/5")}`}
-            onClick={() => { onSelect('ARCHIVED'); onClose(); }}
-          >
-            Archived Notes
-          </button>
+            className={`w-full text-left px-3 py-2 rounded-md mb-2 ${activeTag === "ARCHIVED" ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+            onClick={() => {
+              onSelect("ARCHIVED");
+              onClose();
+            }}
+          >{t("archivedNotes")}</button>
 
           {/* User tags */}
           {tagsWithCounts.map(({ tag, count }) => {
-            const active = typeof activeTag === "string" && activeTag !== ALL_IMAGES &&
+            const active =
+              typeof activeTag === "string" &&
+              activeTag !== ALL_IMAGES &&
               activeTag.toLowerCase() === tag.toLowerCase();
             return (
               <button
                 key={tag}
-                className={`w-full text-left px-3 py-2 rounded-md mb-1 flex items-center justify-between ${active ? (dark ? "bg-white/10" : "bg-black/5") : (dark ? "hover:bg-white/10" : "hover:bg-black/5")}`}
-                onClick={() => { onSelect(tag); onClose(); }}
+                className={`w-full text-left px-3 py-2 rounded-md mb-1 flex items-center justify-between ${active ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+                onClick={() => {
+                  onSelect(tag);
+                  onClose();
+                }}
                 title={tag}
               >
                 <span className="truncate">{tag}</span>
@@ -1591,7 +2040,7 @@ function TagSidebar({ open, onClose, tagsWithCounts, activeTag, onSelect, dark, 
             );
           })}
           {tagsWithCounts.length === 0 && (
-            <p className="text-sm text-gray-500 mt-2">No tags yet. Add tags to your notes!</p>
+            <p className="text-sm text-gray-500 mt-2">{t("noTagsYet")}</p>
           )}
         </nav>
 
@@ -1605,21 +2054,24 @@ function TagSidebar({ open, onClose, tagsWithCounts, activeTag, onSelect, dark, 
               const startWidth = width;
 
               const handleMouseMove = (moveEvent) => {
-                const newWidth = Math.max(200, Math.min(500, startWidth + (moveEvent.clientX - startX)));
+                const newWidth = Math.max(
+                  200,
+                  Math.min(500, startWidth + (moveEvent.clientX - startX)),
+                );
                 onResize(newWidth);
               };
 
               const handleMouseUp = () => {
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-                document.body.style.cursor = '';
-                document.body.style.userSelect = '';
+                document.removeEventListener("mousemove", handleMouseMove);
+                document.removeEventListener("mouseup", handleMouseUp);
+                document.body.style.cursor = "";
+                document.body.style.userSelect = "";
               };
 
-              document.addEventListener('mousemove', handleMouseMove);
-              document.addEventListener('mouseup', handleMouseUp);
-              document.body.style.cursor = 'ew-resize';
-              document.body.style.userSelect = 'none';
+              document.addEventListener("mousemove", handleMouseMove);
+              document.addEventListener("mouseup", handleMouseUp);
+              document.body.style.cursor = "ew-resize";
+              document.body.style.userSelect = "none";
             }}
           />
         )}
@@ -1629,17 +2081,32 @@ function TagSidebar({ open, onClose, tagsWithCounts, activeTag, onSelect, dark, 
 }
 
 /** ---------- Settings Panel ---------- */
-function SettingsPanel({ open, onClose, dark, onExportAll, onImportAll, onImportGKeep, onImportMd, onDownloadSecretKey, alwaysShowSidebarOnWide, setAlwaysShowSidebarOnWide, localAiEnabled, setLocalAiEnabled, showGenericConfirm, showToast }) {
+function SettingsPanel({
+  open,
+  onClose,
+  dark,
+  onExportAll,
+  onImportAll,
+  onImportGKeep,
+  onImportMd,
+  onDownloadSecretKey,
+  alwaysShowSidebarOnWide,
+  setAlwaysShowSidebarOnWide,
+  localAiEnabled,
+  setLocalAiEnabled,
+  showGenericConfirm,
+  showToast,
+}) {
   // Prevent body scroll when settings panel is open
   React.useEffect(() => {
     if (open) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     }
 
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     };
   }, [open]);
 
@@ -1648,23 +2115,26 @@ function SettingsPanel({ open, onClose, dark, onExportAll, onImportAll, onImport
       {open && (
         <div
           className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
         />
       )}
       <div
         className={`fixed top-0 right-0 z-50 h-full w-full sm:w-96 shadow-2xl transition-transform duration-200 ${open ? "translate-x-0" : "translate-x-full"}`}
-        style={{ backgroundColor: dark ? "#222222" : "rgba(255,255,255,0.95)", borderLeft: "1px solid var(--border-light)" }}
+        style={{
+          backgroundColor: dark ? "#222222" : "rgba(255,255,255,0.95)",
+          borderLeft: "1px solid var(--border-light)",
+        }}
         aria-hidden={!open}
       >
         <div className="p-4 flex items-center justify-between border-b border-[var(--border-light)]">
           <h3 className="text-lg font-semibold flex items-center gap-2">
-            <SettingsIcon />
-            Settings
-          </h3>
+            <SettingsIcon />{t("settings")}</h3>
           <button
             className="p-2 rounded hover:bg-black/5 dark:hover:bg-white/10"
             onClick={onClose}
-            title="Close"
+            title={t("close")}
           >
             <CloseIcon />
           </button>
@@ -1673,107 +2143,134 @@ function SettingsPanel({ open, onClose, dark, onExportAll, onImportAll, onImport
         <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
           {/* Data Management Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">Data Management</h4>
+            <h4 className="text-md font-semibold mb-4">{t("dataManagement")}</h4>
             <div className="space-y-3">
               <button
                 className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
-                onClick={() => { onClose(); onExportAll?.(); }}
+                onClick={() => {
+                  onClose();
+                  onExportAll?.();
+                }}
               >
-                <div className="font-medium">Export ALL notes (.json)</div>
-                <div className="text-sm text-gray-500">Download all notes as JSON file</div>
+                <div className="font-medium">{t("exportAllNotesJson")}</div>
+                <div className="text-sm text-gray-500">{t("downloadAllNotesJson")}</div>
               </button>
 
               <button
                 className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
-                onClick={() => { onClose(); onImportAll?.(); }}
+                onClick={() => {
+                  onClose();
+                  onImportAll?.();
+                }}
               >
-                <div className="font-medium">Import notes (.json)</div>
-                <div className="text-sm text-gray-500">Import notes from JSON file</div>
+                <div className="font-medium">{t("importNotesJson")}</div>
+                <div className="text-sm text-gray-500">{t("importNotesFromJsonFile")}</div>
               </button>
 
               <button
                 className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
-                onClick={() => { onClose(); onImportGKeep?.(); }}
+                onClick={() => {
+                  onClose();
+                  onImportGKeep?.();
+                }}
               >
-                <div className="font-medium">Import Google Keep notes (.json)</div>
-                <div className="text-sm text-gray-500">Import notes from Google Keep JSON export</div>
+                <div className="font-medium">{t("importGoogleKeepNotes")}</div>
+                <div className="text-sm text-gray-500">{t("importNotesFromGoogleKeepExport")}</div>
               </button>
 
               <button
                 className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
-                onClick={() => { onClose(); onImportMd?.(); }}
+                onClick={() => {
+                  onClose();
+                  onImportMd?.();
+                }}
               >
-                <div className="font-medium">Import Markdown files (.md)</div>
-                <div className="text-sm text-gray-500">Import notes from Markdown files</div>
+                <div className="font-medium">{t("importMarkdownFilesMd")}</div>
+                <div className="text-sm text-gray-500">{t("importNotesFromMarkdownFiles")}</div>
               </button>
 
               <button
                 className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
-                onClick={() => { onClose(); onDownloadSecretKey?.(); }}
+                onClick={() => {
+                  onClose();
+                  onDownloadSecretKey?.();
+                }}
               >
-                <div className="font-medium">Download secret key (.txt)</div>
-                <div className="text-sm text-gray-500">Download your encryption key for backup</div>
+                <div className="font-medium">{t("downloadSecretKeyTxt")}</div>
+                <div className="text-sm text-gray-500">{t("downloadEncryptionKeyBackup")}</div>
               </button>
             </div>
           </div>
 
           {/* UI Preferences Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">UI Preferences</h4>
+            <h4 className="text-md font-semibold mb-4">{t("uiPreferences")}</h4>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="font-medium">Local AI Assistant</div>
-                  <div className="text-sm text-gray-500">Ask questions about your notes (server-side model)</div>
+                  <div className="text-sm text-gray-500">{t("askQuestionsAboutNotes")}</div>
                 </div>
                 <button
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${localAiEnabled
-                    ? 'bg-indigo-600'
-                    : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    localAiEnabled
+                      ? "bg-indigo-600"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
                   onClick={() => {
                     if (!localAiEnabled) {
                       // Show confirmation dialog when enabling
                       showGenericConfirm({
-                        title: "Enable AI Assistant?",
-                        message: "This will download a ~700MB AI model (Llama-3.2-1B) to the server and may use significant CPU resources. The download will happen in the background. Continue?",
-                        confirmText: "Enable AI",
-                        cancelText: "Cancel",
+                        title: t("enableAiAssistantQuestion"),
+                        message:
+                          t("enableAiAssistantWarning"),
+                        confirmText: t("enableAi"),
+                        cancelText: t("cancel"),
                         danger: false,
                         onConfirm: async () => {
                           setLocalAiEnabled(true);
-                          showToast("AI Assistant enabled. Model will download on first use.", "success");
-                        }
+                          showToast(
+                            t("aiAssistantEnabledModelDownload"),
+                            "success",
+                          );
+                        },
                       });
                     } else {
                       // Disable without confirmation
                       setLocalAiEnabled(false);
-                      showToast("AI Assistant disabled", "info");
+                      showToast(t("aiAssistantDisabled"), "info");
                     }
                   }}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localAiEnabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      localAiEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
                   />
                 </button>
               </div>
 
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-medium">Always show sidebar on wide screens</div>
-                  <div className="text-sm text-gray-500">Keep tags panel visible on screens wider than 700px</div>
+                  <div className="font-medium">{t("alwaysShowSidebarWide")}</div>
+                  <div className="text-sm text-gray-500">{t("keepTagsPanelVisible")}</div>
                 </div>
                 <button
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${alwaysShowSidebarOnWide
-                    ? 'bg-indigo-600'
-                    : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  onClick={() => setAlwaysShowSidebarOnWide(!alwaysShowSidebarOnWide)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    alwaysShowSidebarOnWide
+                      ? "bg-indigo-600"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                  onClick={() =>
+                    setAlwaysShowSidebarOnWide(!alwaysShowSidebarOnWide)
+                  }
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${alwaysShowSidebarOnWide ? 'translate-x-6' : 'translate-x-1'
-                      }`}
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      alwaysShowSidebarOnWide
+                        ? "translate-x-6"
+                        : "translate-x-1"
+                    }`}
                   />
                 </button>
               </div>
@@ -1786,26 +2283,50 @@ function SettingsPanel({ open, onClose, dark, onExportAll, onImportAll, onImport
 }
 
 /** ---------- Admin Panel ---------- */
-function AdminPanel({ open, onClose, dark, adminSettings, allUsers, newUserForm, setNewUserForm, updateAdminSettings, createUser, deleteUser, updateUser, currentUser, showGenericConfirm, showToast }) {
+function AdminPanel({
+  open,
+  onClose,
+  dark,
+  adminSettings,
+  allUsers,
+  newUserForm,
+  setNewUserForm,
+  updateAdminSettings,
+  createUser,
+  deleteUser,
+  updateUser,
+  currentUser,
+  showGenericConfirm,
+  showToast,
+}) {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [editUserModalOpen, setEditUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [editUserForm, setEditUserForm] = useState({ name: '', email: '', password: '', is_admin: false });
+  const [editUserForm, setEditUserForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    is_admin: false,
+  });
   const [isUpdatingUser, setIsUpdatingUser] = useState(false);
 
-  console.log("AdminPanel render:", { open, adminSettings, allUsers: allUsers?.length });
+  console.log("AdminPanel render:", {
+    open,
+    adminSettings,
+    allUsers: allUsers?.length,
+  });
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
     if (!newUserForm.name || !newUserForm.email || !newUserForm.password) {
-      showToast("Please fill in all required fields", "error");
+      showToast(t("pleaseFillRequiredFields"), "error");
       return;
     }
 
     setIsCreatingUser(true);
     try {
       await createUser(newUserForm);
-      showToast("User created successfully!", "success");
+      showToast(t("userCreatedSuccessfullyBang"), "success");
     } catch (e) {
       // Error already handled in createUser function
     } finally {
@@ -1818,8 +2339,8 @@ function AdminPanel({ open, onClose, dark, adminSettings, allUsers, newUserForm,
     setEditUserForm({
       name: user.name,
       email: user.email,
-      password: '',
-      is_admin: user.is_admin
+      password: "",
+      is_admin: user.is_admin,
     });
     setEditUserModalOpen(true);
   };
@@ -1827,7 +2348,7 @@ function AdminPanel({ open, onClose, dark, adminSettings, allUsers, newUserForm,
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     if (!editUserForm.name || !editUserForm.email) {
-      showToast("Name and email are required", "error");
+      showToast(t("nameAndEmailRequired"), "error");
       return;
     }
 
@@ -1837,41 +2358,41 @@ function AdminPanel({ open, onClose, dark, adminSettings, allUsers, newUserForm,
       const updateData = {
         name: editUserForm.name,
         email: editUserForm.email,
-        is_admin: editUserForm.is_admin
+        is_admin: editUserForm.is_admin,
       };
       if (editUserForm.password) {
         updateData.password = editUserForm.password;
       }
 
       await updateUser(editingUser.id, updateData);
-      showToast("User updated successfully!", "success");
+      showToast(t("userUpdatedSuccessfullyBang"), "success");
       setEditUserModalOpen(false);
       setEditingUser(null);
     } catch (e) {
-      showToast(e.message || "Failed to update user", "error");
+      showToast(e.message || t("failedUpdateUser"), "error");
     } finally {
       setIsUpdatingUser(false);
     }
   };
 
   const formatBytes = (bytes) => {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0) return "0 B";
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   // Prevent body scroll when admin panel is open
   React.useEffect(() => {
     if (open) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     }
 
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     };
   }, [open]);
 
@@ -1880,20 +2401,27 @@ function AdminPanel({ open, onClose, dark, adminSettings, allUsers, newUserForm,
       {open && (
         <div
           className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
         />
       )}
       <div
         className={`fixed top-0 right-0 z-50 h-full w-full sm:w-96 shadow-2xl transition-transform duration-200 ${open ? "translate-x-0" : "translate-x-full"}`}
-        style={{ backgroundColor: dark ? "rgba(40,40,40,0.95)" : "rgba(255,255,255,0.95)", borderLeft: "1px solid var(--border-light)" }}
+        style={{
+          backgroundColor: dark
+            ? "rgba(40,40,40,0.95)"
+            : "rgba(255,255,255,0.95)",
+          borderLeft: "1px solid var(--border-light)",
+        }}
         aria-hidden={!open}
       >
         <div className="p-4 flex items-center justify-between border-b border-[var(--border-light)]">
-          <h3 className="text-lg font-semibold">Admin Panel</h3>
+          <h3 className="text-lg font-semibold">{t("adminPanel")}</h3>
           <button
             className="p-2 rounded hover:bg-black/5 dark:hover:bg-white/10"
             onClick={onClose}
-            title="Close"
+            title={t("close")}
           >
             <CloseIcon />
           </button>
@@ -1902,20 +2430,28 @@ function AdminPanel({ open, onClose, dark, adminSettings, allUsers, newUserForm,
         <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
           {/* Settings Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">Settings</h4>
+            <h4 className="text-md font-semibold mb-4">{t("settings")}</h4>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm">Allow New Account Creation</span>
+                <span className="text-sm">{t("allowNewAccountCreation")}</span>
                 <button
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${adminSettings.allowNewAccounts
-                    ? 'bg-indigo-600'
-                    : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  onClick={() => updateAdminSettings({ allowNewAccounts: !adminSettings.allowNewAccounts })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    adminSettings.allowNewAccounts
+                      ? "bg-indigo-600"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                  onClick={() =>
+                    updateAdminSettings({
+                      allowNewAccounts: !adminSettings.allowNewAccounts,
+                    })
+                  }
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${adminSettings.allowNewAccounts ? 'translate-x-6' : 'translate-x-1'
-                      }`}
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      adminSettings.allowNewAccounts
+                        ? "translate-x-6"
+                        : "translate-x-1"
+                    }`}
                   />
                 </button>
               </div>
@@ -1924,27 +2460,36 @@ function AdminPanel({ open, onClose, dark, adminSettings, allUsers, newUserForm,
 
           {/* Create User Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">Create New User</h4>
+            <h4 className="text-md font-semibold mb-4">{t("createNewUser")}</h4>
             <form onSubmit={handleCreateUser} className="space-y-3">
               <input
                 type="text"
-                placeholder="Name"
+                placeholder={t("name")}
                 value={newUserForm.name}
-                onChange={(e) => setNewUserForm(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) =>
+                  setNewUserForm((prev) => ({ ...prev, name: e.target.value }))
+                }
                 className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400"
               />
               <input
                 type="text"
-                placeholder="Username"
+                placeholder={t("username")}
                 value={newUserForm.email}
-                onChange={(e) => setNewUserForm(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(e) =>
+                  setNewUserForm((prev) => ({ ...prev, email: e.target.value }))
+                }
                 className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400"
               />
               <input
                 type="password"
-                placeholder="Password"
+                placeholder={t("password")}
                 value={newUserForm.password}
-                onChange={(e) => setNewUserForm(prev => ({ ...prev, password: e.target.value }))}
+                onChange={(e) =>
+                  setNewUserForm((prev) => ({
+                    ...prev,
+                    password: e.target.value,
+                  }))
+                }
                 className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400"
               />
               <div className="flex items-center">
@@ -1952,27 +2497,36 @@ function AdminPanel({ open, onClose, dark, adminSettings, allUsers, newUserForm,
                   type="checkbox"
                   id="is_admin"
                   checked={newUserForm.is_admin}
-                  onChange={(e) => setNewUserForm(prev => ({ ...prev, is_admin: e.target.checked }))}
+                  onChange={(e) =>
+                    setNewUserForm((prev) => ({
+                      ...prev,
+                      is_admin: e.target.checked,
+                    }))
+                  }
                   className="mr-2"
                 />
-                <label htmlFor="is_admin" className="text-sm">Make admin</label>
+                <label htmlFor="is_admin" className="text-sm">{t("makeAdmin")}</label>
               </div>
               <button
                 type="submit"
                 disabled={isCreatingUser}
                 className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
               >
-                {isCreatingUser ? "Creating..." : "Create User"}
+                {isCreatingUser ? "Creating..." : t("createUser")}
               </button>
             </form>
           </div>
 
           {/* Users List Section */}
           <div>
-            <h4 className="text-md font-semibold mb-4">All Users ({allUsers.length})</h4>
+            <h4 className="text-md font-semibold mb-4">{t("allUsers")} ({allUsers.length})
+            </h4>
             <div className="space-y-3">
               {allUsers.map((user) => (
-                <div key={user.id} className="p-3 border border-[var(--border-light)] rounded-lg">
+                <div
+                  key={user.id}
+                  className="p-3 border border-[var(--border-light)] rounded-lg"
+                >
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <div className="font-medium">{user.name}</div>
@@ -1980,38 +2534,34 @@ function AdminPanel({ open, onClose, dark, adminSettings, allUsers, newUserForm,
                     </div>
                     <div className="flex items-center gap-2">
                       {user.is_admin && (
-                        <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 rounded">
-                          Admin
-                        </span>
+                        <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 rounded">{t("admin")}</span>
                       )}
                       <button
                         onClick={() => openEditUserModal(user)}
                         className="px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded hover:bg-blue-200 dark:hover:bg-blue-800"
-                      >
-                        Edit
-                      </button>
+                      >{t("edit")}</button>
                       {user.id !== currentUser?.id && (
                         <button
                           onClick={() => {
                             showGenericConfirm({
-                              title: "Delete User",
-                              message: `Are you sure you want to delete ${user.name}?`,
-                              confirmText: "Delete",
+                              title: t("deleteUser"),
+                              message: t("deleteUserConfirmName").replace("{name}", user.name),
+                              confirmText: t("delete"),
                               danger: true,
-                              onConfirm: () => deleteUser(user.id)
+                              onConfirm: () => deleteUser(user.id),
                             });
                           }}
                           className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
-                        >
-                          Delete
-                        </button>
+                        >{t("delete")}</button>
                       )}
                     </div>
                   </div>
                   <div className="text-xs text-gray-500 space-y-1">
-                    <div>Notes: {user.notes}</div>
-                    <div>Storage: {formatBytes(user.storage_bytes ?? 0)}</div>
-                    <div>Joined: {new Date(user.created_at).toLocaleDateString()}</div>
+                    <div>{t("notes")}: {user.notes}</div>
+                    <div>{t("storage")}: {formatBytes(user.storage_bytes ?? 0)}</div>
+                    <div>
+                      Joined: {new Date(user.created_at).toLocaleDateString()}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -2024,36 +2574,51 @@ function AdminPanel({ open, onClose, dark, adminSettings, allUsers, newUserForm,
       {editUserModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold mb-4">Edit User</h3>
+            <h3 className="text-lg font-semibold mb-4">{t("editUser")}</h3>
             <form onSubmit={handleUpdateUser} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Name</label>
+                <label className="block text-sm font-medium mb-1">{t("name")}</label>
                 <input
                   type="text"
                   value={editUserForm.name}
-                  onChange={(e) => setEditUserForm(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) =>
+                    setEditUserForm((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                    }))
+                  }
                   className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Username</label>
+                <label className="block text-sm font-medium mb-1">{t("username")}</label>
                 <input
                   type="text"
                   value={editUserForm.email}
-                  onChange={(e) => setEditUserForm(prev => ({ ...prev, email: e.target.value }))}
+                  onChange={(e) =>
+                    setEditUserForm((prev) => ({
+                      ...prev,
+                      email: e.target.value,
+                    }))
+                  }
                   className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Password (leave empty to keep current)</label>
+                <label className="block text-sm font-medium mb-1">{t("passwordLeaveEmptyKeepCurrent")}</label>
                 <input
                   type="password"
                   value={editUserForm.password}
-                  onChange={(e) => setEditUserForm(prev => ({ ...prev, password: e.target.value }))}
+                  onChange={(e) =>
+                    setEditUserForm((prev) => ({
+                      ...prev,
+                      password: e.target.value,
+                    }))
+                  }
                   className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400"
-                  placeholder="Leave empty to keep current password"
+                  placeholder={t("leaveEmptyKeepCurrentPassword")}
                 />
               </div>
               <div className="flex items-center">
@@ -2061,25 +2626,28 @@ function AdminPanel({ open, onClose, dark, adminSettings, allUsers, newUserForm,
                   type="checkbox"
                   id="edit_is_admin"
                   checked={editUserForm.is_admin}
-                  onChange={(e) => setEditUserForm(prev => ({ ...prev, is_admin: e.target.checked }))}
+                  onChange={(e) =>
+                    setEditUserForm((prev) => ({
+                      ...prev,
+                      is_admin: e.target.checked,
+                    }))
+                  }
                   className="mr-2"
                 />
-                <label htmlFor="edit_is_admin" className="text-sm">Make admin</label>
+                <label htmlFor="edit_is_admin" className="text-sm">{t("makeAdmin")}</label>
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setEditUserModalOpen(false)}
                   className="px-4 py-2 border border-[var(--border-light)] rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
-                >
-                  Cancel
-                </button>
+                >{t("cancel")}</button>
                 <button
                   type="submit"
                   disabled={isUpdatingUser}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {isUpdatingUser ? "Updating..." : "Update User"}
+                  {isUpdatingUser ? "Updating..." : t("updateUser")}
                 </button>
               </div>
             </form>
@@ -2092,26 +2660,57 @@ function AdminPanel({ open, onClose, dark, adminSettings, allUsers, newUserForm,
 
 /** ---------- NotesUI (presentational) ---------- */
 function NotesUI({
-  currentUser, dark, toggleDark,
-  search, setSearch,
-  composerType, setComposerType,
-  title, setTitle,
-  content, setContent, contentRef,
-  clInput, setClInput, addComposerItem, clItems,
-  composerDrawingData, setComposerDrawingData,
-  composerImages, setComposerImages, composerFileRef,
-  tags, setTags,
-  composerColor, setComposerColor,
+  currentUser,
+  dark,
+  toggleDark,
+  search,
+  setSearch,
+  composerType,
+  setComposerType,
+  title,
+  setTitle,
+  content,
+  setContent,
+  contentRef,
+  clInput,
+  setClInput,
+  addComposerItem,
+  clItems,
+  composerDrawingData,
+  setComposerDrawingData,
+  composerImages,
+  setComposerImages,
+  composerFileRef,
+  tags,
+  setTags,
+  composerColor,
+  setComposerColor,
   addNote,
-  pinned, others,
+  pinned,
+  others,
   openModal,
-  onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
   togglePin,
   addImagesToState,
-  onExportAll, onImportAll, onImportGKeep, onImportMd, onDownloadSecretKey, importFileRef, gkeepFileRef, mdFileRef, signOut,
-  filteredEmptyWithSearch, allEmpty,
-  headerMenuOpen, setHeaderMenuOpen,
-  headerMenuRef, headerBtnRef,
+  onExportAll,
+  onImportAll,
+  onImportGKeep,
+  onImportMd,
+  onDownloadSecretKey,
+  importFileRef,
+  gkeepFileRef,
+  mdFileRef,
+  signOut,
+  filteredEmptyWithSearch,
+  allEmpty,
+  headerMenuOpen,
+  setHeaderMenuOpen,
+  headerMenuRef,
+  headerBtnRef,
   // new for sidebar
   openSidebar,
   activeTagFilter,
@@ -2119,14 +2718,18 @@ function NotesUI({
   sidebarWidth,
   // formatting
   formatComposer,
-  showComposerFmt, setShowComposerFmt,
+  showComposerFmt,
+  setShowComposerFmt,
   composerFmtBtnRef,
   onComposerKeyDown,
   // collapsed composer
-  composerCollapsed, setComposerCollapsed,
+  composerCollapsed,
+  setComposerCollapsed,
   titleRef,
   // color popover
-  colorBtnRef, showColorPop, setShowColorPop,
+  colorBtnRef,
+  showColorPop,
+  setShowColorPop,
   // loading state
   notesLoading,
   // multi-select
@@ -2157,15 +2760,22 @@ function NotesUI({
   // Settings panel
   openSettingsPanel,
   // AI props
-  localAiEnabled, aiResponse, setAiResponse, isAiLoading, aiLoadingProgress, onAiSearch
+  localAiEnabled,
+  aiResponse,
+  setAiResponse,
+  isAiLoading,
+  aiLoadingProgress,
+  onAiSearch,
 }) {
   // Multi-select color popover (local UI state)
   const multiColorBtnRef = useRef(null);
   const [showMultiColorPop, setShowMultiColorPop] = useState(false);
   const tagLabel =
-    activeTagFilter === ALL_IMAGES ? "All Images" :
-      activeTagFilter === 'ARCHIVED' ? "Archived Notes" :
-        activeTagFilter;
+    activeTagFilter === ALL_IMAGES
+      ? t("allImages")
+      : activeTagFilter === "ARCHIVED"
+        ? t("archivedNotes")
+        : activeTagFilter;
 
   // Close header menu when scrolling
   React.useEffect(() => {
@@ -2175,71 +2785,89 @@ function NotesUI({
       setHeaderMenuOpen(false);
     };
 
-    const scrollContainer = document.querySelector('.min-h-screen');
+    const scrollContainer = document.querySelector(".min-h-screen");
     if (scrollContainer) {
-      scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
-      return () => scrollContainer.removeEventListener('scroll', handleScroll);
+      scrollContainer.addEventListener("scroll", handleScroll, {
+        passive: true,
+      });
+      return () => scrollContainer.removeEventListener("scroll", handleScroll);
     }
   }, [headerMenuOpen, setHeaderMenuOpen]);
 
   return (
     <div
       className="min-h-screen"
-      style={{ marginLeft: sidebarPermanent ? `${sidebarWidth}px` : '0px' }}
+      style={{ marginLeft: sidebarPermanent ? `${sidebarWidth}px` : "0px" }}
     >
       {/* Multi-select toolbar (floats above header when active) */}
       {multiMode && (
-        <div className="p-3 sm:p-4 flex items-center justify-between sticky top-0 z-[25] glass-card mb-2" style={{ position: "sticky" }}>
+        <div
+          className="p-3 sm:p-4 flex items-center justify-between sticky top-0 z-[25] glass-card mb-2"
+          style={{ position: "sticky" }}
+        >
           <div className="flex items-center gap-2 flex-wrap">
-            <button className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm" onClick={onBulkDownloadZip}>
-              Download (.zip)
-            </button>
-            <button className="px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm" onClick={onBulkDelete}>
-              Delete
-            </button>
+            <button
+              className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
+              onClick={onBulkDownloadZip}
+            >{t("downloadZip")}</button>
+            <button
+              className="px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm"
+              onClick={onBulkDelete}
+            >{t("delete")}</button>
             <button
               ref={multiColorBtnRef}
               type="button"
               onClick={() => setShowMultiColorPop((v) => !v)}
               className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
-              title="Color"
+              title={t("color")}
+            >{t("colorEmoji")}</button>
+            <Popover
+              anchorRef={multiColorBtnRef}
+              open={showMultiColorPop}
+              onClose={() => setShowMultiColorPop(false)}
             >
-              🎨 Color
-            </button>
-            <Popover anchorRef={multiColorBtnRef} open={showMultiColorPop} onClose={() => setShowMultiColorPop(false)}>
-              <div className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}>
+              <div
+                className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
+              >
                 <div className="grid grid-cols-6 gap-2">
-                  {COLOR_ORDER.filter((name) => LIGHT_COLORS[name]).map((name) => (
-                    <ColorDot
-                      key={name}
-                      name={name}
-                      darkMode={dark}
-                      selected={false}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onBulkColor(name);
-                        setShowMultiColorPop(false);
-                      }}
-                    />
-                  ))}
+                  {COLOR_ORDER.filter((name) => LIGHT_COLORS[name]).map(
+                    (name) => (
+                      <ColorDot
+                        key={name}
+                        name={name}
+                        darkMode={dark}
+                        selected={false}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onBulkColor(name);
+                          setShowMultiColorPop(false);
+                        }}
+                      />
+                    ),
+                  )}
                 </div>
               </div>
             </Popover>
-            {activeTagFilter !== 'ARCHIVED' && (
-              <button className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1" onClick={() => onBulkPin(true)}>
-                <PinIcon />
-                Pin
-              </button>
+            {activeTagFilter !== "ARCHIVED" && (
+              <button
+                className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1"
+                onClick={() => onBulkPin(true)}
+              >
+                <PinIcon />{t("pin")}</button>
             )}
-            <button className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1" onClick={onBulkArchive}>
+            <button
+              className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1"
+              onClick={onBulkArchive}
+            >
               <ArchiveIcon />
-              {activeTagFilter === 'ARCHIVED' ? 'Unarchive' : 'Archive'}
+              {activeTagFilter === "ARCHIVED" ? "Unarchive" : t("archive")}
             </button>
-            <span className="text-xs opacity-70 ml-2">Selected: {selectedIds.length}</span>
+            <span className="text-xs opacity-70 ml-2">{t("selectedPrefix")} {selectedIds.length}
+            </span>
           </div>
           <button
             className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-            title="Exit multi-select"
+            title={t("exitMultiSelect")}
             onClick={onExitMulti}
           >
             <CloseIcon />
@@ -2255,8 +2883,8 @@ function NotesUI({
             <button
               onClick={openSidebar}
               className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              title="Open tags"
-              aria-label="Open tags"
+              title={t("openTags")}
+              aria-label={t("openTags")}
             >
               <Hamburger />
             </button>
@@ -2266,23 +2894,25 @@ function NotesUI({
           <img
             src="/favicon-32x32.png"
             srcSet="/pwa-192.png 2x, /pwa-512.png 3x"
-            alt="Glass Keep logo"
+            alt={t("glassKeepLogo")}
             className="h-7 w-7 rounded-xl shadow-sm select-none pointer-events-none"
             draggable="false"
           />
 
-          <h1 className="hidden sm:block text-2xl sm:text-3xl font-bold">Glass Keep</h1>
+          <h1 className="hidden sm:block text-2xl sm:text-3xl font-bold">
+            Glass Keep
+          </h1>
           {activeTagFilter && (
             <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20">
-              {tagLabel === "All Images" || tagLabel === "Archived Notes" ? tagLabel : `Tag: ${tagLabel}`}
+              {tagLabel === t("allImages") || tagLabel === t("archivedNotes")
+                ? tagLabel
+                : `Tag: ${tagLabel}`}
             </span>
           )}
 
           {/* Offline indicator */}
           {!isOnline && (
-            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20">
-              Offline
-            </span>
+            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20">{t("offline")}</span>
           )}
         </div>
 
@@ -2290,12 +2920,16 @@ function NotesUI({
           <div className="relative w-full max-w-lg">
             <input
               type="text"
-              placeholder={localAiEnabled ? "Search or Ask AI..." : "Search..."}
-              className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-4 ${localAiEnabled ? 'pr-14' : 'pr-8'} py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
+		placeholder={localAiEnabled ? t("searchOrAskAi") : t("search")}
+              className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-4 ${localAiEnabled ? "pr-14" : "pr-8"} py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && localAiEnabled && search.trim().length > 0) {
+                if (
+                  e.key === "Enter" &&
+                  localAiEnabled &&
+                  search.trim().length > 0
+                ) {
                   onAiSearch?.(search);
                 }
               }}
@@ -2304,7 +2938,7 @@ function NotesUI({
               {localAiEnabled && search.trim().length > 0 && (
                 <button
                   type="button"
-                  title="Ask AI"
+                  title={t("askAi")}
                   className="h-7 w-7 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
                   onClick={() => onAiSearch?.(search)}
                 >
@@ -2314,7 +2948,7 @@ function NotesUI({
               {search && (
                 <button
                   type="button"
-                  aria-label="Clear search"
+                  aria-label={t("clearSearch")}
                   className="h-6 w-6 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
                   onClick={() => setSearch("")}
                 >
@@ -2326,8 +2960,10 @@ function NotesUI({
         </div>
 
         <div className="relative flex items-center gap-3">
-          <span className={`text-sm hidden sm:inline ${dark ? "text-gray-100" : "text-gray-900"}`}>
-            {currentUser?.name ? `Hi, ${currentUser.name}` : currentUser?.email}
+          <span
+            className={`text-sm hidden sm:inline ${dark ? "text-gray-100" : "text-gray-900"}`}
+          >
+            {currentUser?.name ? `${t("hiPrefix")} ${currentUser.name}` : currentUser?.email}
           </span>
 
           {/* Header 3-dot menu */}
@@ -2335,7 +2971,7 @@ function NotesUI({
             ref={headerBtnRef}
             onClick={() => setHeaderMenuOpen((v) => !v)}
             className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
-            title="Menu"
+            title={t("menu")}
             aria-haspopup="menu"
             aria-expanded={headerMenuOpen}
           >
@@ -2355,52 +2991,61 @@ function NotesUI({
                 style={{ backgroundColor: dark ? "#222222" : undefined }}
                 onClick={(e) => e.stopPropagation()}
               >
-
                 <button
                   className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                  onClick={() => { setHeaderMenuOpen(false); openSettingsPanel?.(); }}
+                  onClick={() => {
+                    setHeaderMenuOpen(false);
+                    openSettingsPanel?.();
+                  }}
                 >
-                  <SettingsIcon />
-                  Settings
-                </button>
+                  <SettingsIcon />{t("settings")}</button>
                 <button
                   className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                  onClick={() => { setHeaderMenuOpen(false); onToggleViewMode?.(); }}
+                  onClick={() => {
+                    setHeaderMenuOpen(false);
+                    onToggleViewMode?.();
+                  }}
                 >
                   {listView ? <GridIcon /> : <ListIcon />}
-                  {listView ? "Grid View" : "List View"}
+                  {listView ? t("gridView") : t("listView")}
                 </button>
                 {/* Theme toggle text item */}
                 <button
                   className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                  onClick={() => { setHeaderMenuOpen(false); toggleDark?.(); }}
+                  onClick={() => {
+                    setHeaderMenuOpen(false);
+                    toggleDark?.();
+                  }}
                 >
                   {dark ? <SunIcon /> : <MoonIcon />}
-                  {dark ? "Light Mode" : "Dark Mode"}
+                  {dark ? t("lightMode") : t("darkMode")}
                 </button>
                 <button
                   className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                  onClick={() => { setHeaderMenuOpen(false); onStartMulti?.(); }}
+                  onClick={() => {
+                    setHeaderMenuOpen(false);
+                    onStartMulti?.();
+                  }}
                 >
-                  <CheckSquareIcon />
-                  Multi select
-                </button>
+                  <CheckSquareIcon />{t("multiSelect")}</button>
                 {currentUser?.is_admin && (
                   <button
                     className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                    onClick={() => { setHeaderMenuOpen(false); openAdminPanel?.(); }}
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      openAdminPanel?.();
+                    }}
                   >
-                    <ShieldIcon />
-                    Admin Panel
-                  </button>
+                    <ShieldIcon />{t("adminPanel")}</button>
                 )}
                 <button
                   className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
-                  onClick={() => { setHeaderMenuOpen(false); signOut?.(); }}
+                  onClick={() => {
+                    setHeaderMenuOpen(false);
+                    signOut?.();
+                  }}
                 >
-                  <LogOutIcon />
-                  Sign out
-                </button>
+                  <LogOutIcon />{t("signOut")}</button>
               </div>
             </>
           )}
@@ -2454,18 +3099,24 @@ function NotesUI({
         <div className="px-4 sm:px-6 md:px-8 lg:px-12 mb-6">
           <div className="max-w-2xl mx-auto glass-card rounded-xl shadow-lg p-5 border border-indigo-500/30 relative overflow-hidden bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/30 dark:to-purple-950/30">
             {isAiLoading && (
-              <div className="absolute top-0 left-0 h-1 bg-indigo-500 transition-all duration-300"
-                style={{ width: aiLoadingProgress ? `${aiLoadingProgress}%` : '5%' }}
+              <div
+                className="absolute top-0 left-0 h-1 bg-indigo-500 transition-all duration-300"
+                style={{
+                  width: aiLoadingProgress ? `${aiLoadingProgress}%` : "5%",
+                }}
               />
             )}
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="text-indigo-600 dark:text-indigo-400" />
-              <h3 className="font-semibold text-indigo-700 dark:text-indigo-300">AI Assistant</h3>
+              <h3 className="font-semibold text-indigo-700 dark:text-indigo-300">{t("aiAssistant")}</h3>
               {aiResponse && !isAiLoading && (
                 <button
-                  onClick={() => { setAiResponse(null); setSearch(''); }}
+                  onClick={() => {
+                    setAiResponse(null);
+                    setSearch("");
+                  }}
                   className="ml-auto p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
-                  title="Clear response"
+                  title={t("clearResponse")}
                 >
                   <CloseIcon />
                 </button>
@@ -2474,13 +3125,13 @@ function NotesUI({
             <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
               {isAiLoading ? (
                 <p className="animate-pulse text-gray-500 italic flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" />
-                  AI Assistant is thinking...
-                </p>
+                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" />{t("aiAssistantThinking")}</p>
               ) : (
                 <div
                   className="text-gray-800 dark:text-gray-200 note-content"
-                  dangerouslySetInnerHTML={{ __html: marked.parse(aiResponse || "") }}
+                  dangerouslySetInnerHTML={{
+                    __html: marked.parse(aiResponse || ""),
+                  }}
                 />
               )}
             </div>
@@ -2494,12 +3145,22 @@ function NotesUI({
           {!isOnline ? (
             <div className="glass-card rounded-xl shadow-lg p-6 mb-8 text-center">
               <div className="text-orange-600 dark:text-orange-400 mb-2">
-                <svg className="w-8 h-8 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                <svg
+                  className="w-8 h-8 mx-auto mb-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold mb-2">You're offline</h3>
-              <p className="text-gray-600 dark:text-gray-400">Please go back online to add notes.</p>
+              <h3 className="text-lg font-semibold mb-2">{t("youAreOffline")}</h3>
+              <p className="text-gray-600 dark:text-gray-400">{t("goBackOnlineToAddNotes")}</p>
             </div>
           ) : (
             <div
@@ -2510,13 +3171,13 @@ function NotesUI({
               {composerCollapsed ? (
                 <input
                   value={content}
-                  onChange={(e) => { }}
+                  onChange={(e) => {}}
                   onFocus={() => {
                     // expand and focus title
                     setComposerCollapsed(false);
                     setTimeout(() => titleRef.current?.focus(), 10);
                   }}
-                  placeholder="Write a note..."
+                  placeholder={t("writeNote")}
                   className="w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2"
                 />
               ) : (
@@ -2526,10 +3187,11 @@ function NotesUI({
                     ref={titleRef}
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Title"
+                    placeholder={t("noteTitle")}
                     disabled={!isOnline}
-                    className={`w-full bg-transparent text-lg font-semibold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none mb-2 p-2 ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
+                    className={`w-full bg-transparent text-lg font-semibold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none mb-2 p-2 ${
+                      !isOnline ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   />
 
                   {/* Body, Checklist, or Drawing */}
@@ -2539,10 +3201,11 @@ function NotesUI({
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
                       onKeyDown={onComposerKeyDown}
-                      placeholder="Write a note..."
+                      placeholder={t("writeNote")}
                       disabled={!isOnline}
-                      className={`w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none p-2 ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
+                      className={`w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none p-2 ${
+                        !isOnline ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
                       rows={1}
                     />
                   ) : composerType === "checklist" ? (
@@ -2551,27 +3214,37 @@ function NotesUI({
                         <input
                           value={clInput}
                           onChange={(e) => setClInput(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addComposerItem(); } }}
-                          placeholder="List item…"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addComposerItem();
+                            }
+                          }}
+                          placeholder={t("listItemEllipsis")}
                           disabled={!isOnline}
-                          className={`flex-1 bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2 border-b border-[var(--border-light)] ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''
-                            }`}
+                          className={`flex-1 bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2 border-b border-[var(--border-light)] ${
+                            !isOnline ? "opacity-50 cursor-not-allowed" : ""
+                          }`}
                         />
                         <button
                           onClick={addComposerItem}
                           disabled={!isOnline}
-                          className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${isOnline
-                            ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                            : 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                            }`}
-                        >
-                          Add
-                        </button>
+                          className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${
+                            isOnline
+                              ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                              : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                          }`}
+                        >{t("add")}</button>
                       </div>
                       {clItems.length > 0 && (
                         <div className="space-y-2">
                           {clItems.map((it) => (
-                            <ChecklistRow key={it.id} item={it} readOnly disableToggle />
+                            <ChecklistRow
+                              key={it.id}
+                              item={it}
+                              readOnly
+                              disableToggle
+                            />
                           ))}
                         </div>
                       )}
@@ -2593,11 +3266,19 @@ function NotesUI({
                     <div className="mt-3 flex gap-2 overflow-x-auto">
                       {composerImages.map((im) => (
                         <div key={im.id} className="relative">
-                          <img src={im.src} alt={im.name} className="h-16 w-24 object-cover rounded-md border border-[var(--border-light)]" />
+                          <img
+                            src={im.src}
+                            alt={im.name}
+                            className="h-16 w-24 object-cover rounded-md border border-[var(--border-light)]"
+                          />
                           <button
-                            title="Remove image"
+                            title={t("removeImage")}
                             className="absolute -top-2 -right-2 bg-black/70 text-white rounded-full w-5 h-5 text-xs"
-                            onClick={() => setComposerImages((prev) => prev.filter((x) => x.id !== im.id))}
+                            onClick={() =>
+                              setComposerImages((prev) =>
+                                prev.filter((x) => x.id !== im.id),
+                              )
+                            }
                           >
                             ×
                           </button>
@@ -2612,10 +3293,11 @@ function NotesUI({
                       value={tags}
                       onChange={(e) => setTags(e.target.value)}
                       type="text"
-                      placeholder="Add tags (comma-separated)"
+                      placeholder={t("addTagsCommaSeparated")}
                       disabled={!isOnline}
-                      className={`w-full sm:flex-1 bg-transparent text-sm placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2 ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
+                      className={`w-full sm:flex-1 bg-transparent text-sm placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2 ${
+                        !isOnline ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
                     />
 
                     <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap sm:flex-none relative">
@@ -2627,16 +3309,21 @@ function NotesUI({
                             type="button"
                             onClick={() => setShowComposerFmt((v) => !v)}
                             className="px-2 py-1 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2 text-sm"
-                            title="Formatting"
+                            title={t("formatting")}
                           >
-                            <FormatIcon /> Formatting
-                          </button>
+                            <FormatIcon />{t("formatting")}</button>
                           <Popover
                             anchorRef={composerFmtBtnRef}
                             open={showComposerFmt}
                             onClose={() => setShowComposerFmt(false)}
                           >
-                            <FormatToolbar dark={dark} onAction={(t) => { setShowComposerFmt(false); formatComposer(t); }} />
+                            <FormatToolbar
+                              dark={dark}
+                              onAction={(t) => {
+                                setShowComposerFmt(false);
+                                formatComposer(t);
+                              }}
+                            />
                           </Popover>
                         </>
                       )}
@@ -2646,33 +3333,36 @@ function NotesUI({
                         <button
                           type="button"
                           onClick={() => setComposerType("text")}
-                          className={`px-2 py-1 rounded-lg border text-sm ${composerType === "text"
-                            ? 'bg-indigo-600 text-white border-indigo-600'
-                            : 'border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10'
-                            }`}
-                          title="Text note"
+                          className={`px-2 py-1 rounded-lg border text-sm ${
+                            composerType === "text"
+                              ? "bg-indigo-600 text-white border-indigo-600"
+                              : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
+                          }`}
+                          title={t("textNote")}
                         >
                           📝
                         </button>
                         <button
                           type="button"
                           onClick={() => setComposerType("checklist")}
-                          className={`px-2 py-1 rounded-lg border text-sm ${composerType === "checklist"
-                            ? 'bg-indigo-600 text-white border-indigo-600'
-                            : 'border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10'
-                            }`}
-                          title="Checklist"
+                          className={`px-2 py-1 rounded-lg border text-sm ${
+                            composerType === "checklist"
+                              ? "bg-indigo-600 text-white border-indigo-600"
+                              : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
+                          }`}
+                          title={t("checklist")}
                         >
                           ✅
                         </button>
                         <button
                           type="button"
                           onClick={() => setComposerType("draw")}
-                          className={`px-2 py-1 rounded-lg border text-sm ${composerType === "draw"
-                            ? 'bg-indigo-600 text-white border-indigo-600'
-                            : 'border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10'
-                            }`}
-                          title="Drawing"
+                          className={`px-2 py-1 rounded-lg border text-sm ${
+                            composerType === "draw"
+                              ? "bg-indigo-600 text-white border-indigo-600"
+                              : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
+                          }`}
+                          title={t("drawing")}
                         >
                           🖌️
                         </button>
@@ -2684,14 +3374,25 @@ function NotesUI({
                         type="button"
                         onClick={() => setShowColorPop((v) => !v)}
                         className="w-6 h-6 rounded-full border-2 border-[var(--border-light)] hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 flex items-center justify-center"
-                        title="Color"
+                        title={t("color")}
                         style={{
-                          backgroundColor: composerColor === "default" ? "transparent" : solid(bgFor(composerColor, dark)),
-                          borderColor: composerColor === "default" ? "#d1d5db" : solid(bgFor(composerColor, dark)),
+                          backgroundColor:
+                            composerColor === "default"
+                              ? "transparent"
+                              : solid(bgFor(composerColor, dark)),
+                          borderColor:
+                            composerColor === "default"
+                              ? "#d1d5db"
+                              : solid(bgFor(composerColor, dark)),
                         }}
                       >
                         {composerColor === "default" && (
-                          <div className="w-4 h-4 rounded-full" style={{ backgroundColor: dark ? "#1f2937" : "#fff" }} />
+                          <div
+                            className="w-4 h-4 rounded-full"
+                            style={{
+                              backgroundColor: dark ? "#1f2937" : "#fff",
+                            }}
+                          />
                         )}
                       </button>
                       <Popover
@@ -2699,9 +3400,13 @@ function NotesUI({
                         open={showColorPop}
                         onClose={() => setShowColorPop(false)}
                       >
-                        <div className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}>
+                        <div
+                          className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
+                        >
                           <div className="grid grid-cols-6 gap-2">
-                            {COLOR_ORDER.filter((name) => LIGHT_COLORS[name]).map((name) => (
+                            {COLOR_ORDER.filter(
+                              (name) => LIGHT_COLORS[name],
+                            ).map((name) => (
                               <ColorDot
                                 key={name}
                                 name={name}
@@ -2732,16 +3437,17 @@ function NotesUI({
                             try {
                               const src = await fileToCompressedDataURL(f);
                               results.push({ id: uid(), src, name: f.name });
-                            } catch (e) { }
+                            } catch (e) {}
                           }
-                          if (results.length) setComposerImages((prev) => [...prev, ...results]);
+                          if (results.length)
+                            setComposerImages((prev) => [...prev, ...results]);
                           e.target.value = "";
                         }}
                       />
                       <button
                         onClick={() => composerFileRef.current?.click()}
                         className="px-2 py-1 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 flex-shrink-0 text-lg"
-                        title="Add images"
+                        title={t("addImages")}
                       >
                         🖼️
                       </button>
@@ -2750,13 +3456,12 @@ function NotesUI({
                       <button
                         onClick={addNote}
                         disabled={!isOnline}
-                        className={`px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-colors whitespace-nowrap flex-shrink-0 ${isOnline
-                          ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                          : 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                          }`}
-                      >
-                        Add Note
-                      </button>
+                        className={`px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-colors whitespace-nowrap flex-shrink-0 ${
+                          isOnline
+                            ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                            : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                        }`}
+                      >{t("addNote")}</button>
                     </div>
                   </div>
                 </>
@@ -2764,117 +3469,118 @@ function NotesUI({
             </div>
           )}
         </div>
-      </div >
+      </div>
 
       {/* Notes lists */}
-      < main className="px-4 sm:px-6 md:px-8 lg:px-12 pb-12" >
-        {
-          pinned.length > 0 && (
-            <section className="mb-10">
-              {listView ? (
+      <main className="px-4 sm:px-6 md:px-8 lg:px-12 pb-12">
+        {pinned.length > 0 && (
+          <section className="mb-10">
+            {listView ? (
+              <div className="max-w-2xl mx-auto">
+                <h2 className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
+                  {t("pinned")}
+                </h2>
+              </div>
+            ) : (
+              <h2 className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
+                {t("pinned")}
+              </h2>
+            )}
+            <div
+              className={
+                listView ? "max-w-2xl mx-auto space-y-6" : "masonry-grid"
+              }
+            >
+              {pinned.map((n) => (
+                <NoteCard
+                  key={n.id}
+                  n={n}
+                  dark={dark}
+                  openModal={openModal}
+                  togglePin={togglePin}
+                  multiMode={multiMode}
+                  selected={selectedIds.includes(String(n.id))}
+                  onToggleSelect={onToggleSelect}
+                  disablePin={
+                    "ontouchstart" in window ||
+                    navigator.maxTouchPoints > 0 ||
+                    activeTagFilter === "ARCHIVED"
+                  }
+                  onDragStart={onDragStart}
+                  onDragOver={onDragOver}
+                  onDragLeave={onDragLeave}
+                  onDrop={onDrop}
+                  onDragEnd={onDragEnd}
+                  isOnline={isOnline}
+                  onUpdateChecklistItem={onUpdateChecklistItem}
+                  currentUser={currentUser}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {others.length > 0 && (
+          <section>
+            {pinned.length > 0 &&
+              (listView ? (
                 <div className="max-w-2xl mx-auto">
                   <h2 className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
-                    Pinned
+                    {t("others")}
                   </h2>
                 </div>
               ) : (
                 <h2 className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
-                  Pinned
+                  {t("others")}
                 </h2>
-              )}
-              <div className={listView ? "max-w-2xl mx-auto space-y-6" : "masonry-grid"}>
-                {pinned.map((n) => (
-                  <NoteCard
-                    key={n.id}
-                    n={n}
-                    dark={dark}
-                    openModal={openModal}
-                    togglePin={togglePin}
-                    multiMode={multiMode}
-                    selected={selectedIds.includes(String(n.id))}
-                    onToggleSelect={onToggleSelect}
-                    disablePin={('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || activeTagFilter === 'ARCHIVED'}
-                    onDragStart={onDragStart}
-                    onDragOver={onDragOver}
-                    onDragLeave={onDragLeave}
-                    onDrop={onDrop}
-                    onDragEnd={onDragEnd}
-                    isOnline={isOnline}
-                    onUpdateChecklistItem={onUpdateChecklistItem}
-                    currentUser={currentUser}
-                  />
-                ))}
-              </div>
-            </section>
-          )
-        }
+              ))}
+            <div
+              className={
+                listView ? "max-w-2xl mx-auto space-y-6" : "masonry-grid"
+              }
+            >
+              {others.map((n) => (
+                <NoteCard
+                  key={n.id}
+                  n={n}
+                  dark={dark}
+                  openModal={openModal}
+                  togglePin={togglePin}
+                  multiMode={multiMode}
+                  selected={selectedIds.includes(String(n.id))}
+                  onToggleSelect={onToggleSelect}
+                  disablePin={
+                    "ontouchstart" in window ||
+                    navigator.maxTouchPoints > 0 ||
+                    activeTagFilter === "ARCHIVED"
+                  }
+                  onDragStart={onDragStart}
+                  onDragOver={onDragOver}
+                  onDragLeave={onDragLeave}
+                  onDrop={onDrop}
+                  onDragEnd={onDragEnd}
+                  isOnline={isOnline}
+                  onUpdateChecklistItem={onUpdateChecklistItem}
+                  currentUser={currentUser}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
-        {
-          others.length > 0 && (
-            <section>
-              {pinned.length > 0 && (
-                listView ? (
-                  <div className="max-w-2xl mx-auto">
-                    <h2 className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
-                      Others
-                    </h2>
-                  </div>
-                ) : (
-                  <h2 className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
-                    Others
-                  </h2>
-                )
-              )}
-              <div className={listView ? "max-w-2xl mx-auto space-y-6" : "masonry-grid"}>
-                {others.map((n) => (
-                  <NoteCard
-                    key={n.id}
-                    n={n}
-                    dark={dark}
-                    openModal={openModal}
-                    togglePin={togglePin}
-                    multiMode={multiMode}
-                    selected={selectedIds.includes(String(n.id))}
-                    onToggleSelect={onToggleSelect}
-                    disablePin={('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || activeTagFilter === 'ARCHIVED'}
-                    onDragStart={onDragStart}
-                    onDragOver={onDragOver}
-                    onDragLeave={onDragLeave}
-                    onDrop={onDrop}
-                    onDragEnd={onDragEnd}
-                    isOnline={isOnline}
-                    onUpdateChecklistItem={onUpdateChecklistItem}
-                    currentUser={currentUser}
-                  />
-                ))}
-              </div>
-            </section>
-          )
-        }
-
-        {
-          notesLoading && (pinned.length + others.length === 0) && (
-            <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
-              Loading Notes…
-            </p>
-          )
-        }
-        {
-          !notesLoading && filteredEmptyWithSearch && (
-            <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
-              No matching notes found.
-            </p>
-          )
-        }
-        {
-          !notesLoading && allEmpty && (
-            <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
-              No notes yet. Add one to get started!
-            </p>
-          )
-        }
-      </main >
-    </div >
+        {notesLoading && pinned.length + others.length === 0 && (
+          <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
+            Loading Notes…
+          </p>
+        )}
+        {!notesLoading && filteredEmptyWithSearch && (
+          <p className="text-center text-gray-500 dark:text-gray-400 mt-10">{t("noMatchingNotes")}</p>
+        )}
+        {!notesLoading && allEmpty && (
+          <p className="text-center text-gray-500 dark:text-gray-400 mt-10">{t("noNotesYet")}</p>
+        )}
+      </main>
+    </div>
   );
 }
 
@@ -2900,10 +3606,10 @@ function AdminView({ dark }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to load users");
+      if (!res.ok) throw new Error(data?.error || t("failedLoadUsers"));
       setUsers(Array.isArray(data) ? data : []);
     } catch (e) {
-      alert(e.message || "Failed to load admin data");
+      alert(e.message || t("failedLoadAdminData"));
       setUsers([]);
     } finally {
       setLoading(false);
@@ -2917,26 +3623,29 @@ function AdminView({ dark }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "Delete failed");
+      if (!res.ok) throw new Error(data?.error || t("deleteFailed"));
       setUsers((prev) => prev.filter((u) => u.id !== id));
     } catch (e) {
-      alert(e.message || "Delete failed");
+      alert(e.message || t("deleteFailed"));
     }
   }
 
-  useEffect(() => { load(); }, []); // load once
+  useEffect(() => {
+    load();
+  }, []); // load once
 
   return (
     <div className="min-h-screen px-4 sm:px-6 md:px-8 lg:px-12 py-8">
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-4">Admin</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-4">{t("admin")}</h1>
         <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-          Manage registered users. You can remove users (this also deletes their notes).
+          Manage registered users. You can remove users (this also deletes their
+          notes).
         </p>
 
         <div className="glass-card rounded-xl p-4 shadow-lg overflow-x-auto">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-lg">Users</h2>
+            <h2 className="font-semibold text-lg">{t("users")}</h2>
             <button
               onClick={load}
               className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
@@ -2948,37 +3657,44 @@ function AdminView({ dark }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left border-b border-[var(--border-light)]">
-                <th className="py-2 pr-3">Name</th>
-                <th className="py-2 pr-3">Email / Username</th>
-                <th className="py-2 pr-3">Notes</th>
-                <th className="py-2 pr-3">Storage</th>
-                <th className="py-2 pr-3">Admin</th>
-                <th className="py-2 pr-3">Created</th>
-                <th className="py-2 pr-3">Actions</th>
+                <th className="py-2 pr-3">{t("name")}</th>
+                <th className="py-2 pr-3">{t("emailOrUsername")}</th>
+                <th className="py-2 pr-3">{t("notes")}</th>
+                <th className="py-2 pr-3">{t("storage")}</th>
+                <th className="py-2 pr-3">{t("admin")}</th>
+                <th className="py-2 pr-3">{t("created")}</th>
+                <th className="py-2 pr-3">{t("actions")}</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={7} className="py-6 text-center text-gray-500 dark:text-gray-400">
-                    No users found.
-                  </td>
+                  <td
+                    colSpan={7}
+                    className="py-6 text-center text-gray-500 dark:text-gray-400"
+                  >{t("noUsersFound")}</td>
                 </tr>
               )}
               {users.map((u) => (
-                <tr key={u.id} className="border-b border-[var(--border-light)] last:border-0">
+                <tr
+                  key={u.id}
+                  className="border-b border-[var(--border-light)] last:border-0"
+                >
                   <td className="py-2 pr-3">{u.name}</td>
                   <td className="py-2 pr-3">{u.email}</td>
                   <td className="py-2 pr-3">{u.notes ?? 0}</td>
-                  <td className="py-2 pr-3">{formatBytes(u.storage_bytes ?? 0)}</td>
+                  <td className="py-2 pr-3">
+                    {formatBytes(u.storage_bytes ?? 0)}
+                  </td>
                   <td className="py-2 pr-3">
                     <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.is_admin
-                        ? "bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/30"
-                        : "bg-gray-500/10 text-gray-700 dark:text-gray-300 border border-gray-500/20"
-                        }`}
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        u.is_admin
+                          ? "bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/30"
+                          : "bg-gray-500/10 text-gray-700 dark:text-gray-300 border border-gray-500/20"
+                      }`}
                     >
-                      {u.is_admin ? "Yes" : "No"}
+                      {u.is_admin ? t("yes") : t("no")}
                     </span>
                   </td>
                   <td className="py-2 pr-3">
@@ -2989,17 +3705,15 @@ function AdminView({ dark }) {
                       className="px-2.5 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700"
                       onClick={() => {
                         showGenericConfirm({
-                          title: "Delete User",
-                          message: "Delete this user and ALL their notes? This cannot be undone.",
-                          confirmText: "Delete",
+                          title: t("deleteUser"),
+                          message: t("deleteUserAndNotesConfirm"),
+                          confirmText: t("delete"),
                           danger: true,
-                          onConfirm: () => removeUser(u.id)
+                          onConfirm: () => removeUser(u.id),
                         });
                       }}
-                      title="Delete user"
-                    >
-                      Delete
-                    </button>
+                      title={t("deleteUser")}
+                    >{t("delete")}</button>
                   </td>
                 </tr>
               ))}
@@ -3007,7 +3721,9 @@ function AdminView({ dark }) {
           </table>
 
           {loading && (
-            <div className="mt-3 text-sm text-gray-500 dark:text-gray-400">Loading…</div>
+            <div className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+              Loading…
+            </div>
           )}
         </div>
       </div>
@@ -3038,10 +3754,18 @@ export default function App() {
   const [tagFilter, setTagFilter] = useState(null); // null = all, ALL_IMAGES = only notes with images
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [alwaysShowSidebarOnWide, setAlwaysShowSidebarOnWide] = useState(() => {
-    try { return localStorage.getItem("sidebarAlwaysVisible") === "true"; } catch (e) { return false; }
+    try {
+      return localStorage.getItem("sidebarAlwaysVisible") === "true";
+    } catch (e) {
+      return false;
+    }
   });
   const [sidebarWidth, setSidebarWidth] = useState(() => {
-    try { return parseInt(localStorage.getItem("sidebarWidth")) || 288; } catch (e) { return 288; }
+    try {
+      return parseInt(localStorage.getItem("sidebarWidth")) || 288;
+    } catch (e) {
+      return 288;
+    }
   });
 
   // Local AI
@@ -3049,7 +3773,9 @@ export default function App() {
     try {
       const stored = localStorage.getItem("localAiEnabled");
       return stored === null ? false : stored === "true";
-    } catch (e) { return false; }
+    } catch (e) {
+      return false;
+    }
   });
   const [aiResponse, setAiResponse] = useState(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -3074,7 +3800,10 @@ export default function App() {
   const [clInput, setClInput] = useState("");
 
   // Drawing composer
-  const [composerDrawingData, setComposerDrawingData] = useState({ paths: [], dimensions: null });
+  const [composerDrawingData, setComposerDrawingData] = useState({
+    paths: [],
+    dimensions: null,
+  });
 
   // Modal state
   const [open, setOpen] = useState(false);
@@ -3098,14 +3827,14 @@ export default function App() {
   // Toast notification system
   const [toasts, setToasts] = useState([]);
 
-  const showToast = (message, type = 'success', duration = 3000) => {
+  const showToast = (message, type = "success", duration = 3000) => {
     const id = Date.now();
     const toast = { id, message, type };
-    setToasts(prev => [...prev, toast]);
+    setToasts((prev) => [...prev, toast]);
 
     if (duration > 0) {
       setTimeout(() => {
-        setToasts(prev => prev.filter(t => t.id !== id));
+        setToasts((prev) => prev.filter((t) => t.id !== id));
       }, duration);
     }
 
@@ -3123,7 +3852,10 @@ export default function App() {
   const [mInput, setMInput] = useState("");
 
   // Drawing modal
-  const [mDrawingData, setMDrawingData] = useState({ paths: [], dimensions: null });
+  const [mDrawingData, setMDrawingData] = useState({
+    paths: [],
+    dimensions: null,
+  });
   const skipNextDrawingAutosave = useRef(false);
   const prevDrawingRef = useRef({ paths: [], dimensions: null });
 
@@ -3149,7 +3881,11 @@ export default function App() {
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
   const collaboratorInputRef = useRef(null);
 
   // Modal formatting
@@ -3204,11 +3940,21 @@ export default function App() {
   const [multiMode, setMultiMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]); // array of string ids
   const isSelected = (id) => selectedIds.includes(String(id));
-  const onStartMulti = () => { setMultiMode(true); setSelectedIds([]); };
-  const onExitMulti = () => { setMultiMode(false); setSelectedIds([]); };
+  const onStartMulti = () => {
+    setMultiMode(true);
+    setSelectedIds([]);
+  };
+  const onExitMulti = () => {
+    setMultiMode(false);
+    setSelectedIds([]);
+  };
   const onToggleSelect = (id, checked) => {
     const sid = String(id);
-    setSelectedIds((prev) => (checked ? Array.from(new Set([...prev, sid])) : prev.filter((x) => x !== sid)));
+    setSelectedIds((prev) =>
+      checked
+        ? Array.from(new Set([...prev, sid]))
+        : prev.filter((x) => x !== sid),
+    );
   };
   const onSelectAllPinned = () => {
     const ids = notes.filter((n) => n.pinned).map((n) => String(n.id));
@@ -3221,40 +3967,55 @@ export default function App() {
 
   // -------- View mode: Grid vs List --------
   const [listView, setListView] = useState(() => {
-    try { return localStorage.getItem("viewMode") === "list"; } catch (e) { return false; }
+    try {
+      return localStorage.getItem("viewMode") === "list";
+    } catch (e) {
+      return false;
+    }
   });
   useEffect(() => {
-    try { localStorage.setItem("viewMode", listView ? "list" : "grid"); } catch (e) { }
+    try {
+      localStorage.setItem("viewMode", listView ? "list" : "grid");
+    } catch (e) {}
   }, [listView]);
   const onToggleViewMode = () => setListView((v) => !v);
 
   // Save sidebar settings
   useEffect(() => {
-    try { localStorage.setItem("sidebarAlwaysVisible", String(alwaysShowSidebarOnWide)); } catch (e) { }
+    try {
+      localStorage.setItem(
+        "sidebarAlwaysVisible",
+        String(alwaysShowSidebarOnWide),
+      );
+    } catch (e) {}
   }, [alwaysShowSidebarOnWide]);
 
   useEffect(() => {
-    try { localStorage.setItem("sidebarWidth", String(sidebarWidth)); } catch (e) { }
+    try {
+      localStorage.setItem("sidebarWidth", String(sidebarWidth));
+    } catch (e) {}
   }, [sidebarWidth]);
 
   useEffect(() => {
-    try { localStorage.setItem("localAiEnabled", String(localAiEnabled)); } catch (e) { }
+    try {
+      localStorage.setItem("localAiEnabled", String(localAiEnabled));
+    } catch (e) {}
     if (!localAiEnabled) setAiResponse(null);
   }, [localAiEnabled]);
 
   // Window resize listener for responsive sidebar behavior
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const onBulkDelete = async () => {
     if (!selectedIds.length) return;
     showGenericConfirm({
-      title: "Delete Notes",
-      message: `Delete ${selectedIds.length} selected note(s)? This cannot be undone.`,
-      confirmText: "Delete",
+      title: t("deleteNotes"),
+      message: t("deleteSelectedNotesConfirm").replace("{count}", String(selectedIds.length)),
+      confirmText: t("delete"),
       danger: true,
       onConfirm: async () => {
         try {
@@ -3262,12 +4023,14 @@ export default function App() {
           for (const id of selectedIds) {
             await api(`/notes/${id}`, { method: "DELETE", token });
           }
-          setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
+          setNotes((prev) =>
+            prev.filter((n) => !selectedIds.includes(String(n.id))),
+          );
           onExitMulti();
         } catch (e) {
-          alert(e.message || "Bulk delete failed");
+          alert(e.message || t("bulkDeleteFailed"));
         }
-      }
+      },
     });
   };
 
@@ -3275,27 +4038,37 @@ export default function App() {
     if (!selectedIds.length) return;
     try {
       // Optimistic update
-      setNotes((prev) => prev.map((n) => (selectedIds.includes(String(n.id)) ? { ...n, pinned: !!pinnedVal } : n)));
+      setNotes((prev) =>
+        prev.map((n) =>
+          selectedIds.includes(String(n.id))
+            ? { ...n, pinned: !!pinnedVal }
+            : n,
+        ),
+      );
       // Persist in background (best-effort)
       for (const id of selectedIds) {
-        await api(`/notes/${id}`, { method: "PATCH", token, body: { pinned: !!pinnedVal } });
+        await api(`/notes/${id}`, {
+          method: "PATCH",
+          token,
+          body: { pinned: !!pinnedVal },
+        });
       }
       // Invalidate caches
       invalidateNotesCache();
       invalidateArchivedNotesCache();
       // Reload fresh data since we invalidated caches
-      if (tagFilter === 'ARCHIVED') {
-        loadArchivedNotes().catch(() => { });
+      if (tagFilter === "ARCHIVED") {
+        loadArchivedNotes().catch(() => {});
       } else {
-        loadNotes().catch(() => { });
+        loadNotes().catch(() => {});
       }
     } catch (e) {
       console.error("Bulk pin failed", e);
       // Reload appropriate notes based on current view
-      if (tagFilter === 'ARCHIVED') {
-        loadArchivedNotes().catch(() => { });
+      if (tagFilter === "ARCHIVED") {
+        loadArchivedNotes().catch(() => {});
       } else {
-        loadNotes().catch(() => { });
+        loadNotes().catch(() => {});
       }
     }
   };
@@ -3304,22 +4077,28 @@ export default function App() {
     if (!selectedIds.length) return;
 
     // Determine if we're archiving or unarchiving based on current view
-    const isArchiving = tagFilter !== 'ARCHIVED';
+    const isArchiving = tagFilter !== "ARCHIVED";
     const archivedValue = isArchiving;
 
     try {
       // Optimistic update - remove from current view
-      setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
+      setNotes((prev) =>
+        prev.filter((n) => !selectedIds.includes(String(n.id))),
+      );
       // Persist in background (best-effort)
       for (const id of selectedIds) {
-        await api(`/notes/${id}/archive`, { method: "POST", token, body: { archived: archivedValue } });
+        await api(`/notes/${id}/archive`, {
+          method: "POST",
+          token,
+          body: { archived: archivedValue },
+        });
       }
       // Invalidate caches
       invalidateNotesCache();
       invalidateArchivedNotesCache();
 
       // If we just unarchived notes from archived view, switch to regular notes view
-      if (!isArchiving && tagFilter === 'ARCHIVED') {
+      if (!isArchiving && tagFilter === "ARCHIVED") {
         setTagFilter(null);
         await loadNotes();
       }
@@ -3327,38 +4106,38 @@ export default function App() {
       // Exit multi-select mode
       onExitMulti();
     } catch (e) {
-      console.error(`Bulk ${isArchiving ? 'archive' : 'unarchive'} failed`, e);
+      console.error(`Bulk ${isArchiving ? "archive" : "unarchive"} failed`, e);
       // Reload notes on failure
-      if (tagFilter === 'ARCHIVED') {
-        loadArchivedNotes().catch(() => { });
+      if (tagFilter === "ARCHIVED") {
+        loadArchivedNotes().catch(() => {});
       } else {
-        loadNotes().catch(() => { });
+        loadNotes().catch(() => {});
       }
     }
   };
 
   const onUpdateChecklistItem = async (noteId, itemId, checked) => {
     // Find the note
-    const note = notes.find(n => String(n.id) === String(noteId));
+    const note = notes.find((n) => String(n.id) === String(noteId));
     if (!note) return;
 
     // Optimistically update the note
-    const updatedItems = (note.items || []).map(item =>
-      item.id === itemId ? { ...item, done: checked } : item
+    const updatedItems = (note.items || []).map((item) =>
+      item.id === itemId ? { ...item, done: checked } : item,
     );
     const updatedNote = { ...note, items: updatedItems };
 
     // Update local state optimistically
-    setNotes(prev => prev.map(n =>
-      String(n.id) === String(noteId) ? updatedNote : n
-    ));
+    setNotes((prev) =>
+      prev.map((n) => (String(n.id) === String(noteId) ? updatedNote : n)),
+    );
 
     try {
       // Update on server
       await api(`/notes/${noteId}`, {
         method: "PATCH",
         token,
-        body: { items: updatedItems, type: "checklist", content: "" }
+        body: { items: updatedItems, type: "checklist", content: "" },
       });
 
       // Invalidate caches since we modified the note
@@ -3367,22 +4146,30 @@ export default function App() {
     } catch (error) {
       console.error("Failed to update checklist item:", error);
       // Revert the optimistic update on error
-      setNotes(prev => prev.map(n =>
-        String(n.id) === String(noteId) ? note : n
-      ));
+      setNotes((prev) =>
+        prev.map((n) => (String(n.id) === String(noteId) ? note : n)),
+      );
     }
   };
 
   const onBulkColor = async (colorName) => {
     if (!selectedIds.length) return;
     try {
-      setNotes((prev) => prev.map((n) => (selectedIds.includes(String(n.id)) ? { ...n, color: colorName } : n)));
+      setNotes((prev) =>
+        prev.map((n) =>
+          selectedIds.includes(String(n.id)) ? { ...n, color: colorName } : n,
+        ),
+      );
       for (const id of selectedIds) {
-        await api(`/notes/${id}`, { method: "PATCH", token, body: { color: colorName } });
+        await api(`/notes/${id}`, {
+          method: "PATCH",
+          token,
+          body: { color: colorName },
+        });
       }
     } catch (e) {
       console.error("Bulk color failed", e);
-      loadNotes().catch(() => { });
+      loadNotes().catch(() => {});
     }
   };
 
@@ -3395,14 +4182,16 @@ export default function App() {
       const zip = new JSZip();
       chosen.forEach((n, idx) => {
         const md = mdForDownload(n);
-        const base = sanitizeFilename(n.title || `note-${String(n.id).slice(-6)}`);
+        const base = sanitizeFilename(
+          n.title || `note-${String(n.id).slice(-6)}`,
+        );
         zip.file(`${base || `note-${idx + 1}`}.md`, md);
       });
       const blob = await zip.generateAsync({ type: "blob" });
       const ts = new Date().toISOString().replace(/[:.]/g, "-");
       triggerBlobDownload(`glass-keep-selected-${ts}.zip`, blob);
     } catch (e) {
-      alert(e.message || "ZIP download failed");
+      alert(e.message || t("zipDownloadFailed"));
     }
   };
 
@@ -3416,9 +4205,16 @@ export default function App() {
 
   // Admin panel state
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
-  const [adminSettings, setAdminSettings] = useState({ allowNewAccounts: true });
+  const [adminSettings, setAdminSettings] = useState({
+    allowNewAccounts: true,
+  });
   const [allUsers, setAllUsers] = useState([]);
-  const [newUserForm, setNewUserForm] = useState({ name: '', email: '', password: '', is_admin: false });
+  const [newUserForm, setNewUserForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    is_admin: false,
+  });
   const [allowRegistration, setAllowRegistration] = useState(true);
 
   // Settings panel state
@@ -3427,7 +4223,7 @@ export default function App() {
   // Derived: Active note + edited text
   const activeNoteObj = useMemo(
     () => notes.find((x) => String(x.id) === String(activeId)),
-    [notes, activeId]
+    [notes, activeId],
   );
   const editedStamp = useMemo(() => {
     const ts = activeNoteObj?.updated_at || activeNoteObj?.timestamp;
@@ -3446,7 +4242,8 @@ export default function App() {
   const modalHasChanges = useMemo(() => {
     if (!activeNoteObj) return false;
     if ((mTitle || "") !== (activeNoteObj.title || "")) return true;
-    if ((mColor || "default") !== (activeNoteObj.color || "default")) return true;
+    if ((mColor || "default") !== (activeNoteObj.color || "default"))
+      return true;
     const tagsA = JSON.stringify(mTagList || []);
     const tagsB = JSON.stringify(activeNoteObj.tags || []);
     if (tagsA !== tagsB) return true;
@@ -3517,15 +4314,17 @@ export default function App() {
   // Close sidebar with Escape
   useEffect(() => {
     if (!sidebarOpen) return;
-    const onKey = (e) => { if (e.key === "Escape") setSidebarOpen(false); };
+    const onKey = (e) => {
+      if (e.key === "Escape") setSidebarOpen(false);
+    };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [sidebarOpen]);
 
   // Cache keys for localStorage
-  const NOTES_CACHE_KEY = `glass-keep-notes-${currentUser?.id || 'anonymous'}`;
-  const ARCHIVED_NOTES_CACHE_KEY = `glass-keep-archived-${currentUser?.id || 'anonymous'}`;
-  const CACHE_TIMESTAMP_KEY = `glass-keep-cache-timestamp-${currentUser?.id || 'anonymous'}`;
+  const NOTES_CACHE_KEY = `glass-keep-notes-${currentUser?.id || "anonymous"}`;
+  const ARCHIVED_NOTES_CACHE_KEY = `glass-keep-archived-${currentUser?.id || "anonymous"}`;
+  const CACHE_TIMESTAMP_KEY = `glass-keep-cache-timestamp-${currentUser?.id || "anonymous"}`;
 
   // Cache invalidation functions
   const invalidateNotesCache = () => {
@@ -3556,10 +4355,13 @@ export default function App() {
   };
   const persistNotesCache = (notes) => {
     try {
-      localStorage.setItem(NOTES_CACHE_KEY, JSON.stringify(Array.isArray(notes) ? notes : []));
+      localStorage.setItem(
+        NOTES_CACHE_KEY,
+        JSON.stringify(Array.isArray(notes) ? notes : []),
+      );
       localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
     } catch (e) {
-      console.error('Error caching notes:', e);
+      console.error("Error caching notes:", e);
     }
   };
   // Consistent ordering: pinned first, then by position (server-persisted DnD),
@@ -3573,7 +4375,12 @@ export default function App() {
         if (ap !== bp) return bp - ap; // pinned first
         const apos = Number.isFinite(+a?.position) ? +a.position : null;
         const bpos = Number.isFinite(+b?.position) ? +b.position : null;
-        if (apos != null && bpos != null && !Number.isNaN(apos) && !Number.isNaN(bpos)) {
+        if (
+          apos != null &&
+          bpos != null &&
+          !Number.isNaN(apos) &&
+          !Number.isNaN(bpos)
+        ) {
           return bpos - apos; // higher position first (most recent/top)
         }
         const at = new Date(a?.updated_at || a?.timestamp || 0).getTime();
@@ -3585,9 +4392,6 @@ export default function App() {
     }
   };
 
-
-
-
   // Load notes
   const handleAiSearch = async (question) => {
     if (!question || question.trim().length < 3) return;
@@ -3597,16 +4401,18 @@ export default function App() {
 
     try {
       const answer = await askAI(question, notes, (progress) => {
-        if (progress.status === 'progress') {
+        if (progress.status === "progress") {
           setAiLoadingProgress(progress.progress);
-        } else if (progress.status === 'ready') {
+        } else if (progress.status === "ready") {
           setAiLoadingProgress(100);
         }
       });
       setAiResponse(answer);
     } catch (err) {
       console.error("AI Error:", err);
-      setAiResponse("Sorry, I encountered an error while processing your request.");
+      setAiResponse(
+        t("aiRequestFailedFriendly"),
+      );
     } finally {
       setIsAiLoading(false);
       setAiLoadingProgress(null);
@@ -3673,7 +4479,10 @@ export default function App() {
 
       // Cache the data
       try {
-        localStorage.setItem(ARCHIVED_NOTES_CACHE_KEY, JSON.stringify(notesArray));
+        localStorage.setItem(
+          ARCHIVED_NOTES_CACHE_KEY,
+          JSON.stringify(notesArray),
+        );
         localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
         console.log("Cached", notesArray.length, "archived notes");
       } catch (error) {
@@ -3696,7 +4505,7 @@ export default function App() {
     console.log("Tag filter changed to:", tagFilter, "from previous value");
 
     // Load appropriate notes based on tag filter
-    if (tagFilter === 'ARCHIVED') {
+    if (tagFilter === "ARCHIVED") {
       console.log("Loading archived notes...");
       loadArchivedNotes().catch((error) => {
         console.error("Failed to load archived notes:", error);
@@ -3719,7 +4528,7 @@ export default function App() {
 
   useEffect(() => {
     if (token) {
-      loadNotes().catch(() => { });
+      loadNotes().catch(() => {});
     }
     if (!token) return;
 
@@ -3744,29 +4553,29 @@ export default function App() {
 
         es.onmessage = (e) => {
           try {
-            const msg = JSON.parse(e.data || '{}');
-            if (msg && msg.type === 'note_updated') {
+            const msg = JSON.parse(e.data || "{}");
+            if (msg && msg.type === "note_updated") {
               // Refresh notes list on any note update relevant to this user
-              if (tagFilter === 'ARCHIVED') {
-                loadArchivedNotes().catch(() => { });
+              if (tagFilter === "ARCHIVED") {
+                loadArchivedNotes().catch(() => {});
               } else {
-                loadNotes().catch(() => { });
+                loadNotes().catch(() => {});
               }
             }
-          } catch (e) { }
+          } catch (e) {}
         };
 
-        es.addEventListener('note_updated', (e) => {
+        es.addEventListener("note_updated", (e) => {
           try {
-            const msg = JSON.parse(e.data || '{}');
+            const msg = JSON.parse(e.data || "{}");
             if (msg && msg.noteId) {
-              if (tagFilter === 'ARCHIVED') {
-                loadArchivedNotes().catch(() => { });
+              if (tagFilter === "ARCHIVED") {
+                loadArchivedNotes().catch(() => {});
               } else {
-                loadNotes().catch(() => { });
+                loadNotes().catch(() => {});
               }
             }
-          } catch (e) { }
+          } catch (e) {}
         });
 
         es.onerror = (error) => {
@@ -3803,7 +4612,6 @@ export default function App() {
             console.log("SSE reconnection attempts exhausted");
           }
         };
-
       } catch (error) {
         console.error("Failed to create EventSource:", error);
       }
@@ -3817,10 +4625,10 @@ export default function App() {
       pollInterval = setInterval(() => {
         // Only poll if SSE is not connected
         if (!es || es.readyState === EventSource.CLOSED) {
-          if (tagFilter === 'ARCHIVED') {
-            loadArchivedNotes().catch(() => { });
+          if (tagFilter === "ARCHIVED") {
+            loadArchivedNotes().catch(() => {});
           } else {
-            loadNotes().catch(() => { });
+            loadNotes().catch(() => {});
           }
         }
       }, 30000); // Poll every 30 seconds as fallback
@@ -3829,11 +4637,9 @@ export default function App() {
     // Start polling after a delay
     const pollTimeout = setTimeout(startPolling, 10000);
 
-
-
     // Handle page visibility changes (PWA background/foreground)
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === "visible") {
         // Page became visible, validate token first
         try {
           // Quick health check - this will fail with 401 if token is expired
@@ -3845,10 +4651,10 @@ export default function App() {
           }
 
           // Also refresh notes when page becomes visible
-          if (tagFilter === 'ARCHIVED') {
-            loadArchivedNotes().catch(() => { });
+          if (tagFilter === "ARCHIVED") {
+            loadArchivedNotes().catch(() => {});
           } else {
-            loadNotes().catch(() => { });
+            loadNotes().catch(() => {});
           }
         } catch (error) {
           // If health check fails with 401, the api function will handle auth expiration
@@ -3859,17 +4665,17 @@ export default function App() {
             if (es && es.readyState === EventSource.CLOSED) {
               connectSSE();
             }
-            if (tagFilter === 'ARCHIVED') {
-              loadArchivedNotes().catch(() => { });
+            if (tagFilter === "ARCHIVED") {
+              loadArchivedNotes().catch(() => {});
             } else {
-              loadNotes().catch(() => { });
+              loadNotes().catch(() => {});
             }
           }
         }
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     // Handle online/offline events
     const handleOnline = () => {
@@ -3882,14 +4688,14 @@ export default function App() {
       setIsOnline(false);
     };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
       setSseConnected(false);
       try {
         if (es) es.close();
-      } catch (e) { }
+      } catch (e) {}
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
       }
@@ -3899,9 +4705,9 @@ export default function App() {
       if (pollInterval) {
         clearInterval(pollInterval);
       }
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, [token]);
 
@@ -3928,8 +4734,12 @@ export default function App() {
       return;
     }
 
-    const prevJson = JSON.stringify(prevDrawingRef.current || { paths: [], dimensions: null });
-    const currentJson = JSON.stringify(mDrawingData || { paths: [], dimensions: null });
+    const prevJson = JSON.stringify(
+      prevDrawingRef.current || { paths: [], dimensions: null },
+    );
+    const currentJson = JSON.stringify(
+      mDrawingData || { paths: [], dimensions: null },
+    );
     if (prevJson === currentJson) return;
 
     // Debounce auto-save by 500ms
@@ -3938,7 +4748,7 @@ export default function App() {
         await api(`/notes/${activeId}`, {
           method: "PATCH",
           token,
-          body: { content: JSON.stringify(mDrawingData), type: "draw" }
+          body: { content: JSON.stringify(mDrawingData), type: "draw" },
         });
         prevDrawingRef.current = mDrawingData;
         invalidateNotesCache();
@@ -3980,7 +4790,9 @@ export default function App() {
     if (!open && !imgViewOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [open, imgViewOpen]);
 
   // Close image viewer if modal closes
@@ -3996,7 +4808,11 @@ export default function App() {
       if (e.key.toLowerCase() === "d") {
         const im = mImages[imgViewIndex];
         if (im) {
-          const fname = normalizeImageFilename(im.name, im.src, imgViewIndex + 1);
+          const fname = normalizeImageFilename(
+            im.name,
+            im.src,
+            imgViewIndex + 1,
+          );
           downloadDataUrl(fname, im.src);
         }
       }
@@ -4099,8 +4915,8 @@ export default function App() {
     // Clear all cached data for this user
     try {
       const keys = Object.keys(localStorage);
-      keys.forEach(key => {
-        if (key.includes('glass-keep-')) {
+      keys.forEach((key) => {
+        if (key.includes("glass-keep-")) {
           localStorage.removeItem(key);
         }
       });
@@ -4110,7 +4926,10 @@ export default function App() {
     navigate("#/login");
   };
   const signIn = async (email, password) => {
-    const res = await api("/login", { method: "POST", body: { email, password } });
+    const res = await api("/login", {
+      method: "POST",
+      body: { email, password },
+    });
     setSession(res);
     setAuth(res);
     navigate("#/notes");
@@ -4124,7 +4943,10 @@ export default function App() {
     return { ok: true };
   };
   const register = async (name, email, password) => {
-    const res = await api("/register", { method: "POST", body: { name, email, password } });
+    const res = await api("/register", {
+      method: "POST",
+      body: { name, email, password },
+    });
     setSession(res);
     setAuth(res);
     navigate("#/notes");
@@ -4142,8 +4964,8 @@ export default function App() {
       // Clear all cached data
       try {
         const keys = Object.keys(localStorage);
-        keys.forEach(key => {
-          if (key.includes('glass-keep-')) {
+        keys.forEach((key) => {
+          if (key.includes("glass-keep-")) {
             localStorage.removeItem(key);
           }
         });
@@ -4153,10 +4975,10 @@ export default function App() {
       navigate("#/login");
     };
 
-    window.addEventListener('auth-expired', handleAuthExpired);
+    window.addEventListener("auth-expired", handleAuthExpired);
 
     return () => {
-      window.removeEventListener('auth-expired', handleAuthExpired);
+      window.removeEventListener("auth-expired", handleAuthExpired);
     };
   }, [navigate]);
 
@@ -4174,11 +4996,19 @@ export default function App() {
     const isDraw = composerType === "draw";
 
     if (isText) {
-      if (!title.trim() && !content.trim() && !tags.trim() && composerImages.length === 0) return;
+      if (
+        !title.trim() &&
+        !content.trim() &&
+        !tags.trim() &&
+        composerImages.length === 0
+      )
+        return;
     } else if (isChecklist) {
       if (!title.trim() && clItems.length === 0) return;
     } else if (isDraw) {
-      const drawPaths = Array.isArray(composerDrawingData) ? composerDrawingData : (composerDrawingData?.paths || []);
+      const drawPaths = Array.isArray(composerDrawingData)
+        ? composerDrawingData
+        : composerDrawingData?.paths || [];
       if (!title.trim() && drawPaths.length === 0) return;
     }
 
@@ -4187,9 +5017,16 @@ export default function App() {
       id: uid(),
       type: composerType,
       title: title.trim(),
-      content: isText ? content : isDraw ? JSON.stringify(composerDrawingData) : "",
+      content: isText
+        ? content
+        : isDraw
+          ? JSON.stringify(composerDrawingData)
+          : "",
       items: isChecklist ? clItems : [],
-      tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+      tags: tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
       images: composerImages,
       color: composerColor,
       pinned: false,
@@ -4199,8 +5036,14 @@ export default function App() {
     };
 
     try {
-      const created = await api("/notes", { method: "POST", body: newNote, token });
-      setNotes((prev) => sortNotesByRecency([created, ...(Array.isArray(prev) ? prev : [])]));
+      const created = await api("/notes", {
+        method: "POST",
+        body: newNote,
+        token,
+      });
+      setNotes((prev) =>
+        sortNotesByRecency([created, ...(Array.isArray(prev) ? prev : [])]),
+      );
       invalidateNotesCache();
 
       // Reset composer after successful add
@@ -4216,7 +5059,7 @@ export default function App() {
       setComposerCollapsed(true);
       if (contentRef.current) contentRef.current.style.height = "auto";
     } catch (e) {
-      alert(e.message || "Failed to add note");
+      alert(e.message || t("failedAddNote"));
     }
   };
 
@@ -4230,14 +5073,18 @@ export default function App() {
   /** -------- Archive/Unarchive note -------- */
   const handleArchiveNote = async (noteId, archived) => {
     try {
-      await api(`/notes/${noteId}/archive`, { method: "POST", token, body: { archived } });
+      await api(`/notes/${noteId}/archive`, {
+        method: "POST",
+        token,
+        body: { archived },
+      });
 
       // Invalidate both caches since archiving affects both regular and archived notes
       invalidateNotesCache();
       invalidateArchivedNotesCache();
 
       // Reload appropriate notes based on current view
-      if (tagFilter === 'ARCHIVED') {
+      if (tagFilter === "ARCHIVED") {
         if (!archived) {
           // If unarchiving from archived view, switch back to regular view
           setTagFilter(null);
@@ -4253,7 +5100,7 @@ export default function App() {
         closeModal();
       }
     } catch (e) {
-      alert(e.message || "Failed to archive note");
+      alert(e.message || t("failedArchiveNote"));
     }
   };
 
@@ -4271,10 +5118,14 @@ export default function App() {
 
   const updateAdminSettings = async (newSettings) => {
     try {
-      const settings = await api("/admin/settings", { method: "PATCH", token, body: newSettings });
+      const settings = await api("/admin/settings", {
+        method: "PATCH",
+        token,
+        body: newSettings,
+      });
       setAdminSettings(settings);
     } catch (e) {
-      alert(e.message || "Failed to update admin settings");
+      alert(e.message || t("failedUpdateAdminSettings"));
     }
   };
 
@@ -4291,12 +5142,16 @@ export default function App() {
 
   const createUser = async (userData) => {
     try {
-      const newUser = await api("/admin/users", { method: "POST", token, body: userData });
-      setAllUsers(prev => [newUser, ...prev]);
-      setNewUserForm({ name: '', email: '', password: '', is_admin: false });
+      const newUser = await api("/admin/users", {
+        method: "POST",
+        token,
+        body: userData,
+      });
+      setAllUsers((prev) => [newUser, ...prev]);
+      setNewUserForm({ name: "", email: "", password: "", is_admin: false });
       return newUser;
     } catch (e) {
-      alert(e.message || "Failed to create user");
+      alert(e.message || t("failedCreateUser"));
       throw e;
     }
   };
@@ -4304,15 +5159,19 @@ export default function App() {
   const deleteUser = async (userId) => {
     try {
       await api(`/admin/users/${userId}`, { method: "DELETE", token });
-      setAllUsers(prev => prev.filter(u => u.id !== userId));
+      setAllUsers((prev) => prev.filter((u) => u.id !== userId));
     } catch (e) {
-      alert(e.message || "Failed to delete user");
+      alert(e.message || t("failedDeleteUser"));
     }
   };
 
   const updateUser = async (userId, userData) => {
-    const updatedUser = await api(`/admin/users/${userId}`, { method: "PATCH", token, body: userData });
-    setAllUsers(prev => prev.map(u => u.id === userId ? updatedUser : u));
+    const updatedUser = await api(`/admin/users/${userId}`, {
+      method: "PATCH",
+      token,
+      body: userData,
+    });
+    setAllUsers((prev) => prev.map((u) => (u.id === userId ? updatedUser : u)));
     return updatedUser;
   };
 
@@ -4320,10 +5179,7 @@ export default function App() {
     console.log("Opening admin panel...");
     setAdminPanelOpen(true);
     try {
-      await Promise.all([
-        loadAdminSettings(),
-        loadAllUsers()
-      ]);
+      await Promise.all([loadAdminSettings(), loadAllUsers()]);
       console.log("Admin panel data loaded successfully");
     } catch (error) {
       console.error("Error loading admin panel data:", error);
@@ -4347,11 +5203,17 @@ export default function App() {
 
   /** -------- Export / Import All -------- */
   const triggerJSONDownload = (filename, jsonText) => {
-    const blob = new Blob([jsonText], { type: "application/json;charset=utf-8" });
+    const blob = new Blob([jsonText], {
+      type: "application/json;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = filename; document.body.appendChild(a);
-    a.click(); a.remove(); URL.revokeObjectURL(url);
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   const exportAll = async () => {
@@ -4359,10 +5221,13 @@ export default function App() {
       const payload = await api("/notes/export", { token });
       const json = JSON.stringify(payload, null, 2);
       const ts = new Date().toISOString().replace(/[:.]/g, "-");
-      const fname = sanitizeFilename(`glass-keep-notes-${currentUser?.email || "user"}-${ts}`) + ".json";
+      const fname =
+        sanitizeFilename(
+          `glass-keep-notes-${currentUser?.email || "user"}-${ts}`,
+        ) + ".json";
       triggerJSONDownload(fname, json);
     } catch (e) {
-      alert(e.message || "Export failed");
+      alert(e.message || t("exportFailed"));
     }
   };
 
@@ -4372,13 +5237,24 @@ export default function App() {
       const file = fileList[0];
       const text = await file.text();
       const parsed = JSON.parse(text);
-      const notesArr = Array.isArray(parsed?.notes) ? parsed.notes : (Array.isArray(parsed) ? parsed : []);
-      if (!notesArr.length) { alert("No notes found in file."); return; }
-      await api("/notes/import", { method: "POST", token, body: { notes: notesArr } });
+      const notesArr = Array.isArray(parsed?.notes)
+        ? parsed.notes
+        : Array.isArray(parsed)
+          ? parsed
+          : [];
+      if (!notesArr.length) {
+        alert(t("noNotesFoundInFile"));
+        return;
+      }
+      await api("/notes/import", {
+        method: "POST",
+        token,
+        body: { notes: notesArr },
+      });
       await loadNotes();
-      alert(`Imported ${notesArr.length} note(s) successfully.`);
+      alert(t("importedNotesSuccessfully").replace("{count}", String(notesArr.length)));
     } catch (e) {
-      alert(e.message || "Import failed");
+      alert(e.message || t("importFailed"));
     }
   };
 
@@ -4387,7 +5263,9 @@ export default function App() {
     try {
       const files = Array.from(fileList || []);
       if (!files.length) return;
-      const texts = await Promise.all(files.map((f) => f.text().catch(() => null)));
+      const texts = await Promise.all(
+        files.map((f) => f.text().catch(() => null)),
+      );
       const notesArr = [];
       for (const t of texts) {
         if (!t) continue;
@@ -4395,17 +5273,29 @@ export default function App() {
           const obj = JSON.parse(t);
           if (!obj || typeof obj !== "object") continue;
           const title = String(obj.title || "");
-          const hasChecklist = Array.isArray(obj.listContent) && obj.listContent.length > 0;
+          const hasChecklist =
+            Array.isArray(obj.listContent) && obj.listContent.length > 0;
           const items = hasChecklist
-            ? obj.listContent.map((it) => ({ id: uid(), text: String(it?.text || ""), done: !!it?.isChecked }))
+            ? obj.listContent.map((it) => ({
+                id: uid(),
+                text: String(it?.text || ""),
+                done: !!it?.isChecked,
+              }))
             : [];
           const content = hasChecklist ? "" : String(obj.textContent || "");
-          const usec = Number(obj.userEditedTimestampUsec || obj.createdTimestampUsec || 0);
-          const ms = Number.isFinite(usec) && usec > 0 ? Math.floor(usec / 1000) : Date.now();
+          const usec = Number(
+            obj.userEditedTimestampUsec || obj.createdTimestampUsec || 0,
+          );
+          const ms =
+            Number.isFinite(usec) && usec > 0
+              ? Math.floor(usec / 1000)
+              : Date.now();
           const timestamp = new Date(ms).toISOString();
           // Extract labels to tags
           const tags = Array.isArray(obj.labels)
-            ? obj.labels.map((l) => (typeof l?.name === 'string' ? l.name.trim() : '')).filter(Boolean)
+            ? obj.labels
+                .map((l) => (typeof l?.name === "string" ? l.name.trim() : ""))
+                .filter(Boolean)
             : [];
           notesArr.push({
             id: uid(),
@@ -4420,14 +5310,21 @@ export default function App() {
             position: ms,
             timestamp,
           });
-        } catch (e) { }
+        } catch (e) {}
       }
-      if (!notesArr.length) { alert("No valid Google Keep notes found."); return; }
-      await api("/notes/import", { method: "POST", token, body: { notes: notesArr } });
+      if (!notesArr.length) {
+        alert(t("noValidGoogleKeepNotesFound"));
+        return;
+      }
+      await api("/notes/import", {
+        method: "POST",
+        token,
+        body: { notes: notesArr },
+      });
       await loadNotes();
-      alert(`Imported ${notesArr.length} Google Keep note(s).`);
+      alert(t("importedGoogleKeepNotes").replace("{count}", String(notesArr.length)));
     } catch (e) {
-      alert(e.message || "Google Keep import failed");
+      alert(e.message || t("googleKeepImportFailed"));
     }
   };
 
@@ -4441,23 +5338,23 @@ export default function App() {
       for (const file of files) {
         try {
           const text = await file.text();
-          const lines = text.split('\n');
+          const lines = text.split("\n");
 
           // Extract title from first line if it starts with #
           let title = "";
           let contentStartIndex = 0;
 
-          if (lines[0] && lines[0].trim().startsWith('#')) {
+          if (lines[0] && lines[0].trim().startsWith("#")) {
             // Remove # symbols and trim
-            title = lines[0].replace(/^#+\s*/, '').trim();
+            title = lines[0].replace(/^#+\s*/, "").trim();
             contentStartIndex = 1;
           } else {
             // Use filename as title (without .md extension)
-            title = file.name.replace(/\.md$/i, '');
+            title = file.name.replace(/\.md$/i, "");
           }
 
           // Join remaining lines as content
-          const content = lines.slice(contentStartIndex).join('\n').trim();
+          const content = lines.slice(contentStartIndex).join("\n").trim();
 
           if (title || content) {
             notesArr.push({
@@ -4479,53 +5376,68 @@ export default function App() {
       }
 
       if (!notesArr.length) {
-        alert("No valid markdown files found.");
+        alert(t("noValidMarkdownFilesFound"));
         return;
       }
 
-      await api("/notes/import", { method: "POST", token, body: { notes: notesArr } });
+      await api("/notes/import", {
+        method: "POST",
+        token,
+        body: { notes: notesArr },
+      });
       await loadNotes();
-      alert(`Imported ${notesArr.length} markdown file(s) successfully.`);
+      alert(t("importedMarkdownFilesSuccessfully").replace("{count}", String(notesArr.length)));
     } catch (e) {
-      alert(e.message || "Markdown import failed");
+      alert(e.message || t("markdownImportFailed"));
     }
   };
 
   /** -------- Collaboration actions -------- */
   const [collaborationDialogOpen, setCollaborationDialogOpen] = useState(false);
-  const [collaborationDialogNoteId, setCollaborationDialogNoteId] = useState(null);
+  const [collaborationDialogNoteId, setCollaborationDialogNoteId] =
+    useState(null);
   const [noteCollaborators, setNoteCollaborators] = useState([]);
   const [isNoteOwner, setIsNoteOwner] = useState(false);
 
-  const loadNoteCollaborators = useCallback(async (noteId) => {
-    try {
-      const collaborators = await api(`/notes/${noteId}/collaborators`, { token });
-      setNoteCollaborators(collaborators || []);
+  const loadNoteCollaborators = useCallback(
+    async (noteId) => {
+      try {
+        const collaborators = await api(`/notes/${noteId}/collaborators`, {
+          token,
+        });
+        setNoteCollaborators(collaborators || []);
 
-      // Check if current user is the owner
-      // Try to get note from current notes list
-      const note = notes.find(n => String(n.id) === String(noteId));
-      // If note has user_id, use it; otherwise check if user is in collaborators list
-      if (note?.user_id) {
-        setIsNoteOwner(note.user_id === currentUser?.id);
-      } else {
-        // If note doesn't have user_id, check if current user is NOT in collaborators
-        // (if they're not a collaborator and can see the note, they're likely the owner)
-        const isCollaborator = collaborators.some(c => c.id === currentUser?.id);
-        setIsNoteOwner(!isCollaborator);
+        // Check if current user is the owner
+        // Try to get note from current notes list
+        const note = notes.find((n) => String(n.id) === String(noteId));
+        // If note has user_id, use it; otherwise check if user is in collaborators list
+        if (note?.user_id) {
+          setIsNoteOwner(note.user_id === currentUser?.id);
+        } else {
+          // If note doesn't have user_id, check if current user is NOT in collaborators
+          // (if they're not a collaborator and can see the note, they're likely the owner)
+          const isCollaborator = collaborators.some(
+            (c) => c.id === currentUser?.id,
+          );
+          setIsNoteOwner(!isCollaborator);
+        }
+      } catch (e) {
+        console.error("Failed to load collaborators:", e);
+        setNoteCollaborators([]);
+        setIsNoteOwner(false);
       }
-    } catch (e) {
-      console.error("Failed to load collaborators:", e);
-      setNoteCollaborators([]);
-      setIsNoteOwner(false);
-    }
-  }, [token, notes, currentUser]);
+    },
+    [token, notes, currentUser],
+  );
 
-  const showCollaborationDialog = useCallback((noteId) => {
-    setCollaborationDialogNoteId(noteId);
-    setCollaborationDialogOpen(true);
-    loadNoteCollaborators(noteId);
-  }, [loadNoteCollaborators]);
+  const showCollaborationDialog = useCallback(
+    (noteId) => {
+      setCollaborationDialogNoteId(noteId);
+      setCollaborationDialogOpen(true);
+      loadNoteCollaborators(noteId);
+    },
+    [loadNoteCollaborators],
+  );
 
   const removeCollaborator = async (collaboratorId, noteId = null) => {
     try {
@@ -4533,9 +5445,9 @@ export default function App() {
       if (!targetNoteId) return;
       await api(`/notes/${targetNoteId}/collaborate/${collaboratorId}`, {
         method: "DELETE",
-        token
+        token,
       });
-      showToast("Collaborator removed successfully", "success");
+      showToast(t("collaboratorRemovedSuccessfully"), "success");
       if (collaborationDialogNoteId) {
         loadNoteCollaborators(collaborationDialogNoteId);
       }
@@ -4544,41 +5456,55 @@ export default function App() {
       }
       invalidateNotesCache();
     } catch (e) {
-      showToast(e.message || "Failed to remove collaborator", "error");
+      showToast(e.message || t("failedRemoveCollaborator"), "error");
     }
   };
 
-  const loadCollaboratorsForAddModal = useCallback(async (noteId) => {
-    try {
-      const collaborators = await api(`/notes/${noteId}/collaborators`, { token });
-      setAddModalCollaborators(collaborators || []);
-    } catch (e) {
-      console.error("Failed to load collaborators:", e);
-      setAddModalCollaborators([]);
-    }
-  }, [token]);
+  const loadCollaboratorsForAddModal = useCallback(
+    async (noteId) => {
+      try {
+        const collaborators = await api(`/notes/${noteId}/collaborators`, {
+          token,
+        });
+        setAddModalCollaborators(collaborators || []);
+      } catch (e) {
+        console.error("Failed to load collaborators:", e);
+        setAddModalCollaborators([]);
+      }
+    },
+    [token],
+  );
 
   // Search users for collaboration dropdown
-  const searchUsers = useCallback(async (query) => {
-    setLoadingUsers(true);
-    try {
-      const searchQuery = query && query.trim().length > 0 ? query.trim() : "";
-      const users = await api(`/users/search?q=${encodeURIComponent(searchQuery)}`, { token });
-      // Filter out current user and existing collaborators
-      const existingCollaboratorIds = new Set(addModalCollaborators.map(c => c.id));
-      const filtered = users.filter(u =>
-        u.id !== currentUser?.id && !existingCollaboratorIds.has(u.id)
-      );
-      setFilteredUsers(filtered);
-      setShowUserDropdown(filtered.length > 0);
-    } catch (e) {
-      console.error("Failed to search users:", e);
-      setFilteredUsers([]);
-      setShowUserDropdown(false);
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, [token, addModalCollaborators, currentUser]);
+  const searchUsers = useCallback(
+    async (query) => {
+      setLoadingUsers(true);
+      try {
+        const searchQuery =
+          query && query.trim().length > 0 ? query.trim() : "";
+        const users = await api(
+          `/users/search?q=${encodeURIComponent(searchQuery)}`,
+          { token },
+        );
+        // Filter out current user and existing collaborators
+        const existingCollaboratorIds = new Set(
+          addModalCollaborators.map((c) => c.id),
+        );
+        const filtered = users.filter(
+          (u) => u.id !== currentUser?.id && !existingCollaboratorIds.has(u.id),
+        );
+        setFilteredUsers(filtered);
+        setShowUserDropdown(filtered.length > 0);
+      } catch (e) {
+        console.error("Failed to search users:", e);
+        setFilteredUsers([]);
+        setShowUserDropdown(false);
+      } finally {
+        setLoadingUsers(false);
+      }
+    },
+    [token, addModalCollaborators, currentUser],
+  );
 
   // Update dropdown position based on input field
   const updateDropdownPosition = useCallback(() => {
@@ -4587,7 +5513,7 @@ export default function App() {
       setDropdownPosition({
         top: rect.bottom + 4, // fixed positioning is relative to viewport
         left: rect.left,
-        width: rect.width
+        width: rect.width,
       });
     }
   }, []);
@@ -4598,7 +5524,7 @@ export default function App() {
       if (
         collaboratorInputRef.current &&
         !collaboratorInputRef.current.contains(event.target) &&
-        !event.target.closest('[data-user-dropdown]')
+        !event.target.closest("[data-user-dropdown]")
       ) {
         setShowUserDropdown(false);
       }
@@ -4608,14 +5534,14 @@ export default function App() {
       updateDropdownPosition();
       // Use setTimeout to ensure the portal is rendered
       setTimeout(() => {
-        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener("mousedown", handleClickOutside);
       }, 0);
-      window.addEventListener('scroll', updateDropdownPosition, true);
-      window.addEventListener('resize', updateDropdownPosition);
+      window.addEventListener("scroll", updateDropdownPosition, true);
+      window.addEventListener("resize", updateDropdownPosition);
       return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-        window.removeEventListener('scroll', updateDropdownPosition, true);
-        window.removeEventListener('resize', updateDropdownPosition);
+        document.removeEventListener("mousedown", handleClickOutside);
+        window.removeEventListener("scroll", updateDropdownPosition, true);
+        window.removeEventListener("resize", updateDropdownPosition);
       };
     }
   }, [showUserDropdown, updateDropdownPosition]);
@@ -4635,22 +5561,24 @@ export default function App() {
       const result = await api(`/notes/${activeId}/collaborate`, {
         method: "POST",
         token,
-        body: { username }
+        body: { username },
       });
 
       // Update local note with collaborator info
-      setNotes((prev) => prev.map((n) =>
-        String(n.id) === String(activeId)
-          ? {
-            ...n,
-            collaborators: [...(n.collaborators || []), username],
-            lastEditedBy: currentUser?.email || currentUser?.name,
-            lastEditedAt: new Date().toISOString()
-          }
-          : n
-      ));
+      setNotes((prev) =>
+        prev.map((n) =>
+          String(n.id) === String(activeId)
+            ? {
+                ...n,
+                collaborators: [...(n.collaborators || []), username],
+                lastEditedBy: currentUser?.email || currentUser?.name,
+                lastEditedAt: new Date().toISOString(),
+              }
+            : n,
+        ),
+      );
 
-      showToast(`Added ${username} as collaborator successfully!`, "success");
+      showToast(t("addedCollaboratorSuccessfully").replace("{username}", String(username)), "success");
       setCollaboratorUsername("");
       setShowUserDropdown(false);
       setFilteredUsers([]);
@@ -4660,7 +5588,7 @@ export default function App() {
         loadNoteCollaborators(activeId);
       }
     } catch (e) {
-      showToast(e.message || "Failed to add collaborator", "error");
+      showToast(e.message || t("failedAddCollaborator"), "error");
     }
   };
 
@@ -4668,7 +5596,7 @@ export default function App() {
   const downloadSecretKey = async () => {
     try {
       const data = await api("/secret-key", { method: "POST", token });
-      if (!data?.key) throw new Error("Secret key not returned by server.");
+      if (!data?.key) throw new Error(t("secretKeyNotReturned"));
       const ts = new Date().toISOString().replace(/[:.]/g, "-");
       const fname = `glass-keep-secret-key-${ts}.txt`;
       const content =
@@ -4677,46 +5605,68 @@ export default function App() {
         `Secret Key:\n${data.key}\n\n` +
         `Instructions:\n` +
         `1) Go to the login page.\n` +
-        `2) Click "Forgot username/password?".\n` +
-        `3) Choose "Sign in with Secret Key" and paste this key.\n`;
+        `2) Click ${t("forgotUsernamePassword")}.\n` +
+        `3) Choose "${t("signInWithSecretKey")}" and paste this key.\n`;
       downloadText(fname, content);
-      alert("Secret key downloaded. Store it in a safe place.");
+      alert(t("secretKeyDownloadedSafe"));
     } catch (e) {
-      alert(e.message || "Could not generate secret key.");
+      alert(e.message || t("couldNotGenerateSecretKey"));
     }
   };
 
   /** -------- Modal tag helpers -------- */
   const addTags = (raw) => {
-    const parts = String(raw).split(",").map((t) => t.trim()).filter(Boolean);
+    const parts = String(raw)
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
     if (!parts.length) return;
     setMTagList((prev) => {
       const set = new Set(prev.map((x) => x.toLowerCase()));
       const merged = [...prev];
-      for (const p of parts) if (!set.has(p.toLowerCase())) { merged.push(p); set.add(p.toLowerCase()); }
+      for (const p of parts)
+        if (!set.has(p.toLowerCase())) {
+          merged.push(p);
+          set.add(p.toLowerCase());
+        }
       return merged;
     });
   };
   const handleTagKeyDown = (e) => {
     if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
       e.preventDefault();
-      if (tagInput.trim()) { addTags(tagInput); setTagInput(""); }
+      if (tagInput.trim()) {
+        addTags(tagInput);
+        setTagInput("");
+      }
     } else if (e.key === "Backspace" && !tagInput) {
       setMTagList((prev) => prev.slice(0, -1));
     }
   };
-  const handleTagBlur = () => { if (tagInput.trim()) { addTags(tagInput); setTagInput(""); } };
+  const handleTagBlur = () => {
+    if (tagInput.trim()) {
+      addTags(tagInput);
+      setTagInput("");
+    }
+  };
   const handleTagPaste = (e) => {
     const text = e.clipboardData?.getData("text");
-    if (text && text.includes(",")) { e.preventDefault(); addTags(text); }
+    if (text && text.includes(",")) {
+      e.preventDefault();
+      addTags(text);
+    }
   };
 
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
     const results = [];
     for (const f of files) {
-      try { const src = await fileToCompressedDataURL(f); results.push({ id: uid(), src, name: f.name }); }
-      catch (e) { console.error("Image load failed", e); }
+      try {
+        const src = await fileToCompressedDataURL(f);
+        results.push({ id: uid(), src, name: f.name });
+      } catch (e) {
+        console.error("Image load failed", e);
+      }
     }
     if (results.length) setter((prev) => [...prev, ...results]);
   };
@@ -4726,7 +5676,8 @@ export default function App() {
   const initialModalStateRef = useRef(null);
 
   const openModal = (id) => {
-    const n = notes.find((x) => String(x.id) === String(id)); if (!n) return;
+    const n = notes.find((x) => String(x.id) === String(id));
+    if (!n) return;
     setSidebarOpen(false);
     setActiveId(String(id));
     setMType(n.type || "text");
@@ -4762,7 +5713,7 @@ export default function App() {
     // Store initial state to detect if user actually edited
     initialModalStateRef.current = {
       title: n.title || "",
-      content: n.type === "draw" ? "" : (n.content || ""),
+      content: n.type === "draw" ? "" : n.content || "",
       tags: Array.isArray(n.tags) ? n.tags : [],
       images: Array.isArray(n.images) ? n.images : [],
       color: n.color || "default",
@@ -4774,14 +5725,19 @@ export default function App() {
   };
 
   // Check if note is collaborative (has collaborators or is owned by someone else)
-  const isCollaborativeNote = useCallback((noteId) => {
-    if (!noteId) return false;
-    const note = notes.find(n => String(n.id) === String(noteId));
-    if (!note) return false;
-    const hasCollaborators = note.collaborators !== undefined && note.collaborators !== null;
-    const isOwnedByOther = note.user_id && currentUser && note.user_id !== currentUser.id;
-    return hasCollaborators || isOwnedByOther;
-  }, [notes, currentUser]);
+  const isCollaborativeNote = useCallback(
+    (noteId) => {
+      if (!noteId) return false;
+      const note = notes.find((n) => String(n.id) === String(noteId));
+      if (!note) return false;
+      const hasCollaborators =
+        note.collaborators !== undefined && note.collaborators !== null;
+      const isOwnedByOther =
+        note.user_id && currentUser && note.user_id !== currentUser.id;
+      return hasCollaborators || isOwnedByOther;
+    },
+    [notes, currentUser],
+  );
 
   // Auto-save timeout ref - must be defined before closeModal
   const autoSaveTimeoutRef = useRef(null);
@@ -4810,7 +5766,13 @@ export default function App() {
   // Save metadata (color, tags, images) immediately for collaborative notes
   // This works even in view mode since these are metadata changes, not content changes
   const saveCollaborativeMetadata = useCallback(async () => {
-    if (activeId == null || mType !== "text" || !isCollaborativeNote(activeId) || !isOnline) return;
+    if (
+      activeId == null ||
+      mType !== "text" ||
+      !isCollaborativeNote(activeId) ||
+      !isOnline
+    )
+      return;
 
     const base = {
       id: activeId,
@@ -4818,7 +5780,7 @@ export default function App() {
       tags: mTagList,
       images: mImages,
       color: mColor,
-      pinned: !!notes.find(n => String(n.id) === String(activeId))?.pinned,
+      pinned: !!notes.find((n) => String(n.id) === String(activeId))?.pinned,
     };
     const payload = { ...base, type: "text", content: mBody, items: [] };
 
@@ -4828,15 +5790,19 @@ export default function App() {
 
       // Update local state
       const nowIso = new Date().toISOString();
-      setNotes((prev) => prev.map((n) =>
-      (String(n.id) === String(activeId) ? {
-        ...n,
-        ...payload,
-        updated_at: nowIso,
-        lastEditedBy: currentUser?.email || currentUser?.name,
-        lastEditedAt: nowIso
-      } : n)
-      ));
+      setNotes((prev) =>
+        prev.map((n) =>
+          String(n.id) === String(activeId)
+            ? {
+                ...n,
+                ...payload,
+                updated_at: nowIso,
+                lastEditedBy: currentUser?.email || currentUser?.name,
+                lastEditedAt: nowIso,
+              }
+            : n,
+        ),
+      );
 
       // Update initial state so hasNoteBeenModified doesn't think it's changed
       if (initialModalStateRef.current) {
@@ -4852,11 +5818,31 @@ export default function App() {
       console.error("Failed to save metadata:", e);
       // Don't show error toast to avoid interrupting user
     }
-  }, [activeId, mType, mTitle, mTagList, mImages, mColor, mBody, notes, token, currentUser, isCollaborativeNote, isOnline]);
+  }, [
+    activeId,
+    mType,
+    mTitle,
+    mTagList,
+    mImages,
+    mColor,
+    mBody,
+    notes,
+    token,
+    currentUser,
+    isCollaborativeNote,
+    isOnline,
+  ]);
 
   // Auto-save for collaborative text notes - must be defined before useEffect that uses it
   const autoSaveCollaborativeNote = useCallback(async () => {
-    if (activeId == null || mType !== "text" || !isCollaborativeNote(activeId) || viewMode || !hasNoteBeenModified()) return;
+    if (
+      activeId == null ||
+      mType !== "text" ||
+      !isCollaborativeNote(activeId) ||
+      viewMode ||
+      !hasNoteBeenModified()
+    )
+      return;
 
     // Clear existing timeout
     if (autoSaveTimeoutRef.current) {
@@ -4871,53 +5857,98 @@ export default function App() {
         tags: mTagList,
         images: mImages,
         color: mColor,
-        pinned: !!notes.find(n => String(n.id) === String(activeId))?.pinned,
+        pinned: !!notes.find((n) => String(n.id) === String(activeId))?.pinned,
       };
       const payload = { ...base, type: "text", content: mBody, items: [] };
 
       try {
-        await api(`/notes/${activeId}`, { method: "PUT", token, body: payload });
+        await api(`/notes/${activeId}`, {
+          method: "PUT",
+          token,
+          body: payload,
+        });
         invalidateNotesCache();
 
         // Update local state
         const nowIso = new Date().toISOString();
-        setNotes((prev) => prev.map((n) =>
-        (String(n.id) === String(activeId) ? {
-          ...n,
-          ...payload,
-          updated_at: nowIso,
-          lastEditedBy: currentUser?.email || currentUser?.name,
-          lastEditedAt: nowIso
-        } : n)
-        ));
+        setNotes((prev) =>
+          prev.map((n) =>
+            String(n.id) === String(activeId)
+              ? {
+                  ...n,
+                  ...payload,
+                  updated_at: nowIso,
+                  lastEditedBy: currentUser?.email || currentUser?.name,
+                  lastEditedAt: nowIso,
+                }
+              : n,
+          ),
+        );
       } catch (e) {
         console.error("Auto-save failed:", e);
         // Don't show error toast for auto-save failures to avoid interrupting user
       }
     }, 1000); // 1 second debounce
-  }, [activeId, mType, mTitle, mTagList, mImages, mColor, mBody, notes, token, currentUser, isCollaborativeNote, viewMode, hasNoteBeenModified]);
+  }, [
+    activeId,
+    mType,
+    mTitle,
+    mTagList,
+    mImages,
+    mColor,
+    mBody,
+    notes,
+    token,
+    currentUser,
+    isCollaborativeNote,
+    viewMode,
+    hasNoteBeenModified,
+  ]);
 
   // Auto-save metadata (color, tags, images) immediately for collaborative notes
   // This works in both view and edit mode since these are metadata changes
   useEffect(() => {
-    if (activeId && mType === "text" && isCollaborativeNote(activeId) && isOnline) {
+    if (
+      activeId &&
+      mType === "text" &&
+      isCollaborativeNote(activeId) &&
+      isOnline
+    ) {
       // Only save if color, tags, or images changed (not title or body)
       const initial = initialModalStateRef.current;
       if (initial) {
         const colorChanged = initial.color !== mColor;
-        const tagsChanged = JSON.stringify(initial.tags) !== JSON.stringify(mTagList);
-        const imagesChanged = JSON.stringify(initial.images) !== JSON.stringify(mImages);
+        const tagsChanged =
+          JSON.stringify(initial.tags) !== JSON.stringify(mTagList);
+        const imagesChanged =
+          JSON.stringify(initial.images) !== JSON.stringify(mImages);
 
         if (colorChanged || tagsChanged || imagesChanged) {
           saveCollaborativeMetadata();
         }
       }
     }
-  }, [mColor, mTagList, mImages, activeId, mType, isCollaborativeNote, isOnline, saveCollaborativeMetadata]);
+  }, [
+    mColor,
+    mTagList,
+    mImages,
+    activeId,
+    mType,
+    isCollaborativeNote,
+    isOnline,
+    saveCollaborativeMetadata,
+  ]);
 
   // Auto-save for collaborative text notes when content changes (title/body)
   useEffect(() => {
-    if (activeId && mType === "text" && isCollaborativeNote(activeId) && isOnline && !viewMode && hasNoteBeenModified()) {
+    if (
+      activeId &&
+      mType === "text" &&
+      isCollaborativeNote(activeId) &&
+      isOnline &&
+      !viewMode &&
+      hasNoteBeenModified()
+    ) {
       autoSaveCollaborativeNote();
     }
 
@@ -4927,7 +5958,17 @@ export default function App() {
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [mBody, mTitle, activeId, mType, isCollaborativeNote, isOnline, viewMode, hasNoteBeenModified, autoSaveCollaborativeNote]);
+  }, [
+    mBody,
+    mTitle,
+    activeId,
+    mType,
+    isCollaborativeNote,
+    isOnline,
+    viewMode,
+    hasNoteBeenModified,
+    autoSaveCollaborativeNote,
+  ]);
 
   // Update initial state reference when note is updated from server (for collaborative notes)
   // This prevents overwriting server changes when user hasn't edited locally
@@ -4940,20 +5981,19 @@ export default function App() {
     // Check if server version is different from our initial state
     const serverState = {
       title: n.title || "",
-      content: n.type === "draw" ? "" : (n.content || ""),
+      content: n.type === "draw" ? "" : n.content || "",
       tags: Array.isArray(n.tags) ? n.tags : [],
       images: Array.isArray(n.images) ? n.images : [],
       color: n.color || "default",
     };
 
     const initial = initialModalStateRef.current;
-    const serverChanged = (
+    const serverChanged =
       initial.title !== serverState.title ||
       initial.content !== serverState.content ||
       JSON.stringify(initial.tags) !== JSON.stringify(serverState.tags) ||
       JSON.stringify(initial.images) !== JSON.stringify(serverState.images) ||
-      initial.color !== serverState.color
-    );
+      initial.color !== serverState.color;
 
     // If server changed and user hasn't edited locally, update initial state to server state
     // This prevents overwriting server changes when user closes without editing
@@ -4971,7 +6011,13 @@ export default function App() {
   const closeModal = () => {
     // Save any pending changes for collaborative text notes before closing
     // Only save if NOT in view mode AND user has actually edited - don't overwrite with stale data
-    if (activeId && mType === "text" && isCollaborativeNote(activeId) && !viewMode && hasNoteBeenModified()) {
+    if (
+      activeId &&
+      mType === "text" &&
+      isCollaborativeNote(activeId) &&
+      !viewMode &&
+      hasNoteBeenModified()
+    ) {
       // Clear the timeout and save immediately
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
@@ -4983,7 +6029,7 @@ export default function App() {
         tags: mTagList,
         images: mImages,
         color: mColor,
-        pinned: !!notes.find(n => String(n.id) === String(activeId))?.pinned,
+        pinned: !!notes.find((n) => String(n.id) === String(activeId))?.pinned,
       };
       const payload = { ...base, type: "text", content: mBody, items: [] };
 
@@ -4991,15 +6037,19 @@ export default function App() {
         .then(() => {
           invalidateNotesCache();
           const nowIso = new Date().toISOString();
-          setNotes((prev) => prev.map((n) =>
-          (String(n.id) === String(activeId) ? {
-            ...n,
-            ...payload,
-            updated_at: nowIso,
-            lastEditedBy: currentUser?.email || currentUser?.name,
-            lastEditedAt: nowIso
-          } : n)
-          ));
+          setNotes((prev) =>
+            prev.map((n) =>
+              String(n.id) === String(activeId)
+                ? {
+                    ...n,
+                    ...payload,
+                    updated_at: nowIso,
+                    lastEditedBy: currentUser?.email || currentUser?.name,
+                    lastEditedAt: nowIso,
+                  }
+                : n,
+            ),
+          );
         })
         .catch((e) => console.error("Final save on close failed:", e));
     }
@@ -5020,14 +6070,19 @@ export default function App() {
       tags: mTagList,
       images: mImages,
       color: mColor,
-      pinned: !!notes.find(n => String(n.id) === String(activeId))?.pinned,
+      pinned: !!notes.find((n) => String(n.id) === String(activeId))?.pinned,
     };
     const payload =
       mType === "text"
         ? { ...base, type: "text", content: mBody, items: [] }
         : mType === "checklist"
           ? { ...base, type: "checklist", content: "", items: mItems }
-          : { ...base, type: "draw", content: JSON.stringify(mDrawingData), items: [] };
+          : {
+              ...base,
+              type: "draw",
+              content: JSON.stringify(mDrawingData),
+              items: [],
+            };
 
     try {
       setSavingModal(true);
@@ -5035,22 +6090,30 @@ export default function App() {
       await api(`/notes/${activeId}`, { method: "PUT", token, body: payload });
       invalidateNotesCache();
 
-      prevItemsRef.current = mType === "checklist" ? (Array.isArray(mItems) ? mItems : []) : [];
-      prevDrawingRef.current = mType === "draw" ? (mDrawingData || { paths: [], dimensions: null }) : { paths: [], dimensions: null };
+      prevItemsRef.current =
+        mType === "checklist" ? (Array.isArray(mItems) ? mItems : []) : [];
+      prevDrawingRef.current =
+        mType === "draw"
+          ? mDrawingData || { paths: [], dimensions: null }
+          : { paths: [], dimensions: null };
       // Also update updated_at locally so the Edited stamp updates immediately
       const nowIso = new Date().toISOString();
-      setNotes((prev) => prev.map((n) =>
-      (String(n.id) === String(activeId) ? {
-        ...n,
-        ...payload,
-        updated_at: nowIso,
-        lastEditedBy: currentUser?.email || currentUser?.name,
-        lastEditedAt: nowIso
-      } : n)
-      ));
+      setNotes((prev) =>
+        prev.map((n) =>
+          String(n.id) === String(activeId)
+            ? {
+                ...n,
+                ...payload,
+                updated_at: nowIso,
+                lastEditedBy: currentUser?.email || currentUser?.name,
+                lastEditedAt: nowIso,
+              }
+            : n,
+        ),
+      );
       closeModal();
     } catch (e) {
-      alert(e.message || "Failed to save note");
+      alert(e.message || t("failedSaveNote"));
     } finally {
       setSavingModal(false);
     }
@@ -5059,9 +6122,9 @@ export default function App() {
     if (activeId == null) return;
     try {
       // Check if user owns the note
-      const note = notes.find(n => String(n.id) === String(activeId));
+      const note = notes.find((n) => String(n.id) === String(activeId));
       if (note && note.user_id !== currentUser?.id) {
-        showToast("You can't delete this note as you don't own it", "error");
+        showToast(t("cannotDeleteNotOwner"), "error");
         return;
       }
 
@@ -5070,23 +6133,31 @@ export default function App() {
 
       setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
       closeModal();
-      showToast("Note deleted successfully", "success");
+      showToast(t("noteDeletedSuccessfully"), "success");
     } catch (e) {
       if (e.status === 404 || e.message?.includes("not found")) {
-        showToast("You can't delete this note as you don't own it", "error");
+        showToast(t("cannotDeleteNotOwner"), "error");
       } else {
-        showToast(e.message || "Delete failed", "error");
+        showToast(e.message || t("deleteFailed"), "error");
       }
     }
   };
   const togglePin = async (id, toPinned) => {
     try {
-      await api(`/notes/${id}`, { method: "PATCH", token, body: { pinned: !!toPinned } });
+      await api(`/notes/${id}`, {
+        method: "PATCH",
+        token,
+        body: { pinned: !!toPinned },
+      });
       invalidateNotesCache();
 
-      setNotes((prev) => prev.map((n) => (String(n.id) === String(id) ? { ...n, pinned: !!toPinned } : n)));
+      setNotes((prev) =>
+        prev.map((n) =>
+          String(n.id) === String(id) ? { ...n, pinned: !!toPinned } : n,
+        ),
+      );
     } catch (e) {
-      alert(e.message || "Failed to toggle pin");
+      alert(e.message || t("failedTogglePin"));
     }
   };
 
@@ -5114,11 +6185,14 @@ export default function App() {
     if (dragGroup.current !== group) return;
     ev.currentTarget.classList.add("drag-over");
   };
-  const onDragLeave = (ev) => { ev.currentTarget.classList.remove("drag-over"); };
+  const onDragLeave = (ev) => {
+    ev.currentTarget.classList.remove("drag-over");
+  };
   const onDrop = async (overId, group, ev) => {
     ev.preventDefault();
     ev.currentTarget.classList.remove("drag-over");
-    const dragged = dragId.current; dragId.current = null;
+    const dragged = dragId.current;
+    dragId.current = null;
     if (!dragged || String(dragged) === String(overId)) return;
     if (dragGroup.current !== group) return;
 
@@ -5128,25 +6202,47 @@ export default function App() {
 
     const pinnedIds = notes.filter((n) => n.pinned).map((n) => String(n.id));
     const otherIds = notes.filter((n) => !n.pinned).map((n) => String(n.id));
-    let newPinned = pinnedIds, newOthers = otherIds;
-    if (group === "pinned") newPinned = moveWithin(pinnedIds, String(dragged), String(overId), placeAfter);
-    else newOthers = moveWithin(otherIds, String(dragged), String(overId), placeAfter);
+    let newPinned = pinnedIds,
+      newOthers = otherIds;
+    if (group === "pinned")
+      newPinned = moveWithin(
+        pinnedIds,
+        String(dragged),
+        String(overId),
+        placeAfter,
+      );
+    else
+      newOthers = moveWithin(
+        otherIds,
+        String(dragged),
+        String(overId),
+        placeAfter,
+      );
 
     // Optimistic update
     const byId = new Map(notes.map((n) => [String(n.id), n]));
-    const reordered = [...newPinned.map((id) => byId.get(id)), ...newOthers.map((id) => byId.get(id))];
+    const reordered = [
+      ...newPinned.map((id) => byId.get(id)),
+      ...newOthers.map((id) => byId.get(id)),
+    ];
     setNotes(reordered);
 
     // Persist order
     try {
-      await api("/notes/reorder", { method: "POST", token, body: { pinnedIds: newPinned, otherIds: newOthers } });
+      await api("/notes/reorder", {
+        method: "POST",
+        token,
+        body: { pinnedIds: newPinned, otherIds: newOthers },
+      });
     } catch (e) {
       console.error("Reorder failed:", e);
-      loadNotes().catch(() => { });
+      loadNotes().catch(() => {});
     }
     dragGroup.current = null;
   };
-  const onDragEnd = (ev) => { ev.currentTarget.classList.remove("dragging"); };
+  const onDragEnd = (ev) => {
+    ev.currentTarget.classList.remove("dragging");
+  };
 
   // Checklist item drag handlers (for modal reordering)
   const onChecklistDragStart = (itemId, ev) => {
@@ -5171,17 +6267,21 @@ export default function App() {
     if (!dragged || String(dragged) === String(overItemId)) return;
 
     // Only allow reordering unchecked items
-    const draggedItem = mItems.find(it => String(it.id) === String(dragged));
-    const overItem = mItems.find(it => String(it.id) === String(overItemId));
+    const draggedItem = mItems.find((it) => String(it.id) === String(dragged));
+    const overItem = mItems.find((it) => String(it.id) === String(overItemId));
 
     if (!draggedItem || !overItem || draggedItem.done || overItem.done) return;
 
     // Reorder the unchecked items
-    const uncheckedItems = mItems.filter(it => !it.done);
-    const checkedItems = mItems.filter(it => it.done);
+    const uncheckedItems = mItems.filter((it) => !it.done);
+    const checkedItems = mItems.filter((it) => it.done);
 
-    const draggedIndex = uncheckedItems.findIndex(it => String(it.id) === String(dragged));
-    const overIndex = uncheckedItems.findIndex(it => String(it.id) === String(overItemId));
+    const draggedIndex = uncheckedItems.findIndex(
+      (it) => String(it.id) === String(dragged),
+    );
+    const overIndex = uncheckedItems.findIndex(
+      (it) => String(it.id) === String(overItemId),
+    );
 
     if (draggedIndex === -1 || overIndex === -1) return;
 
@@ -5201,7 +6301,7 @@ export default function App() {
         await api(`/notes/${activeId}`, {
           method: "PATCH",
           token,
-          body: { items: newItems, type: "checklist", content: "" }
+          body: { items: newItems, type: "checklist", content: "" },
         });
       }
     } catch (error) {
@@ -5211,8 +6311,8 @@ export default function App() {
   const onChecklistDragEnd = (ev) => {
     ev.currentTarget.classList.remove("dragging");
     // Clean up any remaining drag-over states
-    document.querySelectorAll('.drag-over').forEach(el => {
-      el.classList.remove('drag-over');
+    document.querySelectorAll(".drag-over").forEach((el) => {
+      el.classList.remove("drag-over");
     });
   };
 
@@ -5220,7 +6320,7 @@ export default function App() {
   const tagsWithCounts = useMemo(() => {
     const map = new Map();
     for (const n of notes) {
-      for (const t of (n.tags || [])) {
+      for (const t of n.tags || []) {
         const key = String(t).trim();
         if (!key) continue;
         map.set(key, (map.get(key) || 0) + 1);
@@ -5234,29 +6334,52 @@ export default function App() {
   /** -------- Derived lists (search + tag filter) -------- */
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    const tag = tagFilter === ALL_IMAGES ? null : (tagFilter === 'ARCHIVED' ? null : (tagFilter?.toLowerCase() || null));
+    const tag =
+      tagFilter === ALL_IMAGES
+        ? null
+        : tagFilter === "ARCHIVED"
+          ? null
+          : tagFilter?.toLowerCase() || null;
 
     return notes.filter((n) => {
       if (tagFilter === ALL_IMAGES) {
         if (!(n.images && n.images.length)) return false;
-      } else if (tagFilter === 'ARCHIVED') {
+      } else if (tagFilter === "ARCHIVED") {
         // In archived view, show all notes (they're already filtered by the backend)
         // Just apply search filter
-      } else if (tag && !(n.tags || []).some((t) => String(t).toLowerCase() === tag)) {
+      } else if (
+        tag &&
+        !(n.tags || []).some((t) => String(t).toLowerCase() === tag)
+      ) {
         return false;
       }
       if (!q) return true;
       const t = (n.title || "").toLowerCase();
       const c = (n.content || "").toLowerCase();
       const tagsStr = (n.tags || []).join(" ").toLowerCase();
-      const items = (n.items || []).map((i) => i.text).join(" ").toLowerCase();
-      const images = (n.images || []).map((im) => im.name).join(" ").toLowerCase();
-      return t.includes(q) || c.includes(q) || tagsStr.includes(q) || items.includes(q) || images.includes(q);
+      const items = (n.items || [])
+        .map((i) => i.text)
+        .join(" ")
+        .toLowerCase();
+      const images = (n.images || [])
+        .map((im) => im.name)
+        .join(" ")
+        .toLowerCase();
+      return (
+        t.includes(q) ||
+        c.includes(q) ||
+        tagsStr.includes(q) ||
+        items.includes(q) ||
+        images.includes(q)
+      );
     });
   }, [notes, search, tagFilter]);
   const pinned = filtered.filter((n) => n.pinned);
   const others = filtered.filter((n) => !n.pinned);
-  const filteredEmptyWithSearch = filtered.length === 0 && notes.length > 0 && !!(search || (tagFilter && tagFilter !== 'ARCHIVED'));
+  const filteredEmptyWithSearch =
+    filtered.length === 0 &&
+    notes.length > 0 &&
+    !!(search || (tagFilter && tagFilter !== "ARCHIVED"));
   const allEmpty = notes.length === 0;
 
   /** -------- Modal link handler: open links in new tab (no auto-enter edit) -------- */
@@ -5283,7 +6406,8 @@ export default function App() {
   };
   const closeImageViewer = () => setImgViewOpen(false);
   const nextImage = () => setImgViewIndex((i) => (i + 1) % mImages.length);
-  const prevImage = () => setImgViewIndex((i) => (i - 1 + mImages.length) % mImages.length);
+  const prevImage = () =>
+    setImgViewIndex((i) => (i - 1 + mImages.length) % mImages.length);
 
   /** -------- Formatting actions (composer & modal) -------- */
   const runFormat = (getter, setter, ref, type) => {
@@ -5294,12 +6418,17 @@ export default function App() {
     const end = el.selectionEnd ?? value.length;
 
     // Insert defaults when editor is empty for quote / ul / ol
-    if ((type === "ul" || type === "ol" || type === "quote") && value.trim().length === 0) {
+    if (
+      (type === "ul" || type === "ol" || type === "quote") &&
+      value.trim().length === 0
+    ) {
       const snippet = type === "ul" ? "- " : type === "ol" ? "1. " : "> ";
       setter(snippet);
       requestAnimationFrame(() => {
         el.focus();
-        try { el.setSelectionRange(snippet.length, snippet.length); } catch (e) { }
+        try {
+          el.setSelectionRange(snippet.length, snippet.length);
+        } catch (e) {}
       });
       return;
     }
@@ -5311,41 +6440,71 @@ export default function App() {
       setter(newValue);
       requestAnimationFrame(() => {
         el.focus();
-        try { el.setSelectionRange(start + snippet.length, start + snippet.length); } catch (e) { }
+        try {
+          el.setSelectionRange(start + snippet.length, start + snippet.length);
+        } catch (e) {}
       });
       return;
     }
 
     let result;
     switch (type) {
-      case "h1": result = prefixLines(value, start, end, "# "); break;
-      case "h2": result = prefixLines(value, start, end, "## "); break;
-      case "h3": result = prefixLines(value, start, end, "### "); break;
-      case "bold": result = wrapSelection(value, start, end, "**", "**"); break;
-      case "italic": result = wrapSelection(value, start, end, "_", "_"); break;
-      case "strike": result = wrapSelection(value, start, end, "~~", "~~"); break;
-      case "code": result = wrapSelection(value, start, end, "`", "`"); break;
-      case "codeblock": result = fencedBlock(value, start, end); break;
-      case "quote": result = prefixLines(value, start, end, "> "); break;
-      case "ul": result = toggleList(value, start, end, "ul"); break;
-      case "ol": result = toggleList(value, start, end, "ol"); break;
-      case "link": result = wrapSelection(value, start, end, "[", "](https://)"); break;
-      default: return;
+      case "h1":
+        result = prefixLines(value, start, end, "# ");
+        break;
+      case "h2":
+        result = prefixLines(value, start, end, "## ");
+        break;
+      case "h3":
+        result = prefixLines(value, start, end, "### ");
+        break;
+      case "bold":
+        result = wrapSelection(value, start, end, "**", "**");
+        break;
+      case "italic":
+        result = wrapSelection(value, start, end, "_", "_");
+        break;
+      case "strike":
+        result = wrapSelection(value, start, end, "~~", "~~");
+        break;
+      case "code":
+        result = wrapSelection(value, start, end, "`", "`");
+        break;
+      case "codeblock":
+        result = fencedBlock(value, start, end);
+        break;
+      case "quote":
+        result = prefixLines(value, start, end, "> ");
+        break;
+      case "ul":
+        result = toggleList(value, start, end, "ul");
+        break;
+      case "ol":
+        result = toggleList(value, start, end, "ol");
+        break;
+      case "link":
+        result = wrapSelection(value, start, end, "[", "](https://)");
+        break;
+      default:
+        return;
     }
     setter(result.text);
     requestAnimationFrame(() => {
       el.focus();
       try {
         el.setSelectionRange(result.range[0], result.range[1]);
-      } catch (e) { }
+      } catch (e) {}
     });
   };
-  const formatComposer = (type) => runFormat(() => content, setContent, contentRef, type);
-  const formatModal = (type) => runFormat(() => mBody, setMBody, mBodyRef, type);
+  const formatComposer = (type) =>
+    runFormat(() => content, setContent, contentRef, type);
+  const formatModal = (type) =>
+    runFormat(() => mBody, setMBody, mBodyRef, type);
 
   /** Composer smart-enter handler */
   const onComposerKeyDown = (e) => {
-    if (e.key !== "Enter" || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key !== "Enter" || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey)
+      return;
     const el = contentRef.current;
     if (!el) return;
     const value = content;
@@ -5356,7 +6515,9 @@ export default function App() {
       e.preventDefault();
       setContent(res.text);
       requestAnimationFrame(() => {
-        try { el.setSelectionRange(res.range[0], res.range[1]); } catch (e) { }
+        try {
+          el.setSelectionRange(res.range[0], res.range[1]);
+        } catch (e) {}
         el.style.height = "auto";
         el.style.height = el.scrollHeight + "px";
       });
@@ -5373,25 +6534,25 @@ export default function App() {
       // Wrap code blocks so the copy button can stay fixed even on horizontal scroll
       root.querySelectorAll("pre").forEach((pre) => {
         // Ensure wrapper
-        let wrapper = pre.closest('.code-block-wrapper');
+        let wrapper = pre.closest(".code-block-wrapper");
         if (!wrapper) {
-          wrapper = document.createElement('div');
-          wrapper.className = 'code-block-wrapper';
+          wrapper = document.createElement("div");
+          wrapper.className = "code-block-wrapper";
           pre.parentNode?.insertBefore(wrapper, pre);
           wrapper.appendChild(pre);
         }
-        if (wrapper.querySelector('.code-copy-btn')) return;
+        if (wrapper.querySelector(".code-copy-btn")) return;
         const btn = document.createElement("button");
         btn.className = "code-copy-btn";
-        btn.textContent = "Copy";
+        btn.textContent = t("copy");
         btn.setAttribute("data-copy-btn", "1");
         btn.addEventListener("click", (e) => {
           e.stopPropagation();
           const codeEl = pre.querySelector("code");
           const text = codeEl ? codeEl.textContent : pre.textContent;
           navigator.clipboard?.writeText(text || "");
-          btn.textContent = "Copied";
-          setTimeout(() => (btn.textContent = "Copy"), 1200);
+          btn.textContent = t("copied");
+          setTimeout(() => (btn.textContent = t("copy")), 1200);
         });
         wrapper.appendChild(btn);
       });
@@ -5407,13 +6568,13 @@ export default function App() {
           return;
         const btn = document.createElement("button");
         btn.className = "inline-code-copy-btn";
-        btn.textContent = "Copy";
+        btn.textContent = t("copy");
         btn.setAttribute("data-copy-btn", "1");
         btn.addEventListener("click", (e) => {
           e.stopPropagation();
           navigator.clipboard?.writeText(code.textContent || "");
-          btn.textContent = "Copied";
-          setTimeout(() => (btn.textContent = "Copy"), 1200);
+          btn.textContent = t("copied");
+          setTimeout(() => (btn.textContent = t("copy")), 1200);
         });
         code.insertAdjacentElement("afterend", btn);
       });
@@ -5429,7 +6590,7 @@ export default function App() {
     const mo = new MutationObserver(() => attach());
     try {
       mo.observe(root, { childList: true, subtree: true });
-    } catch (e) { }
+    } catch (e) {}
 
     return () => {
       clearTimeout(t1);
@@ -5445,7 +6606,7 @@ export default function App() {
         className="modal-scrim fixed inset-0 bg-black/40 backdrop-blur-md z-40 flex items-center justify-center transition-opacity duration-300 overscroll-contain"
         onMouseDown={(e) => {
           // Only consider closing if the press STARTS on the scrim
-          scrimClickStartRef.current = (e.target === e.currentTarget);
+          scrimClickStartRef.current = e.target === e.currentTarget;
         }}
         onClick={(e) => {
           // Close only if press started AND ended on scrim (prevents drag-outside-close)
@@ -5474,18 +6635,21 @@ export default function App() {
             >
               <div className="flex flex-wrap items-center gap-2">
                 <input
-                  className={`flex-[1_0_50%] min-w-[240px] shrink-0 bg-transparent text-2xl font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none pr-2 ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
+                  className={`flex-[1_0_50%] min-w-[240px] shrink-0 bg-transparent text-2xl font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none pr-2 ${
+                    !isOnline ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
                   value={mTitle}
-                  onChange={(e) => { if (isOnline) setMTitle(e.target.value) }}
-                  placeholder="Title"
+                  onChange={(e) => {
+                    if (isOnline) setMTitle(e.target.value);
+                  }}
+                  placeholder={t("noteTitle")}
                   disabled={!isOnline}
                 />
                 <div className="flex items-center gap-2 flex-none ml-auto">
                   {/* Collaboration button - always visible */}
                   <button
                     className="rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 relative"
-                    title="Collaborate"
+                    title={t("collaborate")}
                     onClick={async () => {
                       setCollaborationModalOpen(true);
                       if (activeId) {
@@ -5493,23 +6657,35 @@ export default function App() {
                       }
                     }}
                   >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <svg
+                      className="w-5 h-5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
                       <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
                     </svg>
-                    <svg className="w-3 h-3 absolute -top-1 -right-1" fill="currentColor" viewBox="0 0 20 20">
+                    <svg
+                      className="w-3 h-3 absolute -top-1 -right-1"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
                       <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
                     </svg>
                   </button>
-
 
                   {/* View/Edit toggle only for TEXT notes - hidden when offline */}
                   {isOnline && mType === "text" && (
                     <button
                       className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
-                      onClick={() => { setViewMode((v) => !v); setShowModalFmt(false); }}
-                      title={viewMode ? "Switch to Edit mode" : "Switch to View mode"}
+                      onClick={() => {
+                        setViewMode((v) => !v);
+                        setShowModalFmt(false);
+                      }}
+                      title={
+                        viewMode ? t("switchToEditMode") : t("switchToViewMode")
+                      }
                     >
-                      {viewMode ? "Edit mode" : "View mode"}
+                      {viewMode ? t("editMode") : t("viewMode")}
                     </button>
                   )}
 
@@ -5518,7 +6694,7 @@ export default function App() {
                       <button
                         ref={modalFmtBtnRef}
                         className="rounded-full p-2.5 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        title="Formatting"
+                        title={t("formatting")}
                         onClick={(e) => {
                           e.stopPropagation();
                           setShowModalFmt((v) => !v);
@@ -5531,7 +6707,13 @@ export default function App() {
                         open={showModalFmt}
                         onClose={() => setShowModalFmt(false)}
                       >
-                        <FormatToolbar dark={dark} onAction={(t) => { setShowModalFmt(false); formatModal(t); }} />
+                        <FormatToolbar
+                          dark={dark}
+                          onAction={(t) => {
+                            setShowModalFmt(false);
+                            formatModal(t);
+                          }}
+                        />
                       </Popover>
                     </>
                   )}
@@ -5542,8 +6724,11 @@ export default function App() {
                       <button
                         ref={modalMenuBtnRef}
                         className="rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        title="More options"
-                        onClick={(e) => { e.stopPropagation(); setModalMenuOpen((v) => !v); }}
+                        title={t("moreOptions")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setModalMenuOpen((v) => !v);
+                        }}
                       >
                         <Kebab />
                       </button>
@@ -5554,20 +6739,28 @@ export default function App() {
                       >
                         <div
                           className={`min-w-[180px] border border-[var(--border-light)] rounded-lg shadow-lg overflow-hidden ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
-                          style={{ backgroundColor: dark ? "#222222" : undefined }}
+                          style={{
+                            backgroundColor: dark ? "#222222" : undefined,
+                          }}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button
                             className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                            onClick={() => { const n = notes.find(nn => String(nn.id) === String(activeId)); if (n) handleDownloadNote(n); setModalMenuOpen(false); }}
+                            onClick={() => {
+                              const n = notes.find(
+                                (nn) => String(nn.id) === String(activeId),
+                              );
+                              if (n) handleDownloadNote(n);
+                              setModalMenuOpen(false);
+                            }}
                           >
-                            <DownloadIcon />
-                            Download .md
-                          </button>
+                            <DownloadIcon />{t("downloadMd")}</button>
                           <button
                             className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                             onClick={() => {
-                              const note = notes.find(nn => String(nn.id) === String(activeId));
+                              const note = notes.find(
+                                (nn) => String(nn.id) === String(activeId),
+                              );
                               if (note) {
                                 handleArchiveNote(activeId, !note.archived);
                                 setModalMenuOpen(false);
@@ -5575,34 +6768,47 @@ export default function App() {
                             }}
                           >
                             <ArchiveIcon />
-                            {activeNoteObj?.archived ? "Unarchive" : "Archive"}
+                            {activeNoteObj?.archived ? "Unarchive" : t("archive")}
                           </button>
                           <button
                             className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                            onClick={() => { setConfirmDeleteOpen(true); setModalMenuOpen(false); }}
+                            onClick={() => {
+                              setConfirmDeleteOpen(true);
+                              setModalMenuOpen(false);
+                            }}
                           >
-                            <Trash />
-                            Delete
-                          </button>
+                            <Trash />{t("delete")}</button>
                         </div>
                       </Popover>
                     </>
                   )}
 
                   {/* Pin button - hidden when offline or in archived view */}
-                  {isOnline && tagFilter !== 'ARCHIVED' && (
+                  {isOnline && tagFilter !== "ARCHIVED" && (
                     <button
                       className="rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      title="Pin/unpin"
-                      onClick={() => activeId != null && togglePin(activeId, !(notes.find((n) => String(n.id) === String(activeId))?.pinned))}
+                      title={t("pinUnpin")}
+                      onClick={() =>
+                        activeId != null &&
+                        togglePin(
+                          activeId,
+                          !notes.find((n) => String(n.id) === String(activeId))
+                            ?.pinned,
+                        )
+                      }
                     >
-                      {(notes.find((n) => String(n.id) === String(activeId))?.pinned) ? <PinFilled /> : <PinOutline />}
+                      {notes.find((n) => String(n.id) === String(activeId))
+                        ?.pinned ? (
+                        <PinFilled />
+                      ) : (
+                        <PinOutline />
+                      )}
                     </button>
                   )}
 
                   <button
                     className="rounded-full p-2.5 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    title="Close"
+                    title={t("close")}
                     onClick={closeModal}
                   >
                     <CloseIcon />
@@ -5612,7 +6818,10 @@ export default function App() {
             </div>
 
             {/* Content area */}
-            <div className={mType === "draw" ? "p-2 pb-6" : "p-6 pb-12"} onClick={onModalBodyClick}>
+            <div
+              className={mType === "draw" ? "p-2 pb-6" : "p-6 pb-12"}
+              onClick={onModalBodyClick}
+            >
               {/* Images */}
               {mImages.length > 0 && (
                 <div className="mb-5 flex gap-3 overflow-x-auto">
@@ -5622,13 +6831,20 @@ export default function App() {
                         src={im.src}
                         alt={im.name}
                         className="h-40 md:h-56 w-auto object-cover rounded-md border border-[var(--border-light)] cursor-zoom-in"
-                        onClick={(e) => { e.stopPropagation(); openImageViewer(idx); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openImageViewer(idx);
+                        }}
                       />
                       {isOnline && (
                         <button
-                          title="Remove image"
+                          title={t("removeImage")}
                           className="absolute -top-2 -right-2 bg-black/70 text-white rounded-full w-5 h-5 text-xs"
-                          onClick={() => setMImages((prev) => prev.filter((x) => x.id !== im.id))}
+                          onClick={() =>
+                            setMImages((prev) =>
+                              prev.filter((x) => x.id !== im.id),
+                            )
+                          }
                         >
                           ×
                         </button>
@@ -5644,27 +6860,41 @@ export default function App() {
                   <div
                     ref={noteViewRef}
                     className="note-content note-content--dense whitespace-pre-wrap"
-                    dangerouslySetInnerHTML={{ __html: marked.parse(mBody || "") }}
+                    dangerouslySetInnerHTML={{
+                      __html: marked.parse(mBody || ""),
+                    }}
                   />
                 ) : (
                   <div className="relative min-h-[160px]">
                     <textarea
                       ref={mBodyRef}
-                      className={`w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden min-h-[160px] ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
-                      style={{ scrollBehavior: 'unset' }}
+                      className={`w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden min-h-[160px] ${
+                        !isOnline ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
+                      style={{ scrollBehavior: "unset" }}
                       value={mBody}
-                      onChange={(e) => { if (isOnline) { setMBody(e.target.value); resizeModalTextarea(); } }}
+                      onChange={(e) => {
+                        if (isOnline) {
+                          setMBody(e.target.value);
+                          resizeModalTextarea();
+                        }
+                      }}
                       onKeyDown={(e) => {
                         if (!isOnline) return;
-                        if (e.key === "Enter" && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                        if (
+                          e.key === "Enter" &&
+                          !e.shiftKey &&
+                          !e.altKey &&
+                          !e.ctrlKey &&
+                          !e.metaKey
+                        ) {
                           const el = mBodyRef.current;
                           const value = mBody;
                           const start = el.selectionStart ?? value.length;
                           const end = el.selectionEnd ?? value.length;
 
                           // Check if cursor is on the last line before Enter
-                          const lastNewlineIndex = value.lastIndexOf('\n');
+                          const lastNewlineIndex = value.lastIndexOf("\n");
                           const isOnLastLine = start > lastNewlineIndex;
 
                           const res = handleSmartEnter(value, start, end);
@@ -5672,7 +6902,12 @@ export default function App() {
                             e.preventDefault();
                             setMBody(res.text);
                             requestAnimationFrame(() => {
-                              try { el.setSelectionRange(res.range[0], res.range[1]); } catch (e) { }
+                              try {
+                                el.setSelectionRange(
+                                  res.range[0],
+                                  res.range[1],
+                                );
+                              } catch (e) {}
                               resizeModalTextarea();
 
                               // If we were on the last line, scroll down a bit to ensure cursor visibility
@@ -5696,7 +6931,7 @@ export default function App() {
                           }
                         }
                       }}
-                      placeholder="Write your note…"
+                      placeholder={t("writeYourNoteEllipsis")}
                       disabled={!isOnline}
                     />
                   </div>
@@ -5714,12 +6949,23 @@ export default function App() {
                             e.preventDefault();
                             const t = mInput.trim();
                             if (t) {
-                              const newItems = [...mItems, { id: uid(), text: t, done: false }];
+                              const newItems = [
+                                ...mItems,
+                                { id: uid(), text: t, done: false },
+                              ];
                               setMItems(newItems);
                               setMInput("");
                               try {
                                 if (activeId) {
-                                  await api(`/notes/${activeId}`, { method: "PATCH", token, body: { items: newItems, type: "checklist", content: "" } });
+                                  await api(`/notes/${activeId}`, {
+                                    method: "PATCH",
+                                    token,
+                                    body: {
+                                      items: newItems,
+                                      type: "checklist",
+                                      content: "",
+                                    },
+                                  });
                                   prevItemsRef.current = newItems;
                                 }
                               } catch (e) {
@@ -5728,210 +6974,331 @@ export default function App() {
                             }
                           }
                         }}
-                        placeholder="List item…"
+                        placeholder={t("listItemEllipsis")}
                         className="flex-1 bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2 border-b border-[var(--border-light)]"
                       />
                       <button
                         onClick={async () => {
                           const t = mInput.trim();
                           if (t) {
-                            const newItems = [...mItems, { id: uid(), text: t, done: false }];
+                            const newItems = [
+                              ...mItems,
+                              { id: uid(), text: t, done: false },
+                            ];
                             setMItems(newItems);
                             setMInput("");
                             try {
                               if (activeId) {
-                                await api(`/notes/${activeId}`, { method: "PATCH", token, body: { items: newItems, type: "checklist", content: "" } });
+                                await api(`/notes/${activeId}`, {
+                                  method: "PATCH",
+                                  token,
+                                  body: {
+                                    items: newItems,
+                                    type: "checklist",
+                                    content: "",
+                                  },
+                                });
                                 prevItemsRef.current = newItems;
                               }
-                            } catch (e) { }
+                            } catch (e) {}
                           }
                         }}
                         className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                      >
-                        Add
-                      </button>
+                      >{t("add")}</button>
                     </div>
                   )}
 
                   {mItems.length > 0 ? (
                     <div className="space-y-4 md:space-y-2">
                       {/* Unchecked items */}
-                      {mItems.filter(it => !it.done).map((it) => (
-                        <div
-                          key={it.id}
-                          data-checklist-item={it.id}
-                          onDragOver={(e) => onChecklistDragOver(it.id, e)}
-                          onDragLeave={onChecklistDragLeave}
-                          onDrop={(e) => onChecklistDrop(it.id, e)}
-                          className="group flex items-start gap-2"
-                        >
-                          {/* Drag handle */}
+                      {mItems
+                        .filter((it) => !it.done)
+                        .map((it) => (
                           <div
-                            draggable={isOnline}
-                            onDragStart={(e) => onChecklistDragStart(it.id, e)}
-                            onDragEnd={onChecklistDragEnd}
-                            onTouchStart={(e) => {
-                              // Handle touch drag start - only when touching the handle
-                              if (!isOnline) return;
-                              const target = e.currentTarget.closest('[data-checklist-item]');
-                              if (target) {
-                                checklistDragId.current = String(it.id);
-                                target.classList.add("dragging");
-                              }
-                            }}
-                            onTouchMove={(e) => {
-                              if (!checklistDragId.current) return;
-
-                              const touch = e.touches[0];
-                              const elementAtPoint = document.elementFromPoint(touch.clientX, touch.clientY);
-                              if (elementAtPoint) {
-                                // Find the checklist item container
-                                const checklistItem = elementAtPoint.closest('[data-checklist-item]');
-                                if (checklistItem && checklistItem !== e.currentTarget.closest('[data-checklist-item]')) {
-                                  const dragOverEvent = new Event('dragover', { bubbles: true });
-                                  checklistItem.dispatchEvent(dragOverEvent);
-                                }
-                              }
-                            }}
-                            onTouchEnd={(e) => {
-                              if (!checklistDragId.current) return;
-                              const touch = e.changedTouches[0];
-                              const elementAtPoint = document.elementFromPoint(touch.clientX, touch.clientY);
-                              const target = e.currentTarget.closest('[data-checklist-item]');
-
-                              if (elementAtPoint) {
-                                const checklistItem = elementAtPoint.closest('[data-checklist-item]');
-                                if (checklistItem && checklistItem !== target) {
-                                  const dropEvent = new Event('drop', { bubbles: true });
-                                  checklistItem.dispatchEvent(dropEvent);
-                                }
-                              }
-
-                              if (target) {
-                                target.classList.remove("dragging");
-                              }
-                              checklistDragId.current = null;
-
-                              // Clean up any remaining drag-over states
-                              document.querySelectorAll('.drag-over').forEach(el => {
-                                el.classList.remove('drag-over');
-                              });
-                            }}
-                            className="flex items-center justify-center py-1 px-1 mt-0.5 cursor-grab active:cursor-grabbing opacity-40 group-hover:opacity-70 transition-opacity"
-                            style={{ touchAction: 'none' }}
+                            key={it.id}
+                            data-checklist-item={it.id}
+                            onDragOver={(e) => onChecklistDragOver(it.id, e)}
+                            onDragLeave={onChecklistDragLeave}
+                            onDrop={(e) => onChecklistDrop(it.id, e)}
+                            className="group flex items-start gap-2"
                           >
-                            <div className="grid grid-cols-2 gap-0.5">
-                              <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                              <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                              <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                              <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                              <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                              <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                            </div>
-                          </div>
-
-                          <div className="flex-1">
-                            <ChecklistRow
-                              item={it}
-                              readOnly={!isOnline}
-                              disableToggle={!isOnline}      /* disable toggle when offline */
-                              showRemove={isOnline && true}  /* show delete X only when online */
-                              size="lg"                  /* bigger checkboxes and X in modal */
-                              onToggle={async (checked, e) => {
-                                e?.stopPropagation(); // Prevent any unwanted event bubbling
+                            {/* Drag handle */}
+                            <div
+                              draggable={isOnline}
+                              onDragStart={(e) =>
+                                onChecklistDragStart(it.id, e)
+                              }
+                              onDragEnd={onChecklistDragEnd}
+                              onTouchStart={(e) => {
+                                // Handle touch drag start - only when touching the handle
                                 if (!isOnline) return;
-                                const newItems = mItems.map(p => p.id === it.id ? { ...p, done: checked } : p);
-                                setMItems(newItems);
-                                try {
-                                  if (activeId) {
-                                    await api(`/notes/${activeId}`, { method: "PATCH", token, body: { items: newItems, type: "checklist", content: "" } });
-                                    prevItemsRef.current = newItems;
-                                  }
-                                } catch (e) {
-                                  // Handle error silently
+                                const target = e.currentTarget.closest(
+                                  "[data-checklist-item]",
+                                );
+                                if (target) {
+                                  checklistDragId.current = String(it.id);
+                                  target.classList.add("dragging");
                                 }
                               }}
-                              onChange={async (txt) => {
-                                if (!isOnline) return;
-                                const newItems = mItems.map(p => p.id === it.id ? { ...p, text: txt } : p);
-                                setMItems(newItems);
-                                try {
-                                  if (activeId) {
-                                    await api(`/notes/${activeId}`, { method: "PATCH", token, body: { items: newItems, type: "checklist", content: "" } });
-                                    prevItemsRef.current = newItems;
-                                  }
-                                } catch (e) { }
-                              }}
-                              onRemove={async () => {
-                                if (!isOnline) return;
-                                const newItems = mItems.filter(p => p.id !== it.id);
-                                setMItems(newItems);
-                                try {
-                                  if (activeId) {
-                                    await api(`/notes/${activeId}`, { method: "PATCH", token, body: { items: newItems, type: "checklist", content: "" } });
-                                    prevItemsRef.current = newItems;
-                                  }
-                                } catch (e) { }
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
+                              onTouchMove={(e) => {
+                                if (!checklistDragId.current) return;
 
-                      {/* Done section */}
-                      {mItems.filter(it => it.done).length > 0 && (
-                        <>
-                          <div className="border-t border-[var(--border-light)] pt-4 mt-4">
-                            <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3">Done</h4>
-                            {mItems.filter(it => it.done).map((it) => (
+                                const touch = e.touches[0];
+                                const elementAtPoint =
+                                  document.elementFromPoint(
+                                    touch.clientX,
+                                    touch.clientY,
+                                  );
+                                if (elementAtPoint) {
+                                  // Find the checklist item container
+                                  const checklistItem = elementAtPoint.closest(
+                                    "[data-checklist-item]",
+                                  );
+                                  if (
+                                    checklistItem &&
+                                    checklistItem !==
+                                      e.currentTarget.closest(
+                                        "[data-checklist-item]",
+                                      )
+                                  ) {
+                                    const dragOverEvent = new Event(
+                                      "dragover",
+                                      { bubbles: true },
+                                    );
+                                    checklistItem.dispatchEvent(dragOverEvent);
+                                  }
+                                }
+                              }}
+                              onTouchEnd={(e) => {
+                                if (!checklistDragId.current) return;
+                                const touch = e.changedTouches[0];
+                                const elementAtPoint =
+                                  document.elementFromPoint(
+                                    touch.clientX,
+                                    touch.clientY,
+                                  );
+                                const target = e.currentTarget.closest(
+                                  "[data-checklist-item]",
+                                );
+
+                                if (elementAtPoint) {
+                                  const checklistItem = elementAtPoint.closest(
+                                    "[data-checklist-item]",
+                                  );
+                                  if (
+                                    checklistItem &&
+                                    checklistItem !== target
+                                  ) {
+                                    const dropEvent = new Event("drop", {
+                                      bubbles: true,
+                                    });
+                                    checklistItem.dispatchEvent(dropEvent);
+                                  }
+                                }
+
+                                if (target) {
+                                  target.classList.remove("dragging");
+                                }
+                                checklistDragId.current = null;
+
+                                // Clean up any remaining drag-over states
+                                document
+                                  .querySelectorAll(".drag-over")
+                                  .forEach((el) => {
+                                    el.classList.remove("drag-over");
+                                  });
+                              }}
+                              className="flex items-center justify-center py-1 px-1 mt-0.5 cursor-grab active:cursor-grabbing opacity-40 group-hover:opacity-70 transition-opacity"
+                              style={{ touchAction: "none" }}
+                            >
+                              <div className="grid grid-cols-2 gap-0.5">
+                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                              </div>
+                            </div>
+
+                            <div className="flex-1">
                               <ChecklistRow
-                                key={it.id}
                                 item={it}
                                 readOnly={!isOnline}
-                                disableToggle={!isOnline}      /* disable toggle when offline */
-                                showRemove={isOnline && true}  /* show delete X only when online */
-                                size="lg"                  /* bigger checkboxes and X in modal */
+                                disableToggle={
+                                  !isOnline
+                                } /* disable toggle when offline */
+                                showRemove={
+                                  isOnline && true
+                                } /* show delete X only when online */
+                                size="lg" /* bigger checkboxes and X in modal */
                                 onToggle={async (checked, e) => {
                                   e?.stopPropagation(); // Prevent any unwanted event bubbling
                                   if (!isOnline) return;
-                                  const newItems = mItems.map(p => p.id === it.id ? { ...p, done: checked } : p);
+                                  const newItems = mItems.map((p) =>
+                                    p.id === it.id
+                                      ? { ...p, done: checked }
+                                      : p,
+                                  );
                                   setMItems(newItems);
                                   try {
                                     if (activeId) {
-                                      await api(`/notes/${activeId}`, { method: "PATCH", token, body: { items: newItems, type: "checklist", content: "" } });
+                                      await api(`/notes/${activeId}`, {
+                                        method: "PATCH",
+                                        token,
+                                        body: {
+                                          items: newItems,
+                                          type: "checklist",
+                                          content: "",
+                                        },
+                                      });
                                       prevItemsRef.current = newItems;
                                     }
-                                  } catch (e) { }
+                                  } catch (e) {
+                                    // Handle error silently
+                                  }
                                 }}
                                 onChange={async (txt) => {
                                   if (!isOnline) return;
-                                  const newItems = mItems.map(p => p.id === it.id ? { ...p, text: txt } : p);
+                                  const newItems = mItems.map((p) =>
+                                    p.id === it.id ? { ...p, text: txt } : p,
+                                  );
                                   setMItems(newItems);
                                   try {
                                     if (activeId) {
-                                      await api(`/notes/${activeId}`, { method: "PATCH", token, body: { items: newItems, type: "checklist", content: "" } });
+                                      await api(`/notes/${activeId}`, {
+                                        method: "PATCH",
+                                        token,
+                                        body: {
+                                          items: newItems,
+                                          type: "checklist",
+                                          content: "",
+                                        },
+                                      });
                                       prevItemsRef.current = newItems;
                                     }
-                                  } catch (e) { }
+                                  } catch (e) {}
                                 }}
                                 onRemove={async () => {
                                   if (!isOnline) return;
-                                  const newItems = mItems.filter(p => p.id !== it.id);
+                                  const newItems = mItems.filter(
+                                    (p) => p.id !== it.id,
+                                  );
                                   setMItems(newItems);
                                   try {
                                     if (activeId) {
-                                      await api(`/notes/${activeId}`, { method: "PATCH", token, body: { items: newItems, type: "checklist", content: "" } });
+                                      await api(`/notes/${activeId}`, {
+                                        method: "PATCH",
+                                        token,
+                                        body: {
+                                          items: newItems,
+                                          type: "checklist",
+                                          content: "",
+                                        },
+                                      });
                                       prevItemsRef.current = newItems;
                                     }
-                                  } catch (e) { }
+                                  } catch (e) {}
                                 }}
                               />
-                            ))}
+                            </div>
+                          </div>
+                        ))}
+
+                      {/* Done section */}
+                      {mItems.filter((it) => it.done).length > 0 && (
+                        <>
+                          <div className="border-t border-[var(--border-light)] pt-4 mt-4">
+                            <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3">{t("done")}</h4>
+                            {mItems
+                              .filter((it) => it.done)
+                              .map((it) => (
+                                <ChecklistRow
+                                  key={it.id}
+                                  item={it}
+                                  readOnly={!isOnline}
+                                  disableToggle={
+                                    !isOnline
+                                  } /* disable toggle when offline */
+                                  showRemove={
+                                    isOnline && true
+                                  } /* show delete X only when online */
+                                  size="lg" /* bigger checkboxes and X in modal */
+                                  onToggle={async (checked, e) => {
+                                    e?.stopPropagation(); // Prevent any unwanted event bubbling
+                                    if (!isOnline) return;
+                                    const newItems = mItems.map((p) =>
+                                      p.id === it.id
+                                        ? { ...p, done: checked }
+                                        : p,
+                                    );
+                                    setMItems(newItems);
+                                    try {
+                                      if (activeId) {
+                                        await api(`/notes/${activeId}`, {
+                                          method: "PATCH",
+                                          token,
+                                          body: {
+                                            items: newItems,
+                                            type: "checklist",
+                                            content: "",
+                                          },
+                                        });
+                                        prevItemsRef.current = newItems;
+                                      }
+                                    } catch (e) {}
+                                  }}
+                                  onChange={async (txt) => {
+                                    if (!isOnline) return;
+                                    const newItems = mItems.map((p) =>
+                                      p.id === it.id ? { ...p, text: txt } : p,
+                                    );
+                                    setMItems(newItems);
+                                    try {
+                                      if (activeId) {
+                                        await api(`/notes/${activeId}`, {
+                                          method: "PATCH",
+                                          token,
+                                          body: {
+                                            items: newItems,
+                                            type: "checklist",
+                                            content: "",
+                                          },
+                                        });
+                                        prevItemsRef.current = newItems;
+                                      }
+                                    } catch (e) {}
+                                  }}
+                                  onRemove={async () => {
+                                    if (!isOnline) return;
+                                    const newItems = mItems.filter(
+                                      (p) => p.id !== it.id,
+                                    );
+                                    setMItems(newItems);
+                                    try {
+                                      if (activeId) {
+                                        await api(`/notes/${activeId}`, {
+                                          method: "PATCH",
+                                          token,
+                                          body: {
+                                            items: newItems,
+                                            type: "checklist",
+                                            content: "",
+                                          },
+                                        });
+                                        prevItemsRef.current = newItems;
+                                      }
+                                    } catch (e) {}
+                                  }}
+                                />
+                              ))}
                           </div>
                         </>
                       )}
                     </div>
-                  ) : <p className="text-sm text-gray-500">No items yet.</p>}
+                  ) : (
+                    <p className="text-sm text-gray-500">{t("noItemsYet")}</p>
+                  )}
                 </div>
               ) : (
                 <DrawingCanvas
@@ -5947,16 +7314,14 @@ export default function App() {
 
               {/* Inline Edited stamp: only when scrollable (appears at very end) */}
               {editedStamp && modalScrollable && (
-                <div className="mt-6 text-xs text-gray-600 dark:text-gray-300 text-right">
-                  Edited: {editedStamp}
+                <div className="mt-6 text-xs text-gray-600 dark:text-gray-300 text-right">{t("editedPrefix")} {editedStamp}
                 </div>
               )}
             </div>
 
             {/* Absolute Edited stamp: only when NOT scrollable (sits just above footer) */}
             {editedStamp && !modalScrollable && (
-              <div className="absolute bottom-3 right-4 text-xs text-gray-600 dark:text-gray-300 pointer-events-none">
-                Edited: {editedStamp}
+              <div className="absolute bottom-3 right-4 text-xs text-gray-600 dark:text-gray-300 pointer-events-none">{t("editedPrefix")} {editedStamp}
               </div>
             )}
           </div>
@@ -5975,8 +7340,10 @@ export default function App() {
                   {isOnline && (
                     <button
                       className="ml-1 opacity-70 hover:opacity-100 focus:outline-none"
-                      title="Remove tag"
-                      onClick={() => setMTagList((prev) => prev.filter((t) => t !== tag))}
+                      title={t("removeTag")}
+                      onClick={() =>
+                        setMTagList((prev) => prev.filter((t) => t !== tag))
+                      }
                     >
                       ×
                     </button>
@@ -5991,7 +7358,7 @@ export default function App() {
                   onKeyDown={handleTagKeyDown}
                   onBlur={handleTagBlur}
                   onPaste={handleTagPaste}
-                  placeholder={mTagList.length ? "Add tag" : "Add tags"}
+                  placeholder={mTagList.length ? t("addTag") : t("addTags")}
                   className="bg-transparent text-sm placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none min-w-[8ch] flex-1"
                 />
               )}
@@ -6007,14 +7374,23 @@ export default function App() {
                     type="button"
                     onClick={() => setShowModalColorPop((v) => !v)}
                     className="w-6 h-6 rounded-full border-2 border-[var(--border-light)] hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 flex items-center justify-center"
-                    title="Color"
+                    title={t("color")}
                     style={{
-                      backgroundColor: mColor === "default" ? "transparent" : solid(bgFor(mColor, dark)),
-                      borderColor: mColor === "default" ? "#d1d5db" : solid(bgFor(mColor, dark)),
+                      backgroundColor:
+                        mColor === "default"
+                          ? "transparent"
+                          : solid(bgFor(mColor, dark)),
+                      borderColor:
+                        mColor === "default"
+                          ? "#d1d5db"
+                          : solid(bgFor(mColor, dark)),
                     }}
                   >
                     {mColor === "default" && (
-                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: dark ? "#1f2937" : "#fff" }} />
+                      <div
+                        className="w-4 h-4 rounded-full"
+                        style={{ backgroundColor: dark ? "#1f2937" : "#fff" }}
+                      />
                     )}
                   </button>
                   <Popover
@@ -6022,21 +7398,25 @@ export default function App() {
                     open={showModalColorPop}
                     onClose={() => setShowModalColorPop(false)}
                   >
-                    <div className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}>
+                    <div
+                      className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
+                    >
                       <div className="grid grid-cols-6 gap-2">
-                        {COLOR_ORDER.filter((name) => LIGHT_COLORS[name]).map((name) => (
-                          <ColorDot
-                            key={name}
-                            name={name}
-                            darkMode={dark}
-                            selected={mColor === name}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMColor(name);
-                              setShowModalColorPop(false);
-                            }}
-                          />
-                        ))}
+                        {COLOR_ORDER.filter((name) => LIGHT_COLORS[name]).map(
+                          (name) => (
+                            <ColorDot
+                              key={name}
+                              name={name}
+                              darkMode={dark}
+                              selected={mColor === name}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMColor(name);
+                                setShowModalColorPop(false);
+                              }}
+                            />
+                          ),
+                        )}
                       </div>
                     </div>
                   </Popover>
@@ -6052,12 +7432,18 @@ export default function App() {
                     accept="image/*"
                     multiple
                     className="hidden"
-                    onChange={async (e) => { const f = e.target.files; if (f && f.length) { await addImagesToState(f, setMImages); } e.target.value = ""; }}
+                    onChange={async (e) => {
+                      const f = e.target.files;
+                      if (f && f.length) {
+                        await addImagesToState(f, setMImages);
+                      }
+                      e.target.value = "";
+                    }}
                   />
                   <button
                     onClick={() => modalFileRef.current?.click()}
                     className="px-2 py-1 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-lg"
-                    title="Add images"
+                    title={t("addImages")}
                   >
                     🖼️
                   </button>
@@ -6065,15 +7451,17 @@ export default function App() {
               )}
 
               {/* Save button - hidden when offline or for collaborative text notes (they auto-save) */}
-              {isOnline && modalHasChanges && !(mType === "text" && isCollaborativeNote(activeId)) && (
-                <button
-                  onClick={saveModal}
-                  disabled={savingModal}
-                  className={`px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 whitespace-nowrap ${savingModal ? "bg-indigo-400 text-white cursor-not-allowed" : "bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500"}`}
-                >
-                  {savingModal ? "Saving..." : "Save"}
-                </button>
-              )}
+              {isOnline &&
+                modalHasChanges &&
+                !(mType === "text" && isCollaborativeNote(activeId)) && (
+                  <button
+                    onClick={saveModal}
+                    disabled={savingModal}
+                    className={`px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 whitespace-nowrap ${savingModal ? "bg-indigo-400 text-white cursor-not-allowed" : "bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500"}`}
+                  >
+                    {savingModal ? "Saving..." : t("save")}
+                  </button>
+                )}
               {/* Delete button moved to modal 3-dot menu */}
             </div>
           </div>
@@ -6087,31 +7475,31 @@ export default function App() {
               />
               <div
                 className="glass-card rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative"
-                style={{ backgroundColor: dark ? "rgba(40,40,40,0.95)" : "rgba(255,255,255,0.95)" }}
+                style={{
+                  backgroundColor: dark
+                    ? "rgba(40,40,40,0.95)"
+                    : "rgba(255,255,255,0.95)",
+                }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <h3 className="text-lg font-semibold mb-2">Delete this note?</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  This action cannot be undone.
-                </p>
+                <h3 className="text-lg font-semibold mb-2">{t("deleteThisNoteQuestion")}</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{t("actionCannotBeUndone")}</p>
                 <div className="mt-5 flex justify-end gap-3">
                   <button
                     className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
                     onClick={() => setConfirmDeleteOpen(false)}
-                  >
-                    Cancel
-                  </button>
+                  >{t("cancel")}</button>
                   <button
                     className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                    onClick={async () => { setConfirmDeleteOpen(false); await deleteModal(); }}
-                  >
-                    Delete
-                  </button>
+                    onClick={async () => {
+                      setConfirmDeleteOpen(false);
+                      await deleteModal();
+                    }}
+                  >{t("delete")}</button>
                 </div>
               </div>
             </div>
           )}
-
 
           {/* Collaboration Modal */}
           {collaborationModalOpen && (
@@ -6127,27 +7515,35 @@ export default function App() {
               />
               <div
                 className="glass-card rounded-xl shadow-2xl w-[90%] max-w-md p-6 relative max-h-[90vh] overflow-y-auto"
-                style={{ backgroundColor: dark ? "rgba(40,40,40,0.95)" : "rgba(255,255,255,0.95)" }}
+                style={{
+                  backgroundColor: dark
+                    ? "rgba(40,40,40,0.95)"
+                    : "rgba(255,255,255,0.95)",
+                }}
                 onClick={(e) => e.stopPropagation()}
               >
                 {(() => {
                   // Check if user owns the note (or if it's a new note)
-                  const note = activeId ? notes.find(n => String(n.id) === String(activeId)) : null;
-                  const isOwner = !activeId || note?.user_id === currentUser?.id;
+                  const note = activeId
+                    ? notes.find((n) => String(n.id) === String(activeId))
+                    : null;
+                  const isOwner =
+                    !activeId || note?.user_id === currentUser?.id;
 
                   return (
                     <>
                       <h3 className="text-lg font-semibold mb-4">
-                        {isOwner ? "Add Collaborator" : "Collaborators"}
+                        {isOwner ? t("addCollaborator") : t("collaborators")}
                       </h3>
 
                       {/* Show existing collaborators with remove option */}
                       {addModalCollaborators.length > 0 && (
                         <div className="mb-4">
-                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Current Collaborators:</p>
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t("currentCollaborators")}</p>
                           <div className="space-y-2 max-h-48 overflow-y-auto">
                             {addModalCollaborators.map((collab) => {
-                              const canRemove = isOwner || collab.id === currentUser?.id;
+                              const canRemove =
+                                isOwner || collab.id === currentUser?.id;
 
                               return (
                                 <div
@@ -6155,18 +7551,31 @@ export default function App() {
                                   className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"
                                 >
                                   <div>
-                                    <p className="font-medium text-sm">{collab.name || collab.email}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">{collab.email}</p>
+                                    <p className="font-medium text-sm">
+                                      {collab.name || collab.email}
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                      {collab.email}
+                                    </p>
                                   </div>
                                   {canRemove && (
                                     <button
                                       onClick={async () => {
-                                        await removeCollaborator(collab.id, activeId);
+                                        await removeCollaborator(
+                                          collab.id,
+                                          activeId,
+                                        );
                                       }}
                                       className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                                      title={collab.id === currentUser?.id ? "Remove yourself" : "Remove collaborator"}
+                                      title={
+                                        collab.id === currentUser?.id
+                                          ? t("removeYourself")
+                                          : t("removeCollaborator")
+                                      }
                                     >
-                                      {collab.id === currentUser?.id ? "Leave" : "Remove"}
+                                      {collab.id === currentUser?.id
+                                        ? t("leave")
+                                        : t("remove")}
                                     </button>
                                   )}
                                 </div>
@@ -6180,7 +7589,8 @@ export default function App() {
                       {isOwner && (
                         <>
                           <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                            Enter the username of the person you want to collaborate with on this note.
+                            Enter the username of the person you want to
+                            collaborate with on this note.
                           </p>
                           <div ref={collaboratorInputRef} className="relative">
                             <input
@@ -6196,19 +7606,29 @@ export default function App() {
                                 updateDropdownPosition();
                                 searchUsers(collaboratorUsername || "");
                               }}
-                              placeholder="Search by username or email"
+                              placeholder={t("searchByUsernameOrEmail")}
                               className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-transparent"
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' && collaboratorUsername.trim()) {
+                                if (
+                                  e.key === "Enter" &&
+                                  collaboratorUsername.trim()
+                                ) {
                                   // If dropdown is open and there's a filtered user, select the first one
-                                  if (showUserDropdown && filteredUsers.length > 0) {
+                                  if (
+                                    showUserDropdown &&
+                                    filteredUsers.length > 0
+                                  ) {
                                     const firstUser = filteredUsers[0];
-                                    setCollaboratorUsername(firstUser.name || firstUser.email);
+                                    setCollaboratorUsername(
+                                      firstUser.name || firstUser.email,
+                                    );
                                     setShowUserDropdown(false);
                                   } else {
-                                    addCollaborator(collaboratorUsername.trim());
+                                    addCollaborator(
+                                      collaboratorUsername.trim(),
+                                    );
                                   }
-                                } else if (e.key === 'Escape') {
+                                } else if (e.key === "Escape") {
                                   setShowUserDropdown(false);
                                 }
                               }}
@@ -6223,19 +7643,17 @@ export default function App() {
                                 setShowUserDropdown(false);
                                 setFilteredUsers([]);
                               }}
-                            >
-                              Cancel
-                            </button>
+                            >{t("cancel")}</button>
                             <button
                               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                               onClick={async () => {
                                 if (collaboratorUsername.trim()) {
-                                  await addCollaborator(collaboratorUsername.trim());
+                                  await addCollaborator(
+                                    collaboratorUsername.trim(),
+                                  );
                                 }
                               }}
-                            >
-                              Add Collaborator
-                            </button>
+                            >{t("addCollaborator")}</button>
                           </div>
                         </>
                       )}
@@ -6251,9 +7669,7 @@ export default function App() {
                               setShowUserDropdown(false);
                               setFilteredUsers([]);
                             }}
-                          >
-                            Close
-                          </button>
+                          >{t("close")}</button>
                         </div>
                       )}
                     </>
@@ -6264,45 +7680,44 @@ export default function App() {
           )}
 
           {/* User dropdown portal - rendered outside modal */}
-          {showUserDropdown && filteredUsers.length > 0 && createPortal(
-            <div
-              data-user-dropdown
-              className="fixed z-[60] bg-white dark:bg-[#272727] border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto"
-              style={{
-                top: `${dropdownPosition.top}px`,
-                left: `${dropdownPosition.left}px`,
-                width: `${dropdownPosition.width}px`
-              }}
-            >
-              {loadingUsers ? (
-                <div className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
-                  Searching...
-                </div>
-              ) : (
-                filteredUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0"
-                    onClick={() => {
-                      setCollaboratorUsername(user.name || user.email);
-                      setShowUserDropdown(false);
-                    }}
-                  >
-                    <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                      {user.name || user.email}
-                    </div>
-                    {user.name && (
-                      <div className="text-xs text-gray-600 dark:text-gray-400">
-                        {user.email}
+          {showUserDropdown &&
+            filteredUsers.length > 0 &&
+            createPortal(
+              <div
+                data-user-dropdown
+                className="fixed z-[60] bg-white dark:bg-[#272727] border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                style={{
+                  top: `${dropdownPosition.top}px`,
+                  left: `${dropdownPosition.left}px`,
+                  width: `${dropdownPosition.width}px`,
+                }}
+              >
+                {loadingUsers ? (
+                  <div className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">{t("searching")}</div>
+                ) : (
+                  filteredUsers.map((user) => (
+                    <div
+                      key={user.id}
+                      className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                      onClick={() => {
+                        setCollaboratorUsername(user.name || user.email);
+                        setShowUserDropdown(false);
+                      }}
+                    >
+                      <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                        {user.name || user.email}
                       </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>,
-            document.body
-          )}
-
+                      {user.name && (
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          {user.email}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>,
+              document.body,
+            )}
         </div>
       </div>
 
@@ -6310,18 +7725,24 @@ export default function App() {
       {imgViewOpen && mImages.length > 0 && (
         <div
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
-          onClick={(e) => { if (e.target === e.currentTarget) closeImageViewer(); }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeImageViewer();
+          }}
         >
           {/* Controls */}
           <div className="absolute top-4 right-4 flex items-center gap-2">
             <button
               className="px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20"
-              title="Download (D)"
+              title={t("downloadShortcut")}
               onClick={async (e) => {
                 e.stopPropagation();
                 const im = mImages[imgViewIndex];
                 if (im) {
-                  const fname = normalizeImageFilename(im.name, im.src, imgViewIndex + 1);
+                  const fname = normalizeImageFilename(
+                    im.name,
+                    im.src,
+                    imgViewIndex + 1,
+                  );
                   await downloadDataUrl(fname, im.src);
                 }
               }}
@@ -6330,8 +7751,11 @@ export default function App() {
             </button>
             <button
               className="px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20"
-              title="Close (Esc)"
-              onClick={(e) => { e.stopPropagation(); closeImageViewer(); }}
+              title={t("closeEsc")}
+              onClick={(e) => {
+                e.stopPropagation();
+                closeImageViewer();
+              }}
             >
               <CloseIcon />
             </button>
@@ -6342,15 +7766,21 @@ export default function App() {
             <>
               <button
                 className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 p-3 bg-white/10 text-white rounded-full hover:bg-white/20"
-                title="Previous (←)"
-                onClick={(e) => { e.stopPropagation(); prevImage(); }}
+                title={t("previousArrow")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  prevImage();
+                }}
               >
                 <ArrowLeft />
               </button>
               <button
                 className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 p-3 bg-white/10 text-white rounded-full hover:bg-white/20"
-                title="Next (→)"
-                onClick={(e) => { e.stopPropagation(); nextImage(); }}
+                title={t("nextArrow")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  nextImage();
+                }}
               >
                 <ArrowRight />
               </button>
@@ -6367,7 +7797,9 @@ export default function App() {
           {/* Caption */}
           <div className="absolute bottom-6 px-3 py-1 rounded bg-black/50 text-white text-xs">
             {mImages[imgViewIndex].name || `image-${imgViewIndex + 1}`}
-            {mImages.length > 1 ? `  (${imgViewIndex + 1}/${mImages.length})` : ""}
+            {mImages.length > 1
+              ? `  (${imgViewIndex + 1}/${mImages.length})`
+              : ""}
           </div>
         </div>
       )}
@@ -6376,7 +7808,8 @@ export default function App() {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (currentUser?.email && route !== "#/notes" && route !== "#/admin") navigate("#/notes");
+    if (currentUser?.email && route !== "#/notes" && route !== "#/admin")
+      navigate("#/notes");
   }, [currentUser]); // eslint-disable-line
 
   // Close sidebar when navigating away or opening modal
@@ -6388,29 +7821,23 @@ export default function App() {
   if (route === "#/admin") {
     if (!currentUser?.email) {
       return (
-        <AuthShell title="Admin Panel" dark={dark} onToggleDark={toggleDark}>
-          <p className="text-sm mb-4">
-            You must sign in as an admin to view this page.
-          </p>
+        <AuthShell title={t("adminPanel")} dark={dark} onToggleDark={toggleDark}>
+          <p className="text-sm mb-4">{t("mustSignInAdmin")}</p>
           <button
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
             onClick={() => (window.location.hash = "#/login")}
-          >
-            Go to Sign In
-          </button>
+          >{t("goToSignIn")}</button>
         </AuthShell>
       );
     }
     if (!currentUser?.is_admin) {
       return (
-        <AuthShell title="Admin Panel" dark={dark} onToggleDark={toggleDark}>
-          <p className="text-sm">Not authorized. Your account is not an admin.</p>
+        <AuthShell title={t("adminPanel")} dark={dark} onToggleDark={toggleDark}>
+          <p className="text-sm">{t("notAuthorizedAdmin")}</p>
           <button
             className="mt-4 px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
             onClick={() => (window.location.hash = "#/notes")}
-          >
-            Back to Notes
-          </button>
+          >{t("backToNotes")}</button>
         </AuthShell>
       );
     }
@@ -6492,7 +7919,11 @@ export default function App() {
       />
 
       {/* Admin Panel */}
-      {console.log("Rendering AdminPanel with:", { adminPanelOpen, adminSettings, allUsers: allUsers?.length })}
+      {console.log("Rendering AdminPanel with:", {
+        adminPanelOpen,
+        adminSettings,
+        allUsers: allUsers?.length,
+      })}
       <AdminPanel
         open={adminPanelOpen}
         onClose={() => setAdminPanelOpen(false)}
@@ -6628,10 +8059,16 @@ export default function App() {
           />
           <div
             className="glass-card rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative"
-            style={{ backgroundColor: dark ? "rgba(40,40,40,0.95)" : "rgba(255,255,255,0.95)" }}
+            style={{
+              backgroundColor: dark
+                ? "rgba(40,40,40,0.95)"
+                : "rgba(255,255,255,0.95)",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold mb-2">{genericConfirmConfig.title || "Confirm Action"}</h3>
+            <h3 className="text-lg font-semibold mb-2">
+              {genericConfirmConfig.title || t("confirmAction")}
+            </h3>
             <p className="text-sm text-gray-600 dark:text-gray-300">
               {genericConfirmConfig.message}
             </p>
@@ -6640,7 +8077,7 @@ export default function App() {
                 className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
                 onClick={() => setGenericConfirmOpen(false)}
               >
-                {genericConfirmConfig.cancelText || "Cancel"}
+                {genericConfirmConfig.cancelText || t("cancel")}
               </button>
               <button
                 className={`px-4 py-2 rounded-lg ${genericConfirmConfig.danger ? "bg-red-600 text-white hover:bg-red-700" : "bg-indigo-600 text-white hover:bg-indigo-700"}`}
@@ -6664,12 +8101,13 @@ export default function App() {
           {toasts.map((toast) => (
             <div
               key={toast.id}
-              className={`px-4 py-2 rounded-lg shadow-lg max-w-sm animate-in slide-in-from-right-2 ${toast.type === 'success'
-                ? 'bg-green-600 text-white'
-                : toast.type === 'error'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-blue-600 text-white'
-                }`}
+              className={`px-4 py-2 rounded-lg shadow-lg max-w-sm animate-in slide-in-from-right-2 ${
+                toast.type === "success"
+                  ? "bg-green-600 text-white"
+                  : toast.type === "error"
+                    ? "bg-red-600 text-white"
+                    : "bg-blue-600 text-white"
+              }`}
             >
               {toast.message}
             </div>
