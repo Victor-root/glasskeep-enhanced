@@ -1018,7 +1018,7 @@ html:not(.dark) .note-content pre .code-copy-btn {
 
 /* === Scrollbars thématiques === */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-button { display: none; }
+::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
 ::-webkit-scrollbar-track { background: #e3d0ff; }
 ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #c4b5fd 0%, #7c3aed 100%); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #ddd6fe 0%, #6d28d9 100%); }
