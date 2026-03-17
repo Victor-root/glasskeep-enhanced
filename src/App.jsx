@@ -2365,12 +2365,12 @@ function SettingsPanel({
             <h4 className="text-md font-semibold mb-4">{t("uiPreferences")}</h4>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="min-w-0">
                   <div className="font-medium">Local AI Assistant</div>
                   <div className="text-sm text-gray-500">{t("askQuestionsAboutNotes")}</div>
                 </div>
                 <button
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
                     localAiEnabled
                       ? "bg-indigo-600"
                       : "bg-gray-300 dark:bg-gray-600"
@@ -2409,12 +2409,12 @@ function SettingsPanel({
               </div>
 
               <div className="flex items-center justify-between">
-                <div>
+                <div className="min-w-0">
                   <div className="font-medium">{t("alwaysShowSidebarWide")}</div>
                   <div className="text-sm text-gray-500">{t("keepTagsPanelVisible")}</div>
                 </div>
                 <button
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
                     alwaysShowSidebarOnWide
                       ? "bg-indigo-600"
                       : "bg-gray-300 dark:bg-gray-600"
