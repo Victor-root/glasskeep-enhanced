@@ -3167,6 +3167,30 @@ function NotesUI({
     }
   }, [headerMenuOpen, setHeaderMenuOpen]);
 
+  // Auto-hide header on scroll down (mobile only)
+  useEffect(() => {
+    if (windowWidth >= 700) {
+      setHeaderVisible(true);
+      return;
+    }
+    const scrollContainer = document.querySelector(".min-h-screen");
+    if (!scrollContainer) return;
+    const onScroll = () => {
+      const y = scrollContainer.scrollTop;
+      const delta = y - lastScrollYRef.current;
+      if (y < 10) {
+        setHeaderVisible(true);
+      } else if (delta > 4) {
+        setHeaderVisible(false);
+      } else if (delta < -4) {
+        setHeaderVisible(true);
+      }
+      lastScrollYRef.current = y;
+    };
+    scrollContainer.addEventListener("scroll", onScroll, { passive: true });
+    return () => scrollContainer.removeEventListener("scroll", onScroll);
+  }, [windowWidth]);
+
   return (
     <div
       className="min-h-screen"
@@ -3249,7 +3273,13 @@ function NotesUI({
       )}
 
       {/* Header */}
-      <header className="p-4 sm:p-6 flex justify-between items-center sticky top-0 z-20 glass-card mb-6">
+      <header
+        className="p-4 sm:p-6 flex justify-between items-center sticky top-0 z-20 glass-card mb-6"
+        style={{
+          transform: !headerVisible && windowWidth < 700 ? "translateY(-100%)" : "translateY(0)",
+          transition: "transform 0.3s ease",
+        }}
+      >
         <div className="flex items-center gap-3">
           {/* Hamburger - only show when sidebar is not permanent */}
           {!sidebarPermanent && (
@@ -4447,6 +4477,10 @@ export default function App() {
 
   // Checklist item drag (for modal reordering)
   const checklistDragId = useRef(null);
+
+  // Header auto-hide on scroll (mobile)
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastScrollYRef = useRef(0);
 
   // Header menu refs + state
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
