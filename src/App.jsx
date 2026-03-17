@@ -7086,7 +7086,7 @@ export default function App() {
                   )}
 
                   <button
-                    className="rounded-full p-2.5 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="rounded-full p-2.5 opacity-70 hover:opacity-100 focus:outline-none"
                     title={t("close")}
                     onClick={closeModal}
                   >
