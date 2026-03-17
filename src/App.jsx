@@ -2148,15 +2148,6 @@ function TagSidebar({
           ><ArchiveSidebarIcon />{t("archivedNotes")}</button>
 
           {/* User tags */}
-          {activeTagFilters.length > 0 && (
-            <div className="px-3 py-1 mb-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
-              <span>🔀 {activeTagFilters.length} tag{activeTagFilters.length > 1 ? "s" : ""} actif{activeTagFilters.length > 1 ? "s" : ""}</span>
-              <button
-                onClick={() => onSelect(null)}
-                className="text-xs underline hover:no-underline"
-              >tout effacer</button>
-            </div>
-          )}
           {tagsWithCounts.map(({ tag, count }) => {
             const active =
               activeTagFilters.length > 0
@@ -2167,11 +2158,11 @@ function TagSidebar({
             return (
               <button
                 key={tag}
-                className={`w-full text-left px-3 py-2 rounded-md mb-1 flex items-center justify-between ${active ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
-                onClick={() => {
-                  onSelect(tag);
-                  // Ne ferme la sidebar que si c'est un filtre simple (pas multi-select)
-                  if (activeTagFilters.length === 0 && !activeTagFilters.includes(tag)) {
+                className={`w-full text-left px-3 py-2 rounded-md mb-1 flex items-center justify-between cursor-pointer ${active ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+                onClick={(e) => {
+                  onSelect(tag, e);
+                  // Ne ferme la sidebar que si c'est un clic simple (pas Ctrl/Cmd+clic)
+                  if (!e.ctrlKey && !e.metaKey) {
                     onClose();
                   }
                 }}
@@ -2184,6 +2175,15 @@ function TagSidebar({
           })}
           {tagsWithCounts.length === 0 && (
             <p className="text-sm text-gray-500 mt-2">{t("noTagsYet")}</p>
+          )}
+          {activeTagFilters.length > 1 && (
+            <div className="px-3 py-1 mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
+              <span>🔀 {activeTagFilters.length} tags actifs</span>
+              <button
+                onClick={() => onSelect(null)}
+                className="text-xs underline hover:no-underline cursor-pointer"
+              >tout effacer</button>
+            </div>
           )}
         </nav>
 
@@ -8419,16 +8419,23 @@ export default function App() {
         tagsWithCounts={tagsWithCounts}
         activeTag={tagFilter}
         activeTagFilters={activeTagFilters}
-        onSelect={(tag) => {
+        onSelect={(tag, event) => {
           if (tag === "ARCHIVED" || tag === ALL_IMAGES || tag === null) {
             setTagFilter(tag);
             setActiveTagFilters([]);
-          } else {
+          } else if (event?.ctrlKey || event?.metaKey) {
+            // Ctrl/Cmd+clic : multi-select (toggle)
             setTagFilter(null);
             setActiveTagFilters((prev) =>
               prev.includes(tag)
                 ? prev.filter((t) => t !== tag)
                 : [...prev, tag]
+            );
+          } else {
+            // Clic simple : filtre unique (re-clic = désélectionne)
+            setTagFilter(null);
+            setActiveTagFilters((prev) =>
+              prev.length === 1 && prev[0] === tag ? [] : [tag]
             );
           }
         }}
