@@ -7106,42 +7106,43 @@ export default function App() {
               </div>
             </div>
 
+            {/* Images - full width like Google Keep */}
+            {mImages.length > 0 && (
+              <div className="w-full">
+                {mImages.map((im, idx) => (
+                  <div key={im.id} className="relative w-full">
+                    <img
+                      src={im.src}
+                      alt={im.name}
+                      className="w-full object-contain cursor-zoom-in"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openImageViewer(idx);
+                      }}
+                    />
+                    {isOnline && (
+                      <button
+                        title={t("removeImage")}
+                        className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full w-7 h-7 text-sm flex items-center justify-center transition-opacity"
+                        onClick={() =>
+                          setMImages((prev) =>
+                            prev.filter((x) => x.id !== im.id),
+                          )
+                        }
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Content area */}
             <div
               className={mType === "draw" ? "p-2 pb-6" : "p-6 pb-12"}
               onClick={onModalBodyClick}
             >
-              {/* Images */}
-              {mImages.length > 0 && (
-                <div className="mb-5 flex gap-3 overflow-x-auto">
-                  {mImages.map((im, idx) => (
-                    <div key={im.id} className="relative inline-block">
-                      <img
-                        src={im.src}
-                        alt={im.name}
-                        className="h-40 md:h-56 w-auto object-cover rounded-md border border-[var(--border-light)] cursor-zoom-in"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openImageViewer(idx);
-                        }}
-                      />
-                      {isOnline && (
-                        <button
-                          title={t("removeImage")}
-                          className="absolute -top-2 -right-2 bg-black/70 text-white rounded-full w-5 h-5 text-xs"
-                          onClick={() =>
-                            setMImages((prev) =>
-                              prev.filter((x) => x.id !== im.id),
-                            )
-                          }
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
 
               {/* Text, Checklist, or Drawing */}
               {mType === "text" ? (
