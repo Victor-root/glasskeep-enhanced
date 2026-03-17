@@ -924,12 +924,6 @@ body {
 /* Hide scrollbars on mobile (keep scrolling) */
 @media (max-width: 639px) {
 
-  /* Mobile: pinned grid 2 columns */
-  .pinned-grid > div {
-    width: calc(50% - 0.375rem);
-  }
-
-
   /* Hide PAGE scrollbars on mobile (keep scrolling) */
   html, body {
     scrollbar-width: none;      /* Firefox */
@@ -981,16 +975,6 @@ html:not(.dark) .note-content pre .code-copy-btn {
 .masonry-grid { display: flex; margin-left: -0.75rem; width: auto; }
 .masonry-grid-column { padding-left: 0.75rem; background-clip: padding-box; }
 .masonry-grid-column > div { margin-bottom: 0.75rem; }
-
-/* Pinned cards flex layout */
-.pinned-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-start; }
-.pinned-grid > div { width: calc(50% - 0.375rem); }
-@media (min-width: 640px) { .pinned-grid > div { width: calc(50% - 0.375rem); } }
-@media (min-width: 768px) { .pinned-grid > div { width: calc(33.333% - 0.5rem); } }
-@media (min-width: 1090px) { .pinned-grid > div { width: calc(25% - 0.5625rem); } }
-@media (min-width: 1340px) { .pinned-grid > div { width: calc(20% - 0.6rem); } }
-@media (min-width: 1588px) { .pinned-grid > div { width: calc(16.666% - 0.625rem); } }
-@media (min-width: 1836px) { .pinned-grid > div { width: calc(14.2857% - 0.6429rem); } }
 
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -3797,38 +3781,69 @@ function NotesUI({
                 {t("pinned")}
               </h2>
             )}
-            <div
-              className={
-                listView ? "max-w-2xl mx-auto space-y-6" : "pinned-grid"
-              }
-            >
-              {pinned.map((n) => (
-                <div key={n.id}>
-                <NoteCard
-                  n={n}
-                  dark={dark}
-                  openModal={openModal}
-                  togglePin={togglePin}
-                  multiMode={multiMode}
-                  selected={selectedIds.includes(String(n.id))}
-                  onToggleSelect={onToggleSelect}
-                  disablePin={
-                    "ontouchstart" in window ||
-                    navigator.maxTouchPoints > 0 ||
-                    activeTagFilter === "ARCHIVED"
-                  }
-                  onDragStart={onDragStart}
-                  onDragOver={onDragOver}
-                  onDragLeave={onDragLeave}
-                  onDrop={onDrop}
-                  onDragEnd={onDragEnd}
-                  isOnline={isOnline}
-                  onUpdateChecklistItem={onUpdateChecklistItem}
-                  currentUser={currentUser}
-                />
-                </div>
-              ))}
-            </div>
+            {listView ? (
+              <div className="max-w-2xl mx-auto space-y-6">
+                {pinned.map((n) => (
+                  <div key={n.id}>
+                  <NoteCard
+                    n={n}
+                    dark={dark}
+                    openModal={openModal}
+                    togglePin={togglePin}
+                    multiMode={multiMode}
+                    selected={selectedIds.includes(String(n.id))}
+                    onToggleSelect={onToggleSelect}
+                    disablePin={
+                      "ontouchstart" in window ||
+                      navigator.maxTouchPoints > 0 ||
+                      activeTagFilter === "ARCHIVED"
+                    }
+                    onDragStart={onDragStart}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                    onDragEnd={onDragEnd}
+                    isOnline={isOnline}
+                    onUpdateChecklistItem={onUpdateChecklistItem}
+                    currentUser={currentUser}
+                  />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Masonry
+                breakpointCols={{default: 7, 1835: 6, 1587: 5, 1339: 4, 1089: 3, 767: 2}}
+                className="masonry-grid"
+                columnClassName="masonry-grid-column"
+              >
+                {pinned.map((n) => (
+                  <div key={n.id}>
+                  <NoteCard
+                    n={n}
+                    dark={dark}
+                    openModal={openModal}
+                    togglePin={togglePin}
+                    multiMode={multiMode}
+                    selected={selectedIds.includes(String(n.id))}
+                    onToggleSelect={onToggleSelect}
+                    disablePin={
+                      "ontouchstart" in window ||
+                      navigator.maxTouchPoints > 0 ||
+                      activeTagFilter === "ARCHIVED"
+                    }
+                    onDragStart={onDragStart}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                    onDragEnd={onDragEnd}
+                    isOnline={isOnline}
+                    onUpdateChecklistItem={onUpdateChecklistItem}
+                    currentUser={currentUser}
+                  />
+                  </div>
+                ))}
+              </Masonry>
+            )}
           </section>
         )}
 
