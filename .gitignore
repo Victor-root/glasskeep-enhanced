@@ -42,3 +42,6 @@ server/*.sqlite
 server/*.sqlite-wal
 server/*.sqlite-shm
 server/*.sqlite-journal
+data/notes.db
+data/notes.db-shm
+data/notes.db-wal
