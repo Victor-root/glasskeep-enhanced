@@ -99,7 +99,7 @@ action_install() {
 
     # Ask port
     local port
-    read -rp "$(echo -e "${YELLOW}Port à utiliser [8080] : ${RESET}")" port
+    read -rp "$(echo -e "${YELLOW}Port à utiliser [8080] : ${RESET}")" port </dev/tty
     port="${port:-8080}"
 
     if ! [[ "$port" =~ ^[0-9]+$ ]] || [[ "$port" -lt 1 || "$port" -gt 65535 ]]; then
@@ -243,7 +243,7 @@ action_uninstall() {
     echo -e "  • Les données (BDD)   : ${DATA_DIR}"
     echo -e "  • La configuration    : ${ENV_FILE}"
     echo ""
-    read -rp "$(echo -e "${YELLOW}Confirmer la désinstallation complète ? [oui/non] : ${RESET}")" confirm
+    read -rp "$(echo -e "${YELLOW}Confirmer la désinstallation complète ? [oui/non] : ${RESET}")" confirm </dev/tty
     if [[ "${confirm,,}" != "oui" ]]; then
         info "Désinstallation annulée."
         exit 0
@@ -324,7 +324,7 @@ main() {
     echo -e "  ${YELLOW}2)${RESET} Mettre à jour GlassKeep"
     echo -e "  ${RED}3)${RESET} Désinstaller GlassKeep"
     echo ""
-    read -rp "$(echo -e "${BOLD}Votre choix [1/2/3] : ${RESET}")" choice
+    read -rp "$(echo -e "${BOLD}Votre choix [1/2/3] : ${RESET}")" choice </dev/tty
 
     case "$choice" in
         1) action_install   ;;
