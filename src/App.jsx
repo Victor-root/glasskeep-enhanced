@@ -199,25 +199,6 @@ const bgFor = (colorKey, dark) =>
   (dark ? DARK_COLORS : LIGHT_COLORS)[colorKey] ||
   (dark ? DARK_COLORS.default : LIGHT_COLORS.default);
 
-const SCROLL_COLORS = {
-  default: ["#a78bfa","#e3d0ff","#7c3aed","#3b0764"],
-  red:     ["#f87171","#fee2e2","#dc2626","#450a0a"],
-  yellow:  ["#fbbf24","#fef9c3","#ca8a04","#422006"],
-  green:   ["#4ade80","#dcfce7","#16a34a","#052e16"],
-  blue:    ["#60a5fa","#dbeafe","#2563eb","#1e3a8a"],
-  purple:  ["#a78bfa","#ede9fe","#7c3aed","#2e1065"],
-  peach:   ["#fb923c","#ffedd5","#ea580c","#431407"],
-  sage:    ["#86efac","#f0fdf4","#4ade80","#052e16"],
-  mint:    ["#34d399","#d1fae5","#059669","#022c22"],
-  sky:     ["#38bdf8","#e0f2fe","#0284c7","#082f49"],
-  sand:    ["#fbbf24","#fef3c7","#b45309","#1c1917"],
-  mauve:   ["#c084fc","#f3e8ff","#a855f7","#2e1065"],
-};
-const scrollColorsFor = (colorKey, dark) => {
-  const [lt, lk, dt, dk] = SCROLL_COLORS[colorKey] || SCROLL_COLORS.default;
-  return dark ? { thumb: dt, track: dk } : { thumb: lt, track: lk };
-};
-
 /** ---------- Modal light boost ---------- */
 const parseRGBA = (str) => {
   const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/.exec(
@@ -237,6 +218,20 @@ const modalBgFor = (colorKey, dark) => {
   const base = bgFor(colorKey, dark);
   if (dark) return base;
   return mixWithWhite(solid(base), 0.8, 0.92);
+};
+
+const scrollColorsFor = (colorKey, dark) => {
+  if (!colorKey || colorKey === "default")
+    return dark ? { thumb: "#7c3aed", track: "#3b0764" } : { thumb: "#a78bfa", track: "#e3d0ff" };
+  const base = solid(bgFor(colorKey, dark));
+  if (dark) {
+    const { r, g, b } = parseRGBA(base);
+    return {
+      thumb: `rgba(${r},${g},${b},0.9)`,
+      track: `rgba(${Math.round(r*0.3)},${Math.round(g*0.3)},${Math.round(b*0.3)},0.8)`,
+    };
+  }
+  return { thumb: mixWithWhite(base, 0.1, 0.85), track: mixWithWhite(base, 0.55, 0.4) };
 };
 
 /** ---------- Special tag filters ---------- */
@@ -1023,6 +1018,7 @@ html:not(.dark) .note-content pre .code-copy-btn {
 
 /* === Scrollbars thématiques === */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-button { display: none; }
 ::-webkit-scrollbar-track { background: #e3d0ff; }
 ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #c4b5fd 0%, #7c3aed 100%); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #ddd6fe 0%, #6d28d9 100%); }
