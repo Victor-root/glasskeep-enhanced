@@ -1316,9 +1316,23 @@ app.get("/api/health", (_req, res) => res.json({ ok: true, env: NODE_ENV }));
 // ---------- Static (production) ----------
 if (NODE_ENV === "production") {
   const dist = path.join(__dirname, "..", "dist");
+  const defaultLang = (process.env.DEFAULT_LANG || "").toLowerCase().startsWith("fr") ? "fr" : "en";
+  const indexPath = path.join(dist, "index.html");
+  const langScript = `<script>window.__GLASSKEEP_LANG="${defaultLang}";</script>`;
+  let indexHtml = null;
+  try {
+    indexHtml = fs.readFileSync(indexPath, "utf8").replace("<head>", `<head>${langScript}`);
+  } catch (_) {
+    // dist not built yet — will fall back to sendFile
+  }
+
   app.use(express.static(dist));
   app.get("*", (_req, res) => {
-    res.sendFile(path.join(dist, "index.html"));
+    if (indexHtml) {
+      res.type("html").send(indexHtml);
+    } else {
+      res.sendFile(indexPath);
+    }
   });
 }
 
