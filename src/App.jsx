@@ -3154,10 +3154,8 @@ function NotesUI({
       setHeaderVisible(true);
       return;
     }
-    const scrollContainer = document.querySelector(".min-h-screen");
-    if (!scrollContainer) return;
     const onScroll = () => {
-      const y = scrollContainer.scrollTop;
+      const y = window.scrollY;
       const delta = y - lastScrollYRef.current;
       if (y < 10) {
         setHeaderVisible(true);
@@ -3168,8 +3166,8 @@ function NotesUI({
       }
       lastScrollYRef.current = y;
     };
-    scrollContainer.addEventListener("scroll", onScroll, { passive: true });
-    return () => scrollContainer.removeEventListener("scroll", onScroll);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, [windowWidth]);
   const tagLabel =
     activeTagFilter === ALL_IMAGES
