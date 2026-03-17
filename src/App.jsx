@@ -7028,7 +7028,7 @@ export default function App() {
       const snippet = type === "ul" ? "- " : type === "ol" ? "1. " : "> ";
       setter(snippet);
       requestAnimationFrame(() => {
-        el.focus();
+        el.focus({ preventScroll: true });
         try {
           el.setSelectionRange(snippet.length, snippet.length);
         } catch (e) {}
@@ -7042,7 +7042,7 @@ export default function App() {
       const newValue = value.slice(0, start) + snippet + value.slice(end);
       setter(newValue);
       requestAnimationFrame(() => {
-        el.focus();
+        el.focus({ preventScroll: true });
         try {
           el.setSelectionRange(start + snippet.length, start + snippet.length);
         } catch (e) {}
@@ -7093,7 +7093,7 @@ export default function App() {
     }
     setter(result.text);
     requestAnimationFrame(() => {
-      el.focus();
+      el.focus({ preventScroll: true });
       try {
         el.setSelectionRange(result.range[0], result.range[1]);
       } catch (e) {}
