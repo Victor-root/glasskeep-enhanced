@@ -3167,29 +3167,6 @@ function NotesUI({
     }
   }, [headerMenuOpen, setHeaderMenuOpen]);
 
-  // Auto-hide header on scroll down (mobile only)
-  useEffect(() => {
-    if (windowWidth >= 700) {
-      setHeaderVisible(true);
-      return;
-    }
-    const scrollContainer = document.querySelector(".min-h-screen");
-    if (!scrollContainer) return;
-    const onScroll = () => {
-      const y = scrollContainer.scrollTop;
-      const delta = y - lastScrollYRef.current;
-      if (y < 10) {
-        setHeaderVisible(true);
-      } else if (delta > 4) {
-        setHeaderVisible(false);
-      } else if (delta < -4) {
-        setHeaderVisible(true);
-      }
-      lastScrollYRef.current = y;
-    };
-    scrollContainer.addEventListener("scroll", onScroll, { passive: true });
-    return () => scrollContainer.removeEventListener("scroll", onScroll);
-  }, [windowWidth]);
 
   return (
     <div
@@ -4481,6 +4458,29 @@ export default function App() {
   // Header auto-hide on scroll (mobile)
   const [headerVisible, setHeaderVisible] = useState(true);
   const lastScrollYRef = useRef(0);
+
+  useEffect(() => {
+    if (windowWidth >= 700) {
+      setHeaderVisible(true);
+      return;
+    }
+    const scrollContainer = document.querySelector(".min-h-screen");
+    if (!scrollContainer) return;
+    const onScroll = () => {
+      const y = scrollContainer.scrollTop;
+      const delta = y - lastScrollYRef.current;
+      if (y < 10) {
+        setHeaderVisible(true);
+      } else if (delta > 4) {
+        setHeaderVisible(false);
+      } else if (delta < -4) {
+        setHeaderVisible(true);
+      }
+      lastScrollYRef.current = y;
+    };
+    scrollContainer.addEventListener("scroll", onScroll, { passive: true });
+    return () => scrollContainer.removeEventListener("scroll", onScroll);
+  }, [windowWidth]);
 
   // Header menu refs + state
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
