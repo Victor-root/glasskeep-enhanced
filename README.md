@@ -1,4 +1,4 @@
-# Glass Keep — FR Fork + UX Improvements
+# Glass Keep — Enhanced Fork
 
 > **Fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with UI improvements, smart tag suggestions, Material Design icons, and added French translation (language follows browser locale).
 
