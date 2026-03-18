@@ -4928,6 +4928,7 @@ export default function App() {
   // NEW: modal scroll container ref + state to place Edited at bottom when not scrollable
   const modalScrollRef = useRef(null);
   const [modalScrollable, setModalScrollable] = useState(false);
+  const savedModalScrollRef = useRef(0);
 
   // SSE connection status
   const [sseConnected, setSseConnected] = useState(false);
@@ -5627,6 +5628,18 @@ export default function App() {
     if (!open || mType !== "text") return;
     if (!viewMode) resizeModalTextarea();
   }, [open, viewMode, mBody, mType]);
+
+  // Restore scroll position after switching between view/edit mode
+  useEffect(() => {
+    const el = modalScrollRef.current;
+    if (!el || savedModalScrollRef.current === 0) return;
+    const saved = savedModalScrollRef.current;
+    requestAnimationFrame(() => {
+      el.scrollTop = saved;
+      // Double-RAF in case textarea resize shifts layout again
+      requestAnimationFrame(() => { el.scrollTop = saved; });
+    });
+  }, [viewMode]);
 
   // Ensure modal formatting menu hides when switching to view mode or non-text
   useEffect(() => {
@@ -7492,13 +7505,9 @@ export default function App() {
                     <button
                       className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
                       onClick={() => {
-                        const scrollEl = modalScrollRef.current;
-                        const savedScroll = scrollEl?.scrollTop || 0;
+                        savedModalScrollRef.current = modalScrollRef.current?.scrollTop || 0;
                         setViewMode((v) => !v);
                         setShowModalFmt(false);
-                        requestAnimationFrame(() => {
-                          if (scrollEl) scrollEl.scrollTop = savedScroll;
-                        });
                       }}
                       title={
                         viewMode ? t("switchToEditMode") : t("switchToViewMode")
