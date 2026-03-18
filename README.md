@@ -48,7 +48,7 @@
 Run the following as **root** on a fresh Debian-based system:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/Victor-root/react-glass-keep/main/install.sh)
+curl -fsSL https://raw.githubusercontent.com/Victor-root/react-glass-keep/main/install.sh | sudo bash
 ```
 
 The script will:
