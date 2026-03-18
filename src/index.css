@@ -6,6 +6,11 @@
 
 /* On mouse click: remove focus outline AND Tailwind ring (box-shadow).
    Keyboard navigation (:focus-visible) keeps its indicator for accessibility. */
+/* Default cursor to arrow everywhere — text cursor only on actual inputs */
+body {
+  cursor: default;
+}
+
 *:focus:not(:focus-visible) {
   outline: none;
   --tw-ring-shadow: 0 0 #0000;

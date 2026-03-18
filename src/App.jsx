@@ -1219,7 +1219,7 @@ function ChecklistRow({
       />
       {readOnly || (!editing && !readOnly) ? (
         <span
-          className={`text-sm break-words min-w-0 ${!readOnly ? "cursor-text" : ""} ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
+          className={`text-sm break-words min-w-0 ${!readOnly ? "cursor-pointer" : ""} ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
           onClick={!readOnly ? (e) => { e.stopPropagation(); setEditing(true); } : undefined}
         >
           {isMobile && !preview ? linkifyPhoneNumbers(item.text) : item.text}
