@@ -633,13 +633,12 @@ const LogOutIcon = () => (
   </svg>
 );
 
-// Floating cards toggle icon
+// Floating cards toggle icon — Layers (Lucide)
 const FloatingCardsIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="1" y="8" width="15" height="11" rx="2" />
-    <rect x="6" y="4" width="15" height="11" rx="2" />
-    <line x1="4" y1="11" x2="9" y2="11" />
-    <line x1="4" y1="14" x2="7" y2="14" />
+    <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
+    <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" />
+    <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />
   </svg>
 );
 
@@ -3386,15 +3385,27 @@ function NotesUI({
           {/* Floating cards toggle */}
           <button
             onClick={onToggleFloatingCards}
-            className={`p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-colors ${
+            className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
               floatingCardsEnabled
-                ? dark ? "text-indigo-300 hover:bg-white/10" : "text-indigo-600 hover:bg-indigo-50"
-                : dark ? "text-gray-500 hover:bg-white/10" : "text-gray-400 hover:bg-gray-100"
+                ? dark
+                  ? "bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30"
+                  : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                : dark
+                  ? "text-gray-500 hover:bg-white/10"
+                  : "text-gray-400 hover:bg-gray-100"
             }`}
             title={floatingCardsEnabled ? t("floatingCardsOn") : t("floatingCardsOff")}
             aria-label={t("toggleFloatingCards")}
           >
             <FloatingCardsIcon />
+            {!floatingCardsEnabled && (
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+              >
+                <span className={`block w-[1.5px] h-5 rotate-45 rounded-full ${dark ? "bg-gray-500" : "bg-gray-400"}`} />
+              </span>
+            )}
           </button>
           <span
             className={`text-sm hidden sm:inline ${dark ? "text-gray-100" : "text-gray-900"}`}
