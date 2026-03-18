@@ -8706,7 +8706,7 @@ export default function App() {
           onToggleDark={toggleDark}
           onRegister={register}
           goLogin={() => navigate("#/login")}
-          floatingCardsEnabled={floatingCardsEnabled}
+          floatingCardsEnabled={true}
         />
       );
     }
@@ -8717,7 +8717,7 @@ export default function App() {
           onToggleDark={toggleDark}
           onLoginWithKey={signInWithSecret}
           goLogin={() => navigate("#/login")}
-          floatingCardsEnabled={floatingCardsEnabled}
+          floatingCardsEnabled={true}
         />
       );
     }
@@ -8729,7 +8729,7 @@ export default function App() {
         goRegister={() => navigate("#/register")}
         goSecret={() => navigate("#/login-secret")}
         allowRegistration={allowRegistration}
-        floatingCardsEnabled={floatingCardsEnabled}
+        floatingCardsEnabled={true}
       />
     );
   }
