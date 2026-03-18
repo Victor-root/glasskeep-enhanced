@@ -5608,17 +5608,22 @@ export default function App() {
       // Debounce the resize to prevent excessive updates
       timeoutId = setTimeout(() => {
         const modalScrollEl = modalScrollRef.current;
-        const scrollTop = modalScrollEl?.scrollTop || 0;
 
         // Set a minimum height to prevent layout shifts
         const MIN = 160;
         el.style.height = MIN + "px";
         el.style.height = Math.max(el.scrollHeight, MIN) + "px";
 
-        // Prevent browser auto-scroll by restoring scroll position after DOM update
+        // After resize, restore scroll: use saved ratio from mode switch if available,
+        // otherwise keep current position (scrollTop may have been clamped to 0 during
+        // the resize because textarea started at min-height, so we always restore).
         requestAnimationFrame(() => {
-          if (modalScrollEl) {
-            modalScrollEl.scrollTop = scrollTop;
+          if (!modalScrollEl) return;
+          const ratio = savedModalScrollRatioRef.current;
+          if (ratio > 0) {
+            const maxScroll = modalScrollEl.scrollHeight - modalScrollEl.clientHeight;
+            modalScrollEl.scrollTop = ratio * maxScroll;
+            savedModalScrollRatioRef.current = 0;
           }
         });
       }, 10); // Small delay to batch rapid changes
@@ -5629,17 +5634,17 @@ export default function App() {
     if (!viewMode) resizeModalTextarea();
   }, [open, viewMode, mBody, mType]);
 
-  // Restore scroll ratio after switching between view/edit mode
+  // Restore scroll ratio when switching edit→view (no textarea resize in this direction)
   useEffect(() => {
+    if (!viewMode) return; // view→edit is handled inside resizeModalTextarea
     const el = modalScrollRef.current;
     const ratio = savedModalScrollRatioRef.current;
     if (!el || ratio === 0) return;
-    // Wait for layout to settle (textarea resize etc.) then apply ratio
-    const apply = () => {
+    requestAnimationFrame(() => {
       const maxScroll = el.scrollHeight - el.clientHeight;
       if (maxScroll > 0) el.scrollTop = ratio * maxScroll;
-    };
-    requestAnimationFrame(() => requestAnimationFrame(apply));
+      savedModalScrollRatioRef.current = 0;
+    });
   }, [viewMode]);
 
   // Ensure modal formatting menu hides when switching to view mode or non-text
