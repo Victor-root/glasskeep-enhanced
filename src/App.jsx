@@ -635,9 +635,11 @@ const LogOutIcon = () => (
 
 // Floating cards toggle icon
 const FloatingCardsIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="7" width="14" height="10" rx="2" />
-    <rect x="6" y="4" width="14" height="10" rx="2" opacity="0.5" />
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1" y="8" width="15" height="11" rx="2" />
+    <rect x="6" y="4" width="15" height="11" rx="2" />
+    <line x1="4" y1="11" x2="9" y2="11" />
+    <line x1="4" y1="14" x2="7" y2="14" />
   </svg>
 );
 
@@ -4623,6 +4625,10 @@ export default function App() {
           // No server setting yet — default to true (new user)
           setAlwaysShowSidebarOnWide(true);
         }
+        if (settings && typeof settings.floatingCardsEnabled === "boolean") {
+          setFloatingCardsEnabled(settings.floatingCardsEnabled);
+          localStorage.setItem("floatingCardsEnabled", String(settings.floatingCardsEnabled));
+        }
       } catch (e) {
         // Network error — default to true
         setAlwaysShowSidebarOnWide((prev) => prev === null ? true : prev);
@@ -4650,6 +4656,19 @@ export default function App() {
       }).catch(() => {});
     }
   }, [alwaysShowSidebarOnWide]);
+
+  // Save floating cards preference to localStorage and server
+  useEffect(() => {
+    try { localStorage.setItem("floatingCardsEnabled", String(floatingCardsEnabled)); } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { floatingCardsEnabled },
+      }).catch(() => {});
+    }
+  }, [floatingCardsEnabled]);
 
   useEffect(() => {
     try {
