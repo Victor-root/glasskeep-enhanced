@@ -2,27 +2,6 @@
 
 > **French fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with full translation, smart tag suggestions, Material Design icons and UI improvements.
 
----
-
-## 🆕 What this fork adds
-
-### 🌍 Full French translation
-- Entire interface translated to French (notes, editor, modal, admin, toasts, dates...)
-- i18n architecture ready for adding other languages easily
-
-### 🏷️ Smart tag suggestions
-- **When creating a note**: a dropdown suggests existing tags as soon as you click the tag field
-- **When editing a note**: same suggestion system with dropdown
-- Add tags via **Enter**, **comma**, **click**, **paste** or **Backspace** to remove
-- Multi-tag filter (AND) in the sidebar — select multiple tags to narrow down results
-
-### 🎨 Modernized interface
-- **Material Design SVG icons** replacing old emojis in the composer and modal
-- **Icons in the tag sidebar** (notes, images, archive, tag)
-- **Compact layout** — reduced spacing between notes, more columns on wide screens
-- **Richer note preview** — renders Markdown with line breaks (16 lines instead of 6)
-- **Wider modal** — responsive with adapted breakpoints to avoid truncated text
-
 <details>
 <summary>📋 Changelog — Changes since fork</summary>
 
@@ -88,6 +67,27 @@
 - i18n groundwork for adding other languages easily
 
 </details>
+
+---
+
+## 🆕 What this fork adds
+
+### 🌍 Full French translation
+- Entire interface translated to French (notes, editor, modal, admin, toasts, dates...)
+- i18n architecture ready for adding other languages easily
+
+### 🏷️ Smart tag suggestions
+- **When creating a note**: a dropdown suggests existing tags as soon as you click the tag field
+- **When editing a note**: same suggestion system with dropdown
+- Add tags via **Enter**, **comma**, **click**, **paste** or **Backspace** to remove
+- Multi-tag filter (AND) in the sidebar — select multiple tags to narrow down results
+
+### 🎨 Modernized interface
+- **Material Design SVG icons** replacing old emojis in the composer and modal
+- **Icons in the tag sidebar** (notes, images, archive, tag)
+- **Compact layout** — reduced spacing between notes, more columns on wide screens
+- **Richer note preview** — renders Markdown with line breaks (16 lines instead of 6)
+- **Wider modal** — responsive with adapted breakpoints to avoid truncated text
 
 ---
 
