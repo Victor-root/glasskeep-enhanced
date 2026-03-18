@@ -23,6 +23,72 @@
 - **Richer note preview** — renders Markdown with line breaks (16 lines instead of 6)
 - **Wider modal** — responsive with adapted breakpoints to avoid truncated text
 
+<details>
+<summary>📋 Changelog — Changes since fork</summary>
+
+### 📱 Mobile
+- Auto-hide header on scroll down
+- Adaptive title size based on text length
+- Close note with Android back button (History API)
+- 2-column grid layout for pinned and regular notes
+- Reduced note card padding and title size
+- Fixed text overflow on note cards
+- Fixed checklist text overflow on cards
+- Highlight clickable phone numbers in checklist items
+- Disable phone links and checkboxes in note preview
+
+### 🎨 UI & Theming
+- Themed scrollbars matching note color (light + dark mode)
+- Aurora Pastel color theme
+- Floating decorative note cards on login background
+- App logo above login title
+- Saturated color palette inspired by Google Keep
+- Material Design icons in composer and tag sidebar
+- Modernized icons with compact layout and richer note preview
+- Tag suggestions dropdown in composer and modal
+
+### 🗂️ Layout & Grid
+- Masonry layout for both pinned and regular notes grid
+- Match Google Keep responsive column breakpoints
+- Fixed ResizeObserver infinite loop in masonry grid
+
+### 🏷️ Tags & Filtering
+- Single-click tag filter replaces selection, Ctrl+click for multi-select
+- OR logic for multi-tag filtering
+- Multi-tag banner moved below tag list
+- Hidden multi-tag banner for single tag selection
+
+### 📝 Notes & Modal
+- Close note modal with Escape key
+- Clicking a card always opens the modal
+- Links in cards open in a new tab without opening the modal
+- Saving a note no longer closes the modal
+- Scroll resets to top when formatting a long note
+- Images displayed full-width like Google Keep
+- Reset note order option in settings
+- Sidebar visibility persisted server-side
+
+### 🐛 Bug Fixes
+- Removed blue focus ring on note close button
+- Fixed × button size, cursor-pointer, and drag handle alignment
+- Fixed checkbox and × button alignment in task lists
+- Fixed note preview height in grid
+- Fixed toggle buttons overflowing in settings panel
+- Fixed login title and logo covered by decorative cards
+- Fixed sidebar flash on load in private browsing
+- Fixed code block wrapping in notes
+- Fixed note sorting when positions are equal
+- Fixed missing "Confirm" i18n key
+
+### 🌍 i18n (French)
+- Full French translation of the interface
+- Translated all toasts, alerts, modals and UI labels
+- French date format with 4-digit years
+- Translated DrawingCanvas and tag placeholders
+- i18n groundwork for adding other languages easily
+
+</details>
+
 ---
 
 ## 📸 Features inherited from the original project
