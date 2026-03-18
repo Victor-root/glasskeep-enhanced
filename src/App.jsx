@@ -1092,7 +1092,18 @@ html:not(.dark) .note-content pre .code-copy-btn {
   opacity: 0.55;
   animation: floatCard var(--dur, 6s) ease-in-out infinite;
   animation-delay: var(--delay, 0s);
+  will-change: transform;
   width: 160px;
+}
+@media (pointer: coarse) {
+  .login-deco-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background-color: rgba(255,255,255,0.55);
+  }
+  html.dark .login-deco-card {
+    background-color: rgba(30,30,40,0.65);
+  }
 }
 html.dark .login-deco-card {
   opacity: 0.35;
