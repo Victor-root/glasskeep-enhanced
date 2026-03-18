@@ -1,6 +1,6 @@
 # Glass Keep — FR Fork + UX Improvements
 
-> 🇫🇷 **French fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with full translation, smart tag suggestions, Material Design icons and UI improvements.
+> **French fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with full translation, smart tag suggestions, Material Design icons and UI improvements.
 
 ---
 
@@ -41,65 +41,35 @@
 
 ---
 
-## 🧰 Installation
+## Installation
 
-### Requirements
-- **Node.js 18+** and npm
-- (Optional) **Docker** & **Docker Compose**
+### One-line install (Debian / Ubuntu / Proxmox LXC)
 
-### Docker (recommended)
+Run the following as **root** on a fresh Debian-based system:
+
 ```bash
-git clone https://github.com/Victor-root/react-glass-keep.git
-cd react-glass-keep
-
-docker build -t glass-keep .
-
-docker run -d \
-  --name glass-keep \
-  --restart unless-stopped \
-  -p 8080:8080 \
-  -e NODE_ENV=production \
-  -e API_PORT=8080 \
-  -e JWT_SECRET="replace-with-a-long-random-string" \
-  -e DB_FILE="/app/data/notes.db" \
-  -e ADMIN_EMAILS="admin" \
-  -e ALLOW_REGISTRATION=false \
-  -v ~/.glass-keep:/app/data \
-  glass-keep
+bash <(curl -fsSL https://raw.githubusercontent.com/Victor-root/react-glass-keep/main/install.sh)
 ```
 
-### docker-compose.yml
-```yaml
-version: "3.8"
-services:
-  app:
-    build: .
-    container_name: glass-keep
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      API_PORT: "8080"
-      JWT_SECRET: replace-with-a-long-random-string
-      DB_FILE: /app/data/notes.db
-      ADMIN_EMAILS: admin
-      ALLOW_REGISTRATION: "false"
-    ports:
-      - "8080:8080"
-    volumes:
-      - ~/.glass-keep:/app/data
-```
-```bash
-mkdir -p ~/.glass-keep
-docker compose up -d
-```
+The script will:
+- Install **Node.js 20** automatically if not present
+- Clone the repo to `/opt/glass-keep/app`
+- Build the app and generate a `.env` config file
+- Register and start a **systemd service** (`glass-keep`)
+- Prompt you for the port (default: `8080`)
+
+It also handles **updates** and **uninstallation** from the same interactive menu. The script output language adapts to your system locale (English/French).
+
+> **Default admin credentials:** `admin` / `admin` — change your password on first login.
+
+---
 
 ### Local development
+
 ```bash
 npm install
 ADMIN_EMAILS="admin" npm run dev
 ```
-
-> **Default admin credentials:** `admin` / `admin`
 
 ---
 
