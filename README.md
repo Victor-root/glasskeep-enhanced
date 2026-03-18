@@ -1,11 +1,12 @@
 # Glass Keep — FR Fork + UX Improvements
 
-> **French fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with full translation, smart tag suggestions, Material Design icons and UI improvements.
+> **Fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with UI improvements, smart tag suggestions, Material Design icons, and added French translation (language follows browser locale).
 
 ## 🆕 What this fork adds
 
-### 🌍 Full French translation
-- Entire interface translated to French (notes, editor, modal, admin, toasts, dates...)
+### 🌍 French translation (+ i18n groundwork)
+- French added as a second language — the app follows your **browser locale** automatically
+- Entire UI translated (notes, editor, modal, admin, toasts, dates...)
 - i18n architecture ready for adding other languages easily
 
 ### 🏷️ Smart tag suggestions
