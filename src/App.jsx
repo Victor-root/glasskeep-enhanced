@@ -917,11 +917,6 @@ html.dark header.glass-card {
   position: absolute;
   top: 8px;
   right: 8px;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.code-block-wrapper:hover .code-copy-btn {
-  opacity: 1;
 }
 
 
@@ -1006,8 +1001,12 @@ html.dark header.glass-card {
   color: #fff;
   border: 1px solid rgba(255,255,255,0.15);
   box-shadow: 0 2px 10px rgba(0,0,0,0.25);
-  opacity: 1;
+  opacity: 0;
+  transition: opacity 0.15s;
   z-index: 2;
+}
+.code-block-wrapper:hover .code-copy-btn {
+  opacity: 1;
 }
 html:not(.dark) .note-content pre .code-copy-btn {
   background: #fff;
