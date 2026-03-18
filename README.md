@@ -58,7 +58,13 @@ The script will:
 - Register and start a **systemd service** (`glass-keep`)
 - Prompt you for the port (default: `8080`)
 
-It also handles **updates** and **uninstallation** from the same interactive menu. The script output language adapts to your system locale (English/French).
+Re-running the same command on an existing installation brings up an interactive menu with three options:
+
+- **Install** — fresh installation
+- **Update** — pulls the latest version, rebuilds, and restarts the service. Your notes and config are preserved, but a **backup of `/opt/glass-keep/data` is recommended** before updating.
+- **Uninstall** — removes the app, the service, and **all your notes** (`/opt/glass-keep/data` is deleted). This is irreversible.
+
+The script output language adapts to your system locale (English/French).
 
 > **Default admin credentials:** `admin` / `admin` — change your password on first login.
 
