@@ -4,3 +4,7 @@
 
 /* If you toggle dark mode by adding `.dark` to <html>, define this variant in v4 */
 
+/* Remove focus outline on mouse click, keep it for keyboard navigation */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
