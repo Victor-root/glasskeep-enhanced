@@ -4,3 +4,10 @@
 
 /* If you toggle dark mode by adding `.dark` to <html>, define this variant in v4 */
 
+/* On mouse click: remove focus outline AND Tailwind ring (box-shadow).
+   Keyboard navigation (:focus-visible) keeps its indicator for accessibility. */
+*:focus:not(:focus-visible) {
+  outline: none;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}
