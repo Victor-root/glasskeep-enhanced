@@ -913,10 +913,30 @@ html.dark header.glass-card {
 
 /* Wrapper for code blocks to anchor copy button outside scroll area */
 .code-block-wrapper { position: relative; }
-.code-block-wrapper .code-copy-btn {
+.code-block-actions {
   position: absolute;
   top: 8px;
   right: 8px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 2;
+}
+.code-block-wrapper:hover .code-block-actions { opacity: 1; }
+.code-block-wrapper.collapsed pre {
+  max-height: 5em;
+  overflow: hidden;
+}
+.code-block-wrapper.collapsed::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2.5em;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--code-block-bg, #1e1e1e));
 }
 
 
@@ -992,8 +1012,8 @@ html.dark header.glass-card {
   }
 }
 
-.note-content pre .code-copy-btn,
-.code-block-wrapper .code-copy-btn {
+.code-copy-btn,
+.code-collapse-btn {
   font-size: .75rem;
   padding: .2rem .45rem;
   border-radius: .35rem;
@@ -1001,14 +1021,10 @@ html.dark header.glass-card {
   color: #fff;
   border: 1px solid rgba(255,255,255,0.15);
   box-shadow: 0 2px 10px rgba(0,0,0,0.25);
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 2;
+  cursor: pointer;
 }
-.code-block-wrapper:hover .code-copy-btn {
-  opacity: 1;
-}
-html:not(.dark) .note-content pre .code-copy-btn {
+html:not(.dark) .code-copy-btn,
+html:not(.dark) .code-collapse-btn {
   background: #fff;
   color: #111;
   border: 1px solid rgba(0,0,0,0.12);
@@ -7348,7 +7364,23 @@ export default function App() {
           pre.parentNode?.insertBefore(wrapper, pre);
           wrapper.appendChild(pre);
         }
-        if (wrapper.querySelector(".code-copy-btn")) return;
+        if (wrapper.querySelector(".code-block-actions")) return;
+        const actions = document.createElement("div");
+        actions.className = "code-block-actions";
+
+        // Collapse button
+        const collapseBtn = document.createElement("button");
+        collapseBtn.className = "code-collapse-btn";
+        collapseBtn.textContent = "▼";
+        collapseBtn.title = "Réduire";
+        collapseBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const isCollapsed = wrapper.classList.toggle("collapsed");
+          collapseBtn.textContent = isCollapsed ? "▶" : "▼";
+          collapseBtn.title = isCollapsed ? "Développer" : "Réduire";
+        });
+
+        // Copy button
         const btn = document.createElement("button");
         btn.className = "code-copy-btn";
         btn.textContent = t("copy");
@@ -7361,7 +7393,10 @@ export default function App() {
           btn.textContent = t("copied");
           setTimeout(() => (btn.textContent = t("copy")), 1200);
         });
-        wrapper.appendChild(btn);
+
+        actions.appendChild(collapseBtn);
+        actions.appendChild(btn);
+        wrapper.appendChild(actions);
       });
 
       // Inline code
