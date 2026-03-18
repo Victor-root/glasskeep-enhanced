@@ -924,15 +924,6 @@ html.dark header.glass-card {
   opacity: 1;
 }
 
-/* Inline copy button — visible only on hover */
-.inline-code-copy-btn {
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-code:hover + .inline-code-copy-btn,
-.inline-code-copy-btn:hover {
-  opacity: 1;
-}
 
 .note-content table { display: block; max-width: 100%; overflow-x: auto; }
 
