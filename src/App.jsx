@@ -7492,8 +7492,13 @@ export default function App() {
                     <button
                       className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
                       onClick={() => {
+                        const scrollEl = modalScrollRef.current;
+                        const savedScroll = scrollEl?.scrollTop || 0;
                         setViewMode((v) => !v);
                         setShowModalFmt(false);
+                        requestAnimationFrame(() => {
+                          if (scrollEl) scrollEl.scrollTop = savedScroll;
+                        });
                       }}
                       title={
                         viewMode ? t("switchToEditMode") : t("switchToViewMode")
