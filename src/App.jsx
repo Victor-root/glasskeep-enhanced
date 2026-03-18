@@ -633,6 +633,14 @@ const LogOutIcon = () => (
   </svg>
 );
 
+// Floating cards toggle icon
+const FloatingCardsIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="7" width="14" height="10" rx="2" />
+    <rect x="6" y="4" width="14" height="10" rx="2" opacity="0.5" />
+  </svg>
+);
+
 // Archive icon
 const ArchiveIcon = () => (
   <svg
@@ -1915,11 +1923,11 @@ function NoteCard({
 }
 
 /** ---------- Auth Shell ---------- */
-function AuthShell({ title, dark, onToggleDark, children }) {
+function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, children }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
       {/* Decorative floating note cards */}
-      <div aria-hidden="true">
+      {floatingCardsEnabled && <div aria-hidden="true">
         <div className="login-deco-card" style={{"--rot":"-12deg","--dur":"7s","--delay":"0s",top:"8%",left:"6%",borderTop:"3px solid rgba(99,102,241,0.7)"}}>
           <div className="deco-title" style={{background:"rgba(99,102,241,0.5)"}}/>
           <div className="deco-line" style={{width:"90%"}}/>
@@ -1976,7 +1984,7 @@ function AuthShell({ title, dark, onToggleDark, children }) {
           <div className="deco-line" style={{width:"80%"}}/>
           <div className="deco-line" style={{width:"62%"}}/>
         </div>
-      </div>
+      </div>}
       <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-6">
           <img
@@ -2011,6 +2019,7 @@ function LoginView({
   goRegister,
   goSecret,
   allowRegistration,
+  floatingCardsEnabled,
 }) {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -2031,6 +2040,7 @@ function LoginView({
       title={t("signInToYourAccount")}
       dark={dark}
       onToggleDark={onToggleDark}
+      floatingCardsEnabled={floatingCardsEnabled}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
@@ -2070,7 +2080,7 @@ function LoginView({
   );
 }
 
-function RegisterView({ dark, onToggleDark, onRegister, goLogin }) {
+function RegisterView({ dark, onToggleDark, onRegister, goLogin, floatingCardsEnabled }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -2094,6 +2104,7 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin }) {
       title={t("createNewAccount")}
       dark={dark}
       onToggleDark={onToggleDark}
+      floatingCardsEnabled={floatingCardsEnabled}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
@@ -2142,7 +2153,7 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin }) {
   );
 }
 
-function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin }) {
+function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin, floatingCardsEnabled }) {
   const [key, setKey] = useState("");
   const [err, setErr] = useState("");
 
@@ -2161,6 +2172,7 @@ function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin }) {
       title={t("signInWithSecretKey")}
       dark={dark}
       onToggleDark={onToggleDark}
+      floatingCardsEnabled={floatingCardsEnabled}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <textarea
@@ -3141,6 +3153,9 @@ function NotesUI({
   onAiSearch,
   // header auto-hide (mobile)
   windowWidth,
+  // floating cards toggle
+  floatingCardsEnabled,
+  onToggleFloatingCards,
 }) {
   // Multi-select color popover (local UI state)
   const multiColorBtnRef = useRef(null);
@@ -3366,6 +3381,19 @@ function NotesUI({
         </div>
 
         <div className="relative flex items-center gap-3">
+          {/* Floating cards toggle */}
+          <button
+            onClick={onToggleFloatingCards}
+            className={`p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-colors ${
+              floatingCardsEnabled
+                ? dark ? "text-indigo-300 hover:bg-white/10" : "text-indigo-600 hover:bg-indigo-50"
+                : dark ? "text-gray-500 hover:bg-white/10" : "text-gray-400 hover:bg-gray-100"
+            }`}
+            title={floatingCardsEnabled ? t("floatingCardsOn") : t("floatingCardsOff")}
+            aria-label={t("toggleFloatingCards")}
+          >
+            <FloatingCardsIcon />
+          </button>
           <span
             className={`text-sm hidden sm:inline ${dark ? "text-gray-100" : "text-gray-900"}`}
           >
@@ -4335,6 +4363,25 @@ export default function App() {
       return 288;
     }
   });
+
+  // Floating cards decoration toggle
+  const [floatingCardsEnabled, setFloatingCardsEnabled] = useState(() => {
+    try {
+      const stored = localStorage.getItem("floatingCardsEnabled");
+      if (stored !== null) return stored === "true";
+      // Default: enabled on desktop (pointer:fine), disabled on mobile/tablet
+      return window.matchMedia?.("(pointer: fine)").matches ?? true;
+    } catch (e) {
+      return true;
+    }
+  });
+  const toggleFloatingCards = useCallback(() => {
+    setFloatingCardsEnabled((v) => {
+      const next = !v;
+      try { localStorage.setItem("floatingCardsEnabled", String(next)); } catch (e) {}
+      return next;
+    });
+  }, []);
 
   // Local AI
   const [localAiEnabled, setLocalAiEnabled] = useState(() => {
@@ -8606,6 +8653,7 @@ export default function App() {
           onToggleDark={toggleDark}
           onRegister={register}
           goLogin={() => navigate("#/login")}
+          floatingCardsEnabled={floatingCardsEnabled}
         />
       );
     }
@@ -8616,6 +8664,7 @@ export default function App() {
           onToggleDark={toggleDark}
           onLoginWithKey={signInWithSecret}
           goLogin={() => navigate("#/login")}
+          floatingCardsEnabled={floatingCardsEnabled}
         />
       );
     }
@@ -8627,6 +8676,7 @@ export default function App() {
         goRegister={() => navigate("#/register")}
         goSecret={() => navigate("#/login-secret")}
         allowRegistration={allowRegistration}
+        floatingCardsEnabled={floatingCardsEnabled}
       />
     );
   }
@@ -8634,7 +8684,7 @@ export default function App() {
   return (
     <>
       {/* Decorative floating background — fixed wallpaper, z-1 keeps it below all UI (desktop only) */}
-      <div aria-hidden="true" style={{position:"fixed",inset:0,zIndex:1,pointerEvents:"none",overflow:"hidden",display:windowWidth<700?"none":undefined}}>
+      {floatingCardsEnabled && <div aria-hidden="true" style={{position:"fixed",inset:0,zIndex:1,pointerEvents:"none",overflow:"hidden",display:windowWidth<700?"none":undefined}}>
         {/* Colonne gauche */}
         <div className="login-deco-card" style={{"--rot":"-12deg","--dur":"7s","--delay":"0s",top:"5%",left:"2%",borderTop:"3px solid rgba(99,102,241,0.7)"}}>
           <div className="deco-title" style={{background:"rgba(99,102,241,0.5)"}}/>
@@ -8729,7 +8779,7 @@ export default function App() {
           <div className="deco-line" style={{width:"66%"}}/>
           <div className="deco-line" style={{width:"50%"}}/>
         </div>
-      </div>
+      </div>}
       {/* Tag Sidebar / Drawer */}
       <TagSidebar
         open={sidebarOpen}
@@ -8921,6 +8971,9 @@ export default function App() {
         openSettingsPanel={openSettingsPanel}
         // header auto-hide (mobile)
         windowWidth={windowWidth}
+        // floating cards toggle
+        floatingCardsEnabled={floatingCardsEnabled}
+        onToggleFloatingCards={toggleFloatingCards}
       />
       {modal}
 
