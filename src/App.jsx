@@ -2406,6 +2406,8 @@ function SettingsPanel({
   setAlwaysShowSidebarOnWide,
   localAiEnabled,
   setLocalAiEnabled,
+  floatingCardsEnabled,
+  setFloatingCardsEnabled,
   showGenericConfirm,
   showToast,
   onResetNoteOrder,
@@ -2597,6 +2599,27 @@ function SettingsPanel({
                       alwaysShowSidebarOnWide
                         ? "translate-x-6"
                         : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="font-medium">{t("enableAnimationsMobile")}</div>
+                  <div className="text-sm text-gray-500">{t("enableAnimationsMobileDesc")}</div>
+                </div>
+                <button
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
+                    floatingCardsEnabled
+                      ? "bg-indigo-600"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                  onClick={() => setFloatingCardsEnabled(!floatingCardsEnabled)}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      floatingCardsEnabled ? "translate-x-6" : "translate-x-1"
                     }`}
                   />
                 </button>
@@ -8714,7 +8737,7 @@ export default function App() {
   return (
     <>
       {/* Decorative floating background — fixed wallpaper, z-1 keeps it below all UI (desktop only) */}
-      {floatingCardsEnabled && <div aria-hidden="true" style={{position:"fixed",inset:0,zIndex:1,pointerEvents:"none",overflow:"hidden",display:windowWidth<700?"none":undefined}}>
+      {floatingCardsEnabled && <div aria-hidden="true" style={{position:"fixed",inset:0,zIndex:1,pointerEvents:"none",overflow:"hidden"}}>
         {/* Colonne gauche */}
         <div className="login-deco-card" style={{"--rot":"-12deg","--dur":"7s","--delay":"0s",top:"5%",left:"2%",borderTop:"3px solid rgba(99,102,241,0.7)"}}>
           <div className="deco-title" style={{background:"rgba(99,102,241,0.5)"}}/>
@@ -8857,6 +8880,8 @@ export default function App() {
         setAlwaysShowSidebarOnWide={setAlwaysShowSidebarOnWide}
         localAiEnabled={localAiEnabled}
         setLocalAiEnabled={setLocalAiEnabled}
+        floatingCardsEnabled={floatingCardsEnabled}
+        setFloatingCardsEnabled={setFloatingCardsEnabled}
         showGenericConfirm={showGenericConfirm}
         showToast={showToast}
         onResetNoteOrder={resetNoteOrder}
