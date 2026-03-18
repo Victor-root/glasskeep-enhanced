@@ -4928,7 +4928,7 @@ export default function App() {
   // NEW: modal scroll container ref + state to place Edited at bottom when not scrollable
   const modalScrollRef = useRef(null);
   const [modalScrollable, setModalScrollable] = useState(false);
-  const savedModalScrollRef = useRef(0);
+  const savedModalScrollRatioRef = useRef(0);
 
   // SSE connection status
   const [sseConnected, setSseConnected] = useState(false);
@@ -5629,16 +5629,17 @@ export default function App() {
     if (!viewMode) resizeModalTextarea();
   }, [open, viewMode, mBody, mType]);
 
-  // Restore scroll position after switching between view/edit mode
+  // Restore scroll ratio after switching between view/edit mode
   useEffect(() => {
     const el = modalScrollRef.current;
-    if (!el || savedModalScrollRef.current === 0) return;
-    const saved = savedModalScrollRef.current;
-    requestAnimationFrame(() => {
-      el.scrollTop = saved;
-      // Double-RAF in case textarea resize shifts layout again
-      requestAnimationFrame(() => { el.scrollTop = saved; });
-    });
+    const ratio = savedModalScrollRatioRef.current;
+    if (!el || ratio === 0) return;
+    // Wait for layout to settle (textarea resize etc.) then apply ratio
+    const apply = () => {
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      if (maxScroll > 0) el.scrollTop = ratio * maxScroll;
+    };
+    requestAnimationFrame(() => requestAnimationFrame(apply));
   }, [viewMode]);
 
   // Ensure modal formatting menu hides when switching to view mode or non-text
@@ -7505,7 +7506,9 @@ export default function App() {
                     <button
                       className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
                       onClick={() => {
-                        savedModalScrollRef.current = modalScrollRef.current?.scrollTop || 0;
+                        const el = modalScrollRef.current;
+                        const maxScroll = el ? el.scrollHeight - el.clientHeight : 0;
+                        savedModalScrollRatioRef.current = maxScroll > 0 ? el.scrollTop / maxScroll : 0;
                         setViewMode((v) => !v);
                         setShowModalFmt(false);
                       }}
