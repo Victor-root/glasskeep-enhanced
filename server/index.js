@@ -1017,7 +1017,8 @@ function adminOnly(req, res, next) {
 
 // Admin settings storage (in-memory for now, could be moved to DB)
 let adminSettings = {
-  allowNewAccounts: process.env.ALLOW_REGISTRATION === "true" || false
+  allowNewAccounts: process.env.ALLOW_REGISTRATION === "true" || false,
+  loginSlogan: "",
 };
 
 // Get admin settings
@@ -1027,10 +1028,13 @@ app.get("/api/admin/settings", auth, adminOnly, (_req, res) => {
 
 // Update admin settings
 app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
-  const { allowNewAccounts } = req.body || {};
+  const { allowNewAccounts, loginSlogan } = req.body || {};
 
   if (typeof allowNewAccounts === 'boolean') {
     adminSettings.allowNewAccounts = allowNewAccounts;
+  }
+  if (typeof loginSlogan === 'string') {
+    adminSettings.loginSlogan = loginSlogan.slice(0, 200);
   }
 
   res.json(adminSettings);
@@ -1039,6 +1043,11 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
 // Check if new account creation is allowed (public endpoint)
 app.get("/api/admin/allow-registration", (_req, res) => {
   res.json({ allowNewAccounts: adminSettings.allowNewAccounts });
+});
+
+// Public endpoint for login slogan
+app.get("/api/admin/login-slogan", (_req, res) => {
+  res.json({ loginSlogan: adminSettings.loginSlogan });
 });
 
 // Include a rough storage usage estimate (bytes) for each user

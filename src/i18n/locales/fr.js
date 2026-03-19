@@ -273,4 +273,7 @@ loginFailed: "Échec de la connexion",
   addPage: "Ajouter une page",
   strokeCount: "trait",
   strokeCountPlural: "traits",
+  loginSlogan: "Vos notes, votre serveur, vos règles.",
+  loginSloganLabel: "Slogan de connexion",
+  loginSloganPlaceholder: "Saisissez un slogan personnalisé pour la page de connexion",
 };

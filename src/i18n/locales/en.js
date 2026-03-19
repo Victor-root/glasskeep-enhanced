@@ -273,4 +273,7 @@ loginFailed: "Login failed",
   addPage: "Add Page",
   strokeCount: "stroke",
   strokeCountPlural: "strokes",
+  loginSlogan: "Your notes, your server, your rules.",
+  loginSloganLabel: "Login Slogan",
+  loginSloganPlaceholder: "Enter a custom slogan for the login page",
 };

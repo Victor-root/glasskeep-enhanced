@@ -1992,7 +1992,7 @@ function NoteCard({
 }
 
 /** ---------- Auth Shell ---------- */
-function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, children }) {
+function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, loginSlogan, children }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
       {/* Decorative floating note cards */}
@@ -2064,6 +2064,11 @@ function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, chi
           />
           <h1 className="text-3xl font-bold">Glass Keep</h1>
           <p className="text-gray-500 dark:text-gray-400">{title}</p>
+          {(loginSlogan || t("loginSlogan")) && (
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1 italic">
+              {loginSlogan || t("loginSlogan")}
+            </p>
+          )}
         </div>
         <div className="glass-card rounded-xl p-6 shadow-lg">{children}</div>
         <div className="mt-6 text-center">
@@ -2089,6 +2094,7 @@ function LoginView({
   goSecret,
   allowRegistration,
   floatingCardsEnabled,
+  loginSlogan,
 }) {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -2110,6 +2116,7 @@ function LoginView({
       dark={dark}
       onToggleDark={onToggleDark}
       floatingCardsEnabled={floatingCardsEnabled}
+      loginSlogan={loginSlogan}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
@@ -2149,7 +2156,7 @@ function LoginView({
   );
 }
 
-function RegisterView({ dark, onToggleDark, onRegister, goLogin, floatingCardsEnabled }) {
+function RegisterView({ dark, onToggleDark, onRegister, goLogin, floatingCardsEnabled, loginSlogan }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -2174,6 +2181,7 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin, floatingCardsEn
       dark={dark}
       onToggleDark={onToggleDark}
       floatingCardsEnabled={floatingCardsEnabled}
+      loginSlogan={loginSlogan}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
@@ -2222,7 +2230,7 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin, floatingCardsEn
   );
 }
 
-function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin, floatingCardsEnabled }) {
+function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin, floatingCardsEnabled, loginSlogan }) {
   const [key, setKey] = useState("");
   const [err, setErr] = useState("");
 
@@ -2242,6 +2250,7 @@ function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin, floating
       dark={dark}
       onToggleDark={onToggleDark}
       floatingCardsEnabled={floatingCardsEnabled}
+      loginSlogan={loginSlogan}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <textarea
@@ -2757,6 +2766,7 @@ function AdminPanel({
   onClose,
   dark,
   adminSettings,
+  setAdminSettings,
   allUsers,
   newUserForm,
   setNewUserForm,
@@ -2923,6 +2933,25 @@ function AdminPanel({
                     }`}
                   />
                 </button>
+              </div>
+              <div>
+                <label className="text-sm block mb-1">{t("loginSloganLabel")}</label>
+                <input
+                  type="text"
+                  maxLength={200}
+                  className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400 text-sm"
+                  placeholder={t("loginSloganPlaceholder")}
+                  value={adminSettings.loginSlogan || ""}
+                  onChange={(e) =>
+                    setAdminSettings((prev) => ({ ...prev, loginSlogan: e.target.value }))
+                  }
+                  onBlur={() =>
+                    updateAdminSettings({ loginSlogan: adminSettings.loginSlogan || "" })
+                  }
+                />
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  {t("loginSlogan")}
+                </p>
               </div>
             </div>
           </div>
@@ -5038,6 +5067,7 @@ export default function App() {
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   const [adminSettings, setAdminSettings] = useState({
     allowNewAccounts: true,
+    loginSlogan: "",
   });
   const [allUsers, setAllUsers] = useState([]);
   const [newUserForm, setNewUserForm] = useState({
@@ -5047,6 +5077,7 @@ export default function App() {
     is_admin: false,
   });
   const [allowRegistration, setAllowRegistration] = useState(true);
+  const [loginSlogan, setLoginSlogan] = useState("");
 
   // Settings panel state
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
@@ -5350,9 +5381,10 @@ export default function App() {
     }
   }, [token, tagFilter]);
 
-  // Check registration setting on app load
+  // Check registration setting and login slogan on app load
   useEffect(() => {
     checkRegistrationSetting();
+    fetchLoginSlogan();
   }, []);
 
   // Handle token expiration globally - must be after signOut is defined
@@ -6003,6 +6035,9 @@ export default function App() {
         body: newSettings,
       });
       setAdminSettings(settings);
+      if (typeof settings.loginSlogan === 'string') {
+        setLoginSlogan(settings.loginSlogan);
+      }
     } catch (e) {
       alert(e.message || t("failedUpdateAdminSettings"));
     }
@@ -6067,6 +6102,16 @@ export default function App() {
 
   const openSettingsPanel = () => {
     setSettingsPanelOpen(true);
+  };
+
+  // Fetch the login slogan (public)
+  const fetchLoginSlogan = async () => {
+    try {
+      const response = await api("/admin/login-slogan");
+      setLoginSlogan(response.loginSlogan || "");
+    } catch (e) {
+      console.error("Failed to fetch login slogan:", e);
+    }
   };
 
   // Check if registration is allowed
@@ -8993,6 +9038,7 @@ export default function App() {
           onRegister={register}
           goLogin={() => navigate("#/login")}
           floatingCardsEnabled={true}
+          loginSlogan={loginSlogan}
         />
       );
     }
@@ -9004,6 +9050,7 @@ export default function App() {
           onLoginWithKey={signInWithSecret}
           goLogin={() => navigate("#/login")}
           floatingCardsEnabled={true}
+          loginSlogan={loginSlogan}
         />
       );
     }
@@ -9016,6 +9063,7 @@ export default function App() {
         goSecret={() => navigate("#/login-secret")}
         allowRegistration={allowRegistration}
         floatingCardsEnabled={true}
+        loginSlogan={loginSlogan}
       />
     );
   }
@@ -9184,6 +9232,7 @@ export default function App() {
         onClose={() => setAdminPanelOpen(false)}
         dark={dark}
         adminSettings={adminSettings}
+        setAdminSettings={setAdminSettings}
         allUsers={allUsers}
         newUserForm={newUserForm}
         setNewUserForm={setNewUserForm}
