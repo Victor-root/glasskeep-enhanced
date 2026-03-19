@@ -1013,7 +1013,7 @@ html.dark header.glass-card {
   cursor: pointer;
 }
 .code-block-wrapper:hover .code-copy-btn {
-  opacity: 0.45;
+  opacity: 1;
 }
 .code-block-wrapper .code-copy-btn:hover {
   opacity: 1;
