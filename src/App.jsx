@@ -7457,7 +7457,7 @@ export default function App() {
           >
             {/* Sticky header (kept single line on desktop, wraps on mobile) */}
             <div
-              className="sticky top-0 z-20 px-4 sm:px-6 pt-4 pb-3 modal-header-blur rounded-t-none sm:rounded-t-xl"
+              className="sticky top-0 z-20 px-4 sm:px-6 pt-4 pb-3 modal-header-blur rounded-t-none sm:rounded-t-xl overflow-x-hidden"
               style={{ backgroundColor: modalBgFor(mColor, dark) }}
             >
               <div className="flex flex-wrap items-center gap-2">
