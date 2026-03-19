@@ -1003,9 +1003,9 @@ html.dark header.glass-card {
   font-size: .75rem;
   padding: .2rem .45rem;
   border-radius: .35rem;
-  background: var(--sb-track, #111);
+  background: var(--note-color, #111);
   color: #fff;
-  border: 1px solid var(--sb-thumb, rgba(255,255,255,0.15));
+  border: none;
   box-shadow: 0 2px 10px rgba(0,0,0,0.25);
   opacity: 0;
   transition: opacity 0.15s;
@@ -1014,12 +1014,9 @@ html.dark header.glass-card {
 .code-block-wrapper:hover .code-copy-btn {
   opacity: 1;
 }
-html:not(.dark) .note-content pre .code-copy-btn,
 html:not(.dark) .code-block-wrapper .code-copy-btn {
-  background: var(--sb-thumb, #6d28d9);
-  color: #fff;
-  border: 1px solid var(--sb-track, rgba(0,0,0,0.12));
-  box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+  color: rgba(0,0,0,0.75);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
   
 .inline-code-copy-btn {
@@ -7525,7 +7522,13 @@ export default function App() {
           <div
             ref={modalScrollRef}
             className="relative flex-1 min-h-0 overflow-y-auto overflow-x-auto mobile-hide-scrollbar modal-scroll-themed"
-            style={(() => { const sc = scrollColorsFor(mColor, dark); return { scrollbarColor: `${sc.thumb} ${sc.track}`, '--sb-thumb': sc.thumb, '--sb-track': sc.track }; })()}
+            style={(() => {
+              const sc = scrollColorsFor(mColor, dark);
+              const noteColorBtn = (!dark && (!mColor || mColor === "default"))
+                ? "#a78bfa"
+                : solid(bgFor(mColor, dark));
+              return { scrollbarColor: `${sc.thumb} ${sc.track}`, '--sb-thumb': sc.thumb, '--sb-track': sc.track, '--note-color': noteColorBtn };
+            })()}
           >
             {/* Sticky header (kept single line on desktop, wraps on mobile) */}
             <div
