@@ -8322,7 +8322,7 @@ export default function App() {
           {/* Footer */}
           <div className="border-t border-[var(--border-light)] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             {/* Tags chips editor */}
-            <div className="flex items-center gap-1.5 flex-1 flex-wrap min-w-0">
+            <div className="flex items-center gap-1.5 sm:flex-1 flex-wrap min-w-0">
               {mTagList.map((tag) => (
                 <span
                   key={tag}
@@ -8348,7 +8348,7 @@ export default function App() {
               ))}
               {/* Tag add button - hidden when offline */}
               {isOnline && (
-                <div className="relative">
+                <div className="relative basis-full sm:basis-auto">
                   <button
                     ref={modalTagBtnRef}
                     type="button"
