@@ -8345,6 +8345,7 @@ export default function App() {
                               e.preventDefault();
                               addTags(tag);
                               setTagInput("");
+                              modalTagInputRef.current?.blur();
                             }}
                             className="w-full text-left px-3 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-sm text-gray-800 dark:text-gray-200 first:rounded-t-xl last:rounded-b-xl flex items-center gap-2 transition-colors duration-100"
                           >
