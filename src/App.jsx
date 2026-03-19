@@ -8287,7 +8287,7 @@ export default function App() {
                   {/* Tag removal button - hidden when offline */}
                   {isOnline && (
                     <button
-                      className="w-3.5 h-3.5 rounded-full bg-indigo-300/50 dark:bg-indigo-600/50 hover:bg-red-400 dark:hover:bg-red-500 flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none"
+                      className="w-3.5 h-3.5 rounded-full bg-indigo-400 dark:bg-indigo-500 text-white hover:bg-red-400 dark:hover:bg-red-500 flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none"
                       title={t("removeTag")}
                       onClick={() =>
                         setMTagList((prev) => prev.filter((t) => t !== tag))
