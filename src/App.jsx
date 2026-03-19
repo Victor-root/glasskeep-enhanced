@@ -3390,7 +3390,7 @@ function NotesUI({
           transition: "transform 0.3s ease",
         }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           {/* Hamburger - only show when sidebar is not permanent */}
           {!sidebarPermanent && (
             <button
@@ -3429,7 +3429,7 @@ function NotesUI({
           )}
         </div>
 
-        <div className="flex-grow flex justify-center px-4 sm:px-8">
+        <div className="flex-grow min-w-0 flex justify-center px-2 sm:px-8">
           <div className="relative w-full max-w-lg">
             <input
               type="text"
@@ -3472,7 +3472,7 @@ function NotesUI({
           </div>
         </div>
 
-        <div className="relative flex items-center gap-3">
+        <div className="relative flex items-center gap-3 shrink-0">
           {/* Floating cards toggle */}
           <button
             onClick={onToggleFloatingCards}
