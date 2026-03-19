@@ -1010,8 +1010,12 @@ html.dark header.glass-card {
   opacity: 0;
   transition: opacity 0.15s;
   z-index: 2;
+  cursor: pointer;
 }
 .code-block-wrapper:hover .code-copy-btn {
+  opacity: 0.45;
+}
+.code-block-wrapper .code-copy-btn:hover {
   opacity: 1;
 }
 html:not(.dark) .code-block-wrapper .code-copy-btn {
