@@ -217,7 +217,7 @@ const mixWithWhite = (rgbaStr, whiteRatio = 0.8, outAlpha = 0.92) => {
 const modalBgFor = (colorKey, dark, opaque = false) => {
   const base = bgFor(colorKey, dark);
   if (dark) return base.replace(/,\s*[\d.]+\)$/, ', 1)');
-  return mixWithWhite(solid(base), 0.8, opaque ? 1 : 0.92);
+  return mixWithWhite(solid(base), 0.8, 1);
 };
 
 const scrollColorsFor = (colorKey, dark) => {
