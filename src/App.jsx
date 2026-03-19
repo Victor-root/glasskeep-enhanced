@@ -8371,6 +8371,8 @@ export default function App() {
                     if (!rect) return null;
                     const spaceBelow = window.innerHeight - rect.bottom;
                     const dropUp = spaceBelow < 280;
+                    const dropWidth = 240;
+                    const dropLeft = Math.min(rect.left, window.innerWidth - dropWidth - 8);
                     const suggestions = tagsWithCounts
                       .filter(
                         ({ tag: t }) =>
@@ -8384,9 +8386,9 @@ export default function App() {
                         style={{
                           position: "fixed",
                           ...(dropUp
-                            ? { bottom: window.innerHeight - rect.top + 6, left: rect.left }
-                            : { top: rect.bottom + 6, left: rect.left }),
-                          width: 240,
+                            ? { bottom: window.innerHeight - rect.top + 6, left: dropLeft }
+                            : { top: rect.bottom + 6, left: dropLeft }),
+                          width: dropWidth,
                           zIndex: 99999,
                         }}
                         className="rounded-2xl shadow-2xl bg-white/98 dark:bg-gray-900/98 backdrop-blur-xl border border-indigo-100/80 dark:border-indigo-800/50 overflow-hidden ring-1 ring-black/5 dark:ring-white/5"
