@@ -1003,9 +1003,9 @@ html.dark header.glass-card {
   font-size: .75rem;
   padding: .2rem .45rem;
   border-radius: .35rem;
-  background: #111;
+  background: var(--sb-track, #111);
   color: #fff;
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid var(--sb-thumb, rgba(255,255,255,0.15));
   box-shadow: 0 2px 10px rgba(0,0,0,0.25);
   opacity: 0;
   transition: opacity 0.15s;
@@ -1014,10 +1014,11 @@ html.dark header.glass-card {
 .code-block-wrapper:hover .code-copy-btn {
   opacity: 1;
 }
-html:not(.dark) .note-content pre .code-copy-btn {
-  background: #fff;
-  color: #111;
-  border: 1px solid rgba(0,0,0,0.12);
+html:not(.dark) .note-content pre .code-copy-btn,
+html:not(.dark) .code-block-wrapper .code-copy-btn {
+  background: var(--sb-thumb, #6d28d9);
+  color: #fff;
+  border: 1px solid var(--sb-track, rgba(0,0,0,0.12));
   box-shadow: 0 2px 10px rgba(0,0,0,0.12);
 }
   
