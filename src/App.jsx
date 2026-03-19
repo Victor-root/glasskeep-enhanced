@@ -919,10 +919,21 @@ html.dark header.glass-card {
 
 /* Wrapper for code blocks to anchor copy button outside scroll area */
 .code-block-wrapper { position: relative; }
-.code-block-wrapper .code-copy-btn {
-  position: absolute;
+/* Sticky anchor: zero-height, sticks at top, button hangs from it */
+.code-copy-anchor {
+  position: sticky;
   top: 8px;
-  right: 8px;
+  height: 0;
+  overflow: visible;
+  text-align: right;
+  z-index: 3;
+  pointer-events: none;
+}
+.code-copy-anchor .code-copy-btn {
+  display: inline-block;
+  pointer-events: auto;
+  margin-right: 8px;
+  position: relative;
 }
 
 
@@ -7431,7 +7442,10 @@ export default function App() {
           btn.textContent = t("copied");
           setTimeout(() => (btn.textContent = t("copy")), 1200);
         });
-        wrapper.appendChild(btn);
+        const anchor = document.createElement("div");
+        anchor.className = "code-copy-anchor";
+        anchor.appendChild(btn);
+        wrapper.insertBefore(anchor, pre);
       });
 
       // Inline code
