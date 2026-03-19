@@ -7652,37 +7652,38 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Desktop inline formatting toolbar (always visible in edit mode) */}
-                {isOnline && mType === "text" && !viewMode && windowWidth >= 768 && (
-                  <div
-                    className={`px-4 sm:px-6 pt-2 pb-3 border-t flex flex-wrap items-center gap-1 ${
-                      dark ? "border-white/10" : "border-black/8"
-                    }`}
-                  >
-                    {(() => {
-                      const base = `fmt-btn ${dark ? "hover:bg-white/10" : "hover:bg-black/5"}`;
-                      return (
-                        <>
-                          <button className={base} onClick={() => formatModal("h1")}>H1</button>
-                          <button className={base} onClick={() => formatModal("h2")}>H2</button>
-                          <button className={base} onClick={() => formatModal("h3")}>H3</button>
-                          <span className="mx-1 opacity-40">|</span>
-                          <button className={base} onClick={() => formatModal("bold")}><strong>B</strong></button>
-                          <button className={base} onClick={() => formatModal("italic")}><em>I</em></button>
-                          <button className={base} onClick={() => formatModal("strike")}><span className="line-through">S</span></button>
-                          <button className={base} onClick={() => formatModal("code")}>`code`</button>
-                          <button className={base} onClick={() => formatModal("codeblock")}>&lt;/&gt;</button>
-                          <span className="mx-1 opacity-40">|</span>
-                          <button className={base} onClick={() => formatModal("quote")}>&gt;</button>
-                          <button className={base} onClick={() => formatModal("ul")}>{t("bulletListLabel")}</button>
-                          <button className={base} onClick={() => formatModal("ol")}>{t("orderedListLabel")}</button>
-                          <button className={base} onClick={() => formatModal("link")}>🔗</button>
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
               </div>
+
+              {/* Desktop inline formatting toolbar (always visible in edit mode) */}
+              {isOnline && mType === "text" && !viewMode && windowWidth >= 768 && (
+                <div
+                  className={`px-4 sm:px-6 pt-2 pb-3 border-t flex flex-wrap items-center gap-1 ${
+                    dark ? "border-white/10" : "border-black/8"
+                  }`}
+                >
+                  {(() => {
+                    const base = `fmt-btn ${dark ? "hover:bg-white/10" : "hover:bg-black/5"}`;
+                    return (
+                      <>
+                        <button className={base} onClick={() => formatModal("h1")}>H1</button>
+                        <button className={base} onClick={() => formatModal("h2")}>H2</button>
+                        <button className={base} onClick={() => formatModal("h3")}>H3</button>
+                        <span className="mx-1 opacity-40">|</span>
+                        <button className={base} onClick={() => formatModal("bold")}><strong>B</strong></button>
+                        <button className={base} onClick={() => formatModal("italic")}><em>I</em></button>
+                        <button className={base} onClick={() => formatModal("strike")}><span className="line-through">S</span></button>
+                        <button className={base} onClick={() => formatModal("code")}>`code`</button>
+                        <button className={base} onClick={() => formatModal("codeblock")}>&lt;/&gt;</button>
+                        <span className="mx-1 opacity-40">|</span>
+                        <button className={base} onClick={() => formatModal("quote")}>&gt;</button>
+                        <button className={base} onClick={() => formatModal("ul")}>{t("bulletListLabel")}</button>
+                        <button className={base} onClick={() => formatModal("ol")}>{t("orderedListLabel")}</button>
+                        <button className={base} onClick={() => formatModal("link")}>🔗</button>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
 
             {/* Images - full width like Google Keep */}
