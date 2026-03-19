@@ -3883,42 +3883,88 @@ function NotesUI({
                           />
                           {composerTagFocused && (() => {
                             const suggestions = tagsWithCounts
-                              .map((x) => x.tag)
                               .filter(
-                                (t) =>
+                                ({ tag: t }) =>
                                   (!composerTagInput.trim() || t.toLowerCase().includes(composerTagInput.toLowerCase())) &&
                                   !composerTagList.map((x) => x.toLowerCase()).includes(t.toLowerCase())
                               );
-                            if (suggestions.length === 0) return null;
+                            const trimmed = composerTagInput.trim();
+                            const isNew = trimmed && !tagsWithCounts.some(({ tag: t }) => t.toLowerCase() === trimmed.toLowerCase()) && !composerTagList.some((t) => t.toLowerCase() === trimmed.toLowerCase());
+                            if (suggestions.length === 0 && !isNew) return null;
                             const rect = composerTagInputRef.current?.getBoundingClientRect();
                             if (!rect) return null;
+                            const spaceBelow = window.innerHeight - rect.bottom;
+                            const dropUp = spaceBelow < 220;
                             return createPortal(
                               <div
                                 style={{
                                   position: "fixed",
-                                  top: rect.bottom + 4,
-                                  left: rect.left,
-                                  width: Math.max(rect.width, 200),
+                                  ...(dropUp
+                                    ? { bottom: window.innerHeight - rect.top + 6, left: rect.left }
+                                    : { top: rect.bottom + 6, left: rect.left }),
+                                  width: Math.max(rect.width, 220),
                                   zIndex: 99999,
                                 }}
-                                className="rounded-lg shadow-lg bg-white/95 dark:bg-gray-800/95 backdrop-blur border border-gray-200 dark:border-gray-600 max-h-40 overflow-y-auto"
+                                className="rounded-2xl shadow-2xl bg-white/98 dark:bg-gray-900/98 backdrop-blur-xl border border-indigo-100/80 dark:border-indigo-800/50 max-h-52 overflow-y-auto overflow-x-hidden ring-1 ring-black/5 dark:ring-white/5"
                               >
-                                {suggestions.map((stag) => (
-                                  <button
-                                    key={stag}
-                                    type="button"
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      if (!composerTagList.map((x) => x.toLowerCase()).includes(stag.toLowerCase())) {
-                                        setComposerTagList((prev) => [...prev, stag]);
-                                      }
-                                      setComposerTagInput("");
-                                    }}
-                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm text-gray-800 dark:text-gray-200 first:rounded-t-lg last:rounded-b-lg"
-                                  >
-                                    🏷️ {stag}
-                                  </button>
-                                ))}
+                                {suggestions.length > 0 && (
+                                  <div className="px-3 pt-2.5 pb-1.5">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{t("existingTags") || "Tags"}</span>
+                                  </div>
+                                )}
+                                <div className="px-1.5 pb-1.5">
+                                  {suggestions.map(({ tag: stag, count }) => (
+                                    <button
+                                      key={stag}
+                                      type="button"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        if (!composerTagList.map((x) => x.toLowerCase()).includes(stag.toLowerCase())) {
+                                          setComposerTagList((prev) => [...prev, stag]);
+                                        }
+                                        setComposerTagInput("");
+                                        composerTagInputRef.current?.blur();
+                                      }}
+                                      className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-indigo-50/80 dark:hover:bg-indigo-900/30 text-sm text-gray-700 dark:text-gray-200 flex items-center justify-between gap-2 transition-all duration-150 group cursor-pointer"
+                                    >
+                                      <span className="flex items-center gap-2 min-w-0">
+                                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-indigo-100/80 dark:bg-indigo-800/40 text-indigo-500 dark:text-indigo-400 shrink-0 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-700/50 transition-colors duration-150">
+                                          <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                            <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
+                                          </svg>
+                                        </span>
+                                        <span className="truncate font-medium">{stag}</span>
+                                      </span>
+                                      <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 tabular-nums shrink-0">{count}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                                {isNew && (
+                                  <>
+                                    {suggestions.length > 0 && <div className="mx-3 border-t border-gray-100 dark:border-gray-800"/>}
+                                    <div className="px-1.5 py-1.5">
+                                      <button
+                                        type="button"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          if (!composerTagList.map((x) => x.toLowerCase()).includes(trimmed.toLowerCase())) {
+                                            setComposerTagList((prev) => [...prev, trimmed]);
+                                          }
+                                          setComposerTagInput("");
+                                          composerTagInputRef.current?.blur();
+                                        }}
+                                        className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-emerald-50/80 dark:hover:bg-emerald-900/20 text-sm flex items-center gap-2 transition-all duration-150 group cursor-pointer"
+                                      >
+                                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-100/80 dark:bg-emerald-800/40 text-emerald-500 dark:text-emerald-400 shrink-0 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-700/50 transition-colors duration-150">
+                                          <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                            <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
+                                          </svg>
+                                        </span>
+                                        <span className="font-medium text-emerald-600 dark:text-emerald-400">{t("createTag") || "Créer"} "<span className="font-semibold">{trimmed}</span>"</span>
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
                               </div>,
                               document.body
                             );
@@ -8300,63 +8346,116 @@ export default function App() {
               ))}
               {/* Tag input - hidden when offline */}
               {isOnline && (
-                <div className="relative flex-1 min-w-[8ch]">
-                  <input
-                    ref={modalTagInputRef}
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={handleTagKeyDown}
-                    onFocus={() => setModalTagFocused(true)}
-                    onBlur={() => { setTimeout(() => { handleTagBlur(); setModalTagFocused(false); }, 200); }}
-                    onPaste={handleTagPaste}
-                    placeholder={mTagList.length ? t("addTag") : t("addTags")}
-                    className="bg-transparent text-sm placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none w-full"
-                  />
+                <div className="relative">
+                  {!modalTagFocused ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalTagFocused(true);
+                        setTimeout(() => modalTagInputRef.current?.focus(), 0);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-indigo-300 dark:border-indigo-600 text-indigo-500 dark:text-indigo-400 hover:border-indigo-400 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all duration-200 cursor-pointer"
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
+                      </svg>
+                      {t("addTag")}
+                    </button>
+                  ) : (
+                    <div className="inline-flex items-center gap-1 min-w-[10ch]">
+                      <input
+                        ref={modalTagInputRef}
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={handleTagKeyDown}
+                        onBlur={() => { setTimeout(() => { handleTagBlur(); setModalTagFocused(false); }, 200); }}
+                        onPaste={handleTagPaste}
+                        placeholder={t("addTag")}
+                        className="bg-transparent text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none w-full"
+                        autoFocus
+                      />
+                    </div>
+                  )}
                   {modalTagFocused && (() => {
                     const suggestions = tagsWithCounts
-                      .map((x) => x.tag)
                       .filter(
-                        (t) =>
+                        ({ tag: t }) =>
                           (!tagInput.trim() || t.toLowerCase().includes(tagInput.toLowerCase())) &&
                           !mTagList.map((x) => x.toLowerCase()).includes(t.toLowerCase())
                       );
-                    if (suggestions.length === 0) return null;
+                    const trimmed = tagInput.trim();
+                    const isNew = trimmed && !tagsWithCounts.some(({ tag: t }) => t.toLowerCase() === trimmed.toLowerCase()) && !mTagList.some((t) => t.toLowerCase() === trimmed.toLowerCase());
+                    if (suggestions.length === 0 && !isNew) return null;
                     const rect = modalTagInputRef.current?.getBoundingClientRect();
                     if (!rect) return null;
                     const spaceBelow = window.innerHeight - rect.bottom;
-                    const dropUp = spaceBelow < 180;
+                    const dropUp = spaceBelow < 220;
                     return createPortal(
                       <div
                         style={{
                           position: "fixed",
                           ...(dropUp
-                            ? { bottom: window.innerHeight - rect.top + 4, left: rect.left }
-                            : { top: rect.bottom + 4, left: rect.left }),
-                          width: Math.max(rect.width, 200),
+                            ? { bottom: window.innerHeight - rect.top + 6, left: rect.left }
+                            : { top: rect.bottom + 6, left: rect.left }),
+                          width: Math.max(rect.width, 220),
                           zIndex: 99999,
                         }}
-                        className="rounded-xl shadow-xl bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-indigo-100/60 dark:border-indigo-800/40 max-h-44 overflow-y-auto"
+                        className="rounded-2xl shadow-2xl bg-white/98 dark:bg-gray-900/98 backdrop-blur-xl border border-indigo-100/80 dark:border-indigo-800/50 max-h-52 overflow-y-auto overflow-x-hidden ring-1 ring-black/5 dark:ring-white/5"
                       >
-                        {suggestions.map((tag) => (
-                          <button
-                            key={tag}
-                            type="button"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              addTags(tag);
-                              setTagInput("");
-                              modalTagInputRef.current?.blur();
-                            }}
-                            className="w-full text-left px-3 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-sm text-gray-800 dark:text-gray-200 first:rounded-t-xl last:rounded-b-xl flex items-center gap-2 transition-colors duration-100"
-                          >
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-700/40">
-                              <svg className="w-2.5 h-2.5 opacity-70 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
-                              </svg>
-                              {tag}
-                            </span>
-                          </button>
-                        ))}
+                        {suggestions.length > 0 && (
+                          <div className="px-3 pt-2.5 pb-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{t("existingTags") || "Tags"}</span>
+                          </div>
+                        )}
+                        <div className="px-1.5 pb-1.5">
+                          {suggestions.map(({ tag, count }) => (
+                            <button
+                              key={tag}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                addTags(tag);
+                                setTagInput("");
+                                modalTagInputRef.current?.blur();
+                              }}
+                              className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-indigo-50/80 dark:hover:bg-indigo-900/30 text-sm text-gray-700 dark:text-gray-200 flex items-center justify-between gap-2 transition-all duration-150 group cursor-pointer"
+                            >
+                              <span className="flex items-center gap-2 min-w-0">
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-indigo-100/80 dark:bg-indigo-800/40 text-indigo-500 dark:text-indigo-400 shrink-0 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-700/50 transition-colors duration-150">
+                                  <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                    <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
+                                  </svg>
+                                </span>
+                                <span className="truncate font-medium">{tag}</span>
+                              </span>
+                              <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 tabular-nums shrink-0">{count}</span>
+                            </button>
+                          ))}
+                        </div>
+                        {isNew && (
+                          <>
+                            {suggestions.length > 0 && <div className="mx-3 border-t border-gray-100 dark:border-gray-800"/>}
+                            <div className="px-1.5 py-1.5">
+                              <button
+                                type="button"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  addTags(trimmed);
+                                  setTagInput("");
+                                  modalTagInputRef.current?.blur();
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-emerald-50/80 dark:hover:bg-emerald-900/20 text-sm flex items-center gap-2 transition-all duration-150 group cursor-pointer"
+                              >
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-100/80 dark:bg-emerald-800/40 text-emerald-500 dark:text-emerald-400 shrink-0 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-700/50 transition-colors duration-150">
+                                  <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                    <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
+                                  </svg>
+                                </span>
+                                <span className="font-medium text-emerald-600 dark:text-emerald-400">{t("createTag") || "Créer"} "<span className="font-semibold">{trimmed}</span>"</span>
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>,
                       document.body
                     );
