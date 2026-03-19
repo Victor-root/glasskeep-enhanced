@@ -8287,15 +8287,13 @@ export default function App() {
                   {/* Tag removal button - hidden when offline */}
                   {isOnline && (
                     <button
-                      className="w-3.5 h-3.5 rounded-full bg-indigo-400 dark:bg-indigo-500 text-white hover:bg-red-400 dark:hover:bg-red-500 flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none"
+                      className="w-3.5 h-3.5 rounded-full text-indigo-400 dark:text-indigo-300 hover:bg-red-400 dark:hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none leading-none"
                       title={t("removeTag")}
                       onClick={() =>
                         setMTagList((prev) => prev.filter((t) => t !== tag))
                       }
                     >
-                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                        <line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/>
-                      </svg>
+                      ×
                     </button>
                   )}
                 </span>
