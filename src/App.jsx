@@ -1017,6 +1017,7 @@ html.dark header.glass-card {
 }
 .code-block-wrapper .code-copy-btn:hover {
   opacity: 1;
+  background: var(--note-color-opaque, #111);
 }
 html:not(.dark) .code-block-wrapper .code-copy-btn {
   color: rgba(0,0,0,0.75);
@@ -7579,7 +7580,8 @@ export default function App() {
               const noteColorBtn = (!dark && (!mColor || mColor === "default"))
                 ? "#a78bfa"
                 : solid(bgFor(mColor, dark));
-              return { scrollbarColor: `${sc.thumb} ${sc.track}`, '--sb-thumb': sc.thumb, '--sb-track': sc.track, '--note-color': noteColorBtn };
+              const noteColorOpaque = typeof noteColorBtn === "string" ? noteColorBtn.replace(/,\s*[\d.]+\)$/, ', 1)') : noteColorBtn;
+              return { scrollbarColor: `${sc.thumb} ${sc.track}`, '--sb-thumb': sc.thumb, '--sb-track': sc.track, '--note-color': noteColorBtn, '--note-color-opaque': noteColorOpaque };
             })()}
           >
             {/* Sticky header (kept single line on desktop, wraps on mobile) */}
