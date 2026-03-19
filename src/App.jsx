@@ -1116,14 +1116,24 @@ html:not(.dark) .note-content pre .code-copy-btn {
     background-color: rgba(30,30,40,0.65);
   }
   /* Disable expensive backdrop-filter on touch devices (tablets/phones) */
+  .glass-card,
+  .modal-scrim,
+  .modal-header-blur {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
   .glass-card {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
     background-color: rgba(255, 255, 255, 0.92);
     box-shadow: 0 2px 8px rgba(139, 92, 246, 0.06);
   }
   html.dark .glass-card {
     background-color: rgba(40, 40, 40, 0.92);
+  }
+  .modal-scrim {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+  .modal-header-blur {
+    background-color: inherit;
   }
   header.glass-card {
     background: linear-gradient(
@@ -7456,7 +7466,7 @@ export default function App() {
   const modal = open && (
     <>
       <div
-        className="modal-scrim fixed inset-0 bg-black/40 backdrop-blur-md z-40 flex items-center justify-center transition-opacity duration-300 overscroll-contain"
+        className="modal-scrim fixed inset-0 bg-black/40 z-40 flex items-center justify-center transition-opacity duration-300 overscroll-contain"
         onMouseDown={(e) => {
           // Only consider closing if the press STARTS on the scrim
           scrimClickStartRef.current = e.target === e.currentTarget;
