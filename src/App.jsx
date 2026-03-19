@@ -5649,21 +5649,23 @@ export default function App() {
       timeoutId = setTimeout(() => {
         const modalScrollEl = modalScrollRef.current;
 
-        // Set a minimum height to prevent layout shifts
+        // Save scroll position before collapsing textarea height
+        const savedScrollTop = modalScrollEl ? modalScrollEl.scrollTop : 0;
+
         const MIN = 160;
         el.style.height = MIN + "px";
         el.style.height = Math.max(el.scrollHeight, MIN) + "px";
 
-        // After resize, restore scroll: use saved ratio from mode switch if available,
-        // otherwise keep current position (scrollTop may have been clamped to 0 during
-        // the resize because textarea started at min-height, so we always restore).
         requestAnimationFrame(() => {
           if (!modalScrollEl) return;
+          // Mode-switch ratio takes priority, otherwise restore pre-resize position
           const ratio = savedModalScrollRatioRef.current;
           if (ratio > 0) {
             const maxScroll = modalScrollEl.scrollHeight - modalScrollEl.clientHeight;
             modalScrollEl.scrollTop = ratio * maxScroll;
             savedModalScrollRatioRef.current = 0;
+          } else {
+            modalScrollEl.scrollTop = savedScrollTop;
           }
         });
       }, 10); // Small delay to batch rapid changes
