@@ -879,8 +879,14 @@ html.dark body {
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border-light);
   box-shadow: 0 4px 24px rgba(139, 92, 246, 0.07);
-  transition: all 0.3s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   break-inside: avoid;
+}
+/* Note cards: skip rendering when off-screen, isolate paint */
+.note-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
+  contain: layout style paint;
 }
 header.glass-card {
   background: linear-gradient(
@@ -1108,6 +1114,27 @@ html:not(.dark) .note-content pre .code-copy-btn {
   }
   html.dark .login-deco-card {
     background-color: rgba(30,30,40,0.65);
+  }
+  /* Disable expensive backdrop-filter on touch devices (tablets/phones) */
+  .glass-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background-color: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.06);
+  }
+  html.dark .glass-card {
+    background-color: rgba(40, 40, 40, 0.92);
+  }
+  header.glass-card {
+    background: linear-gradient(
+      90deg,
+      rgba(99, 102, 241, 0.07) 0%,
+      rgba(168, 85, 247, 0.07) 50%,
+      rgba(236, 72, 153, 0.05) 100%
+    ), rgba(255, 255, 255, 0.92);
+  }
+  html.dark header.glass-card {
+    background: rgba(40, 40, 40, 0.92);
   }
 }
 html.dark .login-deco-card {
