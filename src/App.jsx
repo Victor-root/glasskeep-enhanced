@@ -4579,6 +4579,7 @@ export default function App() {
   const [tagInput, setTagInput] = useState("");
   const [modalTagFocused, setModalTagFocused] = useState(false);
   const modalTagInputRef = useRef(null);
+  const suppressTagBlurRef = useRef(false);
   const [mColor, setMColor] = useState("default");
   const [viewMode, setViewMode] = useState(true);
   const [mImages, setMImages] = useState([]);
@@ -8347,12 +8348,12 @@ export default function App() {
               {/* Tag input - hidden when offline */}
               {isOnline && (
                 <div className="relative">
-                  {!modalTagFocused ? (
+                  {!modalTagFocused && (
                     <button
                       type="button"
                       onClick={() => {
                         setModalTagFocused(true);
-                        setTimeout(() => modalTagInputRef.current?.focus(), 0);
+                        modalTagInputRef.current?.focus();
                       }}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-indigo-300 dark:border-indigo-600 text-indigo-500 dark:text-indigo-400 hover:border-indigo-400 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all duration-200 cursor-pointer"
                     >
@@ -8361,21 +8362,25 @@ export default function App() {
                       </svg>
                       {t("addTag")}
                     </button>
-                  ) : (
-                    <div className="inline-flex items-center gap-1 min-w-[10ch]">
-                      <input
-                        ref={modalTagInputRef}
-                        value={tagInput}
-                        onChange={(e) => setTagInput(e.target.value)}
-                        onKeyDown={handleTagKeyDown}
-                        onBlur={() => { setTimeout(() => { handleTagBlur(); setModalTagFocused(false); }, 200); }}
-                        onPaste={handleTagPaste}
-                        placeholder={t("addTag")}
-                        className="bg-transparent text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none w-full"
-                        autoFocus
-                      />
-                    </div>
                   )}
+                  <div className={`inline-flex items-center gap-1 min-w-[10ch] ${modalTagFocused ? "" : "hidden"}`}>
+                    <input
+                      ref={modalTagInputRef}
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={handleTagKeyDown}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          if (!suppressTagBlurRef.current) handleTagBlur();
+                          suppressTagBlurRef.current = false;
+                          setModalTagFocused(false);
+                        }, 200);
+                      }}
+                      onPaste={handleTagPaste}
+                      placeholder={t("addTag")}
+                      className="bg-transparent text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none w-full"
+                    />
+                  </div>
                   {modalTagFocused && (() => {
                     const suggestions = tagsWithCounts
                       .filter(
@@ -8414,6 +8419,7 @@ export default function App() {
                               type="button"
                               onMouseDown={(e) => {
                                 e.preventDefault();
+                                suppressTagBlurRef.current = true;
                                 addTags(tag);
                                 setTagInput("");
                                 modalTagInputRef.current?.blur();
@@ -8440,6 +8446,7 @@ export default function App() {
                                 type="button"
                                 onMouseDown={(e) => {
                                   e.preventDefault();
+                                  suppressTagBlurRef.current = true;
                                   addTags(trimmed);
                                   setTagInput("");
                                   modalTagInputRef.current?.blur();
