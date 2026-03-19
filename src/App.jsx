@@ -8360,7 +8360,7 @@ export default function App() {
                     type="button"
                     onClick={() => {
                       setModalTagFocused((v) => {
-                        if (!v) setTimeout(() => modalTagInputRef.current?.focus(), 0);
+                        if (!v) setTimeout(() => { if (windowWidth >= 640) modalTagInputRef.current?.focus(); }, 0);
                         return !v;
                       });
                       setTagInput("");
