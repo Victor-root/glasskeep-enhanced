@@ -7457,10 +7457,10 @@ export default function App() {
           >
             {/* Sticky header (kept single line on desktop, wraps on mobile) */}
             <div
-              className="sticky top-0 z-20 px-4 sm:px-6 pt-4 pb-3 modal-header-blur rounded-t-none sm:rounded-t-xl overflow-x-hidden"
+              className="sticky top-0 z-20 pt-4 modal-header-blur rounded-t-none sm:rounded-t-xl"
               style={{ backgroundColor: modalBgFor(mColor, dark) }}
             >
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6 pb-3">
                 <input
                   className={`flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none pr-2 ${
                     !isOnline ? "opacity-50 cursor-not-allowed" : ""
@@ -7655,7 +7655,7 @@ export default function App() {
                 {/* Desktop inline formatting toolbar (always visible in edit mode) */}
                 {isOnline && mType === "text" && !viewMode && windowWidth >= 768 && (
                   <div
-                    className={`mt-2 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-2 border-t flex flex-wrap items-center gap-1 ${
+                    className={`px-4 sm:px-6 pt-2 pb-3 border-t flex flex-wrap items-center gap-1 ${
                       dark ? "border-white/10" : "border-black/8"
                     }`}
                   >
