@@ -1044,14 +1044,15 @@ html:not(.dark) .note-content pre .code-copy-btn {
 ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #ddd6fe 0%, #6d28d9 100%); }
 * { scrollbar-width: thin; scrollbar-color: #a78bfa #e3d0ff; }
 .dark * { scrollbar-color: #7c3aed #3b0764; }
+html.dark { scrollbar-color: #7c3aed #3b0764; scrollbar-width: thin; }
 /* Descendants of html.dark */
-.dark ::-webkit-scrollbar-track { background: #3b0764; }
-.dark ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #7c3aed 0%, #4c1d95 100%); }
-.dark ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #8b5cf6 0%, #5b21b6 100%); }
+.dark ::-webkit-scrollbar-track { background: #3b0764 !important; }
+.dark ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #7c3aed 0%, #4c1d95 100%) !important; }
+.dark ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #8b5cf6 0%, #5b21b6 100%) !important; }
 /* html element itself (main page scrollbar) */
-html.dark::-webkit-scrollbar-track { background: #3b0764; }
-html.dark::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #7c3aed 0%, #4c1d95 100%); border-radius: 10px; }
-html.dark::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #8b5cf6 0%, #5b21b6 100%); }
+html.dark::-webkit-scrollbar-track { background: #3b0764 !important; }
+html.dark::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #7c3aed 0%, #4c1d95 100%) !important; border-radius: 10px; }
+html.dark::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #8b5cf6 0%, #5b21b6 100%) !important; }
 /* Modal — scrollbar adaptée à la couleur de la note */
 .modal-scroll-themed::-webkit-scrollbar-track { background: var(--sb-track); }
 .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 10px; }
