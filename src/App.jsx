@@ -7655,7 +7655,7 @@ export default function App() {
                 {/* Desktop inline formatting toolbar (always visible in edit mode) */}
                 {isOnline && mType === "text" && !viewMode && windowWidth >= 768 && (
                   <div
-                    className={`fmt-inline mt-2 flex flex-wrap items-center gap-1 pt-2 border-t ${
+                    className={`mt-2 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-2 border-t flex flex-wrap items-center gap-1 ${
                       dark ? "border-white/10" : "border-black/8"
                     }`}
                   >
