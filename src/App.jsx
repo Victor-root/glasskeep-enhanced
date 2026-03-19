@@ -8320,36 +8320,32 @@ export default function App() {
           </div>
 
           {/* Footer */}
-          <div className="border-t border-[var(--border-light)] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="border-t border-[var(--border-light)] p-4 flex flex-wrap items-center justify-between gap-3">
             {/* Tags chips editor */}
-            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:flex-1 gap-1.5 min-w-0">
-              {mTagList.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {mTagList.map((tag) => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-700/40 backdrop-blur-sm transition-all duration-150 hover:bg-indigo-200/90 dark:hover:bg-indigo-800/60 hover:scale-105 hover:shadow-sm"
+            <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
+              {mTagList.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-700/40 backdrop-blur-sm transition-all duration-150 hover:bg-indigo-200/90 dark:hover:bg-indigo-800/60 hover:scale-105 hover:shadow-sm"
+                >
+                  <svg className="w-3 h-3 opacity-70 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
+                  </svg>
+                  {tag}
+                  {/* Tag removal button - hidden when offline */}
+                  {isOnline && (
+                    <button
+                      className="w-3.5 h-3.5 rounded-full text-indigo-400 dark:text-indigo-300 hover:bg-red-400 dark:hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none leading-none"
+                      title={t("removeTag")}
+                      onClick={() =>
+                        setMTagList((prev) => prev.filter((t) => t !== tag))
+                      }
                     >
-                      <svg className="w-3 h-3 opacity-70 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                        <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
-                      </svg>
-                      {tag}
-                      {/* Tag removal button - hidden when offline */}
-                      {isOnline && (
-                        <button
-                          className="w-3.5 h-3.5 rounded-full text-indigo-400 dark:text-indigo-300 hover:bg-red-400 dark:hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none leading-none"
-                          title={t("removeTag")}
-                          onClick={() =>
-                            setMTagList((prev) => prev.filter((t) => t !== tag))
-                          }
-                        >
-                          ×
-                        </button>
-                      )}
-                    </span>
-                  ))}
-                </div>
-              )}
+                      ×
+                    </button>
+                  )}
+                </span>
+              ))}
               {/* Tag add button - hidden when offline */}
               {isOnline && (
                 <div className="relative">
@@ -8495,7 +8491,7 @@ export default function App() {
             </div>
 
             {/* Right controls */}
-            <div className="w-full sm:w-auto flex items-center gap-3 flex-wrap justify-end">
+            <div className="flex items-center gap-3 flex-wrap justify-end flex-shrink-0">
               {/* Color dropdown (modal) - hidden when offline */}
               {isOnline && (
                 <>
