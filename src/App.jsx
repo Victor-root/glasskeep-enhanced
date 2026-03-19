@@ -214,10 +214,10 @@ const mixWithWhite = (rgbaStr, whiteRatio = 0.8, outAlpha = 0.92) => {
   const bb = Math.round(255 * whiteRatio + b * (1 - whiteRatio));
   return `rgba(${rr}, ${gg}, ${bb}, ${outAlpha})`;
 };
-const modalBgFor = (colorKey, dark) => {
+const modalBgFor = (colorKey, dark, opaque = false) => {
   const base = bgFor(colorKey, dark);
-  if (dark) return base;
-  return mixWithWhite(solid(base), 0.8, 0.92);
+  if (dark) return opaque ? solid(base) : base;
+  return mixWithWhite(solid(base), 0.8, opaque ? 1 : 0.92);
 };
 
 const scrollColorsFor = (colorKey, dark) => {
@@ -7486,7 +7486,7 @@ export default function App() {
       >
         <div
           className="glass-card rounded-none shadow-2xl w-full h-full max-w-none sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl flex flex-col relative overflow-hidden"
-          style={{ backgroundColor: modalBgFor(mColor, dark) }}
+          style={{ backgroundColor: modalBgFor(mColor, dark, windowWidth < 640) }}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
@@ -7500,7 +7500,7 @@ export default function App() {
             {/* Sticky header (kept single line on desktop, wraps on mobile) */}
             <div
               className="sticky top-0 z-20 pt-4 modal-header-blur rounded-t-none sm:rounded-t-xl"
-              style={{ backgroundColor: modalBgFor(mColor, dark) }}
+              style={{ backgroundColor: modalBgFor(mColor, dark, windowWidth < 640) }}
             >
               <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6 pb-3">
                 <input
