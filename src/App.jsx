@@ -919,21 +919,10 @@ html.dark header.glass-card {
 
 /* Wrapper for code blocks to anchor copy button outside scroll area */
 .code-block-wrapper { position: relative; }
-/* Sticky anchor: zero-height, sticks at top, button hangs from it */
-.code-copy-anchor {
-  position: sticky;
+.code-block-wrapper .code-copy-btn {
+  position: absolute;
   top: 8px;
-  height: 0;
-  overflow: visible;
-  text-align: right;
-  z-index: 3;
-  pointer-events: none;
-}
-.code-copy-anchor .code-copy-btn {
-  display: inline-block;
-  pointer-events: auto;
-  margin-right: 8px;
-  position: relative;
+  right: 8px;
 }
 
 
@@ -7442,10 +7431,27 @@ export default function App() {
           btn.textContent = t("copied");
           setTimeout(() => (btn.textContent = t("copy")), 1200);
         });
-        const anchor = document.createElement("div");
-        anchor.className = "code-copy-anchor";
-        anchor.appendChild(btn);
-        wrapper.insertBefore(anchor, pre);
+        wrapper.appendChild(btn);
+
+        // Keep copy button visible when code block top scrolls past the modal header
+        const scrollEl = wrapper.closest(".modal-scroll-themed");
+        if (scrollEl) {
+          const stickyHeader = scrollEl.querySelector(".sticky");
+          const adjustPos = () => {
+            const headerBottom = stickyHeader
+              ? stickyHeader.getBoundingClientRect().bottom
+              : scrollEl.getBoundingClientRect().top;
+            const wrapperTop = wrapper.getBoundingClientRect().top;
+            const offset = headerBottom - wrapperTop;
+            if (offset > 8) {
+              const maxTop = wrapper.offsetHeight - btn.offsetHeight - 8;
+              btn.style.top = Math.min(offset + 8, maxTop) + "px";
+            } else {
+              btn.style.top = "8px";
+            }
+          };
+          scrollEl.addEventListener("scroll", adjustPos, { passive: true });
+        }
       });
 
       // Inline code
