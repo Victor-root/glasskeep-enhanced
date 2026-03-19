@@ -8320,9 +8320,9 @@ export default function App() {
           </div>
 
           {/* Footer */}
-          <div className="border-t border-[var(--border-light)] p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="border-t border-[var(--border-light)] p-4 flex flex-wrap items-center gap-3">
             {/* Tags chips editor */}
-            <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5 min-w-0">
               {mTagList.map((tag) => (
                 <span
                   key={tag}
@@ -8491,7 +8491,7 @@ export default function App() {
             </div>
 
             {/* Right controls */}
-            <div className="flex items-center gap-3 flex-wrap justify-end flex-shrink-0">
+            <div className="ml-auto flex items-center gap-3 flex-shrink-0">
               {/* Color dropdown (modal) - hidden when offline */}
               {isOnline && (
                 <>
