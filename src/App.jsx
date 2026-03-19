@@ -2064,11 +2064,6 @@ function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, log
           />
           <h1 className="text-3xl font-bold">Glass Keep</h1>
           <p className="text-gray-500 dark:text-gray-400">{title}</p>
-          {(loginSlogan || t("loginSlogan")) && (
-            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1 italic">
-              {loginSlogan || t("loginSlogan")}
-            </p>
-          )}
         </div>
         <div className="glass-card rounded-xl p-6 shadow-lg">{children}</div>
         <div className="mt-6 text-center">
@@ -2080,6 +2075,13 @@ function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, log
             {dark ? <Moon /> : <Sun />} {t("toggleTheme")}
           </button>
         </div>
+        {(loginSlogan || t("loginSlogan")) && (
+          <div className="mt-4 text-center">
+            <span className="glass-card inline-block rounded-full px-4 py-1.5 text-sm text-gray-600 dark:text-gray-300 shadow-sm">
+              {loginSlogan || t("loginSlogan")}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
