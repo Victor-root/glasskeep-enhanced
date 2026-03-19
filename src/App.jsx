@@ -1044,13 +1044,21 @@ html:not(.dark) .note-content pre .code-copy-btn {
 ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #ddd6fe 0%, #6d28d9 100%); }
 * { scrollbar-width: thin; scrollbar-color: #a78bfa #e3d0ff; }
 .dark * { scrollbar-color: #7c3aed #3b0764; }
+/* Descendants of html.dark */
 .dark ::-webkit-scrollbar-track { background: #3b0764; }
 .dark ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #7c3aed 0%, #4c1d95 100%); }
 .dark ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #8b5cf6 0%, #5b21b6 100%); }
+/* html element itself (main page scrollbar) */
+html.dark::-webkit-scrollbar-track { background: #3b0764; }
+html.dark::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #7c3aed 0%, #4c1d95 100%); border-radius: 10px; }
+html.dark::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #8b5cf6 0%, #5b21b6 100%); }
 /* Modal — scrollbar adaptée à la couleur de la note */
 .modal-scroll-themed::-webkit-scrollbar-track { background: var(--sb-track); }
 .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 10px; }
 .modal-scroll-themed::-webkit-scrollbar-thumb:hover { filter: brightness(1.15); }
+/* Fallback si CSS vars non résolues sur webkit (Safari) */
+html.dark .modal-scroll-themed::-webkit-scrollbar-track { background: var(--sb-track, #3b0764); }
+html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-thumb, #7c3aed); border-radius: 10px; }
 
 /* clamp for text preview */
 .line-clamp-6 {
