@@ -8422,7 +8422,7 @@ export default function App() {
                                 suppressTagBlurRef.current = true;
                                 addTags(tag);
                                 setTagInput("");
-                                modalTagInputRef.current?.blur();
+                                setModalTagFocused(false);
                               }}
                               className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-indigo-50/80 dark:hover:bg-indigo-900/30 text-sm text-gray-700 dark:text-gray-200 flex items-center justify-between gap-2 transition-all duration-150 group cursor-pointer"
                             >
@@ -8449,7 +8449,7 @@ export default function App() {
                                   suppressTagBlurRef.current = true;
                                   addTags(trimmed);
                                   setTagInput("");
-                                  modalTagInputRef.current?.blur();
+                                  setModalTagFocused(false);
                                 }}
                                 className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-emerald-50/80 dark:hover:bg-emerald-900/20 text-sm flex items-center gap-2 transition-all duration-150 group cursor-pointer"
                               >
