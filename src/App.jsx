@@ -8274,17 +8274,20 @@ export default function App() {
           {/* Footer */}
           <div className="border-t border-[var(--border-light)] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             {/* Tags chips editor */}
-            <div className="flex items-center gap-2 flex-1 flex-wrap min-w-0">
+            <div className="flex items-center gap-1.5 flex-1 flex-wrap min-w-0">
               {mTagList.map((tag) => (
                 <span
                   key={tag}
-                  className="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 text-xs font-medium px-2.5 py-0.5 rounded-full inline-flex items-center gap-1"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-700/40 backdrop-blur-sm transition-all duration-150 hover:bg-indigo-200/90 dark:hover:bg-indigo-800/60 hover:scale-105 hover:shadow-sm"
                 >
+                  <svg className="w-3 h-3 opacity-70 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
+                  </svg>
                   {tag}
                   {/* Tag removal button - hidden when offline */}
                   {isOnline && (
                     <button
-                      className="ml-1 opacity-70 hover:opacity-100 focus:outline-none"
+                      className="w-3.5 h-3.5 rounded-full bg-indigo-300/50 dark:bg-indigo-600/50 hover:bg-red-400 dark:hover:bg-red-500 flex items-center justify-center text-[10px] leading-none transition-all duration-150 cursor-pointer focus:outline-none"
                       title={t("removeTag")}
                       onClick={() =>
                         setMTagList((prev) => prev.filter((t) => t !== tag))
@@ -8332,7 +8335,7 @@ export default function App() {
                           width: Math.max(rect.width, 200),
                           zIndex: 99999,
                         }}
-                        className="rounded-lg shadow-lg bg-white/95 dark:bg-gray-800/95 backdrop-blur border border-gray-200 dark:border-gray-600 max-h-40 overflow-y-auto"
+                        className="rounded-xl shadow-xl bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-indigo-100/60 dark:border-indigo-800/40 max-h-44 overflow-y-auto"
                       >
                         {suggestions.map((tag) => (
                           <button
@@ -8343,9 +8346,14 @@ export default function App() {
                               addTags(tag);
                               setTagInput("");
                             }}
-                            className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm text-gray-800 dark:text-gray-200 first:rounded-t-lg last:rounded-b-lg"
+                            className="w-full text-left px-3 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-sm text-gray-800 dark:text-gray-200 first:rounded-t-xl last:rounded-b-xl flex items-center gap-2 transition-colors duration-100"
                           >
-                            🏷️ {tag}
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-700/40">
+                              <svg className="w-2.5 h-2.5 opacity-70 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
+                              </svg>
+                              {tag}
+                            </span>
                           </button>
                         ))}
                       </div>,
