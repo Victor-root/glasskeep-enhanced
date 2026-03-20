@@ -1840,7 +1840,7 @@ function NoteCard({
       data-group={group}
     >
       {multiMode && (
-        <div className="absolute top-3 right-3 flex items-center gap-2">
+        <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
           {/* Modern checkbox */}
           <div
             className={`w-6 h-6 rounded-md border-2 flex items-center justify-center cursor-pointer transition-all ${
