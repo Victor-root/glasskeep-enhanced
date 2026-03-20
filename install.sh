@@ -2,7 +2,7 @@
 # =============================================================================
 #  GlassKeep — Install / Update / Uninstall script
 #  Supports: Debian, Ubuntu, Proxmox LXC (Debian-based)
-#  Repo   : https://github.com/Victor-root/react-glass-keep.git
+#  Repo   : https://github.com/Victor-root/glasskeep-enhanced.git
 #  Install: /opt/glass-keep/app
 #  Service: glass-keep (systemd)
 # =============================================================================
@@ -19,7 +19,7 @@ BOLD='\033[1m'
 RESET='\033[0m'
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-REPO_URL="https://github.com/Victor-root/react-glass-keep.git"
+REPO_URL="https://github.com/Victor-root/glasskeep-enhanced.git"
 INSTALL_DIR="/opt/glass-keep/app"
 DATA_DIR="/opt/glass-keep/data"
 ENV_FILE="/opt/glass-keep/.env"
