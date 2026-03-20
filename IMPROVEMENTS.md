@@ -196,11 +196,9 @@ Integration of a small local AI model for suggestions and assistant features.
 - **Information**: Model size, CPU usage, background download
 - **Toast**: Notification after activation
 
-### Sharp Module - Docker Fix
-- **Issue**: Sharp module using wrong runtime in Docker
-- **Solution**:
-  - Installation of `libvips-dev`
-  - `npm rebuild sharp` in Dockerfile
+### Sharp Module Fix
+- **Issue**: Sharp module using wrong runtime
+- **Solution**: Installation of `libvips-dev` and `npm rebuild sharp`
 - **Impact**: Image processing (thumbnails, etc.) works correctly
 
 ### Composer Icons
@@ -219,7 +217,6 @@ Integration of a small local AI model for suggestions and assistant features.
 ### Modified Files
 - **src/App.jsx**: +118 lines (UI, i18n, responsive)
 - **src/DrawingCanvas.jsx**: +40 lines (i18n, phone number highlighting)
-- **Dockerfile**: AI and Sharp dependencies
 - **Various**: Translations and styles
 
 ### Key Commits
@@ -275,18 +272,12 @@ To apply all these improvements to a new instance:
    npm run build
    ```
 
-3. **Docker (optional)**
-   ```bash
-   docker build -t glasskeep .
-   docker run -p 3000:3000 -v ./data:/app/data glasskeep
-   ```
-
-4. **i18n Configuration**
+3. **i18n Configuration**
    - FR/EN translations are built-in
    - Language switcher in settings
    - LocalStorage saves preference
 
-5. **AI Assistant (optional)**
+4. **AI Assistant (optional)**
    - Disabled by default
    - Enable via Settings → AI Assistant
    - ~700MB downloaded on-demand

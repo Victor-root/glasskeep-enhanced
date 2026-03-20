@@ -25,7 +25,7 @@ async function initServerAI() {
 
     // Configure env for server
     env.allowLocalModels = false;
-    // Cache directory in Docker
+    // Cache directory for AI models
     env.cacheDir = path.join(__dirname, '..', 'data', 'ai-cache');
 
     console.log("Loading high-stability AI model (Llama-3.2-1B)...");
@@ -101,7 +101,7 @@ const dbFile =
   process.env.SQLITE_FILE ||
   path.join(__dirname, "data.sqlite");
 
-// Ensure the directory for the DB exists (helps on Windows/macOS + Docker bind mounts)
+// Ensure the directory for the DB exists
 try {
   fs.mkdirSync(path.dirname(dbFile), { recursive: true });
 } catch (e) {
