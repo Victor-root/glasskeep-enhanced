@@ -2083,7 +2083,13 @@ function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, log
           </div>
         )}
       </div>
-    </div>
+    <p className="absolute bottom-4 left-0 right-0 text-center text-xs text-gray-400 dark:text-gray-600 z-10 select-none">
+      Open source project &mdash; original by{" "}
+      <a href="https://github.com/nikunjsingh93" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">nikunjsingh93</a>
+      {" · "}forked &amp; maintained by{" "}
+      <a href="https://github.com/Victor-root/react-glass-keep" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">Victor-root</a>
+    </p>
+  </div>
   );
 }
 
