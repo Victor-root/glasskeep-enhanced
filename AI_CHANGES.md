@@ -24,8 +24,7 @@ Modified the application to prevent automatic AI model downloads and require use
 - Returns success/error status
 
 #### Fixed Sharp Module Issue
-- Added `libvips-dev` installation in Dockerfile runtime stage
-- Added `npm rebuild sharp` to ensure correct platform binaries
+- Ensured `libvips-dev` is installed and `npm rebuild sharp` runs for correct platform binaries
 - This fixes the "sharp module using the linux-x64 runtime" error
 
 ### 2. Client-side Changes (`src/App.jsx`)
@@ -45,13 +44,6 @@ Modified the application to prevent automatic AI model downloads and require use
 
 #### Updated Description
 - Changed "tiny local model" to "server-side model" for accuracy
-
-### 3. Dockerfile Changes
-
-#### Runtime Dependencies
-- Added `libvips-dev` package installation
-- Added `npm rebuild sharp` command
-- Ensures sharp module works correctly in Docker container
 
 ## User Experience Flow
 
@@ -82,11 +74,9 @@ Modified the application to prevent automatic AI model downloads and require use
 2. **User Control**: Users explicitly opt-in to AI features
 3. **Transparency**: Users are informed about download size and resource usage
 4. **Bandwidth Savings**: Model only downloads if user wants to use AI
-5. **Docker Image Size**: Base image remains lighter without pre-downloaded model
-
 ## Technical Notes
 
-- AI model is cached in `/app/data/ai-cache` directory in Docker
+- AI model is cached in the `data/ai-cache` directory
 - Model uses 4-bit quantization (~700MB instead of ~2.8GB)
 - First AI query after enabling will trigger model download
 - Subsequent queries use cached model
