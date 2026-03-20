@@ -5,6 +5,13 @@
 
 set -e  # Exit on any error
 
+# Ensure JWT_SECRET is provided
+if [ -z "${JWT_SECRET:-}" ]; then
+  echo "❌ JWT_SECRET is not set. Export it before running this script."
+  echo "   Example: export JWT_SECRET=\$(openssl rand -hex 32)"
+  exit 1
+fi
+
 echo "🧹 Removing existing glass-keep container (if exists)..."
 docker rm -f glass-keep 2>/dev/null || true
 
@@ -18,7 +25,7 @@ docker run -d \
   -p 8080:8080 \
   -e NODE_ENV=production \
   -e API_PORT=8080 \
-  -e JWT_SECRET=dev-please-change \
+  -e JWT_SECRET="$JWT_SECRET" \
   -e DB_FILE=/app/data/notes.db \
   -e ADMIN_EMAILS=adminniku \
   -v "$HOME/.glass-keep:/app/data" \
