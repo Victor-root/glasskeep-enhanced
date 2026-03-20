@@ -2320,6 +2320,19 @@ function TagSidebar({
   const isAllNotes = activeTag === null && activeTagFilters.length === 0;
   const isAllImages = activeTag === ALL_IMAGES;
 
+  // Long-press support for multi-tag selection on touch devices
+  const longPressTimer = useRef(null);
+  const longPressTriggered = useRef(false);
+
+  const handleTagTouchStart = (tag) => {
+    longPressTriggered.current = false;
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true;
+      onSelect(tag, { ctrlKey: true });
+    }, 500);
+  };
+  const handleTagTouchEnd = () => clearTimeout(longPressTimer.current);
+
   // Suppress slide animation when sidebar first becomes permanent (server load)
   const hasBeenPermanentRef = useRef(permanent);
   const [skipTransition, setSkipTransition] = useState(false);
@@ -2408,12 +2421,19 @@ function TagSidebar({
                 key={tag}
                 className={`w-full text-left px-3 py-2 rounded-md mb-1 flex items-center justify-between cursor-pointer ${active ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
                 onClick={(e) => {
+                  if (longPressTriggered.current) {
+                    longPressTriggered.current = false;
+                    return;
+                  }
                   onSelect(tag, e);
                   // Ne ferme la sidebar que si c'est un clic simple (pas Ctrl/Cmd+clic)
                   if (!e.ctrlKey && !e.metaKey) {
                     onClose();
                   }
                 }}
+                onTouchStart={() => handleTagTouchStart(tag)}
+                onTouchEnd={handleTagTouchEnd}
+                onTouchCancel={handleTagTouchEnd}
                 title={tag}
               >
                 <span className="flex items-center gap-2 truncate"><TagIcon />{tag}</span>
