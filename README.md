@@ -123,7 +123,7 @@ The script output language adapts to your system locale (English/French).
 
 ```bash
 npm install
-ADMIN_EMAILS="admin" npm run dev
+JWT_SECRET="$(openssl rand -hex 32)" ADMIN_EMAILS="admin" npm run dev
 ```
 
 ---
@@ -142,7 +142,7 @@ Missing keys will fall back to English.
 
 ## 🔐 Security
 
-- Change `JWT_SECRET` in production
+- `JWT_SECRET` is **automatically generated** by the install script and saved in `/etc/glass-keep.env` — no manual action required. If you run the server outside of the install script, you must set it yourself (the server will refuse to start without a valid, non-placeholder secret). Generate one with: `openssl rand -hex 32`
 - Serve over HTTPS for PWA support
 - Treat the recovery secret key like a password
 
