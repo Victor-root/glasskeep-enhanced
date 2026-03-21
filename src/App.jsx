@@ -9118,7 +9118,7 @@ export default function App() {
             onClick={(e) => e.stopPropagation()}
           />
           {/* Caption */}
-          <div className="absolute top-4 left-0 right-0 z-10 text-xs text-white text-center px-28 truncate">
+          <div className="absolute top-4 left-0 right-0 z-10 text-xs text-white text-center hidden sm:block">
             {mImages[imgViewIndex].name || `image-${imgViewIndex + 1}`}
             {mImages.length > 1
               ? `  (${imgViewIndex + 1}/${mImages.length})`
