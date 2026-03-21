@@ -45,6 +45,7 @@ function trColorName(name) {
     "mint": "colorMint",
     "sky": "colorSky",
     "sand": "colorSand",
+    "mauve": "colorMauve",
   };
   return map[v] ? t(map[v]) : name;
 }
@@ -4535,22 +4536,28 @@ function AdminView({ dark }) {
 function TooltipPortal() {
   const [tooltip, setTooltip] = useState(null);
   useEffect(() => {
+    let timer = null;
     const show = (e) => {
       const el = e.target.closest('[data-tooltip]');
       if (!el) return;
       const label = el.getAttribute('data-tooltip');
       if (!label) return;
-      const rect = el.getBoundingClientRect();
-      const below = rect.top < 60;
-      setTooltip({ label, x: rect.left + rect.width / 2, y: below ? rect.bottom : rect.top, below });
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const rect = el.getBoundingClientRect();
+        const below = rect.top < 60;
+        setTooltip({ label, x: rect.left + rect.width / 2, y: below ? rect.bottom : rect.top, below });
+      }, 600);
     };
     const hide = (e) => {
+      clearTimeout(timer);
       const el = e.target.closest('[data-tooltip]');
       if (el && !el.contains(e.relatedTarget)) setTooltip(null);
     };
     document.addEventListener('mouseover', show);
     document.addEventListener('mouseout', hide);
     return () => {
+      clearTimeout(timer);
       document.removeEventListener('mouseover', show);
       document.removeEventListener('mouseout', hide);
     };
