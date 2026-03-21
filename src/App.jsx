@@ -1185,7 +1185,7 @@ html.dark .login-deco-card {
 
 /** ---------- Image compression (client) ---------- */
 async function fileToCompressedDataURL(file, maxDim = 1600, quality = 0.85) {
-  const isPng = file.type === "image/png";
+  const hasAlpha = ["image/png", "image/webp", "image/gif", "image/avif"].includes(file.type);
   const dataUrl = await new Promise((res, rej) => {
     const fr = new FileReader();
     fr.onload = () => res(fr.result);
@@ -1207,7 +1207,7 @@ async function fileToCompressedDataURL(file, maxDim = 1600, quality = 0.85) {
   canvas.height = targetH;
   const ctx = canvas.getContext("2d");
   ctx.drawImage(img, 0, 0, targetW, targetH);
-  return isPng
+  return hasAlpha
     ? canvas.toDataURL("image/png")
     : canvas.toDataURL("image/jpeg", quality);
 }
