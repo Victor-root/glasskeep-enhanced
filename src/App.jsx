@@ -1737,13 +1737,13 @@ function DrawingPreview({ data, width, height, darkMode = false }) {
   }, [data, width, height, darkMode]);
 
   return (
-    <div className="flex items-center justify-center h-32 rounded overflow-hidden">
+    <div className="w-[90%] mx-auto rounded overflow-hidden">
       <canvas
         ref={canvasRef}
         width={width}
         height={height}
         className="block"
-        style={{ maxWidth: "100%", maxHeight: "100%" }}
+        style={{ width: "100%", height: "auto" }}
       />
     </div>
   );
@@ -1943,8 +1943,8 @@ function NoteCard({
       ) : isDraw ? (
         <DrawingPreview
           data={n.content}
-          width={100}
-          height={150}
+          width={800}
+          height={600}
           darkMode={dark}
         />
       ) : (
