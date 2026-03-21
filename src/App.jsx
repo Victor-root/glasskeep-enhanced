@@ -4563,7 +4563,8 @@ function TooltipPortal() {
       setTooltip(null);
     };
 
-    // Mobile: show only after 2s long press, auto-hide after 2s
+    // Mobile: show only after 2s long press, stay visible 2s after release
+    let hideTimer = null;
     const touchStart = (e) => {
       const el = e.target.closest('[data-tooltip]');
       if (!el) return;
@@ -4572,26 +4573,29 @@ function TooltipPortal() {
         const data = getTooltipData(el);
         if (data) {
           setTooltip(data);
-          setTimeout(() => setTooltip(null), 2000);
+          clearTimeout(hideTimer);
+          hideTimer = setTimeout(() => setTooltip(null), 2500);
         }
       }, 2000);
     };
+    const touchEnd = () => clearTimeout(timer); // cancel pending show, keep visible if already shown
     const touchCancel = () => {
       clearTimeout(timer);
-      setTooltip(null);
+      setTooltip(null); // scroll/move cancels immediately
     };
 
     document.addEventListener('pointerover', show);
     document.addEventListener('pointerout', hide);
     document.addEventListener('touchstart', touchStart, { passive: true });
-    document.addEventListener('touchend', touchCancel);
+    document.addEventListener('touchend', touchEnd);
     document.addEventListener('touchmove', touchCancel, { passive: true });
     return () => {
       clearTimeout(timer);
+      clearTimeout(hideTimer);
       document.removeEventListener('pointerover', show);
       document.removeEventListener('pointerout', hide);
       document.removeEventListener('touchstart', touchStart);
-      document.removeEventListener('touchend', touchCancel);
+      document.removeEventListener('touchend', touchEnd);
       document.removeEventListener('touchmove', touchCancel);
     };
   }, []);
