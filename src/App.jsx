@@ -4599,9 +4599,27 @@ function TooltipPortal() {
       document.removeEventListener('touchmove', touchCancel);
     };
   }, []);
+  const boxRef = useRef(null);
+  useLayoutEffect(() => {
+    if (!tooltip || !boxRef.current) return;
+    const el = boxRef.current;
+    const rect = el.getBoundingClientRect();
+    const pad = 8;
+    const vw = window.innerWidth;
+    let shift = 0;
+    if (rect.left < pad) shift = pad - rect.left;
+    else if (rect.right > vw - pad) shift = vw - pad - rect.right;
+    if (shift !== 0) {
+      el.style.transform = tooltip.below
+        ? `translateX(calc(-50% + ${shift}px))`
+        : `translate(calc(-50% + ${shift}px), -100%)`;
+    }
+  }, [tooltip]);
+
   if (!tooltip) return null;
   return createPortal(
     <div
+      ref={boxRef}
       className="pointer-events-none fixed z-[10001]"
       style={tooltip.below
         ? { top: tooltip.y + 8, left: tooltip.x, transform: 'translateX(-50%)' }
