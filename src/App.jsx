@@ -1926,7 +1926,7 @@ function NoteCard({
           <img
             src={mainImg.src}
             alt={mainImg.name || "note image"}
-            className="w-full h-40 object-cover"
+            className="w-full h-40 object-cover object-center"
           />
           {imgs.length > 1 && (
             <span className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">
