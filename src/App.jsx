@@ -45,6 +45,7 @@ function trColorName(name) {
     "mint": "colorMint",
     "sky": "colorSky",
     "sand": "colorSand",
+    "mauve": "colorMauve",
   };
   return map[v] ? t(map[v]) : name;
 }
@@ -1306,7 +1307,7 @@ function ChecklistRow({
       {(showRemove || !readOnly) && (
         <button
           className={`${removeVisibility} transition-opacity text-gray-500 hover:text-red-600 rounded-full border border-[var(--border-light)] flex items-center justify-center cursor-pointer ${removeSize}`}
-          title={t("removeItem")}
+          data-tooltip={t("removeItem")}
           onClick={onRemove}
         >
           ✕
@@ -1319,7 +1320,7 @@ const ColorDot = ({ name, selected, onClick, darkMode }) => (
   <button
     type="button"
     onClick={onClick}
-    title={trColorName(name)}
+    data-tooltip={trColorName(name)}
     aria-label={trColorName(name)}
     className={`w-6 h-6 rounded-full border-2 border-transparent focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${name === "default" ? "flex items-center justify-center" : ""} ${selected ? "ring-2 ring-indigo-500" : ""}`}
     style={{
@@ -1737,13 +1738,13 @@ function DrawingPreview({ data, width, height, darkMode = false }) {
   }, [data, width, height, darkMode]);
 
   return (
-    <div className="flex items-center justify-center h-32 rounded overflow-hidden">
+    <div className="w-[90%] mx-auto rounded overflow-hidden">
       <canvas
         ref={canvasRef}
         width={width}
         height={height}
         className="block"
-        style={{ maxWidth: "100%", maxHeight: "100%" }}
+        style={{ width: "100%", height: "auto" }}
       />
     </div>
   );
@@ -1876,7 +1877,7 @@ function NoteCard({
       {((n.collaborators !== undefined && n.collaborators !== null) ||
         (n.user_id && currentUser && n.user_id !== currentUser.id)) && (
         <div className="absolute bottom-3 right-3 z-10">
-          <div className="relative" title={t("collaboratedNote")}>
+          <div className="relative" data-tooltip={t("collaboratedNote")}>
             <svg
               className="w-5 h-5 text-black dark:text-white"
               fill="currentColor"
@@ -1908,7 +1909,7 @@ function NoteCard({
               togglePin(n.id, !n.pinned);
             }}
             className="relative rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            title={n.pinned ? t("unpin") : t("pin")}
+            data-tooltip={n.pinned ? t("unpin") : t("pin")}
             disabled={!!disablePin}
           >
             {n.pinned ? <PinFilled /> : <PinOutline />}
@@ -1943,8 +1944,8 @@ function NoteCard({
       ) : isDraw ? (
         <DrawingPreview
           data={n.content}
-          width={100}
-          height={150}
+          width={800}
+          height={600}
           darkMode={dark}
         />
       ) : (
@@ -2070,7 +2071,7 @@ function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, log
           <button
             onClick={onToggleDark}
             className={`inline-flex items-center gap-2 text-sm ${dark ? "text-gray-300" : "text-gray-700"} hover:underline`}
-            title={t("toggleDarkMode")}
+            data-tooltip={t("toggleDarkMode")}
           >
             {dark ? <Moon /> : <Sun />} {t("toggleTheme")}
           </button>
@@ -2120,7 +2121,7 @@ function LoginView({
 
   return (
     <AuthShell
-      title={t("signInToYourAccount")}
+      data-tooltip={t("signInToYourAccount")}
       dark={dark}
       onToggleDark={onToggleDark}
       floatingCardsEnabled={floatingCardsEnabled}
@@ -2185,7 +2186,7 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin, floatingCardsEn
 
   return (
     <AuthShell
-      title={t("createNewAccount")}
+      data-tooltip={t("createNewAccount")}
       dark={dark}
       onToggleDark={onToggleDark}
       floatingCardsEnabled={floatingCardsEnabled}
@@ -2254,7 +2255,7 @@ function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin, floating
 
   return (
     <AuthShell
-      title={t("signInWithSecretKey")}
+      data-tooltip={t("signInWithSecretKey")}
       dark={dark}
       onToggleDark={onToggleDark}
       floatingCardsEnabled={floatingCardsEnabled}
@@ -2380,7 +2381,7 @@ function TagSidebar({
             <button
               className="p-2 rounded hover:bg-black/5 dark:hover:bg-white/10"
               onClick={onClose}
-              title={t("close")}
+              data-tooltip={t("close")}
             >
               <CloseIcon />
             </button>
@@ -2440,7 +2441,7 @@ function TagSidebar({
                 onTouchStart={() => handleTagTouchStart(tag)}
                 onTouchEnd={handleTagTouchEnd}
                 onTouchCancel={handleTagTouchEnd}
-                title={tag}
+                data-tooltip={tag}
               >
                 <span className="flex items-center gap-2 truncate"><TagIcon />{tag}</span>
                 <span className="text-xs opacity-70">{count}</span>
@@ -2557,7 +2558,7 @@ function SettingsPanel({
           <button
             className="p-2 rounded hover:bg-black/5 dark:hover:bg-white/10"
             onClick={onClose}
-            title={t("close")}
+            data-tooltip={t("close")}
           >
             <CloseIcon />
           </button>
@@ -2928,7 +2929,7 @@ function AdminPanel({
           <button
             className="p-2 rounded hover:bg-black/5 dark:hover:bg-white/10"
             onClick={onClose}
-            title={t("close")}
+            data-tooltip={t("close")}
           >
             <CloseIcon />
           </button>
@@ -3383,7 +3384,7 @@ function NotesUI({
               type="button"
               onClick={() => setShowMultiColorPop((v) => !v)}
               className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
-              title={t("color")}
+              data-tooltip={t("color")}
             >{t("colorEmoji")}</button>
             <Popover
               anchorRef={multiColorBtnRef}
@@ -3431,7 +3432,7 @@ function NotesUI({
           </div>
           <button
             className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-            title={t("exitMultiSelect")}
+            data-tooltip={t("exitMultiSelect")}
             onClick={onExitMulti}
           >
             <CloseIcon />
@@ -3453,7 +3454,7 @@ function NotesUI({
             <button
               onClick={openSidebar}
               className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              title={t("openTags")}
+              data-tooltip={t("openTags")}
               aria-label={t("openTags")}
             >
               <Hamburger />
@@ -3508,7 +3509,7 @@ function NotesUI({
               {localAiEnabled && search.trim().length > 0 && (
                 <button
                   type="button"
-                  title={t("askAi")}
+                  data-tooltip={t("askAi")}
                   className="h-7 w-7 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
                   onClick={() => onAiSearch?.(search)}
                 >
@@ -3542,7 +3543,7 @@ function NotesUI({
                   ? "text-gray-500 hover:bg-white/10"
                   : "text-gray-400 hover:bg-gray-100"
             }`}
-            title={floatingCardsEnabled ? t("floatingCardsOn") : t("floatingCardsOff")}
+            data-tooltip={floatingCardsEnabled ? t("floatingCardsOn") : t("floatingCardsOff")}
             aria-label={t("toggleFloatingCards")}
           >
             <FloatingCardsIcon />
@@ -3566,7 +3567,7 @@ function NotesUI({
             ref={headerBtnRef}
             onClick={() => setHeaderMenuOpen((v) => !v)}
             className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
-            title={t("menu")}
+            data-tooltip={t("menu")}
             aria-haspopup="menu"
             aria-expanded={headerMenuOpen}
           >
@@ -3711,7 +3712,7 @@ function NotesUI({
                     setSearch("");
                   }}
                   className="ml-auto p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
-                  title={t("clearResponse")}
+                  data-tooltip={t("clearResponse")}
                 >
                   <CloseIcon />
                 </button>
@@ -3867,7 +3868,7 @@ function NotesUI({
                             className="h-16 w-24 object-cover rounded-md border border-[var(--border-light)]"
                           />
                           <button
-                            title={t("removeImage")}
+                            data-tooltip={t("removeImage")}
                             className="absolute -top-2 -right-2 bg-black/70 text-white rounded-full w-5 h-5 text-xs"
                             onClick={() =>
                               setComposerImages((prev) =>
@@ -4044,7 +4045,7 @@ function NotesUI({
                             type="button"
                             onClick={() => setShowComposerFmt((v) => !v)}
                             className="px-2 py-1 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2 text-sm"
-                            title={t("formatting")}
+                            data-tooltip={t("formatting")}
                           >
                             <FormatIcon />{t("formatting")}</button>
                           <Popover
@@ -4073,7 +4074,7 @@ function NotesUI({
                               ? "bg-indigo-600 text-white border-indigo-600"
                               : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
                           }`}
-                          title={t("textNote")}
+                          data-tooltip={t("textNote")}
                         >
                           <TextNoteIcon />
                         </button>
@@ -4085,7 +4086,7 @@ function NotesUI({
                               ? "bg-indigo-600 text-white border-indigo-600"
                               : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
                           }`}
-                          title={t("checklist")}
+                          data-tooltip={t("checklist")}
                         >
                           <ChecklistIcon />
                         </button>
@@ -4097,7 +4098,7 @@ function NotesUI({
                               ? "bg-indigo-600 text-white border-indigo-600"
                               : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
                           }`}
-                          title={t("drawing")}
+                          data-tooltip={t("drawing")}
                         >
                           <BrushIcon />
                         </button>
@@ -4109,7 +4110,7 @@ function NotesUI({
                         type="button"
                         onClick={() => setShowColorPop((v) => !v)}
                         className="w-6 h-6 rounded-full border-2 border-[var(--border-light)] hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 flex items-center justify-center"
-                        title={t("color")}
+                        data-tooltip={t("color")}
                         style={{
                           backgroundColor:
                             composerColor === "default"
@@ -4182,7 +4183,7 @@ function NotesUI({
                       <button
                         onClick={() => composerFileRef.current?.click()}
                         className="px-2 py-1 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 flex-shrink-0 text-lg"
-                        title={t("addImages")}
+                        data-tooltip={t("addImages")}
                       >
                         <AddImageIcon />
                       </button>
@@ -4512,7 +4513,7 @@ function AdminView({ dark }) {
                           onConfirm: () => removeUser(u.id),
                         });
                       }}
-                      title={t("deleteUser")}
+                      data-tooltip={t("deleteUser")}
                     >{t("delete")}</button>
                   </td>
                 </tr>
@@ -4532,6 +4533,108 @@ function AdminView({ dark }) {
 }
 
 /** ---------- App ---------- */
+function TooltipPortal() {
+  const [tooltip, setTooltip] = useState(null);
+  useEffect(() => {
+    let timer = null;
+
+    const getTooltipData = (el) => {
+      const label = el.getAttribute('data-tooltip');
+      if (!label) return null;
+      const rect = el.getBoundingClientRect();
+      const below = rect.top < 60;
+      return { label, x: rect.left + rect.width / 2, y: below ? rect.bottom : rect.top, below };
+    };
+
+    // Desktop: mouse pointer only (pointerType === 'mouse' excludes touch/pen)
+    const show = (e) => {
+      if (e.pointerType !== 'mouse') return;
+      const el = e.target.closest('[data-tooltip]');
+      if (!el) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const data = getTooltipData(el);
+        if (data) setTooltip(data);
+      }, 600);
+    };
+    const hide = (e) => {
+      if (e.pointerType !== 'mouse') return;
+      clearTimeout(timer);
+      setTooltip(null);
+    };
+
+    // Mobile: show only after 2s long press, stay visible 2s after release
+    let hideTimer = null;
+    const touchStart = (e) => {
+      const el = e.target.closest('[data-tooltip]');
+      if (!el) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const data = getTooltipData(el);
+        if (data) {
+          setTooltip(data);
+          clearTimeout(hideTimer);
+          hideTimer = setTimeout(() => setTooltip(null), 5000);
+        }
+      }, 1000);
+    };
+    const touchEnd = () => clearTimeout(timer); // cancel pending show, keep visible if already shown
+    const touchCancel = () => {
+      clearTimeout(timer);
+      setTooltip(null); // scroll/move cancels immediately
+    };
+
+    document.addEventListener('pointerover', show);
+    document.addEventListener('pointerout', hide);
+    document.addEventListener('touchstart', touchStart, { passive: true });
+    document.addEventListener('touchend', touchEnd);
+    document.addEventListener('touchmove', touchCancel, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(hideTimer);
+      document.removeEventListener('pointerover', show);
+      document.removeEventListener('pointerout', hide);
+      document.removeEventListener('touchstart', touchStart);
+      document.removeEventListener('touchend', touchEnd);
+      document.removeEventListener('touchmove', touchCancel);
+    };
+  }, []);
+  const boxRef = useRef(null);
+  useLayoutEffect(() => {
+    if (!tooltip || !boxRef.current) return;
+    const el = boxRef.current;
+    const rect = el.getBoundingClientRect();
+    const pad = 8;
+    const vw = window.innerWidth;
+    let shift = 0;
+    if (rect.left < pad) shift = pad - rect.left;
+    else if (rect.right > vw - pad) shift = vw - pad - rect.right;
+    if (shift !== 0) {
+      el.style.transform = tooltip.below
+        ? `translateX(calc(-50% + ${shift}px))`
+        : `translate(calc(-50% + ${shift}px), -100%)`;
+    }
+  }, [tooltip]);
+
+  if (!tooltip) return null;
+  return createPortal(
+    <div
+      ref={boxRef}
+      className="pointer-events-none fixed z-[10001]"
+      style={tooltip.below
+        ? { top: tooltip.y + 8, left: tooltip.x, transform: 'translateX(-50%)' }
+        : { top: tooltip.y - 8, left: tooltip.x, transform: 'translate(-50%, -100%)' }
+      }
+    >
+      <div className="px-2.5 py-1 text-xs font-medium text-white bg-gray-800 rounded-lg whitespace-nowrap shadow-xl">
+        {tooltip.label}
+        <div className={`absolute left-1/2 -translate-x-1/2 border-4 border-transparent ${tooltip.below ? 'bottom-full border-b-gray-800' : 'top-full border-t-gray-800'}`} />
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function App() {
   const [route, setRoute] = useState(window.location.hash || "#/login");
 
@@ -7684,7 +7787,7 @@ export default function App() {
                   {/* Collaboration button - always visible */}
                   <button
                     className="rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 relative"
-                    title={t("collaborate")}
+                    data-tooltip={t("collaborate")}
                     onClick={async () => {
                       setCollaborationModalOpen(true);
                       if (activeId) {
@@ -7719,7 +7822,7 @@ export default function App() {
                         setViewMode((v) => !v);
                         setShowModalFmt(false);
                       }}
-                      title={
+                      data-tooltip={
                         viewMode ? t("switchToEditMode") : t("switchToViewMode")
                       }
                     >
@@ -7733,7 +7836,7 @@ export default function App() {
                       <button
                         ref={modalFmtBtnRef}
                         className="rounded-full p-2.5 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        title={t("formatting")}
+                        data-tooltip={t("formatting")}
                         onClick={(e) => {
                           e.stopPropagation();
                           setShowModalFmt((v) => !v);
@@ -7763,7 +7866,7 @@ export default function App() {
                       <button
                         ref={modalMenuBtnRef}
                         className="rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        title={t("moreOptions")}
+                        data-tooltip={t("moreOptions")}
                         onClick={(e) => {
                           e.stopPropagation();
                           setModalMenuOpen((v) => !v);
@@ -7826,7 +7929,7 @@ export default function App() {
                   {isOnline && tagFilter !== "ARCHIVED" && (
                     <button
                       className="rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      title={t("pinUnpin")}
+                      data-tooltip={t("pinUnpin")}
                       onClick={() =>
                         activeId != null &&
                         togglePin(
@@ -7847,7 +7950,7 @@ export default function App() {
 
                   <button
                     className="rounded-full p-2.5 opacity-70 hover:opacity-100 focus:outline-none"
-                    title={t("close")}
+                    data-tooltip={t("close")}
                     onClick={closeModal}
                   >
                     <CloseIcon />
@@ -7904,7 +8007,7 @@ export default function App() {
                     />
                     {isOnline && (
                       <button
-                        title={t("removeImage")}
+                        data-tooltip={t("removeImage")}
                         className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full w-7 h-7 text-sm flex items-center justify-center transition-opacity"
                         onClick={() =>
                           setMImages((prev) =>
@@ -8415,7 +8518,7 @@ export default function App() {
                   {isOnline && (
                     <button
                       className="w-3.5 h-3.5 rounded-full text-indigo-400 dark:text-indigo-300 hover:bg-red-400 dark:hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none leading-none"
-                      title={t("removeTag")}
+                      data-tooltip={t("removeTag")}
                       onClick={() =>
                         setMTagList((prev) => prev.filter((t) => t !== tag))
                       }
@@ -8579,7 +8682,7 @@ export default function App() {
                     type="button"
                     onClick={() => setShowModalColorPop((v) => !v)}
                     className="w-6 h-6 rounded-full border-2 border-[var(--border-light)] hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 flex items-center justify-center"
-                    title={t("color")}
+                    data-tooltip={t("color")}
                     style={{
                       backgroundColor:
                         mColor === "default"
@@ -8648,7 +8751,7 @@ export default function App() {
                   <button
                     onClick={() => modalFileRef.current?.click()}
                     className="px-2 py-1 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-lg"
-                    title={t("addImages")}
+                    data-tooltip={t("addImages")}
                   >
                     <AddImageIcon />
                   </button>
@@ -8772,7 +8875,7 @@ export default function App() {
                                         );
                                       }}
                                       className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                                      title={
+                                      data-tooltip={
                                         collab.id === currentUser?.id
                                           ? "Remove yourself"
                                           : "Remove collaborator"
@@ -8794,8 +8897,7 @@ export default function App() {
                       {isOwner && (
                         <>
                           <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                            Enter the username of the person you want to
-                            collaborate with on this note.
+                            {t("collaborateInstructions")}
                           </p>
                           <div ref={collaboratorInputRef} className="relative">
                             <input
@@ -8938,7 +9040,7 @@ export default function App() {
           <div className="absolute top-4 right-4 flex items-center gap-2">
             <button
               className="px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20"
-              title={t("downloadShortcut")}
+              data-tooltip={t("downloadShortcut")}
               onClick={async (e) => {
                 e.stopPropagation();
                 const im = mImages[imgViewIndex];
@@ -8956,7 +9058,7 @@ export default function App() {
             </button>
             <button
               className="px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20"
-              title={t("closeEsc")}
+              data-tooltip={t("closeEsc")}
               onClick={(e) => {
                 e.stopPropagation();
                 closeImageViewer();
@@ -8971,7 +9073,7 @@ export default function App() {
             <>
               <button
                 className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 p-3 bg-white/10 text-white rounded-full hover:bg-white/20"
-                title={t("previousArrow")}
+                data-tooltip={t("previousArrow")}
                 onClick={(e) => {
                   e.stopPropagation();
                   prevImage();
@@ -8981,7 +9083,7 @@ export default function App() {
               </button>
               <button
                 className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 p-3 bg-white/10 text-white rounded-full hover:bg-white/20"
-                title={t("nextArrow")}
+                data-tooltip={t("nextArrow")}
                 onClick={(e) => {
                   e.stopPropagation();
                   nextImage();
@@ -9098,6 +9200,7 @@ export default function App() {
 
   return (
     <>
+      <TooltipPortal />
       {/* Decorative floating background — fixed wallpaper, z-1 keeps it below all UI (desktop only) */}
       {floatingCardsEnabled && <div aria-hidden="true" style={{position:"fixed",inset:0,zIndex:1,pointerEvents:"none",overflow:"hidden"}}>
         {/* Colonne gauche */}
