@@ -4541,7 +4541,8 @@ function TooltipPortal() {
       const label = el.getAttribute('data-tooltip');
       if (!label) return;
       const rect = el.getBoundingClientRect();
-      setTooltip({ label, x: rect.left + rect.width / 2, y: rect.top });
+      const below = rect.top < 60;
+      setTooltip({ label, x: rect.left + rect.width / 2, y: below ? rect.bottom : rect.top, below });
     };
     const hide = (e) => {
       const el = e.target.closest('[data-tooltip]');
@@ -4557,12 +4558,15 @@ function TooltipPortal() {
   if (!tooltip) return null;
   return createPortal(
     <div
-      className="pointer-events-none fixed z-[9999]"
-      style={{ top: tooltip.y - 8, left: tooltip.x, transform: 'translate(-50%, -100%)' }}
+      className="pointer-events-none fixed z-[10001]"
+      style={tooltip.below
+        ? { top: tooltip.y + 8, left: tooltip.x, transform: 'translateX(-50%)' }
+        : { top: tooltip.y - 8, left: tooltip.x, transform: 'translate(-50%, -100%)' }
+      }
     >
       <div className="px-2.5 py-1 text-xs font-medium text-white bg-gray-800 rounded-lg whitespace-nowrap shadow-xl">
         {tooltip.label}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+        <div className={`absolute left-1/2 -translate-x-1/2 border-4 border-transparent ${tooltip.below ? 'bottom-full border-b-gray-800' : 'top-full border-t-gray-800'}`} />
       </div>
     </div>,
     document.body
