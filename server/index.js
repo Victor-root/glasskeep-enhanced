@@ -299,19 +299,10 @@ const insertUser = db.prepare(
   "INSERT INTO users (name,email,password_hash,created_at) VALUES (?,?,?,?)"
 );
 
-// Seed default admin user if none exist
-(function seedDefaultAdmin() {
-  const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
-  if (userCount === 0) {
-    const adminEmail = "admin";
-    const adminPass = "admin";
-    const hash = bcrypt.hashSync(adminPass, 10);
-    const info = insertUser.run("Admin", adminEmail, hash, nowISO());
-    const mkAdmin = db.prepare("UPDATE users SET is_admin=1 WHERE id=?");
-    mkAdmin.run(info.lastInsertRowid);
-    console.log(`Default admin user created: ${adminEmail} / ${adminPass}`);
-  }
-})();
+// No default admin account — admin must be created explicitly via install.sh
+// If the database is empty and no admin exists, the server starts but
+// login/register endpoints will be the only way to create users.
+// The install.sh script handles initial admin creation at install time.
 const getUserById = db.prepare("SELECT * FROM users WHERE id = ?");
 const getNoteById = db.prepare("SELECT * FROM notes WHERE id = ?");
 const getUserSettings = db.prepare("SELECT settings_json FROM user_settings WHERE user_id = ?");

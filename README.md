@@ -115,7 +115,7 @@ Re-running the same command on an existing installation brings up an interactive
 
 The script output language adapts to your system locale (English/French).
 
-> **Default admin credentials:** `admin` / `admin` — change your password on first login.
+> **First install:** the install script will prompt you to create an admin account (login + password). No default credentials are hardcoded.
 
 ---
 
