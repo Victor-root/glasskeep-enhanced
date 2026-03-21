@@ -1924,17 +1924,22 @@ function NoteCard({
         <h3 className="font-bold text-sm sm:text-lg mb-2 break-words">{n.title}</h3>
       )}
 
-      {mainImg && (
-        <div className="mb-3 relative overflow-hidden rounded-lg border border-[var(--border-light)] bg-transparent">
-          <img
-            src={mainImg.src}
-            alt={mainImg.name || "note image"}
-            className="w-full h-40 object-contain object-center"
-          />
-          {imgs.length > 1 && (
-            <span className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">
-              {t("moreItems").replace("{count}", String(imgs.length - 1))}</span>
-          )}
+      {imgs.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-3">
+          {imgs.map((im) => (
+            <div
+              key={im.id}
+              className="overflow-hidden rounded-lg border border-[var(--border-light)]"
+              style={{ width: imgs.length === 1 ? "100%" : "calc(50% - 2px)" }}
+            >
+              <img
+                src={im.src}
+                alt={im.name || "note image"}
+                className="w-full h-auto object-contain object-center"
+                style={{ maxHeight: "200px" }}
+              />
+            </div>
+          ))}
         </div>
       )}
 
