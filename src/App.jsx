@@ -9052,7 +9052,7 @@ export default function App() {
           }}
         >
           {/* Controls */}
-          <div className="absolute top-4 right-4 flex items-center gap-2">
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
             <button
               className={`px-3 py-2 rounded-lg ${dark ? "bg-white/10 text-white hover:bg-white/20" : "bg-black/10 text-black hover:bg-black/20"}`}
               data-tooltip={t("downloadShortcut")}
@@ -9087,7 +9087,7 @@ export default function App() {
           {mImages.length > 1 && (
             <>
               <button
-                className={`absolute left-4 md:left-8 top-1/2 -translate-y-1/2 p-3 rounded-full ${dark ? "bg-white/10 text-white hover:bg-white/20" : "bg-black/10 text-black hover:bg-black/20"}`}
+                className={`absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full ${dark ? "bg-white/10 text-white hover:bg-white/20" : "bg-black/10 text-black hover:bg-black/20"}`}
                 data-tooltip={t("previousArrow")}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -9097,7 +9097,7 @@ export default function App() {
                 <ArrowLeft />
               </button>
               <button
-                className={`absolute right-4 md:right-8 top-1/2 -translate-y-1/2 p-3 rounded-full ${dark ? "bg-white/10 text-white hover:bg-white/20" : "bg-black/10 text-black hover:bg-black/20"}`}
+                className={`absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full ${dark ? "bg-white/10 text-white hover:bg-white/20" : "bg-black/10 text-black hover:bg-black/20"}`}
                 data-tooltip={t("nextArrow")}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -9118,7 +9118,7 @@ export default function App() {
             onClick={(e) => e.stopPropagation()}
           />
           {/* Caption */}
-          <div className={`absolute bottom-6 px-3 py-1 rounded text-xs ${dark ? "bg-white/10 text-white" : "bg-black/10 text-black"}`}>
+          <div className={`absolute bottom-6 z-10 px-3 py-1 rounded text-xs ${dark ? "bg-white/10 text-white" : "bg-black/10 text-black"}`}>
             {mImages[imgViewIndex].name || `image-${imgViewIndex + 1}`}
             {mImages.length > 1
               ? `  (${imgViewIndex + 1}/${mImages.length})`
