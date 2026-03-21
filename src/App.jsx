@@ -1185,6 +1185,7 @@ html.dark .login-deco-card {
 
 /** ---------- Image compression (client) ---------- */
 async function fileToCompressedDataURL(file, maxDim = 1600, quality = 0.85) {
+  const isPng = file.type === "image/png";
   const dataUrl = await new Promise((res, rej) => {
     const fr = new FileReader();
     fr.onload = () => res(fr.result);
@@ -1206,7 +1207,9 @@ async function fileToCompressedDataURL(file, maxDim = 1600, quality = 0.85) {
   canvas.height = targetH;
   const ctx = canvas.getContext("2d");
   ctx.drawImage(img, 0, 0, targetW, targetH);
-  return canvas.toDataURL("image/jpeg", quality);
+  return isPng
+    ? canvas.toDataURL("image/png")
+    : canvas.toDataURL("image/jpeg", quality);
 }
 
 /** ---------- Phone number linkification (mobile only) ---------- */
