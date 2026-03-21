@@ -4563,16 +4563,18 @@ function TooltipPortal() {
       setTooltip(null);
     };
 
-    // Mobile: show on tap, auto-hide after 2s
+    // Mobile: show only after 2s long press, auto-hide after 2s
     const touchStart = (e) => {
       const el = e.target.closest('[data-tooltip]');
       if (!el) return;
       clearTimeout(timer);
-      const data = getTooltipData(el);
-      if (data) {
-        setTooltip(data);
-        timer = setTimeout(() => setTooltip(null), 2000);
-      }
+      timer = setTimeout(() => {
+        const data = getTooltipData(el);
+        if (data) {
+          setTooltip(data);
+          setTimeout(() => setTooltip(null), 2000);
+        }
+      }, 2000);
     };
     const touchCancel = () => {
       clearTimeout(timer);
