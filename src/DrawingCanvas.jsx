@@ -49,6 +49,16 @@ const DeleteToolIcon = () => (
     <path d="M6 19c0 1.1.9 2 2 2h8a2 2 0 002-2V7H6v12zm3.46-7.12 1.41-1.41L12 11.59l1.12-1.12 1.41 1.41L13.41 13l1.12 1.12-1.41 1.41L12 14.41l-1.12 1.12-1.41-1.41L10.59 13l-1.13-1.12zM15.5 4l-1-1h-5l-1 1H5v2h14V4z" />
   </svg>
 );
+const Tooltip = ({ label, children }) => (
+  <div className="relative group inline-flex">
+    {children}
+    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 text-xs font-medium text-white bg-gray-800 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50 shadow-xl pointer-events-none">
+      {label}
+      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+    </div>
+  </div>
+);
+
 function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = false, darkMode = false, hideModeToggle = false, initialMode = null }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -330,13 +340,14 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
       {/* View/Draw Mode Toggle - only when drawing is allowed and not hidden */}
       {!readOnly && !hideModeToggle && (
         <div className="flex items-center justify-between mb-3">
-          <button
-            onClick={() => setMode(mode === 'view' ? 'draw' : 'view')}
-            className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
-            title={mode === 'view' ? t('switchToDrawMode') : t('switchToViewMode')}
-          >
-            {mode === 'view' ? t('drawMode') : t('viewMode')}
-          </button>
+          <Tooltip label={mode === 'view' ? t('switchToDrawMode') : t('switchToViewMode')}>
+            <button
+              onClick={() => setMode(mode === 'view' ? 'draw' : 'view')}
+              className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
+            >
+              {mode === 'view' ? t('drawMode') : t('viewMode')}
+            </button>
+          </Tooltip>
         </div>
       )}
 
@@ -345,29 +356,31 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
         <div className="flex items-center gap-3 mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
           {/* Tool selection */}
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setTool('pen')}
-              className={`px-2 py-1 rounded text-sm ${tool === 'pen' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
-              title={t("pen")}
-            >
-              <PenToolIcon />
-            </button>
-            <button
-              onClick={() => setTool('eraser')}
-              className={`px-2 py-1 rounded text-sm ${tool === 'eraser' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
-              title={t("eraser")}
-            >
-              <EraserToolIcon />
-            </button>
+            <Tooltip label={t("pen")}>
+              <button
+                onClick={() => setTool('pen')}
+                className={`px-2 py-1 rounded text-sm ${tool === 'pen' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+              >
+                <PenToolIcon />
+              </button>
+            </Tooltip>
+            <Tooltip label={t("eraser")}>
+              <button
+                onClick={() => setTool('eraser')}
+                className={`px-2 py-1 rounded text-sm ${tool === 'eraser' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+              >
+                <EraserToolIcon />
+              </button>
+            </Tooltip>
           </div>
 
           {/* Color picker dropdown */}
           {tool === 'pen' && (
             <div className="relative color-picker-container">
+              <Tooltip label={t('changeColor')}>
               <button
                 onClick={() => setShowColorPicker(!showColorPicker)}
                 className="flex items-center gap-1 px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-sm hover:bg-gray-300 dark:hover:bg-gray-600"
-                title={t('changeColor')}
               >
                 <div
                   className="w-4 h-4 rounded border border-gray-400"
@@ -375,6 +388,7 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
                 />
                 <ExpandMoreIcon />
               </button>
+              </Tooltip>
 
               {showColorPicker && (
                 <div className="absolute top-full mt-1 p-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-10 min-w-[200px]">
@@ -398,34 +412,37 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
           )}
 
           {/* Size picker */}
-          <select
-            value={size}
-            onChange={(e) => setSize(Number(e.target.value))}
-            className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-sm"
-            title={t("brushSize")}
-          >
-            {PEN_SIZES.map(s => (
-              <option key={s} value={s}>{s}px</option>
-            ))}
-          </select>
+          <Tooltip label={t("brushSize")}>
+            <select
+              value={size}
+              onChange={(e) => setSize(Number(e.target.value))}
+              className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-sm"
+            >
+              {PEN_SIZES.map(s => (
+                <option key={s} value={s}>{s}px</option>
+              ))}
+            </select>
+          </Tooltip>
 
           {/* Actions */}
           <div className="flex items-center gap-1 ml-auto">
-            <button
-              onClick={undo}
-              disabled={paths.length === 0}
-              className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-sm disabled:opacity-50 hover:bg-gray-300 dark:hover:bg-gray-600"
-              title={t("undo")}
-            >
-              <UndoToolIcon />
-            </button>
-            <button
-              onClick={clearCanvas}
-              className="px-2 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
-              title={t("clearAll")}
-            >
-              <DeleteToolIcon />
-            </button>
+            <Tooltip label={t("undo")}>
+              <button
+                onClick={undo}
+                disabled={paths.length === 0}
+                className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-sm disabled:opacity-50 hover:bg-gray-300 dark:hover:bg-gray-600"
+              >
+                <UndoToolIcon />
+              </button>
+            </Tooltip>
+            <Tooltip label={t("clearAll")}>
+              <button
+                onClick={clearCanvas}
+                className="px-2 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+              >
+                <DeleteToolIcon />
+              </button>
+            </Tooltip>
           </div>
         </div>
       )}
@@ -476,13 +493,14 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
       {/* Add Page Button - only in draw mode */}
       {!readOnly && mode === 'draw' && (
         <div className="mt-3 flex justify-center">
-          <button
-            onClick={addPage}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium transition-colors"
-            title={t('addPageTitle')}
-          >
-            {t("addPage")}
-          </button>
+          <Tooltip label={t('addPageTitle')}>
+            <button
+              onClick={addPage}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium transition-colors"
+            >
+              {t("addPage")}
+            </button>
+          </Tooltip>
         </div>
       )}
 
