@@ -1924,17 +1924,22 @@ function NoteCard({
         <h3 className="font-bold text-sm sm:text-lg mb-2 break-words">{n.title}</h3>
       )}
 
-      {mainImg && (
-        <div className="mb-3 relative overflow-hidden rounded-lg border border-[var(--border-light)] bg-transparent">
-          <img
-            src={mainImg.src}
-            alt={mainImg.name || "note image"}
-            className="w-full h-40 object-contain object-center"
-          />
-          {imgs.length > 1 && (
-            <span className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">
-              {t("moreItems").replace("{count}", String(imgs.length - 1))}</span>
-          )}
+      {imgs.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-3">
+          {imgs.map((im) => (
+            <div
+              key={im.id}
+              className="overflow-hidden rounded-lg"
+              style={{ width: imgs.length === 1 ? "100%" : "calc(50% - 2px)" }}
+            >
+              <img
+                src={im.src}
+                alt={im.name || "note image"}
+                className="w-full h-auto object-contain object-center"
+                style={{ maxHeight: "200px" }}
+              />
+            </div>
+          ))}
         </div>
       )}
 
@@ -4835,6 +4840,13 @@ export default function App() {
   // Image Viewer state (fullscreen)
   const [imgViewOpen, setImgViewOpen] = useState(false);
   const [imgViewIndex, setImgViewIndex] = useState(0);
+  const [mobileNavVisible, setMobileNavVisible] = useState(true);
+  const mobileNavTimer = useRef(null);
+  const resetMobileNav = () => {
+    setMobileNavVisible(true);
+    clearTimeout(mobileNavTimer.current);
+    mobileNavTimer.current = setTimeout(() => setMobileNavVisible(false), 3000);
+  };
 
   // Drag
   const dragId = useRef(null);
@@ -7510,6 +7522,7 @@ export default function App() {
   const openImageViewer = (index) => {
     setImgViewIndex(index);
     setImgViewOpen(true);
+    resetMobileNav();
   };
   const closeImageViewer = () => setImgViewOpen(false);
   const nextImage = () => setImgViewIndex((i) => (i + 1) % mImages.length);
@@ -7994,15 +8007,22 @@ export default function App() {
               )}
             </div>
 
-            {/* Images - full width like Google Keep */}
+            {/* Images - Google Keep style grid */}
             {mImages.length > 0 && (
-              <div className="w-full">
+              <div className="flex flex-wrap gap-2 justify-center px-2 pb-2">
                 {mImages.map((im, idx) => (
-                  <div key={im.id} className="relative w-full">
+                  <div
+                    key={im.id}
+                    className="group relative overflow-hidden rounded-md border border-[var(--border-light)]"
+                    style={{
+                      width: mImages.length === 1 ? "100%" : "calc(50% - 4px)",
+                    }}
+                  >
                     <img
                       src={im.src}
                       alt={im.name}
-                      className="w-full object-contain cursor-zoom-in"
+                      className="w-full h-auto object-contain object-center cursor-pointer"
+                      style={{ maxHeight: "360px" }}
                       onClick={(e) => {
                         e.stopPropagation();
                         openImageViewer(idx);
@@ -8011,7 +8031,7 @@ export default function App() {
                     {isOnline && (
                       <button
                         data-tooltip={t("removeImage")}
-                        className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full w-7 h-7 text-sm flex items-center justify-center transition-opacity"
+                        className="absolute -top-1 right-0 text-black dark:text-white text-2xl leading-none opacity-0 group-hover:opacity-100 hover:opacity-60 transition-opacity cursor-pointer"
                         onClick={() =>
                           setMImages((prev) =>
                             prev.filter((x) => x.id !== im.id),
@@ -9032,17 +9052,18 @@ export default function App() {
       </div>
 
       {/* Fullscreen Image Viewer */}
-      {imgViewOpen && mImages.length > 0 && (
+      {imgViewOpen && mImages.length > 0 && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
+          className="fixed inset-0 z-[9999] backdrop-blur-md bg-black/30 flex items-center justify-center"
           onClick={(e) => {
             if (e.target === e.currentTarget) closeImageViewer();
+            resetMobileNav();
           }}
         >
           {/* Controls */}
-          <div className="absolute top-4 right-4 flex items-center gap-2">
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
             <button
-              className="px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20"
+              className="px-3 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20"
               data-tooltip={t("downloadShortcut")}
               onClick={async (e) => {
                 e.stopPropagation();
@@ -9060,7 +9081,7 @@ export default function App() {
               <DownloadIcon />
             </button>
             <button
-              className="px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20"
+              className="px-3 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20"
               data-tooltip={t("closeEsc")}
               onClick={(e) => {
                 e.stopPropagation();
@@ -9075,21 +9096,23 @@ export default function App() {
           {mImages.length > 1 && (
             <>
               <button
-                className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 p-3 bg-white/10 text-white rounded-full hover:bg-white/20"
+                className={`absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-opacity duration-300 sm:opacity-100 ${mobileNavVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
                 data-tooltip={t("previousArrow")}
                 onClick={(e) => {
                   e.stopPropagation();
                   prevImage();
+                  resetMobileNav();
                 }}
               >
                 <ArrowLeft />
               </button>
               <button
-                className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 p-3 bg-white/10 text-white rounded-full hover:bg-white/20"
+                className={`absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-opacity duration-300 sm:opacity-100 ${mobileNavVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
                 data-tooltip={t("nextArrow")}
                 onClick={(e) => {
                   e.stopPropagation();
                   nextImage();
+                  resetMobileNav();
                 }}
               >
                 <ArrowRight />
@@ -9102,16 +9125,18 @@ export default function App() {
             src={mImages[imgViewIndex].src}
             alt={mImages[imgViewIndex].name || `image-${imgViewIndex + 1}`}
             className="max-w-[92vw] max-h-[92vh] object-contain rounded-lg shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            style={{ background: dark ? "#000" : "#fff" }}
+            onClick={(e) => { e.stopPropagation(); resetMobileNav(); }}
           />
           {/* Caption */}
-          <div className="absolute bottom-6 px-3 py-1 rounded bg-black/50 text-white text-xs">
-            {mImages[imgViewIndex].name || `image-${imgViewIndex + 1}`}
-            {mImages.length > 1
-              ? `  (${imgViewIndex + 1}/${mImages.length})`
-              : ""}
+          <div className="absolute top-4 left-0 right-0 z-10 text-xs text-white text-center">
+            <span className="hidden sm:inline">{mImages[imgViewIndex].name || `image-${imgViewIndex + 1}`} </span>
+            {mImages.length > 1 && (
+              <span>{imgViewIndex + 1}/{mImages.length}</span>
+            )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
