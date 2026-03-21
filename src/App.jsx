@@ -882,43 +882,6 @@ html.dark body {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   break-inside: avoid;
 }
-/* Custom tooltips */
-[data-tooltip] { position: relative; }
-[data-tooltip]::before {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 5px 10px;
-  background: #1f2937;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 500;
-  border-radius: 8px;
-  white-space: nowrap;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-  z-index: 9999;
-  line-height: 1.5;
-}
-[data-tooltip]::after {
-  content: '';
-  position: absolute;
-  bottom: calc(100% + 3px);
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: #1f2937;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-  z-index: 9999;
-}
-[data-tooltip]:hover::before,
-[data-tooltip]:hover::after { opacity: 1; }
 /* Note cards: skip rendering when off-screen, isolate paint */
 .note-card {
   content-visibility: auto;
@@ -4569,6 +4532,43 @@ function AdminView({ dark }) {
 }
 
 /** ---------- App ---------- */
+function TooltipPortal() {
+  const [tooltip, setTooltip] = useState(null);
+  useEffect(() => {
+    const show = (e) => {
+      const el = e.target.closest('[data-tooltip]');
+      if (!el) return;
+      const label = el.getAttribute('data-tooltip');
+      if (!label) return;
+      const rect = el.getBoundingClientRect();
+      setTooltip({ label, x: rect.left + rect.width / 2, y: rect.top });
+    };
+    const hide = (e) => {
+      const el = e.target.closest('[data-tooltip]');
+      if (el && !el.contains(e.relatedTarget)) setTooltip(null);
+    };
+    document.addEventListener('mouseover', show);
+    document.addEventListener('mouseout', hide);
+    return () => {
+      document.removeEventListener('mouseover', show);
+      document.removeEventListener('mouseout', hide);
+    };
+  }, []);
+  if (!tooltip) return null;
+  return createPortal(
+    <div
+      className="pointer-events-none fixed z-[9999]"
+      style={{ top: tooltip.y - 8, left: tooltip.x, transform: 'translate(-50%, -100%)' }}
+    >
+      <div className="px-2.5 py-1 text-xs font-medium text-white bg-gray-800 rounded-lg whitespace-nowrap shadow-xl">
+        {tooltip.label}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function App() {
   const [route, setRoute] = useState(window.location.hash || "#/login");
 
@@ -9135,6 +9135,7 @@ export default function App() {
 
   return (
     <>
+      <TooltipPortal />
       {/* Decorative floating background — fixed wallpaper, z-1 keeps it below all UI (desktop only) */}
       {floatingCardsEnabled && <div aria-hidden="true" style={{position:"fixed",inset:0,zIndex:1,pointerEvents:"none",overflow:"hidden"}}>
         {/* Colonne gauche */}
