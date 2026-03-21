@@ -333,9 +333,9 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
           <button
             onClick={() => setMode(mode === 'view' ? 'draw' : 'view')}
             className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
-            title={mode === 'view' ? 'Switch to Draw mode' : 'Switch to View mode'}
+            title={mode === 'view' ? t('switchToDrawMode') : t('switchToViewMode')}
           >
-            {mode === 'view' ? 'Draw mode' : 'View mode'}
+            {mode === 'view' ? t('drawMode') : t('viewMode')}
           </button>
         </div>
       )}
@@ -367,7 +367,7 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
               <button
                 onClick={() => setShowColorPicker(!showColorPicker)}
                 className="flex items-center gap-1 px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-sm hover:bg-gray-300 dark:hover:bg-gray-600"
-                title="Change color"
+                title={t('changeColor')}
               >
                 <div
                   className="w-4 h-4 rounded border border-gray-400"
@@ -479,7 +479,7 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
           <button
             onClick={addPage}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium transition-colors"
-            title="Double the canvas size to add more space for notes"
+            title={t('addPageTitle')}
           >
             {t("addPage")}
           </button>
@@ -489,8 +489,8 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
       {/* Info */}
       <div className="text-xs text-gray-500 mt-2">
         {paths.length} {paths.length !== 1 ? t("strokeCountPlural") : t("strokeCount")}
-        {mode === 'view' && ' (view mode)'}
-        {readOnly && mode === 'draw' && ' (read-only)'}
+        {mode === 'view' && ` (${t('viewMode')})`}
+        {readOnly && mode === 'draw' && ` (${t('readOnlyLabel')})`}
       </div>
     </div>
   );
