@@ -4537,29 +4537,62 @@ function TooltipPortal() {
   const [tooltip, setTooltip] = useState(null);
   useEffect(() => {
     let timer = null;
+
+    const getTooltipData = (el) => {
+      const label = el.getAttribute('data-tooltip');
+      if (!label) return null;
+      const rect = el.getBoundingClientRect();
+      const below = rect.top < 60;
+      return { label, x: rect.left + rect.width / 2, y: below ? rect.bottom : rect.top, below };
+    };
+
+    // Desktop: mouse pointer only (pointerType === 'mouse' excludes touch/pen)
     const show = (e) => {
+      if (e.pointerType !== 'mouse') return;
       const el = e.target.closest('[data-tooltip]');
       if (!el) return;
-      const label = el.getAttribute('data-tooltip');
-      if (!label) return;
       clearTimeout(timer);
       timer = setTimeout(() => {
-        const rect = el.getBoundingClientRect();
-        const below = rect.top < 60;
-        setTooltip({ label, x: rect.left + rect.width / 2, y: below ? rect.bottom : rect.top, below });
+        const data = getTooltipData(el);
+        if (data) setTooltip(data);
       }, 600);
     };
     const hide = (e) => {
+      if (e.pointerType !== 'mouse') return;
       clearTimeout(timer);
-      const el = e.target.closest('[data-tooltip]');
-      if (el && !el.contains(e.relatedTarget)) setTooltip(null);
+      setTooltip(null);
     };
-    document.addEventListener('mouseover', show);
-    document.addEventListener('mouseout', hide);
+
+    // Mobile: long press (600ms hold)
+    const touchStart = (e) => {
+      const el = e.target.closest('[data-tooltip]');
+      if (!el) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const data = getTooltipData(el);
+        if (data) {
+          setTooltip(data);
+          setTimeout(() => setTooltip(null), 2000);
+        }
+      }, 600);
+    };
+    const touchCancel = () => {
+      clearTimeout(timer);
+      setTooltip(null);
+    };
+
+    document.addEventListener('pointerover', show);
+    document.addEventListener('pointerout', hide);
+    document.addEventListener('touchstart', touchStart, { passive: true });
+    document.addEventListener('touchend', touchCancel);
+    document.addEventListener('touchmove', touchCancel, { passive: true });
     return () => {
       clearTimeout(timer);
-      document.removeEventListener('mouseover', show);
-      document.removeEventListener('mouseout', hide);
+      document.removeEventListener('pointerover', show);
+      document.removeEventListener('pointerout', hide);
+      document.removeEventListener('touchstart', touchStart);
+      document.removeEventListener('touchend', touchCancel);
+      document.removeEventListener('touchmove', touchCancel);
     };
   }, []);
   if (!tooltip) return null;
