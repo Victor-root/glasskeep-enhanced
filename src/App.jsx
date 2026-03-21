@@ -1929,7 +1929,7 @@ function NoteCard({
           {imgs.map((im) => (
             <div
               key={im.id}
-              className="overflow-hidden rounded-lg border border-[var(--border-light)]"
+              className="overflow-hidden rounded-lg"
               style={{ width: imgs.length === 1 ? "100%" : "calc(50% - 2px)" }}
             >
               <img
@@ -8005,7 +8005,7 @@ export default function App() {
                 {mImages.map((im, idx) => (
                   <div
                     key={im.id}
-                    className="relative overflow-hidden rounded-md"
+                    className="relative overflow-hidden rounded-md border border-[var(--border-light)]"
                     style={{
                       width: mImages.length === 1 ? "100%" : "calc(50% - 4px)",
                     }}
@@ -8023,7 +8023,7 @@ export default function App() {
                     {isOnline && (
                       <button
                         data-tooltip={t("removeImage")}
-                        className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full w-7 h-7 text-sm flex items-center justify-center transition-opacity"
+                        className="absolute top-1 right-1 text-black dark:text-white text-lg leading-none hover:opacity-60 transition-opacity"
                         onClick={() =>
                           setMImages((prev) =>
                             prev.filter((x) => x.id !== im.id),
