@@ -275,6 +275,31 @@ install_nodejs() {
 setup_admin() {
     local db_file="$1"
 
+    # If the database already exists and has users, skip admin creation entirely
+    if [[ -f "$db_file" ]]; then
+        local count
+        count=$(node -e "
+            const Database = require('better-sqlite3');
+            const db = new Database('$db_file');
+            try {
+                const row = db.prepare('SELECT COUNT(*) as count FROM users').get();
+                process.stdout.write(String(row.count));
+            } catch(e) { process.stdout.write('0'); }
+            db.close();
+        " 2>/dev/null || echo "0")
+        if [[ "$count" -gt 0 ]]; then
+            info "Users already exist in database — skipping admin setup."
+            GLASSKEEP_ADMIN_LOGIN=$(node -e "
+                const Database = require('better-sqlite3');
+                const db = new Database('$db_file');
+                const row = db.prepare('SELECT email FROM users WHERE is_admin=1 LIMIT 1').get();
+                process.stdout.write(row ? row.email : '');
+                db.close();
+            " 2>/dev/null || echo "")
+            return
+        fi
+    fi
+
     echo ""
     echo -e "${BOLD}${CYAN}▶ ${MSG_ADMIN_SETUP_TITLE}${RESET}"
     echo ""
@@ -429,7 +454,7 @@ API_PORT=${port}
 JWT_SECRET=${jwt_secret}
 DB_FILE=${DATA_DIR}/notes.db
 ADMIN_EMAILS=${GLASSKEEP_ADMIN_LOGIN}
-ALLOW_REGISTRATION=true
+ALLOW_REGISTRATION=false
 EOF
     chmod 600 "$ENV_FILE"
     # shellcheck disable=SC2059
