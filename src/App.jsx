@@ -9044,9 +9044,9 @@ export default function App() {
       </div>
 
       {/* Fullscreen Image Viewer */}
-      {imgViewOpen && mImages.length > 0 && (
+      {imgViewOpen && mImages.length > 0 && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
+          className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center"
           onClick={(e) => {
             if (e.target === e.currentTarget) closeImageViewer();
           }}
@@ -9124,7 +9124,8 @@ export default function App() {
               ? `  (${imgViewIndex + 1}/${mImages.length})`
               : ""}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
