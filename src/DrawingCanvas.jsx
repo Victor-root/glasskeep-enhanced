@@ -411,23 +411,21 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
 
           {/* Actions */}
           <div className="flex items-center gap-1 ml-auto">
-            <Tooltip label={t("undo")}>
-              <button
+            <button
+                data-tooltip={t("undo")}
                 onClick={undo}
                 disabled={paths.length === 0}
                 className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-sm disabled:opacity-50 hover:bg-gray-300 dark:hover:bg-gray-600"
               >
                 <UndoToolIcon />
               </button>
-            </Tooltip>
-            <Tooltip label={t("clearAll")}>
-              <button
+            <button
+                data-tooltip={t("clearAll")}
                 onClick={clearCanvas}
                 className="px-2 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
               >
                 <DeleteToolIcon />
               </button>
-            </Tooltip>
           </div>
         </div>
       )}
@@ -478,14 +476,13 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
       {/* Add Page Button - only in draw mode */}
       {!readOnly && mode === 'draw' && (
         <div className="mt-3 flex justify-center">
-          <Tooltip label={t('addPageTitle')}>
-            <button
+          <button
+              data-tooltip={t('addPageTitle')}
               onClick={addPage}
               className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium transition-colors"
             >
               {t("addPage")}
             </button>
-          </Tooltip>
         </div>
       )}
 
