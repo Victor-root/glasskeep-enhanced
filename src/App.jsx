@@ -7994,15 +7994,22 @@ export default function App() {
               )}
             </div>
 
-            {/* Images - full width like Google Keep */}
+            {/* Images - Google Keep style grid */}
             {mImages.length > 0 && (
-              <div className="w-full">
+              <div className="flex flex-wrap gap-2 justify-center px-2 pb-2">
                 {mImages.map((im, idx) => (
-                  <div key={im.id} className="relative w-full">
+                  <div
+                    key={im.id}
+                    className="relative overflow-hidden rounded-md"
+                    style={{
+                      width: mImages.length === 1 ? "100%" : "calc(50% - 4px)",
+                    }}
+                  >
                     <img
                       src={im.src}
                       alt={im.name}
-                      className="w-full object-contain cursor-zoom-in"
+                      className="w-full object-contain object-center cursor-zoom-in bg-black/5 dark:bg-white/5"
+                      style={{ height: mImages.length === 1 ? "220px" : "160px" }}
                       onClick={(e) => {
                         e.stopPropagation();
                         openImageViewer(idx);
