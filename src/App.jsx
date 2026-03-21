@@ -1185,6 +1185,7 @@ html.dark .login-deco-card {
 
 /** ---------- Image compression (client) ---------- */
 async function fileToCompressedDataURL(file, maxDim = 1600, quality = 0.85) {
+  const hasAlpha = ["image/png", "image/webp", "image/gif", "image/avif"].includes(file.type);
   const dataUrl = await new Promise((res, rej) => {
     const fr = new FileReader();
     fr.onload = () => res(fr.result);
@@ -1206,7 +1207,9 @@ async function fileToCompressedDataURL(file, maxDim = 1600, quality = 0.85) {
   canvas.height = targetH;
   const ctx = canvas.getContext("2d");
   ctx.drawImage(img, 0, 0, targetW, targetH);
-  return canvas.toDataURL("image/jpeg", quality);
+  return hasAlpha
+    ? canvas.toDataURL("image/png")
+    : canvas.toDataURL("image/jpeg", quality);
 }
 
 /** ---------- Phone number linkification (mobile only) ---------- */
@@ -1922,11 +1925,11 @@ function NoteCard({
       )}
 
       {mainImg && (
-        <div className="mb-3 relative overflow-hidden rounded-lg border border-[var(--border-light)]">
+        <div className="mb-3 relative overflow-hidden rounded-lg border border-[var(--border-light)] bg-transparent">
           <img
             src={mainImg.src}
             alt={mainImg.name || "note image"}
-            className="w-full h-40 object-cover"
+            className="w-full h-40 object-contain object-center"
           />
           {imgs.length > 1 && (
             <span className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">
