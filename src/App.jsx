@@ -9046,7 +9046,7 @@ export default function App() {
       {/* Fullscreen Image Viewer */}
       {imgViewOpen && mImages.length > 0 && createPortal(
         <div
-          className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center"
+          className="fixed inset-0 z-[9999] backdrop-blur-md bg-black/30 flex items-center justify-center"
           onClick={(e) => {
             if (e.target === e.currentTarget) closeImageViewer();
           }}
@@ -9118,7 +9118,7 @@ export default function App() {
             onClick={(e) => e.stopPropagation()}
           />
           {/* Caption */}
-          <div className="absolute bottom-2 z-10 text-xs text-white">
+          <div className="absolute top-4 left-4 z-10 text-xs text-white">
             {mImages[imgViewIndex].name || `image-${imgViewIndex + 1}`}
             {mImages.length > 1
               ? `  (${imgViewIndex + 1}/${mImages.length})`
