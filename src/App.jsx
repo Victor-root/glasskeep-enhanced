@@ -8842,8 +8842,7 @@ export default function App() {
                       {isOwner && (
                         <>
                           <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                            Enter the username of the person you want to
-                            collaborate with on this note.
+                            {t("collaborateInstructions")}
                           </p>
                           <div ref={collaboratorInputRef} className="relative">
                             <input
