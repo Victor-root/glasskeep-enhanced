@@ -8023,7 +8023,7 @@ export default function App() {
                     {isOnline && (
                       <button
                         data-tooltip={t("removeImage")}
-                        className="absolute top-0 right-0 text-black dark:text-white text-2xl leading-none hover:opacity-60 transition-opacity w-7 h-7 flex items-center justify-center"
+                        className="absolute -top-1 right-0 text-black dark:text-white text-2xl leading-none hover:opacity-60 transition-opacity"
                         onClick={() =>
                           setMImages((prev) =>
                             prev.filter((x) => x.id !== im.id),
