@@ -1922,7 +1922,7 @@ function NoteCard({
       )}
 
       {mainImg && (
-        <div className="mb-3 relative overflow-hidden rounded-lg border border-[var(--border-light)]">
+        <div className="mb-3 relative overflow-hidden rounded-lg border border-[var(--border-light)] bg-transparent">
           <img
             src={mainImg.src}
             alt={mainImg.name || "note image"}
