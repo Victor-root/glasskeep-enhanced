@@ -106,6 +106,8 @@ setup_i18n() {
         MSG_ADMIN_PASS_CONFIRM="Confirmer le mot de passe : "
         MSG_ADMIN_PASS_MISMATCH="Les mots de passe ne correspondent pas. Réessayez."
         MSG_ADMIN_EMPTY_FIELD="Le nom affiché et le mot de passe ne doivent pas être vides."
+        MSG_ADMIN_NAME_TOO_LONG="Le nom affiché ne doit pas dépasser 40 caractères."
+        MSG_ADMIN_LOGIN_INVALID="Le login ne doit contenir que des lettres, chiffres, points, tirets ou underscores (3–32 caractères)."
         MSG_ADMIN_PASS_TOO_SHORT="Le mot de passe doit contenir au moins 4 caractères."
         MSG_ADMIN_CREATED="Compte admin créé avec succès."
         MSG_ADMIN_CREATION_FAILED="Échec de la création du compte admin."
@@ -186,6 +188,8 @@ setup_i18n() {
         MSG_ADMIN_PASS_CONFIRM="Confirm password: "
         MSG_ADMIN_PASS_MISMATCH="Passwords do not match. Please try again."
         MSG_ADMIN_EMPTY_FIELD="Display name and password must not be empty."
+        MSG_ADMIN_NAME_TOO_LONG="Display name must not exceed 40 characters."
+        MSG_ADMIN_LOGIN_INVALID="Login must contain only letters, digits, dots, hyphens or underscores (3–32 characters)."
         MSG_ADMIN_PASS_TOO_SHORT="Password must be at least 4 characters."
         MSG_ADMIN_CREATED="Admin account created successfully."
         MSG_ADMIN_CREATION_FAILED="Failed to create admin account."
@@ -310,15 +314,30 @@ setup_admin() {
 
     while true; do
         read -rp "$(echo -e "${YELLOW}${MSG_ADMIN_NAME_PROMPT}${RESET}")" admin_name </dev/tty
+        # Trim leading/trailing whitespace
+        admin_name="$(echo -e "${admin_name}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
         if [[ -z "$admin_name" ]]; then
             warn "$MSG_ADMIN_EMPTY_FIELD"
             continue
         fi
 
+        if [[ ${#admin_name} -gt 40 ]]; then
+            warn "$MSG_ADMIN_NAME_TOO_LONG"
+            continue
+        fi
+
         # shellcheck disable=SC2059
         read -rp "$(echo -e "${YELLOW}$(printf "$MSG_ADMIN_LOGIN_PROMPT" "$admin_name")${RESET}")" admin_login </dev/tty
+        # Trim leading/trailing whitespace
+        admin_login="$(echo -e "${admin_login}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
         admin_login="${admin_login:-$admin_name}"
+
+        # Validate login: letters, digits, dot, hyphen, underscore only, 3-32 chars
+        if [[ ${#admin_login} -lt 3 || ${#admin_login} -gt 32 ]] || ! [[ "$admin_login" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            warn "$MSG_ADMIN_LOGIN_INVALID"
+            continue
+        fi
 
         read -rsp "$(echo -e "${YELLOW}${MSG_ADMIN_PASS_PROMPT}${RESET}")" admin_pass </dev/tty
         echo ""
