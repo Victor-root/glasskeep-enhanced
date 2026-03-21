@@ -9126,7 +9126,7 @@ export default function App() {
             alt={mImages[imgViewIndex].name || `image-${imgViewIndex + 1}`}
             className="max-w-[92vw] max-h-[92vh] object-contain rounded-lg shadow-2xl"
             style={{ background: dark ? "#000" : "#fff" }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); resetMobileNav(); }}
           />
           {/* Caption */}
           <div className="absolute top-4 left-0 right-0 z-10 text-xs text-white text-center">
