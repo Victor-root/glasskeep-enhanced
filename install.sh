@@ -99,9 +99,16 @@ setup_i18n() {
         MSG_ACCESS_TITLE="GlassKeep est opérationnel !"
         MSG_ACCESS_LOCAL="Accès local     : "
         MSG_ACCESS_NET="Accès réseau    : "
-        MSG_ACCESS_CREDS="Identifiants par défaut :"
-        MSG_ACCESS_LOGIN="Login    : admin"
-        MSG_ACCESS_PASS="Mot de passe : admin"
+        MSG_ADMIN_SETUP_TITLE="Création du compte administrateur"
+        MSG_ADMIN_LOGIN_PROMPT="Login admin : "
+        MSG_ADMIN_PASS_PROMPT="Mot de passe admin : "
+        MSG_ADMIN_PASS_CONFIRM="Confirmer le mot de passe : "
+        MSG_ADMIN_PASS_MISMATCH="Les mots de passe ne correspondent pas. Réessayez."
+        MSG_ADMIN_EMPTY_FIELD="Le login et le mot de passe ne doivent pas être vides."
+        MSG_ADMIN_PASS_TOO_SHORT="Le mot de passe doit contenir au moins 4 caractères."
+        MSG_ADMIN_CREATED="Compte admin créé avec succès."
+        MSG_ADMIN_CREATION_FAILED="Échec de la création du compte admin."
+        MSG_ACCESS_CREDS="Connectez-vous avec le compte admin créé lors de l'installation."
         MSG_ACCESS_LOGS="Logs en temps réel : "
         MSG_ACCESS_STATUS="Statut du service  : "
 
@@ -171,9 +178,16 @@ setup_i18n() {
         MSG_ACCESS_TITLE="GlassKeep is up and running!"
         MSG_ACCESS_LOCAL="Local access    : "
         MSG_ACCESS_NET="Network access  : "
-        MSG_ACCESS_CREDS="Default credentials:"
-        MSG_ACCESS_LOGIN="Login    : admin"
-        MSG_ACCESS_PASS="Password : admin"
+        MSG_ADMIN_SETUP_TITLE="Admin account setup"
+        MSG_ADMIN_LOGIN_PROMPT="Admin login: "
+        MSG_ADMIN_PASS_PROMPT="Admin password: "
+        MSG_ADMIN_PASS_CONFIRM="Confirm password: "
+        MSG_ADMIN_PASS_MISMATCH="Passwords do not match. Please try again."
+        MSG_ADMIN_EMPTY_FIELD="Login and password must not be empty."
+        MSG_ADMIN_PASS_TOO_SHORT="Password must be at least 4 characters."
+        MSG_ADMIN_CREATED="Admin account created successfully."
+        MSG_ADMIN_CREATION_FAILED="Failed to create admin account."
+        MSG_ACCESS_CREDS="Log in with the admin account created during installation."
         MSG_ACCESS_LOGS="Live logs  : "
         MSG_ACCESS_STATUS="Service status : "
 
@@ -257,6 +271,107 @@ install_nodejs() {
     success "$(printf "$MSG_NODE_DONE" "$(node --version)")"
 }
 
+# ── Admin account setup ───────────────────────────────────────────────────────
+setup_admin() {
+    local db_file="$1"
+
+    echo ""
+    echo -e "${BOLD}${CYAN}▶ ${MSG_ADMIN_SETUP_TITLE}${RESET}"
+    echo ""
+
+    local admin_login admin_pass admin_pass2
+
+    while true; do
+        read -rp "$(echo -e "${YELLOW}${MSG_ADMIN_LOGIN_PROMPT}${RESET}")" admin_login </dev/tty
+        read -rsp "$(echo -e "${YELLOW}${MSG_ADMIN_PASS_PROMPT}${RESET}")" admin_pass </dev/tty
+        echo ""
+        read -rsp "$(echo -e "${YELLOW}${MSG_ADMIN_PASS_CONFIRM}${RESET}")" admin_pass2 </dev/tty
+        echo ""
+
+        if [[ -z "$admin_login" || -z "$admin_pass" ]]; then
+            warn "$MSG_ADMIN_EMPTY_FIELD"
+            continue
+        fi
+
+        if [[ ${#admin_pass} -lt 4 ]]; then
+            warn "$MSG_ADMIN_PASS_TOO_SHORT"
+            continue
+        fi
+
+        if [[ "$admin_pass" != "$admin_pass2" ]]; then
+            warn "$MSG_ADMIN_PASS_MISMATCH"
+            continue
+        fi
+
+        break
+    done
+
+    # Create admin via a small Node.js helper that uses the same bcrypt
+    local create_script="${INSTALL_DIR}/server/create-admin.js"
+    cat > "$create_script" <<'NODESCRIPT'
+const Database = require("better-sqlite3");
+const bcrypt = require("bcryptjs");
+
+const dbFile = process.argv[2];
+const login = process.argv[3];
+const password = process.argv[4];
+
+if (!dbFile || !login || !password) {
+  console.error("Usage: node create-admin.js <db_file> <login> <password>");
+  process.exit(1);
+}
+
+const db = new Database(dbFile);
+
+// Ensure users table exists (same schema as server/index.js)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    is_admin INTEGER NOT NULL DEFAULT 0,
+    secret_key_hash TEXT,
+    secret_key_created_at TEXT
+  )
+`);
+
+const existing = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
+if (existing > 0) {
+  console.log("Users already exist in database — skipping admin creation.");
+  process.exit(0);
+}
+
+const hash = bcrypt.hashSync(password, 10);
+const now = new Date().toISOString();
+const info = db.prepare(
+  "INSERT INTO users (name, email, password_hash, created_at) VALUES (?, ?, ?, ?)"
+).run("Admin", login, hash, now);
+
+db.prepare("UPDATE users SET is_admin=1 WHERE id=?").run(info.lastInsertRowid);
+
+console.log("OK");
+db.close();
+NODESCRIPT
+
+    local result
+    result=$(node "$create_script" "$db_file" "$admin_login" "$admin_pass" 2>&1)
+    local exit_code=$?
+    rm -f "$create_script"
+
+    if [[ $exit_code -ne 0 ]] || [[ "$result" != "OK" && "$result" != *"skipping"* ]]; then
+        error "$MSG_ADMIN_CREATION_FAILED"
+        [[ -n "$result" ]] && error "$result"
+        die "$MSG_ADMIN_CREATION_FAILED"
+    fi
+
+    success "$MSG_ADMIN_CREATED"
+
+    # Set ADMIN_EMAILS in .env to the chosen login for admin promotion on restart
+    GLASSKEEP_ADMIN_LOGIN="$admin_login"
+}
+
 # ── Actions ───────────────────────────────────────────────────────────────────
 action_install() {
     echo -e "\n${BOLD}═══════════════════════════════════════${RESET}"
@@ -301,6 +416,10 @@ action_install() {
 
     mkdir -p "$DATA_DIR"
 
+    # Interactive admin account creation
+    GLASSKEEP_ADMIN_LOGIN=""
+    setup_admin "${DATA_DIR}/notes.db"
+
     local jwt_secret
     jwt_secret=$(openssl rand -hex 32 2>/dev/null || cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 64)
 
@@ -309,7 +428,7 @@ NODE_ENV=production
 API_PORT=${port}
 JWT_SECRET=${jwt_secret}
 DB_FILE=${DATA_DIR}/notes.db
-ADMIN_EMAILS=admin
+ADMIN_EMAILS=${GLASSKEEP_ADMIN_LOGIN}
 ALLOW_REGISTRATION=true
 EOF
     chmod 600 "$ENV_FILE"
@@ -454,8 +573,6 @@ show_access_info() {
     echo -e "  ${BOLD}${MSG_ACCESS_NET}${RESET} http://${ip}:${port}"
     echo ""
     echo -e "  ${BOLD}${MSG_ACCESS_CREDS}${RESET}"
-    echo -e "    ${MSG_ACCESS_LOGIN}"
-    echo -e "    ${MSG_ACCESS_PASS}"
     echo ""
     echo -e "  ${CYAN}${MSG_ACCESS_LOGS}${RESET} journalctl -u ${SERVICE_NAME} -f"
     echo -e "  ${CYAN}${MSG_ACCESS_STATUS}${RESET} systemctl status ${SERVICE_NAME}"
