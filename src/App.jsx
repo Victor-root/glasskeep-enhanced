@@ -4574,9 +4574,9 @@ function TooltipPortal() {
         if (data) {
           setTooltip(data);
           clearTimeout(hideTimer);
-          hideTimer = setTimeout(() => setTooltip(null), 2500);
+          hideTimer = setTimeout(() => setTooltip(null), 5000);
         }
-      }, 2000);
+      }, 1000);
     };
     const touchEnd = () => clearTimeout(timer); // cancel pending show, keep visible if already shown
     const touchCancel = () => {
