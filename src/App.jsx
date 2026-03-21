@@ -8005,7 +8005,7 @@ export default function App() {
                 {mImages.map((im, idx) => (
                   <div
                     key={im.id}
-                    className="relative overflow-hidden rounded-md border border-[var(--border-light)]"
+                    className="group relative overflow-hidden rounded-md border border-[var(--border-light)]"
                     style={{
                       width: mImages.length === 1 ? "100%" : "calc(50% - 4px)",
                     }}
@@ -8023,7 +8023,7 @@ export default function App() {
                     {isOnline && (
                       <button
                         data-tooltip={t("removeImage")}
-                        className="absolute -top-1 right-0 text-black dark:text-white text-2xl leading-none hover:opacity-60 transition-opacity cursor-pointer"
+                        className="absolute -top-1 right-0 text-black dark:text-white text-2xl leading-none opacity-0 group-hover:opacity-100 hover:opacity-60 transition-opacity cursor-pointer"
                         onClick={() =>
                           setMImages((prev) =>
                             prev.filter((x) => x.id !== im.id),
