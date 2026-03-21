@@ -4840,6 +4840,13 @@ export default function App() {
   // Image Viewer state (fullscreen)
   const [imgViewOpen, setImgViewOpen] = useState(false);
   const [imgViewIndex, setImgViewIndex] = useState(0);
+  const [mobileNavVisible, setMobileNavVisible] = useState(true);
+  const mobileNavTimer = useRef(null);
+  const resetMobileNav = () => {
+    setMobileNavVisible(true);
+    clearTimeout(mobileNavTimer.current);
+    mobileNavTimer.current = setTimeout(() => setMobileNavVisible(false), 3000);
+  };
 
   // Drag
   const dragId = useRef(null);
@@ -7515,6 +7522,7 @@ export default function App() {
   const openImageViewer = (index) => {
     setImgViewIndex(index);
     setImgViewOpen(true);
+    resetMobileNav();
   };
   const closeImageViewer = () => setImgViewOpen(false);
   const nextImage = () => setImgViewIndex((i) => (i + 1) % mImages.length);
@@ -9049,6 +9057,7 @@ export default function App() {
           className="fixed inset-0 z-[9999] backdrop-blur-md bg-black/30 flex items-center justify-center"
           onClick={(e) => {
             if (e.target === e.currentTarget) closeImageViewer();
+            resetMobileNav();
           }}
         >
           {/* Controls */}
@@ -9087,21 +9096,23 @@ export default function App() {
           {mImages.length > 1 && (
             <>
               <button
-                className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20"
+                className={`absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-opacity duration-300 sm:opacity-100 ${mobileNavVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
                 data-tooltip={t("previousArrow")}
                 onClick={(e) => {
                   e.stopPropagation();
                   prevImage();
+                  resetMobileNav();
                 }}
               >
                 <ArrowLeft />
               </button>
               <button
-                className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20"
+                className={`absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-opacity duration-300 sm:opacity-100 ${mobileNavVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
                 data-tooltip={t("nextArrow")}
                 onClick={(e) => {
                   e.stopPropagation();
                   nextImage();
+                  resetMobileNav();
                 }}
               >
                 <ArrowRight />
