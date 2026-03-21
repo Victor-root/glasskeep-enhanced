@@ -8008,8 +8008,8 @@ export default function App() {
                     <img
                       src={im.src}
                       alt={im.name}
-                      className="w-full object-contain object-center cursor-zoom-in bg-black/5 dark:bg-white/5"
-                      style={{ height: mImages.length === 1 ? "220px" : "160px" }}
+                      className="w-full h-auto object-contain object-center cursor-zoom-in"
+                      style={{ maxHeight: "360px" }}
                       onClick={(e) => {
                         e.stopPropagation();
                         openImageViewer(idx);
