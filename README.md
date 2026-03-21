@@ -119,6 +119,24 @@ The script output language adapts to your system locale (English/French).
 
 ---
 
+### Recommended system requirements
+
+#### Without AI features
+
+- **Minimum:** 1 vCPU, 1 GB RAM, 3–5 GB storage
+- **Recommended:** 2 vCPU, 2 GB RAM, 5–10 GB storage
+
+#### With AI features enabled
+
+GlassKeep can load a server-side ONNX Llama model on first use. This significantly increases RAM and storage usage.
+
+- **Minimum:** 2 vCPU, 4 GB RAM, 8–10 GB storage
+- **Recommended:** 4 vCPU, 6–8 GB RAM, 10–20 GB storage
+
+> Actual requirements depend on the number of users, the amount of notes/images stored, and whether AI is actively used.
+
+---
+
 ### Local development
 
 ```bash
