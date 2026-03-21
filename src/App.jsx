@@ -9046,7 +9046,7 @@ export default function App() {
       {/* Fullscreen Image Viewer */}
       {imgViewOpen && mImages.length > 0 && (
         <div
-          className={`fixed inset-0 z-50 flex items-center justify-center ${dark ? "bg-black" : "bg-white"}`}
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
           onClick={(e) => {
             if (e.target === e.currentTarget) closeImageViewer();
           }}
