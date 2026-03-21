@@ -8013,7 +8013,7 @@ export default function App() {
                     <img
                       src={im.src}
                       alt={im.name}
-                      className="w-full h-auto object-contain object-center cursor-zoom-in"
+                      className="w-full h-auto object-contain object-center cursor-pointer"
                       style={{ maxHeight: "360px" }}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -8023,7 +8023,7 @@ export default function App() {
                     {isOnline && (
                       <button
                         data-tooltip={t("removeImage")}
-                        className="absolute -top-1 right-0 text-black dark:text-white text-2xl leading-none hover:opacity-60 transition-opacity"
+                        className="absolute -top-1 right-0 text-black dark:text-white text-2xl leading-none hover:opacity-60 transition-opacity cursor-pointer"
                         onClick={() =>
                           setMImages((prev) =>
                             prev.filter((x) => x.id !== im.id),
