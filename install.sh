@@ -100,11 +100,15 @@ setup_i18n() {
         MSG_ACCESS_LOCAL="Accès local     : "
         MSG_ACCESS_NET="Accès réseau    : "
         MSG_ADMIN_SETUP_TITLE="Création du compte administrateur"
-        MSG_ADMIN_LOGIN_PROMPT="Login admin : "
+        MSG_ADMIN_NAME_PROMPT="Nom affiché : "
+        MSG_ADMIN_LOGIN_PROMPT="Nom d'utilisateur / login [%s] : "
         MSG_ADMIN_PASS_PROMPT="Mot de passe admin : "
         MSG_ADMIN_PASS_CONFIRM="Confirmer le mot de passe : "
         MSG_ADMIN_PASS_MISMATCH="Les mots de passe ne correspondent pas. Réessayez."
-        MSG_ADMIN_EMPTY_FIELD="Le login et le mot de passe ne doivent pas être vides."
+        MSG_ADMIN_EMPTY_NAME="Le nom affiché ne doit pas être vide."
+        MSG_ADMIN_EMPTY_PASS="Le mot de passe ne doit pas être vide."
+        MSG_ADMIN_NAME_TOO_LONG="Le nom affiché ne doit pas dépasser 40 caractères."
+        MSG_ADMIN_LOGIN_INVALID="Le login ne doit contenir que des lettres, chiffres, points, tirets ou underscores (3–32 caractères)."
         MSG_ADMIN_PASS_TOO_SHORT="Le mot de passe doit contenir au moins 4 caractères."
         MSG_ADMIN_CREATED="Compte admin créé avec succès."
         MSG_ADMIN_CREATION_FAILED="Échec de la création du compte admin."
@@ -179,11 +183,15 @@ setup_i18n() {
         MSG_ACCESS_LOCAL="Local access    : "
         MSG_ACCESS_NET="Network access  : "
         MSG_ADMIN_SETUP_TITLE="Admin account setup"
-        MSG_ADMIN_LOGIN_PROMPT="Admin login: "
+        MSG_ADMIN_NAME_PROMPT="Display name: "
+        MSG_ADMIN_LOGIN_PROMPT="Username / login [%s]: "
         MSG_ADMIN_PASS_PROMPT="Admin password: "
         MSG_ADMIN_PASS_CONFIRM="Confirm password: "
         MSG_ADMIN_PASS_MISMATCH="Passwords do not match. Please try again."
-        MSG_ADMIN_EMPTY_FIELD="Login and password must not be empty."
+        MSG_ADMIN_EMPTY_NAME="Display name must not be empty."
+        MSG_ADMIN_EMPTY_PASS="Password must not be empty."
+        MSG_ADMIN_NAME_TOO_LONG="Display name must not exceed 40 characters."
+        MSG_ADMIN_LOGIN_INVALID="Login must contain only letters, digits, dots, hyphens or underscores (3–32 characters)."
         MSG_ADMIN_PASS_TOO_SHORT="Password must be at least 4 characters."
         MSG_ADMIN_CREATED="Admin account created successfully."
         MSG_ADMIN_CREATION_FAILED="Failed to create admin account."
@@ -304,17 +312,42 @@ setup_admin() {
     echo -e "${BOLD}${CYAN}▶ ${MSG_ADMIN_SETUP_TITLE}${RESET}"
     echo ""
 
-    local admin_login admin_pass admin_pass2
+    local admin_name admin_login admin_pass admin_pass2
 
     while true; do
-        read -rp "$(echo -e "${YELLOW}${MSG_ADMIN_LOGIN_PROMPT}${RESET}")" admin_login </dev/tty
+        read -rp "$(echo -e "${YELLOW}${MSG_ADMIN_NAME_PROMPT}${RESET}")" admin_name </dev/tty
+        # Trim leading/trailing whitespace
+        admin_name="$(echo -e "${admin_name}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+        if [[ -z "$admin_name" ]]; then
+            warn "$MSG_ADMIN_EMPTY_NAME"
+            continue
+        fi
+
+        if [[ ${#admin_name} -gt 40 ]]; then
+            warn "$MSG_ADMIN_NAME_TOO_LONG"
+            continue
+        fi
+
+        # shellcheck disable=SC2059
+        read -rp "$(echo -e "${YELLOW}$(printf "$MSG_ADMIN_LOGIN_PROMPT" "$admin_name")${RESET}")" admin_login </dev/tty
+        # Trim leading/trailing whitespace
+        admin_login="$(echo -e "${admin_login}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        admin_login="${admin_login:-$admin_name}"
+
+        # Validate login: letters, digits, dot, hyphen, underscore only, 3-32 chars
+        if [[ ${#admin_login} -lt 3 || ${#admin_login} -gt 32 ]] || ! [[ "$admin_login" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            warn "$MSG_ADMIN_LOGIN_INVALID"
+            continue
+        fi
+
         read -rsp "$(echo -e "${YELLOW}${MSG_ADMIN_PASS_PROMPT}${RESET}")" admin_pass </dev/tty
         echo ""
         read -rsp "$(echo -e "${YELLOW}${MSG_ADMIN_PASS_CONFIRM}${RESET}")" admin_pass2 </dev/tty
         echo ""
 
-        if [[ -z "$admin_login" || -z "$admin_pass" ]]; then
-            warn "$MSG_ADMIN_EMPTY_FIELD"
+        if [[ -z "$admin_pass" ]]; then
+            warn "$MSG_ADMIN_EMPTY_PASS"
             continue
         fi
 
@@ -338,11 +371,12 @@ const Database = require("better-sqlite3");
 const bcrypt = require("bcryptjs");
 
 const dbFile = process.argv[2];
-const login = process.argv[3];
-const password = process.argv[4];
+const displayName = process.argv[3];
+const login = process.argv[4];
+const password = process.argv[5];
 
-if (!dbFile || !login || !password) {
-  console.error("Usage: node create-admin.js <db_file> <login> <password>");
+if (!dbFile || !displayName || !login || !password) {
+  console.error("Usage: node create-admin.js <db_file> <name> <login> <password>");
   process.exit(1);
 }
 
@@ -372,7 +406,7 @@ const hash = bcrypt.hashSync(password, 10);
 const now = new Date().toISOString();
 const info = db.prepare(
   "INSERT INTO users (name, email, password_hash, created_at) VALUES (?, ?, ?, ?)"
-).run("Admin", login, hash, now);
+).run(displayName, login, hash, now);
 
 db.prepare("UPDATE users SET is_admin=1 WHERE id=?").run(info.lastInsertRowid);
 
@@ -381,7 +415,7 @@ db.close();
 NODESCRIPT
 
     local result
-    result=$(node "$create_script" "$db_file" "$admin_login" "$admin_pass" 2>&1)
+    result=$(node "$create_script" "$db_file" "$admin_name" "$admin_login" "$admin_pass" 2>&1)
     local exit_code=$?
     rm -f "$create_script"
 
