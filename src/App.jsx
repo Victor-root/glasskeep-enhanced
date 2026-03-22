@@ -1367,7 +1367,7 @@ function ColorPickerPanel({ anchorRef, open, onClose, colors, selectedColor, dar
       const a = anchorRef?.current;
       if (!a) return;
       const r = a.getBoundingClientRect();
-      const panelW = 216;
+      const panelW = 256;
       const spaceBelow = window.innerHeight - r.bottom;
       const dropUp = spaceBelow < 240;
       let left = Math.min(r.left, window.innerWidth - panelW - 8);
@@ -1395,7 +1395,7 @@ function ColorPickerPanel({ anchorRef, open, onClose, colors, selectedColor, dar
     position: "fixed",
     left: pos.left,
     zIndex: 99999,
-    width: 216,
+    width: 256,
     ...(pos.dropUp
       ? { bottom: window.innerHeight - pos.top }
       : { top: pos.top }),
@@ -1411,7 +1411,7 @@ function ColorPickerPanel({ anchorRef, open, onClose, colors, selectedColor, dar
           : "bg-white/98 border-gray-100/80"
       }`}
     >
-      <div className="grid grid-cols-4 gap-2.5">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 48px)", gap: "12px" }}>
         {colors.map((name) => (
           <button
             key={name}
