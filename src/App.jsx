@@ -2470,6 +2470,15 @@ const ArchiveSidebarIcon = () => (
     <line x1="10" y1="12" x2="14" y2="12" />
   </svg>
 );
+const TrashSidebarIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+    <path d="M10 11v6" />
+    <path d="M14 11v6" />
+    <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+  </svg>
+);
 const TagIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
@@ -2580,6 +2589,15 @@ function TagSidebar({
               onClose();
             }}
           ><ArchiveSidebarIcon />{t("archivedNotes")}</button>
+
+          {/* Trash */}
+          <button
+            className={`w-full text-left px-3 py-2 rounded-md mb-2 flex items-center gap-3 ${activeTag === "TRASHED" ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+            onClick={() => {
+              onSelect("TRASHED");
+              onClose();
+            }}
+          ><TrashSidebarIcon />{t("trashedNotes")}</button>
 
           {/* User tags */}
           {tagsWithCounts.map(({ tag, count }) => {
@@ -3445,6 +3463,7 @@ function NotesUI({
   onBulkDelete,
   onBulkPin,
   onBulkArchive,
+  onBulkRestore,
   onBulkColor,
   onBulkDownloadZip,
   // view mode
@@ -3506,7 +3525,9 @@ function NotesUI({
       ? t("allImages")
       : activeTagFilter === "ARCHIVED"
         ? t("archivedNotes")
-        : activeTagFilter;
+        : activeTagFilter === "TRASHED"
+          ? t("trashedNotes")
+          : activeTagFilter;
 
   // Close header menu when scrolling
   React.useEffect(() => {
@@ -3542,40 +3563,55 @@ function NotesUI({
               className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
               onClick={onBulkDownloadZip}
             >{t("downloadZip")}</button>
-            <button
-              className="px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm"
-              onClick={onBulkDelete}
-            >{t("delete")}</button>
-            <button
-              ref={multiColorBtnRef}
-              type="button"
-              onClick={() => setShowMultiColorPop((v) => !v)}
-              className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
-              data-tooltip={t("color")}
-            >{t("colorEmoji")}</button>
-            <ColorPickerPanel
-              anchorRef={multiColorBtnRef}
-              open={showMultiColorPop}
-              onClose={() => setShowMultiColorPop(false)}
-              colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
-              selectedColor={null}
-              darkMode={dark}
-              onSelect={(name) => { onBulkColor(name); }}
-            />
-            {activeTagFilter !== "ARCHIVED" && (
-              <button
-                className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1"
-                onClick={() => onBulkPin(true)}
-              >
-                <PinIcon />{t("pin")}</button>
+            {activeTagFilter === "TRASHED" ? (
+              <>
+                <button
+                  className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1"
+                  onClick={onBulkRestore}
+                >{t("restoreFromTrash")}</button>
+                <button
+                  className="px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm"
+                  onClick={onBulkDelete}
+                >{t("permanentlyDelete")}</button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm"
+                  onClick={onBulkDelete}
+                >{t("delete")}</button>
+                <button
+                  ref={multiColorBtnRef}
+                  type="button"
+                  onClick={() => setShowMultiColorPop((v) => !v)}
+                  className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
+                  data-tooltip={t("color")}
+                >{t("colorEmoji")}</button>
+                <ColorPickerPanel
+                  anchorRef={multiColorBtnRef}
+                  open={showMultiColorPop}
+                  onClose={() => setShowMultiColorPop(false)}
+                  colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
+                  selectedColor={null}
+                  darkMode={dark}
+                  onSelect={(name) => { onBulkColor(name); }}
+                />
+                {activeTagFilter !== "ARCHIVED" && (
+                  <button
+                    className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1"
+                    onClick={() => onBulkPin(true)}
+                  >
+                    <PinIcon />{t("pin")}</button>
+                )}
+                <button
+                  className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1"
+                  onClick={onBulkArchive}
+                >
+                  <ArchiveIcon />
+                  {activeTagFilter === "ARCHIVED" ? "Unarchive" : t("archive")}
+                </button>
+              </>
             )}
-            <button
-              className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1"
-              onClick={onBulkArchive}
-            >
-              <ArchiveIcon />
-              {activeTagFilter === "ARCHIVED" ? "Unarchive" : t("archive")}
-            </button>
             <span className="text-xs opacity-70 ml-2">{t("selectedPrefix")} {selectedIds.length}
             </span>
           </div>
@@ -4352,7 +4388,7 @@ function NotesUI({
                     disablePin={
                       "ontouchstart" in window ||
                       navigator.maxTouchPoints > 0 ||
-                      activeTagFilter === "ARCHIVED"
+                      activeTagFilter === "ARCHIVED" || activeTagFilter === "TRASHED"
                     }
                     onDragStart={onDragStart}
                     onDragOver={onDragOver}
@@ -4385,7 +4421,7 @@ function NotesUI({
                     disablePin={
                       "ontouchstart" in window ||
                       navigator.maxTouchPoints > 0 ||
-                      activeTagFilter === "ARCHIVED"
+                      activeTagFilter === "ARCHIVED" || activeTagFilter === "TRASHED"
                     }
                     onDragStart={onDragStart}
                     onDragOver={onDragOver}
@@ -4432,7 +4468,7 @@ function NotesUI({
                     disablePin={
                       "ontouchstart" in window ||
                       navigator.maxTouchPoints > 0 ||
-                      activeTagFilter === "ARCHIVED"
+                      activeTagFilter === "ARCHIVED" || activeTagFilter === "TRASHED"
                     }
                     onDragStart={onDragStart}
                     onDragOver={onDragOver}
@@ -4465,7 +4501,7 @@ function NotesUI({
                     disablePin={
                       "ontouchstart" in window ||
                       navigator.maxTouchPoints > 0 ||
-                      activeTagFilter === "ARCHIVED"
+                      activeTagFilter === "ARCHIVED" || activeTagFilter === "TRASHED"
                     }
                     onDragStart={onDragStart}
                     onDragOver={onDragOver}
@@ -4492,7 +4528,9 @@ function NotesUI({
           <p className="text-center text-gray-500 dark:text-gray-400 mt-10">{t("noMatchingNotes")}</p>
         )}
         {!notesLoading && allEmpty && (
-          <p className="text-center text-gray-500 dark:text-gray-400 mt-10">{t("noNotesYet")}</p>
+          <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
+            {activeTagFilter === "TRASHED" ? t("noTrashedNotes") : t("noNotesYet")}
+          </p>
         )}
       </main>
     </div>
@@ -5139,26 +5177,54 @@ export default function App() {
 
   const onBulkDelete = async () => {
     if (!selectedIds.length) return;
-    showGenericConfirm({
-      title: t("deleteNotes"),
-      message: t("deleteSelectedNotesConfirm").replace("{count}", String(selectedIds.length)),
-      confirmText: t("delete"),
-      danger: true,
-      onConfirm: async () => {
-        try {
-          // Fire deletes sequentially to keep API simple
-          for (const id of selectedIds) {
-            await api(`/notes/${id}`, { method: "DELETE", token });
+
+    if (tagFilter === "TRASHED") {
+      // Permanent delete from trash
+      showGenericConfirm({
+        title: t("permanentlyDelete"),
+        message: t("permanentlyDeleteConfirm"),
+        confirmText: t("permanentlyDelete"),
+        danger: true,
+        onConfirm: async () => {
+          try {
+            for (const id of selectedIds) {
+              await api(`/notes/${id}/permanent`, { method: "DELETE", token });
+            }
+            invalidateTrashedNotesCache();
+            setNotes((prev) =>
+              prev.filter((n) => !selectedIds.includes(String(n.id))),
+            );
+            onExitMulti();
+          } catch (e) {
+            alert(e.message || t("bulkDeleteFailed"));
           }
-          setNotes((prev) =>
-            prev.filter((n) => !selectedIds.includes(String(n.id))),
-          );
-          onExitMulti();
-        } catch (e) {
-          alert(e.message || t("bulkDeleteFailed"));
-        }
-      },
-    });
+        },
+      });
+    } else {
+      // Move to trash
+      showGenericConfirm({
+        title: t("moveToTrash"),
+        message: t("bulkMoveToTrashConfirm").replace("{count}", String(selectedIds.length)),
+        confirmText: t("moveToTrash"),
+        danger: true,
+        onConfirm: async () => {
+          try {
+            for (const id of selectedIds) {
+              await api(`/notes/${id}/trash`, { method: "POST", token });
+            }
+            invalidateNotesCache();
+            invalidateArchivedNotesCache();
+            invalidateTrashedNotesCache();
+            setNotes((prev) =>
+              prev.filter((n) => !selectedIds.includes(String(n.id))),
+            );
+            onExitMulti();
+          } catch (e) {
+            alert(e.message || t("bulkDeleteFailed"));
+          }
+        },
+      });
+    }
   };
 
   const onBulkPin = async (pinnedVal) => {
@@ -5186,6 +5252,8 @@ export default function App() {
       // Reload fresh data since we invalidated caches
       if (tagFilter === "ARCHIVED") {
         loadArchivedNotes().catch(() => {});
+      } else if (tagFilter === "TRASHED") {
+        loadTrashedNotes().catch(() => {});
       } else {
         loadNotes().catch(() => {});
       }
@@ -5194,9 +5262,30 @@ export default function App() {
       // Reload appropriate notes based on current view
       if (tagFilter === "ARCHIVED") {
         loadArchivedNotes().catch(() => {});
+      } else if (tagFilter === "TRASHED") {
+        loadTrashedNotes().catch(() => {});
       } else {
         loadNotes().catch(() => {});
       }
+    }
+  };
+
+  const onBulkRestore = async () => {
+    if (!selectedIds.length) return;
+    try {
+      for (const id of selectedIds) {
+        await api(`/notes/${id}/restore`, { method: "POST", token });
+      }
+      invalidateNotesCache();
+      invalidateArchivedNotesCache();
+      invalidateTrashedNotesCache();
+      setNotes((prev) =>
+        prev.filter((n) => !selectedIds.includes(String(n.id))),
+      );
+      onExitMulti();
+    } catch (e) {
+      console.error("Bulk restore failed", e);
+      loadTrashedNotes().catch(() => {});
     }
   };
 
@@ -5454,6 +5543,7 @@ export default function App() {
   // Cache keys for localStorage
   const NOTES_CACHE_KEY = `glass-keep-notes-${currentUser?.id || "anonymous"}`;
   const ARCHIVED_NOTES_CACHE_KEY = `glass-keep-archived-${currentUser?.id || "anonymous"}`;
+  const TRASHED_NOTES_CACHE_KEY = `glass-keep-trashed-${currentUser?.id || "anonymous"}`;
   const CACHE_TIMESTAMP_KEY = `glass-keep-cache-timestamp-${currentUser?.id || "anonymous"}`;
 
   // Cache invalidation functions
@@ -5472,6 +5562,14 @@ export default function App() {
       localStorage.removeItem(CACHE_TIMESTAMP_KEY);
     } catch (error) {
       console.error("Error invalidating archived notes cache:", error);
+    }
+  };
+
+  const invalidateTrashedNotesCache = () => {
+    try {
+      localStorage.removeItem(TRASHED_NOTES_CACHE_KEY);
+    } catch (error) {
+      console.error("Error invalidating trashed notes cache:", error);
     }
   };
 
@@ -5630,6 +5728,38 @@ export default function App() {
       setNotesLoading(false);
     }
   };
+
+  // Load trashed notes
+  const loadTrashedNotes = async () => {
+    if (!token) return;
+    setNotesLoading(true);
+
+    try {
+      const data = await api("/notes/trashed", { token });
+      const notesArray = Array.isArray(data) ? data : [];
+      setNotes(sortNotesByRecency(notesArray));
+      try {
+        localStorage.setItem(TRASHED_NOTES_CACHE_KEY, JSON.stringify(notesArray));
+      } catch (error) {
+        console.error("Error caching trashed notes:", error);
+      }
+    } catch (error) {
+      console.error("Error loading trashed notes from server:", error);
+      try {
+        const cachedData = localStorage.getItem(TRASHED_NOTES_CACHE_KEY);
+        if (cachedData) {
+          setNotes(sortNotesByRecency(JSON.parse(cachedData)));
+        } else {
+          setNotes([]);
+        }
+      } catch {
+        setNotes([]);
+      }
+    } finally {
+      setNotesLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!token) return;
 
@@ -5640,6 +5770,11 @@ export default function App() {
       console.log("Loading archived notes...");
       loadArchivedNotes().catch((error) => {
         console.error("Failed to load archived notes:", error);
+      });
+    } else if (tagFilter === "TRASHED") {
+      console.log("Loading trashed notes...");
+      loadTrashedNotes().catch((error) => {
+        console.error("Failed to load trashed notes:", error);
       });
     } else {
       console.log("Loading regular notes...");
@@ -5690,6 +5825,8 @@ export default function App() {
               // Refresh notes list on any note update relevant to this user
               if (tagFilter === "ARCHIVED") {
                 loadArchivedNotes().catch(() => {});
+              } else if (tagFilter === "TRASHED") {
+                loadTrashedNotes().catch(() => {});
               } else {
                 loadNotes().catch(() => {});
               }
@@ -5703,6 +5840,8 @@ export default function App() {
             if (msg && msg.noteId) {
               if (tagFilter === "ARCHIVED") {
                 loadArchivedNotes().catch(() => {});
+              } else if (tagFilter === "TRASHED") {
+                loadTrashedNotes().catch(() => {});
               } else {
                 loadNotes().catch(() => {});
               }
@@ -6258,9 +6397,10 @@ export default function App() {
         body: { archived },
       });
 
-      // Invalidate both caches since archiving affects both regular and archived notes
+      // Invalidate all caches since archiving affects multiple views
       invalidateNotesCache();
       invalidateArchivedNotesCache();
+      invalidateTrashedNotesCache();
 
       // Reload appropriate notes based on current view
       if (tagFilter === "ARCHIVED") {
@@ -7336,18 +7476,43 @@ export default function App() {
         return;
       }
 
-      await api(`/notes/${activeId}`, { method: "DELETE", token });
-      invalidateNotesCache();
-
-      setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
-      closeModal();
-      showToast(t("noteDeletedSuccessfully"), "success");
+      if (tagFilter === "TRASHED") {
+        // Permanent delete from trash
+        await api(`/notes/${activeId}/permanent`, { method: "DELETE", token });
+        invalidateTrashedNotesCache();
+        setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
+        closeModal();
+        showToast(t("notePermanentlyDeleted"), "success");
+      } else {
+        // Move to trash
+        await api(`/notes/${activeId}/trash`, { method: "POST", token });
+        invalidateNotesCache();
+        invalidateArchivedNotesCache();
+        invalidateTrashedNotesCache();
+        setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
+        closeModal();
+        showToast(t("noteMovedToTrash"), "success");
+      }
     } catch (e) {
       if (e.status === 404 || e.message?.includes("not found")) {
         showToast(t("cannotDeleteNotOwner"), "error");
       } else {
         showToast(e.message || t("deleteFailed"), "error");
       }
+    }
+  };
+
+  const restoreFromTrash = async (noteId) => {
+    try {
+      await api(`/notes/${noteId}/restore`, { method: "POST", token });
+      invalidateNotesCache();
+      invalidateArchivedNotesCache();
+      invalidateTrashedNotesCache();
+      setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
+      closeModal();
+      showToast(t("noteRestoredFromTrash"), "success");
+    } catch (e) {
+      showToast(e.message || t("failedRestoreNote"), "error");
     }
   };
   const togglePin = async (id, toPinned) => {
@@ -7583,13 +7748,18 @@ export default function App() {
         ? null
         : tagFilter === "ARCHIVED"
           ? null
-          : tagFilter?.toLowerCase() || null;
+          : tagFilter === "TRASHED"
+            ? null
+            : tagFilter?.toLowerCase() || null;
 
     return notes.filter((n) => {
       if (tagFilter === ALL_IMAGES) {
         if (!(n.images && n.images.length)) return false;
       } else if (tagFilter === "ARCHIVED") {
         // In archived view, show all notes (they're already filtered by the backend)
+        // Just apply search filter
+      } else if (tagFilter === "TRASHED") {
+        // In trashed view, show all notes (they're already filtered by the backend)
         // Just apply search filter
       } else if (activeTagFilters.length > 0) {
         // Multi-tag filter : la note doit contenir AU MOINS UN des tags sélectionnés
@@ -7629,7 +7799,7 @@ export default function App() {
   const filteredEmptyWithSearch =
     filtered.length === 0 &&
     notes.length > 0 &&
-    !!(search || (tagFilter && tagFilter !== "ARCHIVED") || activeTagFilters.length > 0);
+    !!(search || (tagFilter && tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED") || activeTagFilters.length > 0);
   const allEmpty = notes.length === 0;
 
   /** -------- Modal link handler: open links in new tab (no auto-enter edit) -------- */
@@ -8044,36 +8214,62 @@ export default function App() {
                             }}
                           >
                             <DownloadIcon />{t("downloadMd")}</button>
-                          <button
-                            className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                            onClick={() => {
-                              const note = notes.find(
-                                (nn) => String(nn.id) === String(activeId),
-                              );
-                              if (note) {
-                                handleArchiveNote(activeId, !note.archived);
-                                setModalMenuOpen(false);
-                              }
-                            }}
-                          >
-                            <ArchiveIcon />
-                            {activeNoteObj?.archived ? "Unarchive" : t("archive")}
-                          </button>
-                          <button
-                            className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                            onClick={() => {
-                              setConfirmDeleteOpen(true);
-                              setModalMenuOpen(false);
-                            }}
-                          >
-                            <Trash />{t("delete")}</button>
+                          {tagFilter === "TRASHED" ? (
+                            <>
+                              <button
+                                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                                onClick={() => {
+                                  restoreFromTrash(activeId);
+                                  setModalMenuOpen(false);
+                                }}
+                              >
+                                <ArchiveIcon />{t("restoreFromTrash")}
+                              </button>
+                              <button
+                                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                                onClick={() => {
+                                  setConfirmDeleteOpen(true);
+                                  setModalMenuOpen(false);
+                                }}
+                              >
+                                <Trash />{t("permanentlyDelete")}
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                                onClick={() => {
+                                  const note = notes.find(
+                                    (nn) => String(nn.id) === String(activeId),
+                                  );
+                                  if (note) {
+                                    handleArchiveNote(activeId, !note.archived);
+                                    setModalMenuOpen(false);
+                                  }
+                                }}
+                              >
+                                <ArchiveIcon />
+                                {activeNoteObj?.archived ? "Unarchive" : t("archive")}
+                              </button>
+                              <button
+                                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                                onClick={() => {
+                                  setConfirmDeleteOpen(true);
+                                  setModalMenuOpen(false);
+                                }}
+                              >
+                                <Trash />{t("moveToTrash")}
+                              </button>
+                            </>
+                          )}
                         </div>
                       </Popover>
                     </>
                   )}
 
                   {/* Pin button - hidden when offline or in archived view */}
-                  {isOnline && tagFilter !== "ARCHIVED" && (
+                  {isOnline && tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED" && (
                     <button
                       className="rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       data-tooltip={t("pinUnpin")}
@@ -8911,8 +9107,12 @@ export default function App() {
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <h3 className="text-lg font-semibold mb-2">{t("deleteThisNoteQuestion")}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">{t("actionCannotBeUndone")}</p>
+                <h3 className="text-lg font-semibold mb-2">
+                  {tagFilter === "TRASHED" ? t("permanentlyDeleteQuestion") : t("moveToTrashQuestion")}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  {tagFilter === "TRASHED" ? t("permanentlyDeleteConfirm") : t("moveToTrashConfirm")}
+                </p>
                 <div className="mt-5 flex justify-end gap-3">
                   <button
                     className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
@@ -8924,7 +9124,7 @@ export default function App() {
                       setConfirmDeleteOpen(false);
                       await deleteModal();
                     }}
-                  >{t("delete")}</button>
+                  >{tagFilter === "TRASHED" ? t("permanentlyDelete") : t("moveToTrash")}</button>
                 </div>
               </div>
             </div>
@@ -9432,7 +9632,7 @@ export default function App() {
         activeTag={tagFilter}
         activeTagFilters={activeTagFilters}
         onSelect={(tag, event) => {
-          if (tag === "ARCHIVED" || tag === ALL_IMAGES || tag === null) {
+          if (tag === "ARCHIVED" || tag === "TRASHED" || tag === ALL_IMAGES || tag === null) {
             setTagFilter(tag);
             setActiveTagFilters([]);
           } else if (event?.ctrlKey || event?.metaKey) {
@@ -9601,6 +9801,7 @@ export default function App() {
         onBulkDelete={onBulkDelete}
         onBulkPin={onBulkPin}
         onBulkArchive={onBulkArchive}
+        onBulkRestore={onBulkRestore}
         onBulkColor={onBulkColor}
         onBulkDownloadZip={onBulkDownloadZip}
         // view mode

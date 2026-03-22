@@ -203,6 +203,9 @@ CREATE TABLE IF NOT EXISTS user_settings (
       if (!names.has("archived")) {
         db.exec(`ALTER TABLE notes ADD COLUMN archived INTEGER NOT NULL DEFAULT 0`);
       }
+      if (!names.has("trashed")) {
+        db.exec(`ALTER TABLE notes ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0`);
+      }
     });
     tx();
   } catch {
@@ -313,10 +316,13 @@ const upsertUserSettings = db.prepare(
 
 // Notes statements
 const listNotes = db.prepare(
-  `SELECT * FROM notes WHERE user_id = ? AND archived = 0 ORDER BY pinned DESC, position DESC, timestamp DESC`
+  `SELECT * FROM notes WHERE user_id = ? AND archived = 0 AND trashed = 0 ORDER BY pinned DESC, position DESC, timestamp DESC`
 );
 const listArchivedNotes = db.prepare(
-  `SELECT * FROM notes WHERE user_id = ? AND archived = 1 ORDER BY timestamp DESC`
+  `SELECT * FROM notes WHERE user_id = ? AND archived = 1 AND trashed = 0 ORDER BY timestamp DESC`
+);
+const listTrashedNotes = db.prepare(
+  `SELECT * FROM notes WHERE user_id = ? AND trashed = 1 ORDER BY timestamp DESC`
 );
 const listNotesPage = db.prepare(
   `SELECT * FROM notes WHERE user_id = ? ORDER BY pinned DESC, position DESC, timestamp DESC LIMIT ? OFFSET ?`
@@ -328,8 +334,8 @@ const getNoteWithCollaboration = db.prepare(`
   WHERE n.id = ? AND (n.user_id = ? OR nc.user_id IS NOT NULL)
 `);
 const insertNote = db.prepare(`
-  INSERT INTO notes (id,user_id,type,title,content,items_json,tags_json,images_json,color,pinned,position,timestamp,archived)
-  VALUES (@id,@user_id,@type,@title,@content,@items_json,@tags_json,@images_json,@color,@pinned,@position,@timestamp,0)
+  INSERT INTO notes (id,user_id,type,title,content,items_json,tags_json,images_json,color,pinned,position,timestamp,archived,trashed)
+  VALUES (@id,@user_id,@type,@title,@content,@items_json,@tags_json,@images_json,@color,@pinned,@position,@timestamp,0,0)
 `);
 const updateNote = db.prepare(`
   UPDATE notes SET
@@ -392,7 +398,7 @@ const getNoteCollaborators = db.prepare(`
 const getCollaboratedNotes = db.prepare(`
   SELECT n.* FROM notes n
   JOIN note_collaborators nc ON n.id = nc.note_id
-  WHERE nc.user_id = ?
+  WHERE nc.user_id = ? AND n.trashed = 0
   ORDER BY n.pinned DESC, n.position DESC, n.timestamp DESC
 `);
 const updateNoteWithEditor = db.prepare(`
@@ -593,18 +599,18 @@ app.get("/api/notes", auth, (req, res) => {
   const allNotesQuery = db.prepare(`
     SELECT DISTINCT n.* FROM notes n
     WHERE (n.user_id = ? OR EXISTS(
-      SELECT 1 FROM note_collaborators nc 
+      SELECT 1 FROM note_collaborators nc
       WHERE nc.note_id = n.id AND nc.user_id = ?
-    )) AND n.archived = 0
+    )) AND n.archived = 0 AND n.trashed = 0
     ORDER BY n.pinned DESC, n.position DESC, n.timestamp DESC
   `);
 
   const allNotesWithPagingQuery = db.prepare(`
     SELECT DISTINCT n.* FROM notes n
     WHERE (n.user_id = ? OR EXISTS(
-      SELECT 1 FROM note_collaborators nc 
+      SELECT 1 FROM note_collaborators nc
       WHERE nc.note_id = n.id AND nc.user_id = ?
-    )) AND n.archived = 0
+    )) AND n.archived = 0 AND n.trashed = 0
     ORDER BY n.pinned DESC, n.position DESC, n.timestamp DESC
     LIMIT ? OFFSET ?
   `);
@@ -742,7 +748,17 @@ app.patch("/api/notes/:id", auth, (req, res) => {
 });
 
 app.delete("/api/notes/:id", auth, (req, res) => {
-  deleteNote.run(req.params.id, req.user.id);
+  // Soft delete: move to trash instead of permanent deletion
+  const id = req.params.id;
+  const existing = getNote.get(id, req.user.id);
+  if (!existing) {
+    return res.status(404).json({ error: "Note not found" });
+  }
+  const updateTrashed = db.prepare(`
+    UPDATE notes SET trashed = 1 WHERE id = ? AND user_id = ?
+  `);
+  updateTrashed.run(id, req.user.id);
+  broadcastNoteUpdated(id);
   res.json({ ok: true });
 });
 
@@ -953,6 +969,102 @@ app.get("/api/notes/archived", auth, (req, res) => {
       archived: !!r.archived,
     }))
   );
+});
+
+// Trash/Restore notes
+app.post("/api/notes/:id/trash", auth, (req, res) => {
+  const id = req.params.id;
+
+  // Check if note exists and user owns it
+  const existing = getNote.get(id, req.user.id);
+  if (!existing) {
+    return res.status(404).json({ error: "Note not found" });
+  }
+
+  // Move to trash (keep archived state intact)
+  const updateTrashed = db.prepare(`
+    UPDATE notes SET trashed = 1 WHERE id = ? AND user_id = ?
+  `);
+
+  const result = updateTrashed.run(id, req.user.id);
+
+  if (result.changes === 0) {
+    return res.status(404).json({ error: "Note not found or access denied" });
+  }
+
+  updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+  broadcastNoteUpdated(id);
+
+  res.json({ ok: true });
+});
+
+app.post("/api/notes/:id/restore", auth, (req, res) => {
+  const id = req.params.id;
+
+  // Check if note exists and user owns it
+  const existing = getNote.get(id, req.user.id);
+  if (!existing) {
+    return res.status(404).json({ error: "Note not found" });
+  }
+
+  // Restore from trash (archived state is preserved)
+  const updateTrashed = db.prepare(`
+    UPDATE notes SET trashed = 0 WHERE id = ? AND user_id = ?
+  `);
+
+  const result = updateTrashed.run(id, req.user.id);
+
+  if (result.changes === 0) {
+    return res.status(404).json({ error: "Note not found or access denied" });
+  }
+
+  updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+  broadcastNoteUpdated(id);
+
+  res.json({ ok: true });
+});
+
+// Get trashed notes
+app.get("/api/notes/trashed", auth, (req, res) => {
+  const rows = listTrashedNotes.all(req.user.id);
+  res.json(
+    rows.map((r) => ({
+      id: r.id,
+      user_id: r.user_id,
+      type: r.type,
+      title: r.title,
+      content: r.content,
+      items: JSON.parse(r.items_json || "[]"),
+      tags: JSON.parse(r.tags_json || "[]"),
+      images: JSON.parse(r.images_json || "[]"),
+      color: r.color,
+      pinned: !!r.pinned,
+      position: r.position,
+      timestamp: r.timestamp,
+      updated_at: r.updated_at,
+      lastEditedBy: r.last_edited_by,
+      lastEditedAt: r.last_edited_at,
+      archived: !!r.archived,
+      trashed: true,
+    }))
+  );
+});
+
+// Permanently delete a note (only from trash)
+app.delete("/api/notes/:id/permanent", auth, (req, res) => {
+  const id = req.params.id;
+
+  // Check if note exists, user owns it, and it's in trash
+  const existing = getNote.get(id, req.user.id);
+  if (!existing) {
+    return res.status(404).json({ error: "Note not found" });
+  }
+  if (!existing.trashed) {
+    return res.status(400).json({ error: "Note must be in trash to permanently delete" });
+  }
+
+  deleteNote.run(id, req.user.id);
+  res.json({ ok: true });
 });
 
 // Export/Import
