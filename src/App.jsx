@@ -4132,27 +4132,18 @@ function NotesUI({
                         ref={colorBtnRef}
                         type="button"
                         onClick={() => setShowColorPop((v) => !v)}
-                        className="w-6 h-6 rounded-full border-2 border-[var(--border-light)] hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 flex items-center justify-center"
+                        className="w-6 h-6 flex items-center justify-center rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-opacity"
                         data-tooltip={t("color")}
                         style={{
-                          backgroundColor:
+                          color:
                             composerColor === "default"
-                              ? "transparent"
-                              : solid(bgFor(composerColor, dark)),
-                          borderColor:
-                            composerColor === "default"
-                              ? "#d1d5db"
+                              ? (dark ? "#9ca3af" : "#6b7280")
                               : solid(bgFor(composerColor, dark)),
                         }}
                       >
-                        {composerColor === "default" && (
-                          <div
-                            className="w-4 h-4 rounded-full"
-                            style={{
-                              backgroundColor: dark ? "#1f2937" : "#fff",
-                            }}
-                          />
-                        )}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+                        </svg>
                       </button>
                       <Popover
                         anchorRef={colorBtnRef}
@@ -8719,25 +8710,18 @@ export default function App() {
                     ref={modalColorBtnRef}
                     type="button"
                     onClick={() => setShowModalColorPop((v) => !v)}
-                    className="w-6 h-6 rounded-full border-2 border-[var(--border-light)] hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 flex items-center justify-center"
+                    className="w-6 h-6 flex items-center justify-center rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-opacity"
                     data-tooltip={t("color")}
                     style={{
-                      backgroundColor:
+                      color:
                         mColor === "default"
-                          ? "transparent"
-                          : solid(bgFor(mColor, dark)),
-                      borderColor:
-                        mColor === "default"
-                          ? "#d1d5db"
+                          ? (dark ? "#9ca3af" : "#6b7280")
                           : solid(bgFor(mColor, dark)),
                     }}
                   >
-                    {mColor === "default" && (
-                      <div
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: dark ? "#1f2937" : "#fff" }}
-                      />
-                    )}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+                    </svg>
                   </button>
                   <Popover
                     anchorRef={modalColorBtnRef}
