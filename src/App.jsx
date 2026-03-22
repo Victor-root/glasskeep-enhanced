@@ -2314,7 +2314,7 @@ function LoginView({
         {err && <p className="text-red-600 text-sm">{err}</p>}
         <button
           type="submit"
-          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
         >{t("signIn")}</button>
       </form>
 
@@ -2394,7 +2394,7 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin, floatingCardsEn
         {err && <p className="text-red-600 text-sm">{err}</p>}
         <button
           type="submit"
-          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
         >{t("createAccount")}</button>
       </form>
       <div className="mt-4 text-sm text-center">
@@ -2438,7 +2438,7 @@ function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin, floating
         {err && <p className="text-red-600 text-sm">{err}</p>}
         <button
           type="submit"
-          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
         >{t("signInWithSecretKey")}</button>
       </form>
       <div className="mt-4 text-sm text-center">
@@ -2938,7 +2938,7 @@ function SettingsPanel({
                 {t("cancel")}
               </button>
               <button
-                className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+                className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
                 onClick={() => {
                   setResetDialogOpen(false);
                   onClose();
@@ -3203,7 +3203,7 @@ function AdminPanel({
               <button
                 type="submit"
                 disabled={isCreatingUser}
-                className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
               >
                 {isCreatingUser ? "Creating..." : t("createUser")}
               </button>
@@ -3338,7 +3338,7 @@ function AdminPanel({
                 <button
                   type="submit"
                   disabled={isUpdatingUser}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
                 >
                   {isUpdatingUser ? "Updating..." : t("updateUser")}
                 </button>
@@ -9073,7 +9073,7 @@ export default function App() {
                               }}
                             >{t("cancel")}</button>
                             <button
-                              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                              className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
                               onClick={async () => {
                                 if (collaboratorUsername.trim()) {
                                   await addCollaborator(
@@ -9257,7 +9257,7 @@ export default function App() {
         <AuthShell title={t("adminPanel")} dark={dark} onToggleDark={toggleDark}>
           <p className="text-sm mb-4">{t("mustSignInAdmin")}</p>
           <button
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
             onClick={() => (window.location.hash = "#/login")}
           >{t("goToSignIn")}</button>
         </AuthShell>
@@ -9655,7 +9655,7 @@ export default function App() {
                 {genericConfirmConfig.cancelText || t("cancel")}
               </button>
               <button
-                className={`px-4 py-2 rounded-lg ${genericConfirmConfig.danger ? "bg-red-600 text-white hover:bg-red-700" : "bg-indigo-600 text-white hover:bg-indigo-700"}`}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.98] ${genericConfirmConfig.danger ? "bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-300/40 hover:shadow-lg hover:shadow-red-300/50" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50"}`}
                 onClick={async () => {
                   setGenericConfirmOpen(false);
                   if (genericConfirmConfig.onConfirm) {
