@@ -1185,7 +1185,11 @@ html.dark .login-deco-card {
 
 /** ---------- Image compression (client) ---------- */
 async function fileToCompressedDataURL(file, maxDim = 1600, quality = 0.85) {
-  const hasAlpha = ["image/png", "image/webp", "image/gif", "image/avif"].includes(file.type);
+  /* Detect alpha support from MIME type AND filename extension */
+  const alphaTypes = ["image/png", "image/webp", "image/gif", "image/avif"];
+  const alphaExts = /\.(png|webp|gif|avif)$/i;
+  const hasAlphaHint = alphaTypes.includes(file.type) || alphaExts.test(file.name || "");
+
   const dataUrl = await new Promise((res, rej) => {
     const fr = new FileReader();
     fr.onload = () => res(fr.result);
@@ -1202,14 +1206,25 @@ async function fileToCompressedDataURL(file, maxDim = 1600, quality = 0.85) {
   const scale = Math.min(1, maxDim / Math.max(width, height));
   const targetW = Math.round(width * scale);
   const targetH = Math.round(height * scale);
+
   const canvas = document.createElement("canvas");
   canvas.width = targetW;
   canvas.height = targetH;
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d", { alpha: true });
+  /* Start from a fully transparent canvas */
+  ctx.clearRect(0, 0, targetW, targetH);
   ctx.drawImage(img, 0, 0, targetW, targetH);
-  return hasAlpha
-    ? canvas.toDataURL("image/png")
-    : canvas.toDataURL("image/jpeg", quality);
+
+  /* If alpha hint matched, check actual pixel data for real transparency */
+  if (hasAlphaHint) {
+    const pixelData = ctx.getImageData(0, 0, targetW, targetH).data;
+    let hasRealAlpha = false;
+    for (let i = 3; i < pixelData.length; i += 4) {
+      if (pixelData[i] < 254) { hasRealAlpha = true; break; }
+    }
+    if (hasRealAlpha) return canvas.toDataURL("image/png");
+  }
+  return canvas.toDataURL("image/jpeg", quality);
 }
 
 /** ---------- Phone number linkification (mobile only) ---------- */
@@ -1930,13 +1945,13 @@ function NoteCard({
             <div
               key={im.id}
               className="overflow-hidden rounded-lg"
-              style={{ width: imgs.length === 1 ? "100%" : "calc(50% - 2px)", backgroundColor: "white" }}
+              style={{ width: imgs.length === 1 ? "100%" : "calc(50% - 2px)" }}
             >
               <img
                 src={im.src}
                 alt={im.name || "note image"}
                 className="w-full h-auto object-contain object-center"
-                style={{ maxHeight: "200px", backgroundColor: "white" }}
+                style={{ maxHeight: "200px" }}
               />
             </div>
           ))}
@@ -8016,7 +8031,6 @@ export default function App() {
                     className="group relative overflow-hidden rounded-md border border-[var(--border-light)]"
                     style={{
                       width: mImages.length === 1 ? "100%" : "calc(50% - 4px)",
-                      backgroundColor: "white",
                     }}
                   >
                     <img
