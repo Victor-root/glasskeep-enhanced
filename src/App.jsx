@@ -4694,7 +4694,7 @@ function TooltipPortal() {
   return createPortal(
     <div
       ref={boxRef}
-      className="pointer-events-none fixed z-[10001]"
+      className="pointer-events-none fixed z-[100001]"
       style={tooltip.below
         ? { top: tooltip.y + 8, left: tooltip.x, transform: 'translateX(-50%)' }
         : { top: tooltip.y - 8, left: tooltip.x, transform: 'translate(-50%, -100%)' }
