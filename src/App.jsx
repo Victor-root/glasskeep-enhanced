@@ -1362,7 +1362,7 @@ function PaletteColorIcon({ size = 22 }) {
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24">
       {/* Palette body - white with dark navy outline */}
       <path
-        fill="#f1f5f9"
+        fill="rgba(255, 158, 0, 0.34)"
         stroke="#1e293b"
         strokeWidth="1.1"
         strokeLinejoin="round"
