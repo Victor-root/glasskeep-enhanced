@@ -3887,6 +3887,7 @@ function NotesUI({
             </div>
           ) : (
             <div
+              ref={composerRef}
               className="glass-card rounded-xl shadow-lg p-4 mb-8 relative"
               style={{ backgroundColor: bgFor(composerColor, dark) }}
             >
@@ -4954,6 +4955,7 @@ export default function App() {
   // Composer collapse + refs
   const [composerCollapsed, setComposerCollapsed] = useState(true);
   const titleRef = useRef(null);
+  const composerRef = useRef(null);
 
   // Color dropdown (composer)
   const colorBtnRef = useRef(null);
@@ -5098,6 +5100,18 @@ export default function App() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Collapse composer when clicking outside
+  useEffect(() => {
+    if (composerCollapsed) return;
+    const handleClickOutside = (e) => {
+      if (composerRef.current && !composerRef.current.contains(e.target)) {
+        setComposerCollapsed(true);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [composerCollapsed]);
 
   const onBulkDelete = async () => {
     if (!selectedIds.length) return;
