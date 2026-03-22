@@ -1085,6 +1085,27 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
   -webkit-backdrop-filter: blur(12px);
 }
 
+/* Note modal enter / exit animations — only transform+opacity (GPU composited, no layout) */
+@keyframes noteModalIn {
+  from { opacity: 0; transform: scale(0.97) translateY(6px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);   }
+}
+@keyframes noteModalOut {
+  from { opacity: 1; transform: scale(1)    translateY(0);   }
+  to   { opacity: 0; transform: scale(0.97) translateY(6px); }
+}
+/* Mobile: full-screen modal → slide-up only, no scale (avoids jitter on small screens) */
+@media (max-width: 639px) {
+  @keyframes noteModalIn  { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes noteModalOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(14px); } }
+}
+@keyframes scrimFadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scrimFadeOut { from { opacity: 1; } to { opacity: 0; } }
+.note-modal-anim         { animation: noteModalIn  200ms ease-out both; }
+.note-modal-anim.closing { animation: noteModalOut 180ms ease-in  both; }
+.note-scrim-anim         { animation: scrimFadeIn  200ms ease-out both; }
+.note-scrim-anim.closing { animation: scrimFadeOut 180ms ease-in  both; }
+
 /* formatting popover base */
 .fmt-pop {
   border: 1px solid var(--border-light);
@@ -4850,6 +4871,8 @@ export default function App() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [genericConfirmOpen, setGenericConfirmOpen] = useState(false);
   const [genericConfirmConfig, setGenericConfirmConfig] = useState({});
+  const [isModalClosing, setIsModalClosing] = useState(false);
+  const modalClosingTimerRef = useRef(null);
 
   // Toast notification system
   const [toasts, setToasts] = useState([]);
@@ -7182,6 +7205,9 @@ export default function App() {
   }, [notes, open, activeId, hasNoteBeenModified]);
 
   const closeModal = () => {
+    // Prevent double-triggering while exit animation is running
+    if (modalClosingTimerRef.current) return;
+
     // Save any pending changes for collaborative text notes before closing
     // Only save if NOT in view mode AND user has actually edited - don't overwrite with stale data
     if (
@@ -7227,16 +7253,22 @@ export default function App() {
         .catch((e) => console.error("Final save on close failed:", e));
     }
 
-    if (modalHistoryRef.current) {
-      modalHistoryRef.current = false;
-      window.history.back();
-    }
-    setOpen(false);
-    setActiveId(null);
-    setViewMode(true);
-    setModalMenuOpen(false);
-    setConfirmDeleteOpen(false);
-    setShowModalFmt(false);
+    // Start exit animation, then actually unmount after it completes
+    setIsModalClosing(true);
+    modalClosingTimerRef.current = setTimeout(() => {
+      modalClosingTimerRef.current = null;
+      if (modalHistoryRef.current) {
+        modalHistoryRef.current = false;
+        window.history.back();
+      }
+      setOpen(false);
+      setActiveId(null);
+      setViewMode(true);
+      setModalMenuOpen(false);
+      setConfirmDeleteOpen(false);
+      setShowModalFmt(false);
+      setIsModalClosing(false);
+    }, 180);
   };
 
   const saveModal = async () => {
@@ -7839,10 +7871,10 @@ export default function App() {
   }, [open, viewMode, mType, mBody, activeId]);
 
   /** -------- Modal JSX -------- */
-  const modal = open && (
+  const modal = (open || isModalClosing) && (
     <>
       <div
-        className="modal-scrim fixed inset-0 bg-black/40 z-40 flex items-center justify-center transition-opacity duration-300 overscroll-contain"
+        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 bg-black/40 z-40 flex items-center justify-center overscroll-contain`}
         onMouseDown={(e) => {
           // Only consider closing if the press STARTS on the scrim
           scrimClickStartRef.current = e.target === e.currentTarget;
@@ -7856,7 +7888,7 @@ export default function App() {
         }}
       >
         <div
-          className="glass-card rounded-none shadow-2xl w-full h-full max-w-none sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl flex flex-col relative overflow-hidden"
+          className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-2xl w-full h-full max-w-none sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl flex flex-col relative overflow-hidden`}
           style={{ backgroundColor: modalBgFor(mColor, dark, windowWidth < 640) }}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
