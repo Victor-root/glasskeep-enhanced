@@ -3406,6 +3406,7 @@ function NotesUI({
   composerCollapsed,
   setComposerCollapsed,
   titleRef,
+  composerRef,
   // color popover
   colorBtnRef,
   showColorPop,
@@ -9550,6 +9551,7 @@ export default function App() {
         composerCollapsed={composerCollapsed}
         setComposerCollapsed={setComposerCollapsed}
         titleRef={titleRef}
+        composerRef={composerRef}
         // color popover
         colorBtnRef={colorBtnRef}
         showColorPop={showColorPop}
