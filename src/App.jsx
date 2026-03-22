@@ -4297,7 +4297,7 @@ function NotesUI({
                       />
                       <button
                         onClick={() => composerFileRef.current?.click()}
-                        className="p-1.5 rounded-xl border-2 border-sky-200/80 bg-gradient-to-br from-sky-50 to-blue-50/60 text-sky-500 hover:from-sky-100 hover:to-blue-100 hover:border-sky-300 hover:scale-105 hover:shadow-sm hover:shadow-sky-200/50 active:scale-95 dark:from-sky-900/20 dark:to-blue-900/10 dark:border-sky-700/50 dark:text-sky-400 dark:hover:from-sky-800/30 dark:hover:to-blue-800/20 flex-shrink-0 transition-all duration-200"
+                        className="p-1.5 text-sky-500 dark:text-sky-400 hover:text-sky-600 dark:hover:text-sky-300 flex-shrink-0 transition-colors duration-200"
                         data-tooltip={t("addImages")}
                       >
                         <AddImageIcon />
@@ -8871,7 +8871,7 @@ export default function App() {
                   />
                   <button
                     onClick={() => modalFileRef.current?.click()}
-                    className="p-1.5 rounded-xl border-2 border-sky-200/80 bg-gradient-to-br from-sky-50 to-blue-50/60 text-sky-500 hover:from-sky-100 hover:to-blue-100 hover:border-sky-300 hover:scale-105 hover:shadow-sm hover:shadow-sky-200/50 active:scale-95 dark:from-sky-900/20 dark:to-blue-900/10 dark:border-sky-700/50 dark:text-sky-400 dark:hover:from-sky-800/30 dark:hover:to-blue-800/20 flex-shrink-0 transition-all duration-200"
+                    className="p-1.5 text-sky-500 dark:text-sky-400 hover:text-sky-600 dark:hover:text-sky-300 flex-shrink-0 transition-colors duration-200"
                     data-tooltip={t("addImages")}
                   >
                     <AddImageIcon />
