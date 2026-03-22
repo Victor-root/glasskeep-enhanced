@@ -1418,6 +1418,7 @@ function ColorPickerPanel({ anchorRef, open, onClose, colors, selectedColor, dar
             type="button"
             onClick={(e) => { e.stopPropagation(); onSelect(name); onClose(); }}
             aria-label={trColorName(name)}
+            data-tooltip={trColorName(name)}
             className={`w-12 h-12 rounded-full transition-transform active:scale-95 hover:scale-110 focus:outline-none flex items-center justify-center ${
               name === "default"
                 ? "border-2 border-gray-300 dark:border-gray-500"
