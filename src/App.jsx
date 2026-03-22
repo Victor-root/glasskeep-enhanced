@@ -3975,9 +3975,9 @@ function NotesUI({
                         <button
                           onClick={addComposerItem}
                           disabled={!isOnline}
-                          className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${
+                          className={`px-3 py-1.5 rounded-lg whitespace-nowrap font-semibold transition-all duration-200 ${
                             isOnline
-                              ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                              ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
                               : "bg-gray-400 text-gray-200 cursor-not-allowed"
                           }`}
                         >{t("add")}</button>
@@ -8332,7 +8332,7 @@ export default function App() {
                             } catch (e) {}
                           }
                         }}
-                        className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                        className="px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
                       >{t("add")}</button>
                     </div>
                   )}
