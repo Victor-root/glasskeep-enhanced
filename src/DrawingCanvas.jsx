@@ -427,7 +427,7 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
                 data-tooltip={t("undo")}
                 onClick={undo}
                 disabled={paths.length === 0}
-                className="p-1.5 rounded-xl border-2 border-amber-200/80 bg-gradient-to-br from-amber-50 to-yellow-50/60 text-amber-500 hover:from-amber-100 hover:to-yellow-100 hover:border-amber-300 hover:scale-105 hover:shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-amber-900/20 dark:to-yellow-900/10 dark:border-amber-700/50 dark:text-amber-400 transition-all duration-200"
+                className="p-1.5 rounded-xl border-2 border-teal-300 bg-gradient-to-br from-teal-100 to-cyan-100 text-teal-700 hover:from-teal-200 hover:to-cyan-200 hover:border-teal-400 hover:scale-105 hover:shadow-sm hover:shadow-teal-200/50 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-teal-800/40 dark:to-cyan-800/30 dark:border-teal-600 dark:text-teal-300 dark:hover:from-teal-700/50 dark:hover:to-cyan-700/40 transition-all duration-200"
               >
                 <UndoToolIcon />
               </button>
