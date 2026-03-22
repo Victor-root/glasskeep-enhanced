@@ -1092,6 +1092,20 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
   box-shadow: 0 10px 30px rgba(0,0,0,.2);
   padding: .5rem;
 }
+@media (max-width: 639px) {
+  .color-picker-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .color-picker-grid button {
+    width: 40px !important;
+    height: 40px !important;
+  }
+  .color-picker-grid button > div {
+    width: 30px !important;
+    height: 30px !important;
+  }
+}
 .fmt-btn {
   display: inline-flex;
   align-items: center;
@@ -3417,7 +3431,7 @@ function NotesUI({
               <div
                 className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
               >
-                <div className="grid grid-cols-6 gap-2">
+                <div className="color-picker-grid grid grid-cols-6 gap-2">
                   {COLOR_ORDER.filter((name) => LIGHT_COLORS[name]).map(
                     (name) => (
                       <ColorDot
@@ -4153,7 +4167,7 @@ function NotesUI({
                         <div
                           className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
                         >
-                          <div className="grid grid-cols-6 gap-2">
+                          <div className="color-picker-grid grid grid-cols-6 gap-2">
                             {COLOR_ORDER.filter(
                               (name) => LIGHT_COLORS[name],
                             ).map((name) => (
@@ -8731,7 +8745,7 @@ export default function App() {
                     <div
                       className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
                     >
-                      <div className="grid grid-cols-6 gap-2">
+                      <div className="color-picker-grid grid grid-cols-6 gap-2">
                         {COLOR_ORDER.filter((name) => LIGHT_COLORS[name]).map(
                           (name) => (
                             <ColorDot
