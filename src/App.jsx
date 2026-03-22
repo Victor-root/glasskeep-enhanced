@@ -4163,7 +4163,7 @@ function NotesUI({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap sm:flex-none relative">
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:flex-none relative">
                       {/* Formatting button (composer) - only for text mode */}
                       {composerType === "text" && (
                         <>
@@ -4171,7 +4171,7 @@ function NotesUI({
                             ref={composerFmtBtnRef}
                             type="button"
                             onClick={() => setShowComposerFmt((v) => !v)}
-                            className="px-2 py-1 rounded-lg border border-violet-200 bg-violet-50 text-violet-600 hover:bg-violet-100 dark:bg-violet-900/20 dark:border-violet-700 dark:text-violet-400 flex items-center gap-2 text-sm"
+                            className="px-2.5 py-1.5 rounded-xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-purple-50 text-violet-600 hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 hover:scale-105 hover:shadow-md hover:shadow-violet-200/60 active:scale-95 dark:from-violet-900/30 dark:to-purple-900/20 dark:border-violet-700/60 dark:text-violet-400 dark:hover:from-violet-800/40 dark:hover:to-purple-800/30 flex items-center gap-1.5 text-sm font-medium transition-all duration-200 flex-shrink-0"
                             data-tooltip={t("formatting")}
                           >
                             <FormatIcon />{t("formatting")}</button>
@@ -4192,14 +4192,14 @@ function NotesUI({
                       )}
 
                       {/* Type selection buttons */}
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
                         <button
                           type="button"
                           onClick={() => setComposerType("text")}
-                          className={`px-2 py-1 rounded-lg border text-sm ${
+                          className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                             composerType === "text"
-                              ? "bg-indigo-600 text-white border-indigo-600"
-                              : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
+                              ? "bg-gradient-to-br from-rose-400 to-pink-500 text-white border-transparent shadow-md shadow-rose-300/50 scale-105"
+                              : "border-rose-200/80 bg-gradient-to-br from-rose-50 to-pink-50/60 text-rose-400 hover:from-rose-100 hover:to-pink-100 hover:border-rose-300 hover:scale-105 hover:shadow-sm hover:shadow-rose-200/50 dark:from-rose-900/20 dark:to-pink-900/10 dark:border-rose-700/50 dark:text-rose-400 dark:hover:from-rose-800/30 dark:hover:to-pink-800/20"
                           }`}
                           data-tooltip={t("textNote")}
                         >
@@ -4208,10 +4208,10 @@ function NotesUI({
                         <button
                           type="button"
                           onClick={() => setComposerType("checklist")}
-                          className={`px-2 py-1 rounded-lg border text-sm ${
+                          className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                             composerType === "checklist"
-                              ? "bg-indigo-600 text-white border-indigo-600"
-                              : "border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400"
+                              ? "bg-gradient-to-br from-emerald-400 to-green-500 text-white border-transparent shadow-md shadow-emerald-300/50 scale-105"
+                              : "border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-green-50/60 text-emerald-500 hover:from-emerald-100 hover:to-green-100 hover:border-emerald-300 hover:scale-105 hover:shadow-sm hover:shadow-emerald-200/50 dark:from-emerald-900/20 dark:to-green-900/10 dark:border-emerald-700/50 dark:text-emerald-400 dark:hover:from-emerald-800/30 dark:hover:to-green-800/20"
                           }`}
                           data-tooltip={t("checklist")}
                         >
@@ -4220,10 +4220,10 @@ function NotesUI({
                         <button
                           type="button"
                           onClick={() => setComposerType("draw")}
-                          className={`px-2 py-1 rounded-lg border text-sm ${
+                          className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                             composerType === "draw"
-                              ? "bg-indigo-600 text-white border-indigo-600"
-                              : "border-orange-200 bg-orange-50 text-orange-500 hover:bg-orange-100 dark:bg-orange-900/20 dark:border-orange-700 dark:text-orange-400"
+                              ? "bg-gradient-to-br from-orange-400 to-amber-500 text-white border-transparent shadow-md shadow-orange-300/50 scale-105"
+                              : "border-orange-200/80 bg-gradient-to-br from-orange-50 to-amber-50/60 text-orange-400 hover:from-orange-100 hover:to-amber-100 hover:border-orange-300 hover:scale-105 hover:shadow-sm hover:shadow-orange-200/50 dark:from-orange-900/20 dark:to-amber-900/10 dark:border-orange-700/50 dark:text-orange-400 dark:hover:from-orange-800/30 dark:hover:to-amber-800/20"
                           }`}
                           data-tooltip={t("drawing")}
                         >
@@ -4236,7 +4236,7 @@ function NotesUI({
                         ref={colorBtnRef}
                         type="button"
                         onClick={() => setShowColorPop((v) => !v)}
-                        className="w-6 h-6 flex items-center justify-center rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-opacity"
+                        className="w-8 h-8 flex items-center justify-center rounded-xl hover:scale-110 hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 active:scale-95"
                         data-tooltip={t("color")}
                       >
                         <PaletteColorIcon size={22} />
@@ -4274,7 +4274,7 @@ function NotesUI({
                       />
                       <button
                         onClick={() => composerFileRef.current?.click()}
-                        className="px-2 py-1 rounded-lg border border-sky-200 bg-sky-50 text-sky-500 hover:bg-sky-100 dark:bg-sky-900/20 dark:border-sky-700 dark:text-sky-400 flex-shrink-0"
+                        className="p-1.5 rounded-xl border-2 border-sky-200/80 bg-gradient-to-br from-sky-50 to-blue-50/60 text-sky-500 hover:from-sky-100 hover:to-blue-100 hover:border-sky-300 hover:scale-105 hover:shadow-sm hover:shadow-sky-200/50 active:scale-95 dark:from-sky-900/20 dark:to-blue-900/10 dark:border-sky-700/50 dark:text-sky-400 dark:hover:from-sky-800/30 dark:hover:to-blue-800/20 flex-shrink-0 transition-all duration-200"
                         data-tooltip={t("addImages")}
                       >
                         <AddImageIcon />
@@ -4284,10 +4284,10 @@ function NotesUI({
                       <button
                         onClick={addNote}
                         disabled={!isOnline}
-                        className={`px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-colors whitespace-nowrap flex-shrink-0 ${
+                        className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
                           isOnline
-                            ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                            : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                            ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+                            : "bg-gray-300 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
                         }`}
                       >{t("addNote")}</button>
                     </div>
