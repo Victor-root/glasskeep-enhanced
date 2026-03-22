@@ -22,6 +22,14 @@
 - **Richer note preview** — renders Markdown with line breaks (16 lines instead of 6)
 - **Wider modal** — responsive with adapted breakpoints to avoid truncated text
 
+### 🗑️ Trash / Recycle bin
+- **Deleting a note no longer removes it permanently** — it moves to the Trash
+- Dedicated **Trash view** in the sidebar, alongside Home and Archive
+- **Restore** a note from the trash — it returns to its original state (active or archived)
+- **Permanent deletion** is only possible from the Trash, with a clear confirmation dialog
+- Works with single notes and bulk selection
+- Full EN/FR translations
+
 <details>
 <summary>📋 Full changelog since fork</summary>
 
@@ -56,6 +64,13 @@
 - OR logic for multi-tag filtering
 - Multi-tag banner moved below tag list
 - Hidden multi-tag banner for single tag selection
+
+### 🗑️ Trash
+- Soft delete: notes go to trash instead of being permanently deleted
+- Trash view with restore and permanent delete actions
+- Archived state preserved through trash/restore cycle
+- Composer hidden in trash view
+- Bulk trash, restore and permanent delete support
 
 ### 📝 Notes & Modal
 - Close note modal with Escape key
