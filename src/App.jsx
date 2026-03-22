@@ -1936,7 +1936,7 @@ function NoteCard({
                 src={im.src}
                 alt={im.name || "note image"}
                 className="w-full h-auto object-contain object-center"
-                style={{ maxHeight: "200px" }}
+                style={{ maxHeight: "200px", backgroundColor: "white" }}
               />
             </div>
           ))}
@@ -8023,7 +8023,7 @@ export default function App() {
                       src={im.src}
                       alt={im.name}
                       className="w-full h-auto object-contain object-center cursor-pointer"
-                      style={{ maxHeight: "360px" }}
+                      style={{ maxHeight: "360px", backgroundColor: "white" }}
                       onClick={(e) => {
                         e.stopPropagation();
                         openImageViewer(idx);
