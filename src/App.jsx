@@ -3660,7 +3660,7 @@ function NotesUI({
           </h1>
           {activeTagFilter && (
             <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20">
-              {tagLabel === t("allImages") || tagLabel === t("archivedNotes")
+              {tagLabel === t("allImages") || tagLabel === t("archivedNotes") || tagLabel === t("trashedNotes")
                 ? tagLabel
                 : `Tag: ${tagLabel}`}
             </span>
