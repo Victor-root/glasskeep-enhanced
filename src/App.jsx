@@ -1930,7 +1930,7 @@ function NoteCard({
             <div
               key={im.id}
               className="overflow-hidden rounded-lg"
-              style={{ width: imgs.length === 1 ? "100%" : "calc(50% - 2px)" }}
+              style={{ width: imgs.length === 1 ? "100%" : "calc(50% - 2px)", backgroundColor: "white" }}
             >
               <img
                 src={im.src}
@@ -8016,6 +8016,7 @@ export default function App() {
                     className="group relative overflow-hidden rounded-md border border-[var(--border-light)]"
                     style={{
                       width: mImages.length === 1 ? "100%" : "calc(50% - 4px)",
+                      backgroundColor: "white",
                     }}
                   >
                     <img
