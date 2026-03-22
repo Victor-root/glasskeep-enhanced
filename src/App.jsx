@@ -3579,7 +3579,7 @@ function NotesUI({
                 <button
                   className="px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm"
                   onClick={onBulkDelete}
-                >{t("delete")}</button>
+                >{t("moveToTrash")}</button>
                 <button
                   ref={multiColorBtnRef}
                   type="button"
@@ -3920,7 +3920,8 @@ function NotesUI({
         </div>
       )}
 
-      {/* Composer */}
+      {/* Composer — hidden in trash view */}
+      {activeTagFilter !== "TRASHED" && (
       <div className="px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="max-w-2xl mx-auto">
           {!isOnline ? (
@@ -4357,6 +4358,7 @@ function NotesUI({
           )}
         </div>
       </div>
+      )}
 
       {/* Notes lists */}
       <main className="px-4 sm:px-6 md:px-8 lg:px-12 pb-12">
@@ -4808,6 +4810,7 @@ export default function App() {
 
   // Tag filter & sidebar
   const [tagFilter, setTagFilter] = useState(null); // null = all, ALL_IMAGES = only notes with images
+  const tagFilterRef = useRef(tagFilter);
   const [activeTagFilters, setActiveTagFilters] = useState([]); // multi-tag filter
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [alwaysShowSidebarOnWide, setAlwaysShowSidebarOnWide] = useState(() => {
@@ -5784,6 +5787,9 @@ export default function App() {
     }
   }, [token, tagFilter]);
 
+  // Keep tagFilter ref in sync for SSE/polling closures
+  useEffect(() => { tagFilterRef.current = tagFilter; }, [tagFilter]);
+
   // Check registration setting and login slogan on app load
   useEffect(() => {
     checkRegistrationSetting();
@@ -5823,9 +5829,10 @@ export default function App() {
             const msg = JSON.parse(e.data || "{}");
             if (msg && msg.type === "note_updated") {
               // Refresh notes list on any note update relevant to this user
-              if (tagFilter === "ARCHIVED") {
+              const currentFilter = tagFilterRef.current;
+              if (currentFilter === "ARCHIVED") {
                 loadArchivedNotes().catch(() => {});
-              } else if (tagFilter === "TRASHED") {
+              } else if (currentFilter === "TRASHED") {
                 loadTrashedNotes().catch(() => {});
               } else {
                 loadNotes().catch(() => {});
@@ -5838,9 +5845,10 @@ export default function App() {
           try {
             const msg = JSON.parse(e.data || "{}");
             if (msg && msg.noteId) {
-              if (tagFilter === "ARCHIVED") {
+              const currentFilter = tagFilterRef.current;
+              if (currentFilter === "ARCHIVED") {
                 loadArchivedNotes().catch(() => {});
-              } else if (tagFilter === "TRASHED") {
+              } else if (currentFilter === "TRASHED") {
                 loadTrashedNotes().catch(() => {});
               } else {
                 loadNotes().catch(() => {});
@@ -5896,8 +5904,11 @@ export default function App() {
       pollInterval = setInterval(() => {
         // Only poll if SSE is not connected
         if (!es || es.readyState === EventSource.CLOSED) {
-          if (tagFilter === "ARCHIVED") {
+          const currentFilter = tagFilterRef.current;
+          if (currentFilter === "ARCHIVED") {
             loadArchivedNotes().catch(() => {});
+          } else if (currentFilter === "TRASHED") {
+            loadTrashedNotes().catch(() => {});
           } else {
             loadNotes().catch(() => {});
           }
@@ -5922,8 +5933,11 @@ export default function App() {
           }
 
           // Also refresh notes when page becomes visible
-          if (tagFilter === "ARCHIVED") {
+          const currentFilter = tagFilterRef.current;
+          if (currentFilter === "ARCHIVED") {
             loadArchivedNotes().catch(() => {});
+          } else if (currentFilter === "TRASHED") {
+            loadTrashedNotes().catch(() => {});
           } else {
             loadNotes().catch(() => {});
           }
