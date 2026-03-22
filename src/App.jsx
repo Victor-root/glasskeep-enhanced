@@ -1185,7 +1185,11 @@ html.dark .login-deco-card {
 
 /** ---------- Image compression (client) ---------- */
 async function fileToCompressedDataURL(file, maxDim = 1600, quality = 0.85) {
-  const hasAlpha = ["image/png", "image/webp", "image/gif", "image/avif"].includes(file.type);
+  /* Detect alpha support from MIME type AND filename extension */
+  const alphaTypes = ["image/png", "image/webp", "image/gif", "image/avif"];
+  const alphaExts = /\.(png|webp|gif|avif)$/i;
+  const hasAlphaHint = alphaTypes.includes(file.type) || alphaExts.test(file.name || "");
+
   const dataUrl = await new Promise((res, rej) => {
     const fr = new FileReader();
     fr.onload = () => res(fr.result);
@@ -1202,14 +1206,25 @@ async function fileToCompressedDataURL(file, maxDim = 1600, quality = 0.85) {
   const scale = Math.min(1, maxDim / Math.max(width, height));
   const targetW = Math.round(width * scale);
   const targetH = Math.round(height * scale);
+
   const canvas = document.createElement("canvas");
   canvas.width = targetW;
   canvas.height = targetH;
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d", { alpha: true });
+  /* Start from a fully transparent canvas */
+  ctx.clearRect(0, 0, targetW, targetH);
   ctx.drawImage(img, 0, 0, targetW, targetH);
-  return hasAlpha
-    ? canvas.toDataURL("image/png")
-    : canvas.toDataURL("image/jpeg", quality);
+
+  /* If alpha hint matched, check actual pixel data for real transparency */
+  if (hasAlphaHint) {
+    const pixelData = ctx.getImageData(0, 0, targetW, targetH).data;
+    let hasRealAlpha = false;
+    for (let i = 3; i < pixelData.length; i += 4) {
+      if (pixelData[i] < 254) { hasRealAlpha = true; break; }
+    }
+    if (hasRealAlpha) return canvas.toDataURL("image/png");
+  }
+  return canvas.toDataURL("image/jpeg", quality);
 }
 
 /** ---------- Phone number linkification (mobile only) ---------- */
@@ -1340,6 +1355,128 @@ const ColorDot = ({ name, selected, onClick, darkMode }) => (
     )}
   </button>
 );
+
+/** ---------- Palette icon with colored blobs ---------- */
+function PaletteColorIcon({ size = 22 }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24">
+      {/* Palette body - white with dark navy outline */}
+      <path
+        fill="rgba(255, 158, 0, 0.34)"
+        stroke="#1e293b"
+        strokeWidth="1.1"
+        strokeLinejoin="round"
+        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-4.97-4.48-9-10-9z"
+      />
+      {/* Red - top */}
+      <circle cx="9"    cy="7.5"  r="1.65" fill="#ef4444" stroke="#1e293b" strokeWidth="0.5"/>
+      {/* Yellow - left */}
+      <circle cx="6.5"  cy="12.5" r="1.65" fill="#f59e0b" stroke="#1e293b" strokeWidth="0.5"/>
+      {/* Dark - center */}
+      <circle cx="12"   cy="11"   r="1.3"  fill="#1e293b"/>
+      {/* Green - between red and blue, near top-right edge */}
+      <circle cx="15.5" cy="7.5"  r="1.65" fill="#10b981" stroke="#1e293b" strokeWidth="0.5"/>
+      {/* Blue - right */}
+      <circle cx="16.5" cy="13.5" r="1.65" fill="#3b82f6" stroke="#1e293b" strokeWidth="0.5"/>
+    </svg>
+  );
+}
+
+/** ---------- Color Picker Panel ---------- */
+function ColorPickerPanel({ anchorRef, open, onClose, colors, selectedColor, darkMode, onSelect }) {
+  const panelRef = useRef(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, dropUp: false });
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const a = anchorRef?.current;
+      if (!a) return;
+      const r = a.getBoundingClientRect();
+      const panelW = 256;
+      const spaceBelow = window.innerHeight - r.bottom;
+      const dropUp = spaceBelow < 240;
+      let left = Math.min(r.left, window.innerWidth - panelW - 8);
+      left = Math.max(8, left);
+      setPos({ top: dropUp ? r.top - 8 : r.bottom + 8, left, dropUp });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open, anchorRef]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (panelRef.current?.contains(e.target)) return;
+      if (anchorRef?.current?.contains(e.target)) return;
+      onClose?.();
+    };
+    document.addEventListener("mousedown", onDown, true);
+    return () => document.removeEventListener("mousedown", onDown, true);
+  }, [open, onClose, anchorRef]);
+
+  if (!open) return null;
+  const panelStyle = {
+    position: "fixed",
+    left: pos.left,
+    zIndex: 99999,
+    width: 256,
+    ...(pos.dropUp
+      ? { bottom: window.innerHeight - pos.top }
+      : { top: pos.top }),
+  };
+
+  return createPortal(
+    <div
+      ref={panelRef}
+      style={panelStyle}
+      className={`rounded-2xl shadow-2xl backdrop-blur-xl border overflow-hidden ring-1 ring-black/5 dark:ring-white/5 p-3 ${
+        darkMode
+          ? "bg-gray-900/98 border-gray-700/50"
+          : "bg-white/98 border-gray-100/80"
+      }`}
+    >
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 48px)", gap: "12px" }}>
+        {colors.map((name) => (
+          <button
+            key={name}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onSelect(name); onClose(); }}
+            aria-label={trColorName(name)}
+            data-tooltip={trColorName(name)}
+            className={`w-12 h-12 rounded-full transition-transform active:scale-95 hover:scale-110 focus:outline-none flex items-center justify-center ${
+              name === "default"
+                ? "border-2 border-gray-300 dark:border-gray-500"
+                : ""
+            } ${
+              selectedColor === name
+                ? "ring-[3px] ring-indigo-500 ring-offset-2 dark:ring-offset-gray-900"
+                : ""
+            }`}
+            style={{
+              backgroundColor:
+                name === "default" ? "transparent" : solid(bgFor(name, darkMode)),
+            }}
+          >
+            {name === "default" && (
+              <div
+                className="w-8 h-8 rounded-full"
+                style={{ backgroundColor: darkMode ? "#1f2937" : "#fff" }}
+              />
+            )}
+            {selectedColor === name && name !== "default" && (
+              <svg className="w-5 h-5 text-white drop-shadow-sm" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+              </svg>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 /** ---------- Formatting helpers ---------- */
 function wrapSelection(value, start, end, before, after, placeholder = "text") {
@@ -3394,33 +3531,15 @@ function NotesUI({
               className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
               data-tooltip={t("color")}
             >{t("colorEmoji")}</button>
-            <Popover
+            <ColorPickerPanel
               anchorRef={multiColorBtnRef}
               open={showMultiColorPop}
               onClose={() => setShowMultiColorPop(false)}
-            >
-              <div
-                className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
-              >
-                <div className="grid grid-cols-6 gap-2">
-                  {COLOR_ORDER.filter((name) => LIGHT_COLORS[name]).map(
-                    (name) => (
-                      <ColorDot
-                        key={name}
-                        name={name}
-                        darkMode={dark}
-                        selected={false}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onBulkColor(name);
-                          setShowMultiColorPop(false);
-                        }}
-                      />
-                    ),
-                  )}
-                </div>
-              </div>
-            </Popover>
+              colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
+              selectedColor={null}
+              darkMode={dark}
+              onSelect={(name) => { onBulkColor(name); }}
+            />
             {activeTagFilter !== "ARCHIVED" && (
               <button
                 className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1"
@@ -4044,7 +4163,7 @@ function NotesUI({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap sm:flex-none relative">
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:flex-none relative">
                       {/* Formatting button (composer) - only for text mode */}
                       {composerType === "text" && (
                         <>
@@ -4052,7 +4171,7 @@ function NotesUI({
                             ref={composerFmtBtnRef}
                             type="button"
                             onClick={() => setShowComposerFmt((v) => !v)}
-                            className="px-2 py-1 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2 text-sm"
+                            className="px-2.5 py-1.5 rounded-xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-purple-50 text-violet-600 hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 hover:scale-105 hover:shadow-md hover:shadow-violet-200/60 active:scale-95 dark:from-violet-900/30 dark:to-purple-900/20 dark:border-violet-700/60 dark:text-violet-400 dark:hover:from-violet-800/40 dark:hover:to-purple-800/30 flex items-center gap-1.5 text-sm font-medium transition-all duration-200 flex-shrink-0"
                             data-tooltip={t("formatting")}
                           >
                             <FormatIcon />{t("formatting")}</button>
@@ -4073,14 +4192,14 @@ function NotesUI({
                       )}
 
                       {/* Type selection buttons */}
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
                         <button
                           type="button"
                           onClick={() => setComposerType("text")}
-                          className={`px-2 py-1 rounded-lg border text-sm ${
+                          className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                             composerType === "text"
-                              ? "bg-indigo-600 text-white border-indigo-600"
-                              : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
+                              ? "bg-gradient-to-br from-rose-400 to-pink-500 text-white border-transparent shadow-md shadow-rose-300/50 scale-105"
+                              : "border-rose-200/80 bg-gradient-to-br from-rose-50 to-pink-50/60 text-rose-400 hover:from-rose-100 hover:to-pink-100 hover:border-rose-300 hover:scale-105 hover:shadow-sm hover:shadow-rose-200/50 dark:from-rose-900/20 dark:to-pink-900/10 dark:border-rose-700/50 dark:text-rose-400 dark:hover:from-rose-800/30 dark:hover:to-pink-800/20"
                           }`}
                           data-tooltip={t("textNote")}
                         >
@@ -4089,10 +4208,10 @@ function NotesUI({
                         <button
                           type="button"
                           onClick={() => setComposerType("checklist")}
-                          className={`px-2 py-1 rounded-lg border text-sm ${
+                          className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                             composerType === "checklist"
-                              ? "bg-indigo-600 text-white border-indigo-600"
-                              : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
+                              ? "bg-gradient-to-br from-emerald-400 to-green-500 text-white border-transparent shadow-md shadow-emerald-300/50 scale-105"
+                              : "border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-green-50/60 text-emerald-500 hover:from-emerald-100 hover:to-green-100 hover:border-emerald-300 hover:scale-105 hover:shadow-sm hover:shadow-emerald-200/50 dark:from-emerald-900/20 dark:to-green-900/10 dark:border-emerald-700/50 dark:text-emerald-400 dark:hover:from-emerald-800/30 dark:hover:to-green-800/20"
                           }`}
                           data-tooltip={t("checklist")}
                         >
@@ -4101,10 +4220,10 @@ function NotesUI({
                         <button
                           type="button"
                           onClick={() => setComposerType("draw")}
-                          className={`px-2 py-1 rounded-lg border text-sm ${
+                          className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                             composerType === "draw"
-                              ? "bg-indigo-600 text-white border-indigo-600"
-                              : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
+                              ? "bg-gradient-to-br from-orange-400 to-amber-500 text-white border-transparent shadow-md shadow-orange-300/50 scale-105"
+                              : "border-orange-200/80 bg-gradient-to-br from-orange-50 to-amber-50/60 text-orange-400 hover:from-orange-100 hover:to-amber-100 hover:border-orange-300 hover:scale-105 hover:shadow-sm hover:shadow-orange-200/50 dark:from-orange-900/20 dark:to-amber-900/10 dark:border-orange-700/50 dark:text-orange-400 dark:hover:from-orange-800/30 dark:hover:to-amber-800/20"
                           }`}
                           data-tooltip={t("drawing")}
                         >
@@ -4117,55 +4236,20 @@ function NotesUI({
                         ref={colorBtnRef}
                         type="button"
                         onClick={() => setShowColorPop((v) => !v)}
-                        className="w-6 h-6 rounded-full border-2 border-[var(--border-light)] hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 flex items-center justify-center"
+                        className="p-1.5 rounded-xl border-2 border-gray-200/80 bg-gradient-to-br from-white to-gray-50/60 hover:from-gray-50 hover:to-slate-100/60 hover:border-gray-300 hover:scale-105 hover:shadow-sm active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:from-gray-800/60 dark:to-gray-700/40 dark:border-gray-600/60 dark:hover:from-gray-700/70 dark:hover:to-gray-600/50 dark:hover:border-gray-500 transition-all duration-200 flex items-center justify-center"
                         data-tooltip={t("color")}
-                        style={{
-                          backgroundColor:
-                            composerColor === "default"
-                              ? "transparent"
-                              : solid(bgFor(composerColor, dark)),
-                          borderColor:
-                            composerColor === "default"
-                              ? "#d1d5db"
-                              : solid(bgFor(composerColor, dark)),
-                        }}
                       >
-                        {composerColor === "default" && (
-                          <div
-                            className="w-4 h-4 rounded-full"
-                            style={{
-                              backgroundColor: dark ? "#1f2937" : "#fff",
-                            }}
-                          />
-                        )}
+                        <PaletteColorIcon size={22} />
                       </button>
-                      <Popover
+                      <ColorPickerPanel
                         anchorRef={colorBtnRef}
                         open={showColorPop}
                         onClose={() => setShowColorPop(false)}
-                      >
-                        <div
-                          className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
-                        >
-                          <div className="grid grid-cols-6 gap-2">
-                            {COLOR_ORDER.filter(
-                              (name) => LIGHT_COLORS[name],
-                            ).map((name) => (
-                              <ColorDot
-                                key={name}
-                                name={name}
-                                darkMode={dark}
-                                selected={composerColor === name}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setComposerColor(name);
-                                  setShowColorPop(false);
-                                }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </Popover>
+                        colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
+                        selectedColor={composerColor}
+                        darkMode={dark}
+                        onSelect={(name) => setComposerColor(name)}
+                      />
 
                       {/* Add Image (composer) */}
                       <input
@@ -4190,7 +4274,7 @@ function NotesUI({
                       />
                       <button
                         onClick={() => composerFileRef.current?.click()}
-                        className="px-2 py-1 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 flex-shrink-0 text-lg"
+                        className="p-1.5 rounded-xl border-2 border-sky-200/80 bg-gradient-to-br from-sky-50 to-blue-50/60 text-sky-500 hover:from-sky-100 hover:to-blue-100 hover:border-sky-300 hover:scale-105 hover:shadow-sm hover:shadow-sky-200/50 active:scale-95 dark:from-sky-900/20 dark:to-blue-900/10 dark:border-sky-700/50 dark:text-sky-400 dark:hover:from-sky-800/30 dark:hover:to-blue-800/20 flex-shrink-0 transition-all duration-200"
                         data-tooltip={t("addImages")}
                       >
                         <AddImageIcon />
@@ -4200,10 +4284,10 @@ function NotesUI({
                       <button
                         onClick={addNote}
                         disabled={!isOnline}
-                        className={`px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-colors whitespace-nowrap flex-shrink-0 ${
+                        className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
                           isOnline
-                            ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                            : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                            ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+                            : "bg-gray-300 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
                         }`}
                       >{t("addNote")}</button>
                     </div>
@@ -4628,7 +4712,7 @@ function TooltipPortal() {
   return createPortal(
     <div
       ref={boxRef}
-      className="pointer-events-none fixed z-[10001]"
+      className="pointer-events-none fixed z-[100001]"
       style={tooltip.below
         ? { top: tooltip.y + 8, left: tooltip.x, transform: 'translateX(-50%)' }
         : { top: tooltip.y - 8, left: tooltip.x, transform: 'translate(-50%, -100%)' }
@@ -8704,53 +8788,20 @@ export default function App() {
                     ref={modalColorBtnRef}
                     type="button"
                     onClick={() => setShowModalColorPop((v) => !v)}
-                    className="w-6 h-6 rounded-full border-2 border-[var(--border-light)] hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 flex items-center justify-center"
+                    className="w-6 h-6 flex items-center justify-center rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-opacity"
                     data-tooltip={t("color")}
-                    style={{
-                      backgroundColor:
-                        mColor === "default"
-                          ? "transparent"
-                          : solid(bgFor(mColor, dark)),
-                      borderColor:
-                        mColor === "default"
-                          ? "#d1d5db"
-                          : solid(bgFor(mColor, dark)),
-                    }}
                   >
-                    {mColor === "default" && (
-                      <div
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: dark ? "#1f2937" : "#fff" }}
-                      />
-                    )}
+                    <PaletteColorIcon size={22} />
                   </button>
-                  <Popover
+                  <ColorPickerPanel
                     anchorRef={modalColorBtnRef}
                     open={showModalColorPop}
                     onClose={() => setShowModalColorPop(false)}
-                  >
-                    <div
-                      className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
-                    >
-                      <div className="grid grid-cols-6 gap-2">
-                        {COLOR_ORDER.filter((name) => LIGHT_COLORS[name]).map(
-                          (name) => (
-                            <ColorDot
-                              key={name}
-                              name={name}
-                              darkMode={dark}
-                              selected={mColor === name}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setMColor(name);
-                                setShowModalColorPop(false);
-                              }}
-                            />
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  </Popover>
+                    colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
+                    selectedColor={mColor}
+                    darkMode={dark}
+                    onSelect={(name) => setMColor(name)}
+                  />
                 </>
               )}
 
@@ -8788,7 +8839,7 @@ export default function App() {
                   <button
                     onClick={saveModal}
                     disabled={savingModal}
-                    className={`px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 whitespace-nowrap ${savingModal ? "bg-indigo-400 text-white cursor-not-allowed" : "bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500"}`}
+                    className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 whitespace-nowrap transition-all duration-200 ${savingModal ? "bg-gradient-to-r from-indigo-400 to-violet-500 text-white cursor-not-allowed opacity-70" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98] focus:ring-indigo-500"}`}
                   >
                     {savingModal ? "Saving..." : t("save")}
                   </button>
