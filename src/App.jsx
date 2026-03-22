@@ -1375,7 +1375,7 @@ function PaletteColorIcon({ size = 22 }) {
       {/* Dark - center */}
       <circle cx="12"   cy="11"   r="1.3"  fill="#1e293b"/>
       {/* Green - between red and blue, near top-right edge */}
-      <circle cx="15.5" cy="7.5"  r="1.65" fill="rgb(255 158 0 / 34%)" stroke="#1e293b" strokeWidth="0.5"/>
+      <circle cx="15.5" cy="7.5"  r="1.65" fill="#ff9e00" fillOpacity="0.34" stroke="#1e293b" strokeWidth="0.5"/>
       {/* Blue - right */}
       <circle cx="16.5" cy="13.5" r="1.65" fill="#3b82f6" stroke="#1e293b" strokeWidth="0.5"/>
     </svg>
