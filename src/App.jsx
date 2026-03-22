@@ -4171,7 +4171,7 @@ function NotesUI({
                             ref={composerFmtBtnRef}
                             type="button"
                             onClick={() => setShowComposerFmt((v) => !v)}
-                            className="px-2 py-1 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2 text-sm"
+                            className="px-2 py-1 rounded-lg border border-violet-200 bg-violet-50 text-violet-600 hover:bg-violet-100 dark:bg-violet-900/20 dark:border-violet-700 dark:text-violet-400 flex items-center gap-2 text-sm"
                             data-tooltip={t("formatting")}
                           >
                             <FormatIcon />{t("formatting")}</button>
@@ -4211,7 +4211,7 @@ function NotesUI({
                           className={`px-2 py-1 rounded-lg border text-sm ${
                             composerType === "checklist"
                               ? "bg-indigo-600 text-white border-indigo-600"
-                              : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400"
                           }`}
                           data-tooltip={t("checklist")}
                         >
@@ -4223,7 +4223,7 @@ function NotesUI({
                           className={`px-2 py-1 rounded-lg border text-sm ${
                             composerType === "draw"
                               ? "bg-indigo-600 text-white border-indigo-600"
-                              : "border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
+                              : "border-orange-200 bg-orange-50 text-orange-500 hover:bg-orange-100 dark:bg-orange-900/20 dark:border-orange-700 dark:text-orange-400"
                           }`}
                           data-tooltip={t("drawing")}
                         >
@@ -4274,7 +4274,7 @@ function NotesUI({
                       />
                       <button
                         onClick={() => composerFileRef.current?.click()}
-                        className="px-2 py-1 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 flex-shrink-0 text-lg"
+                        className="px-2 py-1 rounded-lg border border-sky-200 bg-sky-50 text-sky-500 hover:bg-sky-100 dark:bg-sky-900/20 dark:border-sky-700 dark:text-sky-400 flex-shrink-0"
                         data-tooltip={t("addImages")}
                       >
                         <AddImageIcon />
