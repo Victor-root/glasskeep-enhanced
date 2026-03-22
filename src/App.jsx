@@ -8037,7 +8037,7 @@ export default function App() {
                       src={im.src}
                       alt={im.name}
                       className="w-full h-auto object-contain object-center cursor-pointer"
-                      style={{ maxHeight: "360px", backgroundColor: "white" }}
+                      style={{ maxHeight: "360px" }}
                       onClick={(e) => {
                         e.stopPropagation();
                         openImageViewer(idx);
