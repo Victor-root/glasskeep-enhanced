@@ -333,7 +333,11 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
         <div className="flex items-center justify-between mb-3">
           <button
               onClick={() => setMode(mode === 'view' ? 'draw' : 'view')}
-              className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
+              className={`px-3 py-1.5 rounded-xl border-2 text-sm font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${
+                mode === 'draw'
+                  ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white border-transparent shadow-md shadow-indigo-300/40 hover:from-indigo-600 hover:to-violet-700'
+                  : 'border-indigo-200/80 bg-gradient-to-br from-indigo-50 to-violet-50/60 text-indigo-600 hover:from-indigo-100 hover:to-violet-100 hover:border-indigo-300 hover:shadow-sm hover:shadow-indigo-200/50 dark:from-indigo-900/20 dark:to-violet-900/10 dark:border-indigo-700/50 dark:text-indigo-400'
+              }`}
               data-tooltip={mode === 'view' ? t('switchToDrawMode') : t('switchToViewMode')}
             >
               {mode === 'view' ? t('drawMode') : t('viewMode')}
@@ -343,20 +347,28 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
 
       {/* Compact Toolbar */}
       {!readOnly && mode === 'draw' && (
-        <div className="flex items-center gap-3 mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+        <div className="flex items-center gap-2 mb-3 p-2 bg-black/5 dark:bg-white/5 rounded-2xl">
           {/* Tool selection */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 rounded-xl p-1">
             <button
                 data-tooltip={t("pen")}
                 onClick={() => setTool('pen')}
-                className={`px-2 py-1 rounded text-sm ${tool === 'pen' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+                className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
+                  tool === 'pen'
+                    ? 'bg-gradient-to-br from-indigo-400 to-blue-500 text-white border-transparent shadow-md shadow-indigo-300/50 scale-105'
+                    : 'border-indigo-200/80 bg-gradient-to-br from-indigo-50 to-blue-50/60 text-indigo-500 hover:from-indigo-100 hover:to-blue-100 hover:border-indigo-300 hover:scale-105 hover:shadow-sm dark:from-indigo-900/20 dark:to-blue-900/10 dark:border-indigo-700/50 dark:text-indigo-400'
+                }`}
               >
                 <PenToolIcon />
               </button>
             <button
                 data-tooltip={t("eraser")}
                 onClick={() => setTool('eraser')}
-                className={`px-2 py-1 rounded text-sm ${tool === 'eraser' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+                className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
+                  tool === 'eraser'
+                    ? 'bg-gradient-to-br from-slate-500 to-gray-600 text-white border-transparent shadow-md shadow-slate-300/50 scale-105'
+                    : 'border-slate-200/80 bg-gradient-to-br from-slate-50 to-gray-50/60 text-slate-500 hover:from-slate-100 hover:to-gray-100 hover:border-slate-300 hover:scale-105 hover:shadow-sm dark:from-slate-900/20 dark:to-gray-900/10 dark:border-slate-700/50 dark:text-slate-400'
+                }`}
               >
                 <EraserToolIcon />
               </button>
@@ -368,17 +380,17 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
               <button
                 data-tooltip={t('changeColor')}
                 onClick={() => setShowColorPicker(!showColorPicker)}
-                className="flex items-center gap-1 px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-sm hover:bg-gray-300 dark:hover:bg-gray-600"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border-2 border-gray-200/80 bg-gradient-to-br from-white to-gray-50/60 hover:from-gray-50 hover:to-slate-100/60 hover:border-gray-300 hover:scale-105 hover:shadow-sm active:scale-95 dark:from-gray-800/60 dark:to-gray-700/40 dark:border-gray-600/60 dark:hover:border-gray-500 transition-all duration-200 text-sm"
               >
                 <div
-                  className="w-4 h-4 rounded border border-gray-400"
+                  className="w-4 h-4 rounded-full border-2 border-white shadow-sm"
                   style={{ backgroundColor: color }}
                 />
                 <ExpandMoreIcon />
               </button>
 
               {showColorPicker && (
-                <div className="absolute top-full mt-1 p-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-10 min-w-[200px]">
+                <div className="absolute top-full mt-2 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-10 min-w-[200px]">
                   <div className="grid grid-cols-6 gap-2">
                     {DRAWING_COLORS.map(c => (
                       <button
@@ -387,7 +399,7 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
                           setColor(c);
                           setShowColorPicker(false);
                         }}
-                        className={`w-6 h-6 rounded-full border-2 ${color === c ? 'border-gray-600 ring-2 ring-gray-400' : 'border-gray-300'}`}
+                        className={`w-7 h-7 rounded-full border-2 transition-all duration-150 hover:scale-110 ${color === c ? 'border-gray-600 ring-2 ring-offset-1 ring-indigo-400 scale-110' : 'border-white shadow-sm hover:border-gray-400'}`}
                         style={{ backgroundColor: c }}
                       />
                     ))}
@@ -402,7 +414,7 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
               data-tooltip={t("brushSize")}
               value={size}
               onChange={(e) => setSize(Number(e.target.value))}
-              className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-sm"
+              className="px-2.5 py-1.5 rounded-xl border-2 border-gray-200/80 bg-gradient-to-br from-white to-gray-50/60 dark:from-gray-800/60 dark:to-gray-700/40 dark:border-gray-600/60 text-sm hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-400"
             >
               {PEN_SIZES.map(s => (
                 <option key={s} value={s}>{s}px</option>
@@ -415,14 +427,14 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
                 data-tooltip={t("undo")}
                 onClick={undo}
                 disabled={paths.length === 0}
-                className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-sm disabled:opacity-50 hover:bg-gray-300 dark:hover:bg-gray-600"
+                className="p-1.5 rounded-xl border-2 border-amber-200/80 bg-gradient-to-br from-amber-50 to-yellow-50/60 text-amber-500 hover:from-amber-100 hover:to-yellow-100 hover:border-amber-300 hover:scale-105 hover:shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-amber-900/20 dark:to-yellow-900/10 dark:border-amber-700/50 dark:text-amber-400 transition-all duration-200"
               >
                 <UndoToolIcon />
               </button>
             <button
                 data-tooltip={t("clearAll")}
                 onClick={clearCanvas}
-                className="px-2 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                className="p-1.5 rounded-xl border-2 border-transparent bg-gradient-to-br from-red-400 to-rose-500 text-white hover:from-red-500 hover:to-rose-600 hover:scale-105 hover:shadow-md hover:shadow-red-300/50 active:scale-95 transition-all duration-200"
               >
                 <DeleteToolIcon />
               </button>
@@ -479,7 +491,7 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
           <button
               data-tooltip={t('addPageTitle')}
               onClick={addPage}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium transition-colors"
+              className="px-4 py-2 rounded-xl font-semibold text-sm bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98] transition-all duration-200"
             >
               {t("addPage")}
             </button>

@@ -4236,7 +4236,7 @@ function NotesUI({
                         ref={colorBtnRef}
                         type="button"
                         onClick={() => setShowColorPop((v) => !v)}
-                        className="w-8 h-8 flex items-center justify-center rounded-xl hover:scale-110 hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 active:scale-95"
+                        className="p-1.5 rounded-xl border-2 border-gray-200/80 bg-gradient-to-br from-white to-gray-50/60 hover:from-gray-50 hover:to-slate-100/60 hover:border-gray-300 hover:scale-105 hover:shadow-sm active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:from-gray-800/60 dark:to-gray-700/40 dark:border-gray-600/60 dark:hover:from-gray-700/70 dark:hover:to-gray-600/50 dark:hover:border-gray-500 transition-all duration-200 flex items-center justify-center"
                         data-tooltip={t("color")}
                       >
                         <PaletteColorIcon size={22} />
