@@ -1092,20 +1092,6 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
   box-shadow: 0 10px 30px rgba(0,0,0,.2);
   padding: .5rem;
 }
-@media (max-width: 639px) {
-  .color-picker-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    gap: 10px !important;
-  }
-  .color-picker-grid button {
-    width: 40px !important;
-    height: 40px !important;
-  }
-  .color-picker-grid button > div {
-    width: 30px !important;
-    height: 30px !important;
-  }
-}
 .fmt-btn {
   display: inline-flex;
   align-items: center;
@@ -1369,6 +1355,101 @@ const ColorDot = ({ name, selected, onClick, darkMode }) => (
     )}
   </button>
 );
+
+/** ---------- Color Picker Panel ---------- */
+function ColorPickerPanel({ anchorRef, open, onClose, colors, selectedColor, darkMode, onSelect }) {
+  const panelRef = useRef(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, dropUp: false });
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const a = anchorRef?.current;
+      if (!a) return;
+      const r = a.getBoundingClientRect();
+      const panelW = 216;
+      const spaceBelow = window.innerHeight - r.bottom;
+      const dropUp = spaceBelow < 240;
+      let left = Math.min(r.left, window.innerWidth - panelW - 8);
+      left = Math.max(8, left);
+      setPos({ top: dropUp ? r.top - 8 : r.bottom + 8, left, dropUp });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open, anchorRef]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (panelRef.current?.contains(e.target)) return;
+      if (anchorRef?.current?.contains(e.target)) return;
+      onClose?.();
+    };
+    document.addEventListener("mousedown", onDown, true);
+    return () => document.removeEventListener("mousedown", onDown, true);
+  }, [open, onClose, anchorRef]);
+
+  if (!open) return null;
+  const panelStyle = {
+    position: "fixed",
+    left: pos.left,
+    zIndex: 99999,
+    width: 216,
+    ...(pos.dropUp
+      ? { bottom: window.innerHeight - pos.top }
+      : { top: pos.top }),
+  };
+
+  return createPortal(
+    <div
+      ref={panelRef}
+      style={panelStyle}
+      className={`rounded-2xl shadow-2xl backdrop-blur-xl border overflow-hidden ring-1 ring-black/5 dark:ring-white/5 p-3 ${
+        darkMode
+          ? "bg-gray-900/98 border-gray-700/50"
+          : "bg-white/98 border-gray-100/80"
+      }`}
+    >
+      <div className="grid grid-cols-4 gap-2.5">
+        {colors.map((name) => (
+          <button
+            key={name}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onSelect(name); onClose(); }}
+            aria-label={trColorName(name)}
+            className={`w-12 h-12 rounded-full transition-transform active:scale-95 hover:scale-110 focus:outline-none flex items-center justify-center ${
+              name === "default"
+                ? "border-2 border-gray-300 dark:border-gray-500"
+                : ""
+            } ${
+              selectedColor === name
+                ? "ring-[3px] ring-indigo-500 ring-offset-2 dark:ring-offset-gray-900"
+                : ""
+            }`}
+            style={{
+              backgroundColor:
+                name === "default" ? "transparent" : solid(bgFor(name, darkMode)),
+            }}
+          >
+            {name === "default" && (
+              <div
+                className="w-8 h-8 rounded-full"
+                style={{ backgroundColor: darkMode ? "#1f2937" : "#fff" }}
+              />
+            )}
+            {selectedColor === name && name !== "default" && (
+              <svg className="w-5 h-5 text-white drop-shadow-sm" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+              </svg>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 /** ---------- Formatting helpers ---------- */
 function wrapSelection(value, start, end, before, after, placeholder = "text") {
@@ -3423,33 +3504,15 @@ function NotesUI({
               className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
               data-tooltip={t("color")}
             >{t("colorEmoji")}</button>
-            <Popover
+            <ColorPickerPanel
               anchorRef={multiColorBtnRef}
               open={showMultiColorPop}
               onClose={() => setShowMultiColorPop(false)}
-            >
-              <div
-                className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
-              >
-                <div className="color-picker-grid grid grid-cols-6 gap-2">
-                  {COLOR_ORDER.filter((name) => LIGHT_COLORS[name]).map(
-                    (name) => (
-                      <ColorDot
-                        key={name}
-                        name={name}
-                        darkMode={dark}
-                        selected={false}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onBulkColor(name);
-                          setShowMultiColorPop(false);
-                        }}
-                      />
-                    ),
-                  )}
-                </div>
-              </div>
-            </Popover>
+              colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
+              selectedColor={null}
+              darkMode={dark}
+              onSelect={(name) => { onBulkColor(name); }}
+            />
             {activeTagFilter !== "ARCHIVED" && (
               <button
                 className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1"
@@ -4159,33 +4222,15 @@ function NotesUI({
                           <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
                         </svg>
                       </button>
-                      <Popover
+                      <ColorPickerPanel
                         anchorRef={colorBtnRef}
                         open={showColorPop}
                         onClose={() => setShowColorPop(false)}
-                      >
-                        <div
-                          className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
-                        >
-                          <div className="color-picker-grid grid grid-cols-6 gap-2">
-                            {COLOR_ORDER.filter(
-                              (name) => LIGHT_COLORS[name],
-                            ).map((name) => (
-                              <ColorDot
-                                key={name}
-                                name={name}
-                                darkMode={dark}
-                                selected={composerColor === name}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setComposerColor(name);
-                                  setShowColorPop(false);
-                                }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </Popover>
+                        colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
+                        selectedColor={composerColor}
+                        darkMode={dark}
+                        onSelect={(name) => setComposerColor(name)}
+                      />
 
                       {/* Add Image (composer) */}
                       <input
@@ -8737,33 +8782,15 @@ export default function App() {
                       <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
                     </svg>
                   </button>
-                  <Popover
+                  <ColorPickerPanel
                     anchorRef={modalColorBtnRef}
                     open={showModalColorPop}
                     onClose={() => setShowModalColorPop(false)}
-                  >
-                    <div
-                      className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
-                    >
-                      <div className="color-picker-grid grid grid-cols-6 gap-2">
-                        {COLOR_ORDER.filter((name) => LIGHT_COLORS[name]).map(
-                          (name) => (
-                            <ColorDot
-                              key={name}
-                              name={name}
-                              darkMode={dark}
-                              selected={mColor === name}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setMColor(name);
-                                setShowModalColorPop(false);
-                              }}
-                            />
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  </Popover>
+                    colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
+                    selectedColor={mColor}
+                    darkMode={dark}
+                    onSelect={(name) => setMColor(name)}
+                  />
                 </>
               )}
 
