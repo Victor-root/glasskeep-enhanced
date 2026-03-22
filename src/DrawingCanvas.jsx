@@ -347,7 +347,7 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
 
       {/* Compact Toolbar */}
       {!readOnly && mode === 'draw' && (
-        <div className="flex items-center gap-2 mb-3 p-2 bg-black/5 dark:bg-white/5 rounded-2xl">
+        <div className="flex items-center flex-wrap gap-2 mb-3 p-2 bg-black/5 dark:bg-white/5 rounded-2xl">
           {/* Tool selection */}
           <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 rounded-xl p-1">
             <button
