@@ -1062,73 +1062,193 @@ html.dark .prose blockquote {
   content: none !important;
 }
 
-/* Modal header icon buttons – note-color aware via --note-color */
+/* ── Modal icon pill container ─────────────────────────────────────────── */
+.modal-icon-group {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  border: 1.5px solid color-mix(in srgb, var(--note-color, #6366f1) 22%, rgba(255,255,255,0.55));
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--note-color, #6366f1) 9%, rgba(255,255,255,0.88)) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 5%, rgba(255,255,255,0.72)) 100%
+  );
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.85),
+    inset 0 -1px 0 color-mix(in srgb, var(--note-color, #6366f1) 8%, rgba(0,0,0,0.05)),
+    0 2px 8px color-mix(in srgb, var(--note-color, #6366f1) 14%, rgba(0,0,0,0.06)),
+    0 1px 2px rgba(0,0,0,0.04);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+html.dark .modal-icon-group {
+  border: 1.5px solid color-mix(in srgb, var(--note-color, #6366f1) 48%, rgba(255,255,255,0.06));
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--note-color, #6366f1) 24%, rgba(255,255,255,0.05)) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 16%, rgba(0,0,0,0.28)) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    inset 0 -1px 0 rgba(0,0,0,0.25),
+    0 2px 14px color-mix(in srgb, var(--note-color, #6366f1) 32%, rgba(0,0,0,0.35)),
+    0 6px 24px color-mix(in srgb, var(--note-color, #6366f1) 18%, rgba(0,0,0,0.2));
+}
+
+/* ── Individual gem buttons ────────────────────────────────────────────── */
 .modal-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.375rem;
-  border-radius: 0.75rem;
-  border: 2px solid color-mix(in srgb, var(--note-color, #6366f1) 32%, transparent);
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--note-color, #6366f1) 13%, white) 0%,
-    color-mix(in srgb, var(--note-color, #6366f1) 8%, white) 100%
-  );
+  width: 2.125rem;
+  height: 2.125rem;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  background:
+    radial-gradient(ellipse at 38% 28%, rgba(255,255,255,0.72) 0%, transparent 62%),
+    color-mix(in srgb, var(--note-color, #6366f1) 8%, rgba(255,255,255,0.15));
   color: color-mix(in srgb, var(--note-color, #6366f1) 90%, black);
-  font-size: 0.875rem;
+  cursor: pointer;
   position: relative;
-  transition: all 0.2s;
+  transition:
+    background   0.22s ease,
+    border-color 0.22s ease,
+    box-shadow   0.22s ease,
+    color        0.15s ease,
+    transform    0.2s  cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-/* Icon drop-shadow for contrast in light mode */
 .modal-icon-btn svg {
-  filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--note-color, #6366f1) 25%, transparent));
+  position: relative;
+  z-index: 1;
+  transition:
+    filter    0.2s ease,
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 1px 1.5px color-mix(in srgb, var(--note-color, #6366f1) 32%, transparent));
 }
 .modal-icon-btn:hover {
-  border-color: color-mix(in srgb, var(--note-color, #6366f1) 55%, transparent);
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--note-color, #6366f1) 22%, white) 0%,
-    color-mix(in srgb, var(--note-color, #6366f1) 15%, white) 100%
-  );
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--note-color, #6366f1) 30%, transparent);
+  border-color: color-mix(in srgb, var(--note-color, #6366f1) 28%, rgba(255,255,255,0.5));
+  background:
+    radial-gradient(ellipse at 38% 28%, rgba(255,255,255,0.82) 0%, transparent 58%),
+    color-mix(in srgb, var(--note-color, #6366f1) 18%, rgba(255,255,255,0.5));
+  transform: translateY(-1.5px) scale(1.11);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.65),
+    0 4px 12px color-mix(in srgb, var(--note-color, #6366f1) 40%, rgba(0,0,0,0.08)),
+    0 1px 3px rgba(0,0,0,0.05);
 }
-/* Dark mode: border et fond plus denses pour ressortir sur fond sombre */
+.modal-icon-btn:hover svg {
+  filter: drop-shadow(0 2px 5px color-mix(in srgb, var(--note-color, #6366f1) 58%, transparent));
+  transform: scale(1.08);
+}
+.modal-icon-btn:active {
+  transform: scale(0.91) !important;
+  transition: transform 0.07s ease !important;
+}
+/* dark mode base */
 html.dark .modal-icon-btn {
-  border: 2px solid color-mix(in srgb, var(--note-color, #6366f1) 60%, transparent);
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--note-color, #6366f1) 30%, transparent) 0%,
-    color-mix(in srgb, var(--note-color, #6366f1) 22%, transparent) 100%
-  );
-  color: color-mix(in srgb, var(--note-color, #6366f1) 85%, white);
+  background:
+    radial-gradient(ellipse at 38% 28%, rgba(255,255,255,0.09) 0%, transparent 60%),
+    color-mix(in srgb, var(--note-color, #6366f1) 26%, rgba(8,8,18,0.45));
+  border-color: color-mix(in srgb, var(--note-color, #6366f1) 48%, rgba(255,255,255,0.04));
+  color: color-mix(in srgb, var(--note-color, #6366f1) 92%, white);
 }
-/* Glow sur les icônes en dark mode */
 html.dark .modal-icon-btn svg {
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--note-color, #6366f1) 65%, transparent));
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--note-color, #6366f1) 68%, transparent));
 }
 html.dark .modal-icon-btn:hover {
-  border-color: color-mix(in srgb, var(--note-color, #6366f1) 80%, transparent);
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--note-color, #6366f1) 42%, transparent) 0%,
-    color-mix(in srgb, var(--note-color, #6366f1) 32%, transparent) 100%
-  );
-  box-shadow: 0 2px 10px color-mix(in srgb, var(--note-color, #6366f1) 45%, transparent);
+  background:
+    radial-gradient(ellipse at 38% 28%, rgba(255,255,255,0.07) 0%, transparent 55%),
+    color-mix(in srgb, var(--note-color, #6366f1) 44%, rgba(8,8,18,0.35));
+  border-color: color-mix(in srgb, var(--note-color, #6366f1) 72%, rgba(255,255,255,0.08));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 4px 16px color-mix(in srgb, var(--note-color, #6366f1) 58%, rgba(0,0,0,0.3)),
+    0 0 0 1px color-mix(in srgb, var(--note-color, #6366f1) 32%, transparent);
 }
-/* Active state (pin when pinned) */
+html.dark .modal-icon-btn:hover svg {
+  filter: drop-shadow(0 0 9px color-mix(in srgb, var(--note-color, #6366f1) 95%, transparent));
+  transform: scale(1.08);
+}
+
+/* ── Active (pin épinglé) ──────────────────────────────────────────────── */
 .modal-icon-btn--active {
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--note-color, #6366f1) 72%, white) 0%,
-    var(--note-color, #6366f1) 100%
-  ) !important;
+  background:
+    radial-gradient(ellipse at 36% 26%, rgba(255,255,255,0.42) 0%, transparent 52%),
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--note-color, #6366f1) 66%, white) 0%,
+      var(--note-color, #6366f1)                                50%,
+      color-mix(in srgb, var(--note-color, #6366f1) 94%, black) 100%
+    ) !important;
   border-color: transparent !important;
   color: white !important;
-  box-shadow: 0 4px 10px color-mix(in srgb, var(--note-color, #6366f1) 50%, transparent) !important;
-  transform: scale(1.05);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.38),
+    inset 0 -1px 0 rgba(0,0,0,0.18),
+    0 4px 16px color-mix(in srgb, var(--note-color, #6366f1) 68%, transparent),
+    0 0 0 2.5px color-mix(in srgb, var(--note-color, #6366f1) 30%, transparent) !important;
+  transform: scale(1.09);
 }
 .modal-icon-btn--active svg {
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35)) !important;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.42)) !important;
+  transform: none !important;
+}
+.modal-icon-btn--active:hover {
+  transform: translateY(-1.5px) scale(1.16) !important;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.38),
+    inset 0 -1px 0 rgba(0,0,0,0.18),
+    0 6px 20px color-mix(in srgb, var(--note-color, #6366f1) 78%, transparent),
+    0 0 0 2.5px color-mix(in srgb, var(--note-color, #6366f1) 38%, transparent) !important;
 }
 html.dark .modal-icon-btn--active {
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--note-color, #6366f1) 65%, transparent) !important;
+  background:
+    radial-gradient(ellipse at 36% 26%, rgba(255,255,255,0.22) 0%, transparent 52%),
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--note-color, #6366f1) 58%, white) 0%,
+      var(--note-color, #6366f1) 100%
+    ) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    inset 0 -1px 0 rgba(0,0,0,0.28),
+    0 4px 22px color-mix(in srgb, var(--note-color, #6366f1) 85%, transparent),
+    0 0 0 2.5px color-mix(in srgb, var(--note-color, #6366f1) 52%, transparent),
+    0 8px 32px color-mix(in srgb, var(--note-color, #6366f1) 44%, transparent) !important;
+}
+html.dark .modal-icon-btn--active:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    inset 0 -1px 0 rgba(0,0,0,0.28),
+    0 6px 26px color-mix(in srgb, var(--note-color, #6366f1) 95%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--note-color, #6366f1) 62%, transparent),
+    0 12px 40px color-mix(in srgb, var(--note-color, #6366f1) 52%, transparent) !important;
+}
+
+/* ── Close button (rouge au hover) ──────────────────────────────────────── */
+.modal-icon-btn--close:hover {
+  background:
+    radial-gradient(ellipse at 38% 28%, rgba(255,255,255,0.78) 0%, transparent 58%),
+    rgba(239, 68, 68, 0.12) !important;
+  border-color: rgba(239, 68, 68, 0.28) !important;
+  color: rgb(220, 38, 38) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.55),
+    0 4px 12px rgba(239, 68, 68, 0.22) !important;
+}
+html.dark .modal-icon-btn--close:hover {
+  background:
+    radial-gradient(ellipse at 38% 28%, rgba(255,255,255,0.06) 0%, transparent 55%),
+    rgba(239, 68, 68, 0.22) !important;
+  border-color: rgba(239, 68, 68, 0.52) !important;
+  color: rgb(252, 165, 165) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 4px 16px rgba(239, 68, 68, 0.38),
+    0 0 0 1px rgba(239, 68, 68, 0.25) !important;
+}
+html.dark .modal-icon-btn--close:hover svg {
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.72)) !important;
 }
 
 /* Copy buttons */
@@ -8729,7 +8849,7 @@ export default function App() {
                   )}
 
                   {/* Icon buttons group – pill container */}
-                  <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
+                  <div className="modal-icon-group">
                   {/* Collaboration button - always visible */}
                   <button
                     className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
@@ -8906,7 +9026,7 @@ export default function App() {
                   )}
 
                   <button
-                    className="modal-icon-btn focus:outline-none"
+                    className="modal-icon-btn modal-icon-btn--close focus:outline-none"
                     data-tooltip={t("close")}
                     onClick={closeModal}
                   >
