@@ -20,6 +20,7 @@
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^9.6.0",
     "cors": "^2.8.5",
+    "dompurify": "^3.3.3",
     "express": "^4.21.2",
     "framer-motion": "^12.23.12",
     "jsonwebtoken": "^9.0.2",
