@@ -5339,6 +5339,7 @@ export default function App() {
     const isArchiving = tagFilter !== "ARCHIVED";
     const archivedValue = isArchiving;
 
+    const count = selectedIds.length;
     try {
       // Optimistic update - remove from current view
       setNotes((prev) =>
@@ -5364,8 +5365,10 @@ export default function App() {
 
       // Exit multi-select mode
       onExitMulti();
+      showToast(t(isArchiving ? "bulkArchivedSuccess" : "bulkUnarchivedSuccess").replace("{count}", String(count)), "success");
     } catch (e) {
       console.error(`Bulk ${isArchiving ? "archive" : "unarchive"} failed`, e);
+      showToast(t(isArchiving ? "bulkArchivedFailed" : "bulkUnarchivedFailed"), "error");
       // Reload notes on failure
       if (tagFilter === "ARCHIVED") {
         loadArchivedNotes().catch(() => {});
