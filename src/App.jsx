@@ -8640,9 +8640,30 @@ export default function App() {
                   disabled={!isOnline}
                 />
                 <div className="flex items-center gap-2 flex-none ml-auto">
+                  {/* View/Edit toggle only for TEXT notes - hidden when offline */}
+                  {isOnline && mType === "text" && (
+                    <button
+                      className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                      onClick={() => {
+                        const el = modalScrollRef.current;
+                        const maxScroll = el ? el.scrollHeight - el.clientHeight : 0;
+                        savedModalScrollRatioRef.current = maxScroll > 0 ? el.scrollTop / maxScroll : 0;
+                        setViewMode((v) => !v);
+                        setShowModalFmt(false);
+                      }}
+                      data-tooltip={
+                        viewMode ? t("switchToEditMode") : t("switchToViewMode")
+                      }
+                    >
+                      {viewMode ? t("editMode") : t("viewMode")}
+                    </button>
+                  )}
+
+                  {/* Icon buttons group – pill container */}
+                  <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
                   {/* Collaboration button - always visible */}
                   <button
-                    className="rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 relative"
+                    className="p-1.5 rounded-xl border-2 text-sm transition-all duration-200 border-indigo-200/80 bg-gradient-to-br from-indigo-50 to-violet-50/60 text-indigo-500 hover:from-indigo-100 hover:to-violet-100 hover:border-indigo-300 hover:scale-105 hover:shadow-sm hover:shadow-indigo-200/50 dark:hover:shadow-none dark:from-indigo-900/20 dark:to-violet-900/10 dark:border-indigo-700/50 dark:text-indigo-400 dark:hover:from-indigo-800/30 dark:hover:to-violet-800/20 relative focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     data-tooltip={t("collaborate")}
                     onClick={async () => {
                       setCollaborationModalOpen(true);
@@ -8667,31 +8688,12 @@ export default function App() {
                     </svg>
                   </button>
 
-                  {/* View/Edit toggle only for TEXT notes - hidden when offline */}
-                  {isOnline && mType === "text" && (
-                    <button
-                      className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
-                      onClick={() => {
-                        const el = modalScrollRef.current;
-                        const maxScroll = el ? el.scrollHeight - el.clientHeight : 0;
-                        savedModalScrollRatioRef.current = maxScroll > 0 ? el.scrollTop / maxScroll : 0;
-                        setViewMode((v) => !v);
-                        setShowModalFmt(false);
-                      }}
-                      data-tooltip={
-                        viewMode ? t("switchToEditMode") : t("switchToViewMode")
-                      }
-                    >
-                      {viewMode ? t("editMode") : t("viewMode")}
-                    </button>
-                  )}
-
                   {/* Formatting button + popover: mobile only (desktop uses inline toolbar below) */}
                   {isOnline && mType === "text" && !viewMode && windowWidth < 768 && (
                     <>
                       <button
                         ref={modalFmtBtnRef}
-                        className="rounded-full p-2.5 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="p-1.5 rounded-xl border-2 text-sm transition-all duration-200 border-violet-200/80 bg-gradient-to-br from-violet-50 to-purple-50/60 text-violet-500 hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 hover:scale-105 hover:shadow-sm hover:shadow-violet-200/50 dark:hover:shadow-none dark:from-violet-900/20 dark:to-purple-900/10 dark:border-violet-700/50 dark:text-violet-400 dark:hover:from-violet-800/30 dark:hover:to-purple-800/20 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         data-tooltip={t("formatting")}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -8721,7 +8723,7 @@ export default function App() {
                     <>
                       <button
                         ref={modalMenuBtnRef}
-                        className="rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="p-1.5 rounded-xl border-2 text-sm transition-all duration-200 border-gray-200/80 bg-gradient-to-br from-gray-50 to-slate-50/60 text-gray-500 hover:from-gray-100 hover:to-slate-100 hover:border-gray-300 hover:scale-105 hover:shadow-sm dark:hover:shadow-none dark:from-gray-800/20 dark:to-slate-800/10 dark:border-gray-600/50 dark:text-gray-400 dark:hover:from-gray-700/30 dark:hover:to-slate-700/20 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         data-tooltip={t("moreOptions")}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -8810,7 +8812,11 @@ export default function App() {
                   {/* Pin button - hidden when offline or in archived view */}
                   {isOnline && tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED" && (
                     <button
-                      className="rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                        notes.find((n) => String(n.id) === String(activeId))?.pinned
+                          ? "bg-gradient-to-br from-amber-400 to-yellow-500 text-white border-transparent shadow-md shadow-amber-300/50 dark:shadow-none scale-105"
+                          : "border-amber-200/80 bg-gradient-to-br from-amber-50 to-yellow-50/60 text-amber-500 hover:from-amber-100 hover:to-yellow-100 hover:border-amber-300 hover:scale-105 hover:shadow-sm hover:shadow-amber-200/50 dark:hover:shadow-none dark:from-amber-900/20 dark:to-yellow-900/10 dark:border-amber-700/50 dark:text-amber-400 dark:hover:from-amber-800/30 dark:hover:to-yellow-800/20"
+                      }`}
                       data-tooltip={t("pinUnpin")}
                       onClick={() =>
                         activeId != null &&
@@ -8831,12 +8837,13 @@ export default function App() {
                   )}
 
                   <button
-                    className="rounded-full p-2.5 opacity-70 hover:opacity-100 focus:outline-none"
+                    className="p-1.5 rounded-xl border-2 text-sm transition-all duration-200 border-rose-200/80 bg-gradient-to-br from-rose-50 to-pink-50/60 text-rose-400 hover:from-rose-100 hover:to-pink-100 hover:border-rose-300 hover:scale-105 hover:shadow-sm hover:shadow-rose-200/50 dark:hover:shadow-none dark:from-rose-900/20 dark:to-pink-900/10 dark:border-rose-700/50 dark:text-rose-400 dark:hover:from-rose-800/30 dark:hover:to-pink-800/20 focus:outline-none"
                     data-tooltip={t("close")}
                     onClick={closeModal}
                   >
                     <CloseIcon />
                   </button>
+                  </div>{/* end icon pill group */}
                 </div>
 
               </div>
