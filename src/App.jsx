@@ -5223,6 +5223,7 @@ export default function App() {
         danger: true,
         onConfirm: async () => {
           try {
+            const count = selectedIds.length;
             for (const id of selectedIds) {
               await api(`/notes/${id}/permanent`, { method: "DELETE", token });
             }
@@ -5231,8 +5232,9 @@ export default function App() {
               prev.filter((n) => !selectedIds.includes(String(n.id))),
             );
             onExitMulti();
+            showToast(t("bulkDeletedSuccess").replace("{count}", String(count)), "success");
           } catch (e) {
-            alert(e.message || t("bulkDeleteFailed"));
+            showToast(e.message || t("bulkDeleteFailed"), "error");
           }
         },
       });
@@ -5245,6 +5247,7 @@ export default function App() {
         danger: true,
         onConfirm: async () => {
           try {
+            const count = selectedIds.length;
             for (const id of selectedIds) {
               await api(`/notes/${id}/trash`, { method: "POST", token });
             }
@@ -5255,8 +5258,9 @@ export default function App() {
               prev.filter((n) => !selectedIds.includes(String(n.id))),
             );
             onExitMulti();
+            showToast(t("bulkTrashedSuccess").replace("{count}", String(count)), "success");
           } catch (e) {
-            alert(e.message || t("bulkDeleteFailed"));
+            showToast(e.message || t("bulkTrashedFailed"), "error");
           }
         },
       });
@@ -5312,6 +5316,7 @@ export default function App() {
       for (const id of selectedIds) {
         await api(`/notes/${id}/restore`, { method: "POST", token });
       }
+      const count = selectedIds.length;
       invalidateNotesCache();
       invalidateArchivedNotesCache();
       invalidateTrashedNotesCache();
@@ -5319,8 +5324,10 @@ export default function App() {
         prev.filter((n) => !selectedIds.includes(String(n.id))),
       );
       onExitMulti();
+      showToast(t("bulkRestoredSuccess").replace("{count}", String(count)), "success");
     } catch (e) {
       console.error("Bulk restore failed", e);
+      showToast(t("bulkRestoredFailed"), "error");
       loadTrashedNotes().catch(() => {});
     }
   };
