@@ -3747,89 +3747,143 @@ function NotesUI({
             {currentUser?.name ? `${t("hiPrefix")} ${currentUser.name}` : currentUser?.email}
           </span>
 
-          {/* Header 3-dot menu */}
-          <button
-            ref={headerBtnRef}
-            onClick={() => setHeaderMenuOpen((v) => !v)}
-            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
-            data-tooltip={t("menu")}
-            aria-haspopup="menu"
-            aria-expanded={headerMenuOpen}
-          >
-            <Kebab />
-          </button>
-
-          {headerMenuOpen && (
-            <>
-              {/* Backdrop to close menu when clicking outside */}
-              <div
-                className="fixed inset-0 z-[1099]"
-                onClick={() => setHeaderMenuOpen(false)}
-              />
-              <div
-                ref={headerMenuRef}
-                className={`absolute top-12 right-0 min-w-[220px] z-[1100] border border-[var(--border-light)] rounded-lg shadow-lg overflow-hidden ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
-                style={{ backgroundColor: dark ? "#222222" : undefined }}
-                onClick={(e) => e.stopPropagation()}
+          {/* Desktop: icon buttons directly in header bar */}
+          <div className="hidden sm:flex items-center gap-1">
+            <button
+              onClick={() => openSettingsPanel?.()}
+              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
+              data-tooltip={t("settings")}
+              aria-label={t("settings")}
+            >
+              <SettingsIcon />
+            </button>
+            <button
+              onClick={() => onToggleViewMode?.()}
+              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
+              data-tooltip={listView ? t("gridView") : t("listView")}
+              aria-label={listView ? t("gridView") : t("listView")}
+            >
+              {listView ? <GridIcon /> : <ListIcon />}
+            </button>
+            <button
+              onClick={() => toggleDark?.()}
+              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
+              data-tooltip={dark ? t("lightMode") : t("darkMode")}
+              aria-label={dark ? t("lightMode") : t("darkMode")}
+            >
+              {dark ? <SunIcon /> : <MoonIcon />}
+            </button>
+            <button
+              onClick={() => onStartMulti?.()}
+              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
+              data-tooltip={t("multiSelect")}
+              aria-label={t("multiSelect")}
+            >
+              <CheckSquareIcon />
+            </button>
+            {currentUser?.is_admin && (
+              <button
+                onClick={() => openAdminPanel?.()}
+                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
+                data-tooltip={t("adminPanel")}
+                aria-label={t("adminPanel")}
               >
-                <button
-                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                  onClick={() => {
-                    setHeaderMenuOpen(false);
-                    openSettingsPanel?.();
-                  }}
+                <ShieldIcon />
+              </button>
+            )}
+            <button
+              onClick={() => signOut?.()}
+              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 text-red-500 dark:text-red-400"
+              data-tooltip={t("signOut")}
+              aria-label={t("signOut")}
+            >
+              <LogOutIcon />
+            </button>
+          </div>
+
+          {/* Mobile: keep 3-dot menu */}
+          <div className="sm:hidden">
+            <button
+              ref={headerBtnRef}
+              onClick={() => setHeaderMenuOpen((v) => !v)}
+              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
+              data-tooltip={t("menu")}
+              aria-haspopup="menu"
+              aria-expanded={headerMenuOpen}
+            >
+              <Kebab />
+            </button>
+
+            {headerMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-[1099]"
+                  onClick={() => setHeaderMenuOpen(false)}
+                />
+                <div
+                  ref={headerMenuRef}
+                  className={`absolute top-12 right-0 min-w-[220px] z-[1100] border border-[var(--border-light)] rounded-lg shadow-lg overflow-hidden ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
+                  style={{ backgroundColor: dark ? "#222222" : undefined }}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <SettingsIcon />{t("settings")}</button>
-                <button
-                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                  onClick={() => {
-                    setHeaderMenuOpen(false);
-                    onToggleViewMode?.();
-                  }}
-                >
-                  {listView ? <GridIcon /> : <ListIcon />}
-                  {listView ? t("gridView") : t("listView")}
-                </button>
-                {/* Theme toggle text item */}
-                <button
-                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                  onClick={() => {
-                    setHeaderMenuOpen(false);
-                    toggleDark?.();
-                  }}
-                >
-                  {dark ? <SunIcon /> : <MoonIcon />}
-                  {dark ? t("lightMode") : t("darkMode")}
-                </button>
-                <button
-                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                  onClick={() => {
-                    setHeaderMenuOpen(false);
-                    onStartMulti?.();
-                  }}
-                >
-                  <CheckSquareIcon />{t("multiSelect")}</button>
-                {currentUser?.is_admin && (
                   <button
                     className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                     onClick={() => {
                       setHeaderMenuOpen(false);
-                      openAdminPanel?.();
+                      openSettingsPanel?.();
                     }}
                   >
-                    <ShieldIcon />{t("adminPanel")}</button>
-                )}
-                <button
-                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
-                  onClick={() => {
-                    setHeaderMenuOpen(false);
-                    signOut?.();
-                  }}
-                >
-                  <LogOutIcon />{t("signOut")}</button>
-              </div>
-            </>
-          )}
+                    <SettingsIcon />{t("settings")}</button>
+                  <button
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      onToggleViewMode?.();
+                    }}
+                  >
+                    {listView ? <GridIcon /> : <ListIcon />}
+                    {listView ? t("gridView") : t("listView")}
+                  </button>
+                  <button
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      toggleDark?.();
+                    }}
+                  >
+                    {dark ? <SunIcon /> : <MoonIcon />}
+                    {dark ? t("lightMode") : t("darkMode")}
+                  </button>
+                  <button
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      onStartMulti?.();
+                    }}
+                  >
+                    <CheckSquareIcon />{t("multiSelect")}</button>
+                  {currentUser?.is_admin && (
+                    <button
+                      className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        openAdminPanel?.();
+                      }}
+                    >
+                      <ShieldIcon />{t("adminPanel")}</button>
+                  )}
+                  <button
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      signOut?.();
+                    }}
+                  >
+                    <LogOutIcon />{t("signOut")}</button>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Hidden import input */}
           <input
