@@ -16,3 +16,41 @@ body {
   --tw-ring-shadow: 0 0 #0000;
   --tw-ring-offset-shadow: 0 0 #0000;
 }
+
+/* Shimmer / light-sweep animation for gradient buttons (dark mode hover) */
+@keyframes btn-shimmer {
+  0% {
+    transform: translateX(-100%) skewX(-15deg);
+  }
+  100% {
+    transform: translateX(250%) skewX(-15deg);
+  }
+}
+
+.btn-gradient {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-gradient::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 35%,
+    rgba(255, 255, 255, 0.25) 45%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0.25) 55%,
+    transparent 65%,
+    transparent 100%
+  );
+  transform: translateX(-100%) skewX(-15deg);
+  pointer-events: none;
+}
+
+:is(.dark, .dark *) .btn-gradient:hover::after {
+  animation: btn-shimmer 0.7s ease-in-out;
+}

@@ -2329,7 +2329,7 @@ function LoginView({
         {err && <p className="text-red-600 text-sm">{err}</p>}
         <button
           type="submit"
-          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
         >{t("signIn")}</button>
       </form>
 
@@ -2409,7 +2409,7 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin, floatingCardsEn
         {err && <p className="text-red-600 text-sm">{err}</p>}
         <button
           type="submit"
-          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
         >{t("createAccount")}</button>
       </form>
       <div className="mt-4 text-sm text-center">
@@ -2453,7 +2453,7 @@ function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin, floating
         {err && <p className="text-red-600 text-sm">{err}</p>}
         <button
           type="submit"
-          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
         >{t("signInWithSecretKey")}</button>
       </form>
       <div className="mt-4 text-sm text-center">
@@ -2971,7 +2971,7 @@ function SettingsPanel({
                 {t("cancel")}
               </button>
               <button
-                className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+                className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                 onClick={() => {
                   setResetDialogOpen(false);
                   onClose();
@@ -3236,7 +3236,7 @@ function AdminPanel({
               <button
                 type="submit"
                 disabled={isCreatingUser}
-                className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
               >
                 {isCreatingUser ? t("creating") : t("createUser")}
               </button>
@@ -3371,7 +3371,7 @@ function AdminPanel({
                 <button
                   type="submit"
                   disabled={isUpdatingUser}
-                  className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                  className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
                 >
                   {isUpdatingUser ? t("updating") : t("updateUser")}
                 </button>
@@ -4158,7 +4158,7 @@ function NotesUI({
                           disabled={!isOnline}
                           className={`px-3 py-1.5 rounded-lg whitespace-nowrap font-semibold transition-all duration-200 ${
                             isOnline
-                              ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+                              ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                               : "bg-gray-400 text-gray-200 cursor-not-allowed"
                           }`}
                         >{t("add")}</button>
@@ -4490,7 +4490,7 @@ function NotesUI({
                         disabled={!isOnline}
                         className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
                           isOnline
-                            ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+                            ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                             : "bg-gray-300 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
                         }`}
                       >{t("addNote")}</button>
@@ -8695,7 +8695,7 @@ export default function App() {
                             } catch (e) {}
                           }
                         }}
-                        className="px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+                        className="px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                       >{t("add")}</button>
                     </div>
                   )}
@@ -9249,7 +9249,7 @@ export default function App() {
                   <button
                     onClick={saveModal}
                     disabled={savingModal}
-                    className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 whitespace-nowrap transition-all duration-200 ${savingModal ? "bg-gradient-to-r from-indigo-400 to-violet-500 text-white cursor-not-allowed opacity-70" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98] focus:ring-indigo-500"}`}
+                    className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 whitespace-nowrap transition-all duration-200 ${savingModal ? "bg-gradient-to-r from-indigo-400 to-violet-500 text-white cursor-not-allowed opacity-70" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient focus:ring-indigo-500"}`}
                   >
                     {savingModal ? t("saving") : t("save")}
                   </button>
@@ -9440,7 +9440,7 @@ export default function App() {
                               }}
                             >{t("cancel")}</button>
                             <button
-                              className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+                              className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                               onClick={async () => {
                                 if (collaboratorUsername.trim()) {
                                   await addCollaborator(
@@ -9624,7 +9624,7 @@ export default function App() {
         <AuthShell title={t("adminPanel")} dark={dark} onToggleDark={toggleDark}>
           <p className="text-sm mb-4">{t("mustSignInAdmin")}</p>
           <button
-            className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+            className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
             onClick={() => (window.location.hash = "#/login")}
           >{t("goToSignIn")}</button>
         </AuthShell>
@@ -10024,7 +10024,7 @@ export default function App() {
                 {genericConfirmConfig.cancelText || t("cancel")}
               </button>
               <button
-                className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.98] ${genericConfirmConfig.danger ? "bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-300/40 hover:shadow-lg hover:shadow-red-300/50" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50"}`}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.98] btn-gradient ${genericConfirmConfig.danger ? "bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-300/40 hover:shadow-lg hover:shadow-red-300/50" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none"}`}
                 onClick={async () => {
                   setGenericConfirmOpen(false);
                   if (genericConfirmConfig.onConfirm) {
