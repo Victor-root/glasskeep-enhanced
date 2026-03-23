@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
         db.exec(`ALTER TABLE users ADD COLUMN avatar_url TEXT`);
       }
       if (!names.has("show_on_login")) {
-        db.exec(`ALTER TABLE users ADD COLUMN show_on_login INTEGER NOT NULL DEFAULT 1`);
+        db.exec(`ALTER TABLE users ADD COLUMN show_on_login INTEGER NOT NULL DEFAULT 0`);
       }
     });
     tx();
