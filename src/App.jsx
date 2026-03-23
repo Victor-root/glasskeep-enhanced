@@ -3656,7 +3656,7 @@ function NotesUI({
 
       {/* Header */}
       <header
-        className="p-4 sm:p-6 flex justify-between items-center sticky top-0 z-20 glass-card mb-6"
+        className="p-4 sm:p-6 flex justify-between items-center sticky top-0 z-20 glass-card mb-6 relative overflow-hidden"
         style={{
           transform: !headerVisible && windowWidth < 700 ? "translateY(-100%)" : "translateY(0)",
           transition: "transform 0.3s ease",
@@ -3745,7 +3745,7 @@ function NotesUI({
 
         {/* Mobile: search icon that expands into a full search bar */}
         <div className="sm:hidden flex items-center ml-auto mr-1">
-          {!mobileSearchOpen ? (
+          {!mobileSearchOpen && (
             <button
               type="button"
               className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-600 dark:text-gray-300"
@@ -3757,65 +3757,67 @@ function NotesUI({
             >
               <SearchIcon />
             </button>
-          ) : (
-            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2 duration-200">
-              <div className="relative">
-                <input
-                  ref={mobileSearchRef}
-                  type="text"
-                  placeholder={localAiEnabled ? t("searchOrAskAi") : t("search")}
-                  className={`w-[180px] bg-transparent border border-[var(--border-light)] rounded-lg pl-3 ${localAiEnabled ? "pr-12" : "pr-8"} py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") {
-                      setMobileSearchOpen(false);
-                    }
-                    if (
-                      e.key === "Enter" &&
-                      localAiEnabled &&
-                      search.trim().length > 0
-                    ) {
-                      onAiSearch?.(search);
-                    }
-                  }}
-                />
-                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                  {localAiEnabled && search.trim().length > 0 && (
-                    <button
-                      type="button"
-                      className="h-6 w-6 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
-                      onClick={() => onAiSearch?.(search)}
-                    >
-                      <Sparkles />
-                    </button>
-                  )}
-                  {search && (
-                    <button
-                      type="button"
-                      aria-label={t("clearSearch")}
-                      className="h-5 w-5 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
-                      onClick={() => setSearch("")}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400"
-                aria-label={t("clearSearch")}
-                onClick={() => {
-                  setMobileSearchOpen(false);
-                  setSearch("");
-                }}
-              >
-                ×
-              </button>
-            </div>
           )}
         </div>
+        {/* Mobile expanded search overlay - covers the header content */}
+        {mobileSearchOpen && (
+          <div className="sm:hidden absolute inset-0 z-30 flex items-center px-3 gap-2 bg-[var(--bg-card,_var(--bg-primary))] backdrop-blur-xl">
+            <div className="relative flex-1 min-w-0">
+              <input
+                ref={mobileSearchRef}
+                type="text"
+                placeholder={localAiEnabled ? t("searchOrAskAi") : t("search")}
+                className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-3 ${localAiEnabled ? "pr-12" : "pr-8"} py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setMobileSearchOpen(false);
+                  }
+                  if (
+                    e.key === "Enter" &&
+                    localAiEnabled &&
+                    search.trim().length > 0
+                  ) {
+                    onAiSearch?.(search);
+                  }
+                }}
+              />
+              <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                {localAiEnabled && search.trim().length > 0 && (
+                  <button
+                    type="button"
+                    className="h-6 w-6 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
+                    onClick={() => onAiSearch?.(search)}
+                  >
+                    <Sparkles />
+                  </button>
+                )}
+                {search && (
+                  <button
+                    type="button"
+                    aria-label={t("clearSearch")}
+                    className="h-5 w-5 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
+                    onClick={() => setSearch("")}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400"
+              aria-label={t("clearSearch")}
+              onClick={() => {
+                setMobileSearchOpen(false);
+                setSearch("");
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         <div className="relative flex items-center gap-3 shrink-0">
           {/* Desktop: icon buttons directly in header bar */}
