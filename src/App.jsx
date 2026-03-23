@@ -3684,11 +3684,21 @@ function NotesUI({
             draggable="false"
           />
 
+          {/* Mobile: stacked name + badge */}
+          <div className="flex flex-col sm:hidden leading-tight">
+            <h1 className="text-lg font-bold">Glass Keep</h1>
+            <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1 max-w-[160px]">
+              <span className="shrink-0 w-3 h-3 [&>svg]:w-3 [&>svg]:h-3"><SectionIcon /></span>
+              <span className="truncate">{sectionLabel}</span>
+            </span>
+          </div>
+
+          {/* Desktop: inline name + separator + badge */}
           <h1 className="hidden sm:block text-2xl sm:text-3xl font-bold">
             Glass Keep
           </h1>
           <span className="hidden sm:inline-block h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
-          <span className="text-sm sm:text-base font-medium px-3 py-1 rounded-lg bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20 flex items-center gap-1.5 max-w-[200px]">
+          <span className="hidden sm:flex text-base font-medium px-3 py-1 rounded-lg bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20 items-center gap-1.5 max-w-[200px]">
             <span className="shrink-0 w-4 h-4 [&>svg]:w-4 [&>svg]:h-4"><SectionIcon /></span>
             <span className="truncate">{sectionLabel}</span>
           </span>
