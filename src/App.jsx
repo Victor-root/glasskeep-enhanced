@@ -3608,7 +3608,7 @@ function NotesUI({
                   onClick={onBulkArchive}
                 >
                   <ArchiveIcon />
-                  {activeTagFilter === "ARCHIVED" ? "Unarchive" : t("archive")}
+                  {activeTagFilter === "ARCHIVED" ? t("unarchive") : t("archive")}
                 </button>
               </>
             )}
@@ -8264,7 +8264,7 @@ export default function App() {
                                 }}
                               >
                                 <ArchiveIcon />
-                                {activeNoteObj?.archived ? "Unarchive" : t("archive")}
+                                {activeNoteObj?.archived ? t("unarchive") : t("archive")}
                               </button>
                               <button
                                 className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
