@@ -4949,6 +4949,7 @@ export default function App() {
 
   // Notes & search
   const [notes, setNotes] = useState([]);
+  const [allNotesForTags, setAllNotesForTags] = useState([]);
   const [search, setSearch] = useState("");
 
   // Tag filter & sidebar
@@ -7893,9 +7894,17 @@ export default function App() {
   };
 
   /** -------- Tags list (unique + counts) -------- */
+  // Keep allNotesForTags in sync with notes when in normal view,
+  // so tags remain visible when navigating to archive/trash
+  useEffect(() => {
+    if (tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED") {
+      setAllNotesForTags(notes);
+    }
+  }, [notes, tagFilter]);
+
   const tagsWithCounts = useMemo(() => {
     const map = new Map();
-    for (const n of notes) {
+    for (const n of allNotesForTags) {
       for (const t of n.tags || []) {
         const key = String(t).trim();
         if (!key) continue;
@@ -7905,7 +7914,7 @@ export default function App() {
     return Array.from(map.entries())
       .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => a.tag.toLowerCase().localeCompare(b.tag.toLowerCase()));
-  }, [notes]);
+  }, [allNotesForTags]);
 
   /** -------- Derived lists (search + tag filter) -------- */
   const filtered = useMemo(() => {
