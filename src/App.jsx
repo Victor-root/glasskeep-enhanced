@@ -3669,9 +3669,9 @@ function NotesUI({
             Glass Keep
           </h1>
           <span className="hidden sm:inline-block h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
-          <span className="text-sm sm:text-base font-medium px-3 py-1 rounded-lg bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20 flex items-center gap-1.5 max-w-[200px]">
+          <span className="text-sm sm:text-base font-medium px-1.5 sm:px-3 py-1 rounded-lg bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20 flex items-center gap-1.5 max-w-[200px]" data-tooltip={sectionLabel}>
             <span className="shrink-0 w-4 h-4 [&>svg]:w-4 [&>svg]:h-4"><SectionIcon /></span>
-            <span className="truncate">{sectionLabel}</span>
+            <span className="hidden sm:inline truncate">{sectionLabel}</span>
           </span>
 
           {/* Offline indicator */}
