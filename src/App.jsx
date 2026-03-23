@@ -68,10 +68,10 @@ const _PURIFY_CONFIG = {
     "blockquote",
     "pre", "code",
     "table", "thead", "tbody", "tr", "th", "td",
-    "img",
+    // "img" intentionally excluded: prevents external image loading (tracking / IP leak)
     "span", "div",
   ],
-  ALLOWED_ATTR: ["href", "title", "alt", "src", "class", "target", "rel"],
+  ALLOWED_ATTR: ["href", "title", "class", "target", "rel"],
   ALLOW_DATA_ATTR: false,
 };
 const renderSafeMarkdown = (md) => {
