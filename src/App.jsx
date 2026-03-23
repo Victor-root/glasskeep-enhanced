@@ -2275,23 +2275,54 @@ function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, log
   );
 }
 
+/** ---------- Avatar helper (reusable) ---------- */
+function UserAvatar({ name, email, avatarUrl, size = "w-7 h-7", textSize = "text-xs", dark, className = "" }) {
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name || email || "?"}
+        className={`${size} rounded-full object-cover select-none ${className}`}
+        draggable="false"
+      />
+    );
+  }
+  return (
+    <span
+      className={`flex items-center justify-center ${size} rounded-full ${textSize} font-semibold select-none ${
+        dark ? "bg-indigo-500/25 text-indigo-300" : "bg-indigo-100 text-indigo-700"
+      } ${className}`}
+    >
+      {(name?.[0] || email?.[0] || "?").toUpperCase()}
+    </span>
+  );
+}
+
 /** ---------- Login / Register / Secret Login ---------- */
 function LoginView({
   dark,
   onToggleDark,
   onLogin,
+  onLoginById,
   goRegister,
   goSecret,
   allowRegistration,
   floatingCardsEnabled,
   loginSlogan,
+  loginProfiles,
 }) {
+  const [mode, setMode] = useState("profiles"); // "profiles" | "password" | "manual"
+  const [selectedProfile, setSelectedProfile] = useState(null);
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
 
-  const handleSubmit = async (e) => {
+  // If no visible profiles, show manual login directly
+  const hasProfiles = loginProfiles && loginProfiles.length > 0;
+
+  const handleManualSubmit = async (e) => {
     e.preventDefault();
+    setErr("");
     try {
       const res = await onLogin(email.trim(), pw);
       if (!res.ok) setErr(res.error || t("loginFailed"));
@@ -2300,6 +2331,116 @@ function LoginView({
     }
   };
 
+  const handleProfileLogin = async (e) => {
+    e.preventDefault();
+    setErr("");
+    try {
+      const res = await onLoginById(selectedProfile.id, pw);
+      if (!res.ok) setErr(res.error || t("loginFailed"));
+    } catch (er) {
+      setErr(er.message || t("loginFailed"));
+    }
+  };
+
+  // Profile selection screen (Jellyfin-style)
+  if (hasProfiles && mode === "profiles") {
+    return (
+      <AuthShell
+        title={t("selectProfile")}
+        dark={dark}
+        onToggleDark={onToggleDark}
+        floatingCardsEnabled={floatingCardsEnabled}
+        loginSlogan={loginSlogan}
+      >
+        <div className="flex flex-wrap justify-center gap-5 mb-4">
+          {loginProfiles.map((profile) => (
+            <button
+              key={profile.id}
+              onClick={() => {
+                setSelectedProfile(profile);
+                setPw("");
+                setErr("");
+                setMode("password");
+              }}
+              className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/10 hover:scale-105 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 min-w-[90px]"
+            >
+              <UserAvatar
+                name={profile.name}
+                avatarUrl={profile.avatar_url}
+                size="w-16 h-16"
+                textSize="text-2xl"
+                dark={dark}
+              />
+              <span className={`text-sm font-medium truncate max-w-[100px] ${dark ? "text-gray-200" : "text-gray-700"}`}>
+                {profile.name}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="text-center">
+          <button
+            className="text-sm text-indigo-600 hover:underline"
+            onClick={() => { setMode("manual"); setErr(""); setPw(""); setEmail(""); }}
+          >{t("manualLogin")}</button>
+        </div>
+      </AuthShell>
+    );
+  }
+
+  // Password entry for selected profile
+  if (mode === "password" && selectedProfile) {
+    return (
+      <AuthShell
+        dark={dark}
+        onToggleDark={onToggleDark}
+        floatingCardsEnabled={floatingCardsEnabled}
+        loginSlogan={loginSlogan}
+      >
+        <div className="flex flex-col items-center mb-4">
+          <UserAvatar
+            name={selectedProfile.name}
+            avatarUrl={selectedProfile.avatar_url}
+            size="w-20 h-20"
+            textSize="text-3xl"
+            dark={dark}
+          />
+          <h2 className={`mt-3 text-lg font-semibold ${dark ? "text-gray-100" : "text-gray-800"}`}>
+            {selectedProfile.name}
+          </h2>
+        </div>
+        <form onSubmit={handleProfileLogin} className="space-y-4">
+          <input
+            type="password"
+            autoFocus
+            className="w-full bg-transparent border border-[var(--border-light)] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+            placeholder={t("enterPassword")}
+            value={pw}
+            onChange={(e) => setPw(e.target.value)}
+            required
+          />
+          {err && <p className="text-red-600 text-sm">{err}</p>}
+          <button
+            type="submit"
+            className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+          >{t("signIn")}</button>
+        </form>
+        <div className="mt-4 text-sm text-center flex justify-center gap-4">
+          {hasProfiles && (
+            <button
+              className="text-indigo-600 hover:underline"
+              onClick={() => { setMode("profiles"); setErr(""); setPw(""); }}
+            >{t("backToProfiles")}</button>
+          )}
+          <button
+            className="text-indigo-600 hover:underline"
+            onClick={() => { setMode("manual"); setErr(""); setPw(""); setEmail(""); }}
+          >{t("otherAccount")}</button>
+        </div>
+      </AuthShell>
+    );
+  }
+
+  // Manual login (classic form)
   return (
     <AuthShell
       data-tooltip={t("signInToYourAccount")}
@@ -2308,7 +2449,7 @@ function LoginView({
       floatingCardsEnabled={floatingCardsEnabled}
       loginSlogan={loginSlogan}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleManualSubmit} className="space-y-4">
         <input
           type="text"
           autoComplete="username"
@@ -2334,6 +2475,12 @@ function LoginView({
       </form>
 
       <div className="mt-4 text-sm flex justify-between items-center">
+        {hasProfiles && (
+          <button
+            className="text-indigo-600 hover:underline"
+            onClick={() => { setMode("profiles"); setErr(""); setPw(""); }}
+          >{t("backToProfiles")}</button>
+        )}
         {allowRegistration && (
           <button
             className="text-indigo-600 hover:underline"
@@ -2716,9 +2863,58 @@ function SettingsPanel({
   showGenericConfirm,
   showToast,
   onResetNoteOrder,
+  currentUser,
+  token,
+  onProfileUpdated,
 }) {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [overridePositions, setOverridePositions] = useState(true);
+  const [profileShowOnLogin, setProfileShowOnLogin] = useState(true);
+  const avatarFileRef = React.useRef(null);
+
+  // Load profile data when panel opens
+  React.useEffect(() => {
+    if (open && token) {
+      api("/user/profile", { token }).then((data) => {
+        if (data) setProfileShowOnLogin(data.show_on_login !== false);
+      }).catch(() => {});
+    }
+  }, [open, token]);
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await fileToCompressedDataURL(file, 256, 0.85);
+      await api("/user/avatar", { method: "PUT", body: { avatar_url: dataUrl }, token });
+      onProfileUpdated?.({ avatar_url: dataUrl });
+      showToast(t("photoUpdated"), "success");
+    } catch (err) {
+      showToast(err.message || "Upload failed", "error");
+    }
+    if (avatarFileRef.current) avatarFileRef.current.value = "";
+  };
+
+  const handleAvatarRemove = async () => {
+    try {
+      await api("/user/avatar", { method: "DELETE", token });
+      onProfileUpdated?.({ avatar_url: null });
+      showToast(t("photoRemoved"), "info");
+    } catch (err) {
+      showToast(err.message || "Remove failed", "error");
+    }
+  };
+
+  const handleShowOnLoginToggle = async () => {
+    const newVal = !profileShowOnLogin;
+    setProfileShowOnLogin(newVal);
+    try {
+      await api("/user/profile", { method: "PATCH", body: { show_on_login: newVal }, token });
+    } catch (err) {
+      setProfileShowOnLogin(!newVal); // revert
+      showToast(err.message || "Update failed", "error");
+    }
+  };
 
   // Prevent body scroll when settings panel is open
   React.useEffect(() => {
@@ -2764,6 +2960,68 @@ function SettingsPanel({
         </div>
 
         <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
+          {/* Profile Section */}
+          <div className="mb-8">
+            <h4 className="text-md font-semibold mb-4">{t("profileSettings")}</h4>
+            <div className="flex items-center gap-4 mb-4">
+              <div className="relative group">
+                <UserAvatar
+                  name={currentUser?.name}
+                  email={currentUser?.email}
+                  avatarUrl={currentUser?.avatar_url}
+                  size="w-16 h-16"
+                  textSize="text-2xl"
+                  dark={dark}
+                />
+                <button
+                  onClick={() => avatarFileRef.current?.click()}
+                  className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                >
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                </button>
+                <input
+                  ref={avatarFileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">{currentUser?.name || currentUser?.email}</div>
+                <div className="flex gap-2 mt-1">
+                  <button
+                    className="text-xs text-indigo-600 hover:underline"
+                    onClick={() => avatarFileRef.current?.click()}
+                  >{currentUser?.avatar_url ? t("changePhoto") : t("uploadPhoto")}</button>
+                  {currentUser?.avatar_url && (
+                    <button
+                      className="text-xs text-red-500 hover:underline"
+                      onClick={handleAvatarRemove}
+                    >{t("removePhoto")}</button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="min-w-0">
+                <div className="font-medium">{t("showOnLogin")}</div>
+              </div>
+              <button
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
+                  profileShowOnLogin ? "bg-indigo-600" : "bg-gray-300 dark:bg-gray-600"
+                }`}
+                onClick={handleShowOnLoginToggle}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    profileShowOnLogin ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
           {/* Data Management Section */}
           <div className="mb-8">
             <h4 className="text-md font-semibold mb-4">{t("dataManagement")}</h4>
@@ -3872,11 +4130,14 @@ function NotesUI({
             )}
             <span className={`mx-1 w-px h-5 ${dark ? "bg-gray-600" : "bg-gray-300"}`} />
             <span className="flex items-center gap-2">
-              <span
-                className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold select-none ${dark ? "bg-indigo-500/25 text-indigo-300" : "bg-indigo-100 text-indigo-700"}`}
-              >
-                {(currentUser?.name?.[0] || currentUser?.email?.[0] || "?").toUpperCase()}
-              </span>
+              <UserAvatar
+                name={currentUser?.name}
+                email={currentUser?.email}
+                avatarUrl={currentUser?.avatar_url}
+                size="w-7 h-7"
+                textSize="text-xs"
+                dark={dark}
+              />
               <span className={`text-sm font-medium ${dark ? "text-gray-200" : "text-gray-700"}`}>
                 {currentUser?.name || currentUser?.email}
               </span>
@@ -5593,6 +5854,7 @@ export default function App() {
   });
   const [allowRegistration, setAllowRegistration] = useState(true);
   const [loginSlogan, setLoginSlogan] = useState("");
+  const [loginProfiles, setLoginProfiles] = useState([]);
 
   // Settings panel state
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
@@ -5948,10 +6210,22 @@ export default function App() {
   // Keep tagFilter ref in sync for SSE/polling closures
   useEffect(() => { tagFilterRef.current = tagFilter; }, [tagFilter]);
 
+  // Fetch login profiles (public)
+  const fetchLoginProfiles = async () => {
+    try {
+      const profiles = await api("/login/profiles");
+      setLoginProfiles(Array.isArray(profiles) ? profiles : []);
+    } catch (e) {
+      console.error("Failed to fetch login profiles:", e);
+      setLoginProfiles([]);
+    }
+  };
+
   // Check registration setting and login slogan on app load
   useEffect(() => {
     checkRegistrationSetting();
     fetchLoginSlogan();
+    fetchLoginProfiles();
   }, []);
 
   // Handle token expiration globally - must be after signOut is defined
@@ -6419,6 +6693,16 @@ export default function App() {
     const res = await api("/login", {
       method: "POST",
       body: { email, password },
+    });
+    setSession(res);
+    setAuth(res);
+    navigate("#/notes");
+    return { ok: true };
+  };
+  const signInById = async (userId, password) => {
+    const res = await api("/login", {
+      method: "POST",
+      body: { user_id: userId, password },
     });
     setSession(res);
     setAuth(res);
@@ -9695,11 +9979,13 @@ export default function App() {
         dark={dark}
         onToggleDark={toggleDark}
         onLogin={signIn}
+        onLoginById={signInById}
         goRegister={() => navigate("#/register")}
         goSecret={() => navigate("#/login-secret")}
         allowRegistration={allowRegistration}
         floatingCardsEnabled={true}
         loginSlogan={loginSlogan}
+        loginProfiles={loginProfiles}
       />
     );
   }
@@ -9857,6 +10143,12 @@ export default function App() {
         showGenericConfirm={showGenericConfirm}
         showToast={showToast}
         onResetNoteOrder={resetNoteOrder}
+        currentUser={currentUser}
+        token={token}
+        onProfileUpdated={(updates) => {
+          setSession((prev) => prev ? { ...prev, user: { ...prev.user, ...updates } } : prev);
+          setAuth({ ...getAuth(), user: { ...getAuth()?.user, ...updates } });
+        }}
       />
 
       {/* Admin Panel */}
