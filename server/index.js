@@ -178,6 +178,12 @@ CREATE TABLE IF NOT EXISTS user_settings (
       if (!names.has("secret_key_created_at")) {
         db.exec(`ALTER TABLE users ADD COLUMN secret_key_created_at TEXT`);
       }
+      if (!names.has("avatar_url")) {
+        db.exec(`ALTER TABLE users ADD COLUMN avatar_url TEXT`);
+      }
+      if (!names.has("show_on_login")) {
+        db.exec(`ALTER TABLE users ADD COLUMN show_on_login INTEGER NOT NULL DEFAULT 0`);
+      }
     });
     tx();
   } catch {
@@ -527,21 +533,27 @@ app.post("/api/register", (req, res) => {
   const token = signToken(user);
   res.json({
     token,
-    user: { id: user.id, name: user.name, email: user.email, is_admin: !!user.is_admin },
+    user: { id: user.id, name: user.name, email: user.email, is_admin: !!user.is_admin, avatar_url: user.avatar_url || null },
   });
 });
 
 app.post("/api/login", (req, res) => {
-  const { email, password } = req.body || {};
-  const user = email ? getUserByEmail.get(email) : null;
-  if (!user) return res.status(401).json({ error: "No account found for that email." });
+  const { email, password, user_id } = req.body || {};
+  // Support login by user_id (profile selection) or by email (manual login)
+  let user;
+  if (user_id) {
+    user = getUserById.get(user_id);
+  } else {
+    user = email ? getUserByEmail.get(email) : null;
+  }
+  if (!user) return res.status(401).json({ error: "No account found." });
   if (!bcrypt.compareSync(password || "", user.password_hash)) {
     return res.status(401).json({ error: "Incorrect password." });
   }
   const token = signToken(user);
   res.json({
     token,
-    user: { id: user.id, name: user.name, email: user.email, is_admin: !!user.is_admin },
+    user: { id: user.id, name: user.name, email: user.email, is_admin: !!user.is_admin, avatar_url: user.avatar_url || null },
   });
 });
 
@@ -579,14 +591,77 @@ app.post("/api/login/secret", (req, res) => {
   const rows = getUsersWithSecret.all();
   for (const u of rows) {
     if (u.secret_key_hash && bcrypt.compareSync(key, u.secret_key_hash)) {
+      const fullUser = getUserById.get(u.id);
       const token = signToken(u);
       return res.json({
         token,
-        user: { id: u.id, name: u.name, email: u.email, is_admin: !!u.is_admin },
+        user: { id: u.id, name: u.name, email: u.email, is_admin: !!u.is_admin, avatar_url: fullUser?.avatar_url || null },
       });
     }
   }
   return res.status(401).json({ error: "Secret key not recognized." });
+});
+
+// ---------- Login Profiles (public) ----------
+// Returns only visible profiles with minimal safe info for the login screen
+app.get("/api/login/profiles", (_req, res) => {
+  const rows = db.prepare(
+    "SELECT id, name, avatar_url FROM users WHERE show_on_login = 1 ORDER BY name ASC"
+  ).all();
+  res.json(rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    avatar_url: r.avatar_url || null,
+  })));
+});
+
+// ---------- Profile Avatar & Visibility ----------
+// Upload / replace avatar (authenticated)
+app.put("/api/user/avatar", auth, (req, res) => {
+  const { avatar_url } = req.body || {};
+  if (!avatar_url || typeof avatar_url !== "string") {
+    return res.status(400).json({ error: "avatar_url is required (data URL)." });
+  }
+  // Accept only image/png, image/jpeg, image/webp data URLs
+  if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(avatar_url)) {
+    return res.status(400).json({ error: "avatar_url must be a valid image data URL (png, jpeg or webp)." });
+  }
+  // Limit to ~1.5MB base64 data URL (~2MB decoded)
+  if (avatar_url.length > 2 * 1024 * 1024) {
+    return res.status(400).json({ error: "Avatar image too large (max ~1.5MB)." });
+  }
+  db.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").run(avatar_url, req.user.id);
+  res.json({ ok: true, avatar_url });
+});
+
+// Delete avatar (authenticated)
+app.delete("/api/user/avatar", auth, (req, res) => {
+  db.prepare("UPDATE users SET avatar_url = NULL WHERE id = ?").run(req.user.id);
+  res.json({ ok: true });
+});
+
+// Get current user profile info (authenticated)
+app.get("/api/user/profile", auth, (req, res) => {
+  const user = getUserById.get(req.user.id);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  res.json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    is_admin: !!user.is_admin,
+    avatar_url: user.avatar_url || null,
+    show_on_login: user.show_on_login !== 0,
+  });
+});
+
+// Update show_on_login preference (authenticated)
+app.patch("/api/user/profile", auth, (req, res) => {
+  const { show_on_login } = req.body || {};
+  if (typeof show_on_login !== "boolean") {
+    return res.status(400).json({ error: "show_on_login must be a boolean." });
+  }
+  db.prepare("UPDATE users SET show_on_login = ? WHERE id = ?").run(show_on_login ? 1 : 0, req.user.id);
+  res.json({ ok: true, show_on_login });
 });
 
 // ---------- Notes ----------
