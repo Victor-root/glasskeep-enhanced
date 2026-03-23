@@ -3656,7 +3656,7 @@ function NotesUI({
 
       {/* Header */}
       <header
-        className="p-4 sm:p-6 flex justify-between items-center sticky top-0 z-20 glass-card mb-6 relative"
+        className={`p-4 sm:p-6 flex justify-between items-center sticky top-0 ${mobileSearchOpen ? "z-[1000]" : "z-20"} glass-card mb-6 relative`}
         style={{
           transform: !headerVisible && windowWidth < 700 ? "translateY(-100%)" : "translateY(0)",
           transition: "transform 0.3s ease",
@@ -3770,12 +3770,14 @@ function NotesUI({
           )}
         </div>
         {/* Mobile expanded search overlay - covers the header content */}
-        {mobileSearchOpen && (
-          <>
+        {mobileSearchOpen && createPortal(
           <div
-            className="sm:hidden fixed inset-0 z-20"
+            className="sm:hidden fixed inset-0 z-[999]"
             onClick={() => setMobileSearchOpen(false)}
-          />
+          />,
+          document.body
+        )}
+        {mobileSearchOpen && (
           <div className="sm:hidden absolute inset-0 z-30 flex items-center px-3 gap-2 bg-[var(--bg-card,_var(--bg-primary))] backdrop-blur-xl">
             <div className="relative flex-1 min-w-0">
               <input
@@ -3821,7 +3823,6 @@ function NotesUI({
               </div>
             </div>
           </div>
-          </>
         )}
 
         <div className="relative flex items-center gap-3 shrink-0">
