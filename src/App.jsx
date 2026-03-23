@@ -1018,6 +1018,44 @@ html.dark header.glass-card {
   display: block;
 }
 
+/* Blockquote – elegant styled citation */
+.note-content blockquote,
+.prose blockquote {
+  border-left: 4px solid rgba(99, 102, 241, 0.45);
+  border-right: 1px solid rgba(99, 102, 241, 0.15);
+  border-top: 1px solid rgba(99, 102, 241, 0.15);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(168, 85, 247, 0.04) 100%);
+  font-style: italic;
+  margin: 0 0 0.75rem 0;
+  padding: 0.6rem 0.9rem 0.6rem 1.25rem;
+  color: var(--text-light);
+}
+html.dark .note-content blockquote,
+html.dark .prose blockquote {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.10) 0%, rgba(168, 85, 247, 0.07) 100%);
+  border-left-color: rgba(99, 102, 241, 0.6);
+}
+/* Avoid double margins from <p> inside blockquote */
+.note-content blockquote p,
+.prose blockquote p {
+  margin: 0;
+}
+.note-content blockquote p + p,
+.prose blockquote p + p {
+  margin-top: 0.35rem;
+}
+/* Prose plugin overrides: remove default quote pseudo-elements and italic */
+.prose blockquote::before,
+.prose blockquote::after {
+  content: none !important;
+}
+.prose blockquote p:first-of-type::before,
+.prose blockquote p:last-of-type::after {
+  content: none !important;
+}
+
 /* Copy buttons */
 /* Hide scrollbars on mobile (keep scrolling) */
 @media (max-width: 639px) {
