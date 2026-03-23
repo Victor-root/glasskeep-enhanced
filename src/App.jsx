@@ -7897,7 +7897,7 @@ export default function App() {
   // Keep allNotesForTags in sync with notes when in normal view,
   // so tags remain visible when navigating to archive/trash
   useEffect(() => {
-    if (tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED") {
+    if (tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED" && notes.length > 0) {
       setAllNotesForTags(notes);
     }
   }, [notes, tagFilter]);
