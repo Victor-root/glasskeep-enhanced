@@ -437,6 +437,21 @@ const ArrowRight = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
   </svg>
 );
+const SearchIcon = () => (
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+);
 const Kebab = () => (
   <svg
     className="w-5 h-5"
@@ -3498,6 +3513,10 @@ function NotesUI({
   const multiColorBtnRef = useRef(null);
   const [showMultiColorPop, setShowMultiColorPop] = useState(false);
 
+  // Mobile search expand
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const mobileSearchRef = useRef(null);
+
   // Header auto-hide on scroll (mobile only)
   const [headerVisible, setHeaderVisible] = useState(true);
   const lastScrollYRef = useRef(0);
@@ -3669,9 +3688,9 @@ function NotesUI({
             Glass Keep
           </h1>
           <span className="hidden sm:inline-block h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
-          <span className="text-sm sm:text-base font-medium px-0 py-0 sm:px-3 sm:py-1 sm:rounded-lg sm:bg-indigo-600/10 text-gray-800 dark:text-gray-200 sm:text-indigo-700 sm:dark:text-indigo-300 sm:border sm:border-indigo-600/20 flex items-center gap-1.5 max-w-[200px]" data-tooltip={sectionLabel}>
-            <span className="shrink-0 w-5 h-5 [&>svg]:w-5 [&>svg]:h-5 sm:w-4 sm:h-4 sm:[&>svg]:w-4 sm:[&>svg]:h-4"><SectionIcon /></span>
-            <span className="hidden sm:inline truncate">{sectionLabel}</span>
+          <span className="text-sm sm:text-base font-medium px-3 py-1 rounded-lg bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20 flex items-center gap-1.5 max-w-[200px]">
+            <span className="shrink-0 w-4 h-4 [&>svg]:w-4 [&>svg]:h-4"><SectionIcon /></span>
+            <span className="truncate">{sectionLabel}</span>
           </span>
 
           {/* Offline indicator */}
@@ -3680,11 +3699,12 @@ function NotesUI({
           )}
         </div>
 
-        <div className="flex-grow min-w-0 flex justify-center px-2 sm:px-8">
+        {/* Desktop: full search bar */}
+        <div className="hidden sm:flex flex-grow min-w-0 justify-center px-2 sm:px-8">
           <div className="relative w-full max-w-lg">
             <input
               type="text"
-		placeholder={localAiEnabled ? t("searchOrAskAi") : t("search")}
+              placeholder={localAiEnabled ? t("searchOrAskAi") : t("search")}
               className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-4 ${localAiEnabled ? "pr-14" : "pr-8"} py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -3721,6 +3741,80 @@ function NotesUI({
               )}
             </div>
           </div>
+        </div>
+
+        {/* Mobile: search icon that expands into a full search bar */}
+        <div className="sm:hidden flex items-center ml-auto mr-1">
+          {!mobileSearchOpen ? (
+            <button
+              type="button"
+              className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-600 dark:text-gray-300"
+              aria-label={t("search")}
+              onClick={() => {
+                setMobileSearchOpen(true);
+                setTimeout(() => mobileSearchRef.current?.focus(), 50);
+              }}
+            >
+              <SearchIcon />
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2 duration-200">
+              <div className="relative">
+                <input
+                  ref={mobileSearchRef}
+                  type="text"
+                  placeholder={localAiEnabled ? t("searchOrAskAi") : t("search")}
+                  className={`w-[180px] bg-transparent border border-[var(--border-light)] rounded-lg pl-3 ${localAiEnabled ? "pr-12" : "pr-8"} py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setMobileSearchOpen(false);
+                    }
+                    if (
+                      e.key === "Enter" &&
+                      localAiEnabled &&
+                      search.trim().length > 0
+                    ) {
+                      onAiSearch?.(search);
+                    }
+                  }}
+                />
+                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                  {localAiEnabled && search.trim().length > 0 && (
+                    <button
+                      type="button"
+                      className="h-6 w-6 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
+                      onClick={() => onAiSearch?.(search)}
+                    >
+                      <Sparkles />
+                    </button>
+                  )}
+                  {search && (
+                    <button
+                      type="button"
+                      aria-label={t("clearSearch")}
+                      className="h-5 w-5 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
+                      onClick={() => setSearch("")}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400"
+                aria-label={t("clearSearch")}
+                onClick={() => {
+                  setMobileSearchOpen(false);
+                  setSearch("");
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="relative flex items-center gap-3 shrink-0">
