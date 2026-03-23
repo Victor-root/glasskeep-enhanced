@@ -335,8 +335,8 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
               onClick={() => setMode(mode === 'view' ? 'draw' : 'view')}
               className={`px-3 py-1.5 rounded-xl border-2 text-sm font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${
                 mode === 'draw'
-                  ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white border-transparent shadow-md shadow-indigo-300/40 hover:from-indigo-600 hover:to-violet-700'
-                  : 'border-indigo-200/80 bg-gradient-to-br from-indigo-50 to-violet-50/60 text-indigo-600 hover:from-indigo-100 hover:to-violet-100 hover:border-indigo-300 hover:shadow-sm hover:shadow-indigo-200/50 dark:from-indigo-900/20 dark:to-violet-900/10 dark:border-indigo-700/50 dark:text-indigo-400'
+                  ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white border-transparent shadow-md shadow-indigo-300/40 dark:shadow-none hover:from-indigo-600 hover:to-violet-700'
+                  : 'border-indigo-200/80 bg-gradient-to-br from-indigo-50 to-violet-50/60 text-indigo-600 hover:from-indigo-100 hover:to-violet-100 hover:border-indigo-300 hover:shadow-sm hover:shadow-indigo-200/50 dark:hover:shadow-none dark:from-indigo-900/20 dark:to-violet-900/10 dark:border-indigo-700/50 dark:text-indigo-400'
               }`}
               data-tooltip={mode === 'view' ? t('switchToDrawMode') : t('switchToViewMode')}
             >
@@ -355,7 +355,7 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
                 onClick={() => setTool('pen')}
                 className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                   tool === 'pen'
-                    ? 'bg-gradient-to-br from-indigo-400 to-blue-500 text-white border-transparent shadow-md shadow-indigo-300/50 scale-105'
+                    ? 'bg-gradient-to-br from-indigo-400 to-blue-500 text-white border-transparent shadow-md shadow-indigo-300/50 dark:shadow-none scale-105'
                     : 'border-indigo-200/80 bg-gradient-to-br from-indigo-50 to-blue-50/60 text-indigo-500 hover:from-indigo-100 hover:to-blue-100 hover:border-indigo-300 hover:scale-105 hover:shadow-sm dark:from-indigo-900/20 dark:to-blue-900/10 dark:border-indigo-700/50 dark:text-indigo-400'
                 }`}
               >
@@ -427,14 +427,14 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
                 data-tooltip={t("undo")}
                 onClick={undo}
                 disabled={paths.length === 0}
-                className="p-1.5 rounded-xl border-2 border-teal-300 bg-gradient-to-br from-teal-100 to-cyan-100 text-teal-700 hover:from-teal-200 hover:to-cyan-200 hover:border-teal-400 hover:scale-105 hover:shadow-sm hover:shadow-teal-200/50 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-teal-800/40 dark:to-cyan-800/30 dark:border-teal-600 dark:text-teal-300 dark:hover:from-teal-700/50 dark:hover:to-cyan-700/40 transition-all duration-200"
+                className="p-1.5 rounded-xl border-2 border-teal-300 bg-gradient-to-br from-teal-100 to-cyan-100 text-teal-700 hover:from-teal-200 hover:to-cyan-200 hover:border-teal-400 hover:scale-105 hover:shadow-sm hover:shadow-teal-200/50 dark:hover:shadow-none active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-teal-800/40 dark:to-cyan-800/30 dark:border-teal-600 dark:text-teal-300 dark:hover:from-teal-700/50 dark:hover:to-cyan-700/40 transition-all duration-200"
               >
                 <UndoToolIcon />
               </button>
             <button
                 data-tooltip={t("clearAll")}
                 onClick={clearCanvas}
-                className="p-1.5 rounded-xl border-2 border-transparent bg-gradient-to-br from-red-400 to-rose-500 text-white hover:from-red-500 hover:to-rose-600 hover:scale-105 hover:shadow-md hover:shadow-red-300/50 active:scale-95 transition-all duration-200"
+                className="p-1.5 rounded-xl border-2 border-transparent bg-gradient-to-br from-red-400 to-rose-500 text-white hover:from-red-500 hover:to-rose-600 hover:scale-105 hover:shadow-md hover:shadow-red-300/50 dark:hover:shadow-none active:scale-95 transition-all duration-200"
               >
                 <DeleteToolIcon />
               </button>

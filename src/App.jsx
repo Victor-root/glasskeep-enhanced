@@ -4375,7 +4375,7 @@ function NotesUI({
                             ref={composerFmtBtnRef}
                             type="button"
                             onClick={() => setShowComposerFmt((v) => !v)}
-                            className="px-2.5 py-1.5 rounded-xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-purple-50 text-violet-600 hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 hover:scale-105 hover:shadow-md hover:shadow-violet-200/60 active:scale-95 dark:from-violet-900/30 dark:to-purple-900/20 dark:border-violet-700/60 dark:text-violet-400 dark:hover:from-violet-800/40 dark:hover:to-purple-800/30 flex items-center gap-1.5 text-sm font-medium transition-all duration-200 flex-shrink-0"
+                            className="px-2.5 py-1.5 rounded-xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-purple-50 text-violet-600 hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 hover:scale-105 hover:shadow-md hover:shadow-violet-200/60 dark:hover:shadow-none active:scale-95 dark:from-violet-900/30 dark:to-purple-900/20 dark:border-violet-700/60 dark:text-violet-400 dark:hover:from-violet-800/40 dark:hover:to-purple-800/30 flex items-center gap-1.5 text-sm font-medium transition-all duration-200 flex-shrink-0"
                             data-tooltip={t("formatting")}
                           >
                             <FormatIcon />{t("formatting")}</button>
@@ -4402,8 +4402,8 @@ function NotesUI({
                           onClick={() => setComposerType("text")}
                           className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                             composerType === "text"
-                              ? "bg-gradient-to-br from-rose-400 to-pink-500 text-white border-transparent shadow-md shadow-rose-300/50 scale-105"
-                              : "border-rose-200/80 bg-gradient-to-br from-rose-50 to-pink-50/60 text-rose-400 hover:from-rose-100 hover:to-pink-100 hover:border-rose-300 hover:scale-105 hover:shadow-sm hover:shadow-rose-200/50 dark:from-rose-900/20 dark:to-pink-900/10 dark:border-rose-700/50 dark:text-rose-400 dark:hover:from-rose-800/30 dark:hover:to-pink-800/20"
+                              ? "bg-gradient-to-br from-rose-400 to-pink-500 text-white border-transparent shadow-md shadow-rose-300/50 dark:shadow-none scale-105"
+                              : "border-rose-200/80 bg-gradient-to-br from-rose-50 to-pink-50/60 text-rose-400 hover:from-rose-100 hover:to-pink-100 hover:border-rose-300 hover:scale-105 hover:shadow-sm hover:shadow-rose-200/50 dark:hover:shadow-none dark:from-rose-900/20 dark:to-pink-900/10 dark:border-rose-700/50 dark:text-rose-400 dark:hover:from-rose-800/30 dark:hover:to-pink-800/20"
                           }`}
                           data-tooltip={t("textNote")}
                         >
@@ -4414,8 +4414,8 @@ function NotesUI({
                           onClick={() => setComposerType("checklist")}
                           className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                             composerType === "checklist"
-                              ? "bg-gradient-to-br from-emerald-400 to-green-500 text-white border-transparent shadow-md shadow-emerald-300/50 scale-105"
-                              : "border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-green-50/60 text-emerald-500 hover:from-emerald-100 hover:to-green-100 hover:border-emerald-300 hover:scale-105 hover:shadow-sm hover:shadow-emerald-200/50 dark:from-emerald-900/20 dark:to-green-900/10 dark:border-emerald-700/50 dark:text-emerald-400 dark:hover:from-emerald-800/30 dark:hover:to-green-800/20"
+                              ? "bg-gradient-to-br from-emerald-400 to-green-500 text-white border-transparent shadow-md shadow-emerald-300/50 dark:shadow-none scale-105"
+                              : "border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-green-50/60 text-emerald-500 hover:from-emerald-100 hover:to-green-100 hover:border-emerald-300 hover:scale-105 hover:shadow-sm hover:shadow-emerald-200/50 dark:hover:shadow-none dark:from-emerald-900/20 dark:to-green-900/10 dark:border-emerald-700/50 dark:text-emerald-400 dark:hover:from-emerald-800/30 dark:hover:to-green-800/20"
                           }`}
                           data-tooltip={t("checklist")}
                         >
@@ -4426,8 +4426,8 @@ function NotesUI({
                           onClick={() => setComposerType("draw")}
                           className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                             composerType === "draw"
-                              ? "bg-gradient-to-br from-orange-400 to-amber-500 text-white border-transparent shadow-md shadow-orange-300/50 scale-105"
-                              : "border-orange-200/80 bg-gradient-to-br from-orange-50 to-amber-50/60 text-orange-400 hover:from-orange-100 hover:to-amber-100 hover:border-orange-300 hover:scale-105 hover:shadow-sm hover:shadow-orange-200/50 dark:from-orange-900/20 dark:to-amber-900/10 dark:border-orange-700/50 dark:text-orange-400 dark:hover:from-orange-800/30 dark:hover:to-amber-800/20"
+                              ? "bg-gradient-to-br from-orange-400 to-amber-500 text-white border-transparent shadow-md shadow-orange-300/50 dark:shadow-none scale-105"
+                              : "border-orange-200/80 bg-gradient-to-br from-orange-50 to-amber-50/60 text-orange-400 hover:from-orange-100 hover:to-amber-100 hover:border-orange-300 hover:scale-105 hover:shadow-sm hover:shadow-orange-200/50 dark:hover:shadow-none dark:from-orange-900/20 dark:to-amber-900/10 dark:border-orange-700/50 dark:text-orange-400 dark:hover:from-orange-800/30 dark:hover:to-amber-800/20"
                           }`}
                           data-tooltip={t("drawing")}
                         >
@@ -10024,7 +10024,7 @@ export default function App() {
                 {genericConfirmConfig.cancelText || t("cancel")}
               </button>
               <button
-                className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.98] btn-gradient ${genericConfirmConfig.danger ? "bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-300/40 hover:shadow-lg hover:shadow-red-300/50" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none"}`}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.98] btn-gradient ${genericConfirmConfig.danger ? "bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-300/40 dark:shadow-none hover:shadow-lg hover:shadow-red-300/50 dark:hover:shadow-none" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none"}`}
                 onClick={async () => {
                   setGenericConfirmOpen(false);
                   if (genericConfirmConfig.onConfirm) {
