@@ -437,6 +437,21 @@ const ArrowRight = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
   </svg>
 );
+const SearchIcon = () => (
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+);
 const Kebab = () => (
   <svg
     className="w-5 h-5"
@@ -476,7 +491,7 @@ const FormatIcon = () => (
 // Settings icon
 const SettingsIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -498,7 +513,7 @@ const SettingsIcon = () => (
 // Grid view icon
 const GridIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -515,7 +530,7 @@ const GridIcon = () => (
 // List view icon
 const ListIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -532,7 +547,7 @@ const ListIcon = () => (
 // Sun icon (light mode)
 const SunIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -568,7 +583,7 @@ const Sparkles = () => (
 // Moon icon (dark mode)
 const MoonIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -585,7 +600,7 @@ const MoonIcon = () => (
 // Multi-select icon (checkbox)
 const CheckSquareIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -603,7 +618,7 @@ const CheckSquareIcon = () => (
 // Admin/Shield icon
 const ShieldIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -620,7 +635,7 @@ const ShieldIcon = () => (
 // Sign out/Logout icon
 const LogOutIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -2314,7 +2329,7 @@ function LoginView({
         {err && <p className="text-red-600 text-sm">{err}</p>}
         <button
           type="submit"
-          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
         >{t("signIn")}</button>
       </form>
 
@@ -2394,7 +2409,7 @@ function RegisterView({ dark, onToggleDark, onRegister, goLogin, floatingCardsEn
         {err && <p className="text-red-600 text-sm">{err}</p>}
         <button
           type="submit"
-          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
         >{t("createAccount")}</button>
       </form>
       <div className="mt-4 text-sm text-center">
@@ -2438,7 +2453,7 @@ function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin, floating
         {err && <p className="text-red-600 text-sm">{err}</p>}
         <button
           type="submit"
-          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+          className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
         >{t("signInWithSecretKey")}</button>
       </form>
       <div className="mt-4 text-sm text-center">
@@ -2956,7 +2971,7 @@ function SettingsPanel({
                 {t("cancel")}
               </button>
               <button
-                className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+                className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                 onClick={() => {
                   setResetDialogOpen(false);
                   onClose();
@@ -3221,7 +3236,7 @@ function AdminPanel({
               <button
                 type="submit"
                 disabled={isCreatingUser}
-                className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
               >
                 {isCreatingUser ? t("creating") : t("createUser")}
               </button>
@@ -3356,7 +3371,7 @@ function AdminPanel({
                 <button
                   type="submit"
                   disabled={isUpdatingUser}
-                  className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                  className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
                 >
                   {isUpdatingUser ? t("updating") : t("updateUser")}
                 </button>
@@ -3433,6 +3448,7 @@ function NotesUI({
   // new for sidebar
   openSidebar,
   activeTagFilter,
+  activeTagFilters = [],
   sidebarPermanent,
   sidebarWidth,
   // formatting
@@ -3497,6 +3513,10 @@ function NotesUI({
   const multiColorBtnRef = useRef(null);
   const [showMultiColorPop, setShowMultiColorPop] = useState(false);
 
+  // Mobile search expand
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const mobileSearchRef = useRef(null);
+
   // Header auto-hide on scroll (mobile only)
   const [headerVisible, setHeaderVisible] = useState(true);
   const lastScrollYRef = useRef(0);
@@ -3520,14 +3540,23 @@ function NotesUI({
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [windowWidth]);
-  const tagLabel =
-    activeTagFilter === ALL_IMAGES
-      ? t("allImages")
-      : activeTagFilter === "ARCHIVED"
-        ? t("archivedNotes")
-        : activeTagFilter === "TRASHED"
-          ? t("trashedNotes")
-          : activeTagFilter;
+  const sectionLabel = (() => {
+    if (activeTagFilters.length > 1) return activeTagFilters.join(", ");
+    if (activeTagFilters.length === 1) return activeTagFilters[0];
+    if (activeTagFilter === ALL_IMAGES) return t("allImages");
+    if (activeTagFilter === "ARCHIVED") return t("archivedNotes");
+    if (activeTagFilter === "TRASHED") return t("trashedNotes");
+    if (activeTagFilter) return activeTagFilter;
+    return t("notes");
+  })();
+
+  const SectionIcon = (() => {
+    if (activeTagFilter === ALL_IMAGES) return ImagesIcon;
+    if (activeTagFilter === "ARCHIVED") return ArchiveSidebarIcon;
+    if (activeTagFilter === "TRASHED") return TrashSidebarIcon;
+    if (activeTagFilter || activeTagFilters.length > 0) return TagIcon;
+    return NotesIcon;
+  })();
 
   // Close header menu when scrolling
   React.useEffect(() => {
@@ -3627,7 +3656,7 @@ function NotesUI({
 
       {/* Header */}
       <header
-        className="p-4 sm:p-6 flex justify-between items-center sticky top-0 z-20 glass-card mb-6"
+        className={`p-4 sm:p-6 flex justify-between items-center sticky top-0 ${mobileSearchOpen ? "z-[1000]" : "z-20"} glass-card mb-6 relative`}
         style={{
           transform: !headerVisible && windowWidth < 700 ? "translateY(-100%)" : "translateY(0)",
           transition: "transform 0.3s ease",
@@ -3655,16 +3684,24 @@ function NotesUI({
             draggable="false"
           />
 
+          {/* Mobile: stacked name + badge */}
+          <div className="flex flex-col sm:hidden leading-tight">
+            <h1 className="text-lg font-bold">Glass Keep</h1>
+            <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1 max-w-[160px]">
+              <span className="shrink-0 w-3 h-3 [&>svg]:w-3 [&>svg]:h-3"><SectionIcon /></span>
+              <span className="truncate">{sectionLabel}</span>
+            </span>
+          </div>
+
+          {/* Desktop: inline name + separator + badge */}
           <h1 className="hidden sm:block text-2xl sm:text-3xl font-bold">
             Glass Keep
           </h1>
-          {activeTagFilter && (
-            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20">
-              {tagLabel === t("allImages") || tagLabel === t("archivedNotes") || tagLabel === t("trashedNotes")
-                ? tagLabel
-                : `Tag: ${tagLabel}`}
-            </span>
-          )}
+          <span className="hidden sm:inline-block h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
+          <span className="hidden sm:flex text-base font-medium px-3 py-1 rounded-lg bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20 items-center gap-1.5 max-w-[200px]">
+            <span className="shrink-0 w-4 h-4 [&>svg]:w-4 [&>svg]:h-4"><SectionIcon /></span>
+            <span className="truncate">{sectionLabel}</span>
+          </span>
 
           {/* Offline indicator */}
           {!isOnline && (
@@ -3672,11 +3709,12 @@ function NotesUI({
           )}
         </div>
 
-        <div className="flex-grow min-w-0 flex justify-center px-2 sm:px-8">
+        {/* Desktop: full search bar */}
+        <div className="hidden sm:flex flex-grow min-w-0 justify-center px-2 sm:px-8">
           <div className="relative w-full max-w-lg">
             <input
               type="text"
-		placeholder={localAiEnabled ? t("searchOrAskAi") : t("search")}
+              placeholder={localAiEnabled ? t("searchOrAskAi") : t("search")}
               className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-4 ${localAiEnabled ? "pr-14" : "pr-8"} py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -3715,121 +3753,227 @@ function NotesUI({
           </div>
         </div>
 
-        <div className="relative flex items-center gap-3 shrink-0">
-          {/* Floating cards toggle */}
-          <button
-            onClick={onToggleFloatingCards}
-            className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
-              floatingCardsEnabled
-                ? dark
-                  ? "bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30"
-                  : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
-                : dark
-                  ? "text-gray-500 hover:bg-white/10"
-                  : "text-gray-400 hover:bg-gray-100"
-            }`}
-            data-tooltip={floatingCardsEnabled ? t("floatingCardsOn") : t("floatingCardsOff")}
-            aria-label={t("toggleFloatingCards")}
-          >
-            <FloatingCardsIcon />
-            {!floatingCardsEnabled && (
-              <span
-                aria-hidden="true"
-                className="absolute inset-0 flex items-center justify-center pointer-events-none"
-              >
-                <span className={`block w-[1.5px] h-5 rotate-45 rounded-full ${dark ? "bg-gray-500" : "bg-gray-400"}`} />
-              </span>
-            )}
-          </button>
-          <span
-            className={`text-sm hidden sm:inline ${dark ? "text-gray-100" : "text-gray-900"}`}
-          >
-            {currentUser?.name ? `${t("hiPrefix")} ${currentUser.name}` : currentUser?.email}
-          </span>
-
-          {/* Header 3-dot menu */}
-          <button
-            ref={headerBtnRef}
-            onClick={() => setHeaderMenuOpen((v) => !v)}
-            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
-            data-tooltip={t("menu")}
-            aria-haspopup="menu"
-            aria-expanded={headerMenuOpen}
-          >
-            <Kebab />
-          </button>
-
-          {headerMenuOpen && (
-            <>
-              {/* Backdrop to close menu when clicking outside */}
-              <div
-                className="fixed inset-0 z-[1099]"
-                onClick={() => setHeaderMenuOpen(false)}
+        {/* Mobile: search icon that expands into a full search bar */}
+        <div className="sm:hidden flex items-center ml-auto mr-1">
+          {!mobileSearchOpen && (
+            <button
+              type="button"
+              className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-600 dark:text-gray-300"
+              aria-label={t("search")}
+              onClick={() => {
+                setMobileSearchOpen(true);
+                setTimeout(() => mobileSearchRef.current?.focus(), 50);
+              }}
+            >
+              <SearchIcon />
+            </button>
+          )}
+        </div>
+        {/* Mobile expanded search overlay - covers the header content */}
+        {mobileSearchOpen && createPortal(
+          <div
+            className="sm:hidden fixed inset-0 z-[999]"
+            onClick={() => setMobileSearchOpen(false)}
+          />,
+          document.body
+        )}
+        {mobileSearchOpen && (
+          <div className="sm:hidden absolute inset-0 z-30 flex items-center px-3 gap-2 bg-[var(--bg-card,_var(--bg-primary))] backdrop-blur-xl">
+            <div className="relative flex-1 min-w-0">
+              <input
+                ref={mobileSearchRef}
+                type="text"
+                placeholder={localAiEnabled ? t("searchOrAskAi") : t("search")}
+                className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-3 ${localAiEnabled ? "pr-12" : "pr-8"} py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setMobileSearchOpen(false);
+                  }
+                  if (
+                    e.key === "Enter" &&
+                    localAiEnabled &&
+                    search.trim().length > 0
+                  ) {
+                    onAiSearch?.(search);
+                  }
+                }}
               />
-              <div
-                ref={headerMenuRef}
-                className={`absolute top-12 right-0 min-w-[220px] z-[1100] border border-[var(--border-light)] rounded-lg shadow-lg overflow-hidden ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
-                style={{ backgroundColor: dark ? "#222222" : undefined }}
-                onClick={(e) => e.stopPropagation()}
+              <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                {localAiEnabled && search.trim().length > 0 && (
+                  <button
+                    type="button"
+                    className="h-6 w-6 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
+                    onClick={() => onAiSearch?.(search)}
+                  >
+                    <Sparkles />
+                  </button>
+                )}
+                {search && (
+                  <button
+                    type="button"
+                    aria-label={t("clearSearch")}
+                    className="h-5 w-5 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
+                    onClick={() => setSearch("")}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="relative flex items-center gap-3 shrink-0">
+          {/* Desktop: icon buttons directly in header bar */}
+          <div className="hidden sm:flex items-center gap-1">
+            <button
+              onClick={() => openSettingsPanel?.()}
+              className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700 focus:ring-gray-500" : "text-gray-500 hover:text-gray-700 hover:bg-gray-200 focus:ring-gray-400"}`}
+              data-tooltip={t("settings")}
+              aria-label={t("settings")}
+            >
+              <SettingsIcon />
+            </button>
+            <button
+              onClick={() => onToggleViewMode?.()}
+              className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-blue-400 hover:text-blue-300 hover:bg-blue-500/15 focus:ring-blue-500" : "text-blue-600 hover:text-blue-700 hover:bg-blue-100 focus:ring-blue-400"}`}
+              data-tooltip={listView ? t("gridView") : t("listView")}
+              aria-label={listView ? t("gridView") : t("listView")}
+            >
+              {listView ? <GridIcon /> : <ListIcon />}
+            </button>
+            <button
+              onClick={() => toggleDark?.()}
+              className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-amber-400 hover:text-amber-300 hover:bg-amber-500/15 focus:ring-amber-500" : "text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 focus:ring-indigo-400"}`}
+              data-tooltip={dark ? t("lightMode") : t("darkMode")}
+              aria-label={dark ? t("lightMode") : t("darkMode")}
+            >
+              {dark ? <SunIcon /> : <MoonIcon />}
+            </button>
+            <button
+              onClick={() => onStartMulti?.()}
+              className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/15 focus:ring-emerald-500" : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 focus:ring-emerald-400"}`}
+              data-tooltip={t("multiSelect")}
+              aria-label={t("multiSelect")}
+            >
+              <CheckSquareIcon />
+            </button>
+            {currentUser?.is_admin && (
+              <button
+                onClick={() => openAdminPanel?.()}
+                className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-red-400 hover:text-red-300 hover:bg-red-500/15 focus:ring-red-500" : "text-red-600 hover:text-red-700 hover:bg-red-100 focus:ring-red-400"}`}
+                data-tooltip={t("adminPanel")}
+                aria-label={t("adminPanel")}
               >
-                <button
-                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                  onClick={() => {
-                    setHeaderMenuOpen(false);
-                    openSettingsPanel?.();
-                  }}
+                <ShieldIcon />
+              </button>
+            )}
+            <span className={`mx-1 w-px h-5 ${dark ? "bg-gray-600" : "bg-gray-300"}`} />
+            <span className="flex items-center gap-2">
+              <span
+                className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold select-none ${dark ? "bg-indigo-500/25 text-indigo-300" : "bg-indigo-100 text-indigo-700"}`}
+              >
+                {(currentUser?.name?.[0] || currentUser?.email?.[0] || "?").toUpperCase()}
+              </span>
+              <span className={`text-sm font-medium ${dark ? "text-gray-200" : "text-gray-700"}`}>
+                {currentUser?.name || currentUser?.email}
+              </span>
+            </span>
+            <button
+              onClick={() => signOut?.()}
+              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 text-red-500 dark:text-red-400"
+              data-tooltip={t("signOut")}
+              aria-label={t("signOut")}
+            >
+              <LogOutIcon />
+            </button>
+          </div>
+
+          {/* Mobile: keep 3-dot menu */}
+          <div className="sm:hidden">
+            <button
+              ref={headerBtnRef}
+              onClick={() => setHeaderMenuOpen((v) => !v)}
+              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
+              data-tooltip={t("menu")}
+              aria-haspopup="menu"
+              aria-expanded={headerMenuOpen}
+            >
+              <Kebab />
+            </button>
+
+            {headerMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-[1099]"
+                  onClick={() => setHeaderMenuOpen(false)}
+                />
+                <div
+                  ref={headerMenuRef}
+                  className={`absolute top-12 right-0 min-w-[220px] z-[1100] border border-[var(--border-light)] rounded-lg shadow-lg overflow-hidden ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
+                  style={{ backgroundColor: dark ? "#222222" : undefined }}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <SettingsIcon />{t("settings")}</button>
-                <button
-                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                  onClick={() => {
-                    setHeaderMenuOpen(false);
-                    onToggleViewMode?.();
-                  }}
-                >
-                  {listView ? <GridIcon /> : <ListIcon />}
-                  {listView ? t("gridView") : t("listView")}
-                </button>
-                {/* Theme toggle text item */}
-                <button
-                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                  onClick={() => {
-                    setHeaderMenuOpen(false);
-                    toggleDark?.();
-                  }}
-                >
-                  {dark ? <SunIcon /> : <MoonIcon />}
-                  {dark ? t("lightMode") : t("darkMode")}
-                </button>
-                <button
-                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                  onClick={() => {
-                    setHeaderMenuOpen(false);
-                    onStartMulti?.();
-                  }}
-                >
-                  <CheckSquareIcon />{t("multiSelect")}</button>
-                {currentUser?.is_admin && (
                   <button
                     className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                     onClick={() => {
                       setHeaderMenuOpen(false);
-                      openAdminPanel?.();
+                      openSettingsPanel?.();
                     }}
                   >
-                    <ShieldIcon />{t("adminPanel")}</button>
-                )}
-                <button
-                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
-                  onClick={() => {
-                    setHeaderMenuOpen(false);
-                    signOut?.();
-                  }}
-                >
-                  <LogOutIcon />{t("signOut")}</button>
-              </div>
-            </>
-          )}
+                    <SettingsIcon />{t("settings")}</button>
+                  <button
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      onToggleViewMode?.();
+                    }}
+                  >
+                    {listView ? <GridIcon /> : <ListIcon />}
+                    {listView ? t("gridView") : t("listView")}
+                  </button>
+                  <button
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      toggleDark?.();
+                    }}
+                  >
+                    {dark ? <SunIcon /> : <MoonIcon />}
+                    {dark ? t("lightMode") : t("darkMode")}
+                  </button>
+                  <button
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      onStartMulti?.();
+                    }}
+                  >
+                    <CheckSquareIcon />{t("multiSelect")}</button>
+                  {currentUser?.is_admin && (
+                    <button
+                      className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        openAdminPanel?.();
+                      }}
+                    >
+                      <ShieldIcon />{t("adminPanel")}</button>
+                  )}
+                  <button
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      signOut?.();
+                    }}
+                  >
+                    <LogOutIcon />{t("signOut")}</button>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Hidden import input */}
           <input
@@ -4014,7 +4158,7 @@ function NotesUI({
                           disabled={!isOnline}
                           className={`px-3 py-1.5 rounded-lg whitespace-nowrap font-semibold transition-all duration-200 ${
                             isOnline
-                              ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+                              ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                               : "bg-gray-400 text-gray-200 cursor-not-allowed"
                           }`}
                         >{t("add")}</button>
@@ -4231,7 +4375,7 @@ function NotesUI({
                             ref={composerFmtBtnRef}
                             type="button"
                             onClick={() => setShowComposerFmt((v) => !v)}
-                            className="px-2.5 py-1.5 rounded-xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-purple-50 text-violet-600 hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 hover:scale-105 hover:shadow-md hover:shadow-violet-200/60 active:scale-95 dark:from-violet-900/30 dark:to-purple-900/20 dark:border-violet-700/60 dark:text-violet-400 dark:hover:from-violet-800/40 dark:hover:to-purple-800/30 flex items-center gap-1.5 text-sm font-medium transition-all duration-200 flex-shrink-0"
+                            className="px-2.5 py-1.5 rounded-xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-purple-50 text-violet-600 hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 hover:scale-105 hover:shadow-md hover:shadow-violet-200/60 dark:hover:shadow-none active:scale-95 dark:from-violet-900/30 dark:to-purple-900/20 dark:border-violet-700/60 dark:text-violet-400 dark:hover:from-violet-800/40 dark:hover:to-purple-800/30 flex items-center gap-1.5 text-sm font-medium transition-all duration-200 flex-shrink-0"
                             data-tooltip={t("formatting")}
                           >
                             <FormatIcon />{t("formatting")}</button>
@@ -4258,8 +4402,8 @@ function NotesUI({
                           onClick={() => setComposerType("text")}
                           className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                             composerType === "text"
-                              ? "bg-gradient-to-br from-rose-400 to-pink-500 text-white border-transparent shadow-md shadow-rose-300/50 scale-105"
-                              : "border-rose-200/80 bg-gradient-to-br from-rose-50 to-pink-50/60 text-rose-400 hover:from-rose-100 hover:to-pink-100 hover:border-rose-300 hover:scale-105 hover:shadow-sm hover:shadow-rose-200/50 dark:from-rose-900/20 dark:to-pink-900/10 dark:border-rose-700/50 dark:text-rose-400 dark:hover:from-rose-800/30 dark:hover:to-pink-800/20"
+                              ? "bg-gradient-to-br from-rose-400 to-pink-500 text-white border-transparent shadow-md shadow-rose-300/50 dark:shadow-none scale-105"
+                              : "border-rose-200/80 bg-gradient-to-br from-rose-50 to-pink-50/60 text-rose-400 hover:from-rose-100 hover:to-pink-100 hover:border-rose-300 hover:scale-105 hover:shadow-sm hover:shadow-rose-200/50 dark:hover:shadow-none dark:from-rose-900/20 dark:to-pink-900/10 dark:border-rose-700/50 dark:text-rose-400 dark:hover:from-rose-800/30 dark:hover:to-pink-800/20"
                           }`}
                           data-tooltip={t("textNote")}
                         >
@@ -4270,8 +4414,8 @@ function NotesUI({
                           onClick={() => setComposerType("checklist")}
                           className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                             composerType === "checklist"
-                              ? "bg-gradient-to-br from-emerald-400 to-green-500 text-white border-transparent shadow-md shadow-emerald-300/50 scale-105"
-                              : "border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-green-50/60 text-emerald-500 hover:from-emerald-100 hover:to-green-100 hover:border-emerald-300 hover:scale-105 hover:shadow-sm hover:shadow-emerald-200/50 dark:from-emerald-900/20 dark:to-green-900/10 dark:border-emerald-700/50 dark:text-emerald-400 dark:hover:from-emerald-800/30 dark:hover:to-green-800/20"
+                              ? "bg-gradient-to-br from-emerald-400 to-green-500 text-white border-transparent shadow-md shadow-emerald-300/50 dark:shadow-none scale-105"
+                              : "border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-green-50/60 text-emerald-500 hover:from-emerald-100 hover:to-green-100 hover:border-emerald-300 hover:scale-105 hover:shadow-sm hover:shadow-emerald-200/50 dark:hover:shadow-none dark:from-emerald-900/20 dark:to-green-900/10 dark:border-emerald-700/50 dark:text-emerald-400 dark:hover:from-emerald-800/30 dark:hover:to-green-800/20"
                           }`}
                           data-tooltip={t("checklist")}
                         >
@@ -4282,8 +4426,8 @@ function NotesUI({
                           onClick={() => setComposerType("draw")}
                           className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                             composerType === "draw"
-                              ? "bg-gradient-to-br from-orange-400 to-amber-500 text-white border-transparent shadow-md shadow-orange-300/50 scale-105"
-                              : "border-orange-200/80 bg-gradient-to-br from-orange-50 to-amber-50/60 text-orange-400 hover:from-orange-100 hover:to-amber-100 hover:border-orange-300 hover:scale-105 hover:shadow-sm hover:shadow-orange-200/50 dark:from-orange-900/20 dark:to-amber-900/10 dark:border-orange-700/50 dark:text-orange-400 dark:hover:from-orange-800/30 dark:hover:to-amber-800/20"
+                              ? "bg-gradient-to-br from-orange-400 to-amber-500 text-white border-transparent shadow-md shadow-orange-300/50 dark:shadow-none scale-105"
+                              : "border-orange-200/80 bg-gradient-to-br from-orange-50 to-amber-50/60 text-orange-400 hover:from-orange-100 hover:to-amber-100 hover:border-orange-300 hover:scale-105 hover:shadow-sm hover:shadow-orange-200/50 dark:hover:shadow-none dark:from-orange-900/20 dark:to-amber-900/10 dark:border-orange-700/50 dark:text-orange-400 dark:hover:from-orange-800/30 dark:hover:to-amber-800/20"
                           }`}
                           data-tooltip={t("drawing")}
                         >
@@ -4346,7 +4490,7 @@ function NotesUI({
                         disabled={!isOnline}
                         className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
                           isOnline
-                            ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+                            ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                             : "bg-gray-300 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
                         }`}
                       >{t("addNote")}</button>
@@ -4805,6 +4949,7 @@ export default function App() {
 
   // Notes & search
   const [notes, setNotes] = useState([]);
+  const [allNotesForTags, setAllNotesForTags] = useState([]);
   const [search, setSearch] = useState("");
 
   // Tag filter & sidebar
@@ -5033,6 +5178,7 @@ export default function App() {
 
   // Loading state for notes
   const [notesLoading, setNotesLoading] = useState(false);
+  const notesAreRegular = useRef(true); // tracks whether notes[] holds regular (non-archive/trash) notes
   // Remove lazy loading state
 
   // -------- Multi-select state --------
@@ -5189,6 +5335,7 @@ export default function App() {
         danger: true,
         onConfirm: async () => {
           try {
+            const count = selectedIds.length;
             for (const id of selectedIds) {
               await api(`/notes/${id}/permanent`, { method: "DELETE", token });
             }
@@ -5197,8 +5344,9 @@ export default function App() {
               prev.filter((n) => !selectedIds.includes(String(n.id))),
             );
             onExitMulti();
+            showToast(t("bulkDeletedSuccess").replace("{count}", String(count)), "success");
           } catch (e) {
-            alert(e.message || t("bulkDeleteFailed"));
+            showToast(e.message || t("bulkDeleteFailed"), "error");
           }
         },
       });
@@ -5211,6 +5359,7 @@ export default function App() {
         danger: true,
         onConfirm: async () => {
           try {
+            const count = selectedIds.length;
             for (const id of selectedIds) {
               await api(`/notes/${id}/trash`, { method: "POST", token });
             }
@@ -5221,8 +5370,9 @@ export default function App() {
               prev.filter((n) => !selectedIds.includes(String(n.id))),
             );
             onExitMulti();
+            showToast(t("bulkTrashedSuccess").replace("{count}", String(count)), "success");
           } catch (e) {
-            alert(e.message || t("bulkDeleteFailed"));
+            showToast(e.message || t("bulkTrashedFailed"), "error");
           }
         },
       });
@@ -5278,6 +5428,7 @@ export default function App() {
       for (const id of selectedIds) {
         await api(`/notes/${id}/restore`, { method: "POST", token });
       }
+      const count = selectedIds.length;
       invalidateNotesCache();
       invalidateArchivedNotesCache();
       invalidateTrashedNotesCache();
@@ -5285,8 +5436,10 @@ export default function App() {
         prev.filter((n) => !selectedIds.includes(String(n.id))),
       );
       onExitMulti();
+      showToast(t("bulkRestoredSuccess").replace("{count}", String(count)), "success");
     } catch (e) {
       console.error("Bulk restore failed", e);
+      showToast(t("bulkRestoredFailed"), "error");
       loadTrashedNotes().catch(() => {});
     }
   };
@@ -5298,6 +5451,7 @@ export default function App() {
     const isArchiving = tagFilter !== "ARCHIVED";
     const archivedValue = isArchiving;
 
+    const count = selectedIds.length;
     try {
       // Optimistic update - remove from current view
       setNotes((prev) =>
@@ -5323,8 +5477,10 @@ export default function App() {
 
       // Exit multi-select mode
       onExitMulti();
+      showToast(t(isArchiving ? "bulkArchivedSuccess" : "bulkUnarchivedSuccess").replace("{count}", String(count)), "success");
     } catch (e) {
       console.error(`Bulk ${isArchiving ? "archive" : "unarchive"} failed`, e);
+      showToast(t(isArchiving ? "bulkArchivedFailed" : "bulkUnarchivedFailed"), "error");
       // Reload notes on failure
       if (tagFilter === "ARCHIVED") {
         loadArchivedNotes().catch(() => {});
@@ -5652,6 +5808,7 @@ export default function App() {
 
   const loadNotes = async () => {
     if (!token) return;
+    notesAreRegular.current = true;
     setNotesLoading(true);
 
     try {
@@ -5683,6 +5840,7 @@ export default function App() {
   // Load archived notes
   const loadArchivedNotes = async () => {
     if (!token) return;
+    notesAreRegular.current = false;
     setNotesLoading(true);
 
     console.log("Loading archived notes, checking cache...");
@@ -5734,6 +5892,7 @@ export default function App() {
   // Load trashed notes
   const loadTrashedNotes = async () => {
     if (!token) return;
+    notesAreRegular.current = false;
     setNotesLoading(true);
 
     try {
@@ -7739,9 +7898,17 @@ export default function App() {
   };
 
   /** -------- Tags list (unique + counts) -------- */
+  // Keep allNotesForTags in sync with notes when in normal view,
+  // so tags remain visible when navigating to archive/trash
+  useEffect(() => {
+    if (notesAreRegular.current) {
+      setAllNotesForTags(notes);
+    }
+  }, [notes]);
+
   const tagsWithCounts = useMemo(() => {
     const map = new Map();
-    for (const n of notes) {
+    for (const n of allNotesForTags) {
       for (const t of n.tags || []) {
         const key = String(t).trim();
         if (!key) continue;
@@ -7751,7 +7918,7 @@ export default function App() {
     return Array.from(map.entries())
       .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => a.tag.toLowerCase().localeCompare(b.tag.toLowerCase()));
-  }, [notes]);
+  }, [allNotesForTags]);
 
   /** -------- Derived lists (search + tag filter) -------- */
   const filtered = useMemo(() => {
@@ -8541,7 +8708,7 @@ export default function App() {
                             } catch (e) {}
                           }
                         }}
-                        className="px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+                        className="px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                       >{t("add")}</button>
                     </div>
                   )}
@@ -9095,7 +9262,7 @@ export default function App() {
                   <button
                     onClick={saveModal}
                     disabled={savingModal}
-                    className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 whitespace-nowrap transition-all duration-200 ${savingModal ? "bg-gradient-to-r from-indigo-400 to-violet-500 text-white cursor-not-allowed opacity-70" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98] focus:ring-indigo-500"}`}
+                    className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 whitespace-nowrap transition-all duration-200 ${savingModal ? "bg-gradient-to-r from-indigo-400 to-violet-500 text-white cursor-not-allowed opacity-70" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient focus:ring-indigo-500"}`}
                   >
                     {savingModal ? t("saving") : t("save")}
                   </button>
@@ -9286,7 +9453,7 @@ export default function App() {
                               }}
                             >{t("cancel")}</button>
                             <button
-                              className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+                              className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                               onClick={async () => {
                                 if (collaboratorUsername.trim()) {
                                   await addCollaborator(
@@ -9470,7 +9637,7 @@ export default function App() {
         <AuthShell title={t("adminPanel")} dark={dark} onToggleDark={toggleDark}>
           <p className="text-sm mb-4">{t("mustSignInAdmin")}</p>
           <button
-            className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98]"
+            className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
             onClick={() => (window.location.hash = "#/login")}
           >{t("goToSignIn")}</button>
         </AuthShell>
@@ -9646,6 +9813,7 @@ export default function App() {
         activeTagFilters={activeTagFilters}
         onSelect={(tag, event) => {
           if (tag === "ARCHIVED" || tag === "TRASHED" || tag === ALL_IMAGES || tag === null) {
+            if (tag === "ARCHIVED" || tag === "TRASHED") setNotes([]);
             setTagFilter(tag);
             setActiveTagFilters([]);
           } else if (event?.ctrlKey || event?.metaKey) {
@@ -9777,6 +9945,7 @@ export default function App() {
         headerBtnRef={headerBtnRef}
         openSidebar={() => setSidebarOpen(true)}
         activeTagFilter={tagFilter}
+        activeTagFilters={activeTagFilters}
         sidebarPermanent={alwaysShowSidebarOnWide && windowWidth >= 700}
         sidebarWidth={sidebarWidth}
         // AI props
@@ -9869,7 +10038,7 @@ export default function App() {
                 {genericConfirmConfig.cancelText || t("cancel")}
               </button>
               <button
-                className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.98] ${genericConfirmConfig.danger ? "bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-300/40 hover:shadow-lg hover:shadow-red-300/50" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50"}`}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.98] btn-gradient ${genericConfirmConfig.danger ? "bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-300/40 dark:shadow-none hover:shadow-lg hover:shadow-red-300/50 dark:hover:shadow-none" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none"}`}
                 onClick={async () => {
                   setGenericConfirmOpen(false);
                   if (genericConfirmConfig.onConfirm) {
@@ -9886,11 +10055,11 @@ export default function App() {
 
       {/* Toast Notifications */}
       {toasts.length > 0 && (
-        <div className="fixed top-4 right-4 z-[60] space-y-2">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] space-y-2 flex flex-col items-center">
           {toasts.map((toast) => (
             <div
               key={toast.id}
-              className={`px-4 py-2 rounded-lg shadow-lg max-w-sm animate-in slide-in-from-right-2 ${
+              className={`px-4 py-2 rounded-lg shadow-lg max-w-sm animate-in slide-in-from-top-2 ${
                 toast.type === "success"
                   ? "bg-green-600 text-white"
                   : toast.type === "error"
