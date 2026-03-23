@@ -51,6 +51,6 @@ body {
   pointer-events: none;
 }
 
-:is(.dark, .dark *) .btn-gradient:hover::after {
+.btn-gradient:hover::after {
   animation: btn-shimmer 0.7s ease-in-out;
 }
