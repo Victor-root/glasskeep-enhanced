@@ -622,7 +622,11 @@ app.put("/api/user/avatar", auth, (req, res) => {
   if (!avatar_url || typeof avatar_url !== "string") {
     return res.status(400).json({ error: "avatar_url is required (data URL)." });
   }
-  // Limit to ~2MB data URL
+  // Accept only image/png, image/jpeg, image/webp data URLs
+  if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(avatar_url)) {
+    return res.status(400).json({ error: "avatar_url must be a valid image data URL (png, jpeg or webp)." });
+  }
+  // Limit to ~1.5MB base64 data URL (~2MB decoded)
   if (avatar_url.length > 2 * 1024 * 1024) {
     return res.status(400).json({ error: "Avatar image too large (max ~1.5MB)." });
   }
