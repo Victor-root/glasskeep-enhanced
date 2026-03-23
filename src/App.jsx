@@ -2092,7 +2092,7 @@ function NoteCard({
             >
               <img
                 src={im.src}
-                alt={im.name || "note image"}
+                alt={im.name || t("noteImage")}
                 className="w-full h-auto object-contain object-center"
                 style={{ maxHeight: "200px" }}
               />
@@ -2827,7 +2827,7 @@ function SettingsPanel({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="min-w-0">
-                  <div className="font-medium">Local AI Assistant</div>
+                  <div className="font-medium">{t("localAiAssistant")}</div>
                   <div className="text-sm text-gray-500">{t("askQuestionsAboutNotes")}</div>
                 </div>
                 <button
@@ -3223,7 +3223,7 @@ function AdminPanel({
                 disabled={isCreatingUser}
                 className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
               >
-                {isCreatingUser ? "Creating..." : t("createUser")}
+                {isCreatingUser ? t("creating") : t("createUser")}
               </button>
             </form>
           </div>
@@ -3255,8 +3255,8 @@ function AdminPanel({
                         <button
                           onClick={() => {
                             showGenericConfirm({
-                              title: "Delete User",
-                              message: `Are you sure you want to delete ${user.name}?`,
+                              title: t("deleteUser"),
+                              message: t("deleteUserConfirm").replace("{name}", user.name),
                               confirmText: t("delete"),
                               danger: true,
                               onConfirm: () => deleteUser(user.id),
@@ -3268,10 +3268,10 @@ function AdminPanel({
                     </div>
                   </div>
                   <div className="text-xs text-gray-500 space-y-1">
-                    <div>Notes: {user.notes}</div>
-                    <div>Storage: {formatBytes(user.storage_bytes ?? 0)}</div>
+                    <div>{t("notes")}: {user.notes}</div>
+                    <div>{t("storage")}: {formatBytes(user.storage_bytes ?? 0)}</div>
                     <div>
-                      Joined: {new Date(user.created_at).toLocaleDateString()}
+                      {t("joinedPrefix")} {new Date(user.created_at).toLocaleDateString()}
                     </div>
                   </div>
                 </div>
@@ -3358,7 +3358,7 @@ function AdminPanel({
                   disabled={isUpdatingUser}
                   className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
                 >
-                  {isUpdatingUser ? "Updating..." : t("updateUser")}
+                  {isUpdatingUser ? t("updating") : t("updateUser")}
                 </button>
               </div>
             </form>
@@ -3608,7 +3608,7 @@ function NotesUI({
                   onClick={onBulkArchive}
                 >
                   <ArchiveIcon />
-                  {activeTagFilter === "ARCHIVED" ? "Unarchive" : t("archive")}
+                  {activeTagFilter === "ARCHIVED" ? t("unarchive") : t("archive")}
                 </button>
               </>
             )}
@@ -3920,8 +3920,8 @@ function NotesUI({
         </div>
       )}
 
-      {/* Composer — hidden in trash view */}
-      {activeTagFilter !== "TRASHED" && (
+      {/* Composer — hidden in trash and archive views */}
+      {activeTagFilter !== "TRASHED" && activeTagFilter !== "ARCHIVED" && (
       <div className="px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="max-w-2xl mx-auto">
           {!isOnline ? (
@@ -4605,7 +4605,7 @@ function AdminView({ dark }) {
               onClick={load}
               className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
             >
-              {loading ? "Refreshing…" : "Refresh"}
+              {loading ? t("refreshing") : t("refresh")}
             </button>
           </div>
 
@@ -4649,7 +4649,7 @@ function AdminView({ dark }) {
                           : "bg-gray-500/10 text-gray-700 dark:text-gray-300 border border-gray-500/20"
                       }`}
                     >
-                      {u.is_admin ? "Yes" : "No"}
+                      {u.is_admin ? t("yes") : t("no")}
                     </span>
                   </td>
                   <td className="py-2 pr-3">
@@ -4660,9 +4660,8 @@ function AdminView({ dark }) {
                       className="px-2.5 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700"
                       onClick={() => {
                         showGenericConfirm({
-                          title: "Delete User",
-                          message:
-                            "Delete this user and ALL their notes? This cannot be undone.",
+                          title: t("deleteUser"),
+                          message: t("deleteUserAllNotesConfirm"),
                           confirmText: t("delete"),
                           danger: true,
                           onConfirm: () => removeUser(u.id),
@@ -8264,7 +8263,7 @@ export default function App() {
                                 }}
                               >
                                 <ArchiveIcon />
-                                {activeNoteObj?.archived ? "Unarchive" : t("archive")}
+                                {activeNoteObj?.archived ? t("unarchive") : t("archive")}
                               </button>
                               <button
                                 className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
@@ -9098,7 +9097,7 @@ export default function App() {
                     disabled={savingModal}
                     className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 whitespace-nowrap transition-all duration-200 ${savingModal ? "bg-gradient-to-r from-indigo-400 to-violet-500 text-white cursor-not-allowed opacity-70" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03] active:scale-[0.98] focus:ring-indigo-500"}`}
                   >
-                    {savingModal ? "Saving..." : t("save")}
+                    {savingModal ? t("saving") : t("save")}
                   </button>
                 )}
               {/* Delete button moved to modal 3-dot menu */}
