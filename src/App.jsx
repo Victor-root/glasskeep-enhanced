@@ -5925,11 +5925,13 @@ export default function App() {
     // Load appropriate notes based on tag filter
     if (tagFilter === "ARCHIVED") {
       console.log("Loading archived notes...");
+      setNotes([]); // Clear immediately to avoid flashing regular notes
       loadArchivedNotes().catch((error) => {
         console.error("Failed to load archived notes:", error);
       });
     } else if (tagFilter === "TRASHED") {
       console.log("Loading trashed notes...");
+      setNotes([]); // Clear immediately to avoid flashing regular notes
       loadTrashedNotes().catch((error) => {
         console.error("Failed to load trashed notes:", error);
       });
