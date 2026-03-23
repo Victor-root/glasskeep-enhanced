@@ -3656,7 +3656,7 @@ function NotesUI({
 
       {/* Header */}
       <header
-        className="p-4 sm:p-6 flex justify-between items-center sticky top-0 z-20 glass-card mb-6 relative overflow-hidden"
+        className="p-4 sm:p-6 flex justify-between items-center sticky top-0 z-20 glass-card mb-6 relative"
         style={{
           transform: !headerVisible && windowWidth < 700 ? "translateY(-100%)" : "translateY(0)",
           transition: "transform 0.3s ease",
