@@ -9,6 +9,7 @@ import React, {
 import { createPortal } from "react-dom";
 import { askAI } from "./ai";
 import { marked as markedParser } from "marked";
+import DOMPurify from "dompurify";
 import DrawingCanvas from "./DrawingCanvas";
 import { t } from "./i18n";
 import Masonry from "react-masonry-css";
@@ -54,6 +55,33 @@ function trColorName(name) {
 // Ensure we can call marked.parse(...)
 const marked =
   typeof markedParser === "function" ? { parse: markedParser } : markedParser;
+
+/** ---------- Secure Markdown Renderer ---------- */
+// Allowlist of tags produced by marked for standard markdown.
+// SVG, style, script and all event-handler attributes are intentionally excluded.
+const _PURIFY_CONFIG = {
+  ALLOWED_TAGS: [
+    "a", "b", "strong", "i", "em", "del", "s", "u",
+    "h1", "h2", "h3", "h4", "h5", "h6",
+    "p", "br", "hr",
+    "ul", "ol", "li",
+    "blockquote",
+    "pre", "code",
+    "table", "thead", "tbody", "tr", "th", "td",
+    "img",
+    "span", "div",
+  ],
+  ALLOWED_ATTR: ["href", "title", "alt", "src", "class", "target", "rel"],
+  ALLOW_DATA_ATTR: false,
+};
+const renderSafeMarkdown = (md) => {
+  try {
+    const raw = marked.parse(md || "");
+    return DOMPurify.sanitize(raw, _PURIFY_CONFIG);
+  } catch {
+    return "";
+  }
+};
 
 /** ---------- API Helpers ---------- */
 const API_BASE = "/api";
@@ -2120,7 +2148,7 @@ function NoteCard({
         <div
           className="text-sm break-words whitespace-pre-wrap overflow-hidden note-content note-content--dense"
           style={{ maxHeight: "280px" }}
-          dangerouslySetInnerHTML={{ __html: marked.parse(displayText || "") }}
+          dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(displayText) }}
         />
       ) : isDraw ? (
         <DrawingPreview
@@ -4316,7 +4344,7 @@ function NotesUI({
                 <div
                   className="text-gray-800 dark:text-gray-200 note-content"
                   dangerouslySetInnerHTML={{
-                    __html: marked.parse(aiResponse || ""),
+                    __html: renderSafeMarkdown(aiResponse),
                   }}
                 />
               )}
@@ -8850,7 +8878,7 @@ export default function App() {
                     ref={noteViewRef}
                     className="note-content note-content--dense whitespace-pre-wrap"
                     dangerouslySetInnerHTML={{
-                      __html: marked.parse(mBody || ""),
+                      __html: renderSafeMarkdown(mBody),
                     }}
                   />
                 ) : (
