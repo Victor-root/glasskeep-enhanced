@@ -3761,12 +3761,15 @@ function NotesUI({
               </button>
             )}
             <span className={`mx-1 w-px h-5 ${dark ? "bg-gray-600" : "bg-gray-300"}`} />
-            <span
-              className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold select-none ${dark ? "bg-indigo-500/25 text-indigo-300" : "bg-indigo-100 text-indigo-700"}`}
-              data-tooltip={currentUser?.name || currentUser?.email}
-              aria-label={currentUser?.name || currentUser?.email}
-            >
-              {(currentUser?.name?.[0] || currentUser?.email?.[0] || "?").toUpperCase()}
+            <span className="flex items-center gap-2">
+              <span
+                className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold select-none ${dark ? "bg-indigo-500/25 text-indigo-300" : "bg-indigo-100 text-indigo-700"}`}
+              >
+                {(currentUser?.name?.[0] || currentUser?.email?.[0] || "?").toUpperCase()}
+              </span>
+              <span className={`text-sm font-medium ${dark ? "text-gray-200" : "text-gray-700"}`}>
+                {currentUser?.name || currentUser?.email}
+              </span>
             </span>
             <button
               onClick={() => signOut?.()}
