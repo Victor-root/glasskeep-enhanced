@@ -3780,6 +3780,7 @@ function NotesUI({
                 className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-3 ${localAiEnabled ? "pr-12" : "pr-8"} py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onBlur={() => setMobileSearchOpen(false)}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     setMobileSearchOpen(false);
@@ -3798,6 +3799,7 @@ function NotesUI({
                   <button
                     type="button"
                     className="h-6 w-6 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => onAiSearch?.(search)}
                   >
                     <Sparkles />
@@ -3808,6 +3810,7 @@ function NotesUI({
                     type="button"
                     aria-label={t("clearSearch")}
                     className="h-5 w-5 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setSearch("")}
                   >
                     ×
@@ -3815,17 +3818,6 @@ function NotesUI({
                 )}
               </div>
             </div>
-            <button
-              type="button"
-              className="shrink-0 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400"
-              aria-label={t("clearSearch")}
-              onClick={() => {
-                setMobileSearchOpen(false);
-                setSearch("");
-              }}
-            >
-              ×
-            </button>
           </div>
         )}
 
