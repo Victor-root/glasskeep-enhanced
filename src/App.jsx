@@ -3716,12 +3716,6 @@ function NotesUI({
         </div>
 
         <div className="relative flex items-center gap-3 shrink-0">
-          <span
-            className={`text-sm hidden sm:inline ${dark ? "text-gray-100" : "text-gray-900"}`}
-          >
-            {currentUser?.name ? `${t("hiPrefix")} ${currentUser.name}` : currentUser?.email}
-          </span>
-
           {/* Desktop: icon buttons directly in header bar */}
           <div className="hidden sm:flex items-center gap-1">
             <button
@@ -3766,6 +3760,14 @@ function NotesUI({
                 <ShieldIcon />
               </button>
             )}
+            <span className={`mx-1 w-px h-5 ${dark ? "bg-gray-600" : "bg-gray-300"}`} />
+            <span
+              className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold select-none ${dark ? "bg-indigo-500/25 text-indigo-300" : "bg-indigo-100 text-indigo-700"}`}
+              data-tooltip={currentUser?.name || currentUser?.email}
+              aria-label={currentUser?.name || currentUser?.email}
+            >
+              {(currentUser?.name?.[0] || currentUser?.email?.[0] || "?").toUpperCase()}
+            </span>
             <button
               onClick={() => signOut?.()}
               className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 text-red-500 dark:text-red-400"
