@@ -3920,8 +3920,8 @@ function NotesUI({
         </div>
       )}
 
-      {/* Composer — hidden in trash view */}
-      {activeTagFilter !== "TRASHED" && (
+      {/* Composer — hidden in trash and archive views */}
+      {activeTagFilter !== "TRASHED" && activeTagFilter !== "ARCHIVED" && (
       <div className="px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="max-w-2xl mx-auto">
           {!isOnline ? (
