@@ -1062,6 +1062,63 @@ html.dark .prose blockquote {
   content: none !important;
 }
 
+/* Modal header icon buttons – note-color aware via --note-color */
+.modal-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem;
+  border-radius: 0.75rem;
+  border: 2px solid color-mix(in srgb, var(--note-color, #6366f1) 28%, transparent);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--note-color, #6366f1) 10%, white) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 6%, white) 100%
+  );
+  color: color-mix(in srgb, var(--note-color, #6366f1) 75%, black);
+  font-size: 0.875rem;
+  position: relative;
+  transition: all 0.2s;
+}
+.modal-icon-btn:hover {
+  border-color: color-mix(in srgb, var(--note-color, #6366f1) 50%, transparent);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--note-color, #6366f1) 18%, white) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 12%, white) 100%
+  );
+  transform: scale(1.05);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--note-color, #6366f1) 25%, transparent);
+}
+html.dark .modal-icon-btn {
+  border-color: color-mix(in srgb, var(--note-color, #6366f1) 35%, transparent);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--note-color, #6366f1) 16%, transparent) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 10%, transparent) 100%
+  );
+  color: color-mix(in srgb, var(--note-color, #6366f1) 65%, white);
+}
+html.dark .modal-icon-btn:hover {
+  border-color: color-mix(in srgb, var(--note-color, #6366f1) 55%, transparent);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--note-color, #6366f1) 28%, transparent) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 20%, transparent) 100%
+  );
+  box-shadow: none;
+}
+/* Active state (pin when pinned) */
+.modal-icon-btn--active {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--note-color, #6366f1) 70%, white) 0%,
+    var(--note-color, #6366f1) 100%
+  ) !important;
+  border-color: transparent !important;
+  color: white !important;
+  box-shadow: 0 4px 8px color-mix(in srgb, var(--note-color, #6366f1) 40%, transparent) !important;
+  transform: scale(1.05);
+}
+html.dark .modal-icon-btn--active {
+  box-shadow: none !important;
+}
+
 /* Copy buttons */
 /* Hide scrollbars on mobile (keep scrolling) */
 @media (max-width: 639px) {
@@ -8663,7 +8720,7 @@ export default function App() {
                   <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
                   {/* Collaboration button - always visible */}
                   <button
-                    className="p-1.5 rounded-xl border-2 text-sm transition-all duration-200 border-indigo-200/80 bg-gradient-to-br from-indigo-50 to-violet-50/60 text-indigo-500 hover:from-indigo-100 hover:to-violet-100 hover:border-indigo-300 hover:scale-105 hover:shadow-sm hover:shadow-indigo-200/50 dark:hover:shadow-none dark:from-indigo-900/20 dark:to-violet-900/10 dark:border-indigo-700/50 dark:text-indigo-400 dark:hover:from-indigo-800/30 dark:hover:to-violet-800/20 relative focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
                     data-tooltip={t("collaborate")}
                     onClick={async () => {
                       setCollaborationModalOpen(true);
@@ -8693,7 +8750,7 @@ export default function App() {
                     <>
                       <button
                         ref={modalFmtBtnRef}
-                        className="p-1.5 rounded-xl border-2 text-sm transition-all duration-200 border-violet-200/80 bg-gradient-to-br from-violet-50 to-purple-50/60 text-violet-500 hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 hover:scale-105 hover:shadow-sm hover:shadow-violet-200/50 dark:hover:shadow-none dark:from-violet-900/20 dark:to-purple-900/10 dark:border-violet-700/50 dark:text-violet-400 dark:hover:from-violet-800/30 dark:hover:to-purple-800/20 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
                         data-tooltip={t("formatting")}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -8723,7 +8780,7 @@ export default function App() {
                     <>
                       <button
                         ref={modalMenuBtnRef}
-                        className="p-1.5 rounded-xl border-2 text-sm transition-all duration-200 border-gray-200/80 bg-gradient-to-br from-gray-50 to-slate-50/60 text-gray-500 hover:from-gray-100 hover:to-slate-100 hover:border-gray-300 hover:scale-105 hover:shadow-sm dark:hover:shadow-none dark:from-gray-800/20 dark:to-slate-800/10 dark:border-gray-600/50 dark:text-gray-400 dark:hover:from-gray-700/30 dark:hover:to-slate-700/20 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
                         data-tooltip={t("moreOptions")}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -8812,10 +8869,10 @@ export default function App() {
                   {/* Pin button - hidden when offline or in archived view */}
                   {isOnline && tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED" && (
                     <button
-                      className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      className={`modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)] ${
                         notes.find((n) => String(n.id) === String(activeId))?.pinned
-                          ? "bg-gradient-to-br from-amber-400 to-yellow-500 text-white border-transparent shadow-md shadow-amber-300/50 dark:shadow-none scale-105"
-                          : "border-amber-200/80 bg-gradient-to-br from-amber-50 to-yellow-50/60 text-amber-500 hover:from-amber-100 hover:to-yellow-100 hover:border-amber-300 hover:scale-105 hover:shadow-sm hover:shadow-amber-200/50 dark:hover:shadow-none dark:from-amber-900/20 dark:to-yellow-900/10 dark:border-amber-700/50 dark:text-amber-400 dark:hover:from-amber-800/30 dark:hover:to-yellow-800/20"
+                          ? "modal-icon-btn--active"
+                          : ""
                       }`}
                       data-tooltip={t("pinUnpin")}
                       onClick={() =>
@@ -8837,7 +8894,7 @@ export default function App() {
                   )}
 
                   <button
-                    className="p-1.5 rounded-xl border-2 text-sm transition-all duration-200 border-rose-200/80 bg-gradient-to-br from-rose-50 to-pink-50/60 text-rose-400 hover:from-rose-100 hover:to-pink-100 hover:border-rose-300 hover:scale-105 hover:shadow-sm hover:shadow-rose-200/50 dark:hover:shadow-none dark:from-rose-900/20 dark:to-pink-900/10 dark:border-rose-700/50 dark:text-rose-400 dark:hover:from-rose-800/30 dark:hover:to-pink-800/20 focus:outline-none"
+                    className="modal-icon-btn focus:outline-none"
                     data-tooltip={t("close")}
                     onClick={closeModal}
                   >
