@@ -1069,54 +1069,66 @@ html.dark .prose blockquote {
   justify-content: center;
   padding: 0.375rem;
   border-radius: 0.75rem;
-  border: 2px solid color-mix(in srgb, var(--note-color, #6366f1) 28%, transparent);
+  border: 2px solid color-mix(in srgb, var(--note-color, #6366f1) 32%, transparent);
   background: linear-gradient(135deg,
-    color-mix(in srgb, var(--note-color, #6366f1) 10%, white) 0%,
-    color-mix(in srgb, var(--note-color, #6366f1) 6%, white) 100%
+    color-mix(in srgb, var(--note-color, #6366f1) 13%, white) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 8%, white) 100%
   );
-  color: color-mix(in srgb, var(--note-color, #6366f1) 75%, black);
+  color: color-mix(in srgb, var(--note-color, #6366f1) 90%, black);
   font-size: 0.875rem;
   position: relative;
   transition: all 0.2s;
 }
+/* Icon drop-shadow for contrast in light mode */
+.modal-icon-btn svg {
+  filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--note-color, #6366f1) 25%, transparent));
+}
 .modal-icon-btn:hover {
-  border-color: color-mix(in srgb, var(--note-color, #6366f1) 50%, transparent);
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--note-color, #6366f1) 18%, white) 0%,
-    color-mix(in srgb, var(--note-color, #6366f1) 12%, white) 100%
-  );
-  transform: scale(1.05);
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--note-color, #6366f1) 25%, transparent);
-}
-html.dark .modal-icon-btn {
-  border-color: color-mix(in srgb, var(--note-color, #6366f1) 35%, transparent);
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--note-color, #6366f1) 16%, transparent) 0%,
-    color-mix(in srgb, var(--note-color, #6366f1) 10%, transparent) 100%
-  );
-  color: color-mix(in srgb, var(--note-color, #6366f1) 65%, white);
-}
-html.dark .modal-icon-btn:hover {
   border-color: color-mix(in srgb, var(--note-color, #6366f1) 55%, transparent);
   background: linear-gradient(135deg,
-    color-mix(in srgb, var(--note-color, #6366f1) 28%, transparent) 0%,
-    color-mix(in srgb, var(--note-color, #6366f1) 20%, transparent) 100%
+    color-mix(in srgb, var(--note-color, #6366f1) 22%, white) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 15%, white) 100%
   );
-  box-shadow: none;
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--note-color, #6366f1) 30%, transparent);
+}
+/* Dark mode: border et fond plus denses pour ressortir sur fond sombre */
+html.dark .modal-icon-btn {
+  border: 2px solid color-mix(in srgb, var(--note-color, #6366f1) 60%, transparent);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--note-color, #6366f1) 30%, transparent) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 22%, transparent) 100%
+  );
+  color: color-mix(in srgb, var(--note-color, #6366f1) 85%, white);
+}
+/* Glow sur les icônes en dark mode */
+html.dark .modal-icon-btn svg {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--note-color, #6366f1) 65%, transparent));
+}
+html.dark .modal-icon-btn:hover {
+  border-color: color-mix(in srgb, var(--note-color, #6366f1) 80%, transparent);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--note-color, #6366f1) 42%, transparent) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 32%, transparent) 100%
+  );
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--note-color, #6366f1) 45%, transparent);
 }
 /* Active state (pin when pinned) */
 .modal-icon-btn--active {
   background: linear-gradient(135deg,
-    color-mix(in srgb, var(--note-color, #6366f1) 70%, white) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 72%, white) 0%,
     var(--note-color, #6366f1) 100%
   ) !important;
   border-color: transparent !important;
   color: white !important;
-  box-shadow: 0 4px 8px color-mix(in srgb, var(--note-color, #6366f1) 40%, transparent) !important;
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--note-color, #6366f1) 50%, transparent) !important;
   transform: scale(1.05);
 }
+.modal-icon-btn--active svg {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35)) !important;
+}
 html.dark .modal-icon-btn--active {
-  box-shadow: none !important;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--note-color, #6366f1) 65%, transparent) !important;
 }
 
 /* Copy buttons */
