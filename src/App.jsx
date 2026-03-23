@@ -5178,6 +5178,7 @@ export default function App() {
 
   // Loading state for notes
   const [notesLoading, setNotesLoading] = useState(false);
+  const notesAreRegular = useRef(true); // tracks whether notes[] holds regular (non-archive/trash) notes
   // Remove lazy loading state
 
   // -------- Multi-select state --------
@@ -5807,6 +5808,7 @@ export default function App() {
 
   const loadNotes = async () => {
     if (!token) return;
+    notesAreRegular.current = true;
     setNotesLoading(true);
 
     try {
@@ -5838,6 +5840,7 @@ export default function App() {
   // Load archived notes
   const loadArchivedNotes = async () => {
     if (!token) return;
+    notesAreRegular.current = false;
     setNotesLoading(true);
 
     console.log("Loading archived notes, checking cache...");
@@ -5889,6 +5892,7 @@ export default function App() {
   // Load trashed notes
   const loadTrashedNotes = async () => {
     if (!token) return;
+    notesAreRegular.current = false;
     setNotesLoading(true);
 
     try {
@@ -7897,10 +7901,10 @@ export default function App() {
   // Keep allNotesForTags in sync with notes when in normal view,
   // so tags remain visible when navigating to archive/trash
   useEffect(() => {
-    if (tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED" && notes.length > 0) {
+    if (notesAreRegular.current) {
       setAllNotesForTags(notes);
     }
-  }, [notes, tagFilter]);
+  }, [notes]);
 
   const tagsWithCounts = useMemo(() => {
     const map = new Map();
