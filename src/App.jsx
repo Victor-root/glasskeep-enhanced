@@ -3433,6 +3433,7 @@ function NotesUI({
   // new for sidebar
   openSidebar,
   activeTagFilter,
+  activeTagFilters = [],
   sidebarPermanent,
   sidebarWidth,
   // formatting
@@ -3520,14 +3521,23 @@ function NotesUI({
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [windowWidth]);
-  const tagLabel =
-    activeTagFilter === ALL_IMAGES
-      ? t("allImages")
-      : activeTagFilter === "ARCHIVED"
-        ? t("archivedNotes")
-        : activeTagFilter === "TRASHED"
-          ? t("trashedNotes")
-          : activeTagFilter;
+  const sectionLabel = (() => {
+    if (activeTagFilters.length > 1) return activeTagFilters.join(", ");
+    if (activeTagFilters.length === 1) return activeTagFilters[0];
+    if (activeTagFilter === ALL_IMAGES) return t("allImages");
+    if (activeTagFilter === "ARCHIVED") return t("archivedNotes");
+    if (activeTagFilter === "TRASHED") return t("trashedNotes");
+    if (activeTagFilter) return activeTagFilter;
+    return t("notes");
+  })();
+
+  const sectionIcon = (() => {
+    if (activeTagFilter === ALL_IMAGES) return "\u{1F5BC}\uFE0F";
+    if (activeTagFilter === "ARCHIVED") return "\u{1F4E6}";
+    if (activeTagFilter === "TRASHED") return "\u{1F5D1}\uFE0F";
+    if (activeTagFilter || activeTagFilters.length > 0) return "\u{1F3F7}\uFE0F";
+    return "\u{1F4DD}";
+  })();
 
   // Close header menu when scrolling
   React.useEffect(() => {
@@ -3658,13 +3668,11 @@ function NotesUI({
           <h1 className="hidden sm:block text-2xl sm:text-3xl font-bold">
             Glass Keep
           </h1>
-          {activeTagFilter && (
-            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20">
-              {tagLabel === t("allImages") || tagLabel === t("archivedNotes") || tagLabel === t("trashedNotes")
-                ? tagLabel
-                : `Tag: ${tagLabel}`}
-            </span>
-          )}
+          <span className="hidden sm:inline-block h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
+          <span className="text-sm sm:text-base font-medium px-3 py-1 rounded-lg bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20 flex items-center gap-1.5 max-w-[200px] truncate">
+            <span className="text-sm shrink-0">{sectionIcon}</span>
+            <span className="truncate">{sectionLabel}</span>
+          </span>
 
           {/* Offline indicator */}
           {!isOnline && (
@@ -9821,6 +9829,7 @@ export default function App() {
         headerBtnRef={headerBtnRef}
         openSidebar={() => setSidebarOpen(true)}
         activeTagFilter={tagFilter}
+        activeTagFilters={activeTagFilters}
         sidebarPermanent={alwaysShowSidebarOnWide && windowWidth >= 700}
         sidebarWidth={sidebarWidth}
         // AI props
