@@ -3771,6 +3771,11 @@ function NotesUI({
         </div>
         {/* Mobile expanded search overlay - covers the header content */}
         {mobileSearchOpen && (
+          <>
+          <div
+            className="sm:hidden fixed inset-0 z-20"
+            onClick={() => setMobileSearchOpen(false)}
+          />
           <div className="sm:hidden absolute inset-0 z-30 flex items-center px-3 gap-2 bg-[var(--bg-card,_var(--bg-primary))] backdrop-blur-xl">
             <div className="relative flex-1 min-w-0">
               <input
@@ -3780,7 +3785,6 @@ function NotesUI({
                 className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-3 ${localAiEnabled ? "pr-12" : "pr-8"} py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                onBlur={() => setMobileSearchOpen(false)}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     setMobileSearchOpen(false);
@@ -3799,7 +3803,6 @@ function NotesUI({
                   <button
                     type="button"
                     className="h-6 w-6 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
-                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => onAiSearch?.(search)}
                   >
                     <Sparkles />
@@ -3810,7 +3813,6 @@ function NotesUI({
                     type="button"
                     aria-label={t("clearSearch")}
                     className="h-5 w-5 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
-                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setSearch("")}
                   >
                     ×
@@ -3819,6 +3821,7 @@ function NotesUI({
               </div>
             </div>
           </div>
+          </>
         )}
 
         <div className="relative flex items-center gap-3 shrink-0">
