@@ -3720,7 +3720,7 @@ function NotesUI({
           <div className="hidden sm:flex items-center gap-1">
             <button
               onClick={() => openSettingsPanel?.()}
-              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
+              className={`p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700 focus:ring-gray-500" : "text-gray-500 hover:text-gray-700 hover:bg-gray-200 focus:ring-gray-400"}`}
               data-tooltip={t("settings")}
               aria-label={t("settings")}
             >
@@ -3728,7 +3728,7 @@ function NotesUI({
             </button>
             <button
               onClick={() => onToggleViewMode?.()}
-              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
+              className={`p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-blue-400 hover:text-blue-300 hover:bg-blue-500/15 focus:ring-blue-500" : "text-blue-600 hover:text-blue-700 hover:bg-blue-100 focus:ring-blue-400"}`}
               data-tooltip={listView ? t("gridView") : t("listView")}
               aria-label={listView ? t("gridView") : t("listView")}
             >
@@ -3736,7 +3736,7 @@ function NotesUI({
             </button>
             <button
               onClick={() => toggleDark?.()}
-              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
+              className={`p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-amber-400 hover:text-amber-300 hover:bg-amber-500/15 focus:ring-amber-500" : "text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 focus:ring-indigo-400"}`}
               data-tooltip={dark ? t("lightMode") : t("darkMode")}
               aria-label={dark ? t("lightMode") : t("darkMode")}
             >
@@ -3744,7 +3744,7 @@ function NotesUI({
             </button>
             <button
               onClick={() => onStartMulti?.()}
-              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
+              className={`p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/15 focus:ring-emerald-500" : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 focus:ring-emerald-400"}`}
               data-tooltip={t("multiSelect")}
               aria-label={t("multiSelect")}
             >
@@ -3753,7 +3753,7 @@ function NotesUI({
             {currentUser?.is_admin && (
               <button
                 onClick={() => openAdminPanel?.()}
-                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
+                className={`p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-purple-400 hover:text-purple-300 hover:bg-purple-500/15 focus:ring-purple-500" : "text-purple-600 hover:text-purple-700 hover:bg-purple-100 focus:ring-purple-400"}`}
                 data-tooltip={t("adminPanel")}
                 aria-label={t("adminPanel")}
               >
