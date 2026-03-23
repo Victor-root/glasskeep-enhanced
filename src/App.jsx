@@ -1018,15 +1018,18 @@ html.dark header.glass-card {
   display: block;
 }
 
-/* Blockquote – elegant styled citation */
+/* Blockquote – elegant styled citation, color-aware via --note-color */
 .note-content blockquote,
 .prose blockquote {
-  border-left: 4px solid rgba(99, 102, 241, 0.45);
-  border-right: 1px solid rgba(99, 102, 241, 0.15);
-  border-top: 1px solid rgba(99, 102, 241, 0.15);
-  border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+  border-left: 4px solid color-mix(in srgb, var(--note-color, #6366f1) 50%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--note-color, #6366f1) 18%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--note-color, #6366f1) 18%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--note-color, #6366f1) 18%, transparent);
   border-radius: 0.5rem;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(168, 85, 247, 0.04) 100%);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--note-color, #6366f1) 8%, transparent) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 5%, transparent) 100%
+  );
   font-style: italic;
   margin: 0 0 0.75rem 0;
   padding: 0.6rem 0.9rem 0.6rem 1.25rem;
@@ -1034,8 +1037,11 @@ html.dark header.glass-card {
 }
 html.dark .note-content blockquote,
 html.dark .prose blockquote {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.10) 0%, rgba(168, 85, 247, 0.07) 100%);
-  border-left-color: rgba(99, 102, 241, 0.6);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--note-color, #6366f1) 14%, transparent) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 10%, transparent) 100%
+  );
+  border-left-color: color-mix(in srgb, var(--note-color, #6366f1) 65%, transparent);
 }
 /* Avoid double margins from <p> inside blockquote */
 .note-content blockquote p,
@@ -2078,7 +2084,10 @@ function NoteCard({
           ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent"
           : ""
       }`}
-      style={{ backgroundColor: bgFor(n.color, dark) }}
+      style={{
+        backgroundColor: bgFor(n.color, dark),
+        '--note-color': (!dark && (!n.color || n.color === 'default')) ? '#a78bfa' : solid(bgFor(n.color, dark)),
+      }}
       data-id={n.id}
       data-group={group}
     >
@@ -8661,7 +8670,7 @@ export default function App() {
                   {/* View/Edit toggle only for TEXT notes - hidden when offline */}
                   {isOnline && mType === "text" && (
                     <button
-                      className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
+                      className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                       onClick={() => {
                         const el = modalScrollRef.current;
                         const maxScroll = el ? el.scrollHeight - el.clientHeight : 0;
