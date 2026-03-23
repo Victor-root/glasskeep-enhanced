@@ -476,7 +476,7 @@ const FormatIcon = () => (
 // Settings icon
 const SettingsIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -498,7 +498,7 @@ const SettingsIcon = () => (
 // Grid view icon
 const GridIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -515,7 +515,7 @@ const GridIcon = () => (
 // List view icon
 const ListIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -532,7 +532,7 @@ const ListIcon = () => (
 // Sun icon (light mode)
 const SunIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -568,7 +568,7 @@ const Sparkles = () => (
 // Moon icon (dark mode)
 const MoonIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -585,7 +585,7 @@ const MoonIcon = () => (
 // Multi-select icon (checkbox)
 const CheckSquareIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -603,7 +603,7 @@ const CheckSquareIcon = () => (
 // Admin/Shield icon
 const ShieldIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -620,7 +620,7 @@ const ShieldIcon = () => (
 // Sign out/Logout icon
 const LogOutIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="w-5 h-5"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -3716,31 +3716,6 @@ function NotesUI({
         </div>
 
         <div className="relative flex items-center gap-3 shrink-0">
-          {/* Floating cards toggle */}
-          <button
-            onClick={onToggleFloatingCards}
-            className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
-              floatingCardsEnabled
-                ? dark
-                  ? "bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30"
-                  : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
-                : dark
-                  ? "text-gray-500 hover:bg-white/10"
-                  : "text-gray-400 hover:bg-gray-100"
-            }`}
-            data-tooltip={floatingCardsEnabled ? t("floatingCardsOn") : t("floatingCardsOff")}
-            aria-label={t("toggleFloatingCards")}
-          >
-            <FloatingCardsIcon />
-            {!floatingCardsEnabled && (
-              <span
-                aria-hidden="true"
-                className="absolute inset-0 flex items-center justify-center pointer-events-none"
-              >
-                <span className={`block w-[1.5px] h-5 rotate-45 rounded-full ${dark ? "bg-gray-500" : "bg-gray-400"}`} />
-              </span>
-            )}
-          </button>
           <span
             className={`text-sm hidden sm:inline ${dark ? "text-gray-100" : "text-gray-900"}`}
           >
