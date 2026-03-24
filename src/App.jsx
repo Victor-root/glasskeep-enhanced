@@ -1127,12 +1127,12 @@ html.dark .modal-icon-btn:hover {
 
 /* ── Séparateur avant le bouton close ──────────────────────────────────── */
 .modal-icon-btn--close {
-  margin-left: 0.2rem;
+  margin-left: 0.5rem;
 }
 .modal-icon-btn--close::before {
   content: '';
   position: absolute;
-  left: -0.325rem;
+  left: -0.55rem;
   top: 18%;
   height: 64%;
   width: 1px;
