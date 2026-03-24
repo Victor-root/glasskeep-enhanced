@@ -1127,6 +1127,22 @@ html.dark .modal-icon-btn:hover {
   color: rgba(255, 255, 255, 0.96);
 }
 
+
+.modal-icon-btn--mode {
+  background: linear-gradient(90deg, #6366f1 0%, #7c3aed 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35) !important;
+}
+.modal-icon-btn--mode:hover {
+  background: linear-gradient(90deg, #4f46e5 0%, #6d28d9 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 18px rgba(99, 102, 241, 0.45) !important;
+}
+html.dark .modal-icon-btn--mode {
+  color: #fff !important;
+}
+
+
 /* ── Séparateur avant le bouton close ──────────────────────────────────── */
 .modal-icon-btn--close {
   margin-left: 1rem;
@@ -8760,10 +8776,12 @@ export default function App() {
                   disabled={!isOnline}
                 />
                 <div className="flex items-center gap-2 flex-none ml-auto">
+                  {/* Icon buttons group – pill container */}
+                  <div className="modal-icon-group">
                   {/* View/Edit toggle only for TEXT notes - hidden when offline */}
                   {isOnline && mType === "text" && (
                     <button
-                      className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                      className="modal-icon-btn modal-icon-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]"
                       onClick={() => {
                         const el = modalScrollRef.current;
                         const maxScroll = el ? el.scrollHeight - el.clientHeight : 0;
@@ -8774,13 +8792,21 @@ export default function App() {
                       data-tooltip={
                         viewMode ? t("switchToEditMode") : t("switchToViewMode")
                       }
+                      aria-label={viewMode ? t("editMode") : t("viewMode")}
                     >
-                      {viewMode ? t("editMode") : t("viewMode")}
+                      {viewMode ? (
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25Z" fill="currentColor" />
+                          <path d="m14.06 4.94 3.75 3.75 1.41-1.41a1.5 1.5 0 0 0 0-2.12l-1.63-1.63a1.5 1.5 0 0 0-2.12 0l-1.41 1.41Z" fill="currentColor" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />
+                          <circle cx="12" cy="12" r="3.2" fill="currentColor" />
+                        </svg>
+                      )}
                     </button>
                   )}
-
-                  {/* Icon buttons group – pill container */}
-                  <div className="modal-icon-group">
                   {/* Collaboration button - always visible */}
                   <button
                     className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
