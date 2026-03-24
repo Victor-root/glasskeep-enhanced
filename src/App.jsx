@@ -2983,7 +2983,6 @@ function TagSidebar({
                 onTouchStart={() => handleTagTouchStart(tag)}
                 onTouchEnd={handleTagTouchEnd}
                 onTouchCancel={handleTagTouchEnd}
-                data-tooltip={tag}
               >
                 <span className="flex items-center gap-2 truncate"><TagIcon />{tag}</span>
                 <span className="text-xs opacity-70">{count}</span>
