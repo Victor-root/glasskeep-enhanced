@@ -1041,7 +1041,7 @@ html.dark .prose blockquote {
     color-mix(in srgb, var(--note-color, #6366f1) 22%, #1e1e2e) 0%,
     color-mix(in srgb, var(--note-color, #6366f1) 14%, #1e1e2e) 100%
   );
-  border-left-color: color-mix(in srgb, var(--note-color, #6366f1) 80%, transparent);
+  border-left-color: color-mix(in srgb, var(--note-color, #6366f1) 100%, white);
   border-right-color: color-mix(in srgb, var(--note-color, #6366f1) 35%, transparent);
   border-top-color: color-mix(in srgb, var(--note-color, #6366f1) 35%, transparent);
   border-bottom-color: color-mix(in srgb, var(--note-color, #6366f1) 35%, transparent);
