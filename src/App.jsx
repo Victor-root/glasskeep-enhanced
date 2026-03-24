@@ -1041,10 +1041,10 @@ html.dark .prose blockquote {
     color-mix(in srgb, var(--note-color, #6366f1) 22%, #1e1e2e) 0%,
     color-mix(in srgb, var(--note-color, #6366f1) 14%, #1e1e2e) 100%
   );
-  border-left-color: color-mix(in srgb, var(--note-color, #6366f1) 100%, white);
-  border-right-color: color-mix(in srgb, var(--note-color, #6366f1) 35%, transparent);
-  border-top-color: color-mix(in srgb, var(--note-color, #6366f1) 35%, transparent);
-  border-bottom-color: color-mix(in srgb, var(--note-color, #6366f1) 35%, transparent);
+  border-left-color: color-mix(in srgb, var(--note-color, #818cf8) 55%, white);
+  border-right-color: color-mix(in srgb, var(--note-color, #818cf8) 30%, white);
+  border-top-color: color-mix(in srgb, var(--note-color, #818cf8) 30%, white);
+  border-bottom-color: color-mix(in srgb, var(--note-color, #818cf8) 30%, white);
 }
 /* Avoid double margins from <p> inside blockquote */
 .note-content blockquote p,
