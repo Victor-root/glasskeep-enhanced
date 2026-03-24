@@ -1018,6 +1018,171 @@ html.dark header.glass-card {
   display: block;
 }
 
+/* Blockquote – elegant styled citation, color-aware via --note-color */
+.note-content blockquote,
+.prose blockquote {
+  border-left: 4px solid color-mix(in srgb, var(--note-color, #6366f1) 50%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--note-color, #6366f1) 18%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--note-color, #6366f1) 18%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--note-color, #6366f1) 18%, transparent);
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--note-color, #6366f1) 8%, transparent) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 5%, transparent) 100%
+  );
+  font-style: italic;
+  margin: 0 0 0.75rem 0;
+  padding: 0.6rem 0.9rem 0.6rem 1.25rem;
+  color: var(--text-light);
+}
+html.dark .note-content blockquote,
+html.dark .prose blockquote {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--note-color, #6366f1) 22%, #1e1e2e) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 14%, #1e1e2e) 100%
+  );
+  border-left-color: color-mix(in srgb, var(--note-color, #818cf8) 55%, white);
+  border-right-color: color-mix(in srgb, var(--note-color, #818cf8) 30%, white);
+  border-top-color: color-mix(in srgb, var(--note-color, #818cf8) 30%, white);
+  border-bottom-color: color-mix(in srgb, var(--note-color, #818cf8) 30%, white);
+}
+/* Avoid double margins from <p> inside blockquote */
+.note-content blockquote p,
+.prose blockquote p {
+  margin: 0;
+}
+.note-content blockquote p + p,
+.prose blockquote p + p {
+  margin-top: 0.35rem;
+}
+/* Prose plugin overrides: remove default quote pseudo-elements and italic */
+.prose blockquote::before,
+.prose blockquote::after {
+  content: none !important;
+}
+.prose blockquote p:first-of-type::before,
+.prose blockquote p:last-of-type::after {
+  content: none !important;
+}
+
+/* ── Modal icon pill container ─────────────────────────────────────────── */
+.modal-icon-group {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 4px 16px rgba(0, 0, 0, 0.05);
+}
+html.dark .modal-icon-group {
+  background: rgba(28, 28, 34, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.5),
+    0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────── */
+.modal-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  cursor: pointer;
+  position: relative;
+  transition:
+    background 0.14s ease,
+    color      0.14s ease,
+    transform  0.18s cubic-bezier(0.34, 1.5, 0.64, 1);
+}
+.modal-icon-btn svg {
+  display: block;
+  transition: transform 0.18s cubic-bezier(0.34, 1.5, 0.64, 1);
+}
+.modal-icon-btn:hover {
+  background: rgba(0, 0, 0, 0.07);
+  color: #111827;
+}
+.modal-icon-btn:hover svg {
+  transform: scale(1.18);
+}
+.modal-icon-btn:active {
+  transform: scale(0.9) !important;
+  transition: transform 0.08s ease !important;
+}
+html.dark .modal-icon-btn {
+  color: rgba(255, 255, 255, 0.65);
+}
+html.dark .modal-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.96);
+}
+
+/* ── Séparateur avant le bouton close ──────────────────────────────────── */
+.modal-icon-btn--close {
+  margin-left: 1rem;
+}
+.modal-icon-btn--close::before {
+  content: '';
+  position: absolute;
+  left: -0.5rem;
+  top: 18%;
+  height: 64%;
+  width: 1px;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 1px;
+}
+html.dark .modal-icon-btn--close::before {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ── Close hover rouge ──────────────────────────────────────────────────── */
+.modal-icon-btn--close:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: #dc2626 !important;
+}
+html.dark .modal-icon-btn--close:hover {
+  background: rgba(239, 68, 68, 0.18) !important;
+  color: #fca5a5 !important;
+}
+
+/* ── Active (pin épinglé) — accent indigo fixe ──────────────────────────── */
+.modal-icon-btn--active {
+  background: #1e293b !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22) !important;
+}
+.modal-icon-btn--active:hover {
+  background: #0f172a !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+}
+.modal-icon-btn--active svg {
+  transform: none !important;
+}
+html.dark .modal-icon-btn--active {
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2) !important;
+}
+html.dark .modal-icon-btn--active:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28) !important;
+}
+
 /* Copy buttons */
 /* Hide scrollbars on mobile (keep scrolling) */
 @media (max-width: 639px) {
@@ -2040,7 +2205,10 @@ function NoteCard({
           ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent"
           : ""
       }`}
-      style={{ backgroundColor: bgFor(n.color, dark) }}
+      style={{
+        backgroundColor: bgFor(n.color, dark),
+        '--note-color': (!dark && (!n.color || n.color === 'default')) ? '#a78bfa' : solid(bgFor(n.color, dark)),
+      }}
       data-id={n.id}
       data-group={group}
     >
@@ -8593,9 +8761,30 @@ export default function App() {
                   disabled={!isOnline}
                 />
                 <div className="flex items-center gap-2 flex-none ml-auto">
+                  {/* View/Edit toggle only for TEXT notes - hidden when offline */}
+                  {isOnline && mType === "text" && (
+                    <button
+                      className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                      onClick={() => {
+                        const el = modalScrollRef.current;
+                        const maxScroll = el ? el.scrollHeight - el.clientHeight : 0;
+                        savedModalScrollRatioRef.current = maxScroll > 0 ? el.scrollTop / maxScroll : 0;
+                        setViewMode((v) => !v);
+                        setShowModalFmt(false);
+                      }}
+                      data-tooltip={
+                        viewMode ? t("switchToEditMode") : t("switchToViewMode")
+                      }
+                    >
+                      {viewMode ? t("editMode") : t("viewMode")}
+                    </button>
+                  )}
+
+                  {/* Icon buttons group – pill container */}
+                  <div className="modal-icon-group">
                   {/* Collaboration button - always visible */}
                   <button
-                    className="rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 relative"
+                    className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
                     data-tooltip={t("collaborate")}
                     onClick={async () => {
                       setCollaborationModalOpen(true);
@@ -8620,31 +8809,12 @@ export default function App() {
                     </svg>
                   </button>
 
-                  {/* View/Edit toggle only for TEXT notes - hidden when offline */}
-                  {isOnline && mType === "text" && (
-                    <button
-                      className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
-                      onClick={() => {
-                        const el = modalScrollRef.current;
-                        const maxScroll = el ? el.scrollHeight - el.clientHeight : 0;
-                        savedModalScrollRatioRef.current = maxScroll > 0 ? el.scrollTop / maxScroll : 0;
-                        setViewMode((v) => !v);
-                        setShowModalFmt(false);
-                      }}
-                      data-tooltip={
-                        viewMode ? t("switchToEditMode") : t("switchToViewMode")
-                      }
-                    >
-                      {viewMode ? t("editMode") : t("viewMode")}
-                    </button>
-                  )}
-
                   {/* Formatting button + popover: mobile only (desktop uses inline toolbar below) */}
                   {isOnline && mType === "text" && !viewMode && windowWidth < 768 && (
                     <>
                       <button
                         ref={modalFmtBtnRef}
-                        className="rounded-full p-2.5 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
                         data-tooltip={t("formatting")}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -8674,7 +8844,7 @@ export default function App() {
                     <>
                       <button
                         ref={modalMenuBtnRef}
-                        className="rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
                         data-tooltip={t("moreOptions")}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -8763,7 +8933,11 @@ export default function App() {
                   {/* Pin button - hidden when offline or in archived view */}
                   {isOnline && tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED" && (
                     <button
-                      className="rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className={`modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)] ${
+                        notes.find((n) => String(n.id) === String(activeId))?.pinned
+                          ? "modal-icon-btn--active"
+                          : ""
+                      }`}
                       data-tooltip={t("pinUnpin")}
                       onClick={() =>
                         activeId != null &&
@@ -8784,12 +8958,13 @@ export default function App() {
                   )}
 
                   <button
-                    className="rounded-full p-2.5 opacity-70 hover:opacity-100 focus:outline-none"
+                    className="modal-icon-btn modal-icon-btn--close focus:outline-none"
                     data-tooltip={t("close")}
                     onClick={closeModal}
                   >
                     <CloseIcon />
                   </button>
+                  </div>{/* end icon pill group */}
                 </div>
 
               </div>
