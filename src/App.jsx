@@ -1159,11 +1159,10 @@ html.dark .modal-icon-btn--close:hover {
   color: #ffffff !important;
   border: none !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22) !important;
-  transform: scale(1.08);
 }
 .modal-icon-btn--active:hover {
   background: #0f172a !important;
-  transform: scale(1.12) !important;
+  transform: scale(1.08) !important;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
 }
 .modal-icon-btn--active svg {
@@ -1178,6 +1177,7 @@ html.dark .modal-icon-btn--active {
 }
 html.dark .modal-icon-btn--active:hover {
   background: rgba(255, 255, 255, 0.22) !important;
+  transform: scale(1.08) !important;
   box-shadow:
     0 4px 14px rgba(0, 0, 0, 0.5),
     inset 0 0 0 1px rgba(255, 255, 255, 0.28) !important;
