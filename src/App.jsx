@@ -1132,7 +1132,7 @@ html.dark .modal-icon-btn:hover {
 .modal-icon-btn--close::before {
   content: '';
   position: absolute;
-  left: -0.8rem;
+  left: -0.5rem;
   top: 18%;
   height: 64%;
   width: 1px;
