@@ -1038,10 +1038,13 @@ html.dark header.glass-card {
 html.dark .note-content blockquote,
 html.dark .prose blockquote {
   background: linear-gradient(135deg,
-    color-mix(in srgb, var(--note-color, #6366f1) 14%, transparent) 0%,
-    color-mix(in srgb, var(--note-color, #6366f1) 10%, transparent) 100%
+    color-mix(in srgb, var(--note-color, #6366f1) 22%, #1e1e2e) 0%,
+    color-mix(in srgb, var(--note-color, #6366f1) 14%, #1e1e2e) 100%
   );
-  border-left-color: color-mix(in srgb, var(--note-color, #6366f1) 65%, transparent);
+  border-left-color: color-mix(in srgb, var(--note-color, #6366f1) 80%, transparent);
+  border-right-color: color-mix(in srgb, var(--note-color, #6366f1) 35%, transparent);
+  border-top-color: color-mix(in srgb, var(--note-color, #6366f1) 35%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--note-color, #6366f1) 35%, transparent);
 }
 /* Avoid double margins from <p> inside blockquote */
 .note-content blockquote p,
