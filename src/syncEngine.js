@@ -97,14 +97,14 @@ export async function getLocalNotes(userId) {
 
 // ──── Queue an offline action ────
 
-export async function queueOfflineAction(action) {
-  await enqueueAction(action);
-  const count = await getQueueLength();
+export async function queueOfflineAction(action, userId) {
+  await enqueueAction(action, userId);
+  const count = await getQueueLength(userId);
   setSyncStatus("pending", count, null);
 }
 
-export async function getPendingCount() {
-  return getQueueLength();
+export async function getPendingCount(userId) {
+  return getQueueLength(userId);
 }
 
 // ──── Apply action locally (optimistic update to IndexedDB) ────
@@ -160,7 +160,7 @@ export async function syncNow(token, userId, apiHelper) {
   if (_syncing) return { ok: false, synced: 0, failed: 0, conflicts: [], reason: "already_syncing" };
   _syncing = true;
 
-  const actions = await getAllQueuedActions();
+  const actions = await getAllQueuedActions(userId);
   if (actions.length === 0) {
     _syncing = false;
     setSyncStatus("synced", 0, null);
@@ -217,7 +217,7 @@ export async function syncNow(token, userId, apiHelper) {
     }
   }
 
-  const remaining = await getQueueLength();
+  const remaining = await getQueueLength(userId);
   _syncing = false;
 
   if (remaining === 0) {
@@ -230,12 +230,18 @@ export async function syncNow(token, userId, apiHelper) {
 }
 
 /**
- * Deduplicate actions: for the same noteId, keep only the latest meaningful action.
- * E.g., if we have create + update + update for the same note, keep create (with latest data) or just the last update.
+ * Deduplicate actions per noteId.
+ * Rules:
+ *  - Consecutive "update" actions for the same note → keep only the last one
+ *  - "create" absorbs a following "update" (data merged), but other action types
+ *    (pin, archive, etc.) are kept as separate actions to replay after the create
+ *  - If the final action is destructive (delete/trash/permanentDelete) AND a create
+ *    exists for the same note → the note was created and destroyed offline, skip all
+ *  - If the final action is destructive without a create → keep only the destructive action
  */
 function deduplicateActions(actions) {
   const byNote = new Map();
-  const nonNoteBound = []; // Actions without noteId
+  const nonNoteBound = [];
 
   for (const action of actions) {
     if (!action.noteId) {
@@ -252,41 +258,55 @@ function deduplicateActions(actions) {
   const result = [...nonNoteBound];
 
   for (const [, noteActions] of byNote) {
-    // Sort by timestamp
     noteActions.sort((a, b) => a.timestamp - b.timestamp);
 
     const hasCreate = noteActions.find((a) => a.type === "create");
     const last = noteActions[noteActions.length - 1];
 
-    // If the last action is a destructive one (delete/trash/permanentDelete)
+    // Created then destroyed offline → skip entirely
     if (["delete", "trash", "permanentDelete"].includes(last.type)) {
       if (hasCreate) {
-        // Created then deleted offline - skip entirely, remove all
         for (const a of noteActions) {
           removeQueuedAction(a.queueId).catch(() => {});
         }
         continue;
       }
-      // Just keep the destructive action
+      // No create → keep only the destructive action
       result.push(last);
       continue;
     }
 
-    // If there's a create, merge all updates into the create
-    if (hasCreate) {
-      const lastUpdate = noteActions.filter((a) => a.type === "update").pop();
-      const merged = {
-        ...hasCreate,
-        data: lastUpdate ? lastUpdate.data : hasCreate.data,
-      };
-      result.push(merged);
-      continue;
+    // Merge consecutive updates, but preserve distinct action types in order
+    const merged = [];
+    for (const action of noteActions) {
+      if (action.type === "create") {
+        // If a later update exists, absorb its data into the create
+        const lastUpdate = noteActions.filter((a) => a.type === "update").pop();
+        merged.push({
+          ...action,
+          data: lastUpdate ? lastUpdate.data : action.data,
+        });
+      } else if (action.type === "update") {
+        // Only keep the last update; skip earlier ones
+        const lastUpdate = noteActions.filter((a) => a.type === "update").pop();
+        if (action === lastUpdate && !hasCreate) {
+          // Only add if there's no create (create already absorbed the data)
+          merged.push(action);
+        }
+        // Earlier updates or updates absorbed by create → skip
+      } else {
+        // pin, archive, restore, etc. → always keep
+        merged.push(action);
+      }
     }
 
-    // Otherwise keep only the last action
-    result.push(last);
+    for (const a of merged) {
+      result.push(a);
+    }
   }
 
+  // Sort final result by timestamp to maintain global order
+  result.sort((a, b) => a.timestamp - b.timestamp);
   return result;
 }
 
@@ -382,7 +402,7 @@ let _autoSyncTimer = null;
 export function startAutoSync(token, userId, apiHelper, intervalMs = 30000) {
   stopAutoSync();
   _autoSyncTimer = setInterval(async () => {
-    const count = await getQueueLength();
+    const count = await getQueueLength(userId);
     if (count > 0) {
       const serverOk = await checkServerHealth(token);
       if (serverOk) {
@@ -401,8 +421,8 @@ export function stopAutoSync() {
 
 // ──── Update sync status based on current state ────
 
-export async function refreshSyncStatus(token) {
-  const count = await getQueueLength();
+export async function refreshSyncStatus(token, userId) {
+  const count = await getQueueLength(userId);
   if (count === 0) {
     const serverOk = navigator.onLine ? await checkServerHealth(token) : false;
     setSyncStatus(serverOk ? "synced" : "offline", 0, null);

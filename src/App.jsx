@@ -3993,6 +3993,9 @@ function NotesUI({
   // floating cards toggle
   floatingCardsEnabled,
   onToggleFloatingCards,
+  // sync indicator
+  syncState,
+  handleSyncNow,
 }) {
   // Multi-select color popover (local UI state)
   const multiColorBtnRef = useRef(null);
@@ -6674,7 +6677,7 @@ export default function App() {
   // Initialize sync status + auto-sync when user logs in
   useEffect(() => {
     if (!token || !currentUser?.id) return;
-    refreshSyncStatus(token).catch(() => {});
+    refreshSyncStatus(token, currentUser?.id).catch(() => {});
     startAutoSync(token, currentUser.id, api, 30000);
     return () => stopAutoSync();
   }, [token, currentUser?.id]);
@@ -6687,20 +6690,20 @@ export default function App() {
       checkServerHealth(token).then((ok) => {
         serverReachable.current = ok;
         if (ok && currentUser?.id) {
-          getPendingCount().then((count) => {
+          getPendingCount(currentUser?.id).then((count) => {
             if (count > 0) {
               syncNow(token, currentUser.id, api).catch(() => {});
             } else {
-              refreshSyncStatus(token).catch(() => {});
+              refreshSyncStatus(token, currentUser?.id).catch(() => {});
             }
           });
         } else {
-          refreshSyncStatus(token).catch(() => {});
+          refreshSyncStatus(token, currentUser?.id).catch(() => {});
         }
       });
     } else {
       serverReachable.current = false;
-      refreshSyncStatus(token).catch(() => {});
+      refreshSyncStatus(token, currentUser?.id).catch(() => {});
     }
   }, [isOnline, token, currentUser?.id]);
 
@@ -7154,7 +7157,7 @@ export default function App() {
     // Persist to IndexedDB
     if (currentUser?.id) {
       await applyActionLocally({ type: "create", noteId: newNote.id, data: newNote }, currentUser.id);
-      await queueOfflineAction({ type: "create", noteId: newNote.id, data: newNote });
+      await queueOfflineAction({ type: "create", noteId: newNote.id, data: newNote }, currentUser.id);
     }
     showToast(t("offlineNoteCreated"), "info");
   };
@@ -7186,7 +7189,7 @@ export default function App() {
             serverReachable.current = false;
             if (currentUser?.id) {
               await applyActionLocally({ type: "archive", noteId, archived }, currentUser.id);
-              await queueOfflineAction({ type: "archive", noteId, archived });
+              await queueOfflineAction({ type: "archive", noteId, archived }, currentUser.id);
             }
             // Remove from current view locally
             setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
@@ -7198,7 +7201,7 @@ export default function App() {
         }
       } else if (currentUser?.id) {
         await applyActionLocally({ type: "archive", noteId, archived }, currentUser.id);
-        await queueOfflineAction({ type: "archive", noteId, archived });
+        await queueOfflineAction({ type: "archive", noteId, archived }, currentUser.id);
         // Remove from current view locally
         setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
         if (archived) closeModal();
@@ -8287,7 +8290,7 @@ export default function App() {
   const handleOfflineUpdate = async (noteId, payload) => {
     if (currentUser?.id) {
       await applyActionLocally({ type: "update", noteId, data: { ...payload, updated_at: new Date().toISOString() } }, currentUser.id);
-      await queueOfflineAction({ type: "update", noteId, data: { ...payload, updated_at: new Date().toISOString() } });
+      await queueOfflineAction({ type: "update", noteId, data: { ...payload, updated_at: new Date().toISOString() } }, currentUser.id);
     }
     showToast(t("offlineNoteUpdated"), "info");
   };
@@ -8313,13 +8316,13 @@ export default function App() {
               serverReachable.current = false;
               if (currentUser?.id) {
                 await applyActionLocally({ type: "permanentDelete", noteId: activeId }, currentUser.id);
-                await queueOfflineAction({ type: "permanentDelete", noteId: activeId });
+                await queueOfflineAction({ type: "permanentDelete", noteId: activeId }, currentUser.id);
               }
             } else throw e;
           }
         } else if (currentUser?.id) {
           await applyActionLocally({ type: "permanentDelete", noteId: activeId }, currentUser.id);
-          await queueOfflineAction({ type: "permanentDelete", noteId: activeId });
+          await queueOfflineAction({ type: "permanentDelete", noteId: activeId }, currentUser.id);
         }
         setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
         closeModal();
@@ -8336,13 +8339,13 @@ export default function App() {
               serverReachable.current = false;
               if (currentUser?.id) {
                 await applyActionLocally({ type: "trash", noteId: activeId }, currentUser.id);
-                await queueOfflineAction({ type: "trash", noteId: activeId });
+                await queueOfflineAction({ type: "trash", noteId: activeId }, currentUser.id);
               }
             } else throw e;
           }
         } else if (currentUser?.id) {
           await applyActionLocally({ type: "trash", noteId: activeId }, currentUser.id);
-          await queueOfflineAction({ type: "trash", noteId: activeId });
+          await queueOfflineAction({ type: "trash", noteId: activeId }, currentUser.id);
         }
         setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
         closeModal();
@@ -8371,13 +8374,13 @@ export default function App() {
             serverReachable.current = false;
             if (currentUser?.id) {
               await applyActionLocally({ type: "restore", noteId }, currentUser.id);
-              await queueOfflineAction({ type: "restore", noteId });
+              await queueOfflineAction({ type: "restore", noteId }, currentUser.id);
             }
           } else throw e;
         }
       } else if (currentUser?.id) {
         await applyActionLocally({ type: "restore", noteId }, currentUser.id);
-        await queueOfflineAction({ type: "restore", noteId });
+        await queueOfflineAction({ type: "restore", noteId }, currentUser.id);
       }
       setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
       closeModal();
@@ -8402,13 +8405,13 @@ export default function App() {
             serverReachable.current = false;
             if (currentUser?.id) {
               await applyActionLocally({ type: "pin", noteId: id, pinned: !!toPinned }, currentUser.id);
-              await queueOfflineAction({ type: "pin", noteId: id, pinned: !!toPinned });
+              await queueOfflineAction({ type: "pin", noteId: id, pinned: !!toPinned }, currentUser.id);
             }
           } else throw e;
         }
       } else if (currentUser?.id) {
         await applyActionLocally({ type: "pin", noteId: id, pinned: !!toPinned }, currentUser.id);
-        await queueOfflineAction({ type: "pin", noteId: id, pinned: !!toPinned });
+        await queueOfflineAction({ type: "pin", noteId: id, pinned: !!toPinned }, currentUser.id);
       }
       setNotes((prev) =>
         prev.map((n) =>
@@ -10733,6 +10736,8 @@ export default function App() {
         // floating cards toggle
         floatingCardsEnabled={floatingCardsEnabled}
         onToggleFloatingCards={toggleFloatingCards}
+        syncState={syncState}
+        handleSyncNow={handleSyncNow}
       />
       {modal}
 

@@ -62,12 +62,17 @@ export async function getAllNotes(userId) {
   return all.filter((n) => String(n._userId) === String(userId));
 }
 
+// Normalize note ID to string to avoid type mismatches in IndexedDB keyPath
+function normalizeId(id) {
+  return id == null ? id : String(id);
+}
+
 export async function putNotes(notes, userId) {
   const db = await openDB();
   const t = db.transaction(NOTES_STORE, "readwrite");
   const store = t.objectStore(NOTES_STORE);
   for (const note of notes) {
-    store.put({ ...note, _userId: String(userId) });
+    store.put({ ...note, id: normalizeId(note.id), _userId: String(userId) });
   }
   return new Promise((resolve, reject) => {
     t.oncomplete = () => resolve();
@@ -77,17 +82,17 @@ export async function putNotes(notes, userId) {
 
 export async function putNote(note, userId) {
   const store = await tx(NOTES_STORE, "readwrite");
-  return reqToPromise(store.put({ ...note, _userId: String(userId) }));
+  return reqToPromise(store.put({ ...note, id: normalizeId(note.id), _userId: String(userId) }));
 }
 
 export async function deleteNote(noteId) {
   const store = await tx(NOTES_STORE, "readwrite");
-  return reqToPromise(store.delete(String(noteId)));
+  return reqToPromise(store.delete(normalizeId(noteId)));
 }
 
 export async function getNote(noteId) {
   const store = await tx(NOTES_STORE);
-  return reqToPromise(store.get(String(noteId)));
+  return reqToPromise(store.get(normalizeId(noteId)));
 }
 
 export async function clearNotesForUser(userId) {
@@ -96,7 +101,7 @@ export async function clearNotesForUser(userId) {
   const t = db.transaction(NOTES_STORE, "readwrite");
   const store = t.objectStore(NOTES_STORE);
   for (const n of all) {
-    store.delete(n.id);
+    store.delete(normalizeId(n.id));
   }
   return new Promise((resolve, reject) => {
     t.oncomplete = () => resolve();
@@ -117,23 +122,30 @@ export async function clearNotesForUser(userId) {
  *  - permanentDelete: { noteId }
  *  - pin: { noteId, pinned: bool }
  */
-export async function enqueueAction(action) {
+export async function enqueueAction(action, userId) {
   const store = await tx(SYNC_QUEUE_STORE, "readwrite");
   const entry = {
     ...action,
+    _userId: String(userId),
     timestamp: Date.now(),
   };
   return reqToPromise(store.add(entry));
 }
 
-export async function getAllQueuedActions() {
+export async function getAllQueuedActions(userId) {
   const store = await tx(SYNC_QUEUE_STORE);
-  return reqToPromise(store.getAll());
+  const all = await reqToPromise(store.getAll());
+  return all.filter((a) => String(a._userId) === String(userId));
 }
 
-export async function getQueueLength() {
-  const store = await tx(SYNC_QUEUE_STORE);
-  return reqToPromise(store.count());
+export async function getQueueLength(userId) {
+  if (!userId) {
+    const store = await tx(SYNC_QUEUE_STORE);
+    return reqToPromise(store.count());
+  }
+  // Filter by userId
+  const all = await getAllQueuedActions(userId);
+  return all.length;
 }
 
 export async function removeQueuedAction(queueId) {
@@ -141,9 +153,23 @@ export async function removeQueuedAction(queueId) {
   return reqToPromise(store.delete(queueId));
 }
 
-export async function clearQueue() {
-  const store = await tx(SYNC_QUEUE_STORE, "readwrite");
-  return reqToPromise(store.clear());
+export async function clearQueue(userId) {
+  if (!userId) {
+    const store = await tx(SYNC_QUEUE_STORE, "readwrite");
+    return reqToPromise(store.clear());
+  }
+  // Only clear actions for this user
+  const actions = await getAllQueuedActions(userId);
+  const db = await openDB();
+  const t = db.transaction(SYNC_QUEUE_STORE, "readwrite");
+  const store = t.objectStore(SYNC_QUEUE_STORE);
+  for (const a of actions) {
+    store.delete(a.queueId);
+  }
+  return new Promise((resolve, reject) => {
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
+  });
 }
 
 // ──── Meta (last sync time, etc.) ────
