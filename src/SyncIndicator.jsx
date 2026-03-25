@@ -64,6 +64,21 @@ function RefreshIcon() {
   );
 }
 
+// Map action types to user-friendly labels
+function actionTypeLabel(type) {
+  const map = {
+    create: t("syncActionCreate") || "Create",
+    update: t("syncActionUpdate") || "Update",
+    delete: t("syncActionDelete") || "Delete",
+    trash: t("syncActionTrash") || "Trash",
+    permanentDelete: t("syncActionPermDelete") || "Perm. delete",
+    archive: t("syncActionArchive") || "Archive",
+    restore: t("syncActionRestore") || "Restore",
+    pin: t("syncActionPin") || "Pin",
+  };
+  return map[type] || type;
+}
+
 // ──── Component ────
 
 export default function SyncIndicator({ syncStatus, onSyncNow, dark }) {
@@ -83,7 +98,7 @@ export default function SyncIndicator({ syncStatus, onSyncNow, dark }) {
     return () => document.removeEventListener("mousedown", handler);
   }, [popoverOpen]);
 
-  const { status, pendingCount, lastError } = syncStatus;
+  const { status, pendingCount, lastError, failedActions } = syncStatus;
 
   // Determine icon, color, and label
   let Icon, colorClass, label, pulse = false;
@@ -97,6 +112,7 @@ export default function SyncIndicator({ syncStatus, onSyncNow, dark }) {
       label = t("syncStatusSynced");
       break;
     case "offline":
+      // Offline: always show CloudOff, even with pending changes (no spinner)
       Icon = CloudOffIcon;
       colorClass = dark
         ? "text-orange-400 hover:text-orange-300 hover:bg-orange-500/15"
@@ -158,6 +174,7 @@ export default function SyncIndicator({ syncStatus, onSyncNow, dark }) {
           status={status}
           pendingCount={pendingCount}
           lastError={lastError}
+          failedActions={failedActions || []}
           label={label}
           onSyncNow={() => {
             onSyncNow?.();
@@ -171,7 +188,7 @@ export default function SyncIndicator({ syncStatus, onSyncNow, dark }) {
   );
 }
 
-function SyncPopover({ popRef, btnRef, dark, status, pendingCount, lastError, label, onSyncNow, onClose }) {
+function SyncPopover({ popRef, btnRef, dark, status, pendingCount, lastError, failedActions, label, onSyncNow, onClose }) {
   const [pos, setPos] = useState({ top: 0, right: 0 });
 
   useEffect(() => {
@@ -179,7 +196,7 @@ function SyncPopover({ popRef, btnRef, dark, status, pendingCount, lastError, la
     const rect = btnRef.current.getBoundingClientRect();
     setPos({
       top: rect.bottom + 8,
-      right: window.innerWidth - rect.right,
+      right: Math.max(8, window.innerWidth - rect.right),
     });
   }, []);
 
@@ -203,7 +220,7 @@ function SyncPopover({ popRef, btnRef, dark, status, pendingCount, lastError, la
       <div className="fixed inset-0 z-[1099]" onClick={onClose} />
       <div
         ref={popRef}
-        className={`fixed z-[1100] w-64 rounded-xl border shadow-xl p-4 ${bgClass} ${textClass}`}
+        className={`fixed z-[1100] w-72 rounded-xl border shadow-xl p-4 ${bgClass} ${textClass}`}
         style={{ top: pos.top, right: pos.right }}
       >
         {/* Status row */}
@@ -220,7 +237,24 @@ function SyncPopover({ popRef, btnRef, dark, status, pendingCount, lastError, la
           </p>
         )}
 
-        {lastError && (
+        {/* Verbose failed actions list */}
+        {failedActions.length > 0 && (
+          <div className="mb-2 space-y-1">
+            <p className="text-xs font-medium text-red-500">{t("syncFailedDetails") || "Failed actions:"}</p>
+            {failedActions.map((fa, i) => (
+              <div key={i} className={`text-xs rounded px-2 py-1 ${dark ? "bg-red-900/30 text-red-300" : "bg-red-50 text-red-700"}`}>
+                <span className="font-medium">{actionTypeLabel(fa.type)}</span>
+                {fa.title && fa.title !== fa.noteId && (
+                  <span className="ml-1 opacity-75">— {fa.title.length > 30 ? fa.title.slice(0, 30) + "…" : fa.title}</span>
+                )}
+                <br />
+                <span className="opacity-60">{fa.error}{fa.status ? ` (${fa.status})` : ""}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {lastError && failedActions.length === 0 && (
           <p className="text-xs mb-2 text-red-500">
             {lastError}
           </p>
@@ -235,6 +269,12 @@ function SyncPopover({ popRef, btnRef, dark, status, pendingCount, lastError, la
         {status === "offline" && pendingCount === 0 && (
           <p className={`text-xs mb-2 ${subtextClass}`}>
             {t("syncOfflineNoChanges")}
+          </p>
+        )}
+
+        {status === "offline" && pendingCount > 0 && (
+          <p className={`text-xs mb-2 ${subtextClass}`}>
+            {t("syncOfflinePending") || "Changes will sync when you're back online."}
           </p>
         )}
 

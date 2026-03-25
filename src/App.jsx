@@ -120,7 +120,7 @@ async function api(path, { method = "GET", body, token } = {}) {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
     const res = await fetch(`${API_BASE}${path}`, {
       method,
@@ -5137,7 +5137,7 @@ function NotesUI({
 
         {notesLoading && pinned.length + others.length === 0 && (
           <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
-            Loading Notes…
+            {t("loadingNotes")}
           </p>
         )}
         {!notesLoading && filteredEmptyWithSearch && (
@@ -6291,13 +6291,41 @@ export default function App() {
     notesAreRegular.current = true;
     setNotesLoading(true);
 
+    // ── Step 1: Show cached notes instantly (IDB → localStorage fallback) ──
+    let hasLocal = false;
+    if (currentUser?.id) {
+      try {
+        const idbNotes = await getLocalNotes(currentUser.id);
+        if (idbNotes.length > 0) {
+          const clean = idbNotes.map(({ _userId, _offlineCreated, _offlineModified, ...rest }) => rest);
+          setNotes(sortNotesByRecency(clean));
+          hasLocal = true;
+        }
+      } catch (e) {
+        console.error("IDB load error:", e);
+      }
+    }
+    if (!hasLocal) {
+      try {
+        const cachedData = localStorage.getItem(NOTES_CACHE_KEY);
+        if (cachedData) {
+          const cachedNotes = JSON.parse(cachedData);
+          setNotes(sortNotesByRecency(cachedNotes));
+          hasLocal = cachedNotes.length > 0;
+        }
+      } catch (e) {
+        console.error("localStorage load error:", e);
+      }
+    }
+    // Stop the loading spinner as soon as we have local data
+    if (hasLocal) setNotesLoading(false);
+
+    // ── Step 2: Refresh from server in background ──
     try {
       const data = await api("/notes", { token });
-      console.log("Notes loaded from server:", data);
       const notesArray = Array.isArray(data) ? data : [];
       setNotes(sortNotesByRecency(notesArray));
       persistNotesCache(notesArray);
-      // Also cache to IndexedDB for robust offline support
       if (currentUser?.id) {
         cacheNotesLocally(notesArray, currentUser.id).catch((e) =>
           console.error("IDB cache error:", e),
@@ -6305,35 +6333,8 @@ export default function App() {
       }
     } catch (error) {
       console.error("Error loading notes from server:", error);
-      // Try IndexedDB first, then localStorage as fallback
-      let loaded = false;
-      if (currentUser?.id) {
-        try {
-          const idbNotes = await getLocalNotes(currentUser.id);
-          if (idbNotes.length > 0) {
-            // Strip internal IDB fields
-            const clean = idbNotes.map(({ _userId, _offlineCreated, _offlineModified, ...rest }) => rest);
-            setNotes(sortNotesByRecency(clean));
-            loaded = true;
-          }
-        } catch (e) {
-          console.error("IDB fallback error:", e);
-        }
-      }
-      if (!loaded) {
-        try {
-          const cachedData = localStorage.getItem(NOTES_CACHE_KEY);
-          if (cachedData) {
-            const cachedNotes = JSON.parse(cachedData);
-            setNotes(sortNotesByRecency(cachedNotes));
-          } else {
-            setNotes([]);
-          }
-        } catch (cacheError) {
-          console.error("Error loading from cache:", cacheError);
-          setNotes([]);
-        }
-      }
+      // If we had no local data either, show empty
+      if (!hasLocal) setNotes([]);
     } finally {
       setNotesLoading(false);
     }

@@ -32,7 +32,7 @@ export async function checkServerHealth(token) {
   }
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
     const headers = { "Content-Type": "application/json" };
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch("/api/health", {
@@ -63,17 +63,19 @@ const listeners = new Set();
 let _syncStatus = "synced";
 let _pendingCount = 0;
 let _lastError = null;
+let _failedActions = []; // Array of { type, noteId, title, error, status }
 
 export function getSyncStatus() {
-  return { status: _syncStatus, pendingCount: _pendingCount, lastError: _lastError };
+  return { status: _syncStatus, pendingCount: _pendingCount, lastError: _lastError, failedActions: _failedActions };
 }
 
-function setSyncStatus(status, pendingCount, lastError) {
+function setSyncStatus(status, pendingCount, lastError, failedActions) {
   _syncStatus = status;
   if (pendingCount !== undefined) _pendingCount = pendingCount;
   if (lastError !== undefined) _lastError = lastError;
+  if (failedActions !== undefined) _failedActions = failedActions;
   for (const fn of listeners) {
-    try { fn({ status: _syncStatus, pendingCount: _pendingCount, lastError: _lastError }); } catch {}
+    try { fn({ status: _syncStatus, pendingCount: _pendingCount, lastError: _lastError, failedActions: _failedActions }); } catch {}
   }
 }
 
@@ -167,7 +169,7 @@ export async function syncNow(token, userId, apiHelper) {
     return { ok: true, synced: 0, failed: 0, conflicts: [] };
   }
 
-  setSyncStatus("syncing", actions.length, null);
+  setSyncStatus("syncing", actions.length, null, []);
 
   // Check server health first
   const serverOk = await checkServerHealth(token);
@@ -180,6 +182,7 @@ export async function syncNow(token, userId, apiHelper) {
   let synced = 0;
   let failed = 0;
   const conflicts = [];
+  const failedDetails = [];
 
   // Sort by timestamp to replay in order
   actions.sort((a, b) => a.timestamp - b.timestamp);
@@ -194,17 +197,24 @@ export async function syncNow(token, userId, apiHelper) {
       synced++;
     } catch (e) {
       console.error("[SyncEngine] Failed to replay action:", action, e);
-      // If it's a 404 on delete/trash/restore, consider it done (note already gone)
-      if (e.status === 404 && ["delete", "trash", "restore", "permanentDelete", "archive"].includes(action.type)) {
+      // If it's a 404, the note no longer exists on server — consider it done
+      if (e.status === 404) {
         await removeQueuedAction(action.queueId);
         synced++;
       } else if (e.isAuthError) {
         // Stop sync on auth errors
         _syncing = false;
-        setSyncStatus("error", actions.length - synced, "Auth expired");
+        setSyncStatus("error", actions.length - synced, "Auth expired", []);
         return { ok: false, synced, failed: actions.length - synced, conflicts, reason: "auth_error" };
       } else {
         failed++;
+        failedDetails.push({
+          type: action.type,
+          noteId: action.noteId,
+          title: action.data?.title || action.noteId || "?",
+          error: e.message || "Unknown error",
+          status: e.status || 0,
+        });
       }
     }
   }
@@ -221,12 +231,17 @@ export async function syncNow(token, userId, apiHelper) {
   _syncing = false;
 
   if (remaining === 0) {
-    setSyncStatus("synced", 0, null);
+    setSyncStatus("synced", 0, null, []);
   } else {
-    setSyncStatus("pending", remaining, failed > 0 ? `${failed} action(s) failed` : null);
+    setSyncStatus(
+      "pending",
+      remaining,
+      failed > 0 ? `${failed} action(s) failed` : null,
+      failedDetails,
+    );
   }
 
-  return { ok: failed === 0, synced, failed, conflicts };
+  return { ok: failed === 0, synced, failed, conflicts, failedDetails };
 }
 
 /**
@@ -313,7 +328,7 @@ function deduplicateActions(actions) {
 async function replayAction(action, token, apiHelper, userId, conflicts) {
   switch (action.type) {
     case "create": {
-      const { _offlineCreated, _offlineModified, _userId, ...cleanData } = action.data;
+      const { _offlineCreated, _offlineModified, _userId, updated_at: _ua, ...cleanData } = action.data;
       const created = await apiHelper("/notes", {
         method: "POST",
         body: cleanData,
@@ -330,15 +345,17 @@ async function replayAction(action, token, apiHelper, userId, conflicts) {
       break;
     }
     case "update": {
-      const { _offlineCreated, _offlineModified, _userId, ...cleanPayload } = action.data;
+      // Strip internal/extraneous fields — server expects: type, title, content, items, tags, images, color, pinned
+      const { _offlineCreated, _offlineModified, _userId, id: _id, updated_at, ...serverPayload } = action.data;
+      // Set timestamp so the server records the edit time
+      if (!serverPayload.timestamp) {
+        serverPayload.timestamp = updated_at || new Date().toISOString();
+      }
 
-      // Check for conflict: fetch server version first
       try {
-        // We don't have a single-note GET, so we'll just try the PUT.
-        // If the server rejects (409), we handle conflict.
         await apiHelper(`/notes/${action.noteId}`, {
           method: "PUT",
-          body: cleanPayload,
+          body: serverPayload,
           token,
         });
       } catch (e) {
@@ -346,16 +363,15 @@ async function replayAction(action, token, apiHelper, userId, conflicts) {
           // Conflict - server has a newer version
           conflicts.push({
             noteId: action.noteId,
-            localData: cleanPayload,
+            localData: serverPayload,
             error: "conflict",
           });
           // Create a backup copy with the local changes
           const backupNote = {
-            ...cleanPayload,
+            ...serverPayload,
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            title: `[Conflict backup] ${cleanPayload.title || ""}`.trim(),
+            title: `[Conflict backup] ${serverPayload.title || ""}`.trim(),
             timestamp: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           };
           await apiHelper("/notes", { method: "POST", body: backupNote, token });
           break;
@@ -425,7 +441,7 @@ export async function refreshSyncStatus(token, userId) {
   const count = await getQueueLength(userId);
   if (count === 0) {
     const serverOk = navigator.onLine ? await checkServerHealth(token) : false;
-    setSyncStatus(serverOk ? "synced" : "offline", 0, null);
+    setSyncStatus(serverOk ? "synced" : "offline", 0, null, []);
   } else {
     const serverOk = navigator.onLine ? await checkServerHealth(token) : false;
     setSyncStatus(serverOk ? "pending" : "offline", count, null);
