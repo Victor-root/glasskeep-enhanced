@@ -13,6 +13,22 @@ import DOMPurify from "dompurify";
 import DrawingCanvas from "./DrawingCanvas";
 import { t } from "./i18n";
 import Masonry from "react-masonry-css";
+import SyncIndicator from "./SyncIndicator.jsx";
+import {
+  cacheNotesLocally,
+  getLocalNotes,
+  queueOfflineAction,
+  applyActionLocally,
+  syncNow,
+  getSyncStatus,
+  onSyncStatusChange,
+  refreshSyncStatus,
+  checkServerHealth,
+  resetHealthCache,
+  startAutoSync,
+  stopAutoSync,
+  getPendingCount,
+} from "./syncEngine.js";
 
 function trColorName(name) {
   const v = String(name || "").trim().toLowerCase();
@@ -4297,6 +4313,11 @@ function NotesUI({
         <div className="relative flex items-center gap-3 shrink-0">
           {/* Desktop: icon buttons directly in header bar */}
           <div className="hidden sm:flex items-center gap-1">
+            <SyncIndicator
+              syncStatus={syncState}
+              onSyncNow={handleSyncNow}
+              dark={dark}
+            />
             <button
               onClick={() => openSettingsPanel?.()}
               className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700 focus:ring-gray-500" : "text-gray-500 hover:text-gray-700 hover:bg-gray-200 focus:ring-gray-400"}`}
@@ -4363,8 +4384,13 @@ function NotesUI({
             </button>
           </div>
 
-          {/* Mobile: keep 3-dot menu */}
-          <div className="sm:hidden">
+          {/* Mobile: sync indicator + 3-dot menu */}
+          <div className="sm:hidden flex items-center gap-1">
+            <SyncIndicator
+              syncStatus={syncState}
+              onSyncNow={handleSyncNow}
+              dark={dark}
+            />
             <button
               ref={headerBtnRef}
               onClick={() => setHeaderMenuOpen((v) => !v)}
@@ -4540,27 +4566,6 @@ function NotesUI({
       {activeTagFilter !== "TRASHED" && activeTagFilter !== "ARCHIVED" && (
       <div className="px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="max-w-2xl mx-auto">
-          {!isOnline ? (
-            <div className="glass-card rounded-xl shadow-lg p-6 mb-8 text-center">
-              <div className="text-orange-600 dark:text-orange-400 mb-2">
-                <svg
-                  className="w-8 h-8 mx-auto mb-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold mb-2">{t("youAreOffline")}</h3>
-              <p className="text-gray-600 dark:text-gray-400">{t("goBackOnlineToAddNotes")}</p>
-            </div>
-          ) : (
             <div
               ref={composerRef}
               className="glass-card rounded-xl shadow-lg p-4 mb-8 relative"
@@ -4587,9 +4592,9 @@ function NotesUI({
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder={t("noteTitle")}
-                    disabled={!isOnline}
+                    disabled={false}
                     className={`w-full bg-transparent text-lg font-semibold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none mb-2 p-2 ${
-                      !isOnline ? "opacity-50 cursor-not-allowed" : ""
+                      ""
                     }`}
                   />
 
@@ -4601,9 +4606,9 @@ function NotesUI({
                       onChange={(e) => setContent(e.target.value)}
                       onKeyDown={onComposerKeyDown}
                       placeholder={t("writeNote")}
-                      disabled={!isOnline}
+                      disabled={false}
                       className={`w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none p-2 ${
-                        !isOnline ? "opacity-50 cursor-not-allowed" : ""
+                        ""
                       }`}
                       rows={1}
                     />
@@ -4620,19 +4625,15 @@ function NotesUI({
                             }
                           }}
                           placeholder={t("listItemEllipsis")}
-                          disabled={!isOnline}
+                          disabled={false}
                           className={`flex-1 bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2 border-b border-[var(--border-light)] ${
-                            !isOnline ? "opacity-50 cursor-not-allowed" : ""
+                            ""
                           }`}
                         />
                         <button
                           onClick={addComposerItem}
-                          disabled={!isOnline}
-                          className={`px-3 py-1.5 rounded-lg whitespace-nowrap font-semibold transition-all duration-200 ${
-                            isOnline
-                              ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
-                              : "bg-gray-400 text-gray-200 cursor-not-allowed"
-                          }`}
+                          disabled={false}
+                          className="px-3 py-1.5 rounded-lg whitespace-nowrap font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                         >{t("add")}</button>
                       </div>
                       {clItems.length > 0 && (
@@ -4654,7 +4655,7 @@ function NotesUI({
                       onChange={setComposerDrawingData}
                       width={650}
                       height={450}
-                      readOnly={!isOnline}
+                      readOnly={false}
                       darkMode={dark}
                       hideModeToggle={true}
                     />
@@ -4696,7 +4697,7 @@ function NotesUI({
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200"
                         >
                           {ctag}
-                          {isOnline && (
+                          {(
                             <button
                               type="button"
                               onClick={() => setComposerTagList((prev) => prev.filter((_, idx) => idx !== i))}
@@ -4705,7 +4706,7 @@ function NotesUI({
                           )}
                         </span>
                       ))}
-                      {isOnline && (
+                      {(
                         <div className="relative flex-1 min-w-[8ch]">
                           <input
                             ref={composerTagInputRef}
@@ -4959,19 +4960,13 @@ function NotesUI({
                       {/* Add Note */}
                       <button
                         onClick={addNote}
-                        disabled={!isOnline}
-                        className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
-                          isOnline
-                            ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
-                            : "bg-gray-300 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
-                        }`}
+                        className="px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 whitespace-nowrap flex-shrink-0 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                       >{t("addNote")}</button>
                     </div>
                   </div>
                 </>
               )}
             </div>
-          )}
         </div>
       </div>
       )}
@@ -6050,6 +6045,10 @@ export default function App() {
   const [sseConnected, setSseConnected] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
+  // ──── Sync engine state ────
+  const [syncState, setSyncState] = useState(() => getSyncStatus());
+  const serverReachable = useRef(true); // tracks actual server reachability beyond navigator.onLine
+
   // Admin panel state
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   const [adminSettings, setAdminSettings] = useState({
@@ -6255,6 +6254,11 @@ export default function App() {
   // Load notes
   const handleAiSearch = async (question) => {
     if (!question || question.trim().length < 3) return;
+    // AI requires server — gracefully decline when offline
+    if (!isOnline || !serverReachable.current) {
+      showToast(t("offlineAiUnavailable"), "info");
+      return;
+    }
     setIsAiLoading(true);
     setAiResponse(null);
     setAiLoadingProgress(0);
@@ -6290,20 +6294,42 @@ export default function App() {
       const notesArray = Array.isArray(data) ? data : [];
       setNotes(sortNotesByRecency(notesArray));
       persistNotesCache(notesArray);
+      // Also cache to IndexedDB for robust offline support
+      if (currentUser?.id) {
+        cacheNotesLocally(notesArray, currentUser.id).catch((e) =>
+          console.error("IDB cache error:", e),
+        );
+      }
     } catch (error) {
       console.error("Error loading notes from server:", error);
-      // Try to load from cache as fallback
-      try {
-        const cachedData = localStorage.getItem(NOTES_CACHE_KEY);
-        if (cachedData) {
-          const cachedNotes = JSON.parse(cachedData);
-          setNotes(sortNotesByRecency(cachedNotes));
-        } else {
+      // Try IndexedDB first, then localStorage as fallback
+      let loaded = false;
+      if (currentUser?.id) {
+        try {
+          const idbNotes = await getLocalNotes(currentUser.id);
+          if (idbNotes.length > 0) {
+            // Strip internal IDB fields
+            const clean = idbNotes.map(({ _userId, _offlineCreated, _offlineModified, ...rest }) => rest);
+            setNotes(sortNotesByRecency(clean));
+            loaded = true;
+          }
+        } catch (e) {
+          console.error("IDB fallback error:", e);
+        }
+      }
+      if (!loaded) {
+        try {
+          const cachedData = localStorage.getItem(NOTES_CACHE_KEY);
+          if (cachedData) {
+            const cachedNotes = JSON.parse(cachedData);
+            setNotes(sortNotesByRecency(cachedNotes));
+          } else {
+            setNotes([]);
+          }
+        } catch (cacheError) {
+          console.error("Error loading from cache:", cacheError);
           setNotes([]);
         }
-      } catch (cacheError) {
-        console.error("Error loading from cache:", cacheError);
-        setNotes([]);
       }
     } finally {
       setNotesLoading(false);
@@ -6638,6 +6664,65 @@ export default function App() {
       window.removeEventListener("offline", handleOffline);
     };
   }, [token]);
+
+  // ──── Sync Engine: subscribe to status changes, auto-sync, cache notes to IDB ────
+  useEffect(() => {
+    const unsub = onSyncStatusChange((s) => setSyncState({ ...s }));
+    return () => unsub();
+  }, []);
+
+  // Initialize sync status + auto-sync when user logs in
+  useEffect(() => {
+    if (!token || !currentUser?.id) return;
+    refreshSyncStatus(token).catch(() => {});
+    startAutoSync(token, currentUser.id, api, 30000);
+    return () => stopAutoSync();
+  }, [token, currentUser?.id]);
+
+  // When online status changes: check server reachability + trigger sync if needed
+  useEffect(() => {
+    if (!token) return;
+    if (isOnline) {
+      resetHealthCache();
+      checkServerHealth(token).then((ok) => {
+        serverReachable.current = ok;
+        if (ok && currentUser?.id) {
+          getPendingCount().then((count) => {
+            if (count > 0) {
+              syncNow(token, currentUser.id, api).catch(() => {});
+            } else {
+              refreshSyncStatus(token).catch(() => {});
+            }
+          });
+        } else {
+          refreshSyncStatus(token).catch(() => {});
+        }
+      });
+    } else {
+      serverReachable.current = false;
+      refreshSyncStatus(token).catch(() => {});
+    }
+  }, [isOnline, token, currentUser?.id]);
+
+  // Manual sync trigger
+  const handleSyncNow = useCallback(async () => {
+    if (!token || !currentUser?.id) return;
+    resetHealthCache();
+    const result = await syncNow(token, currentUser.id, api);
+    if (result.ok || result.synced > 0) {
+      // Reload notes from server after successful sync
+      loadNotes().catch(() => {});
+      if (result.conflicts?.length > 0) {
+        showToast(t("syncConflictBackup"), "warning", 6000);
+      } else {
+        showToast(t("syncSuccess"), "success");
+      }
+    } else if (result.reason === "server_unreachable") {
+      showToast(t("syncFailed"), "error");
+    } else if (result.reason === "auth_error") {
+      showToast(t("sessionExpired"), "error");
+    }
+  }, [token, currentUser?.id]);
 
   // Live-sync checklist items in open modal when remote updates arrive
   useEffect(() => {
@@ -7017,35 +7102,61 @@ export default function App() {
       updated_at: nowIso,
     };
 
-    try {
-      const created = await api("/notes", {
-        method: "POST",
-        body: newNote,
-        token,
-      });
-      setNotes((prev) =>
-        sortNotesByRecency([created, ...(Array.isArray(prev) ? prev : [])]),
-      );
-      invalidateNotesCache();
+    // Check if server is reachable
+    const serverOk = isOnline && serverReachable.current;
 
-      // Reset composer after successful add
-      setTitle("");
-      setContent("");
-      setTags("");
-      setComposerTagList([]);
-      setComposerTagInput("");
-      setComposerTagFocused(false);
-      setComposerImages([]);
-      setComposerColor("default");
-      setClItems([]);
-      setClInput("");
-      setComposerDrawingData({ paths: [], dimensions: null });
-      setComposerType("text");
-      setComposerCollapsed(true);
-      if (contentRef.current) contentRef.current.style.height = "auto";
-    } catch (e) {
-      alert(e.message || t("failedAddNote"));
+    if (serverOk) {
+      try {
+        const created = await api("/notes", {
+          method: "POST",
+          body: newNote,
+          token,
+        });
+        setNotes((prev) =>
+          sortNotesByRecency([created, ...(Array.isArray(prev) ? prev : [])]),
+        );
+        invalidateNotesCache();
+        if (currentUser?.id) cacheNotesLocally([created], currentUser.id).catch(() => {});
+      } catch (e) {
+        // Server call failed — fall through to offline path
+        if (e.isNetworkError) {
+          serverReachable.current = false;
+          await handleOfflineCreate(newNote);
+        } else {
+          alert(e.message || t("failedAddNote"));
+          return;
+        }
+      }
+    } else {
+      await handleOfflineCreate(newNote);
     }
+
+    // Reset composer after successful add (online or offline)
+    setTitle("");
+    setContent("");
+    setTags("");
+    setComposerTagList([]);
+    setComposerTagInput("");
+    setComposerTagFocused(false);
+    setComposerImages([]);
+    setComposerColor("default");
+    setClItems([]);
+    setClInput("");
+    setComposerDrawingData({ paths: [], dimensions: null });
+    setComposerType("text");
+    setComposerCollapsed(true);
+    if (contentRef.current) contentRef.current.style.height = "auto";
+  };
+
+  const handleOfflineCreate = async (newNote) => {
+    // Add to local state immediately
+    setNotes((prev) => sortNotesByRecency([newNote, ...(Array.isArray(prev) ? prev : [])]));
+    // Persist to IndexedDB
+    if (currentUser?.id) {
+      await applyActionLocally({ type: "create", noteId: newNote.id, data: newNote }, currentUser.id);
+      await queueOfflineAction({ type: "create", noteId: newNote.id, data: newNote });
+    }
+    showToast(t("offlineNoteCreated"), "info");
   };
 
   /** -------- Download single note .md -------- */
@@ -7057,22 +7168,47 @@ export default function App() {
 
   /** -------- Archive/Unarchive note -------- */
   const handleArchiveNote = async (noteId, archived) => {
+    const serverOk = isOnline && serverReachable.current;
+
     try {
-      await api(`/notes/${noteId}/archive`, {
-        method: "POST",
-        token,
-        body: { archived },
-      });
+      if (serverOk) {
+        try {
+          await api(`/notes/${noteId}/archive`, {
+            method: "POST",
+            token,
+            body: { archived },
+          });
+          invalidateNotesCache();
+          invalidateArchivedNotesCache();
+          invalidateTrashedNotesCache();
+        } catch (e) {
+          if (e.isNetworkError) {
+            serverReachable.current = false;
+            if (currentUser?.id) {
+              await applyActionLocally({ type: "archive", noteId, archived }, currentUser.id);
+              await queueOfflineAction({ type: "archive", noteId, archived });
+            }
+            // Remove from current view locally
+            setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
+            if (archived) closeModal();
+            showToast(t("offlineNoteUpdated"), "info");
+            return;
+          }
+          throw e;
+        }
+      } else if (currentUser?.id) {
+        await applyActionLocally({ type: "archive", noteId, archived }, currentUser.id);
+        await queueOfflineAction({ type: "archive", noteId, archived });
+        // Remove from current view locally
+        setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
+        if (archived) closeModal();
+        showToast(t("offlineNoteUpdated"), "info");
+        return;
+      }
 
-      // Invalidate all caches since archiving affects multiple views
-      invalidateNotesCache();
-      invalidateArchivedNotesCache();
-      invalidateTrashedNotesCache();
-
-      // Reload appropriate notes based on current view
+      // Online path: reload appropriate notes
       if (tagFilter === "ARCHIVED") {
         if (!archived) {
-          // If unarchiving from archived view, switch back to regular view
           setTagFilter(null);
           await loadNotes();
         } else {
@@ -8100,11 +8236,26 @@ export default function App() {
               items: [],
             };
 
+    const serverOk = isOnline && serverReachable.current;
+
     try {
       setSavingModal(true);
 
-      await api(`/notes/${activeId}`, { method: "PUT", token, body: payload });
-      invalidateNotesCache();
+      if (serverOk) {
+        try {
+          await api(`/notes/${activeId}`, { method: "PUT", token, body: payload });
+          invalidateNotesCache();
+        } catch (e) {
+          if (e.isNetworkError) {
+            serverReachable.current = false;
+            await handleOfflineUpdate(activeId, payload);
+          } else {
+            throw e;
+          }
+        }
+      } else {
+        await handleOfflineUpdate(activeId, payload);
+      }
 
       prevItemsRef.current =
         mType === "checklist" ? (Array.isArray(mItems) ? mItems : []) : [];
@@ -8112,7 +8263,6 @@ export default function App() {
         mType === "draw"
           ? mDrawingData || { paths: [], dimensions: null }
           : { paths: [], dimensions: null };
-      // Also update updated_at locally so the Edited stamp updates immediately
       const nowIso = new Date().toISOString();
       setNotes((prev) =>
         prev.map((n) =>
@@ -8133,6 +8283,14 @@ export default function App() {
       setSavingModal(false);
     }
   };
+
+  const handleOfflineUpdate = async (noteId, payload) => {
+    if (currentUser?.id) {
+      await applyActionLocally({ type: "update", noteId, data: { ...payload, updated_at: new Date().toISOString() } }, currentUser.id);
+      await queueOfflineAction({ type: "update", noteId, data: { ...payload, updated_at: new Date().toISOString() } });
+    }
+    showToast(t("offlineNoteUpdated"), "info");
+  };
   const deleteModal = async () => {
     if (activeId == null) return;
     try {
@@ -8143,22 +8301,52 @@ export default function App() {
         return;
       }
 
+      const serverOk = isOnline && serverReachable.current;
+
       if (tagFilter === "TRASHED") {
-        // Permanent delete from trash
-        await api(`/notes/${activeId}/permanent`, { method: "DELETE", token });
-        invalidateTrashedNotesCache();
+        if (serverOk) {
+          try {
+            await api(`/notes/${activeId}/permanent`, { method: "DELETE", token });
+            invalidateTrashedNotesCache();
+          } catch (e) {
+            if (e.isNetworkError) {
+              serverReachable.current = false;
+              if (currentUser?.id) {
+                await applyActionLocally({ type: "permanentDelete", noteId: activeId }, currentUser.id);
+                await queueOfflineAction({ type: "permanentDelete", noteId: activeId });
+              }
+            } else throw e;
+          }
+        } else if (currentUser?.id) {
+          await applyActionLocally({ type: "permanentDelete", noteId: activeId }, currentUser.id);
+          await queueOfflineAction({ type: "permanentDelete", noteId: activeId });
+        }
         setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
         closeModal();
-        showToast(t("notePermanentlyDeleted"), "success");
+        showToast(serverOk ? t("notePermanentlyDeleted") : t("offlineNoteDeleted"), serverOk ? "success" : "info");
       } else {
-        // Move to trash
-        await api(`/notes/${activeId}/trash`, { method: "POST", token });
-        invalidateNotesCache();
-        invalidateArchivedNotesCache();
-        invalidateTrashedNotesCache();
+        if (serverOk) {
+          try {
+            await api(`/notes/${activeId}/trash`, { method: "POST", token });
+            invalidateNotesCache();
+            invalidateArchivedNotesCache();
+            invalidateTrashedNotesCache();
+          } catch (e) {
+            if (e.isNetworkError) {
+              serverReachable.current = false;
+              if (currentUser?.id) {
+                await applyActionLocally({ type: "trash", noteId: activeId }, currentUser.id);
+                await queueOfflineAction({ type: "trash", noteId: activeId });
+              }
+            } else throw e;
+          }
+        } else if (currentUser?.id) {
+          await applyActionLocally({ type: "trash", noteId: activeId }, currentUser.id);
+          await queueOfflineAction({ type: "trash", noteId: activeId });
+        }
         setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
         closeModal();
-        showToast(t("noteMovedToTrash"), "success");
+        showToast(serverOk ? t("noteMovedToTrash") : t("offlineNoteDeleted"), serverOk ? "success" : "info");
       }
     } catch (e) {
       if (e.status === 404 || e.message?.includes("not found")) {
@@ -8170,27 +8358,58 @@ export default function App() {
   };
 
   const restoreFromTrash = async (noteId) => {
+    const serverOk = isOnline && serverReachable.current;
     try {
-      await api(`/notes/${noteId}/restore`, { method: "POST", token });
-      invalidateNotesCache();
-      invalidateArchivedNotesCache();
-      invalidateTrashedNotesCache();
+      if (serverOk) {
+        try {
+          await api(`/notes/${noteId}/restore`, { method: "POST", token });
+          invalidateNotesCache();
+          invalidateArchivedNotesCache();
+          invalidateTrashedNotesCache();
+        } catch (e) {
+          if (e.isNetworkError) {
+            serverReachable.current = false;
+            if (currentUser?.id) {
+              await applyActionLocally({ type: "restore", noteId }, currentUser.id);
+              await queueOfflineAction({ type: "restore", noteId });
+            }
+          } else throw e;
+        }
+      } else if (currentUser?.id) {
+        await applyActionLocally({ type: "restore", noteId }, currentUser.id);
+        await queueOfflineAction({ type: "restore", noteId });
+      }
       setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
       closeModal();
-      showToast(t("noteRestoredFromTrash"), "success");
+      showToast(serverOk ? t("noteRestoredFromTrash") : t("offlineNoteUpdated"), serverOk ? "success" : "info");
     } catch (e) {
       showToast(e.message || t("failedRestoreNote"), "error");
     }
   };
   const togglePin = async (id, toPinned) => {
+    const serverOk = isOnline && serverReachable.current;
     try {
-      await api(`/notes/${id}`, {
-        method: "PATCH",
-        token,
-        body: { pinned: !!toPinned },
-      });
-      invalidateNotesCache();
-
+      if (serverOk) {
+        try {
+          await api(`/notes/${id}`, {
+            method: "PATCH",
+            token,
+            body: { pinned: !!toPinned },
+          });
+          invalidateNotesCache();
+        } catch (e) {
+          if (e.isNetworkError) {
+            serverReachable.current = false;
+            if (currentUser?.id) {
+              await applyActionLocally({ type: "pin", noteId: id, pinned: !!toPinned }, currentUser.id);
+              await queueOfflineAction({ type: "pin", noteId: id, pinned: !!toPinned });
+            }
+          } else throw e;
+        }
+      } else if (currentUser?.id) {
+        await applyActionLocally({ type: "pin", noteId: id, pinned: !!toPinned }, currentUser.id);
+        await queueOfflineAction({ type: "pin", noteId: id, pinned: !!toPinned });
+      }
       setNotes((prev) =>
         prev.map((n) =>
           String(n.id) === String(id) ? { ...n, pinned: !!toPinned } : n,
@@ -8760,7 +8979,7 @@ export default function App() {
               <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6 pb-3">
                 <input
                   className={`flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none pr-2 ${
-                    !isOnline ? "opacity-50 cursor-not-allowed" : ""
+                    ""
                   }`}
                   style={windowWidth < 700 ? {
                     fontSize: mTitle.length > 40 ? "0.85rem"
@@ -8770,16 +8989,16 @@ export default function App() {
                   } : undefined}
                   value={mTitle}
                   onChange={(e) => {
-                    if (isOnline) setMTitle(e.target.value);
+                    setMTitle(e.target.value);
                   }}
                   placeholder={t("noteTitle")}
-                  disabled={!isOnline}
+                  disabled={false}
                 />
                 <div className="flex items-center gap-2 flex-none ml-auto">
                   {/* Icon buttons group – pill container */}
                   <div className="modal-icon-group">
                   {/* View/Edit toggle only for TEXT notes - hidden when offline */}
-                  {isOnline && mType === "text" && (
+                  {mType === "text" && (
                     <button
                       className="modal-icon-btn modal-icon-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]"
                       onClick={() => {
@@ -8865,7 +9084,7 @@ export default function App() {
                   )}
 
                   {/* 3-dots menu - hidden when offline */}
-                  {isOnline && (
+                  {(
                     <>
                       <button
                         ref={modalMenuBtnRef}
@@ -8955,8 +9174,8 @@ export default function App() {
                     </>
                   )}
 
-                  {/* Pin button - hidden when offline or in archived view */}
-                  {isOnline && tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED" && (
+                  {/* Pin button - hidden in archived/trash view */}
+                  {tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED" && (
                     <button
                       className={`modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)] ${
                         notes.find((n) => String(n.id) === String(activeId))?.pinned
@@ -9047,7 +9266,7 @@ export default function App() {
                         openImageViewer(idx);
                       }}
                     />
-                    {isOnline && (
+                    {(
                       <button
                         data-tooltip={t("removeImage")}
                         className="absolute -top-1 right-0 text-black dark:text-white text-2xl leading-none opacity-0 group-hover:opacity-100 hover:opacity-60 transition-opacity cursor-pointer"
@@ -9086,18 +9305,16 @@ export default function App() {
                     <textarea
                       ref={mBodyRef}
                       className={`w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden min-h-[160px] ${
-                        !isOnline ? "opacity-50 cursor-not-allowed" : ""
+                        ""
                       }`}
                       style={{ scrollBehavior: "unset" }}
                       value={mBody}
                       onChange={(e) => {
-                        if (isOnline) {
-                          setMBody(e.target.value);
-                          resizeModalTextarea();
-                        }
+                        setMBody(e.target.value);
+                        resizeModalTextarea();
                       }}
                       onKeyDown={(e) => {
-                        if (!isOnline) return;
+                        /* offline edit allowed */
                         if (
                           e.key === "Enter" &&
                           !e.shiftKey &&
@@ -9149,14 +9366,14 @@ export default function App() {
                         }
                       }}
                       placeholder={t("writeYourNoteEllipsis")}
-                      disabled={!isOnline}
+                      disabled={false}
                     />
                   </div>
                 )
               ) : mType === "checklist" ? (
                 <div className="space-y-4 md:space-y-2">
                   {/* Add new item row - hidden when offline */}
-                  {isOnline && (
+                  {(
                     <div className="flex gap-2">
                       <input
                         value={mInput}
@@ -9248,7 +9465,7 @@ export default function App() {
                               onDragEnd={onChecklistDragEnd}
                               onTouchStart={(e) => {
                                 // Handle touch drag start - only when touching the handle
-                                if (!isOnline) return;
+                                /* offline edit allowed */
                                 const target = e.currentTarget.closest(
                                   "[data-checklist-item]",
                                 );
@@ -9341,17 +9558,13 @@ export default function App() {
                             <div className="flex-1">
                               <ChecklistRow
                                 item={it}
-                                readOnly={!isOnline}
-                                disableToggle={
-                                  !isOnline
-                                } /* disable toggle when offline */
-                                showRemove={
-                                  isOnline && true
-                                } /* show delete X only when online */
+                                readOnly={false}
+                                disableToggle={false}
+                                showRemove={true}
                                 size="lg" /* bigger checkboxes and X in modal */
                                 onToggle={async (checked, e) => {
                                   e?.stopPropagation(); // Prevent any unwanted event bubbling
-                                  if (!isOnline) return;
+                                  /* offline edit allowed */
                                   const newItems = mItems.map((p) =>
                                     p.id === it.id
                                       ? { ...p, done: checked }
@@ -9376,7 +9589,7 @@ export default function App() {
                                   }
                                 }}
                                 onChange={async (txt) => {
-                                  if (!isOnline) return;
+                                  /* offline edit allowed */
                                   const newItems = mItems.map((p) =>
                                     p.id === it.id ? { ...p, text: txt } : p,
                                   );
@@ -9397,7 +9610,7 @@ export default function App() {
                                   } catch (e) {}
                                 }}
                                 onRemove={async () => {
-                                  if (!isOnline) return;
+                                  /* offline edit allowed */
                                   const newItems = mItems.filter(
                                     (p) => p.id !== it.id,
                                   );
@@ -9433,17 +9646,13 @@ export default function App() {
                                 <ChecklistRow
                                   key={it.id}
                                   item={it}
-                                  readOnly={!isOnline}
-                                  disableToggle={
-                                    !isOnline
-                                  } /* disable toggle when offline */
-                                  showRemove={
-                                    isOnline && true
-                                  } /* show delete X only when online */
-                                  size="lg" /* bigger checkboxes and X in modal */
+                                  readOnly={false}
+                                  disableToggle={false}
+                                  showRemove={true}
+                                  size="lg"
                                   onToggle={async (checked, e) => {
                                     e?.stopPropagation(); // Prevent any unwanted event bubbling
-                                    if (!isOnline) return;
+                                    /* offline edit allowed */
                                     const newItems = mItems.map((p) =>
                                       p.id === it.id
                                         ? { ...p, done: checked }
@@ -9466,7 +9675,7 @@ export default function App() {
                                     } catch (e) {}
                                   }}
                                   onChange={async (txt) => {
-                                    if (!isOnline) return;
+                                    /* offline edit allowed */
                                     const newItems = mItems.map((p) =>
                                       p.id === it.id ? { ...p, text: txt } : p,
                                     );
@@ -9487,7 +9696,7 @@ export default function App() {
                                     } catch (e) {}
                                   }}
                                   onRemove={async () => {
-                                    if (!isOnline) return;
+                                    /* offline edit allowed */
                                     const newItems = mItems.filter(
                                       (p) => p.id !== it.id,
                                     );
@@ -9523,7 +9732,7 @@ export default function App() {
                   onChange={setMDrawingData}
                   width={750}
                   height={850}
-                  readOnly={!isOnline}
+                  readOnly={false}
                   darkMode={dark}
                   initialMode="view"
                 />
@@ -9557,7 +9766,7 @@ export default function App() {
                   </svg>
                   {tag}
                   {/* Tag removal button - hidden when offline */}
-                  {isOnline && (
+                  {(
                     <button
                       className="w-3.5 h-3.5 rounded-full text-indigo-400 dark:text-indigo-300 hover:bg-red-400 dark:hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none leading-none"
                       data-tooltip={t("removeTag")}
@@ -9571,7 +9780,7 @@ export default function App() {
                 </span>
               ))}
               {/* Tag add button - hidden when offline */}
-              {isOnline && (
+              {(
                 <div className="relative">
                   <button
                     ref={modalTagBtnRef}
@@ -9717,7 +9926,7 @@ export default function App() {
             {/* Right controls */}
             <div className="ml-auto flex items-center gap-3 flex-shrink-0">
               {/* Color dropdown (modal) - hidden when offline */}
-              {isOnline && (
+              {(
                 <>
                   <button
                     ref={modalColorBtnRef}
@@ -9741,7 +9950,7 @@ export default function App() {
               )}
 
               {/* Add images - hidden when offline */}
-              {isOnline && (
+              {(
                 <>
                   <input
                     ref={modalFileRef}
@@ -9767,9 +9976,8 @@ export default function App() {
                 </>
               )}
 
-              {/* Save button - hidden when offline or for collaborative text notes (they auto-save) */}
-              {isOnline &&
-                modalHasChanges &&
+              {/* Save button - hidden for collaborative text notes (they auto-save) */}
+              {modalHasChanges &&
                 !(mType === "text" && isCollaborativeNote(activeId)) && (
                   <button
                     onClick={saveModal}
