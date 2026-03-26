@@ -347,7 +347,6 @@ const insertNoteIdempotent = db.prepare(`
   INSERT OR IGNORE INTO notes (id,user_id,type,title,content,items_json,tags_json,images_json,color,pinned,position,timestamp,archived,trashed)
   VALUES (@id,@user_id,@type,@title,@content,@items_json,@tags_json,@images_json,@color,@pinned,@position,@timestamp,0,0)
 `);
-const getNoteById = db.prepare(`SELECT * FROM notes WHERE id = ?`);
 const updateNote = db.prepare(`
   UPDATE notes SET
     type=@type, title=@title, content=@content, items_json=@items_json, tags_json=@tags_json,

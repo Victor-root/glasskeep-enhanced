@@ -3992,6 +3992,9 @@ function NotesUI({
   // floating cards toggle
   floatingCardsEnabled,
   onToggleFloatingCards,
+  // sync
+  syncStatus,
+  handleSyncNow,
 }) {
   // Multi-select color popover (local UI state)
   const multiColorBtnRef = useRef(null);
@@ -10623,6 +10626,9 @@ export default function App() {
         isOnline={isOnline}
         loadNotes={loadNotes}
         loadArchivedNotes={loadArchivedNotes}
+        // sync
+        syncStatus={syncStatus}
+        handleSyncNow={handleSyncNow}
         // checklist update
         onUpdateChecklistItem={onUpdateChecklistItem}
         // Admin panel
