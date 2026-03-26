@@ -6722,7 +6722,7 @@ export default function App() {
     }
   }, [notes, open, activeId, mType]);
 
-  // Auto-save drawing changes
+  // Auto-save drawing changes (local-first)
   useEffect(() => {
     if (!open || !activeId || mType !== "draw") return;
     if (skipNextDrawingAutosave.current) {
@@ -6738,23 +6738,43 @@ export default function App() {
     );
     if (prevJson === currentJson) return;
 
-    // Debounce auto-save by 500ms
+    // Debounce local-first save by 500ms
     const timeoutId = setTimeout(async () => {
+      prevDrawingRef.current = mDrawingData;
+      const noteId = String(activeId);
+      const nowIso = new Date().toISOString();
+      const drawingContent = JSON.stringify(mDrawingData);
+
+      // Update notes state
+      setNotes((prev) =>
+        prev.map((n) =>
+          String(n.id) === noteId
+            ? { ...n, content: drawingContent, updated_at: nowIso }
+            : n,
+        ),
+      );
+
+      // Persist to IndexedDB
       try {
-        await api(`/notes/${activeId}`, {
-          method: "PATCH",
-          token,
-          body: { content: JSON.stringify(mDrawingData), type: "draw" },
-        });
-        prevDrawingRef.current = mDrawingData;
-        invalidateNotesCache();
+        const existing = await idbGetNote(noteId);
+        if (existing) {
+          await idbPutNote({ ...existing, content: drawingContent, updated_at: nowIso });
+        }
       } catch (e) {
-        console.error("Failed to auto-save drawing:", e);
+        console.error("IndexedDB drawing update failed:", e);
       }
+      invalidateNotesCache();
+
+      // Enqueue for server sync
+      enqueueAndSync({
+        type: "patch",
+        noteId,
+        payload: { content: drawingContent, type: "draw" },
+      });
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [mDrawingData, open, activeId, mType, token]);
+  }, [mDrawingData, open, activeId, mType, enqueueAndSync]);
 
   // Live-sync drawing data in open modal when remote updates arrive
   useEffect(() => {
@@ -8392,6 +8412,39 @@ export default function App() {
   };
 
   // Checklist item drag handlers (for modal reordering)
+
+  // Local-first helper: persist checklist changes to IndexedDB + sync queue
+  const syncChecklistItems = async (newItems) => {
+    prevItemsRef.current = newItems;
+    if (!activeId) return;
+    const noteId = String(activeId);
+    const nowIso = new Date().toISOString();
+    // Update notes state
+    setNotes((prev) =>
+      prev.map((n) =>
+        String(n.id) === noteId
+          ? { ...n, items: newItems, updated_at: nowIso }
+          : n,
+      ),
+    );
+    // Persist to IndexedDB
+    try {
+      const existing = await idbGetNote(noteId);
+      if (existing) {
+        await idbPutNote({ ...existing, items: newItems, updated_at: nowIso });
+      }
+    } catch (e) {
+      console.error("IndexedDB checklist update failed:", e);
+    }
+    invalidateNotesCache();
+    // Enqueue for server sync
+    enqueueAndSync({
+      type: "patch",
+      noteId,
+      payload: { items: newItems, type: "checklist", content: "" },
+    });
+  };
+
   const onChecklistDragStart = (itemId, ev) => {
     checklistDragId.current = String(itemId);
     ev.currentTarget.classList.add("dragging");
@@ -8440,20 +8493,7 @@ export default function App() {
     const newItems = [...uncheckedItems, ...checkedItems];
 
     setMItems(newItems);
-    prevItemsRef.current = newItems;
-
-    // Save to server
-    try {
-      if (activeId) {
-        await api(`/notes/${activeId}`, {
-          method: "PATCH",
-          token,
-          body: { items: newItems, type: "checklist", content: "" },
-        });
-      }
-    } catch (error) {
-      console.error("Failed to reorder checklist items:", error);
-    }
+    syncChecklistItems(newItems);
   };
   const onChecklistDragEnd = (ev) => {
     ev.currentTarget.classList.remove("dragging");
@@ -9216,7 +9256,7 @@ export default function App() {
                       <input
                         value={mInput}
                         onChange={(e) => setMInput(e.target.value)}
-                        onKeyDown={async (e) => {
+                        onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
                             const t = mInput.trim();
@@ -9227,22 +9267,7 @@ export default function App() {
                               ];
                               setMItems(newItems);
                               setMInput("");
-                              try {
-                                if (activeId) {
-                                  await api(`/notes/${activeId}`, {
-                                    method: "PATCH",
-                                    token,
-                                    body: {
-                                      items: newItems,
-                                      type: "checklist",
-                                      content: "",
-                                    },
-                                  });
-                                  prevItemsRef.current = newItems;
-                                }
-                              } catch (e) {
-                                // Handle error silently
-                              }
+                              syncChecklistItems(newItems);
                             }
                           }
                         }}
@@ -9250,7 +9275,7 @@ export default function App() {
                         className="flex-1 bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2 border-b border-[var(--border-light)]"
                       />
                       <button
-                        onClick={async () => {
+                        onClick={() => {
                           const t = mInput.trim();
                           if (t) {
                             const newItems = [
@@ -9259,20 +9284,7 @@ export default function App() {
                             ];
                             setMItems(newItems);
                             setMInput("");
-                            try {
-                              if (activeId) {
-                                await api(`/notes/${activeId}`, {
-                                  method: "PATCH",
-                                  token,
-                                  body: {
-                                    items: newItems,
-                                    type: "checklist",
-                                    content: "",
-                                  },
-                                });
-                                prevItemsRef.current = newItems;
-                              }
-                            } catch (e) {}
+                            syncChecklistItems(newItems);
                           }
                         }}
                         className="px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
@@ -9397,71 +9409,28 @@ export default function App() {
                                 readOnly={false}
                                 disableToggle={false}
                                 showRemove={true}
-                                size="lg" /* bigger checkboxes and X in modal */
-                                onToggle={async (checked, e) => {
+                                size="lg"
+                                onToggle={(checked, e) => {
                                   e?.stopPropagation();
                                   const newItems = mItems.map((p) =>
-                                    p.id === it.id
-                                      ? { ...p, done: checked }
-                                      : p,
+                                    p.id === it.id ? { ...p, done: checked } : p,
                                   );
                                   setMItems(newItems);
-                                  try {
-                                    if (activeId) {
-                                      await api(`/notes/${activeId}`, {
-                                        method: "PATCH",
-                                        token,
-                                        body: {
-                                          items: newItems,
-                                          type: "checklist",
-                                          content: "",
-                                        },
-                                      });
-                                      prevItemsRef.current = newItems;
-                                    }
-                                  } catch (e) {
-                                    // Handle error silently
-                                  }
+                                  syncChecklistItems(newItems);
                                 }}
-                                onChange={async (txt) => {
+                                onChange={(txt) => {
                                   const newItems = mItems.map((p) =>
                                     p.id === it.id ? { ...p, text: txt } : p,
                                   );
                                   setMItems(newItems);
-                                  try {
-                                    if (activeId) {
-                                      await api(`/notes/${activeId}`, {
-                                        method: "PATCH",
-                                        token,
-                                        body: {
-                                          items: newItems,
-                                          type: "checklist",
-                                          content: "",
-                                        },
-                                      });
-                                      prevItemsRef.current = newItems;
-                                    }
-                                  } catch (e) {}
+                                  syncChecklistItems(newItems);
                                 }}
-                                onRemove={async () => {
+                                onRemove={() => {
                                   const newItems = mItems.filter(
                                     (p) => p.id !== it.id,
                                   );
                                   setMItems(newItems);
-                                  try {
-                                    if (activeId) {
-                                      await api(`/notes/${activeId}`, {
-                                        method: "PATCH",
-                                        token,
-                                        body: {
-                                          items: newItems,
-                                          type: "checklist",
-                                          content: "",
-                                        },
-                                      });
-                                      prevItemsRef.current = newItems;
-                                    }
-                                  } catch (e) {}
+                                  syncChecklistItems(newItems);
                                 }}
                               />
                             </div>
@@ -9482,69 +9451,28 @@ export default function App() {
                                   readOnly={false}
                                   disableToggle={false}
                                   showRemove={true}
-                                  size="lg" /* bigger checkboxes and X in modal */
-                                  onToggle={async (checked, e) => {
+                                  size="lg"
+                                  onToggle={(checked, e) => {
                                     e?.stopPropagation();
                                     const newItems = mItems.map((p) =>
-                                      p.id === it.id
-                                        ? { ...p, done: checked }
-                                        : p,
+                                      p.id === it.id ? { ...p, done: checked } : p,
                                     );
                                     setMItems(newItems);
-                                    try {
-                                      if (activeId) {
-                                        await api(`/notes/${activeId}`, {
-                                          method: "PATCH",
-                                          token,
-                                          body: {
-                                            items: newItems,
-                                            type: "checklist",
-                                            content: "",
-                                          },
-                                        });
-                                        prevItemsRef.current = newItems;
-                                      }
-                                    } catch (e) {}
+                                    syncChecklistItems(newItems);
                                   }}
-                                  onChange={async (txt) => {
+                                  onChange={(txt) => {
                                     const newItems = mItems.map((p) =>
                                       p.id === it.id ? { ...p, text: txt } : p,
                                     );
                                     setMItems(newItems);
-                                    try {
-                                      if (activeId) {
-                                        await api(`/notes/${activeId}`, {
-                                          method: "PATCH",
-                                          token,
-                                          body: {
-                                            items: newItems,
-                                            type: "checklist",
-                                            content: "",
-                                          },
-                                        });
-                                        prevItemsRef.current = newItems;
-                                      }
-                                    } catch (e) {}
+                                    syncChecklistItems(newItems);
                                   }}
-                                  onRemove={async () => {
+                                  onRemove={() => {
                                     const newItems = mItems.filter(
                                       (p) => p.id !== it.id,
                                     );
                                     setMItems(newItems);
-                                    try {
-                                      if (activeId) {
-                                        await api(`/notes/${activeId}`, {
-                                          method: "PATCH",
-                                          token,
-                                          body: {
-                                            items: newItems,
-                                            type: "checklist",
-                                            content: "",
-                                          },
-                                        });
-                                        prevItemsRef.current = newItems;
-                                      }
-                                    } catch (e) {}
+                                    syncChecklistItems(newItems);
                                   }}
                                 />
                               ))}
