@@ -97,6 +97,18 @@ export async function getLocalNotes(userId) {
   return getAllNotes(userId);
 }
 
+// Update a single note in IDB cache (for keeping cache fresh after online mutations)
+export async function updateNoteInCache(note, userId) {
+  if (!userId || !note) return;
+  await putNote({ ...note, id: String(note.id) }, userId);
+}
+
+// Remove a note from IDB cache (for delete/trash/archive online mutations)
+export async function removeNoteFromCache(noteId, userId) {
+  if (!userId || noteId == null) return;
+  await idbDeleteNote(String(noteId));
+}
+
 // ──── Queue an offline action ────
 
 export async function queueOfflineAction(action, userId) {

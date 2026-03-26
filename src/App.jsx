@@ -19,6 +19,8 @@ import {
   getLocalNotes,
   queueOfflineAction,
   applyActionLocally,
+  updateNoteInCache,
+  removeNoteFromCache,
   syncNow,
   getSyncStatus,
   onSyncStatusChange,
@@ -6289,38 +6291,45 @@ export default function App() {
   const loadNotes = async () => {
     if (!token) return;
     notesAreRegular.current = true;
-    setNotesLoading(true);
 
-    // ── Step 1: Show cached notes instantly (IDB → localStorage fallback) ──
-    let hasLocal = false;
-    if (currentUser?.id) {
-      try {
-        const idbNotes = await getLocalNotes(currentUser.id);
-        if (idbNotes.length > 0) {
-          const clean = idbNotes.map(({ _userId, _offlineCreated, _offlineModified, ...rest }) => rest);
-          setNotes(sortNotesByRecency(clean));
-          hasLocal = true;
-        }
-      } catch (e) {
-        console.error("IDB load error:", e);
-      }
-    }
-    if (!hasLocal) {
-      try {
-        const cachedData = localStorage.getItem(NOTES_CACHE_KEY);
-        if (cachedData) {
-          const cachedNotes = JSON.parse(cachedData);
-          setNotes(sortNotesByRecency(cachedNotes));
-          hasLocal = cachedNotes.length > 0;
-        }
-      } catch (e) {
-        console.error("localStorage load error:", e);
-      }
-    }
-    // Stop the loading spinner as soon as we have local data
-    if (hasLocal) setNotesLoading(false);
+    // Only show IDB/cache on initial load (when we have no notes yet).
+    // On subsequent refreshes (visibility change, SSE, polling), skip IDB to
+    // avoid overwriting the current (more recent) React state with stale data.
+    const alreadyHasNotes = Array.isArray(notes) && notes.length > 0;
+    let hasLocal = alreadyHasNotes;
 
-    // ── Step 2: Refresh from server in background ──
+    if (!alreadyHasNotes) {
+      setNotesLoading(true);
+      // ── Show cached notes instantly on first load ──
+      if (currentUser?.id) {
+        try {
+          const idbNotes = await getLocalNotes(currentUser.id);
+          if (idbNotes.length > 0) {
+            const clean = idbNotes.map(({ _userId, _offlineCreated, _offlineModified, ...rest }) => rest);
+            setNotes(sortNotesByRecency(clean));
+            hasLocal = true;
+          }
+        } catch (e) {
+          console.error("IDB load error:", e);
+        }
+      }
+      if (!hasLocal) {
+        try {
+          const cachedData = localStorage.getItem(NOTES_CACHE_KEY);
+          if (cachedData) {
+            const cachedNotes = JSON.parse(cachedData);
+            setNotes(sortNotesByRecency(cachedNotes));
+            hasLocal = cachedNotes.length > 0;
+          }
+        } catch (e) {
+          console.error("localStorage load error:", e);
+        }
+      }
+      // Stop spinner as soon as we have local data
+      if (hasLocal) setNotesLoading(false);
+    }
+
+    // ── Refresh from server (silent if we already have notes) ──
     try {
       const data = await api("/notes", { token });
       const notesArray = Array.isArray(data) ? data : [];
@@ -6333,7 +6342,6 @@ export default function App() {
       }
     } catch (error) {
       console.error("Error loading notes from server:", error);
-      // If we had no local data either, show empty
       if (!hasLocal) setNotes([]);
     } finally {
       setNotesLoading(false);
@@ -7185,6 +7193,8 @@ export default function App() {
           invalidateNotesCache();
           invalidateArchivedNotesCache();
           invalidateTrashedNotesCache();
+          // Remove from IDB cache (archived notes leave the main view)
+          if (currentUser?.id) removeNoteFromCache(noteId, currentUser.id).catch(() => {});
         } catch (e) {
           if (e.isNetworkError) {
             serverReachable.current = false;
@@ -8268,19 +8278,22 @@ export default function App() {
           ? mDrawingData || { paths: [], dimensions: null }
           : { paths: [], dimensions: null };
       const nowIso = new Date().toISOString();
+      const updatedNote = {
+        ...notes.find((n) => String(n.id) === String(activeId)),
+        ...payload,
+        updated_at: nowIso,
+        lastEditedBy: currentUser?.email || currentUser?.name,
+        lastEditedAt: nowIso,
+      };
       setNotes((prev) =>
         prev.map((n) =>
-          String(n.id) === String(activeId)
-            ? {
-                ...n,
-                ...payload,
-                updated_at: nowIso,
-                lastEditedBy: currentUser?.email || currentUser?.name,
-                lastEditedAt: nowIso,
-              }
-            : n,
+          String(n.id) === String(activeId) ? updatedNote : n,
         ),
       );
+      // Keep IDB cache fresh after online save
+      if (serverOk && currentUser?.id) {
+        updateNoteInCache(updatedNote, currentUser.id).catch(() => {});
+      }
     } catch (e) {
       alert(e.message || t("failedSaveNote"));
     } finally {
@@ -8312,6 +8325,8 @@ export default function App() {
           try {
             await api(`/notes/${activeId}/permanent`, { method: "DELETE", token });
             invalidateTrashedNotesCache();
+            // Remove from IDB cache
+            if (currentUser?.id) removeNoteFromCache(activeId, currentUser.id).catch(() => {});
           } catch (e) {
             if (e.isNetworkError) {
               serverReachable.current = false;
@@ -8335,6 +8350,8 @@ export default function App() {
             invalidateNotesCache();
             invalidateArchivedNotesCache();
             invalidateTrashedNotesCache();
+            // Remove from IDB cache (trashed notes are no longer in main view)
+            if (currentUser?.id) removeNoteFromCache(activeId, currentUser.id).catch(() => {});
           } catch (e) {
             if (e.isNetworkError) {
               serverReachable.current = false;
@@ -8370,6 +8387,8 @@ export default function App() {
           invalidateNotesCache();
           invalidateArchivedNotesCache();
           invalidateTrashedNotesCache();
+          // Note will re-appear via loadNotes; remove stale trash entry from IDB
+          if (currentUser?.id) removeNoteFromCache(noteId, currentUser.id).catch(() => {});
         } catch (e) {
           if (e.isNetworkError) {
             serverReachable.current = false;
@@ -8401,6 +8420,11 @@ export default function App() {
             body: { pinned: !!toPinned },
           });
           invalidateNotesCache();
+          // Keep IDB in sync with server state
+          if (currentUser?.id) {
+            const note = notes.find((n) => String(n.id) === String(id));
+            if (note) updateNoteInCache({ ...note, pinned: !!toPinned }, currentUser.id).catch(() => {});
+          }
         } catch (e) {
           if (e.isNetworkError) {
             serverReachable.current = false;
