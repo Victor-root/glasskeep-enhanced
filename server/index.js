@@ -343,6 +343,11 @@ const insertNote = db.prepare(`
   INSERT INTO notes (id,user_id,type,title,content,items_json,tags_json,images_json,color,pinned,position,timestamp,archived,trashed)
   VALUES (@id,@user_id,@type,@title,@content,@items_json,@tags_json,@images_json,@color,@pinned,@position,@timestamp,0,0)
 `);
+const insertNoteIdempotent = db.prepare(`
+  INSERT OR IGNORE INTO notes (id,user_id,type,title,content,items_json,tags_json,images_json,color,pinned,position,timestamp,archived,trashed)
+  VALUES (@id,@user_id,@type,@title,@content,@items_json,@tags_json,@images_json,@color,@pinned,@position,@timestamp,0,0)
+`);
+const getNoteById = db.prepare(`SELECT * FROM notes WHERE id = ?`);
 const updateNote = db.prepare(`
   UPDATE notes SET
     type=@type, title=@title, content=@content, items_json=@items_json, tags_json=@tags_json,
@@ -728,8 +733,9 @@ app.get("/api/notes", auth, (req, res) => {
 
 app.post("/api/notes", auth, (req, res) => {
   const body = req.body || {};
+  const noteId = body.id || uid();
   const n = {
-    id: body.id || uid(),
+    id: noteId,
     user_id: req.user.id,
     type: body.type === "checklist" ? "checklist" : body.type === "draw" ? "draw" : "text",
     title: String(body.title || ""),
@@ -742,6 +748,29 @@ app.post("/api/notes", auth, (req, res) => {
     position: typeof body.position === "number" ? body.position : Date.now(),
     timestamp: body.timestamp || nowISO(),
   };
+
+  // Idempotent creation: if client provides an ID that already exists,
+  // return the existing note instead of failing with a UNIQUE constraint error.
+  if (body.id) {
+    const existing = getNoteById.get(body.id);
+    if (existing && existing.user_id === req.user.id) {
+      return res.status(200).json({
+        id: existing.id,
+        type: existing.type,
+        title: existing.title,
+        content: existing.content,
+        items: JSON.parse(existing.items_json || "[]"),
+        tags: JSON.parse(existing.tags_json || "[]"),
+        images: JSON.parse(existing.images_json || "[]"),
+        color: existing.color,
+        pinned: !!existing.pinned,
+        position: existing.position,
+        timestamp: existing.timestamp,
+        user_id: existing.user_id,
+      });
+    }
+  }
+
   insertNote.run(n);
   res.status(201).json({
     id: n.id,

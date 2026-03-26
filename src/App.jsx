@@ -13,6 +13,21 @@ import DOMPurify from "dompurify";
 import DrawingCanvas from "./DrawingCanvas";
 import { t } from "./i18n";
 import Masonry from "react-masonry-css";
+import SyncStatusIcon from "./sync/SyncStatusIcon.jsx";
+import { SyncEngine } from "./sync/syncEngine.js";
+import {
+  getAllNotes as idbGetAllNotes,
+  getNote as idbGetNote,
+  putNote as idbPutNote,
+  putNotes as idbPutNotes,
+  deleteNote as idbDeleteNote,
+  enqueue as idbEnqueue,
+  getQueueStats,
+  hasPendingChanges,
+  clearQueue as idbClearQueue,
+  clearNotesForUser as idbClearNotesForUser,
+  collapseQueue,
+} from "./sync/localDb.js";
 
 function trColorName(name) {
   const v = String(name || "").trim().toLowerCase();
@@ -4321,6 +4336,7 @@ function NotesUI({
             >
               {dark ? <SunIcon /> : <MoonIcon />}
             </button>
+            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
             <button
               onClick={() => onStartMulti?.()}
               className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/15 focus:ring-emerald-500" : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 focus:ring-emerald-400"}`}
@@ -4363,8 +4379,9 @@ function NotesUI({
             </button>
           </div>
 
-          {/* Mobile: keep 3-dot menu */}
-          <div className="sm:hidden">
+          {/* Mobile: sync icon + 3-dot menu */}
+          <div className="sm:hidden flex items-center gap-1">
+            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
             <button
               ref={headerBtnRef}
               onClick={() => setHeaderMenuOpen((v) => !v)}
@@ -5424,6 +5441,14 @@ export default function App() {
   const [allNotesForTags, setAllNotesForTags] = useState([]);
   const [search, setSearch] = useState("");
 
+  // ─── Local-first sync state ───
+  const [syncStatus, setSyncStatus] = useState({
+    state: "synced", serverOnline: true, pending: 0, processing: 0, failed: 0, total: 0, items: [],
+  });
+  const syncEngineRef = useRef(null);
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
+
   // Tag filter & sidebar
   const [tagFilter, setTagFilter] = useState(null); // null = all, ALL_IMAGES = only notes with images
   const tagFilterRef = useRef(tagFilter);
@@ -5799,53 +5824,44 @@ export default function App() {
     if (!selectedIds.length) return;
 
     if (tagFilter === "TRASHED") {
-      // Permanent delete from trash
       showGenericConfirm({
         title: t("permanentlyDelete"),
         message: t("permanentlyDeleteConfirm"),
         confirmText: t("permanentlyDelete"),
         danger: true,
         onConfirm: async () => {
-          try {
-            const count = selectedIds.length;
-            for (const id of selectedIds) {
-              await api(`/notes/${id}/permanent`, { method: "DELETE", token });
-            }
-            invalidateTrashedNotesCache();
-            setNotes((prev) =>
-              prev.filter((n) => !selectedIds.includes(String(n.id))),
-            );
-            onExitMulti();
-            showToast(t("bulkDeletedSuccess").replace("{count}", String(count)), "success");
-          } catch (e) {
-            showToast(e.message || t("bulkDeleteFailed"), "error");
+          const count = selectedIds.length;
+          for (const id of selectedIds) {
+            try { await idbDeleteNote(String(id)); } catch (e) { console.error(e); }
+            enqueueAndSync({ type: "permanentDelete", noteId: String(id) });
           }
+          invalidateTrashedNotesCache();
+          setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
+          onExitMulti();
+          showToast(t("bulkDeletedSuccess").replace("{count}", String(count)), "success");
         },
       });
     } else {
-      // Move to trash
       showGenericConfirm({
         title: t("moveToTrash"),
         message: t("bulkMoveToTrashConfirm").replace("{count}", String(selectedIds.length)),
         confirmText: t("moveToTrash"),
         danger: true,
         onConfirm: async () => {
-          try {
-            const count = selectedIds.length;
-            for (const id of selectedIds) {
-              await api(`/notes/${id}/trash`, { method: "POST", token });
-            }
-            invalidateNotesCache();
-            invalidateArchivedNotesCache();
-            invalidateTrashedNotesCache();
-            setNotes((prev) =>
-              prev.filter((n) => !selectedIds.includes(String(n.id))),
-            );
-            onExitMulti();
-            showToast(t("bulkTrashedSuccess").replace("{count}", String(count)), "success");
-          } catch (e) {
-            showToast(e.message || t("bulkTrashedFailed"), "error");
+          const count = selectedIds.length;
+          for (const id of selectedIds) {
+            try {
+              const existing = await idbGetNote(String(id));
+              if (existing) await idbPutNote({ ...existing, trashed: true });
+            } catch (e) { console.error(e); }
+            enqueueAndSync({ type: "trash", noteId: String(id) });
           }
+          invalidateNotesCache();
+          invalidateArchivedNotesCache();
+          invalidateTrashedNotesCache();
+          setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
+          onExitMulti();
+          showToast(t("bulkTrashedSuccess").replace("{count}", String(count)), "success");
         },
       });
     }
@@ -5853,169 +5869,107 @@ export default function App() {
 
   const onBulkPin = async (pinnedVal) => {
     if (!selectedIds.length) return;
-    try {
-      // Optimistic update
-      setNotes((prev) =>
-        prev.map((n) =>
-          selectedIds.includes(String(n.id))
-            ? { ...n, pinned: !!pinnedVal }
-            : n,
-        ),
-      );
-      // Persist in background (best-effort)
-      for (const id of selectedIds) {
-        await api(`/notes/${id}`, {
-          method: "PATCH",
-          token,
-          body: { pinned: !!pinnedVal },
-        });
-      }
-      // Invalidate caches
-      invalidateNotesCache();
-      invalidateArchivedNotesCache();
-      // Reload fresh data since we invalidated caches
-      if (tagFilter === "ARCHIVED") {
-        loadArchivedNotes().catch(() => {});
-      } else if (tagFilter === "TRASHED") {
-        loadTrashedNotes().catch(() => {});
-      } else {
-        loadNotes().catch(() => {});
-      }
-    } catch (e) {
-      console.error("Bulk pin failed", e);
-      // Reload appropriate notes based on current view
-      if (tagFilter === "ARCHIVED") {
-        loadArchivedNotes().catch(() => {});
-      } else if (tagFilter === "TRASHED") {
-        loadTrashedNotes().catch(() => {});
-      } else {
-        loadNotes().catch(() => {});
-      }
+    // Local-first: update UI + IndexedDB, then enqueue
+    setNotes((prev) =>
+      prev.map((n) =>
+        selectedIds.includes(String(n.id))
+          ? { ...n, pinned: !!pinnedVal }
+          : n,
+      ),
+    );
+    for (const id of selectedIds) {
+      try {
+        const existing = await idbGetNote(String(id));
+        if (existing) await idbPutNote({ ...existing, pinned: !!pinnedVal });
+      } catch (e) { console.error(e); }
+      enqueueAndSync({ type: "patch", noteId: String(id), payload: { pinned: !!pinnedVal } });
     }
+    invalidateNotesCache();
+    invalidateArchivedNotesCache();
   };
 
   const onBulkRestore = async () => {
     if (!selectedIds.length) return;
-    try {
-      for (const id of selectedIds) {
-        await api(`/notes/${id}/restore`, { method: "POST", token });
-      }
-      const count = selectedIds.length;
-      invalidateNotesCache();
-      invalidateArchivedNotesCache();
-      invalidateTrashedNotesCache();
-      setNotes((prev) =>
-        prev.filter((n) => !selectedIds.includes(String(n.id))),
-      );
-      onExitMulti();
-      showToast(t("bulkRestoredSuccess").replace("{count}", String(count)), "success");
-    } catch (e) {
-      console.error("Bulk restore failed", e);
-      showToast(t("bulkRestoredFailed"), "error");
-      loadTrashedNotes().catch(() => {});
+    const count = selectedIds.length;
+    for (const id of selectedIds) {
+      try {
+        const existing = await idbGetNote(String(id));
+        if (existing) await idbPutNote({ ...existing, trashed: false });
+      } catch (e) { console.error(e); }
+      enqueueAndSync({ type: "restore", noteId: String(id) });
     }
+    invalidateNotesCache();
+    invalidateArchivedNotesCache();
+    invalidateTrashedNotesCache();
+    setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
+    onExitMulti();
+    showToast(t("bulkRestoredSuccess").replace("{count}", String(count)), "success");
   };
 
   const onBulkArchive = async () => {
     if (!selectedIds.length) return;
 
-    // Determine if we're archiving or unarchiving based on current view
     const isArchiving = tagFilter !== "ARCHIVED";
     const archivedValue = isArchiving;
-
     const count = selectedIds.length;
-    try {
-      // Optimistic update - remove from current view
-      setNotes((prev) =>
-        prev.filter((n) => !selectedIds.includes(String(n.id))),
-      );
-      // Persist in background (best-effort)
-      for (const id of selectedIds) {
-        await api(`/notes/${id}/archive`, {
-          method: "POST",
-          token,
-          body: { archived: archivedValue },
-        });
-      }
-      // Invalidate caches
-      invalidateNotesCache();
-      invalidateArchivedNotesCache();
 
-      // If we just unarchived notes from archived view, switch to regular notes view
-      if (!isArchiving && tagFilter === "ARCHIVED") {
-        setTagFilter(null);
-        await loadNotes();
-      }
-
-      // Exit multi-select mode
-      onExitMulti();
-      showToast(t(isArchiving ? "bulkArchivedSuccess" : "bulkUnarchivedSuccess").replace("{count}", String(count)), "success");
-    } catch (e) {
-      console.error(`Bulk ${isArchiving ? "archive" : "unarchive"} failed`, e);
-      showToast(t(isArchiving ? "bulkArchivedFailed" : "bulkUnarchivedFailed"), "error");
-      // Reload notes on failure
-      if (tagFilter === "ARCHIVED") {
-        loadArchivedNotes().catch(() => {});
-      } else {
-        loadNotes().catch(() => {});
-      }
+    // Local-first: update IndexedDB + UI, then enqueue
+    setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
+    for (const id of selectedIds) {
+      try {
+        const existing = await idbGetNote(String(id));
+        if (existing) await idbPutNote({ ...existing, archived: !!archivedValue });
+      } catch (e) { console.error(e); }
+      enqueueAndSync({ type: "archive", noteId: String(id), payload: { archived: !!archivedValue } });
     }
+    invalidateNotesCache();
+    invalidateArchivedNotesCache();
+
+    if (!isArchiving && tagFilter === "ARCHIVED") {
+      setTagFilter(null);
+      loadNotes();
+    }
+
+    onExitMulti();
+    showToast(t(isArchiving ? "bulkArchivedSuccess" : "bulkUnarchivedSuccess").replace("{count}", String(count)), "success");
   };
 
   const onUpdateChecklistItem = async (noteId, itemId, checked) => {
-    // Find the note
     const note = notes.find((n) => String(n.id) === String(noteId));
     if (!note) return;
 
-    // Optimistically update the note
     const updatedItems = (note.items || []).map((item) =>
       item.id === itemId ? { ...item, done: checked } : item,
     );
     const updatedNote = { ...note, items: updatedItems };
 
-    // Update local state optimistically
+    // Local-first: update UI + IndexedDB, then enqueue
     setNotes((prev) =>
       prev.map((n) => (String(n.id) === String(noteId) ? updatedNote : n)),
     );
-
     try {
-      // Update on server
-      await api(`/notes/${noteId}`, {
-        method: "PATCH",
-        token,
-        body: { items: updatedItems, type: "checklist", content: "" },
-      });
+      const existing = await idbGetNote(String(noteId));
+      if (existing) await idbPutNote({ ...existing, items: updatedItems });
+    } catch (e) { console.error(e); }
 
-      // Invalidate caches since we modified the note
-      invalidateNotesCache();
-      invalidateArchivedNotesCache();
-    } catch (error) {
-      console.error("Failed to update checklist item:", error);
-      // Revert the optimistic update on error
-      setNotes((prev) =>
-        prev.map((n) => (String(n.id) === String(noteId) ? note : n)),
-      );
-    }
+    invalidateNotesCache();
+    invalidateArchivedNotesCache();
+    enqueueAndSync({ type: "patch", noteId: String(noteId), payload: { items: updatedItems, type: "checklist", content: "" } });
   };
 
   const onBulkColor = async (colorName) => {
     if (!selectedIds.length) return;
-    try {
-      setNotes((prev) =>
-        prev.map((n) =>
-          selectedIds.includes(String(n.id)) ? { ...n, color: colorName } : n,
-        ),
-      );
-      for (const id of selectedIds) {
-        await api(`/notes/${id}`, {
-          method: "PATCH",
-          token,
-          body: { color: colorName },
-        });
-      }
-    } catch (e) {
-      console.error("Bulk color failed", e);
-      loadNotes().catch(() => {});
+    setNotes((prev) =>
+      prev.map((n) =>
+        selectedIds.includes(String(n.id)) ? { ...n, color: colorName } : n,
+      ),
+    );
+    for (const id of selectedIds) {
+      try {
+        const existing = await idbGetNote(String(id));
+        if (existing) await idbPutNote({ ...existing, color: colorName });
+      } catch (e) { console.error(e); }
+      enqueueAndSync({ type: "patch", noteId: String(id), payload: { color: colorName } });
     }
   };
 
@@ -6171,6 +6125,77 @@ export default function App() {
     return () => document.removeEventListener("keydown", onKey);
   }, [sidebarOpen]);
 
+  // ─── SyncEngine lifecycle ───
+  useEffect(() => {
+    if (!token || !currentUser?.id) {
+      if (syncEngineRef.current) {
+        syncEngineRef.current.destroy();
+        syncEngineRef.current = null;
+      }
+      setSyncStatus({ state: "synced", serverOnline: true, pending: 0, processing: 0, failed: 0, total: 0, items: [] });
+      return;
+    }
+
+    const engine = new SyncEngine({
+      getToken: () => tokenRef.current,
+      onStatusChange: (status) => setSyncStatus(status),
+      onSyncComplete: () => {},
+      onSyncError: (item, err) => console.warn("[Sync] Failed:", item.type, item.noteId, err.message),
+    });
+    syncEngineRef.current = engine;
+    engine.startHealthChecks();
+
+    // Process leftover queue from previous session
+    getQueueStats().then((stats) => {
+      if (stats.total > 0) {
+        setSyncStatus({
+          state: stats.failed > 0 ? "error" : "pending",
+          serverOnline: engine.isServerOnline,
+          ...stats,
+        });
+        engine.processQueue();
+      }
+    });
+
+    return () => {
+      engine.destroy();
+      syncEngineRef.current = null;
+    };
+  }, [token, currentUser?.id]);
+
+  const triggerSync = useCallback(() => {
+    syncEngineRef.current?.processQueue();
+  }, []);
+
+  const handleSyncNow = useCallback(() => {
+    syncEngineRef.current?.processQueue();
+  }, []);
+
+  // Warn before closing if there are pending local changes
+  useEffect(() => {
+    const handler = (e) => {
+      if (syncStatus.total > 0 && syncStatus.state !== "synced") {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [syncStatus.total, syncStatus.state]);
+
+  // ─── Local-first helpers ───
+  // Enqueue a sync action and immediately trigger the engine
+  const enqueueAndSync = useCallback(async (action) => {
+    await idbEnqueue(action);
+    setSyncStatus((prev) => ({
+      ...prev,
+      state: "pending",
+      pending: prev.pending + 1,
+      total: prev.total + 1,
+    }));
+    triggerSync();
+  }, [triggerSync]);
+
   // Cache keys for localStorage
   const NOTES_CACHE_KEY = `glass-keep-notes-${currentUser?.id || "anonymous"}`;
   const ARCHIVED_NOTES_CACHE_KEY = `glass-keep-archived-${currentUser?.id || "anonymous"}`;
@@ -6284,26 +6309,73 @@ export default function App() {
     notesAreRegular.current = true;
     setNotesLoading(true);
 
+    // First: show notes from IndexedDB immediately (local-first)
+    try {
+      const localNotes = await idbGetAllNotes(currentUser?.id, "active");
+      if (localNotes.length > 0) {
+        setNotes(sortNotesByRecency(localNotes));
+      }
+    } catch (e) {
+      console.error("IndexedDB read failed:", e);
+    }
+
+    // Then: fetch from server and merge (protecting pending local changes)
     try {
       const data = await api("/notes", { token });
-      console.log("Notes loaded from server:", data);
-      const notesArray = Array.isArray(data) ? data : [];
-      setNotes(sortNotesByRecency(notesArray));
-      persistNotesCache(notesArray);
+      const serverNotes = Array.isArray(data) ? data : [];
+
+      // Hydrate IndexedDB, skipping notes with pending local changes
+      const toWrite = [];
+      for (const sn of serverNotes) {
+        const pending = await hasPendingChanges(String(sn.id));
+        if (!pending) {
+          toWrite.push({ ...sn, id: String(sn.id), user_id: sn.user_id || currentUser?.id, archived: false, trashed: false });
+        }
+      }
+      if (toWrite.length > 0) await idbPutNotes(toWrite);
+
+      // Build final list: server notes + locally-only notes not yet on server
+      const serverIds = new Set(serverNotes.map((n) => String(n.id)));
+      const localOnly = [];
+      try {
+        const allLocal = await idbGetAllNotes(currentUser?.id, "active");
+        for (const ln of allLocal) {
+          if (!serverIds.has(String(ln.id))) {
+            localOnly.push(ln);
+          }
+        }
+      } catch (e) {}
+
+      // For notes with pending changes, use local version
+      const merged = [];
+      for (const sn of serverNotes) {
+        const pending = await hasPendingChanges(String(sn.id));
+        if (pending) {
+          const localVer = await idbGetNote(String(sn.id));
+          merged.push(localVer || sn);
+        } else {
+          merged.push(sn);
+        }
+      }
+
+      const final = [...merged, ...localOnly];
+      setNotes(sortNotesByRecency(final));
+      persistNotesCache(final);
     } catch (error) {
       console.error("Error loading notes from server:", error);
-      // Try to load from cache as fallback
+      // Fallback: use IndexedDB data (already shown above), or localStorage
       try {
-        const cachedData = localStorage.getItem(NOTES_CACHE_KEY);
-        if (cachedData) {
-          const cachedNotes = JSON.parse(cachedData);
-          setNotes(sortNotesByRecency(cachedNotes));
+        const localNotes = await idbGetAllNotes(currentUser?.id, "active");
+        if (localNotes.length > 0) {
+          setNotes(sortNotesByRecency(localNotes));
         } else {
-          setNotes([]);
+          const cachedData = localStorage.getItem(NOTES_CACHE_KEY);
+          if (cachedData) {
+            setNotes(sortNotesByRecency(JSON.parse(cachedData)));
+          }
         }
-      } catch (cacheError) {
-        console.error("Error loading from cache:", cacheError);
-        setNotes([]);
+      } catch (e) {
+        console.error("Fallback load failed:", e);
       }
     } finally {
       setNotesLoading(false);
@@ -6316,47 +6388,58 @@ export default function App() {
     notesAreRegular.current = false;
     setNotesLoading(true);
 
-    console.log("Loading archived notes, checking cache...");
-    // First, try to load from cache immediately for better UX
-    let hasCachedData = false;
+    // Show IndexedDB archived notes immediately
     try {
-      const cachedData = localStorage.getItem(ARCHIVED_NOTES_CACHE_KEY);
-      if (cachedData) {
-        const cachedNotes = JSON.parse(cachedData);
-        console.log("Found cached archived notes:", cachedNotes.length);
-        setNotes(sortNotesByRecency(cachedNotes));
-        hasCachedData = true;
-      } else {
-        console.log("No cached archived notes found");
+      const localArchived = await idbGetAllNotes(currentUser?.id, "archived");
+      if (localArchived.length > 0) {
+        setNotes(sortNotesByRecency(localArchived));
       }
-    } catch (cacheError) {
-      console.error("Error loading archived notes from cache:", cacheError);
-    }
+    } catch (e) {}
 
     try {
       const data = await api("/notes/archived", { token });
-      console.log("Archived notes loaded from server:", data);
       const notesArray = Array.isArray(data) ? data : [];
-      setNotes(sortNotesByRecency(notesArray));
 
-      // Cache the data
-      try {
-        localStorage.setItem(
-          ARCHIVED_NOTES_CACHE_KEY,
-          JSON.stringify(notesArray),
-        );
-        localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
-        console.log("Cached", notesArray.length, "archived notes");
-      } catch (error) {
-        console.error("Error caching archived notes:", error);
+      // Hydrate IndexedDB
+      const toWrite = [];
+      for (const sn of notesArray) {
+        const pending = await hasPendingChanges(String(sn.id));
+        if (!pending) {
+          toWrite.push({ ...sn, id: String(sn.id), user_id: sn.user_id || currentUser?.id, archived: true, trashed: false });
+        }
       }
+      if (toWrite.length > 0) await idbPutNotes(toWrite);
+
+      // Merge with local-only archived notes
+      const serverIds = new Set(notesArray.map((n) => String(n.id)));
+      const localOnly = [];
+      try {
+        const allLocal = await idbGetAllNotes(currentUser?.id, "archived");
+        for (const ln of allLocal) {
+          if (!serverIds.has(String(ln.id))) localOnly.push(ln);
+        }
+      } catch (e) {}
+
+      const merged = [];
+      for (const sn of notesArray) {
+        const pending = await hasPendingChanges(String(sn.id));
+        if (pending) {
+          const localVer = await idbGetNote(String(sn.id));
+          merged.push(localVer || sn);
+        } else {
+          merged.push(sn);
+        }
+      }
+
+      const final = [...merged, ...localOnly];
+      setNotes(sortNotesByRecency(final));
+      try {
+        localStorage.setItem(ARCHIVED_NOTES_CACHE_KEY, JSON.stringify(final));
+        localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+      } catch (e) {}
     } catch (error) {
       console.error("Error loading archived notes from server:", error);
-      // If we don't have cached data, set empty array
-      if (!hasCachedData) {
-        console.log("No cached data and server error, setting empty array");
-        setNotes([]);
-      }
+      // Keep IndexedDB data already shown
     } finally {
       setNotesLoading(false);
     }
@@ -6368,23 +6451,46 @@ export default function App() {
     notesAreRegular.current = false;
     setNotesLoading(true);
 
+    // Show IndexedDB trashed notes immediately
+    try {
+      const localTrashed = await idbGetAllNotes(currentUser?.id, "trashed");
+      if (localTrashed.length > 0) {
+        setNotes(sortNotesByRecency(localTrashed));
+      }
+    } catch (e) {}
+
     try {
       const data = await api("/notes/trashed", { token });
       const notesArray = Array.isArray(data) ? data : [];
+
+      // Hydrate IndexedDB
+      const toWrite = [];
+      for (const sn of notesArray) {
+        const pending = await hasPendingChanges(String(sn.id));
+        if (!pending) {
+          toWrite.push({ ...sn, id: String(sn.id), user_id: sn.user_id || currentUser?.id, archived: false, trashed: true });
+        }
+      }
+      if (toWrite.length > 0) await idbPutNotes(toWrite);
+
       setNotes(sortNotesByRecency(notesArray));
       try {
         localStorage.setItem(TRASHED_NOTES_CACHE_KEY, JSON.stringify(notesArray));
-      } catch (error) {
-        console.error("Error caching trashed notes:", error);
-      }
+      } catch (e) {}
     } catch (error) {
       console.error("Error loading trashed notes from server:", error);
+      // Keep IndexedDB data already shown, or fallback to localStorage
       try {
-        const cachedData = localStorage.getItem(TRASHED_NOTES_CACHE_KEY);
-        if (cachedData) {
-          setNotes(sortNotesByRecency(JSON.parse(cachedData)));
+        const localTrashed = await idbGetAllNotes(currentUser?.id, "trashed");
+        if (localTrashed.length > 0) {
+          setNotes(sortNotesByRecency(localTrashed));
         } else {
-          setNotes([]);
+          const cachedData = localStorage.getItem(TRASHED_NOTES_CACHE_KEY);
+          if (cachedData) {
+            setNotes(sortNotesByRecency(JSON.parse(cachedData)));
+          } else {
+            setNotes([]);
+          }
         }
       } catch {
         setNotes([]);
@@ -6884,9 +6990,19 @@ export default function App() {
 
   /** -------- Auth actions -------- */
   const signOut = () => {
+    // Clear IndexedDB sync data
+    if (currentUser?.id) {
+      idbClearNotesForUser(currentUser.id).catch(() => {});
+      idbClearQueue().catch(() => {});
+    }
+    if (syncEngineRef.current) {
+      syncEngineRef.current.destroy();
+      syncEngineRef.current = null;
+    }
     setAuth(null);
     setSession(null);
     setNotes([]);
+    setSyncStatus({ state: "synced", serverOnline: true, pending: 0, processing: 0, failed: 0, total: 0, items: [] });
     // Clear all cached data for this user
     try {
       const keys = Object.keys(localStorage);
@@ -7017,35 +7133,43 @@ export default function App() {
       updated_at: nowIso,
     };
 
+    // Local-first: apply immediately, then sync in background
+    const localNote = {
+      ...newNote,
+      user_id: currentUser?.id,
+      archived: false,
+      trashed: false,
+    };
     try {
-      const created = await api("/notes", {
-        method: "POST",
-        body: newNote,
-        token,
-      });
-      setNotes((prev) =>
-        sortNotesByRecency([created, ...(Array.isArray(prev) ? prev : [])]),
-      );
-      invalidateNotesCache();
-
-      // Reset composer after successful add
-      setTitle("");
-      setContent("");
-      setTags("");
-      setComposerTagList([]);
-      setComposerTagInput("");
-      setComposerTagFocused(false);
-      setComposerImages([]);
-      setComposerColor("default");
-      setClItems([]);
-      setClInput("");
-      setComposerDrawingData({ paths: [], dimensions: null });
-      setComposerType("text");
-      setComposerCollapsed(true);
-      if (contentRef.current) contentRef.current.style.height = "auto";
+      await idbPutNote(localNote);
     } catch (e) {
-      alert(e.message || t("failedAddNote"));
+      console.error("IndexedDB put failed:", e);
     }
+
+    // Update UI immediately from local state
+    setNotes((prev) =>
+      sortNotesByRecency([localNote, ...(Array.isArray(prev) ? prev : [])]),
+    );
+    invalidateNotesCache();
+
+    // Enqueue for server sync
+    enqueueAndSync({ type: "create", noteId: newNote.id, payload: newNote });
+
+    // Reset composer immediately (don't wait for server)
+    setTitle("");
+    setContent("");
+    setTags("");
+    setComposerTagList([]);
+    setComposerTagInput("");
+    setComposerTagFocused(false);
+    setComposerImages([]);
+    setComposerColor("default");
+    setClItems([]);
+    setClInput("");
+    setComposerDrawingData({ paths: [], dimensions: null });
+    setComposerType("text");
+    setComposerCollapsed(true);
+    if (contentRef.current) contentRef.current.style.height = "auto";
   };
 
   /** -------- Download single note .md -------- */
@@ -7057,37 +7181,40 @@ export default function App() {
 
   /** -------- Archive/Unarchive note -------- */
   const handleArchiveNote = async (noteId, archived) => {
+    // Local-first: apply archive state immediately
     try {
-      await api(`/notes/${noteId}/archive`, {
-        method: "POST",
-        token,
-        body: { archived },
-      });
+      const existing = await idbGetNote(String(noteId));
+      if (existing) await idbPutNote({ ...existing, archived: !!archived });
+    } catch (e) { console.error(e); }
 
-      // Invalidate all caches since archiving affects multiple views
-      invalidateNotesCache();
-      invalidateArchivedNotesCache();
-      invalidateTrashedNotesCache();
+    // Invalidate all caches since archiving affects multiple views
+    invalidateNotesCache();
+    invalidateArchivedNotesCache();
+    invalidateTrashedNotesCache();
 
-      // Reload appropriate notes based on current view
-      if (tagFilter === "ARCHIVED") {
-        if (!archived) {
-          // If unarchiving from archived view, switch back to regular view
-          setTagFilter(null);
-          await loadNotes();
-        } else {
-          await loadArchivedNotes();
-        }
+    // Update UI: remove from current view
+    if (tagFilter === "ARCHIVED") {
+      if (!archived) {
+        setTagFilter(null);
+        loadNotes();
       } else {
-        await loadNotes();
+        loadArchivedNotes();
       }
-
+    } else {
+      // Remove from current view (it moved to archived)
       if (archived) {
-        closeModal();
+        setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
+      } else {
+        loadNotes();
       }
-    } catch (e) {
-      alert(e.message || t("failedArchiveNote"));
     }
+
+    if (archived) {
+      closeModal();
+    }
+
+    // Enqueue for server sync
+    enqueueAndSync({ type: "archive", noteId: String(noteId), payload: { archived: !!archived } });
   };
 
   /** -------- Admin Panel Functions -------- */
@@ -8100,105 +8227,110 @@ export default function App() {
               items: [],
             };
 
+    // Local-first: apply immediately, sync in background
+    setSavingModal(true);
+
+    prevItemsRef.current =
+      mType === "checklist" ? (Array.isArray(mItems) ? mItems : []) : [];
+    prevDrawingRef.current =
+      mType === "draw"
+        ? mDrawingData || { paths: [], dimensions: null }
+        : { paths: [], dimensions: null };
+
+    const nowIso = new Date().toISOString();
+    const updatedFields = {
+      ...payload,
+      updated_at: nowIso,
+      lastEditedBy: currentUser?.email || currentUser?.name,
+      lastEditedAt: nowIso,
+    };
+
+    // Update IndexedDB immediately
     try {
-      setSavingModal(true);
-
-      await api(`/notes/${activeId}`, { method: "PUT", token, body: payload });
-      invalidateNotesCache();
-
-      prevItemsRef.current =
-        mType === "checklist" ? (Array.isArray(mItems) ? mItems : []) : [];
-      prevDrawingRef.current =
-        mType === "draw"
-          ? mDrawingData || { paths: [], dimensions: null }
-          : { paths: [], dimensions: null };
-      // Also update updated_at locally so the Edited stamp updates immediately
-      const nowIso = new Date().toISOString();
-      setNotes((prev) =>
-        prev.map((n) =>
-          String(n.id) === String(activeId)
-            ? {
-                ...n,
-                ...payload,
-                updated_at: nowIso,
-                lastEditedBy: currentUser?.email || currentUser?.name,
-                lastEditedAt: nowIso,
-              }
-            : n,
-        ),
-      );
+      const existing = await idbGetNote(String(activeId));
+      if (existing) {
+        await idbPutNote({ ...existing, ...updatedFields });
+      }
     } catch (e) {
-      alert(e.message || t("failedSaveNote"));
-    } finally {
-      setSavingModal(false);
+      console.error("IndexedDB update failed:", e);
     }
+
+    // Update UI immediately
+    setNotes((prev) =>
+      prev.map((n) =>
+        String(n.id) === String(activeId)
+          ? { ...n, ...updatedFields }
+          : n,
+      ),
+    );
+    invalidateNotesCache();
+
+    // Enqueue for server sync
+    enqueueAndSync({ type: "update", noteId: String(activeId), payload });
+
+    setSavingModal(false);
   };
   const deleteModal = async () => {
     if (activeId == null) return;
-    try {
-      // Check if user owns the note
-      const note = notes.find((n) => String(n.id) === String(activeId));
-      if (note && note.user_id !== currentUser?.id) {
-        showToast(t("cannotDeleteNotOwner"), "error");
-        return;
-      }
+    // Check if user owns the note
+    const note = notes.find((n) => String(n.id) === String(activeId));
+    if (note && note.user_id !== currentUser?.id) {
+      showToast(t("cannotDeleteNotOwner"), "error");
+      return;
+    }
 
-      if (tagFilter === "TRASHED") {
-        // Permanent delete from trash
-        await api(`/notes/${activeId}/permanent`, { method: "DELETE", token });
-        invalidateTrashedNotesCache();
-        setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
-        closeModal();
-        showToast(t("notePermanentlyDeleted"), "success");
-      } else {
-        // Move to trash
-        await api(`/notes/${activeId}/trash`, { method: "POST", token });
-        invalidateNotesCache();
-        invalidateArchivedNotesCache();
-        invalidateTrashedNotesCache();
-        setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
-        closeModal();
-        showToast(t("noteMovedToTrash"), "success");
-      }
-    } catch (e) {
-      if (e.status === 404 || e.message?.includes("not found")) {
-        showToast(t("cannotDeleteNotOwner"), "error");
-      } else {
-        showToast(e.message || t("deleteFailed"), "error");
-      }
+    if (tagFilter === "TRASHED") {
+      // Local-first: permanent delete
+      try { await idbDeleteNote(String(activeId)); } catch (e) { console.error(e); }
+      invalidateTrashedNotesCache();
+      setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
+      closeModal();
+      showToast(t("notePermanentlyDeleted"), "success");
+      enqueueAndSync({ type: "permanentDelete", noteId: String(activeId) });
+    } else {
+      // Local-first: move to trash
+      try {
+        const existing = await idbGetNote(String(activeId));
+        if (existing) await idbPutNote({ ...existing, trashed: true });
+      } catch (e) { console.error(e); }
+      invalidateNotesCache();
+      invalidateArchivedNotesCache();
+      invalidateTrashedNotesCache();
+      setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
+      closeModal();
+      showToast(t("noteMovedToTrash"), "success");
+      enqueueAndSync({ type: "trash", noteId: String(activeId) });
     }
   };
 
   const restoreFromTrash = async (noteId) => {
+    // Local-first: restore immediately
     try {
-      await api(`/notes/${noteId}/restore`, { method: "POST", token });
-      invalidateNotesCache();
-      invalidateArchivedNotesCache();
-      invalidateTrashedNotesCache();
-      setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
-      closeModal();
-      showToast(t("noteRestoredFromTrash"), "success");
-    } catch (e) {
-      showToast(e.message || t("failedRestoreNote"), "error");
-    }
+      const existing = await idbGetNote(String(noteId));
+      if (existing) await idbPutNote({ ...existing, trashed: false });
+    } catch (e) { console.error(e); }
+    invalidateNotesCache();
+    invalidateArchivedNotesCache();
+    invalidateTrashedNotesCache();
+    setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
+    closeModal();
+    showToast(t("noteRestoredFromTrash"), "success");
+    enqueueAndSync({ type: "restore", noteId: String(noteId) });
   };
   const togglePin = async (id, toPinned) => {
+    // Local-first: apply pin immediately
     try {
-      await api(`/notes/${id}`, {
-        method: "PATCH",
-        token,
-        body: { pinned: !!toPinned },
-      });
-      invalidateNotesCache();
+      const existing = await idbGetNote(String(id));
+      if (existing) await idbPutNote({ ...existing, pinned: !!toPinned });
+    } catch (e) { console.error(e); }
+    invalidateNotesCache();
 
-      setNotes((prev) =>
-        prev.map((n) =>
-          String(n.id) === String(id) ? { ...n, pinned: !!toPinned } : n,
-        ),
-      );
-    } catch (e) {
-      alert(e.message || t("failedTogglePin"));
-    }
+    setNotes((prev) =>
+      prev.map((n) =>
+        String(n.id) === String(id) ? { ...n, pinned: !!toPinned } : n,
+      ),
+    );
+    enqueueAndSync({ type: "patch", noteId: String(id), payload: { pinned: !!toPinned } });
   };
 
   /** -------- Reset note order -------- */
@@ -8224,33 +8356,19 @@ export default function App() {
     }
 
     setNotes(sorted);
+
+    // Local-first: update IndexedDB positions
+    for (const n of sorted) {
+      try {
+        const existing = await idbGetNote(String(n.id));
+        if (existing) await idbPutNote({ ...existing, position: n.position });
+      } catch (e) {}
+    }
+
     const pinnedIds = sorted.filter((n) => n.pinned).map((n) => String(n.id));
     const otherIds = sorted.filter((n) => !n.pinned).map((n) => String(n.id));
-    try {
-      await api("/notes/reorder", {
-        method: "POST",
-        token,
-        body: { pinnedIds, otherIds },
-      });
-
-      // Persist new positions to each note on the server
-      if (overridePositions) {
-        await Promise.all(
-          sorted.map((n) =>
-            api(`/notes/${n.id}`, {
-              method: "PATCH",
-              token,
-              body: { position: n.position },
-            }).catch(() => {})
-          )
-        );
-      }
-
-      showToast?.(t("noteOrderReset"));
-    } catch (e) {
-      console.error("Reset order failed:", e);
-      loadNotes().catch(() => {});
-    }
+    enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds, otherIds } });
+    showToast?.(t("noteOrderReset"));
   };
 
   /** -------- Drag & Drop reorder (cards) -------- */
@@ -8303,17 +8421,8 @@ export default function App() {
     ];
     setNotes(reordered);
 
-    // Persist order
-    try {
-      await api("/notes/reorder", {
-        method: "POST",
-        token,
-        body: { pinnedIds: newPinned, otherIds: newOthers },
-      });
-    } catch (e) {
-      console.error("Reorder failed:", e);
-      loadNotes().catch(() => {});
-    }
+    // Local-first: enqueue reorder for server sync
+    enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds: newPinned, otherIds: newOthers } });
     dragGroup.current = null;
   };
   const onDragEnd = (ev) => {
