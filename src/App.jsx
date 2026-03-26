@@ -4560,27 +4560,7 @@ function NotesUI({
       {activeTagFilter !== "TRASHED" && activeTagFilter !== "ARCHIVED" && (
       <div className="px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="max-w-2xl mx-auto">
-          {!isOnline ? (
-            <div className="glass-card rounded-xl shadow-lg p-6 mb-8 text-center">
-              <div className="text-orange-600 dark:text-orange-400 mb-2">
-                <svg
-                  className="w-8 h-8 mx-auto mb-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold mb-2">{t("youAreOffline")}</h3>
-              <p className="text-gray-600 dark:text-gray-400">{t("goBackOnlineToAddNotes")}</p>
-            </div>
-          ) : (
+          {(
             <div
               ref={composerRef}
               className="glass-card rounded-xl shadow-lg p-4 mb-8 relative"
@@ -4607,10 +4587,7 @@ function NotesUI({
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder={t("noteTitle")}
-                    disabled={!isOnline}
-                    className={`w-full bg-transparent text-lg font-semibold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none mb-2 p-2 ${
-                      !isOnline ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
+                    className="w-full bg-transparent text-lg font-semibold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none mb-2 p-2"
                   />
 
                   {/* Body, Checklist, or Drawing */}
@@ -4621,10 +4598,7 @@ function NotesUI({
                       onChange={(e) => setContent(e.target.value)}
                       onKeyDown={onComposerKeyDown}
                       placeholder={t("writeNote")}
-                      disabled={!isOnline}
-                      className={`w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none p-2 ${
-                        !isOnline ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
+                      className="w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none p-2"
                       rows={1}
                     />
                   ) : composerType === "checklist" ? (
@@ -4640,19 +4614,11 @@ function NotesUI({
                             }
                           }}
                           placeholder={t("listItemEllipsis")}
-                          disabled={!isOnline}
-                          className={`flex-1 bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2 border-b border-[var(--border-light)] ${
-                            !isOnline ? "opacity-50 cursor-not-allowed" : ""
-                          }`}
+                          className="flex-1 bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2 border-b border-[var(--border-light)]"
                         />
                         <button
                           onClick={addComposerItem}
-                          disabled={!isOnline}
-                          className={`px-3 py-1.5 rounded-lg whitespace-nowrap font-semibold transition-all duration-200 ${
-                            isOnline
-                              ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
-                              : "bg-gray-400 text-gray-200 cursor-not-allowed"
-                          }`}
+                          className="px-3 py-1.5 rounded-lg whitespace-nowrap font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                         >{t("add")}</button>
                       </div>
                       {clItems.length > 0 && (
@@ -4674,7 +4640,7 @@ function NotesUI({
                       onChange={setComposerDrawingData}
                       width={650}
                       height={450}
-                      readOnly={!isOnline}
+                      readOnly={false}
                       darkMode={dark}
                       hideModeToggle={true}
                     />
@@ -4716,16 +4682,14 @@ function NotesUI({
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200"
                         >
                           {ctag}
-                          {isOnline && (
-                            <button
-                              type="button"
-                              onClick={() => setComposerTagList((prev) => prev.filter((_, idx) => idx !== i))}
-                              className="hover:text-red-500 font-bold"
-                            >×</button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => setComposerTagList((prev) => prev.filter((_, idx) => idx !== i))}
+                            className="hover:text-red-500 font-bold"
+                          >×</button>
                         </span>
                       ))}
-                      {isOnline && (
+                      {(
                         <div className="relative flex-1 min-w-[8ch]">
                           <input
                             ref={composerTagInputRef}
@@ -4979,12 +4943,7 @@ function NotesUI({
                       {/* Add Note */}
                       <button
                         onClick={addNote}
-                        disabled={!isOnline}
-                        className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
-                          isOnline
-                            ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
-                            : "bg-gray-300 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
-                        }`}
+                        className="px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 whitespace-nowrap flex-shrink-0 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                       >{t("addNote")}</button>
                     </div>
                   </div>
@@ -8871,9 +8830,7 @@ export default function App() {
             >
               <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6 pb-3">
                 <input
-                  className={`flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none pr-2 ${
-                    !isOnline ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
+                  className="flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none pr-2"
                   style={windowWidth < 700 ? {
                     fontSize: mTitle.length > 40 ? "0.85rem"
                       : mTitle.length > 28 ? "1rem"
@@ -8881,17 +8838,14 @@ export default function App() {
                       : "1.25rem"
                   } : undefined}
                   value={mTitle}
-                  onChange={(e) => {
-                    if (isOnline) setMTitle(e.target.value);
-                  }}
+                  onChange={(e) => setMTitle(e.target.value)}
                   placeholder={t("noteTitle")}
-                  disabled={!isOnline}
                 />
                 <div className="flex items-center gap-2 flex-none ml-auto">
                   {/* Icon buttons group – pill container */}
                   <div className="modal-icon-group">
-                  {/* View/Edit toggle only for TEXT notes - hidden when offline */}
-                  {isOnline && mType === "text" && (
+                  {/* View/Edit toggle only for TEXT notes */}
+                  {mType === "text" && (
                     <button
                       className="modal-icon-btn modal-icon-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]"
                       onClick={() => {
@@ -8947,7 +8901,7 @@ export default function App() {
                   </button>
 
                   {/* Formatting button + popover: mobile only (desktop uses inline toolbar below) */}
-                  {isOnline && mType === "text" && !viewMode && windowWidth < 768 && (
+                  {mType === "text" && !viewMode && windowWidth < 768 && (
                     <>
                       <button
                         ref={modalFmtBtnRef}
@@ -8976,11 +8930,10 @@ export default function App() {
                     </>
                   )}
 
-                  {/* 3-dots menu - hidden when offline */}
-                  {isOnline && (
-                    <>
-                      <button
-                        ref={modalMenuBtnRef}
+                  {/* 3-dots menu */}
+                  <>
+                    <button
+                      ref={modalMenuBtnRef}
                         className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
                         data-tooltip={t("moreOptions")}
                         onClick={(e) => {
@@ -9063,12 +9016,11 @@ export default function App() {
                             </>
                           )}
                         </div>
-                      </Popover>
-                    </>
-                  )}
+                    </Popover>
+                  </>
 
-                  {/* Pin button - hidden when offline or in archived view */}
-                  {isOnline && tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED" && (
+                  {/* Pin button - hidden in archived view */}
+                  {tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED" && (
                     <button
                       className={`modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)] ${
                         notes.find((n) => String(n.id) === String(activeId))?.pinned
@@ -9107,7 +9059,7 @@ export default function App() {
               </div>
 
               {/* Desktop inline formatting toolbar (always visible in edit mode) */}
-              {isOnline && mType === "text" && !viewMode && windowWidth >= 768 && (
+              {mType === "text" && !viewMode && windowWidth >= 768 && (
                 <div
                   className={`px-4 sm:px-6 pt-2 pb-3 border-t flex flex-wrap items-center gap-1 ${
                     dark ? "border-white/10" : "border-black/8"
@@ -9159,19 +9111,17 @@ export default function App() {
                         openImageViewer(idx);
                       }}
                     />
-                    {isOnline && (
-                      <button
-                        data-tooltip={t("removeImage")}
-                        className="absolute -top-1 right-0 text-black dark:text-white text-2xl leading-none opacity-0 group-hover:opacity-100 hover:opacity-60 transition-opacity cursor-pointer"
-                        onClick={() =>
-                          setMImages((prev) =>
-                            prev.filter((x) => x.id !== im.id),
-                          )
-                        }
-                      >
-                        ×
-                      </button>
-                    )}
+                    <button
+                      data-tooltip={t("removeImage")}
+                      className="absolute -top-1 right-0 text-black dark:text-white text-2xl leading-none opacity-0 group-hover:opacity-100 hover:opacity-60 transition-opacity cursor-pointer"
+                      onClick={() =>
+                        setMImages((prev) =>
+                          prev.filter((x) => x.id !== im.id),
+                        )
+                      }
+                    >
+                      ×
+                    </button>
                   </div>
                 ))}
               </div>
@@ -9197,19 +9147,14 @@ export default function App() {
                   <div className="relative min-h-[160px]">
                     <textarea
                       ref={mBodyRef}
-                      className={`w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden min-h-[160px] ${
-                        !isOnline ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
+                      className="w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden min-h-[160px]"
                       style={{ scrollBehavior: "unset" }}
                       value={mBody}
                       onChange={(e) => {
-                        if (isOnline) {
-                          setMBody(e.target.value);
-                          resizeModalTextarea();
-                        }
+                        setMBody(e.target.value);
+                        resizeModalTextarea();
                       }}
                       onKeyDown={(e) => {
-                        if (!isOnline) return;
                         if (
                           e.key === "Enter" &&
                           !e.shiftKey &&
@@ -9261,15 +9206,13 @@ export default function App() {
                         }
                       }}
                       placeholder={t("writeYourNoteEllipsis")}
-                      disabled={!isOnline}
                     />
                   </div>
                 )
               ) : mType === "checklist" ? (
                 <div className="space-y-4 md:space-y-2">
-                  {/* Add new item row - hidden when offline */}
-                  {isOnline && (
-                    <div className="flex gap-2">
+                  {/* Add new item row */}
+                  <div className="flex gap-2">
                       <input
                         value={mInput}
                         onChange={(e) => setMInput(e.target.value)}
@@ -9334,8 +9277,7 @@ export default function App() {
                         }}
                         className="px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                       >{t("add")}</button>
-                    </div>
-                  )}
+                  </div>
 
                   {mItems.length > 0 ? (
                     <div className="space-y-4 md:space-y-2">
@@ -9353,14 +9295,13 @@ export default function App() {
                           >
                             {/* Drag handle */}
                             <div
-                              draggable={isOnline}
+                              draggable
                               onDragStart={(e) =>
                                 onChecklistDragStart(it.id, e)
                               }
                               onDragEnd={onChecklistDragEnd}
                               onTouchStart={(e) => {
                                 // Handle touch drag start - only when touching the handle
-                                if (!isOnline) return;
                                 const target = e.currentTarget.closest(
                                   "[data-checklist-item]",
                                 );
@@ -9453,17 +9394,12 @@ export default function App() {
                             <div className="flex-1">
                               <ChecklistRow
                                 item={it}
-                                readOnly={!isOnline}
-                                disableToggle={
-                                  !isOnline
-                                } /* disable toggle when offline */
-                                showRemove={
-                                  isOnline && true
-                                } /* show delete X only when online */
+                                readOnly={false}
+                                disableToggle={false}
+                                showRemove={true}
                                 size="lg" /* bigger checkboxes and X in modal */
                                 onToggle={async (checked, e) => {
-                                  e?.stopPropagation(); // Prevent any unwanted event bubbling
-                                  if (!isOnline) return;
+                                  e?.stopPropagation();
                                   const newItems = mItems.map((p) =>
                                     p.id === it.id
                                       ? { ...p, done: checked }
@@ -9488,7 +9424,6 @@ export default function App() {
                                   }
                                 }}
                                 onChange={async (txt) => {
-                                  if (!isOnline) return;
                                   const newItems = mItems.map((p) =>
                                     p.id === it.id ? { ...p, text: txt } : p,
                                   );
@@ -9509,7 +9444,6 @@ export default function App() {
                                   } catch (e) {}
                                 }}
                                 onRemove={async () => {
-                                  if (!isOnline) return;
                                   const newItems = mItems.filter(
                                     (p) => p.id !== it.id,
                                   );
@@ -9545,17 +9479,12 @@ export default function App() {
                                 <ChecklistRow
                                   key={it.id}
                                   item={it}
-                                  readOnly={!isOnline}
-                                  disableToggle={
-                                    !isOnline
-                                  } /* disable toggle when offline */
-                                  showRemove={
-                                    isOnline && true
-                                  } /* show delete X only when online */
+                                  readOnly={false}
+                                  disableToggle={false}
+                                  showRemove={true}
                                   size="lg" /* bigger checkboxes and X in modal */
                                   onToggle={async (checked, e) => {
-                                    e?.stopPropagation(); // Prevent any unwanted event bubbling
-                                    if (!isOnline) return;
+                                    e?.stopPropagation();
                                     const newItems = mItems.map((p) =>
                                       p.id === it.id
                                         ? { ...p, done: checked }
@@ -9578,7 +9507,6 @@ export default function App() {
                                     } catch (e) {}
                                   }}
                                   onChange={async (txt) => {
-                                    if (!isOnline) return;
                                     const newItems = mItems.map((p) =>
                                       p.id === it.id ? { ...p, text: txt } : p,
                                     );
@@ -9599,7 +9527,6 @@ export default function App() {
                                     } catch (e) {}
                                   }}
                                   onRemove={async () => {
-                                    if (!isOnline) return;
                                     const newItems = mItems.filter(
                                       (p) => p.id !== it.id,
                                     );
@@ -9635,7 +9562,7 @@ export default function App() {
                   onChange={setMDrawingData}
                   width={750}
                   height={850}
-                  readOnly={!isOnline}
+                  readOnly={false}
                   darkMode={dark}
                   initialMode="view"
                 />
@@ -9668,23 +9595,19 @@ export default function App() {
                     <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
                   </svg>
                   {tag}
-                  {/* Tag removal button - hidden when offline */}
-                  {isOnline && (
-                    <button
-                      className="w-3.5 h-3.5 rounded-full text-indigo-400 dark:text-indigo-300 hover:bg-red-400 dark:hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none leading-none"
-                      data-tooltip={t("removeTag")}
-                      onClick={() =>
-                        setMTagList((prev) => prev.filter((t) => t !== tag))
-                      }
-                    >
-                      ×
-                    </button>
-                  )}
+                  <button
+                    className="w-3.5 h-3.5 rounded-full text-indigo-400 dark:text-indigo-300 hover:bg-red-400 dark:hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none leading-none"
+                    data-tooltip={t("removeTag")}
+                    onClick={() =>
+                      setMTagList((prev) => prev.filter((t) => t !== tag))
+                    }
+                  >
+                    ×
+                  </button>
                 </span>
               ))}
-              {/* Tag add button - hidden when offline */}
-              {isOnline && (
-                <div className="relative">
+              {/* Tag add button */}
+              <div className="relative">
                   <button
                     ref={modalTagBtnRef}
                     type="button"
@@ -9822,66 +9745,56 @@ export default function App() {
                       document.body
                     );
                   })()}
-                </div>
-              )}
+              </div>
             </div>
 
             {/* Right controls */}
             <div className="ml-auto flex items-center gap-3 flex-shrink-0">
-              {/* Color dropdown (modal) - hidden when offline */}
-              {isOnline && (
-                <>
-                  <button
-                    ref={modalColorBtnRef}
-                    type="button"
-                    onClick={() => setShowModalColorPop((v) => !v)}
-                    className="w-6 h-6 flex items-center justify-center rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-opacity"
-                    data-tooltip={t("color")}
-                  >
-                    <PaletteColorIcon size={22} />
-                  </button>
-                  <ColorPickerPanel
-                    anchorRef={modalColorBtnRef}
-                    open={showModalColorPop}
-                    onClose={() => setShowModalColorPop(false)}
-                    colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
-                    selectedColor={mColor}
-                    darkMode={dark}
-                    onSelect={(name) => setMColor(name)}
-                  />
-                </>
-              )}
+              {/* Color dropdown (modal) */}
+              <button
+                ref={modalColorBtnRef}
+                type="button"
+                onClick={() => setShowModalColorPop((v) => !v)}
+                className="w-6 h-6 flex items-center justify-center rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-opacity"
+                data-tooltip={t("color")}
+              >
+                <PaletteColorIcon size={22} />
+              </button>
+              <ColorPickerPanel
+                anchorRef={modalColorBtnRef}
+                open={showModalColorPop}
+                onClose={() => setShowModalColorPop(false)}
+                colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
+                selectedColor={mColor}
+                darkMode={dark}
+                onSelect={(name) => setMColor(name)}
+              />
 
-              {/* Add images - hidden when offline */}
-              {isOnline && (
-                <>
-                  <input
-                    ref={modalFileRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={async (e) => {
-                      const f = e.target.files;
-                      if (f && f.length) {
-                        await addImagesToState(f, setMImages);
-                      }
-                      e.target.value = "";
-                    }}
-                  />
-                  <button
-                    onClick={() => modalFileRef.current?.click()}
-                    className="p-1.5 text-sky-500 dark:text-sky-400 hover:text-sky-600 dark:hover:text-sky-300 flex-shrink-0 transition-colors duration-200"
-                    data-tooltip={t("addImages")}
-                  >
-                    <AddImageIcon />
-                  </button>
-                </>
-              )}
+              {/* Add images */}
+              <input
+                ref={modalFileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files;
+                  if (f && f.length) {
+                    await addImagesToState(f, setMImages);
+                  }
+                  e.target.value = "";
+                }}
+              />
+              <button
+                onClick={() => modalFileRef.current?.click()}
+                className="p-1.5 text-sky-500 dark:text-sky-400 hover:text-sky-600 dark:hover:text-sky-300 flex-shrink-0 transition-colors duration-200"
+                data-tooltip={t("addImages")}
+              >
+                <AddImageIcon />
+              </button>
 
-              {/* Save button - hidden when offline or for collaborative text notes (they auto-save) */}
-              {isOnline &&
-                modalHasChanges &&
+              {/* Save button - hidden for collaborative text notes (they auto-save) */}
+              {modalHasChanges &&
                 !(mType === "text" && isCollaborativeNote(activeId)) && (
                   <button
                     onClick={saveModal}
