@@ -5405,7 +5405,9 @@ export default function App() {
 
   // ─── Local-first sync state ───
   const [syncStatus, setSyncStatus] = useState({
-    state: "synced", serverOnline: true, pending: 0, processing: 0, failed: 0, total: 0, items: [],
+    syncState: "pending", serverReachable: null, hasPendingChanges: false, isSyncing: false,
+    lastSyncAt: null, lastSyncError: null,
+    pending: 0, processing: 0, failed: 0, total: 0, items: [],
   });
   const syncEngineRef = useRef(null);
   const tokenRef = useRef(token);
@@ -6098,7 +6100,11 @@ export default function App() {
         syncEngineRef.current.destroy();
         syncEngineRef.current = null;
       }
-      setSyncStatus({ state: "synced", serverOnline: true, pending: 0, processing: 0, failed: 0, total: 0, items: [] });
+      setSyncStatus({
+        syncState: "synced", serverReachable: null, hasPendingChanges: false, isSyncing: false,
+        lastSyncAt: null, lastSyncError: null,
+        pending: 0, processing: 0, failed: 0, total: 0, items: [],
+      });
       return;
     }
 
@@ -6112,16 +6118,7 @@ export default function App() {
     engine.startHealthChecks();
 
     // Process leftover queue from previous session
-    getQueueStats().then((stats) => {
-      if (stats.total > 0) {
-        setSyncStatus({
-          state: stats.failed > 0 ? "error" : "pending",
-          serverOnline: engine.isServerOnline,
-          ...stats,
-        });
-        engine.processQueue();
-      }
-    });
+    engine.processQueue();
 
     return () => {
       engine.destroy();
@@ -6134,31 +6131,25 @@ export default function App() {
   }, []);
 
   const handleSyncNow = useCallback(() => {
-    syncEngineRef.current?.processQueue();
+    syncEngineRef.current?.forceSync();
   }, []);
 
   // Warn before closing if there are pending local changes
   useEffect(() => {
     const handler = (e) => {
-      if (syncStatus.total > 0 && syncStatus.state !== "synced") {
+      if (syncStatus.hasPendingChanges) {
         e.preventDefault();
         e.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [syncStatus.total, syncStatus.state]);
+  }, [syncStatus.hasPendingChanges]);
 
   // ─── Local-first helpers ───
   // Enqueue a sync action and immediately trigger the engine
   const enqueueAndSync = useCallback(async (action) => {
     await idbEnqueue(action);
-    setSyncStatus((prev) => ({
-      ...prev,
-      state: "pending",
-      pending: prev.pending + 1,
-      total: prev.total + 1,
-    }));
     triggerSync();
   }, [triggerSync]);
 
@@ -6999,7 +6990,11 @@ export default function App() {
     setAuth(null);
     setSession(null);
     setNotes([]);
-    setSyncStatus({ state: "synced", serverOnline: true, pending: 0, processing: 0, failed: 0, total: 0, items: [] });
+    setSyncStatus({
+      syncState: "synced", serverReachable: null, hasPendingChanges: false, isSyncing: false,
+      lastSyncAt: null, lastSyncError: null,
+      pending: 0, processing: 0, failed: 0, total: 0, items: [],
+    });
     // Clear all cached data for this user
     try {
       const keys = Object.keys(localStorage);

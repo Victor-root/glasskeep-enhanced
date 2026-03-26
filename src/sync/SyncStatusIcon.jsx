@@ -55,8 +55,8 @@ const RefreshIcon = ({ className }) => (
 
 // ─── Status config ───
 
-function getStatusConfig(state, dark) {
-  switch (state) {
+function getStatusConfig(syncState, dark) {
+  switch (syncState) {
     case "synced":
       return {
         Icon: CloudCheck,
@@ -99,7 +99,7 @@ function getStatusConfig(state, dark) {
       };
     default:
       return {
-        Icon: CloudCheck,
+        Icon: CloudPending,
         color: dark ? "text-gray-400" : "text-gray-500",
         hoverBg: dark ? "hover:bg-gray-500/15" : "hover:bg-gray-200",
         label: "...",
@@ -131,13 +131,30 @@ function statusBadge(status, dark) {
   return dark ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600";
 }
 
+function formatTimeAgo(ts) {
+  if (!ts) return null;
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 10) return t("syncJustNow") || "just now";
+  if (diff < 60) return `${diff}s`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
+}
+
 // ─── Component ───
-// Props: dark, syncStatus, onSyncNow
 
 export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
   const btnRef = useRef(null);
+
+  // Force re-render every 10s so "time ago" stays fresh
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!open) return;
+    const id = setInterval(() => setTick((v) => v + 1), 10000);
+    return () => clearInterval(id);
+  }, [open]);
 
   // Close on outside click
   useEffect(() => {
@@ -156,11 +173,25 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
 
   if (!syncStatus) return null;
 
-  const { state, pending, processing, failed, total, items } = syncStatus;
-  const config = getStatusConfig(state, dark);
+  const {
+    syncState, serverReachable, hasPendingChanges, lastSyncAt, lastSyncError,
+    pending, processing, failed, total, items,
+  } = syncStatus;
+
+  const config = getStatusConfig(syncState, dark);
   const { Icon, color, hoverBg, label, animate } = config;
 
   const failedItems = (items || []).filter((i) => i.status === "failed");
+
+  // Server status line
+  const serverLabel =
+    serverReachable === true ? (t("syncServerReachable") || "Server OK")
+    : serverReachable === false ? (t("syncServerUnreachable") || "Server unreachable")
+    : (t("syncServerChecking") || "Checking...");
+  const serverColor =
+    serverReachable === true ? (dark ? "text-emerald-400" : "text-emerald-600")
+    : serverReachable === false ? (dark ? "text-red-400" : "text-red-600")
+    : (dark ? "text-gray-400" : "text-gray-500");
 
   return (
     <div className="relative">
@@ -175,7 +206,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
       >
         <Icon className="w-5 h-5" />
         {/* Badge for pending count */}
-        {total > 0 && state !== "synced" && (
+        {total > 0 && syncState !== "synced" && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold px-1 leading-none">
             {total}
           </span>
@@ -204,11 +235,36 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
                 <Icon className={`w-5 h-5 ${color}`} />
                 <span className="font-semibold text-sm">{label}</span>
               </div>
+
+              {/* Server status + last sync */}
+              <div className={`mt-1.5 flex items-center gap-2 text-xs`}>
+                <span className={`inline-flex items-center gap-1 ${serverColor}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    serverReachable === true ? "bg-emerald-500"
+                    : serverReachable === false ? "bg-red-500"
+                    : "bg-gray-400"
+                  }`} />
+                  {serverLabel}
+                </span>
+                {lastSyncAt && (
+                  <span className={dark ? "text-gray-500" : "text-gray-400"}>
+                    · {formatTimeAgo(lastSyncAt)}
+                  </span>
+                )}
+              </div>
+
               {total > 0 && (
                 <div className={`mt-1 text-xs ${dark ? "text-gray-400" : "text-gray-500"}`}>
                   {pending > 0 && <span>{t("syncPendingCount", { count: pending })}</span>}
                   {processing > 0 && <span>{pending > 0 ? " · " : ""}{t("syncProcessingCount", { count: processing })}</span>}
                   {failed > 0 && <span>{(pending > 0 || processing > 0) ? " · " : ""}{t("syncFailedCount", { count: failed })}</span>}
+                </div>
+              )}
+
+              {/* Last error */}
+              {lastSyncError && syncState !== "synced" && (
+                <div className={`mt-1 text-xs ${dark ? "text-red-400" : "text-red-600"}`}>
+                  {lastSyncError}
                 </div>
               )}
             </div>
@@ -260,12 +316,12 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
             </div>
 
             {/* Safe to close indicator */}
-            {state === "synced" && (
+            {syncState === "synced" && (
               <div className={`px-4 pb-3 text-xs text-center ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
                 {t("syncSafeToClose")}
               </div>
             )}
-            {state !== "synced" && state !== "syncing" && total > 0 && (
+            {hasPendingChanges && (
               <div className={`px-4 pb-3 text-xs text-center ${dark ? "text-amber-400" : "text-amber-600"}`}>
                 {t("syncNotSafeToClose")}
               </div>

@@ -13,10 +13,24 @@ const API_BASE = "/api";
 const MAX_RETRIES = 5;
 const BASE_RETRY_DELAY = 2000; // 2s, 4s, 8s, 16s, 32s
 
+// Health check intervals
+const HEALTH_IDLE_INTERVAL = 30000;      // 30s when everything is OK
+const HEALTH_PENDING_INTERVAL = 10000;   // 10s when there are pending changes
+const HEALTH_OFFLINE_INTERVAL = 5000;    // 5s when server is known to be down
+
 /**
  * SyncEngine manages background synchronization.
  * It processes queue items sequentially, retries on failure,
  * and reports status changes via callbacks.
+ *
+ * Status model emitted via onStatusChange:
+ *   serverReachable: boolean  — last health check result
+ *   hasPendingChanges: boolean
+ *   isSyncing: boolean
+ *   lastSyncAt: number|null   — timestamp of last successful sync action
+ *   lastSyncError: string|null
+ *   syncState: "synced"|"pending"|"syncing"|"offline"|"error"
+ *   pending/processing/failed/total/items: queue stats
  */
 export class SyncEngine {
   constructor({ getToken, onStatusChange, onSyncComplete, onSyncError }) {
@@ -26,9 +40,12 @@ export class SyncEngine {
     this.onSyncError = onSyncError || (() => {});
     this._processing = false;
     this._healthTimer = null;
-    this._aggressiveHealthTimer = null;
-    this._serverOnline = true;
     this._destroyed = false;
+
+    // Internal state
+    this._serverReachable = null; // null = unknown, true/false = tested
+    this._lastSyncAt = null;
+    this._lastSyncError = null;
   }
 
   // ─── Public API ───
@@ -41,17 +58,16 @@ export class SyncEngine {
     this._processing = true;
 
     try {
-      // Collapse redundant entries first
       await collapseQueue();
 
       const items = await getPendingQueue();
       if (items.length === 0) {
         this._processing = false;
-        this.onStatusChange(await this._buildStatus("synced"));
+        await this._emitStatus();
         return;
       }
 
-      this.onStatusChange(await this._buildStatus("syncing"));
+      await this._emitStatus(); // will show "syncing" because _processing was true... but we set it before
 
       for (const item of items) {
         if (this._destroyed) break;
@@ -69,16 +85,19 @@ export class SyncEngine {
         if (item.status === "failed" && item.lastAttemptAt) {
           const delay = BASE_RETRY_DELAY * Math.pow(2, Math.min(item.attempts, 4));
           if (Date.now() - item.lastAttemptAt < delay) {
-            continue; // Not time to retry yet
+            continue;
           }
         }
 
         await updateQueueItem(item.queueId, { status: "processing" });
-        this.onStatusChange(await this._buildStatus("syncing"));
+        await this._emitStatus();
 
         try {
           await this._executeAction(item);
           await removeQueueItem(item.queueId);
+          this._serverReachable = true;
+          this._lastSyncAt = Date.now();
+          this._lastSyncError = null;
           this.onSyncComplete(item);
         } catch (err) {
           const isAuthError = err.status === 401;
@@ -87,40 +106,42 @@ export class SyncEngine {
           const isNetworkError = err.isNetworkError || err.status === 0 || !err.status;
 
           if (isAuthError) {
-            // Don't retry auth errors
             await updateQueueItem(item.queueId, {
               status: "failed",
               lastError: "Authentication expired",
-              attempts: MAX_RETRIES, // prevent further retries
+              attempts: MAX_RETRIES,
             });
           } else if (isConflict && item.type === "create") {
-            // Note already exists on server (idempotent create succeeded before)
             await removeQueueItem(item.queueId);
+            this._serverReachable = true;
+            this._lastSyncAt = Date.now();
             this.onSyncComplete(item);
             continue;
           } else if (isNotFound && (item.type === "update" || item.type === "patch" || item.type === "archive")) {
-            // Note doesn't exist on server anymore
+            this._serverReachable = true; // server responded, just note missing
             await updateQueueItem(item.queueId, {
               status: "failed",
               lastError: `Note not found on server (${err.status})`,
               attempts: MAX_RETRIES,
             });
           } else if (isNetworkError) {
-            this._serverOnline = false;
+            this._serverReachable = false;
+            this._lastSyncError = "Server unreachable";
             await updateQueueItem(item.queueId, {
               status: "failed",
               lastError: "Server unreachable",
               attempts: item.attempts + 1,
               lastAttemptAt: Date.now(),
             });
-            // Stop processing - server is down
-            this.onStatusChange(await this._buildStatus("offline"));
-            this._startAggressiveHealthCheck();
+            // Stop processing — server is down
+            this._adjustHealthInterval();
             break;
           } else {
+            this._serverReachable = true; // server responded with an error
+            this._lastSyncError = `${err.message || "Unknown error"} (HTTP ${err.status || "?"})`;
             await updateQueueItem(item.queueId, {
               status: "failed",
-              lastError: `${err.message || "Unknown error"} (HTTP ${err.status || "?"})`,
+              lastError: this._lastSyncError,
               attempts: item.attempts + 1,
               lastAttemptAt: Date.now(),
             });
@@ -129,28 +150,41 @@ export class SyncEngine {
         }
       }
 
-      // Final status
+      // Schedule retry if needed
       const stats = await getQueueStats();
-      if (stats.total === 0) {
-        this.onStatusChange(await this._buildStatus("synced"));
-      } else if (stats.failed > 0 && stats.pending === 0 && stats.processing === 0) {
-        this.onStatusChange(await this._buildStatus("error"));
-      } else if (stats.pending > 0 || stats.failed > 0) {
-        this.onStatusChange(await this._buildStatus("pending"));
-        // Schedule retry
-        if (!this._destroyed) {
-          setTimeout(() => this.processQueue(), BASE_RETRY_DELAY);
-        }
+      if ((stats.pending > 0 || stats.failed > 0) && !this._destroyed) {
+        setTimeout(() => this.processQueue(), BASE_RETRY_DELAY);
       }
     } catch (err) {
       console.error("[SyncEngine] processQueue error:", err);
     } finally {
       this._processing = false;
+      await this._emitStatus();
     }
   }
 
   /**
-   * Lightweight health check to detect server recovery.
+   * Force sync: health check first, then process queue.
+   * Returns the resulting status for immediate feedback.
+   */
+  async forceSync() {
+    await this.healthCheck();
+    // Reset failed items to pending so they get retried immediately
+    const stats = await getQueueStats();
+    for (const item of stats.items) {
+      if (item.status === "failed" && item.attempts < MAX_RETRIES) {
+        await updateQueueItem(item.queueId, {
+          status: "pending",
+          lastAttemptAt: 0, // clear backoff
+        });
+      }
+    }
+    await this.processQueue();
+  }
+
+  /**
+   * Lightweight health check to detect server availability.
+   * Always emits a status update so UI stays in sync.
    */
   async healthCheck() {
     const token = this.getToken();
@@ -166,45 +200,51 @@ export class SyncEngine {
       clearTimeout(timeoutId);
 
       if (res.ok) {
-        const wasOffline = !this._serverOnline;
-        this._serverOnline = true;
+        const wasOffline = this._serverReachable === false;
+        this._serverReachable = true;
+        this._adjustHealthInterval();
+        await this._emitStatus();
         if (wasOffline) {
-          this._stopAggressiveHealthCheck();
-          // Server is back, retry queue
+          // Server recovered — retry queue
           this.processQueue();
         }
         return true;
       }
-      this._serverOnline = false;
+      this._serverReachable = false;
+      this._adjustHealthInterval();
+      await this._emitStatus();
       return false;
     } catch {
-      this._serverOnline = false;
+      this._serverReachable = false;
+      this._adjustHealthInterval();
+      await this._emitStatus();
       return false;
     }
   }
 
   /**
-   * Start regular health checks (every 30s).
+   * Start adaptive health checks.
    */
   startHealthChecks() {
     this.stopHealthChecks();
-    this._healthTimer = setInterval(() => {
-      this.healthCheck();
-    }, 30000);
-    // Initial check
+    // Initial check to establish server reachability
     this.healthCheck();
+    this._scheduleNextHealth();
   }
 
   stopHealthChecks() {
     if (this._healthTimer) {
-      clearInterval(this._healthTimer);
+      clearTimeout(this._healthTimer);
       this._healthTimer = null;
     }
-    this._stopAggressiveHealthCheck();
   }
 
-  get isServerOnline() {
-    return this._serverOnline;
+  get serverReachable() {
+    return this._serverReachable;
+  }
+
+  get lastSyncAt() {
+    return this._lastSyncAt;
   }
 
   destroy() {
@@ -214,31 +254,85 @@ export class SyncEngine {
 
   // ─── Private ───
 
-  _startAggressiveHealthCheck() {
-    if (this._aggressiveHealthTimer) return;
-    this._aggressiveHealthTimer = setInterval(() => {
-      this.healthCheck();
-    }, 5000); // Check every 5s when offline + pending changes
+  /**
+   * Adaptive health check scheduling:
+   * - Server down + pending: aggressive (5s)
+   * - Pending changes: moderate (10s)
+   * - All synced: relaxed (30s)
+   */
+  _adjustHealthInterval() {
+    // The interval will be picked up by _scheduleNextHealth
   }
 
-  _stopAggressiveHealthCheck() {
-    if (this._aggressiveHealthTimer) {
-      clearInterval(this._aggressiveHealthTimer);
-      this._aggressiveHealthTimer = null;
-    }
+  _scheduleNextHealth() {
+    if (this._destroyed) return;
+    if (this._healthTimer) clearTimeout(this._healthTimer);
+
+    getQueueStats().then((stats) => {
+      let interval;
+      if (this._serverReachable === false && stats.total > 0) {
+        interval = HEALTH_OFFLINE_INTERVAL;
+      } else if (stats.total > 0) {
+        interval = HEALTH_PENDING_INTERVAL;
+      } else {
+        interval = HEALTH_IDLE_INTERVAL;
+      }
+
+      this._healthTimer = setTimeout(async () => {
+        if (!this._destroyed) {
+          await this.healthCheck();
+          this._scheduleNextHealth();
+        }
+      }, interval);
+    }).catch(() => {
+      // Fallback: idle interval
+      this._healthTimer = setTimeout(() => {
+        if (!this._destroyed) {
+          this.healthCheck().then(() => this._scheduleNextHealth());
+        }
+      }, HEALTH_IDLE_INTERVAL);
+    });
   }
 
-  async _buildStatus(state) {
+  /**
+   * Build and emit the canonical status object.
+   * This is the SINGLE source of truth for UI.
+   */
+  async _emitStatus() {
     const stats = await getQueueStats();
-    return {
-      state, // synced | pending | syncing | offline | error
-      serverOnline: this._serverOnline,
+    const hasPending = stats.total > 0;
+
+    // Derive the display state
+    let syncState;
+    if (this._processing && hasPending) {
+      syncState = "syncing";
+    } else if (this._serverReachable === false && hasPending) {
+      syncState = "offline";
+    } else if (this._serverReachable === false && !hasPending) {
+      // Server is down but nothing to sync — still show offline
+      syncState = "offline";
+    } else if (stats.failed > 0 && stats.pending === 0 && stats.processing === 0) {
+      syncState = "error";
+    } else if (hasPending) {
+      syncState = "pending";
+    } else {
+      syncState = "synced";
+    }
+
+    this.onStatusChange({
+      syncState,
+      serverReachable: this._serverReachable,
+      hasPendingChanges: hasPending,
+      isSyncing: this._processing,
+      lastSyncAt: this._lastSyncAt,
+      lastSyncError: this._lastSyncError,
+      // Queue stats for detail display
       pending: stats.pending,
       processing: stats.processing,
       failed: stats.failed,
       total: stats.total,
       items: stats.items,
-    };
+    });
   }
 
   async _executeAction(item) {
@@ -292,7 +386,6 @@ export class SyncEngine {
           throw e;
         }
         if (err.isAuthError || err.status) throw err;
-        // Network error
         const e = new Error("Network error");
         e.status = 0;
         e.isNetworkError = true;
