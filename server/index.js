@@ -1194,6 +1194,37 @@ app.get("/api/notes/export", auth, (req, res) => {
   });
 });
 
+// Get single note by ID (for targeted SSE patching)
+// MUST be after all literal /api/notes/xxx GET routes to avoid shadowing
+app.get("/api/notes/:id", auth, (req, res) => {
+  const r = getNoteWithCollaboration.get(req.user.id, req.params.id, req.user.id);
+  if (!r) return res.status(404).json({ error: "Note not found" });
+  const collabCount = db.prepare(
+    "SELECT COUNT(*) as count FROM note_collaborators WHERE note_id = ?"
+  ).get(r.id);
+  const hasCollaborators = (collabCount?.count || 0) > 0;
+  res.json({
+    id: r.id,
+    user_id: r.user_id,
+    type: r.type,
+    title: r.title,
+    content: r.content,
+    items: JSON.parse(r.items_json || "[]"),
+    tags: JSON.parse(r.tags_json || "[]"),
+    images: JSON.parse(r.images_json || "[]"),
+    color: r.color,
+    pinned: !!r.pinned,
+    position: r.position,
+    timestamp: r.timestamp,
+    updated_at: r.updated_at,
+    lastEditedBy: r.last_edited_by,
+    lastEditedAt: r.last_edited_at,
+    archived: !!r.archived,
+    trashed: !!r.trashed,
+    collaborators: hasCollaborators ? [] : null,
+  });
+});
+
 app.post("/api/notes/import", auth, (req, res) => {
   const payload = req.body || {};
   const src = Array.isArray(payload.notes)

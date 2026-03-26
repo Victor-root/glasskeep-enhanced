@@ -5888,8 +5888,12 @@ export default function App() {
     invalidateArchivedNotesCache();
 
     if (!isArchiving && tagFilter === "ARCHIVED") {
+      // Unarchiving from archived view — remove them from current list and switch view
+      setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
       setTagFilter(null);
-      loadNotes();
+    } else if (isArchiving) {
+      // Archiving from normal view — remove them from current list
+      setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
     }
 
     onExitMulti();
@@ -6522,11 +6526,72 @@ export default function App() {
     const maxReconnectAttempts = 10;
     const baseReconnectDelay = 1000;
 
+    // ─── Targeted single-note patch (local-first safe) ───
+    const patchSingleNote = async (noteId) => {
+      if (!noteId) return;
+      const nid = String(noteId);
+
+      // Don't overwrite notes with pending local changes
+      const pending = await hasPendingChanges(nid);
+      if (pending) return;
+
+      try {
+        const serverNote = await api(`/notes/${nid}`, { token });
+        if (!serverNote || !serverNote.id) return;
+
+        const currentFilter = tagFilterRef.current;
+        const noteArchived = !!serverNote.archived;
+        const noteTrashed = !!serverNote.trashed;
+
+        // Determine if this note belongs in the current view
+        const belongsInView =
+          (currentFilter === "ARCHIVED" && noteArchived && !noteTrashed) ||
+          (currentFilter === "TRASHED" && noteTrashed) ||
+          (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"))
+            && !noteArchived && !noteTrashed;
+
+        // Update IndexedDB
+        try {
+          await idbPutNote({
+            ...serverNote,
+            id: nid,
+            user_id: serverNote.user_id || currentUser?.id,
+          });
+        } catch (e) {}
+
+        if (belongsInView) {
+          // Upsert into current notes list
+          setNotes((prev) => {
+            const idx = prev.findIndex((n) => String(n.id) === nid);
+            if (idx >= 0) {
+              // Update existing note in place
+              const updated = [...prev];
+              updated[idx] = serverNote;
+              return updated;
+            } else {
+              // New note that belongs in this view - add to list
+              return sortNotesByRecency([...prev, serverNote]);
+            }
+          });
+        } else {
+          // Note no longer belongs in the current view — remove it
+          setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+        }
+      } catch (e) {
+        // Fetch failed (404, network, etc.) — if 404, note was deleted
+        if (e.status === 404) {
+          setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+          try { await idbDeleteNote(nid); } catch (_) {}
+        }
+        // Other errors: silently ignore, state stays as-is
+      }
+    };
+
     const connectSSE = () => {
       try {
         const url = new URL(`${window.location.origin}/api/events`);
         url.searchParams.set("token", token);
-        url.searchParams.set("_t", Date.now()); // Cache buster for PWA
+        url.searchParams.set("_t", Date.now());
         es = new EventSource(url.toString());
 
         es.onopen = () => {
@@ -6535,51 +6600,33 @@ export default function App() {
           reconnectAttempts = 0;
         };
 
+        // Generic message handler
         es.onmessage = (e) => {
           try {
             const msg = JSON.parse(e.data || "{}");
-            if (msg && msg.type === "note_updated") {
-              // Refresh notes list on any note update relevant to this user
-              const currentFilter = tagFilterRef.current;
-              if (currentFilter === "ARCHIVED") {
-                loadArchivedNotes().catch(() => {});
-              } else if (currentFilter === "TRASHED") {
-                loadTrashedNotes().catch(() => {});
-              } else {
-                loadNotes().catch(() => {});
-              }
+            if (msg && msg.type === "note_updated" && msg.noteId) {
+              patchSingleNote(msg.noteId);
             }
-          } catch (e) {}
+          } catch (_) {}
         };
 
+        // Named event handler
         es.addEventListener("note_updated", (e) => {
           try {
             const msg = JSON.parse(e.data || "{}");
             if (msg && msg.noteId) {
-              const currentFilter = tagFilterRef.current;
-              if (currentFilter === "ARCHIVED") {
-                loadArchivedNotes().catch(() => {});
-              } else if (currentFilter === "TRASHED") {
-                loadTrashedNotes().catch(() => {});
-              } else {
-                loadNotes().catch(() => {});
-              }
+              patchSingleNote(msg.noteId);
             }
-          } catch (e) {}
+          } catch (_) {}
         });
 
         es.onerror = (error) => {
           console.log("SSE error, attempting reconnect...", error);
           setSseConnected(false);
 
-          // Check if SSE is in a failed state (readyState 2 = CLOSED, usually means 401/auth error)
           if (es.readyState === EventSource.CLOSED) {
-            // If it's closed due to auth error, check if token is still valid
-            // The event source might have been closed due to 401
             const currentAuth = getAuth();
             if (!currentAuth || !currentAuth.token) {
-              // Token is missing, don't try to reconnect
-              console.log("SSE closed - no valid token, stopping reconnection");
               return;
             }
           }
@@ -6590,16 +6637,10 @@ export default function App() {
             const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts);
             reconnectTimeout = setTimeout(() => {
               reconnectAttempts++;
-              // Check token before reconnecting
               const currentAuth = getAuth();
-              if (!currentAuth || !currentAuth.token) {
-                console.log("SSE reconnection cancelled - no valid token");
-                return;
-              }
+              if (!currentAuth || !currentAuth.token) return;
               connectSSE();
             }, delay);
-          } else {
-            console.log("SSE reconnection attempts exhausted");
           }
         };
       } catch (error) {
@@ -6609,12 +6650,12 @@ export default function App() {
 
     connectSSE();
 
-    // Fallback polling mechanism in case SSE fails
+    // Fallback polling: only when SSE is dead, and only every 60s
     let pollInterval;
     const startPolling = () => {
       pollInterval = setInterval(() => {
-        // Only poll if SSE is not connected
         if (!es || es.readyState === EventSource.CLOSED) {
+          // SSE is dead — do a full reload as last resort
           const currentFilter = tagFilterRef.current;
           if (currentFilter === "ARCHIVED") {
             loadArchivedNotes().catch(() => {});
@@ -6624,63 +6665,45 @@ export default function App() {
             loadNotes().catch(() => {});
           }
         }
-      }, 30000); // Poll every 30 seconds as fallback
+        // When SSE is connected, polling does nothing
+      }, 60000);
     };
 
-    // Start polling after a delay
-    const pollTimeout = setTimeout(startPolling, 10000);
+    const pollTimeout = setTimeout(startPolling, 15000);
 
-    // Handle page visibility changes (PWA background/foreground)
+    // Visibility change: reconnect SSE if dead, trigger SyncEngine
+    // No full reload — trust SSE to have kept state up to date
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === "visible") {
-        // Page became visible, validate token first
+      if (document.visibilityState !== "visible") return;
+
+      // Reconnect SSE if needed
+      if (es && es.readyState === EventSource.CLOSED) {
         try {
-          // Quick health check - this will fail with 401 if token is expired
           await api("/health", { token });
-
-          // Token is valid, reconnect if needed
-          if (es && es.readyState === EventSource.CLOSED) {
-            connectSSE();
-          }
-
-          // Also refresh notes when page becomes visible
-          const currentFilter = tagFilterRef.current;
-          if (currentFilter === "ARCHIVED") {
-            loadArchivedNotes().catch(() => {});
-          } else if (currentFilter === "TRASHED") {
-            loadTrashedNotes().catch(() => {});
-          } else {
-            loadNotes().catch(() => {});
-          }
+          connectSSE();
         } catch (error) {
-          // If health check fails with 401, the api function will handle auth expiration
-          // Otherwise, just log and try to reconnect anyway
-          if (error.status !== 401) {
-            console.error("Error checking connection:", error);
-            // Still try to reconnect SSE and refresh notes on other errors
-            if (es && es.readyState === EventSource.CLOSED) {
-              connectSSE();
-            }
-            if (tagFilter === "ARCHIVED") {
-              loadArchivedNotes().catch(() => {});
-            } else {
-              loadNotes().catch(() => {});
-            }
-          }
+          if (error.status === 401) return;
+          // Server might be down, ignore
         }
       }
+
+      // Trigger sync engine to process any pending queue items
+      triggerSync();
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     // Handle online/offline events
     const handleOnline = () => {
-      console.log("App went online");
       setIsOnline(true);
+      // Reconnect SSE if it was dead
+      if (es && es.readyState === EventSource.CLOSED) {
+        connectSSE();
+      }
+      triggerSync();
     };
 
     const handleOffline = () => {
-      console.log("App went offline");
       setIsOnline(false);
     };
 
@@ -6689,18 +6712,10 @@ export default function App() {
 
     return () => {
       setSseConnected(false);
-      try {
-        if (es) es.close();
-      } catch (e) {}
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-      }
-      if (pollTimeout) {
-        clearTimeout(pollTimeout);
-      }
-      if (pollInterval) {
-        clearInterval(pollInterval);
-      }
+      try { if (es) es.close(); } catch (e) {}
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (pollTimeout) clearTimeout(pollTimeout);
+      if (pollInterval) clearInterval(pollInterval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
@@ -7174,21 +7189,20 @@ export default function App() {
     invalidateArchivedNotesCache();
     invalidateTrashedNotesCache();
 
-    // Update UI: remove from current view
+    // Update UI: remove note from current view (it moved to another view)
     if (tagFilter === "ARCHIVED") {
       if (!archived) {
-        setTagFilter(null);
-        loadNotes();
-      } else {
-        loadArchivedNotes();
-      }
-    } else {
-      // Remove from current view (it moved to archived)
-      if (archived) {
+        // Unarchiving from archived view — switch view and remove from list
         setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
-      } else {
-        loadNotes();
+        setTagFilter(null);
       }
+      // If archiving within archived view, note stays (no-op)
+    } else {
+      if (archived) {
+        // Archiving from normal view — remove from list
+        setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
+      }
+      // If unarchiving from normal view, note stays (no-op)
     }
 
     if (archived) {
