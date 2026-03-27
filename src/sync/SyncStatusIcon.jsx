@@ -191,22 +191,42 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
 
   const failedItems = (items || []).filter((i) => i.status === "failed");
 
-  // Server status line — when syncState is "error", don't show green even if server responded
-  const serverLabel =
-    syncState === "error" ? (t("syncServerReachable") || "Server OK")
-    : serverReachable === true ? (t("syncServerReachable") || "Server OK")
-    : serverReachable === false ? (t("syncServerUnreachable") || "Server unreachable")
-    : (t("syncServerChecking") || "Checking...");
-  const serverColor =
-    syncState === "error" ? (dark ? "text-amber-400" : "text-amber-600")
-    : serverReachable === true ? (dark ? "text-emerald-400" : "text-emerald-600")
-    : serverReachable === false ? (dark ? "text-red-400" : "text-red-600")
-    : (dark ? "text-gray-400" : "text-gray-500");
-  const serverDotColor =
-    syncState === "error" ? "bg-amber-500"
-    : serverReachable === true ? "bg-emerald-500"
-    : serverReachable === false ? "bg-red-500"
-    : "bg-gray-400";
+  // Server status line — derived from syncState FIRST to avoid contradictions.
+  // syncState already encodes the canonical priority (offline > error > syncing > etc.)
+  // so we never show "Server OK" alongside active errors, or "Checking..." while syncing.
+  let serverLabel, serverColor, serverDotColor;
+  if (syncState === "offline") {
+    serverLabel = t("syncServerUnreachable") || "Server unreachable";
+    serverColor = dark ? "text-red-400" : "text-red-600";
+    serverDotColor = "bg-red-500";
+  } else if (syncState === "error") {
+    // Server responded (it IS reachable) but sync items failed — don't say "OK"
+    serverLabel = t("syncServerReachableErrors") || "Server reachable";
+    serverColor = dark ? "text-amber-400" : "text-amber-600";
+    serverDotColor = "bg-amber-500";
+  } else if (syncState === "syncing") {
+    // Actively syncing — engine won't sync if server is known down,
+    // so serverReachable===null here just means "was true, currently unverified"
+    serverLabel = t("syncServerReachable") || "Server OK";
+    serverColor = dark ? "text-emerald-400" : "text-emerald-600";
+    serverDotColor = "bg-emerald-500";
+  } else if (syncState === "checking") {
+    serverLabel = t("syncServerChecking") || "Checking...";
+    serverColor = dark ? "text-gray-400" : "text-gray-500";
+    serverDotColor = "bg-gray-400";
+  } else if (serverReachable === false) {
+    serverLabel = t("syncServerUnreachable") || "Server unreachable";
+    serverColor = dark ? "text-red-400" : "text-red-600";
+    serverDotColor = "bg-red-500";
+  } else if (serverReachable === true) {
+    serverLabel = t("syncServerReachable") || "Server OK";
+    serverColor = dark ? "text-emerald-400" : "text-emerald-600";
+    serverDotColor = "bg-emerald-500";
+  } else {
+    serverLabel = t("syncServerChecking") || "Checking...";
+    serverColor = dark ? "text-gray-400" : "text-gray-500";
+    serverDotColor = "bg-gray-400";
+  }
 
   return (
     <div className="relative">
@@ -326,8 +346,8 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
               </button>
             </div>
 
-            {/* Safe to close indicator — mutually exclusive */}
-            {hasPendingChanges ? (
+            {/* Safe to close indicator — covers all meaningful states */}
+            {hasPendingChanges || syncState === "error" || syncState === "offline" ? (
               <div className={`px-4 pb-3 text-xs text-center ${dark ? "text-amber-400" : "text-amber-600"}`}>
                 {t("syncNotSafeToClose")}
               </div>
