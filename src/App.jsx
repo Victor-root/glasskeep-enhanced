@@ -6430,9 +6430,32 @@ export default function App() {
       }
       if (toWrite.length > 0) await idbPutNotes(toWrite);
 
-      setNotes(sortNotesByRecency(notesArray));
+      // Merge with locally-trashed notes not yet on server (pending sync)
+      const serverIds = new Set(notesArray.map((n) => String(n.id)));
+      const localOnly = [];
       try {
-        localStorage.setItem(TRASHED_NOTES_CACHE_KEY, JSON.stringify(notesArray));
+        const allLocal = await idbGetAllNotes(currentUser?.id, "trashed");
+        for (const ln of allLocal) {
+          if (!serverIds.has(String(ln.id))) localOnly.push(ln);
+        }
+      } catch (e) {}
+
+      // For notes with pending changes, use local version
+      const merged = [];
+      for (const sn of notesArray) {
+        const pending = await hasPendingChanges(String(sn.id));
+        if (pending) {
+          const localVer = await idbGetNote(String(sn.id));
+          merged.push(localVer || sn);
+        } else {
+          merged.push(sn);
+        }
+      }
+
+      const final = [...merged, ...localOnly];
+      setNotes(sortNotesByRecency(final));
+      try {
+        localStorage.setItem(TRASHED_NOTES_CACHE_KEY, JSON.stringify(final));
       } catch (e) {}
     } catch (error) {
       console.error("Error loading trashed notes from server:", error);
