@@ -6269,19 +6269,19 @@ export default function App() {
     notesAreRegular.current = true;
     setNotesLoading(true);
 
-    // First: show notes from IndexedDB immediately (local-first)
     try {
-      const localNotes = await idbGetAllNotes(currentUser?.id, "active");
-      if (localNotes.length > 0) {
-        if (tagFilterRef.current !== expectedFilter) return; // view changed
-        setNotes(sortNotesByRecency(localNotes));
+      // First: show notes from IndexedDB immediately (local-first)
+      try {
+        const localNotes = await idbGetAllNotes(currentUser?.id, "active");
+        if (localNotes.length > 0) {
+          if (tagFilterRef.current !== expectedFilter) return; // view changed
+          setNotes(sortNotesByRecency(localNotes));
+        }
+      } catch (e) {
+        console.error("IndexedDB read failed:", e);
       }
-    } catch (e) {
-      console.error("IndexedDB read failed:", e);
-    }
 
-    // Then: fetch from server and merge (protecting pending local changes)
-    try {
+      // Then: fetch from server and merge (protecting pending local changes)
       const data = await api("/notes", { token });
       if (tagFilterRef.current !== expectedFilter) return; // view changed during fetch
       const serverNotes = Array.isArray(data) ? data : [];
@@ -6356,16 +6356,16 @@ export default function App() {
     notesAreRegular.current = false;
     setNotesLoading(true);
 
-    // Show IndexedDB archived notes immediately
     try {
-      const localArchived = await idbGetAllNotes(currentUser?.id, "archived");
-      if (localArchived.length > 0) {
-        if (tagFilterRef.current !== expectedFilter) return;
-        setNotes(sortNotesByRecency(localArchived));
-      }
-    } catch (e) {}
+      // Show IndexedDB archived notes immediately
+      try {
+        const localArchived = await idbGetAllNotes(currentUser?.id, "archived");
+        if (localArchived.length > 0) {
+          if (tagFilterRef.current !== expectedFilter) return;
+          setNotes(sortNotesByRecency(localArchived));
+        }
+      } catch (e) {}
 
-    try {
       const data = await api("/notes/archived", { token });
       if (tagFilterRef.current !== expectedFilter) return;
       const notesArray = Array.isArray(data) ? data : [];
@@ -6425,16 +6425,16 @@ export default function App() {
     notesAreRegular.current = false;
     setNotesLoading(true);
 
-    // Show IndexedDB trashed notes immediately
     try {
-      const localTrashed = await idbGetAllNotes(currentUser?.id, "trashed");
-      if (localTrashed.length > 0) {
-        if (tagFilterRef.current !== expectedFilter) return;
-        setNotes(sortNotesByRecency(localTrashed));
-      }
-    } catch (e) {}
+      // Show IndexedDB trashed notes immediately
+      try {
+        const localTrashed = await idbGetAllNotes(currentUser?.id, "trashed");
+        if (localTrashed.length > 0) {
+          if (tagFilterRef.current !== expectedFilter) return;
+          setNotes(sortNotesByRecency(localTrashed));
+        }
+      } catch (e) {}
 
-    try {
       const data = await api("/notes/trashed", { token });
       if (tagFilterRef.current !== expectedFilter) return;
       const notesArray = Array.isArray(data) ? data : [];
@@ -6505,29 +6505,26 @@ export default function App() {
   useEffect(() => {
     if (!token) return;
 
-    console.log("Tag filter changed to:", tagFilter, "from previous value");
+    // Update ref FIRST so load functions can use it for async staleness checks
+    tagFilterRef.current = tagFilter;
 
     // Load appropriate notes based on tag filter
     if (tagFilter === "ARCHIVED") {
-      console.log("Loading archived notes...");
       loadArchivedNotes().catch((error) => {
         console.error("Failed to load archived notes:", error);
       });
     } else if (tagFilter === "TRASHED") {
-      console.log("Loading trashed notes...");
       loadTrashedNotes().catch((error) => {
         console.error("Failed to load trashed notes:", error);
       });
     } else {
-      console.log("Loading regular notes...");
       loadNotes().catch((error) => {
         console.error("Failed to load regular notes:", error);
       });
     }
   }, [token, tagFilter]);
 
-  // Keep tagFilter ref in sync for SSE/polling closures
-  useEffect(() => { tagFilterRef.current = tagFilter; }, [tagFilter]);
+  // tagFilterRef is now updated inside the load useEffect above (before calling load functions)
 
   // Fetch login profiles (public)
   const fetchLoginProfiles = async () => {
