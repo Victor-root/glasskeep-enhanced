@@ -345,7 +345,8 @@ export class SyncEngine {
 
     getQueueStats().then((stats) => {
       let interval;
-      if (this._serverReachable === false && stats.total > 0) {
+      if (this._serverReachable === false) {
+        // Always aggressive when offline — detect recovery ASAP
         interval = HEALTH_OFFLINE_INTERVAL;
       } else if (stats.total > 0) {
         interval = HEALTH_PENDING_INTERVAL;
