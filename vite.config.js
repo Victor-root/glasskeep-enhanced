@@ -41,11 +41,17 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
         runtimeCaching: [
           {
+            // Health check must NEVER be served from cache — sync engine
+            // relies on it to detect server downtime accurately.
+            urlPattern: /^https?:\/\/.*\/api\/health$/,
+            handler: 'NetworkOnly',
+          },
+          {
             urlPattern: /^https?:\/\/.*\/api\/notes.*$/,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'notes-cache',
-              networkTimeoutSeconds: 3,
+              networkTimeoutSeconds: 2,
               cacheableResponse: {
                 statuses: [0, 200]
               },
@@ -60,7 +66,7 @@ export default defineConfig({
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
-              networkTimeoutSeconds: 3,
+              networkTimeoutSeconds: 2,
               cacheableResponse: {
                 statuses: [0, 200]
               },

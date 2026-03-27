@@ -226,11 +226,10 @@ export class SyncEngine {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
       const res = await fetch(`${API_BASE}/health`, {
         headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
-        cache: "no-store", // bypass service worker cache — must hit real server
       });
       clearTimeout(timeoutId);
 
@@ -425,7 +424,7 @@ export class SyncEngine {
         ? { ...baseHeaders, "Content-Type": "application/json" }
         : baseHeaders;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
       try {
         const res = await fetch(`${API_BASE}${path}`, {
           ...options,
