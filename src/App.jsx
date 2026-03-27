@@ -5640,6 +5640,7 @@ export default function App() {
   // Loading state for notes
   const [notesLoading, setNotesLoading] = useState(false);
   const notesAreRegular = useRef(true); // tracks whether notes[] holds regular (non-archive/trash) notes
+  const localEditDirtyRef = useRef(null); // noteId with unsaved local edits (set before debounce fires)
   // Remove lazy loading state
 
   // -------- Multi-select state --------
@@ -6571,9 +6572,12 @@ export default function App() {
       if (!noteId) return;
       const nid = String(noteId);
 
-      // Don't overwrite notes with pending local changes
+      // Don't overwrite notes with pending local changes (already in sync queue)
       const pending = await hasPendingChanges(nid);
       if (pending) return;
+
+      // Don't overwrite note currently being edited in modal (debounce may not have fired yet)
+      if (localEditDirtyRef.current === nid) return;
 
       try {
         const serverNote = await api(`/notes/${nid}`, { token });
@@ -7961,11 +7965,16 @@ export default function App() {
     invalidateNotesCache();
 
     // Enqueue targeted patch (only the changed fields)
-    enqueueAndSync({
+    await enqueueAndSync({
       type: "patch",
       noteId: nId,
       payload: { ...fields, type: "text" },
     });
+    // hasPendingChanges() now returns true → SSE protection via queue takes over
+    // Clear the dirty ref only if it still points to this note
+    if (localEditDirtyRef.current === nId) {
+      localEditDirtyRef.current = null;
+    }
   }, [enqueueAndSync]);
 
   // Local-first auto-save for text metadata (color, tags, images) — immediate, no debounce
@@ -7979,6 +7988,9 @@ export default function App() {
     const imagesChanged = JSON.stringify(initial.images) !== JSON.stringify(mImages);
 
     if (!colorChanged && !tagsChanged && !imagesChanged) return;
+
+    // Mark note as locally dirty before enqueue (protects against SSE overwrite)
+    localEditDirtyRef.current = String(activeId);
 
     // Build patch with only changed metadata fields
     const metaPatch = {};
@@ -8006,6 +8018,10 @@ export default function App() {
     const titleChanged = initial.title !== mTitle.trim();
     const contentChanged = initial.content !== mBody;
     if (!titleChanged && !contentChanged) return;
+
+    // Mark note as locally dirty IMMEDIATELY (before debounce fires).
+    // This protects against SSE overwriting IDB during the debounce window.
+    localEditDirtyRef.current = String(activeId);
 
     const timeoutId = setTimeout(() => {
       // Build patch with only changed content fields
@@ -8085,6 +8101,9 @@ export default function App() {
         }
       }
     }
+
+    // Clear dirty flag — auto-save flush above enqueued any remaining changes
+    localEditDirtyRef.current = null;
 
     // Start exit animation, then actually unmount after it completes
     setIsModalClosing(true);
