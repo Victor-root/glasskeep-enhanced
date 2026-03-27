@@ -39,6 +39,7 @@ export class SyncEngine {
     this.onSyncComplete = onSyncComplete || (() => {});
     this.onSyncError = onSyncError || (() => {});
     this._processing = false;
+    this._isChecking = false; // true while forceSync health-checks (immediate UI feedback)
     this._healthTimer = null;
     this._destroyed = false;
 
@@ -168,14 +169,22 @@ export class SyncEngine {
    * Returns the resulting status for immediate feedback.
    */
   async forceSync() {
+    // Immediately signal "checking" so the UI reacts before the network call
+    this._isChecking = true;
+    await this._emitStatus();
+    this._isChecking = false;
+
     await this.healthCheck();
-    // Reset failed items to pending so they get retried immediately
+
+    if (!this._serverReachable) return; // server is down — healthCheck already emitted offline
+
+    // Reset failed items so they are retried immediately (bypass backoff)
     const stats = await getQueueStats();
     for (const item of stats.items) {
       if (item.status === "failed" && item.attempts < MAX_RETRIES) {
         await updateQueueItem(item.queueId, {
           status: "pending",
-          lastAttemptAt: 0, // clear backoff
+          lastAttemptAt: 0,
         });
       }
     }
@@ -202,6 +211,10 @@ export class SyncEngine {
       if (res.ok) {
         const wasOffline = this._serverReachable === false;
         this._serverReachable = true;
+        // Clear any stale network-error message — server is now confirmed reachable
+        if (this._lastSyncError === "Server unreachable") {
+          this._lastSyncError = null;
+        }
         this._adjustHealthInterval();
         await this._emitStatus();
         if (wasOffline) {
@@ -211,11 +224,13 @@ export class SyncEngine {
         return true;
       }
       this._serverReachable = false;
+      this._lastSyncError = "Server unreachable";
       this._adjustHealthInterval();
       await this._emitStatus();
       return false;
     } catch {
       this._serverReachable = false;
+      this._lastSyncError = "Server unreachable";
       this._adjustHealthInterval();
       await this._emitStatus();
       return false;
@@ -302,20 +317,27 @@ export class SyncEngine {
     const stats = await getQueueStats();
     const hasPending = stats.total > 0;
 
-    // Derive the display state
+    // Derive the display state — strict priority, no false positives
     let syncState;
-    if (this._processing && hasPending) {
+    if (this._isChecking) {
+      // forceSync in progress — immediate feedback before network call
+      syncState = "checking";
+    } else if (this._processing) {
+      // Queue is being processed (items exist, network calls in flight)
       syncState = "syncing";
-    } else if (this._serverReachable === false && hasPending) {
+    } else if (this._serverReachable === false) {
+      // Server confirmed unreachable — always offline regardless of queue state
       syncState = "offline";
-    } else if (this._serverReachable === false && !hasPending) {
-      // Server is down but nothing to sync — still show offline
-      syncState = "offline";
+    } else if (this._serverReachable === null) {
+      // Server reachability not yet established — show checking, not synced
+      syncState = "checking";
     } else if (stats.failed > 0 && stats.pending === 0 && stats.processing === 0) {
+      // Server reachable but some actions failed permanently (404, 403, etc.)
       syncState = "error";
     } else if (hasPending) {
       syncState = "pending";
     } else {
+      // Only reach "synced" when serverReachable === true AND queue is empty
       syncState = "synced";
     }
 

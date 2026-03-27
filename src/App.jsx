@@ -5405,7 +5405,7 @@ export default function App() {
 
   // ─── Local-first sync state ───
   const [syncStatus, setSyncStatus] = useState({
-    syncState: "pending", serverReachable: null, hasPendingChanges: false, isSyncing: false,
+    syncState: "checking", serverReachable: null, hasPendingChanges: false, isSyncing: false,
     lastSyncAt: null, lastSyncError: null,
     pending: 0, processing: 0, failed: 0, total: 0, items: [],
   });
@@ -6101,7 +6101,7 @@ export default function App() {
         syncEngineRef.current = null;
       }
       setSyncStatus({
-        syncState: "synced", serverReachable: null, hasPendingChanges: false, isSyncing: false,
+        syncState: "checking", serverReachable: null, hasPendingChanges: false, isSyncing: false,
         lastSyncAt: null, lastSyncError: null,
         pending: 0, processing: 0, failed: 0, total: 0, items: [],
       });

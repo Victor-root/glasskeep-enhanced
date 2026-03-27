@@ -57,6 +57,14 @@ const RefreshIcon = ({ className }) => (
 
 function getStatusConfig(syncState, dark) {
   switch (syncState) {
+    case "checking":
+      return {
+        Icon: CloudPending,
+        color: dark ? "text-gray-400" : "text-gray-500",
+        hoverBg: dark ? "hover:bg-gray-500/15" : "hover:bg-gray-200",
+        label: t("syncServerChecking"),
+        animate: true,
+      };
     case "synced":
       return {
         Icon: CloudCheck,
@@ -315,17 +323,16 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
               </button>
             </div>
 
-            {/* Safe to close indicator */}
-            {syncState === "synced" && (
-              <div className={`px-4 pb-3 text-xs text-center ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
-                {t("syncSafeToClose")}
-              </div>
-            )}
-            {hasPendingChanges && (
+            {/* Safe to close indicator — mutually exclusive */}
+            {hasPendingChanges ? (
               <div className={`px-4 pb-3 text-xs text-center ${dark ? "text-amber-400" : "text-amber-600"}`}>
                 {t("syncNotSafeToClose")}
               </div>
-            )}
+            ) : syncState === "synced" ? (
+              <div className={`px-4 pb-3 text-xs text-center ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
+                {t("syncSafeToClose")}
+              </div>
+            ) : null}
           </div>
         </>
       )}
