@@ -6304,7 +6304,11 @@ export default function App() {
       }
 
       // Then: fetch from server and merge (protecting pending local changes)
-      // Skip API call entirely if sync engine already knows server is down
+      // If server status is unknown, resolve with a quick health check first (2s max)
+      if (syncEngineRef.current && syncEngineRef.current.serverReachable === null) {
+        await syncEngineRef.current.healthCheck();
+      }
+      // Skip API call entirely if sync engine knows server is down
       if (syncEngineRef.current?.serverReachable === false) throw new Error("Server offline (skip)");
       const data = await api("/notes", { token });
       if (tagFilterRef.current !== expectedFilter) return; // view changed during fetch
@@ -6353,6 +6357,8 @@ export default function App() {
       persistNotesCache(final);
     } catch (error) {
       console.error("Error loading notes from server:", error);
+      // Notify sync engine so it detects offline state quickly
+      syncEngineRef.current?.healthCheck();
       if (tagFilterRef.current !== expectedFilter) return; // view changed
       // Fallback: use IndexedDB data (already shown above), or localStorage
       try {
@@ -6391,7 +6397,10 @@ export default function App() {
         }
       } catch (e) {}
 
-      // Skip API call if sync engine already knows server is down
+      // If server status is unknown, resolve with a quick health check first (2s max)
+      if (syncEngineRef.current && syncEngineRef.current.serverReachable === null) {
+        await syncEngineRef.current.healthCheck();
+      }
       if (syncEngineRef.current?.serverReachable === false) throw new Error("Server offline (skip)");
       const data = await api("/notes/archived", { token });
       if (tagFilterRef.current !== expectedFilter) return;
@@ -6441,6 +6450,7 @@ export default function App() {
       } catch (e) {}
     } catch (error) {
       console.error("Error loading archived notes from server:", error);
+      syncEngineRef.current?.healthCheck();
       // Keep IndexedDB data already shown
     } finally {
       setNotesLoading(false);
@@ -6465,7 +6475,10 @@ export default function App() {
         }
       } catch (e) {}
 
-      // Skip API call if sync engine already knows server is down
+      // If server status is unknown, resolve with a quick health check first (2s max)
+      if (syncEngineRef.current && syncEngineRef.current.serverReachable === null) {
+        await syncEngineRef.current.healthCheck();
+      }
       if (syncEngineRef.current?.serverReachable === false) throw new Error("Server offline (skip)");
       const data = await api("/notes/trashed", { token });
       if (tagFilterRef.current !== expectedFilter) return;
@@ -6515,6 +6528,7 @@ export default function App() {
       } catch (e) {}
     } catch (error) {
       console.error("Error loading trashed notes from server:", error);
+      syncEngineRef.current?.healthCheck();
       if (tagFilterRef.current !== expectedFilter) return;
       // Keep IndexedDB data already shown, or fallback to localStorage
       try {
