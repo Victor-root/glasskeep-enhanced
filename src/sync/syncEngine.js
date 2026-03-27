@@ -358,7 +358,9 @@ export class SyncEngine {
 
     this.onStatusChange({
       syncState,
-      serverReachable: this._serverReachable,
+      // During active processing, never claim "Server OK" — the network call hasn't returned yet.
+      // Show null ("Vérification...") so the dot reflects uncertainty, not stale optimism.
+      serverReachable: this._processing ? (this._serverReachable === false ? false : null) : this._serverReachable,
       hasPendingChanges: hasPending,
       isSyncing: this._processing,
       lastSyncAt: this._lastSyncAt,
