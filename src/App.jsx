@@ -5124,9 +5124,16 @@ function NotesUI({
           <p className="text-center text-gray-500 dark:text-gray-400 mt-10">{t("noMatchingNotes")}</p>
         )}
         {!notesLoading && allEmpty && (
-          <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
-            {activeTagFilter === "TRASHED" ? t("noTrashedNotes") : t("noNotesYet")}
-          </p>
+          <div className="text-center mt-10 px-4">
+            <p className="text-gray-500 dark:text-gray-400">
+              {activeTagFilter === "TRASHED" ? t("noTrashedNotes") : activeTagFilter === "ARCHIVED" ? t("noMatchingNotes") : t("noNotesYet")}
+            </p>
+            {syncStatus?.syncState === "offline" && (
+              <p className="mt-2 text-sm text-amber-500 dark:text-amber-400">
+                {t("offlineViewNotLoaded")}
+              </p>
+            )}
+          </div>
         )}
       </main>
     </div>
