@@ -191,15 +191,22 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
 
   const failedItems = (items || []).filter((i) => i.status === "failed");
 
-  // Server status line
+  // Server status line — when syncState is "error", don't show green even if server responded
   const serverLabel =
-    serverReachable === true ? (t("syncServerReachable") || "Server OK")
+    syncState === "error" ? (t("syncServerReachable") || "Server OK")
+    : serverReachable === true ? (t("syncServerReachable") || "Server OK")
     : serverReachable === false ? (t("syncServerUnreachable") || "Server unreachable")
     : (t("syncServerChecking") || "Checking...");
   const serverColor =
-    serverReachable === true ? (dark ? "text-emerald-400" : "text-emerald-600")
+    syncState === "error" ? (dark ? "text-amber-400" : "text-amber-600")
+    : serverReachable === true ? (dark ? "text-emerald-400" : "text-emerald-600")
     : serverReachable === false ? (dark ? "text-red-400" : "text-red-600")
     : (dark ? "text-gray-400" : "text-gray-500");
+  const serverDotColor =
+    syncState === "error" ? "bg-amber-500"
+    : serverReachable === true ? "bg-emerald-500"
+    : serverReachable === false ? "bg-red-500"
+    : "bg-gray-400";
 
   return (
     <div className="relative">
@@ -247,11 +254,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
               {/* Server status + last sync */}
               <div className={`mt-1.5 flex items-center gap-2 text-xs`}>
                 <span className={`inline-flex items-center gap-1 ${serverColor}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    serverReachable === true ? "bg-emerald-500"
-                    : serverReachable === false ? "bg-red-500"
-                    : "bg-gray-400"
-                  }`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${serverDotColor}`} />
                   {serverLabel}
                 </span>
                 {lastSyncAt && (

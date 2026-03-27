@@ -123,6 +123,11 @@ export class SyncEngine {
             this._lastSyncAt = Date.now();
             this.onSyncComplete(item);
             continue;
+          } else if (isNotFound && (item.type === "trash" || item.type === "restore")) {
+            // Note doesn't exist or was already trashed/restored — discard silently
+            this._serverReachable = true;
+            await removeQueueItem(item.queueId);
+            continue;
           } else if (isNotFound && (item.type === "update" || item.type === "patch" || item.type === "archive")) {
             this._serverReachable = true; // server responded, just note missing
             await updateQueueItem(item.queueId, {
@@ -396,12 +401,14 @@ export class SyncEngine {
       throw err;
     }
 
-    const headers = {
-      "Content-Type": "application/json",
+    const baseHeaders = {
       Authorization: `Bearer ${token}`,
     };
 
     const doFetch = async (path, options = {}) => {
+      const headers = options.body
+        ? { ...baseHeaders, "Content-Type": "application/json" }
+        : baseHeaders;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
       try {
