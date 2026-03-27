@@ -207,11 +207,11 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
   } else if (syncState === "syncing") {
     // Actively syncing — engine won't sync if server is known down,
     // so serverReachable===null here just means "was true, currently unverified"
-    serverLabel = t("syncServerReachable") || "Server OK";
+    serverLabel = t("syncServerReachable") || "Server reachable";
     serverColor = dark ? "text-emerald-400" : "text-emerald-600";
     serverDotColor = "bg-emerald-500";
   } else if (syncState === "checking") {
-    serverLabel = t("syncServerChecking") || "Checking...";
+    serverLabel = t("syncServerChecking") || "Checking server...";
     serverColor = dark ? "text-gray-400" : "text-gray-500";
     serverDotColor = "bg-gray-400";
   } else if (serverReachable === false) {
@@ -219,11 +219,11 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
     serverColor = dark ? "text-red-400" : "text-red-600";
     serverDotColor = "bg-red-500";
   } else if (serverReachable === true) {
-    serverLabel = t("syncServerReachable") || "Server OK";
+    serverLabel = t("syncServerReachable") || "Server reachable";
     serverColor = dark ? "text-emerald-400" : "text-emerald-600";
     serverDotColor = "bg-emerald-500";
   } else {
-    serverLabel = t("syncServerChecking") || "Checking...";
+    serverLabel = t("syncServerChecking") || "Checking server...";
     serverColor = dark ? "text-gray-400" : "text-gray-500";
     serverDotColor = "bg-gray-400";
   }
