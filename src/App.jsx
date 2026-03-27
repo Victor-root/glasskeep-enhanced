@@ -26,7 +26,6 @@ import {
   hasPendingChanges,
   clearQueue as idbClearQueue,
   clearNotesForUser as idbClearNotesForUser,
-  collapseQueue,
 } from "./sync/localDb.js";
 
 function trColorName(name) {
@@ -5404,11 +5403,13 @@ export default function App() {
   const [search, setSearch] = useState("");
 
   // ─── Local-first sync state ───
-  const [syncStatus, setSyncStatus] = useState({
+  // Canonical reset shape — used at init, cleanup, and sign-out to avoid divergence.
+  const SYNC_STATUS_RESET = useMemo(() => ({
     syncState: "checking", serverReachable: null, hasPendingChanges: false, isSyncing: false,
     lastSyncAt: null, lastSyncError: null,
     pending: 0, processing: 0, failed: 0, total: 0, items: [],
-  });
+  }), []);
+  const [syncStatus, setSyncStatus] = useState(SYNC_STATUS_RESET);
   const syncEngineRef = useRef(null);
   const tokenRef = useRef(token);
   tokenRef.current = token;
@@ -6095,17 +6096,30 @@ export default function App() {
   }, [sidebarOpen]);
 
   // ─── SyncEngine lifecycle ───
+  //
+  // CANONICAL SYNC PATH (single source of truth):
+  //
+  //   User action → IDB write → enqueueAndSync(action) → idbEnqueue → triggerSync
+  //     → syncEngineRef.current.processQueue() → HTTP calls → onStatusChange → setSyncStatus
+  //
+  //   Remote updates: SSE → patchSingleNote(noteId) → hasPendingChanges guard → IDB + setNotes
+  //   Retry:          processQueue self-reschedules on retryable failures
+  //   Recovery:       healthCheck (adaptive 5s/10s/30s) resets transient failures → processQueue
+  //   Manual:         handleSyncNow → syncEngine.forceSync() → healthCheck + reset all + processQueue
+  //
+  //   State ownership:
+  //   - syncStatus (React state)     ← ONLY written by syncEngine.onStatusChange + reset points
+  //   - IndexedDB syncQueue          ← ONLY written by idbEnqueue + syncEngine queue updates
+  //   - IndexedDB notes store        ← Written by load functions, auto-save, patchSingleNote
+  //   - localEditDirtyRef            ← Protects IDB from SSE overwrite during debounce window
+  //
   useEffect(() => {
     if (!token || !currentUser?.id) {
       if (syncEngineRef.current) {
         syncEngineRef.current.destroy();
         syncEngineRef.current = null;
       }
-      setSyncStatus({
-        syncState: "checking", serverReachable: null, hasPendingChanges: false, isSyncing: false,
-        lastSyncAt: null, lastSyncError: null,
-        pending: 0, processing: 0, failed: 0, total: 0, items: [],
-      });
+      setSyncStatus(SYNC_STATUS_RESET);
       return;
     }
 
@@ -7043,11 +7057,7 @@ export default function App() {
     setAuth(null);
     setSession(null);
     setNotes([]);
-    setSyncStatus({
-      syncState: "synced", serverReachable: null, hasPendingChanges: false, isSyncing: false,
-      lastSyncAt: null, lastSyncError: null,
-      pending: 0, processing: 0, failed: 0, total: 0, items: [],
-    });
+    setSyncStatus(SYNC_STATUS_RESET);
     // Clear all cached data for this user
     try {
       const keys = Object.keys(localStorage);
