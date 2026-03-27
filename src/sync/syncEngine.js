@@ -338,32 +338,43 @@ export class SyncEngine {
     const hasPending = stats.total > 0;
 
     // Derive the display state — strict priority, no false positives
+    //
+    // Rule 1: serverReachable === false wins EVERYTHING. UI stays red/offline.
+    //         Even if _processing is true (a stale retry is running), the user sees "offline".
+    // Rule 2: serverReachable === null (unknown) → "checking" — never green.
+    // Rule 3: Only when serverReachable === true (confirmed by health check or successful sync)
+    //         can we show syncing/pending/synced/error.
     let syncState;
-    if (this._isChecking) {
-      // forceSync in progress — immediate feedback before network call
+    if (this._serverReachable === false) {
+      // Server confirmed unreachable — ALWAYS offline, no exceptions
+      syncState = "offline";
+    } else if (this._isChecking || this._serverReachable === null) {
       syncState = "checking";
     } else if (this._processing) {
-      // Queue is being processed (items exist, network calls in flight)
       syncState = "syncing";
-    } else if (this._serverReachable === false) {
-      // Server confirmed unreachable — always offline regardless of queue state
-      syncState = "offline";
-    } else if (this._serverReachable === null) {
-      // Server reachability not yet established — show checking, not synced
-      syncState = "checking";
     } else if (stats.failed > 0 && stats.pending === 0 && stats.processing === 0) {
-      // Server reachable but some actions failed permanently (404, 403, etc.)
       syncState = "error";
     } else if (hasPending) {
       syncState = "pending";
     } else {
-      // Only reach "synced" when serverReachable === true AND queue is empty
       syncState = "synced";
+    }
+
+    // CRITICAL: During processing or checking, server reachability is UNVERIFIED for
+    // this attempt. Never show "Server OK" based on a stale previous check.
+    // Only confirmed states: false stays false, true becomes null during processing.
+    let emittedServerReachable = this._serverReachable;
+    if (this._processing || this._isChecking) {
+      // If currently attempting network calls, server state is uncertain
+      // false = already confirmed down (keep it), true/null = not yet confirmed for this attempt
+      if (this._serverReachable !== false) {
+        emittedServerReachable = null;
+      }
     }
 
     this.onStatusChange({
       syncState,
-      serverReachable: this._serverReachable,
+      serverReachable: emittedServerReachable,
       hasPendingChanges: hasPending,
       isSyncing: this._processing,
       lastSyncAt: this._lastSyncAt,
