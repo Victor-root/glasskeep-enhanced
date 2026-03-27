@@ -55,11 +55,19 @@ export class SyncEngine {
    * Trigger sync processing. Safe to call repeatedly.
    */
   async processQueue() {
-    if (this._processing || this._destroyed) return;
+    if (this._destroyed) return;
+    if (this._processing) {
+      await this._emitStatus(); // refresh queue count even while busy
+      return;
+    }
 
     // Never attempt network calls if server is known to be down.
     // The health check will reset _serverReachable and call processQueue on recovery.
-    if (this._serverReachable === false) return;
+    // Still emit status so the UI reflects the new queue count.
+    if (this._serverReachable === false) {
+      await this._emitStatus();
+      return;
+    }
 
     this._processing = true;
 
