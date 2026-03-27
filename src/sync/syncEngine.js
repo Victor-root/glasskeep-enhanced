@@ -13,10 +13,10 @@ const API_BASE = "/api";
 const MAX_RETRIES = 5;
 const BASE_RETRY_DELAY = 2000; // 2s, 4s, 8s, 16s, 32s
 
-// Health check intervals
-const HEALTH_IDLE_INTERVAL = 30000;      // 30s when everything is OK
-const HEALTH_PENDING_INTERVAL = 10000;   // 10s when there are pending changes
-const HEALTH_OFFLINE_INTERVAL = 5000;    // 5s when server is known to be down
+// Health check intervals (self-hosted LAN — lightweight ping, can be aggressive)
+const HEALTH_IDLE_INTERVAL = 10000;      // 10s when everything is OK
+const HEALTH_PENDING_INTERVAL = 5000;    // 5s when there are pending changes
+const HEALTH_OFFLINE_INTERVAL = 3000;    // 3s when server is known to be down
 
 /**
  * SyncEngine manages background synchronization.
