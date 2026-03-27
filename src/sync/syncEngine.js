@@ -56,6 +56,11 @@ export class SyncEngine {
    */
   async processQueue() {
     if (this._processing || this._destroyed) return;
+
+    // Never attempt network calls if server is known to be down.
+    // The health check will reset _serverReachable and call processQueue on recovery.
+    if (this._serverReachable === false) return;
+
     this._processing = true;
 
     try {
@@ -68,7 +73,7 @@ export class SyncEngine {
         return;
       }
 
-      await this._emitStatus(); // will show "syncing" because _processing was true... but we set it before
+      await this._emitStatus();
 
       for (const item of items) {
         if (this._destroyed) break;
@@ -358,9 +363,7 @@ export class SyncEngine {
 
     this.onStatusChange({
       syncState,
-      // During active processing, never claim "Server OK" — the network call hasn't returned yet.
-      // Show null ("Vérification...") so the dot reflects uncertainty, not stale optimism.
-      serverReachable: this._processing ? (this._serverReachable === false ? false : null) : this._serverReachable,
+      serverReachable: this._serverReachable,
       hasPendingChanges: hasPending,
       isSyncing: this._processing,
       lastSyncAt: this._lastSyncAt,
