@@ -6296,14 +6296,15 @@ export default function App() {
       }
       if (toWrite.length > 0) await idbPutNotes(toWrite);
 
-      // Build final list: server notes + locally-only notes not yet on server
+      // Build final list: server notes + locally-only notes with pending sync
       const serverIds = new Set(serverNotes.map((n) => String(n.id)));
       const localOnly = [];
       try {
         const allLocal = await idbGetAllNotes(currentUser?.id, "active");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            localOnly.push(ln);
+            const pending = await hasPendingChanges(String(ln.id));
+            if (pending) localOnly.push(ln);
           }
         }
       } catch (e) {}
@@ -6380,13 +6381,16 @@ export default function App() {
       }
       if (toWrite.length > 0) await idbPutNotes(toWrite);
 
-      // Merge with local-only archived notes
+      // Merge with local-only archived notes that have pending sync
       const serverIds = new Set(notesArray.map((n) => String(n.id)));
       const localOnly = [];
       try {
         const allLocal = await idbGetAllNotes(currentUser?.id, "archived");
         for (const ln of allLocal) {
-          if (!serverIds.has(String(ln.id))) localOnly.push(ln);
+          if (!serverIds.has(String(ln.id))) {
+            const pending = await hasPendingChanges(String(ln.id));
+            if (pending) localOnly.push(ln);
+          }
         }
       } catch (e) {}
 
@@ -6449,13 +6453,16 @@ export default function App() {
       }
       if (toWrite.length > 0) await idbPutNotes(toWrite);
 
-      // Merge with locally-trashed notes not yet on server (pending sync)
+      // Merge with locally-trashed notes that have pending sync
       const serverIds = new Set(notesArray.map((n) => String(n.id)));
       const localOnly = [];
       try {
         const allLocal = await idbGetAllNotes(currentUser?.id, "trashed");
         for (const ln of allLocal) {
-          if (!serverIds.has(String(ln.id))) localOnly.push(ln);
+          if (!serverIds.has(String(ln.id))) {
+            const pending = await hasPendingChanges(String(ln.id));
+            if (pending) localOnly.push(ln);
+          }
         }
       } catch (e) {}
 
