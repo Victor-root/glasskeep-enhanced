@@ -7910,7 +7910,7 @@ export default function App() {
   );
 
   // Auto-save timeout ref - must be defined before closeModal
-  // autoSaveTimeoutRef removed — text auto-save now uses useEffect cleanup pattern
+
 
   // Check if the note has been modified from initial state
   const hasNoteBeenModified = useCallback(() => {
@@ -7933,87 +7933,18 @@ export default function App() {
     );
   }, [activeId, mTitle, mBody, mTagList, mImages, mColor]);
 
-  // Save metadata (color, tags, images) immediately for collaborative notes
-  // This works even in view mode since these are metadata changes, not content changes
-  const saveCollaborativeMetadata = useCallback(async () => {
-    if (
-      activeId == null ||
-      mType !== "text" ||
-      !isCollaborativeNote(activeId) ||
-      !isOnline
-    )
-      return;
-
-    const base = {
-      id: activeId,
-      title: mTitle.trim(),
-      tags: mTagList,
-      images: mImages,
-      color: mColor,
-      pinned: !!notes.find((n) => String(n.id) === String(activeId))?.pinned,
-    };
-    const payload = { ...base, type: "text", content: mBody, items: [] };
-
-    try {
-      await api(`/notes/${activeId}`, { method: "PUT", token, body: payload });
-      invalidateNotesCache();
-
-      // Update local state
-      const nowIso = new Date().toISOString();
-      setNotes((prev) =>
-        prev.map((n) =>
-          String(n.id) === String(activeId)
-            ? {
-                ...n,
-                ...payload,
-                updated_at: nowIso,
-                lastEditedBy: currentUser?.email || currentUser?.name,
-                lastEditedAt: nowIso,
-              }
-            : n,
-        ),
-      );
-
-      // Update initial state so hasNoteBeenModified doesn't think it's changed
-      if (initialModalStateRef.current) {
-        initialModalStateRef.current = {
-          title: mTitle.trim(),
-          content: mBody,
-          tags: mTagList,
-          images: mImages,
-          color: mColor,
-        };
-      }
-    } catch (e) {
-      console.error("Failed to save metadata:", e);
-      // Don't show error toast to avoid interrupting user
-    }
-  }, [
-    activeId,
-    mType,
-    mTitle,
-    mTagList,
-    mImages,
-    mColor,
-    mBody,
-    notes,
-    token,
-    currentUser,
-    isCollaborativeNote,
-    isOnline,
-  ]);
 
   // Local-first auto-save for text notes: persist to IndexedDB + enqueue patch
   // Works for ALL text notes (not just collaborative) — mirrors drawing/checklist pattern
-  const autoSaveTextNote = useCallback(async (noteId, title, content) => {
+  const autoSaveTextNote = useCallback(async (noteId, fields) => {
     const nId = String(noteId);
     const nowIso = new Date().toISOString();
 
-    // Update notes state
+    // Update notes state with only provided fields
     setNotes((prev) =>
       prev.map((n) =>
         String(n.id) === nId
-          ? { ...n, title, content, updated_at: nowIso }
+          ? { ...n, ...fields, updated_at: nowIso }
           : n,
       ),
     );
@@ -8022,74 +7953,80 @@ export default function App() {
     try {
       const existing = await idbGetNote(nId);
       if (existing) {
-        await idbPutNote({ ...existing, title, content, updated_at: nowIso });
+        await idbPutNote({ ...existing, ...fields, updated_at: nowIso });
       }
     } catch (e) {
       console.error("IndexedDB text auto-save failed:", e);
     }
     invalidateNotesCache();
 
-    // Enqueue targeted patch (only title + content, not full note)
+    // Enqueue targeted patch (only the changed fields)
     enqueueAndSync({
       type: "patch",
       noteId: nId,
-      payload: { title, content, type: "text" },
+      payload: { ...fields, type: "text" },
     });
   }, [enqueueAndSync]);
 
-  // Auto-save metadata (color, tags, images) immediately for collaborative notes
-  // This works in both view and edit mode since these are metadata changes
+  // Local-first auto-save for text metadata (color, tags, images) — immediate, no debounce
   useEffect(() => {
-    if (
-      activeId &&
-      mType === "text" &&
-      isCollaborativeNote(activeId) &&
-      isOnline
-    ) {
-      // Only save if color, tags, or images changed (not title or body)
-      const initial = initialModalStateRef.current;
-      if (initial) {
-        const colorChanged = initial.color !== mColor;
-        const tagsChanged =
-          JSON.stringify(initial.tags) !== JSON.stringify(mTagList);
-        const imagesChanged =
-          JSON.stringify(initial.images) !== JSON.stringify(mImages);
+    if (!open || !activeId || mType !== "text") return;
+    const initial = initialModalStateRef.current;
+    if (!initial) return;
 
-        if (colorChanged || tagsChanged || imagesChanged) {
-          saveCollaborativeMetadata();
-        }
-      }
-    }
-  }, [
-    mColor,
-    mTagList,
-    mImages,
-    activeId,
-    mType,
-    isCollaborativeNote,
-    isOnline,
-    saveCollaborativeMetadata,
-  ]);
+    const colorChanged = initial.color !== mColor;
+    const tagsChanged = JSON.stringify(initial.tags) !== JSON.stringify(mTagList);
+    const imagesChanged = JSON.stringify(initial.images) !== JSON.stringify(mImages);
 
-  // Auto-save for ALL text notes: debounced local-first persist + patch sync
+    if (!colorChanged && !tagsChanged && !imagesChanged) return;
+
+    // Build patch with only changed metadata fields
+    const metaPatch = {};
+    if (colorChanged) metaPatch.color = mColor;
+    if (tagsChanged) metaPatch.tags = mTagList;
+    if (imagesChanged) metaPatch.images = mImages;
+
+    autoSaveTextNote(activeId, metaPatch);
+
+    // Update initial state so we don't re-trigger
+    initialModalStateRef.current = {
+      ...initial,
+      ...(colorChanged ? { color: mColor } : {}),
+      ...(tagsChanged ? { tags: mTagList } : {}),
+      ...(imagesChanged ? { images: mImages } : {}),
+    };
+  }, [mColor, mTagList, mImages, open, activeId, mType, autoSaveTextNote]);
+
+  // Auto-save text content (title + body): debounced local-first persist + patch sync
   useEffect(() => {
     if (!open || !activeId || mType !== "text" || viewMode) return;
-    if (!hasNoteBeenModified()) return;
+    const initial = initialModalStateRef.current;
+    if (!initial) return;
+
+    const titleChanged = initial.title !== mTitle.trim();
+    const contentChanged = initial.content !== mBody;
+    if (!titleChanged && !contentChanged) return;
 
     const timeoutId = setTimeout(() => {
-      autoSaveTextNote(activeId, mTitle.trim(), mBody);
+      // Build patch with only changed content fields
+      const contentPatch = {};
+      if (titleChanged) contentPatch.title = mTitle.trim();
+      if (contentChanged) contentPatch.content = mBody;
+
+      autoSaveTextNote(activeId, contentPatch);
+
       // Update initial state so subsequent comparisons are against the saved version
       if (initialModalStateRef.current) {
         initialModalStateRef.current = {
           ...initialModalStateRef.current,
-          title: mTitle.trim(),
-          content: mBody,
+          ...(titleChanged ? { title: mTitle.trim() } : {}),
+          ...(contentChanged ? { content: mBody } : {}),
         };
       }
     }, 1000); // 1 second debounce
 
     return () => clearTimeout(timeoutId);
-  }, [mBody, mTitle, open, activeId, mType, viewMode, hasNoteBeenModified, autoSaveTextNote]);
+  }, [mBody, mTitle, open, activeId, mType, viewMode, autoSaveTextNote]);
 
   // Update initial state reference when note is updated from server (for collaborative notes)
   // This prevents overwriting server changes when user hasn't edited locally
@@ -8133,14 +8070,20 @@ export default function App() {
     // Prevent double-triggering while exit animation is running
     if (modalClosingTimerRef.current) return;
 
-    // Flush any pending text auto-save immediately before closing (local-first)
-    if (
-      activeId &&
-      mType === "text" &&
-      !viewMode &&
-      hasNoteBeenModified()
-    ) {
-      autoSaveTextNote(activeId, mTitle.trim(), mBody);
+    // Flush any pending text changes immediately before closing (local-first)
+    if (activeId && mType === "text" && !viewMode) {
+      const initial = initialModalStateRef.current;
+      if (initial) {
+        const patch = {};
+        if (initial.title !== mTitle.trim()) patch.title = mTitle.trim();
+        if (initial.content !== mBody) patch.content = mBody;
+        if (initial.color !== mColor) patch.color = mColor;
+        if (JSON.stringify(initial.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
+        if (JSON.stringify(initial.images) !== JSON.stringify(mImages)) patch.images = mImages;
+        if (Object.keys(patch).length > 0) {
+          autoSaveTextNote(activeId, patch);
+        }
+      }
     }
 
     // Start exit animation, then actually unmount after it completes
@@ -8163,66 +8106,75 @@ export default function App() {
 
   const saveModal = async () => {
     if (activeId == null) return;
-    const base = {
-      id: activeId,
-      title: mTitle.trim(),
-      tags: mTagList,
-      images: mImages,
-      color: mColor,
-      pinned: !!notes.find((n) => String(n.id) === String(activeId))?.pinned,
-    };
-    const payload =
-      mType === "text"
-        ? { ...base, type: "text", content: mBody, items: [] }
-        : mType === "checklist"
-          ? { ...base, type: "checklist", content: "", items: mItems }
-          : {
-              ...base,
-              type: "draw",
-              content: JSON.stringify(mDrawingData),
-              items: [],
-            };
-
-    // Local-first: apply immediately, sync in background
     setSavingModal(true);
 
-    prevItemsRef.current =
-      mType === "checklist" ? (Array.isArray(mItems) ? mItems : []) : [];
-    prevDrawingRef.current =
-      mType === "draw"
-        ? mDrawingData || { paths: [], dimensions: null }
-        : { paths: [], dimensions: null };
-
+    const noteId = String(activeId);
     const nowIso = new Date().toISOString();
-    const updatedFields = {
-      ...payload,
-      updated_at: nowIso,
-      lastEditedBy: currentUser?.email || currentUser?.name,
-      lastEditedAt: nowIso,
-    };
 
-    // Update IndexedDB immediately
-    try {
-      const existing = await idbGetNote(String(activeId));
-      if (existing) {
-        await idbPutNote({ ...existing, ...updatedFields });
+    if (mType === "text") {
+      // Text notes: use targeted patch with only changed fields
+      const patch = {};
+      const initial = initialModalStateRef.current;
+      if (initial) {
+        if (initial.title !== mTitle.trim()) patch.title = mTitle.trim();
+        if (initial.content !== mBody) patch.content = mBody;
+        if (initial.color !== mColor) patch.color = mColor;
+        if (JSON.stringify(initial.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
+        if (JSON.stringify(initial.images) !== JSON.stringify(mImages)) patch.images = mImages;
+      } else {
+        // No initial state — send everything
+        Object.assign(patch, { title: mTitle.trim(), content: mBody, color: mColor, tags: mTagList, images: mImages });
       }
-    } catch (e) {
-      console.error("IndexedDB update failed:", e);
+
+      if (Object.keys(patch).length > 0) {
+        autoSaveTextNote(activeId, patch);
+      }
+    } else {
+      // Checklist / Drawing: keep full update (they manage their own local-first flows)
+      const base = {
+        id: activeId,
+        title: mTitle.trim(),
+        tags: mTagList,
+        images: mImages,
+        color: mColor,
+        pinned: !!notes.find((n) => String(n.id) === String(activeId))?.pinned,
+      };
+      const payload =
+        mType === "checklist"
+          ? { ...base, type: "checklist", content: "", items: mItems }
+          : { ...base, type: "draw", content: JSON.stringify(mDrawingData), items: [] };
+
+      prevItemsRef.current =
+        mType === "checklist" ? (Array.isArray(mItems) ? mItems : []) : [];
+      prevDrawingRef.current =
+        mType === "draw"
+          ? mDrawingData || { paths: [], dimensions: null }
+          : { paths: [], dimensions: null };
+
+      const updatedFields = {
+        ...payload,
+        updated_at: nowIso,
+        lastEditedBy: currentUser?.email || currentUser?.name,
+        lastEditedAt: nowIso,
+      };
+
+      try {
+        const existing = await idbGetNote(noteId);
+        if (existing) {
+          await idbPutNote({ ...existing, ...updatedFields });
+        }
+      } catch (e) {
+        console.error("IndexedDB update failed:", e);
+      }
+
+      setNotes((prev) =>
+        prev.map((n) =>
+          String(n.id) === noteId ? { ...n, ...updatedFields } : n,
+        ),
+      );
+      invalidateNotesCache();
+      enqueueAndSync({ type: "update", noteId, payload });
     }
-
-    // Update UI immediately
-    setNotes((prev) =>
-      prev.map((n) =>
-        String(n.id) === String(activeId)
-          ? { ...n, ...updatedFields }
-          : n,
-      ),
-    );
-    invalidateNotesCache();
-
-    // Enqueue for server sync
-    enqueueAndSync({ type: "update", noteId: String(activeId), payload });
 
     setSavingModal(false);
   };
