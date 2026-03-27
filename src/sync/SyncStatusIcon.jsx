@@ -184,7 +184,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
 
   const {
     syncState, serverReachable, hasPendingChanges, lastSyncAt, lastSyncError,
-    pending, processing, failed, total, items,
+    pending, processing, failed, total, items, failedChecks,
   } = syncStatus;
 
   const config = getStatusConfig(syncState, dark);
@@ -290,6 +290,12 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
                   {pending > 0 && <span>{t("syncPendingCount", { count: pending })}</span>}
                   {processing > 0 && <span>{pending > 0 ? " · " : ""}{t("syncProcessingCount", { count: processing })}</span>}
                   {failed > 0 && <span>{(pending > 0 || processing > 0) ? " · " : ""}{t("syncFailedCount", { count: failed })}</span>}
+                </div>
+              )}
+
+              {failedChecks > 0 && syncState === "offline" && (
+                <div className={`mt-1 text-xs ${dark ? "text-amber-400" : "text-amber-600"}`}>
+                  {t("syncFailedChecks", { count: failedChecks })}
                 </div>
               )}
 

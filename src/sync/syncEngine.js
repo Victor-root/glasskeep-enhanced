@@ -47,6 +47,7 @@ export class SyncEngine {
     this._serverReachable = null; // null = unknown, true/false = tested
     this._lastSyncAt = null;
     this._lastSyncError = null;
+    this._failedChecks = 0; // consecutive failed health checks (reset on success)
   }
 
   // ─── Public API ───
@@ -146,6 +147,7 @@ export class SyncEngine {
           } else if (isNetworkError) {
             this._serverReachable = false;
             this._lastSyncError = "Server unreachable";
+            this._failedChecks++;
             await updateQueueItem(item.queueId, {
               status: "failed",
               lastError: "Server unreachable",
@@ -253,6 +255,7 @@ export class SyncEngine {
         const wasOffline = this._serverReachable === false;
         this._serverReachable = true;
         this._lastSyncError = null;
+        this._failedChecks = 0;
 
         // Server confirmed reachable — reset all transient failures so they retry.
         // Fatal errors (auth expired, note not found) are already at MAX_RETRIES
@@ -280,12 +283,14 @@ export class SyncEngine {
       }
       this._serverReachable = false;
       this._lastSyncError = "Server unreachable";
+      this._failedChecks++;
       this._adjustHealthInterval();
       await this._emitStatus();
       return false;
     } catch {
       this._serverReachable = false;
       this._lastSyncError = "Server unreachable";
+      this._failedChecks++;
       this._adjustHealthInterval();
       await this._emitStatus();
       return false;
@@ -420,6 +425,7 @@ export class SyncEngine {
       failed: stats.failed,
       total: stats.total,
       items: stats.items,
+      failedChecks: this._failedChecks,
     });
   }
 
