@@ -151,9 +151,10 @@ export class SyncEngine {
         }
       }
 
-      // Schedule retry if needed
+      // Schedule retry only if there are items that can still be retried.
+      // Do NOT retry for items stuck at MAX_RETRIES — health check recovery handles those.
       const stats = await getQueueStats();
-      if ((stats.pending > 0 || stats.failed > 0) && !this._destroyed) {
+      if (stats.pending > 0 && !this._destroyed) {
         setTimeout(() => this.processQueue(), BASE_RETRY_DELAY);
       }
     } catch (err) {
@@ -178,13 +179,14 @@ export class SyncEngine {
 
     if (!this._serverReachable) return; // server is down — healthCheck already emitted offline
 
-    // Reset failed items so they are retried immediately (bypass backoff)
+    // Reset ALL failed items — forced sync bypasses MAX_RETRIES and backoff completely
     const stats = await getQueueStats();
     for (const item of stats.items) {
-      if (item.status === "failed" && item.attempts < MAX_RETRIES) {
+      if (item.status === "failed") {
         await updateQueueItem(item.queueId, {
           status: "pending",
           lastAttemptAt: 0,
+          attempts: 0, // Full reset so they get a clean retry
         });
       }
     }
@@ -215,10 +217,23 @@ export class SyncEngine {
         if (this._lastSyncError === "Server unreachable") {
           this._lastSyncError = null;
         }
+        if (wasOffline) {
+          // Server recovered — reset items that failed due to network (including those at MAX_RETRIES)
+          // so they can be retried. Items that failed for other reasons (404, auth) are left alone.
+          const stats = await getQueueStats();
+          for (const item of stats.items) {
+            if (item.status === "failed" && item.lastError === "Server unreachable") {
+              await updateQueueItem(item.queueId, {
+                status: "pending",
+                lastAttemptAt: 0,
+                attempts: 0,
+              });
+            }
+          }
+        }
         this._adjustHealthInterval();
         await this._emitStatus();
         if (wasOffline) {
-          // Server recovered — retry queue
           this.processQueue();
         }
         return true;
