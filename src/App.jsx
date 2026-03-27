@@ -118,7 +118,7 @@ async function api(path, { method = "GET", body, token } = {}) {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout (self-hosted LAN)
 
     const res = await fetch(`${API_BASE}${path}`, {
       method,
@@ -6304,6 +6304,8 @@ export default function App() {
       }
 
       // Then: fetch from server and merge (protecting pending local changes)
+      // Skip API call entirely if sync engine already knows server is down
+      if (syncEngineRef.current?.serverReachable === false) throw new Error("Server offline (skip)");
       const data = await api("/notes", { token });
       if (tagFilterRef.current !== expectedFilter) return; // view changed during fetch
       const serverNotes = Array.isArray(data) ? data : [];
@@ -6389,6 +6391,8 @@ export default function App() {
         }
       } catch (e) {}
 
+      // Skip API call if sync engine already knows server is down
+      if (syncEngineRef.current?.serverReachable === false) throw new Error("Server offline (skip)");
       const data = await api("/notes/archived", { token });
       if (tagFilterRef.current !== expectedFilter) return;
       const notesArray = Array.isArray(data) ? data : [];
@@ -6461,6 +6465,8 @@ export default function App() {
         }
       } catch (e) {}
 
+      // Skip API call if sync engine already knows server is down
+      if (syncEngineRef.current?.serverReachable === false) throw new Error("Server offline (skip)");
       const data = await api("/notes/trashed", { token });
       if (tagFilterRef.current !== expectedFilter) return;
       const notesArray = Array.isArray(data) ? data : [];
