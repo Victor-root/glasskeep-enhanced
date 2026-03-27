@@ -6320,7 +6320,9 @@ export default function App() {
         }
       }
 
-      const final = [...merged, ...localOnly];
+      // Filter: only keep notes that belong in the active view
+      // (local versions of notes with pending changes might have trashed/archived flags)
+      const final = [...merged, ...localOnly].filter((n) => !n.archived && !n.trashed);
       if (tagFilterRef.current !== expectedFilter) return; // view changed
       setNotes(sortNotesByRecency(final));
       persistNotesCache(final);
@@ -6399,7 +6401,8 @@ export default function App() {
         }
       }
 
-      const final = [...merged, ...localOnly];
+      // Filter: only keep notes that belong in the archived view
+      const final = [...merged, ...localOnly].filter((n) => !!n.archived && !n.trashed);
       if (tagFilterRef.current !== expectedFilter) return;
       setNotes(sortNotesByRecency(final));
       try {
@@ -6468,7 +6471,8 @@ export default function App() {
         }
       }
 
-      const final = [...merged, ...localOnly];
+      // Filter: only keep notes that belong in the trashed view
+      const final = [...merged, ...localOnly].filter((n) => !!n.trashed);
       if (tagFilterRef.current !== expectedFilter) return;
       setNotes(sortNotesByRecency(final));
       try {
