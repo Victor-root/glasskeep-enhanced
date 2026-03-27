@@ -6146,7 +6146,7 @@ export default function App() {
   }, []);
 
   const handleSyncNow = useCallback(() => {
-    syncEngineRef.current?.forceSync();
+    return syncEngineRef.current?.forceSync();
   }, []);
 
   // Warn before closing if there are pending local changes

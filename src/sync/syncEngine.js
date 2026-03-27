@@ -193,14 +193,22 @@ export class SyncEngine {
    * Returns the resulting status for immediate feedback.
    */
   async forceSync() {
-    // Immediately signal "checking" so the UI reacts before the network call
+    // Signal "checking" for the entire duration of the health check
+    // so the UI shows a spinner / "Vérification du serveur..." immediately.
     this._isChecking = true;
     await this._emitStatus();
-    this._isChecking = false;
 
-    await this.healthCheck();
+    try {
+      await this.healthCheck();
+    } finally {
+      this._isChecking = false;
+    }
 
-    if (!this._serverReachable) return; // server is down — healthCheck already emitted offline
+    // healthCheck already emitted the result; now re-emit with _isChecking=false
+    // so the UI transitions from "checking" → the real state (offline/synced/pending)
+    await this._emitStatus();
+
+    if (!this._serverReachable) return; // server is down — already emitted offline
 
     // Reset ALL failed items — forced sync bypasses MAX_RETRIES and backoff completely
     const stats = await getQueueStats();

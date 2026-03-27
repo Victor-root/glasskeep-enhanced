@@ -153,6 +153,7 @@ function formatTimeAgo(ts) {
 
 export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
   const [open, setOpen] = useState(false);
+  const [forceSyncing, setForceSyncing] = useState(false);
   const menuRef = useRef(null);
   const btnRef = useRef(null);
 
@@ -334,15 +335,26 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
             {/* Sync now button */}
             <div className="px-4 py-3">
               <button
-                onClick={() => onSyncNow?.()}
+                disabled={forceSyncing}
+                onClick={async () => {
+                  if (forceSyncing) return;
+                  setForceSyncing(true);
+                  try {
+                    await onSyncNow?.();
+                  } finally {
+                    setForceSyncing(false);
+                  }
+                }}
                 className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  dark
-                    ? "bg-indigo-600 hover:bg-indigo-500 text-white"
-                    : "bg-indigo-500 hover:bg-indigo-600 text-white"
+                  forceSyncing
+                    ? "bg-indigo-400 text-white/70 cursor-wait"
+                    : dark
+                      ? "bg-indigo-600 hover:bg-indigo-500 text-white"
+                      : "bg-indigo-500 hover:bg-indigo-600 text-white"
                 }`}
               >
-                <RefreshIcon className="w-4 h-4" />
-                {t("syncNow")}
+                <RefreshIcon className={`w-4 h-4 ${forceSyncing ? "animate-spin" : ""}`} />
+                {forceSyncing ? (t("syncServerChecking") || "Checking server...") : t("syncNow")}
               </button>
             </div>
 
