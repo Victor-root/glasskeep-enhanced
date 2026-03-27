@@ -7910,7 +7910,7 @@ export default function App() {
   );
 
   // Auto-save timeout ref - must be defined before closeModal
-  const autoSaveTimeoutRef = useRef(null);
+  // autoSaveTimeoutRef removed — text auto-save now uses useEffect cleanup pattern
 
   // Check if the note has been modified from initial state
   const hasNoteBeenModified = useCallback(() => {
@@ -8003,77 +8003,39 @@ export default function App() {
     isOnline,
   ]);
 
-  // Auto-save for collaborative text notes - must be defined before useEffect that uses it
-  const autoSaveCollaborativeNote = useCallback(async () => {
-    if (
-      activeId == null ||
-      mType !== "text" ||
-      !isCollaborativeNote(activeId) ||
-      viewMode ||
-      !hasNoteBeenModified()
-    )
-      return;
+  // Local-first auto-save for text notes: persist to IndexedDB + enqueue patch
+  // Works for ALL text notes (not just collaborative) — mirrors drawing/checklist pattern
+  const autoSaveTextNote = useCallback(async (noteId, title, content) => {
+    const nId = String(noteId);
+    const nowIso = new Date().toISOString();
 
-    // Clear existing timeout
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
+    // Update notes state
+    setNotes((prev) =>
+      prev.map((n) =>
+        String(n.id) === nId
+          ? { ...n, title, content, updated_at: nowIso }
+          : n,
+      ),
+    );
 
-    // Set new timeout for debounced save
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      const base = {
-        id: activeId,
-        title: mTitle.trim(),
-        tags: mTagList,
-        images: mImages,
-        color: mColor,
-        pinned: !!notes.find((n) => String(n.id) === String(activeId))?.pinned,
-      };
-      const payload = { ...base, type: "text", content: mBody, items: [] };
-
-      try {
-        await api(`/notes/${activeId}`, {
-          method: "PUT",
-          token,
-          body: payload,
-        });
-        invalidateNotesCache();
-
-        // Update local state
-        const nowIso = new Date().toISOString();
-        setNotes((prev) =>
-          prev.map((n) =>
-            String(n.id) === String(activeId)
-              ? {
-                  ...n,
-                  ...payload,
-                  updated_at: nowIso,
-                  lastEditedBy: currentUser?.email || currentUser?.name,
-                  lastEditedAt: nowIso,
-                }
-              : n,
-          ),
-        );
-      } catch (e) {
-        console.error("Auto-save failed:", e);
-        // Don't show error toast for auto-save failures to avoid interrupting user
+    // Persist to IndexedDB
+    try {
+      const existing = await idbGetNote(nId);
+      if (existing) {
+        await idbPutNote({ ...existing, title, content, updated_at: nowIso });
       }
-    }, 1000); // 1 second debounce
-  }, [
-    activeId,
-    mType,
-    mTitle,
-    mTagList,
-    mImages,
-    mColor,
-    mBody,
-    notes,
-    token,
-    currentUser,
-    isCollaborativeNote,
-    viewMode,
-    hasNoteBeenModified,
-  ]);
+    } catch (e) {
+      console.error("IndexedDB text auto-save failed:", e);
+    }
+    invalidateNotesCache();
+
+    // Enqueue targeted patch (only title + content, not full note)
+    enqueueAndSync({
+      type: "patch",
+      noteId: nId,
+      payload: { title, content, type: "text" },
+    });
+  }, [enqueueAndSync]);
 
   // Auto-save metadata (color, tags, images) immediately for collaborative notes
   // This works in both view and edit mode since these are metadata changes
@@ -8109,36 +8071,25 @@ export default function App() {
     saveCollaborativeMetadata,
   ]);
 
-  // Auto-save for collaborative text notes when content changes (title/body)
+  // Auto-save for ALL text notes: debounced local-first persist + patch sync
   useEffect(() => {
-    if (
-      activeId &&
-      mType === "text" &&
-      isCollaborativeNote(activeId) &&
-      isOnline &&
-      !viewMode &&
-      hasNoteBeenModified()
-    ) {
-      autoSaveCollaborativeNote();
-    }
+    if (!open || !activeId || mType !== "text" || viewMode) return;
+    if (!hasNoteBeenModified()) return;
 
-    // Cleanup timeout on unmount or when dependencies change
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
+    const timeoutId = setTimeout(() => {
+      autoSaveTextNote(activeId, mTitle.trim(), mBody);
+      // Update initial state so subsequent comparisons are against the saved version
+      if (initialModalStateRef.current) {
+        initialModalStateRef.current = {
+          ...initialModalStateRef.current,
+          title: mTitle.trim(),
+          content: mBody,
+        };
       }
-    };
-  }, [
-    mBody,
-    mTitle,
-    activeId,
-    mType,
-    isCollaborativeNote,
-    isOnline,
-    viewMode,
-    hasNoteBeenModified,
-    autoSaveCollaborativeNote,
-  ]);
+    }, 1000); // 1 second debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [mBody, mTitle, open, activeId, mType, viewMode, hasNoteBeenModified, autoSaveTextNote]);
 
   // Update initial state reference when note is updated from server (for collaborative notes)
   // This prevents overwriting server changes when user hasn't edited locally
@@ -8182,49 +8133,14 @@ export default function App() {
     // Prevent double-triggering while exit animation is running
     if (modalClosingTimerRef.current) return;
 
-    // Save any pending changes for collaborative text notes before closing
-    // Only save if NOT in view mode AND user has actually edited - don't overwrite with stale data
+    // Flush any pending text auto-save immediately before closing (local-first)
     if (
       activeId &&
       mType === "text" &&
-      isCollaborativeNote(activeId) &&
       !viewMode &&
       hasNoteBeenModified()
     ) {
-      // Clear the timeout and save immediately
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
-      }
-      // Trigger immediate save
-      const base = {
-        id: activeId,
-        title: mTitle.trim(),
-        tags: mTagList,
-        images: mImages,
-        color: mColor,
-        pinned: !!notes.find((n) => String(n.id) === String(activeId))?.pinned,
-      };
-      const payload = { ...base, type: "text", content: mBody, items: [] };
-
-      api(`/notes/${activeId}`, { method: "PUT", token, body: payload })
-        .then(() => {
-          invalidateNotesCache();
-          const nowIso = new Date().toISOString();
-          setNotes((prev) =>
-            prev.map((n) =>
-              String(n.id) === String(activeId)
-                ? {
-                    ...n,
-                    ...payload,
-                    updated_at: nowIso,
-                    lastEditedBy: currentUser?.email || currentUser?.name,
-                    lastEditedAt: nowIso,
-                  }
-                : n,
-            ),
-          );
-        })
-        .catch((e) => console.error("Final save on close failed:", e));
+      autoSaveTextNote(activeId, mTitle.trim(), mBody);
     }
 
     // Start exit animation, then actually unmount after it completes

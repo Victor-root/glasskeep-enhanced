@@ -161,11 +161,24 @@ export class SyncEngine {
         }
       }
 
-      // Schedule retry only if there are items that can still be retried.
-      // Do NOT retry for items stuck at MAX_RETRIES — health check recovery handles those.
+      // Schedule retry if there are items that can still be retried.
+      // Include both pending items AND failed items still under MAX_RETRIES.
       const stats = await getQueueStats();
-      if (stats.pending > 0 && !this._destroyed) {
-        setTimeout(() => this.processQueue(), BASE_RETRY_DELAY);
+      const hasRetryable = stats.items.some(
+        (i) => i.status === "pending" || (i.status === "failed" && i.attempts < MAX_RETRIES)
+      );
+      if (hasRetryable && !this._destroyed) {
+        // Find the shortest remaining delay among retryable failed items
+        let nextDelay = BASE_RETRY_DELAY;
+        for (const i of stats.items) {
+          if (i.status === "failed" && i.attempts < MAX_RETRIES && i.lastAttemptAt) {
+            const backoff = BASE_RETRY_DELAY * Math.pow(2, Math.min(i.attempts, 4));
+            const elapsed = Date.now() - i.lastAttemptAt;
+            const remaining = Math.max(backoff - elapsed, 500);
+            nextDelay = Math.min(nextDelay, remaining);
+          }
+        }
+        setTimeout(() => this.processQueue(), nextDelay);
       }
     } catch (err) {
       console.error("[SyncEngine] processQueue error:", err);
@@ -223,27 +236,28 @@ export class SyncEngine {
       if (res.ok) {
         const wasOffline = this._serverReachable === false;
         this._serverReachable = true;
-        // Clear any stale network-error message — server is now confirmed reachable
-        if (this._lastSyncError === "Server unreachable") {
-          this._lastSyncError = null;
-        }
-        if (wasOffline) {
-          // Server recovered — reset items that failed due to network (including those at MAX_RETRIES)
-          // so they can be retried. Items that failed for other reasons (404, auth) are left alone.
-          const stats = await getQueueStats();
-          for (const item of stats.items) {
-            if (item.status === "failed" && item.lastError === "Server unreachable") {
-              await updateQueueItem(item.queueId, {
-                status: "pending",
-                lastAttemptAt: 0,
-                attempts: 0,
-              });
-            }
+        this._lastSyncError = null;
+
+        // Server confirmed reachable — reset all transient failures so they retry.
+        // Fatal errors (auth expired, note not found) are already at MAX_RETRIES
+        // or removed, so this only affects retryable items.
+        const stats = await getQueueStats();
+        const NON_RETRYABLE = new Set(["Authentication expired"]);
+        let resetCount = 0;
+        for (const item of stats.items) {
+          if (item.status === "failed" && !NON_RETRYABLE.has(item.lastError) && !item.lastError?.startsWith("Note not found")) {
+            await updateQueueItem(item.queueId, {
+              status: "pending",
+              lastAttemptAt: 0,
+              attempts: 0,
+            });
+            resetCount++;
           }
         }
+
         this._adjustHealthInterval();
         await this._emitStatus();
-        if (wasOffline) {
+        if (wasOffline || resetCount > 0) {
           this.processQueue();
         }
         return true;
