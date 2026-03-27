@@ -230,6 +230,7 @@ export class SyncEngine {
       const res = await fetch(`${API_BASE}/health`, {
         headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
+        cache: "no-store", // bypass service worker cache — must hit real server
       });
       clearTimeout(timeoutId);
 
