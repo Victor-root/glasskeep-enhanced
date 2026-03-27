@@ -118,7 +118,8 @@ export class SyncEngine {
           const isAuthError = err.status === 401;
           const isConflict = err.status === 409;
           const isNotFound = err.status === 404;
-          const isNetworkError = err.isNetworkError || err.status === 0 || !err.status;
+          const isTimeout = !!err.isTimeout;
+          const isNetworkError = !isTimeout && (err.isNetworkError || err.status === 0 || !err.status);
 
           if (isAuthError) {
             await updateQueueItem(item.queueId, {
@@ -133,18 +134,28 @@ export class SyncEngine {
             this.onSyncComplete(item);
             continue;
           } else if (isNotFound && (item.type === "trash" || item.type === "restore")) {
-            // Note doesn't exist or was already trashed/restored — discard silently
             this._serverReachable = true;
             await removeQueueItem(item.queueId);
             continue;
           } else if (isNotFound && (item.type === "update" || item.type === "patch" || item.type === "archive")) {
-            this._serverReachable = true; // server responded, just note missing
+            this._serverReachable = true;
             await updateQueueItem(item.queueId, {
               status: "failed",
               lastError: `Note not found on server (${err.status})`,
               attempts: MAX_RETRIES,
             });
+          } else if (isTimeout) {
+            // Timeout: server may be busy (e.g. concurrent device sync).
+            // DON'T mark server as unreachable — just retry later.
+            this._lastSyncError = "Request timeout";
+            await updateQueueItem(item.queueId, {
+              status: "failed",
+              lastError: "Request timeout",
+              attempts: item.attempts + 1,
+              lastAttemptAt: Date.now(),
+            });
           } else if (isNetworkError) {
+            // Genuine network failure (connection refused, DNS, etc.)
             this._serverReachable = false;
             this._lastSyncError = "Server unreachable";
             this._failedChecks++;
@@ -158,7 +169,7 @@ export class SyncEngine {
             this._adjustHealthInterval();
             break;
           } else {
-            this._serverReachable = true; // server responded with an error
+            this._serverReachable = true;
             this._lastSyncError = `${err.message || "Unknown error"} (HTTP ${err.status || "?"})`;
             await updateQueueItem(item.queueId, {
               status: "failed",
@@ -477,12 +488,15 @@ export class SyncEngine {
       } catch (err) {
         clearTimeout(timeoutId);
         if (err.name === "AbortError") {
+          // Timeout is NOT a network error — the server may just be busy.
+          // Don't mark server as unreachable, just retry the item.
           const e = new Error("Request timeout");
           e.status = 408;
-          e.isNetworkError = true;
+          e.isTimeout = true;
           throw e;
         }
         if (err.isAuthError || err.status) throw err;
+        // Genuine network failure (connection refused, DNS, etc.)
         const e = new Error("Network error");
         e.status = 0;
         e.isNetworkError = true;
