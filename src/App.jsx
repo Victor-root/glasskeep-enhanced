@@ -6263,6 +6263,9 @@ export default function App() {
 
   const loadNotes = async () => {
     if (!token) return;
+    const expectedFilter = tagFilterRef.current;
+    // Guard: only load active notes when we're actually in the active view
+    if (expectedFilter === "ARCHIVED" || expectedFilter === "TRASHED") return;
     notesAreRegular.current = true;
     setNotesLoading(true);
 
@@ -6270,6 +6273,7 @@ export default function App() {
     try {
       const localNotes = await idbGetAllNotes(currentUser?.id, "active");
       if (localNotes.length > 0) {
+        if (tagFilterRef.current !== expectedFilter) return; // view changed
         setNotes(sortNotesByRecency(localNotes));
       }
     } catch (e) {
@@ -6279,6 +6283,7 @@ export default function App() {
     // Then: fetch from server and merge (protecting pending local changes)
     try {
       const data = await api("/notes", { token });
+      if (tagFilterRef.current !== expectedFilter) return; // view changed during fetch
       const serverNotes = Array.isArray(data) ? data : [];
 
       // Hydrate IndexedDB, skipping notes with pending local changes
@@ -6316,19 +6321,21 @@ export default function App() {
       }
 
       const final = [...merged, ...localOnly];
+      if (tagFilterRef.current !== expectedFilter) return; // view changed
       setNotes(sortNotesByRecency(final));
       persistNotesCache(final);
     } catch (error) {
       console.error("Error loading notes from server:", error);
+      if (tagFilterRef.current !== expectedFilter) return; // view changed
       // Fallback: use IndexedDB data (already shown above), or localStorage
       try {
         const localNotes = await idbGetAllNotes(currentUser?.id, "active");
         if (localNotes.length > 0) {
-          setNotes(sortNotesByRecency(localNotes));
+          if (tagFilterRef.current === expectedFilter) setNotes(sortNotesByRecency(localNotes));
         } else {
           const cachedData = localStorage.getItem(NOTES_CACHE_KEY);
           if (cachedData) {
-            setNotes(sortNotesByRecency(JSON.parse(cachedData)));
+            if (tagFilterRef.current === expectedFilter) setNotes(sortNotesByRecency(JSON.parse(cachedData)));
           }
         }
       } catch (e) {
@@ -6342,6 +6349,8 @@ export default function App() {
   // Load archived notes
   const loadArchivedNotes = async () => {
     if (!token) return;
+    const expectedFilter = "ARCHIVED";
+    if (tagFilterRef.current !== expectedFilter) return;
     notesAreRegular.current = false;
     setNotesLoading(true);
 
@@ -6349,12 +6358,14 @@ export default function App() {
     try {
       const localArchived = await idbGetAllNotes(currentUser?.id, "archived");
       if (localArchived.length > 0) {
+        if (tagFilterRef.current !== expectedFilter) return;
         setNotes(sortNotesByRecency(localArchived));
       }
     } catch (e) {}
 
     try {
       const data = await api("/notes/archived", { token });
+      if (tagFilterRef.current !== expectedFilter) return;
       const notesArray = Array.isArray(data) ? data : [];
 
       // Hydrate IndexedDB
@@ -6389,6 +6400,7 @@ export default function App() {
       }
 
       const final = [...merged, ...localOnly];
+      if (tagFilterRef.current !== expectedFilter) return;
       setNotes(sortNotesByRecency(final));
       try {
         localStorage.setItem(ARCHIVED_NOTES_CACHE_KEY, JSON.stringify(final));
@@ -6405,6 +6417,8 @@ export default function App() {
   // Load trashed notes
   const loadTrashedNotes = async () => {
     if (!token) return;
+    const expectedFilter = "TRASHED";
+    if (tagFilterRef.current !== expectedFilter) return;
     notesAreRegular.current = false;
     setNotesLoading(true);
 
@@ -6412,12 +6426,14 @@ export default function App() {
     try {
       const localTrashed = await idbGetAllNotes(currentUser?.id, "trashed");
       if (localTrashed.length > 0) {
+        if (tagFilterRef.current !== expectedFilter) return;
         setNotes(sortNotesByRecency(localTrashed));
       }
     } catch (e) {}
 
     try {
       const data = await api("/notes/trashed", { token });
+      if (tagFilterRef.current !== expectedFilter) return;
       const notesArray = Array.isArray(data) ? data : [];
 
       // Hydrate IndexedDB
@@ -6453,27 +6469,29 @@ export default function App() {
       }
 
       const final = [...merged, ...localOnly];
+      if (tagFilterRef.current !== expectedFilter) return;
       setNotes(sortNotesByRecency(final));
       try {
         localStorage.setItem(TRASHED_NOTES_CACHE_KEY, JSON.stringify(final));
       } catch (e) {}
     } catch (error) {
       console.error("Error loading trashed notes from server:", error);
+      if (tagFilterRef.current !== expectedFilter) return;
       // Keep IndexedDB data already shown, or fallback to localStorage
       try {
         const localTrashed = await idbGetAllNotes(currentUser?.id, "trashed");
         if (localTrashed.length > 0) {
-          setNotes(sortNotesByRecency(localTrashed));
+          if (tagFilterRef.current === expectedFilter) setNotes(sortNotesByRecency(localTrashed));
         } else {
           const cachedData = localStorage.getItem(TRASHED_NOTES_CACHE_KEY);
           if (cachedData) {
-            setNotes(sortNotesByRecency(JSON.parse(cachedData)));
+            if (tagFilterRef.current === expectedFilter) setNotes(sortNotesByRecency(JSON.parse(cachedData)));
           } else {
-            setNotes([]);
+            if (tagFilterRef.current === expectedFilter) setNotes([]);
           }
         }
       } catch {
-        setNotes([]);
+        if (tagFilterRef.current === expectedFilter) setNotes([]);
       }
     } finally {
       setNotesLoading(false);
@@ -10312,7 +10330,8 @@ export default function App() {
         activeTagFilters={activeTagFilters}
         onSelect={(tag, event) => {
           if (tag === "ARCHIVED" || tag === "TRASHED" || tag === ALL_IMAGES || tag === null) {
-            if (tag === "ARCHIVED" || tag === "TRASHED") setNotes([]);
+            // Only clear notes when SWITCHING views, not when re-clicking the same one
+            if ((tag === "ARCHIVED" || tag === "TRASHED") && tag !== tagFilter) setNotes([]);
             setTagFilter(tag);
             setActiveTagFilters([]);
           } else if (event?.ctrlKey || event?.metaKey) {
