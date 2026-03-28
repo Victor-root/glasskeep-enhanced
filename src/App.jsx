@@ -8532,15 +8532,32 @@ export default function App() {
     else
       newOthers = swapWithin(otherIds, String(dragged), String(overId));
 
-    // Optimistic update
+    // Assign position values so order survives reload (higher = earlier)
+    const now = Date.now();
+    const orderedIds = [...newPinned, ...newOthers];
+    const positionMap = new Map();
+    orderedIds.forEach((id, i) => positionMap.set(id, now - i));
+
+    // Optimistic update with positions baked in
     const byId = new Map(notes.map((n) => [String(n.id), n]));
-    const reordered = [
-      ...newPinned.map((id) => byId.get(id)),
-      ...newOthers.map((id) => byId.get(id)),
-    ];
+    const reordered = orderedIds.map((id) => {
+      const n = byId.get(id);
+      return n ? { ...n, position: positionMap.get(id) } : n;
+    });
     setNotes(reordered);
 
-    // Local-first: enqueue reorder for server sync
+    // Persist new positions to IndexedDB (local-first)
+    for (const id of orderedIds) {
+      const pos = positionMap.get(id);
+      try {
+        const existing = await idbGetNote(id, currentUser?.id, sessionId);
+        if (existing) await idbPutNote({ ...existing, position: pos }, currentUser?.id, sessionId);
+      } catch (e) {}
+    }
+
+    invalidateNotesCache();
+
+    // Enqueue reorder for server sync
     enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds: newPinned, otherIds: newOthers } });
     dragGroup.current = null;
   };
