@@ -6923,7 +6923,9 @@ export default function App() {
 
   // Flush any pending drawing debounce — shared persist logic used by both
   // the debounce timeout and the flush-on-close path.
-  const flushPendingDrawingSave = useCallback(() => {
+  // Async: dirty flag stays active until queue write completes, closing the
+  // micro-window where SSE patchSingleNote could slip through.
+  const flushPendingDrawingSave = useCallback(async () => {
     const pending = pendingDrawingSaveRef.current;
     if (!pending) return;
     pendingDrawingSaveRef.current = null;
@@ -6946,24 +6948,31 @@ export default function App() {
       ),
     );
 
-    (async () => {
-      try {
-        const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
-        if (existing) {
-          await idbPutNote({ ...existing, content: drawingContent, updated_at: nowIso }, currentUser?.id, sessionId);
-        }
-      } catch (e) {
-        console.error("IndexedDB drawing flush failed:", e);
+    // Persist to IDB first — hasPendingChanges() reads from this store
+    try {
+      const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
+      if (existing) {
+        await idbPutNote({ ...existing, content: drawingContent, updated_at: nowIso }, currentUser?.id, sessionId);
       }
-      invalidateNotesCache();
-    })();
+    } catch (e) {
+      console.error("IndexedDB drawing flush failed:", e);
+    }
+    invalidateNotesCache();
 
-    enqueueAndSync({
-      type: "patch",
-      noteId,
-      payload: { content: drawingContent, type: "draw" },
-    });
+    // Write queue item — after this, hasPendingChanges() returns true for noteId
+    try {
+      await enqueueAndSync({
+        type: "patch",
+        noteId,
+        payload: { content: drawingContent, type: "draw" },
+      });
+    } catch (e) {
+      console.error("Drawing enqueue failed:", e);
+      // Don't clear dirty flag on failure — keep SSE protection active
+      return;
+    }
 
+    // Only NOW is it safe to release dirty flag — queue item exists
     if (localEditDirtyRef.current === noteId) {
       localEditDirtyRef.current = null;
     }
@@ -8282,8 +8291,11 @@ export default function App() {
       }
     }
 
-    // Clear dirty flag — auto-save flush above enqueued any remaining changes
-    localEditDirtyRef.current = null;
+    // Clear dirty flag for non-draw notes — draw notes' dirty flag is managed
+    // by the async flushPendingDrawingSave (cleared only after queue write).
+    if (mType !== "draw") {
+      localEditDirtyRef.current = null;
+    }
 
     // Start exit animation, then actually unmount after it completes
     setIsModalClosing(true);
