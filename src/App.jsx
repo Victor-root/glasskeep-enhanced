@@ -9549,8 +9549,8 @@ export default function App() {
                   <span>{t("editedPrefix")} {editedStamp}</span>
                   {activeId && (
                     <span
-                      className="opacity-30 hover:opacity-100 cursor-default transition-opacity select-all"
-                      title={`Note ID : ${activeId}`}
+                      className="opacity-30 hover:opacity-100 cursor-default transition-opacity"
+                      data-tooltip={`Note ID : ${activeId}`}
                     >ⓘ</span>
                   )}
                 </div>
@@ -9563,8 +9563,8 @@ export default function App() {
                 <span className="pointer-events-none">{t("editedPrefix")} {editedStamp}</span>
                 {activeId && (
                   <span
-                    className="opacity-30 hover:opacity-100 cursor-default transition-opacity select-all"
-                    title={`Note ID : ${activeId}`}
+                    className="opacity-30 hover:opacity-100 cursor-default transition-opacity"
+                    data-tooltip={`Note ID : ${activeId}`}
                   >ⓘ</span>
                 )}
               </div>
