@@ -218,8 +218,8 @@ export async function removeQueueItem(queueId) {
 }
 
 /**
- * Clear all queue items for a user (all sessions). Used at sign-out / auth-expired
- * to ensure no orphaned items remain from any session.
+ * Clear all queue items for a user (all sessions).
+ * Kept as a fallback but prefer clearQueueForSession for targeted cleanup.
  */
 export async function clearQueueForUser(userId) {
   const db = await openDb();
@@ -227,6 +227,29 @@ export async function clearQueueForUser(userId) {
   const store = t.objectStore(QUEUE_STORE);
   const idx = store.index("userId");
   const req = idx.openCursor(IDBKeyRange.only(userId));
+  req.onsuccess = (e) => {
+    const cursor = e.target.result;
+    if (cursor) {
+      cursor.delete();
+      cursor.continue();
+    }
+  };
+  return new Promise((resolve, reject) => {
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
+  });
+}
+
+/**
+ * Clear queue items for a specific session only.
+ * Used at sign-out / auth-expired for strict session-scoped cleanup.
+ */
+export async function clearQueueForSession(userId, sessionId) {
+  const db = await openDb();
+  const t = db.transaction(QUEUE_STORE, "readwrite");
+  const store = t.objectStore(QUEUE_STORE);
+  const idx = store.index("userSession");
+  const req = idx.openCursor(IDBKeyRange.only([userId, sessionId]));
   req.onsuccess = (e) => {
     const cursor = e.target.result;
     if (cursor) {

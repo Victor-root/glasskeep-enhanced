@@ -24,7 +24,7 @@ import {
   enqueue as idbEnqueue,
   getQueueStats,
   hasPendingChanges,
-  clearQueueForUser as idbClearQueueForUser,
+  clearQueueForSession as idbClearQueueForSession,
   clearNotesForUser as idbClearNotesForUser,
 } from "./sync/localDb.js";
 
@@ -7173,10 +7173,15 @@ export default function App() {
   // Uses refs so it's safe to call from stale closures (e.g. event listeners).
   const cleanupClientSession = () => {
     const userId = currentUserIdRef.current;
+    const sid = sessionIdRef.current;
     // IndexedDB cleanup (best-effort, never throws)
+    // Notes are user-scoped (no sessionId in notes store), so clear by user.
+    // Queue is session-scoped — only clear the current session's items.
     if (userId) {
       idbClearNotesForUser(userId).catch(() => {});
-      idbClearQueueForUser(userId).catch(() => {});
+      if (sid) {
+        idbClearQueueForSession(userId, sid).catch(() => {});
+      }
     }
     // Tear down sync engine
     if (syncEngineRef.current) {
@@ -7227,8 +7232,9 @@ export default function App() {
   };
   const signInWithSecret = async (key) => {
     const res = await api("/login/secret", { method: "POST", body: { key } });
-    setSession(res);
-    setAuth(res);
+    const sessionWithId = { ...res, sessionId: crypto.randomUUID() };
+    setSession(sessionWithId);
+    setAuth(sessionWithId);
     navigate("#/notes");
     return { ok: true };
   };
@@ -7237,8 +7243,9 @@ export default function App() {
       method: "POST",
       body: { name, email, password },
     });
-    setSession(res);
-    setAuth(res);
+    const sessionWithId = { ...res, sessionId: crypto.randomUUID() };
+    setSession(sessionWithId);
+    setAuth(sessionWithId);
     navigate("#/notes");
     return { ok: true };
   };
