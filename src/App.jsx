@@ -5568,6 +5568,8 @@ export default function App() {
   });
   const skipNextDrawingAutosave = useRef(false);
   const prevDrawingRef = useRef({ paths: [], dimensions: null });
+  const pendingDrawingSaveRef = useRef(null); // { noteId, drawingData } when debounce is pending
+  const drawingDebounceTimerRef = useRef(null);
 
   // Clear data when switching composer types
   useEffect(() => {
@@ -6919,6 +6921,54 @@ export default function App() {
     }
   }, [notes, open, activeId, mType]);
 
+  // Flush any pending drawing debounce — shared persist logic used by both
+  // the debounce timeout and the flush-on-close path.
+  const flushPendingDrawingSave = useCallback(() => {
+    const pending = pendingDrawingSaveRef.current;
+    if (!pending) return;
+    pendingDrawingSaveRef.current = null;
+
+    if (drawingDebounceTimerRef.current) {
+      clearTimeout(drawingDebounceTimerRef.current);
+      drawingDebounceTimerRef.current = null;
+    }
+
+    const { noteId, drawingData } = pending;
+    prevDrawingRef.current = drawingData;
+    const nowIso = new Date().toISOString();
+    const drawingContent = JSON.stringify(drawingData);
+
+    setNotes((prev) =>
+      prev.map((n) =>
+        String(n.id) === noteId
+          ? { ...n, content: drawingContent, updated_at: nowIso }
+          : n,
+      ),
+    );
+
+    (async () => {
+      try {
+        const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
+        if (existing) {
+          await idbPutNote({ ...existing, content: drawingContent, updated_at: nowIso }, currentUser?.id, sessionId);
+        }
+      } catch (e) {
+        console.error("IndexedDB drawing flush failed:", e);
+      }
+      invalidateNotesCache();
+    })();
+
+    enqueueAndSync({
+      type: "patch",
+      noteId,
+      payload: { content: drawingContent, type: "draw" },
+    });
+
+    if (localEditDirtyRef.current === noteId) {
+      localEditDirtyRef.current = null;
+    }
+  }, [currentUser?.id, sessionId, enqueueAndSync]);
+
   // Auto-save drawing changes (local-first)
   useEffect(() => {
     if (!open || !activeId || mType !== "draw") return;
@@ -6940,54 +6990,29 @@ export default function App() {
     const dirtyNoteId = String(activeId);
     localEditDirtyRef.current = dirtyNoteId;
 
-    // Debounce local-first save by 500ms
-    const timeoutId = setTimeout(async () => {
-      prevDrawingRef.current = mDrawingData;
-      const noteId = dirtyNoteId;
-      const nowIso = new Date().toISOString();
-      const drawingContent = JSON.stringify(mDrawingData);
+    // Store pending payload so flush can pick it up if modal closes mid-debounce
+    pendingDrawingSaveRef.current = { noteId: dirtyNoteId, drawingData: mDrawingData };
 
-      // Update notes state
-      setNotes((prev) =>
-        prev.map((n) =>
-          String(n.id) === noteId
-            ? { ...n, content: drawingContent, updated_at: nowIso }
-            : n,
-        ),
-      );
-
-      // Persist to IndexedDB
-      try {
-        const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
-        if (existing) {
-          await idbPutNote({ ...existing, content: drawingContent, updated_at: nowIso }, currentUser?.id, sessionId);
-        }
-      } catch (e) {
-        console.error("IndexedDB drawing update failed:", e);
-      }
-      invalidateNotesCache();
-
-      // Enqueue for server sync
-      enqueueAndSync({
-        type: "patch",
-        noteId,
-        payload: { content: drawingContent, type: "draw" },
-      });
-
-      // Release dirty flag only if still ours (another edit may have re-set it)
-      if (localEditDirtyRef.current === dirtyNoteId) {
-        localEditDirtyRef.current = null;
-      }
+    // Debounce local-first save by 500ms — timeout calls flush which consumes
+    // and clears pendingDrawingSaveRef, so no double-execute is possible.
+    const timeoutId = setTimeout(() => {
+      drawingDebounceTimerRef.current = null;
+      flushPendingDrawingSave();
     }, 500);
+    drawingDebounceTimerRef.current = timeoutId;
 
     return () => {
       clearTimeout(timeoutId);
-      // Cleanup cancelled debounce — release dirty flag if still ours
-      if (localEditDirtyRef.current === dirtyNoteId) {
-        localEditDirtyRef.current = null;
-      }
+      drawingDebounceTimerRef.current = null;
     };
-  }, [mDrawingData, open, activeId, mType, enqueueAndSync]);
+  }, [mDrawingData, open, activeId, mType, flushPendingDrawingSave]);
+
+  // Flush pending drawing save when modal closes or active note changes
+  useEffect(() => {
+    if (!open || !activeId || mType !== "draw") {
+      flushPendingDrawingSave();
+    }
+  }, [open, activeId, mType, flushPendingDrawingSave]);
 
   // Live-sync drawing data in open modal when remote updates arrive
   useEffect(() => {
@@ -8235,6 +8260,11 @@ export default function App() {
   const closeModal = () => {
     // Prevent double-triggering while exit animation is running
     if (modalClosingTimerRef.current) return;
+
+    // Flush any pending drawing debounce before closing
+    if (activeId && mType === "draw") {
+      flushPendingDrawingSave();
+    }
 
     // Flush any pending text changes immediately before closing (local-first)
     if (activeId && mType === "text" && !viewMode) {
