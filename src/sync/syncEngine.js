@@ -317,7 +317,7 @@ export class SyncEngine {
 
         this._adjustHealthInterval();
         await this._emitStatus();
-        if (wasOffline || resetCount > 0) {
+        if (wasOffline || resetCount > 0 || stats.total > 0) {
           this.processQueue();
         }
         return true;
