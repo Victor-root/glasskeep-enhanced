@@ -5421,6 +5421,8 @@ export default function App() {
   const reconnectSseRef = useRef(null); // called when server recovers to revive SSE
   const tokenRef = useRef(token);
   tokenRef.current = token;
+  const currentUserIdRef = useRef(currentUser?.id);
+  currentUserIdRef.current = currentUser?.id;
 
   // Tag filter & sidebar
   const [tagFilter, setTagFilter] = useState(null); // null = all, ALL_IMAGES = only notes with images
@@ -7162,21 +7164,27 @@ export default function App() {
   }, [open, mBody, mTitle, mItems.length, mImages.length, viewMode, mType]);
 
   /** -------- Auth actions -------- */
-  const signOut = () => {
-    // Clear IndexedDB sync data
-    if (currentUser?.id) {
-      idbClearNotesForUser(currentUser.id).catch(() => {});
-      idbClearQueueForUser(currentUser.id).catch(() => {});
+
+  // Centralised cleanup for sign-out AND auth-expired — single source of truth.
+  // Uses refs so it's safe to call from stale closures (e.g. event listeners).
+  const cleanupClientSession = () => {
+    const userId = currentUserIdRef.current;
+    // IndexedDB cleanup (best-effort, never throws)
+    if (userId) {
+      idbClearNotesForUser(userId).catch(() => {});
+      idbClearQueueForUser(userId).catch(() => {});
     }
+    // Tear down sync engine
     if (syncEngineRef.current) {
       syncEngineRef.current.destroy();
       syncEngineRef.current = null;
     }
+    // Reset React state
     setAuth(null);
     setSession(null);
     setNotes([]);
     setSyncStatus(SYNC_STATUS_RESET);
-    // Clear all cached data for this user
+    // Clear localStorage caches
     try {
       const keys = Object.keys(localStorage);
       keys.forEach((key) => {
@@ -7184,10 +7192,12 @@ export default function App() {
           localStorage.removeItem(key);
         }
       });
-    } catch (error) {
-      console.error("Error clearing cache on sign out:", error);
-    }
+    } catch (e) {}
     navigate("#/login");
+  };
+
+  const signOut = () => {
+    cleanupClientSession();
   };
   const signIn = async (email, password) => {
     const res = await api("/login", {
@@ -7227,34 +7237,15 @@ export default function App() {
     return { ok: true };
   };
 
-  // Handle token expiration globally
+  // Handle token expiration globally — same cleanup as signOut
   useEffect(() => {
     const handleAuthExpired = () => {
-      console.log("Auth expired, signing out...");
-      // Clear auth and redirect to login
-      setAuth(null);
-      setSession(null);
-      setNotes([]);
-      // Clear all cached data
-      try {
-        const keys = Object.keys(localStorage);
-        keys.forEach((key) => {
-          if (key.includes("glass-keep-")) {
-            localStorage.removeItem(key);
-          }
-        });
-      } catch (error) {
-        console.error("Error clearing cache on auth expiration:", error);
-      }
-      navigate("#/login");
+      console.warn("[Auth] Token expired, cleaning up session...");
+      cleanupClientSession();
     };
-
     window.addEventListener("auth-expired", handleAuthExpired);
-
-    return () => {
-      window.removeEventListener("auth-expired", handleAuthExpired);
-    };
-  }, [navigate]);
+    return () => window.removeEventListener("auth-expired", handleAuthExpired);
+  }, []);
 
   /** -------- Composer helpers -------- */
   const addComposerItem = () => {
