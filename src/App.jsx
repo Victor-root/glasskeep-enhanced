@@ -6152,8 +6152,20 @@ export default function App() {
     syncEngineRef.current?.processQueue();
   }, []);
 
-  const handleSyncNow = useCallback(() => {
-    return syncEngineRef.current?.forceSync();
+  const handleSyncNow = useCallback(async () => {
+    await syncEngineRef.current?.forceSync();
+    // After syncing the queue, also reload notes from server to pick up
+    // changes made by other devices (new notes, edits, etc.)
+    if (syncEngineRef.current?.serverReachable) {
+      const currentFilter = tagFilterRef.current;
+      if (currentFilter === "ARCHIVED") {
+        loadArchivedNotes().catch(() => {});
+      } else if (currentFilter === "TRASHED") {
+        loadTrashedNotes().catch(() => {});
+      } else {
+        loadNotes().catch(() => {});
+      }
+    }
   }, []);
 
   // Warn before closing if there are pending local changes

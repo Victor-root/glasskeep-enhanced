@@ -771,6 +771,7 @@ app.post("/api/notes", auth, (req, res) => {
   }
 
   insertNote.run(n);
+  broadcastNoteUpdated(n.id);
   res.status(201).json({
     id: n.id,
     type: n.type,
