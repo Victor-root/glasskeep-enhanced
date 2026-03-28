@@ -48,6 +48,7 @@ export class SyncEngine {
     this._lastSyncAt = null;
     this._lastSyncError = null;
     this._failedChecks = 0; // consecutive failed health checks (reset on success)
+    this._healthCheckInFlight = false; // guard against concurrent health checks
   }
 
   // ─── Public API ───
@@ -253,14 +254,20 @@ export class SyncEngine {
     const token = this.getToken();
     if (!token) return false;
 
+    // Prevent concurrent health checks (e.g. forceSync + scheduled check)
+    if (this._healthCheckInFlight) return this._serverReachable ?? false;
+    this._healthCheckInFlight = true;
+
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
       // No Authorization header needed — /api/health has no auth middleware.
       // Cache-busting param forces the browser to open a fresh connection,
       // which avoids stale TCP sockets after a server restart (common on mobile).
+      // cache: "no-store" bypasses HTTP cache (SW already uses NetworkOnly).
       const res = await fetch(`${API_BASE}/health?_t=${Date.now()}`, {
         signal: controller.signal,
+        cache: "no-store",
       });
       clearTimeout(timeoutId);
 
@@ -309,6 +316,8 @@ export class SyncEngine {
       this._adjustHealthInterval();
       await this._emitStatus();
       return false;
+    } finally {
+      this._healthCheckInFlight = false;
     }
   }
 

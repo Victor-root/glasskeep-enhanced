@@ -6830,11 +6830,16 @@ export default function App() {
     // Handle online/offline events
     const handleOnline = () => {
       setIsOnline(true);
+      // Browser detected network recovery — run health check first,
+      // then process queue if server is reachable
+      syncEngineRef.current?.healthCheck().then((ok) => {
+        if (ok) triggerSync();
+      });
       // Reconnect SSE if it was dead
       if (es && es.readyState === EventSource.CLOSED) {
+        reconnectAttempts = 0;
         connectSSE();
       }
-      triggerSync();
     };
 
     const handleOffline = () => {
