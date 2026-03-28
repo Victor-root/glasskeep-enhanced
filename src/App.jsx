@@ -6192,10 +6192,10 @@ export default function App() {
   }, [triggerSync, currentUser?.id, sessionId]);
 
   // Cache keys for localStorage
-  const NOTES_CACHE_KEY = `glass-keep-notes-${currentUser?.id || "anonymous"}`;
-  const ARCHIVED_NOTES_CACHE_KEY = `glass-keep-archived-${currentUser?.id || "anonymous"}`;
-  const TRASHED_NOTES_CACHE_KEY = `glass-keep-trashed-${currentUser?.id || "anonymous"}`;
-  const CACHE_TIMESTAMP_KEY = `glass-keep-cache-timestamp-${currentUser?.id || "anonymous"}`;
+  const NOTES_CACHE_KEY = `glass-keep-notes-${currentUser?.id || "anonymous"}-${sessionId || "no-session"}`;
+  const ARCHIVED_NOTES_CACHE_KEY = `glass-keep-archived-${currentUser?.id || "anonymous"}-${sessionId || "no-session"}`;
+  const TRASHED_NOTES_CACHE_KEY = `glass-keep-trashed-${currentUser?.id || "anonymous"}-${sessionId || "no-session"}`;
+  const CACHE_TIMESTAMP_KEY = `glass-keep-cache-timestamp-${currentUser?.id || "anonymous"}-${sessionId || "no-session"}`;
 
   // Cache invalidation functions
   const invalidateNotesCache = () => {
