@@ -61,6 +61,8 @@ const WarningIcon = ({ className }) => (
   </svg>
 );
 
+const MAX_RETRIES = 5; // must match syncEngine.js
+
 // ─── Status config ───
 
 function getStatusConfig(syncState, dark) {
@@ -185,12 +187,13 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
 
   const {
     syncState, serverReachable, hasPendingChanges, lastSyncAt, lastSyncError,
-    pending, processing, failed, total, items, failedChecks,
+    pending, processing, retry, failed, total, items, failedChecks,
   } = syncStatus;
 
   const config = getStatusConfig(syncState, dark);
   const { Icon, color, hoverBg, label, animate } = config;
 
+  const retryItems = (items || []).filter((i) => i.status === "retry");
   const failedItems = (items || []).filter((i) => i.status === "failed");
   const pendingAndProcessing = (pending || 0) + (processing || 0);
 
@@ -305,22 +308,54 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
               </div>
             )}
 
-            {/* ── Section 3: Errors ── */}
-            {(failed > 0 || (lastSyncError && syncState !== "synced" && syncState !== "offline")) && (
+            {/* ── Section 3a: Retrying (amber — transient, will be retried) ── */}
+            {retryItems.length > 0 && (
+              <div className={`border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
+                <div className={`px-4 pt-2.5 pb-1.5 flex items-center gap-1.5 text-xs font-medium ${dark ? "text-amber-400" : "text-amber-600"}`}>
+                  <RefreshIcon className="w-3 h-3" />
+                  {t("syncRetryingTitle")}
+                </div>
+                <div className="max-h-[120px] overflow-y-auto">
+                  {retryItems.map((item) => (
+                    <div
+                      key={item.queueId}
+                      className={`px-4 py-1.5 text-xs ${dark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={dark ? "text-gray-300" : "text-gray-700"}>
+                          {actionTypeLabel(item.type)}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={dark ? "text-amber-400/70" : "text-amber-500"}>
+                            {t("syncRetryCount", { count: item.attempts })}/{MAX_RETRIES}
+                          </span>
+                          <span className={dark ? "text-gray-500" : "text-gray-400"}>
+                            {item.noteId && item.noteId !== "__reorder__" ? `#${item.noteId.slice(0, 8)}` : ""}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="h-1" />
+              </div>
+            )}
+
+            {/* ── Section 3b: Failed (red — permanent, max retries reached) ── */}
+            {(failed > 0 || (lastSyncError && syncState === "error")) && (
               <div className={`border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
                 <div className={`px-4 pt-2.5 pb-1.5 flex items-center gap-1.5 text-xs font-medium ${dark ? "text-red-400" : "text-red-600"}`}>
                   <WarningIcon className="w-3.5 h-3.5" />
                   {t("syncErrorsTitle")}
                 </div>
 
-                {/* Global error (only if different from item errors, or no items) */}
-                {lastSyncError && syncState !== "synced" && syncState !== "offline" && (failedItems.length === 0 || !failedItems.some(i => i.lastError === lastSyncError)) && (
+                {/* Global error (only if not duplicated by item errors) */}
+                {lastSyncError && syncState === "error" && (failedItems.length === 0 || !failedItems.some(i => i.lastError === lastSyncError)) && (
                   <div className={`px-4 py-1.5 text-xs ${dark ? "text-red-400/80" : "text-red-500"}`}>
                     {lastSyncError}
                   </div>
                 )}
 
-                {/* Individual failed items */}
                 {failedItems.length > 0 && (
                   <div className="max-h-[180px] overflow-y-auto">
                     {failedItems.map((item) => (

@@ -97,8 +97,8 @@ export class SyncEngine {
           continue;
         }
 
-        // Check retry delay
-        if (item.status === "failed" && item.lastAttemptAt) {
+        // Check retry delay (applies to both "retry" and "failed" statuses)
+        if ((item.status === "retry" || item.status === "failed") && item.lastAttemptAt) {
           const delay = BASE_RETRY_DELAY * Math.pow(2, Math.min(item.attempts, 4));
           if (Date.now() - item.lastAttemptAt < delay) {
             continue;
@@ -149,10 +149,11 @@ export class SyncEngine {
             // Timeout: server may be busy (e.g. concurrent device sync).
             // DON'T mark server as unreachable — just retry later.
             this._lastSyncError = "Request timeout";
+            const nextAttempts = item.attempts + 1;
             await updateQueueItem(item.queueId, {
-              status: "failed",
+              status: nextAttempts >= MAX_RETRIES ? "failed" : "retry",
               lastError: "Request timeout",
-              attempts: item.attempts + 1,
+              attempts: nextAttempts,
               lastAttemptAt: Date.now(),
             });
           } else if (isNetworkError) {
@@ -160,10 +161,11 @@ export class SyncEngine {
             this._serverReachable = false;
             this._lastSyncError = "Server unreachable";
             this._failedChecks++;
+            const nextAttempts = item.attempts + 1;
             await updateQueueItem(item.queueId, {
-              status: "failed",
+              status: nextAttempts >= MAX_RETRIES ? "failed" : "retry",
               lastError: "Server unreachable",
-              attempts: item.attempts + 1,
+              attempts: nextAttempts,
               lastAttemptAt: Date.now(),
             });
             // Stop processing — server is down
@@ -172,10 +174,11 @@ export class SyncEngine {
           } else {
             this._serverReachable = true;
             this._lastSyncError = `${err.message || "Unknown error"} (HTTP ${err.status || "?"})`;
+            const nextAttempts = item.attempts + 1;
             await updateQueueItem(item.queueId, {
-              status: "failed",
+              status: nextAttempts >= MAX_RETRIES ? "failed" : "retry",
               lastError: this._lastSyncError,
-              attempts: item.attempts + 1,
+              attempts: nextAttempts,
               lastAttemptAt: Date.now(),
             });
             this.onSyncError(item, err);
@@ -187,13 +190,13 @@ export class SyncEngine {
       // Include both pending items AND failed items still under MAX_RETRIES.
       const stats = await getQueueStats();
       const hasRetryable = stats.items.some(
-        (i) => i.status === "pending" || (i.status === "failed" && i.attempts < MAX_RETRIES)
+        (i) => i.status === "pending" || i.status === "retry" || (i.status === "failed" && i.attempts < MAX_RETRIES)
       );
       if (hasRetryable && !this._destroyed) {
         // Find the shortest remaining delay among retryable failed items
         let nextDelay = BASE_RETRY_DELAY;
         for (const i of stats.items) {
-          if (i.status === "failed" && i.attempts < MAX_RETRIES && i.lastAttemptAt) {
+          if ((i.status === "retry" || (i.status === "failed" && i.attempts < MAX_RETRIES)) && i.lastAttemptAt) {
             const backoff = BASE_RETRY_DELAY * Math.pow(2, Math.min(i.attempts, 4));
             const elapsed = Date.now() - i.lastAttemptAt;
             const remaining = Math.max(backoff - elapsed, 500);
@@ -235,7 +238,7 @@ export class SyncEngine {
     // Reset ALL failed items — forced sync bypasses MAX_RETRIES and backoff completely
     const stats = await getQueueStats();
     for (const item of stats.items) {
-      if (item.status === "failed") {
+      if (item.status === "failed" || item.status === "retry") {
         await updateQueueItem(item.queueId, {
           status: "pending",
           lastAttemptAt: 0,
@@ -284,7 +287,7 @@ export class SyncEngine {
         const NON_RETRYABLE = new Set(["Authentication expired"]);
         let resetCount = 0;
         for (const item of stats.items) {
-          if (item.status === "failed" && !NON_RETRYABLE.has(item.lastError) && !item.lastError?.startsWith("Note not found")) {
+          if ((item.status === "failed" || item.status === "retry") && !NON_RETRYABLE.has(item.lastError) && !item.lastError?.startsWith("Note not found")) {
             await updateQueueItem(item.queueId, {
               status: "pending",
               lastAttemptAt: 0,
@@ -417,7 +420,9 @@ export class SyncEngine {
       syncState = "checking";
     } else if (this._processing) {
       syncState = "syncing";
-    } else if (stats.failed > 0 && stats.pending === 0 && stats.processing === 0) {
+    } else if (stats.failed > 0 && stats.pending === 0 && stats.processing === 0 && stats.retry === 0) {
+      // Only show "error" when ALL remaining items are permanently failed (max retries).
+      // Items in "retry" are still being retried — that's normal, not an error state.
       syncState = "error";
     } else if (hasPending) {
       syncState = "pending";
@@ -447,6 +452,7 @@ export class SyncEngine {
       // Queue stats for detail display
       pending: stats.pending,
       processing: stats.processing,
+      retry: stats.retry,
       failed: stats.failed,
       total: stats.total,
       items: stats.items,

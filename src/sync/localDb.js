@@ -168,11 +168,16 @@ export async function getPendingQueue() {
     const req = store.index("status").getAll("pending");
     req.onsuccess = () => {
       const items = req.result || [];
-      // Also get failed items for retry
-      const req2 = store.index("status").getAll("failed");
+      // Also get retry + failed items for retry
+      const req2 = store.index("status").getAll("retry");
       req2.onsuccess = () => {
-        const failed = req2.result || [];
-        resolve([...items, ...failed].sort((a, b) => a.createdAt - b.createdAt));
+        const retrying = req2.result || [];
+        const req3 = store.index("status").getAll("failed");
+        req3.onsuccess = () => {
+          const failed = req3.result || [];
+          resolve([...items, ...retrying, ...failed].sort((a, b) => a.createdAt - b.createdAt));
+        };
+        req3.onerror = () => resolve([...items, ...retrying].sort((a, b) => a.createdAt - b.createdAt));
       };
       req2.onerror = () => resolve(items);
     };
@@ -219,8 +224,9 @@ export async function getQueueStats() {
   const items = await getQueueItems();
   const pending = items.filter((i) => i.status === "pending").length;
   const processing = items.filter((i) => i.status === "processing").length;
+  const retry = items.filter((i) => i.status === "retry").length;
   const failed = items.filter((i) => i.status === "failed").length;
-  return { total: items.length, pending, processing, failed, items };
+  return { total: items.length, pending, processing, retry, failed, items };
 }
 
 /**
@@ -278,7 +284,7 @@ export async function hasPendingChanges(noteId) {
     const req = store.index("noteId").getAll(noteId);
     req.onsuccess = () => {
       const items = (req.result || []).filter(
-        (i) => i.status === "pending" || i.status === "processing" || i.status === "failed"
+        (i) => i.status === "pending" || i.status === "processing" || i.status === "retry" || i.status === "failed"
       );
       resolve(items.length > 0);
     };
