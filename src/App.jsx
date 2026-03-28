@@ -4408,50 +4408,50 @@ function NotesUI({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-gray-300 hover:bg-white/10" : "text-gray-600 hover:bg-gray-100"}`}
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                     onClick={() => {
                       setHeaderMenuOpen(false);
                       openSettingsPanel?.();
                     }}
                   >
-                    <SettingsIcon />{t("settings")}</button>
+                    <span className={dark ? "text-gray-400" : "text-gray-500"}><SettingsIcon /></span>{t("settings")}</button>
                   <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-blue-400 hover:bg-white/10" : "text-blue-600 hover:bg-gray-100"}`}
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                     onClick={() => {
                       setHeaderMenuOpen(false);
                       onToggleViewMode?.();
                     }}
                   >
-                    {listView ? <GridIcon /> : <ListIcon />}
+                    <span className={dark ? "text-blue-400" : "text-blue-600"}>{listView ? <GridIcon /> : <ListIcon />}</span>
                     {listView ? t("gridView") : t("listView")}
                   </button>
                   <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-amber-400 hover:bg-white/10" : "text-indigo-600 hover:bg-gray-100"}`}
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                     onClick={() => {
                       setHeaderMenuOpen(false);
                       toggleDark?.();
                     }}
                   >
-                    {dark ? <SunIcon /> : <MoonIcon />}
+                    <span className={dark ? "text-amber-400" : "text-indigo-600"}>{dark ? <SunIcon /> : <MoonIcon />}</span>
                     {dark ? t("lightMode") : t("darkMode")}
                   </button>
                   <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-violet-400 hover:bg-white/10" : "text-violet-600 hover:bg-gray-100"}`}
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                     onClick={() => {
                       setHeaderMenuOpen(false);
                       onStartMulti?.();
                     }}
                   >
-                    <CheckSquareIcon />{t("multiSelect")}</button>
+                    <span className={dark ? "text-violet-400" : "text-violet-600"}><CheckSquareIcon /></span>{t("multiSelect")}</button>
                   {currentUser?.is_admin && (
                     <button
-                      className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
+                      className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                       onClick={() => {
                         setHeaderMenuOpen(false);
                         openAdminPanel?.();
                       }}
                     >
-                      <ShieldIcon />{t("adminPanel")}</button>
+                      <span className={dark ? "text-red-400" : "text-red-600"}><ShieldIcon /></span>{t("adminPanel")}</button>
                   )}
                   <button
                     className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
