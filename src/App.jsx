@@ -5397,6 +5397,7 @@ export default function App() {
   const [session, setSession] = useState(getAuth());
   const token = session?.token;
   const currentUser = session?.user || null;
+  const sessionId = session?.sessionId || null;
 
   // Theme
   const [dark, setDark] = useState(false);
@@ -5423,6 +5424,8 @@ export default function App() {
   tokenRef.current = token;
   const currentUserIdRef = useRef(currentUser?.id);
   currentUserIdRef.current = currentUser?.id;
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
 
   // Tag filter & sidebar
   const [tagFilter, setTagFilter] = useState(null); // null = all, ALL_IMAGES = only notes with images
@@ -6136,6 +6139,7 @@ export default function App() {
     const engine = new SyncEngine({
       getToken: () => tokenRef.current,
       userId: currentUser.id,
+      sessionId,
       onStatusChange: (status) => setSyncStatus(status),
       onSyncComplete: () => {},
       onSyncError: (item, err) => console.warn("[Sync] Failed:", item.type, item.noteId, err.message),
@@ -6150,7 +6154,7 @@ export default function App() {
       engine.destroy();
       syncEngineRef.current = null;
     };
-  }, [token, currentUser?.id]);
+  }, [token, currentUser?.id, sessionId]);
 
   const triggerSync = useCallback(() => {
     syncEngineRef.current?.processQueue();
@@ -6183,9 +6187,9 @@ export default function App() {
   // ─── Local-first helpers ───
   // Enqueue a sync action and immediately trigger the engine
   const enqueueAndSync = useCallback(async (action) => {
-    await idbEnqueue({ ...action, userId: currentUser?.id });
+    await idbEnqueue({ ...action, userId: currentUser?.id, sessionId });
     triggerSync();
-  }, [triggerSync, currentUser?.id]);
+  }, [triggerSync, currentUser?.id, sessionId]);
 
   // Cache keys for localStorage
   const NOTES_CACHE_KEY = `glass-keep-notes-${currentUser?.id || "anonymous"}`;
@@ -6333,7 +6337,7 @@ export default function App() {
       // server version (pending=false) instead of the correct local version.
       const pendingSet = new Set();
       for (const sn of serverNotes) {
-        if (await hasPendingChanges(String(sn.id), currentUser?.id)) pendingSet.add(String(sn.id));
+        if (await hasPendingChanges(String(sn.id), currentUser?.id, sessionId)) pendingSet.add(String(sn.id));
       }
 
       // Hydrate IndexedDB, skipping notes with pending local changes
@@ -6352,7 +6356,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, "active");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await hasPendingChanges(String(ln.id), currentUser?.id)) localOnly.push(ln);
+            if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) localOnly.push(ln);
           }
         }
       } catch (e) {}
@@ -6428,7 +6432,7 @@ export default function App() {
       // Snapshot pending status once to avoid race with concurrent queue processing
       const pendingSet = new Set();
       for (const sn of notesArray) {
-        if (await hasPendingChanges(String(sn.id), currentUser?.id)) pendingSet.add(String(sn.id));
+        if (await hasPendingChanges(String(sn.id), currentUser?.id, sessionId)) pendingSet.add(String(sn.id));
       }
 
       // Hydrate IndexedDB
@@ -6447,7 +6451,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, "archived");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await hasPendingChanges(String(ln.id), currentUser?.id)) localOnly.push(ln);
+            if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) localOnly.push(ln);
           }
         }
       } catch (e) {}
@@ -6509,7 +6513,7 @@ export default function App() {
       // Snapshot pending status once to avoid race with concurrent queue processing
       const pendingSet = new Set();
       for (const sn of notesArray) {
-        if (await hasPendingChanges(String(sn.id), currentUser?.id)) pendingSet.add(String(sn.id));
+        if (await hasPendingChanges(String(sn.id), currentUser?.id, sessionId)) pendingSet.add(String(sn.id));
       }
 
       // Hydrate IndexedDB
@@ -6528,7 +6532,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, "trashed");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await hasPendingChanges(String(ln.id), currentUser?.id)) localOnly.push(ln);
+            if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) localOnly.push(ln);
           }
         }
       } catch (e) {}
@@ -6673,7 +6677,7 @@ export default function App() {
       const nid = String(noteId);
 
       // Don't overwrite notes with pending local changes (already in sync queue)
-      const pending = await hasPendingChanges(nid, currentUser?.id);
+      const pending = await hasPendingChanges(nid, currentUser?.id, sessionId);
       if (pending) return;
 
       // Don't overwrite note currently being edited in modal (debounce may not have fired yet)
@@ -7204,8 +7208,9 @@ export default function App() {
       method: "POST",
       body: { email, password },
     });
-    setSession(res);
-    setAuth(res);
+    const sessionWithId = { ...res, sessionId: crypto.randomUUID() };
+    setSession(sessionWithId);
+    setAuth(sessionWithId);
     navigate("#/notes");
     return { ok: true };
   };
@@ -7214,8 +7219,9 @@ export default function App() {
       method: "POST",
       body: { user_id: userId, password },
     });
-    setSession(res);
-    setAuth(res);
+    const sessionWithId = { ...res, sessionId: crypto.randomUUID() };
+    setSession(sessionWithId);
+    setAuth(sessionWithId);
     navigate("#/notes");
     return { ok: true };
   };

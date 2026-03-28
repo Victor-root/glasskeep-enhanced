@@ -2,7 +2,7 @@
 // IndexedDB wrapper for local-first note storage and sync queue
 
 const DB_NAME = "glasskeep";
-const DB_VERSION = 2; // v2: add userId index to syncQueue for per-user isolation
+const DB_VERSION = 3; // v3: add compound [userId, sessionId] index for per-session isolation
 const NOTES_STORE = "notes";
 const QUEUE_STORE = "syncQueue";
 
@@ -28,6 +28,7 @@ function openDb() {
         qs.createIndex("status", "status", { unique: false });
         qs.createIndex("createdAt", "createdAt", { unique: false });
         qs.createIndex("userId", "userId", { unique: false });
+        qs.createIndex("userSession", ["userId", "sessionId"], { unique: false });
       }
 
       // ─── v2: add userId index to existing syncQueue ───
@@ -35,6 +36,14 @@ function openDb() {
         const queueStore = e.target.transaction.objectStore(QUEUE_STORE);
         if (!queueStore.indexNames.contains("userId")) {
           queueStore.createIndex("userId", "userId", { unique: false });
+        }
+      }
+
+      // ─── v3: add compound [userId, sessionId] index ───
+      if (oldVersion >= 1 && oldVersion < 3) {
+        const queueStore = e.target.transaction.objectStore(QUEUE_STORE);
+        if (!queueStore.indexNames.contains("userSession")) {
+          queueStore.createIndex("userSession", ["userId", "sessionId"], { unique: false });
         }
       }
     };
@@ -132,8 +141,8 @@ export async function clearNotesForUser(userId) {
 }
 
 // ─── Sync Queue Store ───
-// All queue functions require a userId to ensure per-user isolation.
-// Entries from v1 (without userId) are silently excluded by the IDB index.
+// All queue read functions require userId + sessionId for per-session isolation.
+// Entries without sessionId (v1/v2) are silently excluded by the compound index.
 
 /**
  * Queue action types:
@@ -166,17 +175,17 @@ export async function enqueue(action) {
   });
 }
 
-export async function getQueueItems(userId) {
+export async function getQueueItems(userId, sessionId) {
   const store = await tx(QUEUE_STORE);
   return new Promise((resolve, reject) => {
-    const req = store.index("userId").getAll(userId);
+    const req = store.index("userSession").getAll([userId, sessionId]);
     req.onsuccess = () => resolve(req.result || []);
     req.onerror = () => reject(req.error);
   });
 }
 
-export async function getPendingQueue(userId) {
-  const items = await getQueueItems(userId);
+export async function getPendingQueue(userId, sessionId) {
+  const items = await getQueueItems(userId, sessionId);
   return items
     .filter((i) => i.status === "pending" || i.status === "retry" || i.status === "failed")
     .sort((a, b) => a.createdAt - b.createdAt);
@@ -208,6 +217,10 @@ export async function removeQueueItem(queueId) {
   });
 }
 
+/**
+ * Clear all queue items for a user (all sessions). Used at sign-out / auth-expired
+ * to ensure no orphaned items remain from any session.
+ */
 export async function clearQueueForUser(userId) {
   const db = await openDb();
   const t = db.transaction(QUEUE_STORE, "readwrite");
@@ -227,8 +240,8 @@ export async function clearQueueForUser(userId) {
   });
 }
 
-export async function getQueueStats(userId) {
-  const items = await getQueueItems(userId);
+export async function getQueueStats(userId, sessionId) {
+  const items = await getQueueItems(userId, sessionId);
   const pending = items.filter((i) => i.status === "pending").length;
   const processing = items.filter((i) => i.status === "processing").length;
   const retry = items.filter((i) => i.status === "retry").length;
@@ -241,8 +254,8 @@ export async function getQueueStats(userId) {
  * E.g. if a note was updated 3 times before sync, keep only the latest.
  * Create actions are never collapsed (they must execute once).
  */
-export async function collapseQueue(userId) {
-  const items = await getQueueItems(userId);
+export async function collapseQueue(userId, sessionId) {
+  const items = await getQueueItems(userId, sessionId);
   const toRemove = [];
   const seen = new Map(); // noteId:type -> latest queue entry
 
@@ -292,15 +305,15 @@ export async function collapseQueue(userId) {
 }
 
 /**
- * Check if a note has pending local changes in the queue for a given user.
+ * Check if a note has pending local changes in the queue for a given session.
  */
-export async function hasPendingChanges(noteId, userId) {
+export async function hasPendingChanges(noteId, userId, sessionId) {
   const store = await tx(QUEUE_STORE);
   return new Promise((resolve, reject) => {
     const req = store.index("noteId").getAll(noteId);
     req.onsuccess = () => {
       const items = (req.result || []).filter(
-        (i) => i.userId === userId &&
+        (i) => i.userId === userId && i.sessionId === sessionId &&
           (i.status === "pending" || i.status === "processing" || i.status === "retry" || i.status === "failed")
       );
       resolve(items.length > 0);
