@@ -24,7 +24,7 @@ import {
   enqueue as idbEnqueue,
   getQueueStats,
   hasPendingChanges,
-  clearQueue as idbClearQueue,
+  clearQueueForUser as idbClearQueueForUser,
   clearNotesForUser as idbClearNotesForUser,
 } from "./sync/localDb.js";
 
@@ -6133,6 +6133,7 @@ export default function App() {
 
     const engine = new SyncEngine({
       getToken: () => tokenRef.current,
+      userId: currentUser.id,
       onStatusChange: (status) => setSyncStatus(status),
       onSyncComplete: () => {},
       onSyncError: (item, err) => console.warn("[Sync] Failed:", item.type, item.noteId, err.message),
@@ -6180,9 +6181,9 @@ export default function App() {
   // ─── Local-first helpers ───
   // Enqueue a sync action and immediately trigger the engine
   const enqueueAndSync = useCallback(async (action) => {
-    await idbEnqueue(action);
+    await idbEnqueue({ ...action, userId: currentUser?.id });
     triggerSync();
-  }, [triggerSync]);
+  }, [triggerSync, currentUser?.id]);
 
   // Cache keys for localStorage
   const NOTES_CACHE_KEY = `glass-keep-notes-${currentUser?.id || "anonymous"}`;
@@ -6330,7 +6331,7 @@ export default function App() {
       // server version (pending=false) instead of the correct local version.
       const pendingSet = new Set();
       for (const sn of serverNotes) {
-        if (await hasPendingChanges(String(sn.id))) pendingSet.add(String(sn.id));
+        if (await hasPendingChanges(String(sn.id), currentUser?.id)) pendingSet.add(String(sn.id));
       }
 
       // Hydrate IndexedDB, skipping notes with pending local changes
@@ -6349,7 +6350,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, "active");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await hasPendingChanges(String(ln.id))) localOnly.push(ln);
+            if (await hasPendingChanges(String(ln.id), currentUser?.id)) localOnly.push(ln);
           }
         }
       } catch (e) {}
@@ -6425,7 +6426,7 @@ export default function App() {
       // Snapshot pending status once to avoid race with concurrent queue processing
       const pendingSet = new Set();
       for (const sn of notesArray) {
-        if (await hasPendingChanges(String(sn.id))) pendingSet.add(String(sn.id));
+        if (await hasPendingChanges(String(sn.id), currentUser?.id)) pendingSet.add(String(sn.id));
       }
 
       // Hydrate IndexedDB
@@ -6444,7 +6445,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, "archived");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await hasPendingChanges(String(ln.id))) localOnly.push(ln);
+            if (await hasPendingChanges(String(ln.id), currentUser?.id)) localOnly.push(ln);
           }
         }
       } catch (e) {}
@@ -6506,7 +6507,7 @@ export default function App() {
       // Snapshot pending status once to avoid race with concurrent queue processing
       const pendingSet = new Set();
       for (const sn of notesArray) {
-        if (await hasPendingChanges(String(sn.id))) pendingSet.add(String(sn.id));
+        if (await hasPendingChanges(String(sn.id), currentUser?.id)) pendingSet.add(String(sn.id));
       }
 
       // Hydrate IndexedDB
@@ -6525,7 +6526,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, "trashed");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await hasPendingChanges(String(ln.id))) localOnly.push(ln);
+            if (await hasPendingChanges(String(ln.id), currentUser?.id)) localOnly.push(ln);
           }
         }
       } catch (e) {}
@@ -6670,7 +6671,7 @@ export default function App() {
       const nid = String(noteId);
 
       // Don't overwrite notes with pending local changes (already in sync queue)
-      const pending = await hasPendingChanges(nid);
+      const pending = await hasPendingChanges(nid, currentUser?.id);
       if (pending) return;
 
       // Don't overwrite note currently being edited in modal (debounce may not have fired yet)
@@ -7165,7 +7166,7 @@ export default function App() {
     // Clear IndexedDB sync data
     if (currentUser?.id) {
       idbClearNotesForUser(currentUser.id).catch(() => {});
-      idbClearQueue().catch(() => {});
+      idbClearQueueForUser(currentUser.id).catch(() => {});
     }
     if (syncEngineRef.current) {
       syncEngineRef.current.destroy();

@@ -34,8 +34,9 @@ const HEALTH_OFFLINE_INTERVAL = 3000;    // 3s when server is known to be down
  *   pending/processing/failed/total/items: queue stats
  */
 export class SyncEngine {
-  constructor({ getToken, onStatusChange, onSyncComplete, onSyncError }) {
+  constructor({ getToken, userId, onStatusChange, onSyncComplete, onSyncError }) {
     this.getToken = getToken;
+    this._userId = userId;
     this.onStatusChange = onStatusChange || (() => {});
     this.onSyncComplete = onSyncComplete || (() => {});
     this.onSyncError = onSyncError || (() => {});
@@ -75,9 +76,9 @@ export class SyncEngine {
     this._processing = true;
 
     try {
-      await collapseQueue();
+      await collapseQueue(this._userId);
 
-      const items = await getPendingQueue();
+      const items = await getPendingQueue(this._userId);
       if (items.length === 0) {
         this._processing = false;
         await this._emitStatus();
@@ -206,7 +207,7 @@ export class SyncEngine {
 
       // Schedule retry if there are items that can still be retried.
       // Include both pending items AND failed items still under MAX_RETRIES.
-      const stats = await getQueueStats();
+      const stats = await getQueueStats(this._userId);
       const hasRetryable = stats.items.some(
         (i) => i.status === "pending" || i.status === "retry" || (i.status === "failed" && i.attempts < MAX_RETRIES)
       );
@@ -254,7 +255,7 @@ export class SyncEngine {
     if (!this._serverReachable) return; // server is down — already emitted offline
 
     // Reset ALL failed items — forced sync bypasses MAX_RETRIES and backoff completely
-    const stats = await getQueueStats();
+    const stats = await getQueueStats(this._userId);
     for (const item of stats.items) {
       if (item.status === "failed" || item.status === "retry") {
         await updateQueueItem(item.queueId, {
@@ -301,7 +302,7 @@ export class SyncEngine {
         // Server confirmed reachable — reset all transient failures so they retry.
         // Fatal errors (auth expired, note not found) are already at MAX_RETRIES
         // or removed, so this only affects retryable items.
-        const stats = await getQueueStats();
+        const stats = await getQueueStats(this._userId);
         const NON_RETRYABLE = new Set(["Authentication expired"]);
         let resetCount = 0;
         for (const item of stats.items) {
@@ -400,7 +401,7 @@ export class SyncEngine {
     if (this._destroyed) return;
     if (this._healthTimer) clearTimeout(this._healthTimer);
 
-    getQueueStats().then((stats) => {
+    getQueueStats(this._userId).then((stats) => {
       let interval;
       if (this._serverReachable === false) {
         // Always aggressive when offline — detect recovery ASAP
@@ -432,7 +433,7 @@ export class SyncEngine {
    * This is the SINGLE source of truth for UI.
    */
   async _emitStatus() {
-    const stats = await getQueueStats();
+    const stats = await getQueueStats(this._userId);
     const hasPending = stats.total > 0;
 
     // Derive the display state — strict priority, no false positives

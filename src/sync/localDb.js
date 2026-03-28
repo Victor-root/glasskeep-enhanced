@@ -2,7 +2,7 @@
 // IndexedDB wrapper for local-first note storage and sync queue
 
 const DB_NAME = "glasskeep";
-const DB_VERSION = 1;
+const DB_VERSION = 2; // v2: add userId index to syncQueue for per-user isolation
 const NOTES_STORE = "notes";
 const QUEUE_STORE = "syncQueue";
 
@@ -14,17 +14,28 @@ function openDb() {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
-      if (!db.objectStoreNames.contains(NOTES_STORE)) {
+      const oldVersion = e.oldVersion;
+
+      // ─── v1: initial stores ───
+      if (oldVersion < 1) {
         const ns = db.createObjectStore(NOTES_STORE, { keyPath: "id" });
         ns.createIndex("user_id", "user_id", { unique: false });
         ns.createIndex("archived", "archived", { unique: false });
         ns.createIndex("trashed", "trashed", { unique: false });
-      }
-      if (!db.objectStoreNames.contains(QUEUE_STORE)) {
+
         const qs = db.createObjectStore(QUEUE_STORE, { keyPath: "queueId", autoIncrement: true });
         qs.createIndex("noteId", "noteId", { unique: false });
         qs.createIndex("status", "status", { unique: false });
         qs.createIndex("createdAt", "createdAt", { unique: false });
+        qs.createIndex("userId", "userId", { unique: false });
+      }
+
+      // ─── v2: add userId index to existing syncQueue ───
+      if (oldVersion >= 1 && oldVersion < 2) {
+        const queueStore = e.target.transaction.objectStore(QUEUE_STORE);
+        if (!queueStore.indexNames.contains("userId")) {
+          queueStore.createIndex("userId", "userId", { unique: false });
+        }
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -121,6 +132,8 @@ export async function clearNotesForUser(userId) {
 }
 
 // ─── Sync Queue Store ───
+// All queue functions require a userId to ensure per-user isolation.
+// Entries from v1 (without userId) are silently excluded by the IDB index.
 
 /**
  * Queue action types:
@@ -138,7 +151,7 @@ export async function enqueue(action) {
   const store = await tx(QUEUE_STORE, "readwrite");
   const entry = {
     ...action,
-    status: "pending", // pending | processing | failed
+    status: "pending", // pending | processing | retry | failed
     createdAt: Date.now(),
     attempts: 0,
     lastError: null,
@@ -153,36 +166,20 @@ export async function enqueue(action) {
   });
 }
 
-export async function getQueueItems() {
+export async function getQueueItems(userId) {
   const store = await tx(QUEUE_STORE);
   return new Promise((resolve, reject) => {
-    const req = store.getAll();
+    const req = store.index("userId").getAll(userId);
     req.onsuccess = () => resolve(req.result || []);
     req.onerror = () => reject(req.error);
   });
 }
 
-export async function getPendingQueue() {
-  const store = await tx(QUEUE_STORE);
-  return new Promise((resolve, reject) => {
-    const req = store.index("status").getAll("pending");
-    req.onsuccess = () => {
-      const items = req.result || [];
-      // Also get retry + failed items for retry
-      const req2 = store.index("status").getAll("retry");
-      req2.onsuccess = () => {
-        const retrying = req2.result || [];
-        const req3 = store.index("status").getAll("failed");
-        req3.onsuccess = () => {
-          const failed = req3.result || [];
-          resolve([...items, ...retrying, ...failed].sort((a, b) => a.createdAt - b.createdAt));
-        };
-        req3.onerror = () => resolve([...items, ...retrying].sort((a, b) => a.createdAt - b.createdAt));
-      };
-      req2.onerror = () => resolve(items);
-    };
-    req.onerror = () => reject(req.error);
-  });
+export async function getPendingQueue(userId) {
+  const items = await getQueueItems(userId);
+  return items
+    .filter((i) => i.status === "pending" || i.status === "retry" || i.status === "failed")
+    .sort((a, b) => a.createdAt - b.createdAt);
 }
 
 export async function updateQueueItem(queueId, updates) {
@@ -211,17 +208,27 @@ export async function removeQueueItem(queueId) {
   });
 }
 
-export async function clearQueue() {
-  const store = await tx(QUEUE_STORE, "readwrite");
+export async function clearQueueForUser(userId) {
+  const db = await openDb();
+  const t = db.transaction(QUEUE_STORE, "readwrite");
+  const store = t.objectStore(QUEUE_STORE);
+  const idx = store.index("userId");
+  const req = idx.openCursor(IDBKeyRange.only(userId));
+  req.onsuccess = (e) => {
+    const cursor = e.target.result;
+    if (cursor) {
+      cursor.delete();
+      cursor.continue();
+    }
+  };
   return new Promise((resolve, reject) => {
-    const req = store.clear();
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
   });
 }
 
-export async function getQueueStats() {
-  const items = await getQueueItems();
+export async function getQueueStats(userId) {
+  const items = await getQueueItems(userId);
   const pending = items.filter((i) => i.status === "pending").length;
   const processing = items.filter((i) => i.status === "processing").length;
   const retry = items.filter((i) => i.status === "retry").length;
@@ -234,8 +241,8 @@ export async function getQueueStats() {
  * E.g. if a note was updated 3 times before sync, keep only the latest.
  * Create actions are never collapsed (they must execute once).
  */
-export async function collapseQueue() {
-  const items = await getQueueItems();
+export async function collapseQueue(userId) {
+  const items = await getQueueItems(userId);
   const toRemove = [];
   const seen = new Map(); // noteId:type -> latest queue entry
 
@@ -285,15 +292,16 @@ export async function collapseQueue() {
 }
 
 /**
- * Check if a note has pending local changes in the queue.
+ * Check if a note has pending local changes in the queue for a given user.
  */
-export async function hasPendingChanges(noteId) {
+export async function hasPendingChanges(noteId, userId) {
   const store = await tx(QUEUE_STORE);
   return new Promise((resolve, reject) => {
     const req = store.index("noteId").getAll(noteId);
     req.onsuccess = () => {
       const items = (req.result || []).filter(
-        (i) => i.status === "pending" || i.status === "processing" || i.status === "retry" || i.status === "failed"
+        (i) => i.userId === userId &&
+          (i.status === "pending" || i.status === "processing" || i.status === "retry" || i.status === "failed")
       );
       resolve(items.length > 0);
     };
