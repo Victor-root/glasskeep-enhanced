@@ -9545,14 +9545,28 @@ export default function App() {
 
               {/* Inline Edited stamp: only when scrollable (appears at very end) */}
               {editedStamp && modalScrollable && (
-                <div className="mt-6 text-xs text-gray-600 dark:text-gray-300 text-right">{t("editedPrefix")} {editedStamp}
+                <div className="mt-6 text-xs text-gray-600 dark:text-gray-300 text-right flex items-center justify-end gap-1.5">
+                  <span>{t("editedPrefix")} {editedStamp}</span>
+                  {activeId && (
+                    <span
+                      className="opacity-30 hover:opacity-100 cursor-default transition-opacity select-all"
+                      title={`Note ID : ${activeId}`}
+                    >ⓘ</span>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Absolute Edited stamp: only when NOT scrollable (sits just above footer) */}
             {editedStamp && !modalScrollable && (
-              <div className="absolute bottom-3 right-4 text-xs text-gray-600 dark:text-gray-300 pointer-events-none">{t("editedPrefix")} {editedStamp}
+              <div className="absolute bottom-3 right-4 text-xs text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
+                <span className="pointer-events-none">{t("editedPrefix")} {editedStamp}</span>
+                {activeId && (
+                  <span
+                    className="opacity-30 hover:opacity-100 cursor-default transition-opacity select-all"
+                    title={`Note ID : ${activeId}`}
+                  >ⓘ</span>
+                )}
               </div>
             )}
           </div>
