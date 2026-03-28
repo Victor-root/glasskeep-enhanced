@@ -5418,6 +5418,7 @@ export default function App() {
   }), []);
   const [syncStatus, setSyncStatus] = useState(SYNC_STATUS_RESET);
   const syncEngineRef = useRef(null);
+  const reconnectSseRef = useRef(null); // called when server recovers to revive SSE
   const tokenRef = useRef(token);
   tokenRef.current = token;
 
@@ -6152,19 +6153,15 @@ export default function App() {
     syncEngineRef.current?.processQueue();
   }, []);
 
+  // Ref to always hold the latest reload function (avoids stale closure in handleSyncNow)
+  const reloadCurrentViewRef = useRef(null);
+
   const handleSyncNow = useCallback(async () => {
     await syncEngineRef.current?.forceSync();
     // After syncing the queue, also reload notes from server to pick up
     // changes made by other devices (new notes, edits, etc.)
     if (syncEngineRef.current?.serverReachable) {
-      const currentFilter = tagFilterRef.current;
-      if (currentFilter === "ARCHIVED") {
-        loadArchivedNotes().catch(() => {});
-      } else if (currentFilter === "TRASHED") {
-        loadTrashedNotes().catch(() => {});
-      } else {
-        loadNotes().catch(() => {});
-      }
+      reloadCurrentViewRef.current?.();
     }
   }, []);
 
@@ -6563,6 +6560,18 @@ export default function App() {
     }
   };
 
+  // Keep ref up to date so handleSyncNow always calls the latest version
+  reloadCurrentViewRef.current = () => {
+    const currentFilter = tagFilterRef.current;
+    if (currentFilter === "ARCHIVED") {
+      loadArchivedNotes().catch(() => {});
+    } else if (currentFilter === "TRASHED") {
+      loadTrashedNotes().catch(() => {});
+    } else {
+      loadNotes().catch(() => {});
+    }
+  };
+
   useEffect(() => {
     if (!token) return;
 
@@ -6617,8 +6626,7 @@ export default function App() {
     let es;
     let reconnectTimeout;
     let reconnectAttempts = 0;
-    const maxReconnectAttempts = 10;
-    const baseReconnectDelay = 1000;
+    const maxReconnectDelay = 30000; // cap backoff at 30s, never give up
 
     // ─── Targeted single-note patch (local-first safe) ───
     const patchSingleNote = async (noteId) => {
@@ -6730,15 +6738,14 @@ export default function App() {
 
           es.close();
 
-          if (reconnectAttempts < maxReconnectAttempts) {
-            const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts);
-            reconnectTimeout = setTimeout(() => {
-              reconnectAttempts++;
-              const currentAuth = getAuth();
-              if (!currentAuth || !currentAuth.token) return;
-              connectSSE();
-            }, delay);
-          }
+          // Always retry — never give up. Cap backoff at maxReconnectDelay.
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
+          reconnectTimeout = setTimeout(() => {
+            reconnectAttempts++;
+            const currentAuth = getAuth();
+            if (!currentAuth || !currentAuth.token) return;
+            connectSSE();
+          }, delay);
         };
       } catch (error) {
         console.error("Failed to create EventSource:", error);
@@ -6746,6 +6753,14 @@ export default function App() {
     };
 
     connectSSE();
+
+    // Expose reconnect for use when sync engine detects server recovery
+    reconnectSseRef.current = () => {
+      if (!es || es.readyState === EventSource.CLOSED) {
+        reconnectAttempts = 0; // reset backoff on explicit reconnect
+        connectSSE();
+      }
+    };
 
     // Fallback polling: only when SSE is dead, and only every 60s
     let pollInterval;
@@ -6818,6 +6833,16 @@ export default function App() {
       window.removeEventListener("offline", handleOffline);
     };
   }, [token]);
+
+  // Reconnect SSE when server recovers from offline
+  const prevSyncStateRef = useRef(syncStatus.syncState);
+  useEffect(() => {
+    const prev = prevSyncStateRef.current;
+    prevSyncStateRef.current = syncStatus.syncState;
+    if (prev === "offline" && syncStatus.syncState !== "offline" && syncStatus.syncState !== "checking") {
+      reconnectSseRef.current?.();
+    }
+  }, [syncStatus.syncState]);
 
   // Live-sync checklist items in open modal when remote updates arrive
   useEffect(() => {
