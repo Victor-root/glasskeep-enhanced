@@ -6323,11 +6323,20 @@ export default function App() {
       if (tagFilterRef.current !== expectedFilter) return; // view changed during fetch
       const serverNotes = Array.isArray(data) ? data : [];
 
+      // Snapshot pending status ONCE to avoid race conditions:
+      // The sync queue runs concurrently — if we check hasPendingChanges
+      // multiple times, an item could be removed between checks, causing
+      // us to skip the IDB write (pending=true) but then use the stale
+      // server version (pending=false) instead of the correct local version.
+      const pendingSet = new Set();
+      for (const sn of serverNotes) {
+        if (await hasPendingChanges(String(sn.id))) pendingSet.add(String(sn.id));
+      }
+
       // Hydrate IndexedDB, skipping notes with pending local changes
       const toWrite = [];
       for (const sn of serverNotes) {
-        const pending = await hasPendingChanges(String(sn.id));
-        if (!pending) {
+        if (!pendingSet.has(String(sn.id))) {
           toWrite.push({ ...sn, id: String(sn.id), user_id: sn.user_id || currentUser?.id, archived: false, trashed: false });
         }
       }
@@ -6340,8 +6349,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, "active");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            const pending = await hasPendingChanges(String(ln.id));
-            if (pending) localOnly.push(ln);
+            if (await hasPendingChanges(String(ln.id))) localOnly.push(ln);
           }
         }
       } catch (e) {}
@@ -6349,8 +6357,7 @@ export default function App() {
       // For notes with pending changes, use local version
       const merged = [];
       for (const sn of serverNotes) {
-        const pending = await hasPendingChanges(String(sn.id));
-        if (pending) {
+        if (pendingSet.has(String(sn.id))) {
           const localVer = await idbGetNote(String(sn.id));
           merged.push(localVer || sn);
         } else {
@@ -6415,11 +6422,16 @@ export default function App() {
       if (tagFilterRef.current !== expectedFilter) return;
       const notesArray = Array.isArray(data) ? data : [];
 
+      // Snapshot pending status once to avoid race with concurrent queue processing
+      const pendingSet = new Set();
+      for (const sn of notesArray) {
+        if (await hasPendingChanges(String(sn.id))) pendingSet.add(String(sn.id));
+      }
+
       // Hydrate IndexedDB
       const toWrite = [];
       for (const sn of notesArray) {
-        const pending = await hasPendingChanges(String(sn.id));
-        if (!pending) {
+        if (!pendingSet.has(String(sn.id))) {
           toWrite.push({ ...sn, id: String(sn.id), user_id: sn.user_id || currentUser?.id, archived: true, trashed: false });
         }
       }
@@ -6432,16 +6444,14 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, "archived");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            const pending = await hasPendingChanges(String(ln.id));
-            if (pending) localOnly.push(ln);
+            if (await hasPendingChanges(String(ln.id))) localOnly.push(ln);
           }
         }
       } catch (e) {}
 
       const merged = [];
       for (const sn of notesArray) {
-        const pending = await hasPendingChanges(String(sn.id));
-        if (pending) {
+        if (pendingSet.has(String(sn.id))) {
           const localVer = await idbGetNote(String(sn.id));
           merged.push(localVer || sn);
         } else {
@@ -6493,11 +6503,16 @@ export default function App() {
       if (tagFilterRef.current !== expectedFilter) return;
       const notesArray = Array.isArray(data) ? data : [];
 
+      // Snapshot pending status once to avoid race with concurrent queue processing
+      const pendingSet = new Set();
+      for (const sn of notesArray) {
+        if (await hasPendingChanges(String(sn.id))) pendingSet.add(String(sn.id));
+      }
+
       // Hydrate IndexedDB
       const toWrite = [];
       for (const sn of notesArray) {
-        const pending = await hasPendingChanges(String(sn.id));
-        if (!pending) {
+        if (!pendingSet.has(String(sn.id))) {
           toWrite.push({ ...sn, id: String(sn.id), user_id: sn.user_id || currentUser?.id, archived: false, trashed: true });
         }
       }
@@ -6510,8 +6525,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, "trashed");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            const pending = await hasPendingChanges(String(ln.id));
-            if (pending) localOnly.push(ln);
+            if (await hasPendingChanges(String(ln.id))) localOnly.push(ln);
           }
         }
       } catch (e) {}
@@ -6519,8 +6533,7 @@ export default function App() {
       // For notes with pending changes, use local version
       const merged = [];
       for (const sn of notesArray) {
-        const pending = await hasPendingChanges(String(sn.id));
-        if (pending) {
+        if (pendingSet.has(String(sn.id))) {
           const localVer = await idbGetNote(String(sn.id));
           merged.push(localVer || sn);
         } else {
