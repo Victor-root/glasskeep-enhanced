@@ -255,9 +255,11 @@ export class SyncEngine {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
-      const res = await fetch(`${API_BASE}/health`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      // No Authorization header needed — /api/health has no auth middleware.
+      // Cache-busting param forces the browser to open a fresh connection,
+      // which avoids stale TCP sockets after a server restart (common on mobile).
+      const res = await fetch(`${API_BASE}/health?_t=${Date.now()}`, {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -292,15 +294,17 @@ export class SyncEngine {
         }
         return true;
       }
+      console.warn("[SyncEngine] healthCheck: server responded", res.status);
       this._serverReachable = false;
-      this._lastSyncError = "Server unreachable";
+      this._lastSyncError = `Server error (${res.status})`;
       this._failedChecks++;
       this._adjustHealthInterval();
       await this._emitStatus();
       return false;
-    } catch {
+    } catch (err) {
+      console.warn("[SyncEngine] healthCheck failed:", err?.name, err?.message);
       this._serverReachable = false;
-      this._lastSyncError = "Server unreachable";
+      this._lastSyncError = err?.name === "AbortError" ? "Health check timeout" : "Server unreachable";
       this._failedChecks++;
       this._adjustHealthInterval();
       await this._emitStatus();

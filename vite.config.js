@@ -43,7 +43,7 @@ export default defineConfig({
           {
             // Health check must NEVER be served from cache — sync engine
             // relies on it to detect server downtime accurately.
-            urlPattern: /^https?:\/\/.*\/api\/health$/,
+            urlPattern: /^https?:\/\/.*\/api\/health(\?.*)?$/,
             handler: 'NetworkOnly',
           },
           {
