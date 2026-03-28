@@ -6725,13 +6725,25 @@ export default function App() {
         es.onopen = () => {
           console.log("SSE connected");
           setSseConnected(true);
-          // On reconnection (not first connect), reload the view immediately
-          // so remote changes appear right away instead of waiting for
-          // individual SSE events to trickle in one by one
+          // On reconnection (not first connect), reload the view — but only
+          // AFTER the sync queue has finished processing. If we reload while
+          // processQueue is running, the server may return stale data (patches
+          // not yet applied) and overwrite correct local state.
           if (hasConnectedOnce) {
-            console.log("[SSE] reconnected — reloading current view");
-            reloadCooldownUntil = Date.now() + 3000; // suppress individual patches for 3s
-            reloadCurrentViewRef.current?.();
+            console.log("[SSE] reconnected — will reload after queue drains");
+            const waitForQueue = () => {
+              const engine = syncEngineRef.current;
+              if (engine && engine._processing) {
+                // Queue still running — check again in 500ms
+                setTimeout(waitForQueue, 500);
+                return;
+              }
+              console.log("[SSE] queue idle — reloading current view");
+              reloadCooldownUntil = Date.now() + 3000;
+              reloadCurrentViewRef.current?.();
+            };
+            // Small initial delay to let processQueue start if it hasn't yet
+            setTimeout(waitForQueue, 300);
           }
           hasConnectedOnce = true;
           reconnectAttempts = 0;
