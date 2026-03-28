@@ -6626,6 +6626,7 @@ export default function App() {
     let es;
     let reconnectTimeout;
     let reconnectAttempts = 0;
+    let hasConnectedOnce = false; // track first vs reconnection
     const maxReconnectDelay = 30000; // cap backoff at 30s, never give up
 
     // ─── Targeted single-note patch (local-first safe) ───
@@ -6702,6 +6703,14 @@ export default function App() {
         es.onopen = () => {
           console.log("SSE connected");
           setSseConnected(true);
+          // On reconnection (not first connect), reload the view immediately
+          // so remote changes appear right away instead of waiting for
+          // individual SSE events to trickle in one by one
+          if (hasConnectedOnce) {
+            console.log("[SSE] reconnected — reloading current view");
+            reloadCurrentViewRef.current?.();
+          }
+          hasConnectedOnce = true;
           reconnectAttempts = 0;
         };
 
