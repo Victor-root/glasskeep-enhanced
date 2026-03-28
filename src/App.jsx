@@ -7190,14 +7190,19 @@ export default function App() {
     setSession(null);
     setNotes([]);
     setSyncStatus(SYNC_STATUS_RESET);
-    // Clear localStorage caches
+    // Clear session-scoped localStorage caches only (preserve UI prefs like dark mode)
+    const uid = userId || "anonymous";
+    const s = sid || "no-session";
     try {
-      const keys = Object.keys(localStorage);
-      keys.forEach((key) => {
-        if (key.includes("glass-keep-")) {
-          localStorage.removeItem(key);
-        }
-      });
+      localStorage.removeItem(`glass-keep-notes-${uid}-${s}`);
+      localStorage.removeItem(`glass-keep-archived-${uid}-${s}`);
+      localStorage.removeItem(`glass-keep-trashed-${uid}-${s}`);
+      localStorage.removeItem(`glass-keep-cache-timestamp-${uid}-${s}`);
+      // Clean up legacy user-scoped fallback keys (pre-session-scope)
+      localStorage.removeItem(`glass-keep-notes-${uid}`);
+      localStorage.removeItem(`glass-keep-archived-${uid}`);
+      localStorage.removeItem(`glass-keep-trashed-${uid}`);
+      localStorage.removeItem(`glass-keep-cache-timestamp-${uid}`);
     } catch (e) {}
     navigate("#/login");
   };
