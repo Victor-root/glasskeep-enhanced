@@ -6628,6 +6628,28 @@ export default function App() {
     let reconnectAttempts = 0;
     let hasConnectedOnce = false; // track first vs reconnection
     const maxReconnectDelay = 30000; // cap backoff at 30s, never give up
+    let reloadCooldownUntil = 0; // suppress patches during full reload
+
+    // ─── Debounced batch patch: collect noteIds, reload once ───
+    let patchBatchTimeout = null;
+    const patchBatchIds = new Set();
+
+    const flushPatchBatch = async () => {
+      patchBatchTimeout = null;
+      const ids = [...patchBatchIds];
+      patchBatchIds.clear();
+      for (const nid of ids) {
+        await patchSingleNote(nid);
+      }
+    };
+
+    const debouncedPatch = (noteId) => {
+      // During reload cooldown, skip — full reload handles everything
+      if (Date.now() < reloadCooldownUntil) return;
+      patchBatchIds.add(String(noteId));
+      if (patchBatchTimeout) clearTimeout(patchBatchTimeout);
+      patchBatchTimeout = setTimeout(flushPatchBatch, 300);
+    };
 
     // ─── Targeted single-note patch (local-first safe) ───
     const patchSingleNote = async (noteId) => {
@@ -6708,31 +6730,22 @@ export default function App() {
           // individual SSE events to trickle in one by one
           if (hasConnectedOnce) {
             console.log("[SSE] reconnected — reloading current view");
+            reloadCooldownUntil = Date.now() + 3000; // suppress individual patches for 3s
             reloadCurrentViewRef.current?.();
           }
           hasConnectedOnce = true;
           reconnectAttempts = 0;
         };
 
-        // Generic message handler
+        // SSE message handler (server sends generic data: messages)
         es.onmessage = (e) => {
           try {
             const msg = JSON.parse(e.data || "{}");
             if (msg && msg.type === "note_updated" && msg.noteId) {
-              patchSingleNote(msg.noteId);
+              debouncedPatch(msg.noteId);
             }
           } catch (_) {}
         };
-
-        // Named event handler
-        es.addEventListener("note_updated", (e) => {
-          try {
-            const msg = JSON.parse(e.data || "{}");
-            if (msg && msg.noteId) {
-              patchSingleNote(msg.noteId);
-            }
-          } catch (_) {}
-        });
 
         es.onerror = (error) => {
           console.log("SSE error, attempting reconnect...", error);
@@ -6835,6 +6848,7 @@ export default function App() {
       setSseConnected(false);
       try { if (es) es.close(); } catch (e) {}
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (patchBatchTimeout) clearTimeout(patchBatchTimeout);
       if (pollTimeout) clearTimeout(pollTimeout);
       if (pollInterval) clearInterval(pollInterval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
