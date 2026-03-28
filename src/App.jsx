@@ -4341,12 +4341,13 @@ function NotesUI({
             <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
             <button
               onClick={() => onStartMulti?.()}
-              className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/15 focus:ring-emerald-500" : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 focus:ring-emerald-400"}`}
+              className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-violet-400 hover:text-violet-300 hover:bg-violet-500/15 focus:ring-violet-500" : "text-violet-600 hover:text-violet-700 hover:bg-violet-100 focus:ring-violet-400"}`}
               data-tooltip={t("multiSelect")}
               aria-label={t("multiSelect")}
             >
               <CheckSquareIcon />
             </button>
+            <span className={`mx-1 w-px h-5 ${dark ? "bg-gray-600" : "bg-gray-300"}`} />
             {currentUser?.is_admin && (
               <button
                 onClick={() => openAdminPanel?.()}
@@ -4357,7 +4358,6 @@ function NotesUI({
                 <ShieldIcon />
               </button>
             )}
-            <span className={`mx-1 w-px h-5 ${dark ? "bg-gray-600" : "bg-gray-300"}`} />
             <span className="flex items-center gap-2">
               <UserAvatar
                 name={currentUser?.name}
@@ -4408,7 +4408,7 @@ function NotesUI({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-gray-300 hover:bg-white/10" : "text-gray-600 hover:bg-gray-100"}`}
                     onClick={() => {
                       setHeaderMenuOpen(false);
                       openSettingsPanel?.();
@@ -4416,7 +4416,7 @@ function NotesUI({
                   >
                     <SettingsIcon />{t("settings")}</button>
                   <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-blue-400 hover:bg-white/10" : "text-blue-600 hover:bg-gray-100"}`}
                     onClick={() => {
                       setHeaderMenuOpen(false);
                       onToggleViewMode?.();
@@ -4426,7 +4426,7 @@ function NotesUI({
                     {listView ? t("gridView") : t("listView")}
                   </button>
                   <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-amber-400 hover:bg-white/10" : "text-indigo-600 hover:bg-gray-100"}`}
                     onClick={() => {
                       setHeaderMenuOpen(false);
                       toggleDark?.();
@@ -4436,7 +4436,7 @@ function NotesUI({
                     {dark ? t("lightMode") : t("darkMode")}
                   </button>
                   <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-violet-400 hover:bg-white/10" : "text-violet-600 hover:bg-gray-100"}`}
                     onClick={() => {
                       setHeaderMenuOpen(false);
                       onStartMulti?.();
@@ -4445,7 +4445,7 @@ function NotesUI({
                     <CheckSquareIcon />{t("multiSelect")}</button>
                   {currentUser?.is_admin && (
                     <button
-                      className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                      className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
                       onClick={() => {
                         setHeaderMenuOpen(false);
                         openAdminPanel?.();
