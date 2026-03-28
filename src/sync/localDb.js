@@ -237,7 +237,6 @@ export async function getQueueStats() {
 export async function collapseQueue() {
   const items = await getQueueItems();
   const toRemove = [];
-  const toUpdate = []; // items whose payload needs merging
   const seen = new Map(); // noteId:type -> latest queue entry
 
   const collapsible = new Set(["update", "patch"]);
@@ -255,19 +254,29 @@ export async function collapseQueue() {
       // Newer fields win (spread order: older first, newer overwrites).
       item.payload = { ...(older.payload || {}), ...(item.payload || {}) };
       toRemove.push(older.queueId);
-      toUpdate.push(item);
     }
     seen.set(key, item);
   }
 
-  if (toRemove.length > 0 || toUpdate.length > 0) {
+  if (toRemove.length > 0) {
+    // Build the set of survivors that need their merged payload persisted.
+    // IMPORTANT: only update items that are NOT being removed — intermediate
+    // items appear in both toRemove and would get recreated by store.put().
+    const removeSet = new Set(toRemove);
+    const survivors = [];
+    for (const item of seen.values()) {
+      if (!removeSet.has(item.queueId)) {
+        survivors.push(item);
+      }
+    }
+
     const db = await openDb();
     const t = db.transaction(QUEUE_STORE, "readwrite");
     const store = t.objectStore(QUEUE_STORE);
     for (const id of toRemove) {
       store.delete(id);
     }
-    for (const item of toUpdate) {
+    for (const item of survivors) {
       store.put(item);
     }
   }
