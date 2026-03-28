@@ -112,12 +112,12 @@ export class SyncEngine {
         await this._emitStatus();
 
         try {
-          await this._executeAction(item);
+          const result = await this._executeAction(item);
           await removeQueueItem(item.queueId);
           this._serverReachable = true;
           this._lastSyncAt = Date.now();
           this._lastSyncError = null;
-          this.onSyncComplete(item);
+          this.onSyncComplete(item, result);
           // Small delay between items to avoid triggering reverse proxy rate limits
           await new Promise((r) => setTimeout(r, QUEUE_ITEM_DELAY));
         } catch (err) {

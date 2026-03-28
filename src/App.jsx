@@ -6143,7 +6143,30 @@ export default function App() {
       userId: currentUser.id,
       sessionId,
       onStatusChange: (status) => setSyncStatus(status),
-      onSyncComplete: () => {},
+      onSyncComplete: async (item, result) => {
+        // Reconcile local cache with server response after successful sync.
+        // Only act when the server returned useful canonical data.
+        try {
+          const uid = currentUser?.id;
+          const sid = sessionId;
+          if (!uid || !sid) return;
+
+          if (item.type === "create" && result && result.id) {
+            // Server returned canonical note — write to IDB if no newer local edit is pending
+            const nid = String(result.id);
+            const pending = await hasPendingChanges(nid, uid, sid);
+            if (!pending) {
+              await idbPutNote(result, uid, sid);
+            }
+          } else if (item.type === "permanentDelete" && item.noteId) {
+            // Server confirmed permanent deletion — remove stale cache entry
+            const nid = String(item.noteId);
+            try { await idbDeleteNote(nid, uid, sid); } catch {}
+          }
+        } catch (e) {
+          console.error("[Sync] reconciliation error:", e);
+        }
+      },
       onSyncError: (item, err) => console.warn("[Sync] Failed:", item.type, item.noteId, err.message),
     });
     syncEngineRef.current = engine;
