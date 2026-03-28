@@ -6935,10 +6935,15 @@ export default function App() {
     );
     if (prevJson === currentJson) return;
 
+    // Mark dirty BEFORE debounce fires — protects against SSE patchSingleNote()
+    // overwriting local drawing state during the 500ms debounce window.
+    const dirtyNoteId = String(activeId);
+    localEditDirtyRef.current = dirtyNoteId;
+
     // Debounce local-first save by 500ms
     const timeoutId = setTimeout(async () => {
       prevDrawingRef.current = mDrawingData;
-      const noteId = String(activeId);
+      const noteId = dirtyNoteId;
       const nowIso = new Date().toISOString();
       const drawingContent = JSON.stringify(mDrawingData);
 
@@ -6968,9 +6973,20 @@ export default function App() {
         noteId,
         payload: { content: drawingContent, type: "draw" },
       });
+
+      // Release dirty flag only if still ours (another edit may have re-set it)
+      if (localEditDirtyRef.current === dirtyNoteId) {
+        localEditDirtyRef.current = null;
+      }
     }, 500);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      // Cleanup cancelled debounce — release dirty flag if still ours
+      if (localEditDirtyRef.current === dirtyNoteId) {
+        localEditDirtyRef.current = null;
+      }
+    };
   }, [mDrawingData, open, activeId, mType, enqueueAndSync]);
 
   // Live-sync drawing data in open modal when remote updates arrive
