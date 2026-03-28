@@ -12,6 +12,7 @@ import {
 const API_BASE = "/api";
 const MAX_RETRIES = 5;
 const BASE_RETRY_DELAY = 2000; // 2s, 4s, 8s, 16s, 32s
+const QUEUE_ITEM_DELAY = 200;  // ms between queue items to avoid rate limiting
 
 // Health check intervals (self-hosted LAN — lightweight ping, can be aggressive)
 const HEALTH_IDLE_INTERVAL = 10000;      // 10s when everything is OK
@@ -115,12 +116,15 @@ export class SyncEngine {
           this._lastSyncAt = Date.now();
           this._lastSyncError = null;
           this.onSyncComplete(item);
+          // Small delay between items to avoid triggering reverse proxy rate limits
+          await new Promise((r) => setTimeout(r, QUEUE_ITEM_DELAY));
         } catch (err) {
           const isAuthError = err.status === 401;
           const isConflict = err.status === 409;
           const isNotFound = err.status === 404;
+          const isRateLimited = err.status === 403 || err.status === 429;
           const isTimeout = !!err.isTimeout;
-          const isNetworkError = !isTimeout && (err.isNetworkError || err.status === 0 || !err.status);
+          const isNetworkError = !isTimeout && !isRateLimited && (err.isNetworkError || err.status === 0 || !err.status);
 
           if (isAuthError) {
             await updateQueueItem(item.queueId, {
@@ -145,6 +149,20 @@ export class SyncEngine {
               lastError: `Note not found on server (${err.status})`,
               attempts: MAX_RETRIES,
             });
+          } else if (isRateLimited) {
+            // Rate limited by reverse proxy (403/429). Server IS reachable,
+            // just rejecting rapid requests. Pause briefly then retry.
+            this._serverReachable = true;
+            this._lastSyncError = `Rate limited (HTTP ${err.status})`;
+            const nextAttempts = item.attempts + 1;
+            await updateQueueItem(item.queueId, {
+              status: nextAttempts >= MAX_RETRIES ? "failed" : "retry",
+              lastError: `Rate limited (HTTP ${err.status})`,
+              attempts: nextAttempts,
+              lastAttemptAt: Date.now(),
+            });
+            // Back off longer for rate limits — wait 3s before next item
+            await new Promise((r) => setTimeout(r, 3000));
           } else if (isTimeout) {
             // Timeout: server may be busy (e.g. concurrent device sync).
             // DON'T mark server as unreachable — just retry later.
@@ -304,10 +322,22 @@ export class SyncEngine {
         }
         return true;
       }
+
+      // Server responded with an error status — it IS reachable, just unhappy.
+      // 403 = rate-limited or auth issue on proxy, NOT "server down".
+      // Only 5xx should be treated as a server problem.
+      const isServerError = res.status >= 500;
       console.warn("[SyncEngine] healthCheck: server responded", res.status);
-      this._serverReachable = false;
-      this._lastSyncError = `Server error (${res.status})`;
-      this._failedChecks++;
+      if (isServerError) {
+        this._serverReachable = false;
+        this._lastSyncError = `Server error (${res.status})`;
+        this._failedChecks++;
+      } else {
+        // 4xx (403, 429, etc.) — server is reachable but rejecting requests
+        // Don't mark as unreachable, just note the issue
+        this._serverReachable = true;
+        this._lastSyncError = `HTTP ${res.status}`;
+      }
       this._adjustHealthInterval();
       await this._emitStatus();
       return false;
