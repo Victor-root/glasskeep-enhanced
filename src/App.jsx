@@ -4315,14 +4315,6 @@ function NotesUI({
           {/* Desktop: icon buttons directly in header bar */}
           <div className="hidden sm:flex items-center gap-1">
             <button
-              onClick={() => openSettingsPanel?.()}
-              className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700 focus:ring-gray-500" : "text-gray-500 hover:text-gray-700 hover:bg-gray-200 focus:ring-gray-400"}`}
-              data-tooltip={t("settings")}
-              aria-label={t("settings")}
-            >
-              <SettingsIcon />
-            </button>
-            <button
               onClick={() => onToggleViewMode?.()}
               className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-blue-400 hover:text-blue-300 hover:bg-blue-500/15 focus:ring-blue-500" : "text-blue-600 hover:text-blue-700 hover:bg-blue-100 focus:ring-blue-400"}`}
               data-tooltip={listView ? t("gridView") : t("listView")}
@@ -4371,6 +4363,15 @@ function NotesUI({
                 {currentUser?.name || currentUser?.email}
               </span>
             </span>
+            <span className={`mx-1 w-px h-5 ${dark ? "bg-gray-600" : "bg-gray-300"}`} />
+            <button
+              onClick={() => openSettingsPanel?.()}
+              className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700 focus:ring-gray-500" : "text-gray-500 hover:text-gray-700 hover:bg-gray-200 focus:ring-gray-400"}`}
+              data-tooltip={t("settings")}
+              aria-label={t("settings")}
+            >
+              <SettingsIcon />
+            </button>
             <button
               onClick={() => signOut?.()}
               className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 text-red-500 dark:text-red-400"
