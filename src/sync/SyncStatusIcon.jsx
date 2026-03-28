@@ -53,6 +53,14 @@ const RefreshIcon = ({ className }) => (
   </svg>
 );
 
+const WarningIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
 // ─── Status config ───
 
 function getStatusConfig(syncState, dark) {
@@ -132,13 +140,6 @@ function actionTypeLabel(type) {
   return map[type] || type;
 }
 
-function statusBadge(status, dark) {
-  if (status === "pending") return dark ? "bg-amber-900/50 text-amber-300" : "bg-amber-100 text-amber-700";
-  if (status === "processing") return dark ? "bg-blue-900/50 text-blue-300" : "bg-blue-100 text-blue-700";
-  if (status === "failed") return dark ? "bg-red-900/50 text-red-300" : "bg-red-100 text-red-700";
-  return dark ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600";
-}
-
 function formatTimeAgo(ts) {
   if (!ts) return null;
   const diff = Math.floor((Date.now() - ts) / 1000);
@@ -191,23 +192,19 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
   const { Icon, color, hoverBg, label, animate } = config;
 
   const failedItems = (items || []).filter((i) => i.status === "failed");
+  const pendingAndProcessing = (pending || 0) + (processing || 0);
 
-  // Server status line — derived from syncState FIRST to avoid contradictions.
-  // syncState already encodes the canonical priority (offline > error > syncing > etc.)
-  // so we never show "Server OK" alongside active errors, or "Checking..." while syncing.
+  // Server status line
   let serverLabel, serverColor, serverDotColor;
   if (syncState === "offline") {
     serverLabel = t("syncServerUnreachable") || "Server unreachable";
     serverColor = dark ? "text-red-400" : "text-red-600";
     serverDotColor = "bg-red-500";
   } else if (syncState === "error") {
-    // Server responded (it IS reachable) but sync items failed — don't say "OK"
     serverLabel = t("syncServerReachableErrors") || "Server reachable";
     serverColor = dark ? "text-amber-400" : "text-amber-600";
     serverDotColor = "bg-amber-500";
   } else if (syncState === "syncing") {
-    // Actively syncing — engine won't sync if server is known down,
-    // so serverReachable===null here just means "was true, currently unverified"
     serverLabel = t("syncServerReachable") || "Server reachable";
     serverColor = dark ? "text-emerald-400" : "text-emerald-600";
     serverDotColor = "bg-emerald-500";
@@ -265,7 +262,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
             }`}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
+            {/* ── Section 1: Status header ── */}
             <div className={`px-4 py-3 border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
               <div className="flex items-center gap-2">
                 <Icon className={`w-5 h-5 ${color}`} />
@@ -273,7 +270,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
               </div>
 
               {/* Server status + last sync */}
-              <div className={`mt-1.5 flex items-center gap-2 text-xs`}>
+              <div className="mt-1.5 flex items-center gap-2 text-xs">
                 <span className={`inline-flex items-center gap-1 ${serverColor}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${serverDotColor}`} />
                   {serverLabel}
@@ -285,60 +282,81 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
                 )}
               </div>
 
-              {total > 0 && (
-                <div className={`mt-1 text-xs ${dark ? "text-gray-400" : "text-gray-500"}`}>
-                  {pending > 0 && <span>{t("syncPendingCount", { count: pending })}</span>}
-                  {processing > 0 && <span>{pending > 0 ? " · " : ""}{t("syncProcessingCount", { count: processing })}</span>}
-                  {failed > 0 && <span>{(pending > 0 || processing > 0) ? " · " : ""}{t("syncFailedCount", { count: failed })}</span>}
-                </div>
-              )}
-
+              {/* Reconnection attempts */}
               {failedChecks > 0 && syncState === "offline" && (
                 <div className={`mt-1 text-xs ${dark ? "text-amber-400" : "text-amber-600"}`}>
                   {t("syncFailedChecks", { count: failedChecks })}
                 </div>
               )}
-
-              {/* Last error */}
-              {lastSyncError && syncState !== "synced" && (
-                <div className={`mt-1 text-xs ${dark ? "text-red-400" : "text-red-600"}`}>
-                  {lastSyncError}
-                </div>
-              )}
             </div>
 
-            {/* Failed items detail */}
-            {failedItems.length > 0 && (
-              <div className={`max-h-[200px] overflow-y-auto border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
-                {failedItems.map((item) => (
-                  <div
-                    key={item.queueId}
-                    className={`px-4 py-2 text-xs ${dark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${statusBadge(item.status, dark)}`}>
-                        {actionTypeLabel(item.type)}
-                      </span>
-                      <span className={`truncate ${dark ? "text-gray-500" : "text-gray-400"}`}>
-                        {item.noteId && item.noteId !== "__reorder__" ? `#${item.noteId.slice(0, 8)}` : ""}
-                      </span>
-                    </div>
-                    {item.lastError && (
-                      <div className={`mt-1 ${dark ? "text-red-400" : "text-red-600"}`}>
-                        {item.lastError}
-                      </div>
-                    )}
-                    {item.attempts > 0 && (
-                      <div className={`mt-0.5 ${dark ? "text-gray-500" : "text-gray-400"}`}>
-                        {t("syncRetryCount", { count: item.attempts })}
-                      </div>
-                    )}
-                  </div>
-                ))}
+            {/* ── Section 2: Queue summary (pending + processing) ── */}
+            {pendingAndProcessing > 0 && (
+              <div className={`px-4 py-2.5 border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className={`w-2 h-2 rounded-full ${processing > 0 ? "bg-blue-500 animate-pulse" : "bg-amber-500"}`} />
+                  <span className={dark ? "text-gray-300" : "text-gray-600"}>
+                    {processing > 0
+                      ? t("syncQueueSyncing", { processing, pending: pending || 0 })
+                      : t("syncQueueWaiting", { count: pending })
+                    }
+                  </span>
+                </div>
               </div>
             )}
 
-            {/* Sync now button */}
+            {/* ── Section 3: Errors ── */}
+            {(failed > 0 || (lastSyncError && syncState !== "synced" && syncState !== "offline")) && (
+              <div className={`border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
+                <div className={`px-4 pt-2.5 pb-1.5 flex items-center gap-1.5 text-xs font-medium ${dark ? "text-red-400" : "text-red-600"}`}>
+                  <WarningIcon className="w-3.5 h-3.5" />
+                  {t("syncErrorsTitle")}
+                </div>
+
+                {/* Global error (only if different from item errors, or no items) */}
+                {lastSyncError && syncState !== "synced" && syncState !== "offline" && (failedItems.length === 0 || !failedItems.some(i => i.lastError === lastSyncError)) && (
+                  <div className={`px-4 py-1.5 text-xs ${dark ? "text-red-400/80" : "text-red-500"}`}>
+                    {lastSyncError}
+                  </div>
+                )}
+
+                {/* Individual failed items */}
+                {failedItems.length > 0 && (
+                  <div className="max-h-[180px] overflow-y-auto">
+                    {failedItems.map((item) => (
+                      <div
+                        key={item.queueId}
+                        className={`px-4 py-2 text-xs ${dark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`font-medium ${dark ? "text-gray-300" : "text-gray-700"}`}>
+                            {actionTypeLabel(item.type)}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            {item.attempts > 0 && (
+                              <span className={dark ? "text-gray-500" : "text-gray-400"}>
+                                {t("syncRetryCount", { count: item.attempts })}
+                              </span>
+                            )}
+                            <span className={`truncate ${dark ? "text-gray-500" : "text-gray-400"}`}>
+                              {item.noteId && item.noteId !== "__reorder__" ? `#${item.noteId.slice(0, 8)}` : ""}
+                            </span>
+                          </div>
+                        </div>
+                        {item.lastError && (
+                          <div className={`mt-0.5 ${dark ? "text-red-400/70" : "text-red-500/80"}`}>
+                            {item.lastError}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="h-1" />
+              </div>
+            )}
+
+            {/* ── Section 4: Sync button ── */}
             <div className="px-4 py-3">
               <button
                 disabled={forceSyncing}
@@ -364,7 +382,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
               </button>
             </div>
 
-            {/* Safe to close indicator — covers all meaningful states */}
+            {/* ── Section 5: Safe to close ── */}
             {hasPendingChanges || syncState === "error" || syncState === "offline" ? (
               <div className={`px-4 pb-3 text-xs text-center ${dark ? "text-amber-400" : "text-amber-600"}`}>
                 {t("syncNotSafeToClose")}
