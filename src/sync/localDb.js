@@ -2,8 +2,9 @@
 // IndexedDB wrapper for local-first note storage and sync queue
 
 const DB_NAME = "glasskeep";
-const DB_VERSION = 3; // v3: add compound [userId, sessionId] index for per-session isolation
-const NOTES_STORE = "notes";
+const DB_VERSION = 4; // v4: session-scoped notes cache (sessionNotes store)
+const NOTES_STORE = "notes"; // legacy (v1-v3), kept for migration compatibility
+const SESSION_NOTES_STORE = "sessionNotes"; // v4+: session-scoped note cache
 const QUEUE_STORE = "syncQueue";
 
 let dbPromise = null;
@@ -18,6 +19,7 @@ function openDb() {
 
       // ─── v1: initial stores ───
       if (oldVersion < 1) {
+        // Legacy notes store — unused from v4+, but created for upgrade path consistency
         const ns = db.createObjectStore(NOTES_STORE, { keyPath: "id" });
         ns.createIndex("user_id", "user_id", { unique: false });
         ns.createIndex("archived", "archived", { unique: false });
@@ -39,11 +41,19 @@ function openDb() {
         }
       }
 
-      // ─── v3: add compound [userId, sessionId] index ───
+      // ─── v3: add compound [userId, sessionId] index to syncQueue ───
       if (oldVersion >= 1 && oldVersion < 3) {
         const queueStore = e.target.transaction.objectStore(QUEUE_STORE);
         if (!queueStore.indexNames.contains("userSession")) {
           queueStore.createIndex("userSession", ["userId", "sessionId"], { unique: false });
+        }
+      }
+
+      // ─── v4: session-scoped notes cache ───
+      if (oldVersion < 4) {
+        if (!db.objectStoreNames.contains(SESSION_NOTES_STORE)) {
+          const sns = db.createObjectStore(SESSION_NOTES_STORE, { keyPath: "cacheKey" });
+          sns.createIndex("userSession", ["userId", "sessionId"], { unique: false });
         }
       }
     };
@@ -60,12 +70,21 @@ function tx(storeName, mode = "readonly") {
   });
 }
 
-// ─── Notes Store ───
+// ─── Helpers ───
 
-export async function getAllNotes(userId, filter = "active") {
-  const store = await tx(NOTES_STORE);
+function makeCacheKey(userId, sessionId, noteId) {
+  return `${userId}:${sessionId}:${noteId}`;
+}
+
+// ─── Notes Store (session-scoped) ───
+// Each note is stored with a cacheKey = userId:sessionId:noteId so two sessions
+// of the same user each have their own isolated local copy. This is a CLIENT CACHE
+// — the server remains the source of truth.
+
+export async function getAllNotes(userId, sessionId, filter = "active") {
+  const store = await tx(SESSION_NOTES_STORE);
   return new Promise((resolve, reject) => {
-    const req = store.index("user_id").getAll(userId);
+    const req = store.index("userSession").getAll([userId, sessionId]);
     req.onsuccess = () => {
       let notes = req.result || [];
       if (filter === "active") {
@@ -81,30 +100,33 @@ export async function getAllNotes(userId, filter = "active") {
   });
 }
 
-export async function getNote(id) {
-  const store = await tx(NOTES_STORE);
+export async function getNote(noteId, userId, sessionId) {
+  const store = await tx(SESSION_NOTES_STORE);
+  const cacheKey = makeCacheKey(userId, sessionId, noteId);
   return new Promise((resolve, reject) => {
-    const req = store.get(id);
+    const req = store.get(cacheKey);
     req.onsuccess = () => resolve(req.result || null);
     req.onerror = () => reject(req.error);
   });
 }
 
-export async function putNote(note) {
-  const store = await tx(NOTES_STORE, "readwrite");
+export async function putNote(note, userId, sessionId) {
+  const store = await tx(SESSION_NOTES_STORE, "readwrite");
+  const cacheKey = makeCacheKey(userId, sessionId, String(note.id));
   return new Promise((resolve, reject) => {
-    const req = store.put(note);
+    const req = store.put({ ...note, cacheKey, userId, sessionId });
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
 }
 
-export async function putNotes(notes) {
+export async function putNotes(notes, userId, sessionId) {
   const db = await openDb();
-  const t = db.transaction(NOTES_STORE, "readwrite");
-  const store = t.objectStore(NOTES_STORE);
+  const t = db.transaction(SESSION_NOTES_STORE, "readwrite");
+  const store = t.objectStore(SESSION_NOTES_STORE);
   for (const note of notes) {
-    store.put(note);
+    const cacheKey = makeCacheKey(userId, sessionId, String(note.id));
+    store.put({ ...note, cacheKey, userId, sessionId });
   }
   return new Promise((resolve, reject) => {
     t.oncomplete = () => resolve();
@@ -112,21 +134,22 @@ export async function putNotes(notes) {
   });
 }
 
-export async function deleteNote(id) {
-  const store = await tx(NOTES_STORE, "readwrite");
+export async function deleteNote(noteId, userId, sessionId) {
+  const store = await tx(SESSION_NOTES_STORE, "readwrite");
+  const cacheKey = makeCacheKey(userId, sessionId, noteId);
   return new Promise((resolve, reject) => {
-    const req = store.delete(id);
+    const req = store.delete(cacheKey);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
 }
 
-export async function clearNotesForUser(userId) {
+export async function clearNotesForSession(userId, sessionId) {
   const db = await openDb();
-  const t = db.transaction(NOTES_STORE, "readwrite");
-  const store = t.objectStore(NOTES_STORE);
-  const idx = store.index("user_id");
-  const req = idx.openCursor(IDBKeyRange.only(userId));
+  const t = db.transaction(SESSION_NOTES_STORE, "readwrite");
+  const store = t.objectStore(SESSION_NOTES_STORE);
+  const idx = store.index("userSession");
+  const req = idx.openCursor(IDBKeyRange.only([userId, sessionId]));
   req.onsuccess = (e) => {
     const cursor = e.target.result;
     if (cursor) {
@@ -214,29 +237,6 @@ export async function removeQueueItem(queueId) {
     const req = store.delete(queueId);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
-  });
-}
-
-/**
- * Clear all queue items for a user (all sessions).
- * Kept as a fallback but prefer clearQueueForSession for targeted cleanup.
- */
-export async function clearQueueForUser(userId) {
-  const db = await openDb();
-  const t = db.transaction(QUEUE_STORE, "readwrite");
-  const store = t.objectStore(QUEUE_STORE);
-  const idx = store.index("userId");
-  const req = idx.openCursor(IDBKeyRange.only(userId));
-  req.onsuccess = (e) => {
-    const cursor = e.target.result;
-    if (cursor) {
-      cursor.delete();
-      cursor.continue();
-    }
-  };
-  return new Promise((resolve, reject) => {
-    t.oncomplete = () => resolve();
-    t.onerror = () => reject(t.error);
   });
 }
 

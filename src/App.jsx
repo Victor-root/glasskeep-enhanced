@@ -25,7 +25,7 @@ import {
   getQueueStats,
   hasPendingChanges,
   clearQueueForSession as idbClearQueueForSession,
-  clearNotesForUser as idbClearNotesForUser,
+  clearNotesForSession as idbClearNotesForSession,
 } from "./sync/localDb.js";
 
 function trColorName(name) {
@@ -5811,7 +5811,7 @@ export default function App() {
         onConfirm: async () => {
           const count = selectedIds.length;
           for (const id of selectedIds) {
-            try { await idbDeleteNote(String(id)); } catch (e) { console.error(e); }
+            try { await idbDeleteNote(String(id), currentUser?.id, sessionId); } catch (e) { console.error(e); }
             enqueueAndSync({ type: "permanentDelete", noteId: String(id) });
           }
           invalidateTrashedNotesCache();
@@ -5830,8 +5830,8 @@ export default function App() {
           const count = selectedIds.length;
           for (const id of selectedIds) {
             try {
-              const existing = await idbGetNote(String(id));
-              if (existing) await idbPutNote({ ...existing, trashed: true });
+              const existing = await idbGetNote(String(id), currentUser?.id, sessionId);
+              if (existing) await idbPutNote({ ...existing, trashed: true }, currentUser?.id, sessionId);
             } catch (e) { console.error(e); }
             enqueueAndSync({ type: "trash", noteId: String(id) });
           }
@@ -5858,8 +5858,8 @@ export default function App() {
     );
     for (const id of selectedIds) {
       try {
-        const existing = await idbGetNote(String(id));
-        if (existing) await idbPutNote({ ...existing, pinned: !!pinnedVal });
+        const existing = await idbGetNote(String(id), currentUser?.id, sessionId);
+        if (existing) await idbPutNote({ ...existing, pinned: !!pinnedVal }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
       enqueueAndSync({ type: "patch", noteId: String(id), payload: { pinned: !!pinnedVal } });
     }
@@ -5872,8 +5872,8 @@ export default function App() {
     const count = selectedIds.length;
     for (const id of selectedIds) {
       try {
-        const existing = await idbGetNote(String(id));
-        if (existing) await idbPutNote({ ...existing, trashed: false });
+        const existing = await idbGetNote(String(id), currentUser?.id, sessionId);
+        if (existing) await idbPutNote({ ...existing, trashed: false }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
       enqueueAndSync({ type: "restore", noteId: String(id) });
     }
@@ -5896,8 +5896,8 @@ export default function App() {
     setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
     for (const id of selectedIds) {
       try {
-        const existing = await idbGetNote(String(id));
-        if (existing) await idbPutNote({ ...existing, archived: !!archivedValue });
+        const existing = await idbGetNote(String(id), currentUser?.id, sessionId);
+        if (existing) await idbPutNote({ ...existing, archived: !!archivedValue }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
       enqueueAndSync({ type: "archive", noteId: String(id), payload: { archived: !!archivedValue } });
     }
@@ -5931,8 +5931,8 @@ export default function App() {
       prev.map((n) => (String(n.id) === String(noteId) ? updatedNote : n)),
     );
     try {
-      const existing = await idbGetNote(String(noteId));
-      if (existing) await idbPutNote({ ...existing, items: updatedItems });
+      const existing = await idbGetNote(String(noteId), currentUser?.id, sessionId);
+      if (existing) await idbPutNote({ ...existing, items: updatedItems }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
 
     invalidateNotesCache();
@@ -5949,8 +5949,8 @@ export default function App() {
     );
     for (const id of selectedIds) {
       try {
-        const existing = await idbGetNote(String(id));
-        if (existing) await idbPutNote({ ...existing, color: colorName });
+        const existing = await idbGetNote(String(id), currentUser?.id, sessionId);
+        if (existing) await idbPutNote({ ...existing, color: colorName }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
       enqueueAndSync({ type: "patch", noteId: String(id), payload: { color: colorName } });
     }
@@ -6310,7 +6310,7 @@ export default function App() {
     try {
       // First: show notes from IndexedDB immediately (local-first)
       try {
-        const localNotes = await idbGetAllNotes(currentUser?.id, "active");
+        const localNotes = await idbGetAllNotes(currentUser?.id, sessionId, "active");
         if (localNotes.length > 0) {
           if (tagFilterRef.current !== expectedFilter) return; // view changed
           setNotes(sortNotesByRecency(localNotes));
@@ -6347,13 +6347,13 @@ export default function App() {
           toWrite.push({ ...sn, id: String(sn.id), user_id: sn.user_id || currentUser?.id, archived: false, trashed: false });
         }
       }
-      if (toWrite.length > 0) await idbPutNotes(toWrite);
+      if (toWrite.length > 0) await idbPutNotes(toWrite, currentUser?.id, sessionId);
 
       // Build final list: server notes + locally-only notes with pending sync
       const serverIds = new Set(serverNotes.map((n) => String(n.id)));
       const localOnly = [];
       try {
-        const allLocal = await idbGetAllNotes(currentUser?.id, "active");
+        const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "active");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
             if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) localOnly.push(ln);
@@ -6365,7 +6365,7 @@ export default function App() {
       const merged = [];
       for (const sn of serverNotes) {
         if (pendingSet.has(String(sn.id))) {
-          const localVer = await idbGetNote(String(sn.id));
+          const localVer = await idbGetNote(String(sn.id), currentUser?.id, sessionId);
           merged.push(localVer || sn);
         } else {
           merged.push(sn);
@@ -6385,7 +6385,7 @@ export default function App() {
       if (tagFilterRef.current !== expectedFilter) return; // view changed
       // Fallback: use IndexedDB data (already shown above), or localStorage
       try {
-        const localNotes = await idbGetAllNotes(currentUser?.id, "active");
+        const localNotes = await idbGetAllNotes(currentUser?.id, sessionId, "active");
         if (localNotes.length > 0) {
           if (tagFilterRef.current === expectedFilter) setNotes(sortNotesByRecency(localNotes));
         } else {
@@ -6413,7 +6413,7 @@ export default function App() {
     try {
       // Show IndexedDB archived notes immediately
       try {
-        const localArchived = await idbGetAllNotes(currentUser?.id, "archived");
+        const localArchived = await idbGetAllNotes(currentUser?.id, sessionId, "archived");
         if (localArchived.length > 0) {
           if (tagFilterRef.current !== expectedFilter) return;
           setNotes(sortNotesByRecency(localArchived));
@@ -6442,13 +6442,13 @@ export default function App() {
           toWrite.push({ ...sn, id: String(sn.id), user_id: sn.user_id || currentUser?.id, archived: true, trashed: false });
         }
       }
-      if (toWrite.length > 0) await idbPutNotes(toWrite);
+      if (toWrite.length > 0) await idbPutNotes(toWrite, currentUser?.id, sessionId);
 
       // Merge with local-only archived notes that have pending sync
       const serverIds = new Set(notesArray.map((n) => String(n.id)));
       const localOnly = [];
       try {
-        const allLocal = await idbGetAllNotes(currentUser?.id, "archived");
+        const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "archived");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
             if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) localOnly.push(ln);
@@ -6459,7 +6459,7 @@ export default function App() {
       const merged = [];
       for (const sn of notesArray) {
         if (pendingSet.has(String(sn.id))) {
-          const localVer = await idbGetNote(String(sn.id));
+          const localVer = await idbGetNote(String(sn.id), currentUser?.id, sessionId);
           merged.push(localVer || sn);
         } else {
           merged.push(sn);
@@ -6494,7 +6494,7 @@ export default function App() {
     try {
       // Show IndexedDB trashed notes immediately
       try {
-        const localTrashed = await idbGetAllNotes(currentUser?.id, "trashed");
+        const localTrashed = await idbGetAllNotes(currentUser?.id, sessionId, "trashed");
         if (localTrashed.length > 0) {
           if (tagFilterRef.current !== expectedFilter) return;
           setNotes(sortNotesByRecency(localTrashed));
@@ -6523,13 +6523,13 @@ export default function App() {
           toWrite.push({ ...sn, id: String(sn.id), user_id: sn.user_id || currentUser?.id, archived: false, trashed: true });
         }
       }
-      if (toWrite.length > 0) await idbPutNotes(toWrite);
+      if (toWrite.length > 0) await idbPutNotes(toWrite, currentUser?.id, sessionId);
 
       // Merge with locally-trashed notes that have pending sync
       const serverIds = new Set(notesArray.map((n) => String(n.id)));
       const localOnly = [];
       try {
-        const allLocal = await idbGetAllNotes(currentUser?.id, "trashed");
+        const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "trashed");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
             if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) localOnly.push(ln);
@@ -6541,7 +6541,7 @@ export default function App() {
       const merged = [];
       for (const sn of notesArray) {
         if (pendingSet.has(String(sn.id))) {
-          const localVer = await idbGetNote(String(sn.id));
+          const localVer = await idbGetNote(String(sn.id), currentUser?.id, sessionId);
           merged.push(localVer || sn);
         } else {
           merged.push(sn);
@@ -6561,7 +6561,7 @@ export default function App() {
       if (tagFilterRef.current !== expectedFilter) return;
       // Keep IndexedDB data already shown, or fallback to localStorage
       try {
-        const localTrashed = await idbGetAllNotes(currentUser?.id, "trashed");
+        const localTrashed = await idbGetAllNotes(currentUser?.id, sessionId, "trashed");
         if (localTrashed.length > 0) {
           if (tagFilterRef.current === expectedFilter) setNotes(sortNotesByRecency(localTrashed));
         } else {
@@ -6704,7 +6704,7 @@ export default function App() {
             ...serverNote,
             id: nid,
             user_id: serverNote.user_id || currentUser?.id,
-          });
+          }, currentUser?.id, sessionId);
         } catch (e) {}
 
         if (belongsInView) {
@@ -6729,7 +6729,7 @@ export default function App() {
         // Fetch failed (404, network, etc.) — if 404, note was deleted
         if (e.status === 404) {
           setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-          try { await idbDeleteNote(nid); } catch (_) {}
+          try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (_) {}
         }
         // Other errors: silently ignore, state stays as-is
       }
@@ -6953,9 +6953,9 @@ export default function App() {
 
       // Persist to IndexedDB
       try {
-        const existing = await idbGetNote(noteId);
+        const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
         if (existing) {
-          await idbPutNote({ ...existing, content: drawingContent, updated_at: nowIso });
+          await idbPutNote({ ...existing, content: drawingContent, updated_at: nowIso }, currentUser?.id, sessionId);
         }
       } catch (e) {
         console.error("IndexedDB drawing update failed:", e);
@@ -7175,13 +7175,10 @@ export default function App() {
     const userId = currentUserIdRef.current;
     const sid = sessionIdRef.current;
     // IndexedDB cleanup (best-effort, never throws)
-    // Notes are user-scoped (no sessionId in notes store), so clear by user.
-    // Queue is session-scoped — only clear the current session's items.
-    if (userId) {
-      idbClearNotesForUser(userId).catch(() => {});
-      if (sid) {
-        idbClearQueueForSession(userId, sid).catch(() => {});
-      }
+    // Both notes cache and sync queue are session-scoped.
+    if (userId && sid) {
+      idbClearNotesForSession(userId, sid).catch(() => {});
+      idbClearQueueForSession(userId, sid).catch(() => {});
     }
     // Tear down sync engine
     if (syncEngineRef.current) {
@@ -7318,7 +7315,7 @@ export default function App() {
       trashed: false,
     };
     try {
-      await idbPutNote(localNote);
+      await idbPutNote(localNote, currentUser?.id, sessionId);
     } catch (e) {
       console.error("IndexedDB put failed:", e);
     }
@@ -7360,8 +7357,8 @@ export default function App() {
   const handleArchiveNote = async (noteId, archived) => {
     // Local-first: apply archive state immediately
     try {
-      const existing = await idbGetNote(String(noteId));
-      if (existing) await idbPutNote({ ...existing, archived: !!archived });
+      const existing = await idbGetNote(String(noteId), currentUser?.id, sessionId);
+      if (existing) await idbPutNote({ ...existing, archived: !!archived }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
 
     // Invalidate all caches since archiving affects multiple views
@@ -8087,9 +8084,9 @@ export default function App() {
 
     // Persist to IndexedDB
     try {
-      const existing = await idbGetNote(nId);
+      const existing = await idbGetNote(nId, currentUser?.id, sessionId);
       if (existing) {
-        await idbPutNote({ ...existing, ...fields, updated_at: nowIso });
+        await idbPutNote({ ...existing, ...fields, updated_at: nowIso }, currentUser?.id, sessionId);
       }
     } catch (e) {
       console.error("IndexedDB text auto-save failed:", e);
@@ -8310,9 +8307,9 @@ export default function App() {
       };
 
       try {
-        const existing = await idbGetNote(noteId);
+        const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
         if (existing) {
-          await idbPutNote({ ...existing, ...updatedFields });
+          await idbPutNote({ ...existing, ...updatedFields }, currentUser?.id, sessionId);
         }
       } catch (e) {
         console.error("IndexedDB update failed:", e);
@@ -8340,7 +8337,7 @@ export default function App() {
 
     if (tagFilter === "TRASHED") {
       // Local-first: permanent delete
-      try { await idbDeleteNote(String(activeId)); } catch (e) { console.error(e); }
+      try { await idbDeleteNote(String(activeId), currentUser?.id, sessionId); } catch (e) { console.error(e); }
       invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
       closeModal();
@@ -8349,8 +8346,8 @@ export default function App() {
     } else {
       // Local-first: move to trash
       try {
-        const existing = await idbGetNote(String(activeId));
-        if (existing) await idbPutNote({ ...existing, trashed: true });
+        const existing = await idbGetNote(String(activeId), currentUser?.id, sessionId);
+        if (existing) await idbPutNote({ ...existing, trashed: true }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
       invalidateNotesCache();
       invalidateArchivedNotesCache();
@@ -8365,8 +8362,8 @@ export default function App() {
   const restoreFromTrash = async (noteId) => {
     // Local-first: restore immediately
     try {
-      const existing = await idbGetNote(String(noteId));
-      if (existing) await idbPutNote({ ...existing, trashed: false });
+      const existing = await idbGetNote(String(noteId), currentUser?.id, sessionId);
+      if (existing) await idbPutNote({ ...existing, trashed: false }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
     invalidateNotesCache();
     invalidateArchivedNotesCache();
@@ -8379,8 +8376,8 @@ export default function App() {
   const togglePin = async (id, toPinned) => {
     // Local-first: apply pin immediately
     try {
-      const existing = await idbGetNote(String(id));
-      if (existing) await idbPutNote({ ...existing, pinned: !!toPinned });
+      const existing = await idbGetNote(String(id), currentUser?.id, sessionId);
+      if (existing) await idbPutNote({ ...existing, pinned: !!toPinned }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
     invalidateNotesCache();
 
@@ -8419,8 +8416,8 @@ export default function App() {
     // Local-first: update IndexedDB positions
     for (const n of sorted) {
       try {
-        const existing = await idbGetNote(String(n.id));
-        if (existing) await idbPutNote({ ...existing, position: n.position });
+        const existing = await idbGetNote(String(n.id), currentUser?.id, sessionId);
+        if (existing) await idbPutNote({ ...existing, position: n.position }, currentUser?.id, sessionId);
       } catch (e) {}
     }
 
@@ -8506,9 +8503,9 @@ export default function App() {
     );
     // Persist to IndexedDB
     try {
-      const existing = await idbGetNote(noteId);
+      const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
       if (existing) {
-        await idbPutNote({ ...existing, items: newItems, updated_at: nowIso });
+        await idbPutNote({ ...existing, items: newItems, updated_at: nowIso }, currentUser?.id, sessionId);
       }
     } catch (e) {
       console.error("IndexedDB checklist update failed:", e);
