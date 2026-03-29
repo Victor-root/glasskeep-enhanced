@@ -7172,6 +7172,16 @@ export default function App() {
                   forceCloseModalForRemoteDelete(nid);
                 }
               }
+            } else if (msg && msg.type === "note_access_revoked" && msg.noteId) {
+              // Collaboration access revoked — note owner removed us.
+              // Remove from all local state immediately (any view).
+              const nid = String(msg.noteId);
+              setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+              idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
+              // Force-close if this note is currently open in modal
+              if (String(activeIdRef.current) === nid) {
+                forceCloseModalForRemoteDelete(nid);
+              }
             }
           } catch (_) {}
         };

@@ -1038,7 +1038,7 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
 
   // Remove collaborator
   const removeCollaborator = db.prepare(`
-    DELETE FROM note_collaborators 
+    DELETE FROM note_collaborators
     WHERE note_id = ? AND user_id = ?
   `);
 
@@ -1048,7 +1048,12 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
     return res.status(404).json({ error: "Collaborator not found" });
   }
 
-  // Update note with editor info
+  // Notify the removed user FIRST — they are no longer in the collaborator list
+  // so broadcastNoteUpdated won't reach them. Send a dedicated event so their
+  // client can remove the note immediately without a full reload.
+  sendEventToUser(userIdToRemove, { type: "note_access_revoked", noteId });
+
+  // Update note with editor info and notify remaining participants
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
   broadcastNoteUpdated(noteId);
 
