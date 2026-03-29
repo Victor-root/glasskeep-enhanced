@@ -1020,7 +1020,11 @@ app.get("/api/notes/:id/collaborators", auth, (req, res) => {
 
 app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
   const noteId = req.params.id;
-  const userIdToRemove = req.params.userId;
+  const userIdToRemove = Number(req.params.userId);
+
+  if (!Number.isInteger(userIdToRemove)) {
+    return res.status(400).json({ error: "Invalid user id" });
+  }
 
   // Check if note exists
   const note = getNoteWithCollaboration.get(req.user.id, noteId, req.user.id);
@@ -1030,7 +1034,7 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
 
   // Check if user is the owner (can remove anyone) or is removing themselves
   const isOwner = note.user_id === req.user.id;
-  const isRemovingSelf = String(userIdToRemove) === String(req.user.id);
+  const isRemovingSelf = userIdToRemove === req.user.id;
 
   if (!isOwner && !isRemovingSelf) {
     return res.status(403).json({ error: "Only note owner can remove other collaborators" });
