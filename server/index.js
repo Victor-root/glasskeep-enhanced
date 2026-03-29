@@ -1248,31 +1248,38 @@ app.post("/api/notes/import", auth, (req, res) => {
       : [];
   if (!src.length) return res.status(400).json({ error: "No notes to import." });
 
-  const rows = listNotes.all(req.user.id);
-  const existing = new Set(rows.map((r) => r.id));
+  // Check ALL notes (including archived/trashed) to avoid PRIMARY KEY collisions.
+  // listNotes only returns active notes — trashed/archived IDs would be missed.
+  const allRows = db.prepare("SELECT id FROM notes WHERE user_id = ?").all(req.user.id);
+  const existing = new Set(allRows.map((r) => r.id));
 
-  const tx = db.transaction((arr) => {
-    for (const n of arr) {
-      const id = existing.has(String(n.id)) ? uid() : String(n.id);
-      existing.add(id);
-      insertNote.run({
-        id,
-        user_id: req.user.id,
-        type: n.type === "checklist" ? "checklist" : n.type === "draw" ? "draw" : "text",
-        title: String(n.title || ""),
-        content: n.type === "checklist" ? "" : String(n.content || ""),
-        items_json: JSON.stringify(Array.isArray(n.items) ? n.items : []),
-        tags_json: JSON.stringify(Array.isArray(n.tags) ? n.tags : []),
-        images_json: JSON.stringify(Array.isArray(n.images) ? n.images : []),
-        color: typeof n.color === "string" ? n.color : "default",
-        pinned: n.pinned ? 1 : 0,
-        position: typeof n.position === "number" ? n.position : Date.now(),
-        timestamp: n.timestamp || nowISO(),
-      });
-    }
-  });
-  tx(src);
-  res.json({ ok: true, imported: src.length });
+  try {
+    const tx = db.transaction((arr) => {
+      for (const n of arr) {
+        const id = existing.has(String(n.id)) ? uid() : String(n.id);
+        existing.add(id);
+        insertNote.run({
+          id,
+          user_id: req.user.id,
+          type: n.type === "checklist" ? "checklist" : n.type === "draw" ? "draw" : "text",
+          title: String(n.title || ""),
+          content: n.type === "checklist" ? "" : String(n.content || ""),
+          items_json: JSON.stringify(Array.isArray(n.items) ? n.items : []),
+          tags_json: JSON.stringify(Array.isArray(n.tags) ? n.tags : []),
+          images_json: JSON.stringify(Array.isArray(n.images) ? n.images : []),
+          color: typeof n.color === "string" ? n.color : "default",
+          pinned: n.pinned ? 1 : 0,
+          position: typeof n.position === "number" ? n.position : Date.now(),
+          timestamp: n.timestamp || nowISO(),
+        });
+      }
+    });
+    tx(src);
+    res.json({ ok: true, imported: src.length });
+  } catch (err) {
+    console.error("[Import] Failed:", err.message);
+    res.status(500).json({ error: `Import failed: ${err.message}` });
+  }
 });
 
 // ---------- User Settings ----------
