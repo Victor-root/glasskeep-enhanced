@@ -329,6 +329,8 @@ export async function collapseQueue(userId, sessionId) {
 
 /**
  * Check if a note has pending local changes in the queue for a given session.
+ * Failed items with "Note not found on server" are excluded — those are
+ * permanent failures that should not protect zombie local notes.
  */
 export async function hasPendingChanges(noteId, userId, sessionId) {
   const store = await tx(QUEUE_STORE);
@@ -337,7 +339,8 @@ export async function hasPendingChanges(noteId, userId, sessionId) {
     req.onsuccess = () => {
       const items = (req.result || []).filter(
         (i) => i.userId === userId && i.sessionId === sessionId &&
-          (i.status === "pending" || i.status === "processing" || i.status === "retry" || i.status === "failed")
+          (i.status === "pending" || i.status === "processing" || i.status === "retry" ||
+           (i.status === "failed" && !i.lastError?.startsWith("Note not found")))
       );
       resolve(items.length > 0);
     };
