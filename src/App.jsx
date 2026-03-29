@@ -8668,8 +8668,9 @@ export default function App() {
       });
     } catch (e) {
       console.error("Checklist enqueue failed:", e);
-      // Don't release dirty flag on failure — keep SSE protection
-      checklistSyncInFlightRef.current = false;
+      // Don't release dirty flag OR in-flight flag on failure.
+      // Keeps closeModal() from clearing dirty prematurely since no queue item exists.
+      // Next successful syncChecklistItems call will reset both flags.
       return;
     }
     checklistSyncInFlightRef.current = false;
