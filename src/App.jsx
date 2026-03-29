@@ -6836,6 +6836,7 @@ export default function App() {
     // ─── Debounced batch patch: collect noteIds, reload once ───
     let patchBatchTimeout = null;
     const patchBatchIds = new Set();
+    let cooldownDeferredIds = new Set(); // events received during reload cooldown
 
     const flushPatchBatch = async () => {
       patchBatchTimeout = null;
@@ -6847,8 +6848,13 @@ export default function App() {
     };
 
     const debouncedPatch = (noteId) => {
-      // During reload cooldown, skip — full reload handles everything
-      if (Date.now() < reloadCooldownUntil) return;
+      // During reload cooldown, buffer instead of dropping — the full reload
+      // may have started BEFORE these notes existed on the server (e.g. another
+      // device synced while the reload was in flight).
+      if (Date.now() < reloadCooldownUntil) {
+        cooldownDeferredIds.add(String(noteId));
+        return;
+      }
       patchBatchIds.add(String(noteId));
       if (patchBatchTimeout) clearTimeout(patchBatchTimeout);
       patchBatchTimeout = setTimeout(flushPatchBatch, 300);
@@ -6950,8 +6956,20 @@ export default function App() {
                 return;
               }
               console.log("[SSE] queue idle — reloading current view");
+              cooldownDeferredIds = new Set(); // clear before cooldown starts
               reloadCooldownUntil = Date.now() + 3000;
               reloadCurrentViewRef.current?.();
+              // After cooldown expires, flush any SSE events that arrived during the
+              // reload window (e.g. another device synced while reload was in flight).
+              setTimeout(() => {
+                if (cooldownDeferredIds.size > 0) {
+                  console.log("[SSE] flushing", cooldownDeferredIds.size, "deferred events");
+                  for (const nid of cooldownDeferredIds) patchBatchIds.add(nid);
+                  cooldownDeferredIds = new Set();
+                  if (patchBatchTimeout) clearTimeout(patchBatchTimeout);
+                  patchBatchTimeout = setTimeout(flushPatchBatch, 300);
+                }
+              }, 3100);
             };
             // Small initial delay to let processQueue start if it hasn't yet
             setTimeout(waitForQueue, 300);
