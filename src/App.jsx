@@ -6392,7 +6392,12 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "active");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) localOnly.push(ln);
+            if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) {
+              localOnly.push(ln);
+            } else {
+              // Dead note: absent from server, no pending changes — purge from IDB
+              try { await idbDeleteNote(String(ln.id), currentUser?.id, sessionId); } catch (e) {}
+            }
           }
         }
       } catch (e) {}
@@ -6487,7 +6492,11 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "archived");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) localOnly.push(ln);
+            if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) {
+              localOnly.push(ln);
+            } else {
+              try { await idbDeleteNote(String(ln.id), currentUser?.id, sessionId); } catch (e) {}
+            }
           }
         }
       } catch (e) {}
@@ -6568,7 +6577,11 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "trashed");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) localOnly.push(ln);
+            if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) {
+              localOnly.push(ln);
+            } else {
+              try { await idbDeleteNote(String(ln.id), currentUser?.id, sessionId); } catch (e) {}
+            }
           }
         }
       } catch (e) {}
