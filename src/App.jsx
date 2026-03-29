@@ -6745,6 +6745,10 @@ export default function App() {
       // Don't overwrite note currently being edited in modal (debounce may not have fired yet)
       if (localEditDirtyRef.current === nid) return;
 
+      // Don't overwrite a checklist whose local sync failed (no queue item exists,
+      // but IDB has the correct local data — dirty flag may have been reused by another note)
+      if (unsafeChecklistNoteIdRef.current === nid) return;
+
       try {
         const serverNote = await api(`/notes/${nid}`, { token });
         if (!serverNote || !serverNote.id) return;
