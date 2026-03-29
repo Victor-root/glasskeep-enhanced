@@ -145,12 +145,12 @@ export class SyncEngine {
             await removeQueueItem(item.queueId);
             continue;
           } else if (isNotFound && (item.type === "update" || item.type === "patch" || item.type === "archive")) {
+            // Note no longer exists on server — terminal, nothing to retry.
+            // Remove from queue so it doesn't pollute stats as a permanent failure.
+            console.warn(`[SyncEngine] ${item.type} 404: note ${item.noteId} gone from server, dropping queue item`);
             this._serverReachable = true;
-            await updateQueueItem(item.queueId, {
-              status: "failed",
-              lastError: `Note not found on server (${err.status})`,
-              attempts: MAX_RETRIES,
-            });
+            await removeQueueItem(item.queueId);
+            continue;
           } else if (isRateLimited) {
             // Rate limited by reverse proxy (403/429). Server IS reachable,
             // just rejecting rapid requests. Pause briefly then retry.
