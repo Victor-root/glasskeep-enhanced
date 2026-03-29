@@ -6842,8 +6842,109 @@ export default function App() {
       patchBatchTimeout = null;
       const ids = [...patchBatchIds];
       patchBatchIds.clear();
+      if (ids.length === 0) return;
+
+      // Single note — fast path, no batching overhead
+      if (ids.length === 1) {
+        await patchSingleNote(ids[0]);
+        return;
+      }
+
+      // Multiple notes — fetch all in parallel, then apply ONE setNotes update
+      // to avoid N sequential re-renders that cause grid flicker.
+      const uid = currentUser?.id;
+      const sid = sessionId;
+      const currentFilter = tagFilterRef.current;
+
+      // Pre-filter: skip protected notes before fetching
+      const toFetch = [];
       for (const nid of ids) {
-        await patchSingleNote(nid);
+        if (isDeleteTombstoned(nid)) continue;
+        if (isNoteLocallyProtected(nid)) continue;
+        if (await hasPendingChanges(nid, uid, sid)) continue;
+        toFetch.push(nid);
+      }
+      if (toFetch.length === 0) return;
+
+      // Fetch all in parallel
+      const results = await Promise.allSettled(
+        toFetch.map(async (nid) => {
+          try {
+            const serverNote = await api(`/notes/${nid}`, { token });
+            if (!serverNote || !serverNote.id) return null;
+            // Final TOCTOU guard
+            if (await isProtectedFromServerOverwrite(nid, uid, sid)) return null;
+            return serverNote;
+          } catch (e) {
+            return e.status === 404 ? { _deleted: true, _nid: nid } : null;
+          }
+        })
+      );
+
+      // Collect updates and removals
+      const upserts = new Map();  // nid → serverNote
+      const removals = new Set(); // nids to remove from view
+      const idbWrites = [];
+
+      for (const r of results) {
+        if (r.status !== "fulfilled" || !r.value) continue;
+        const val = r.value;
+
+        if (val._deleted) {
+          removals.add(val._nid);
+          idbWrites.push(idbDeleteNote(val._nid, uid, sid).catch(() => {}));
+          continue;
+        }
+
+        const nid = String(val.id);
+        const noteArchived = !!val.archived;
+        const noteTrashed = !!val.trashed;
+        const belongsInView =
+          (currentFilter === "ARCHIVED" && noteArchived && !noteTrashed) ||
+          (currentFilter === "TRASHED" && noteTrashed) ||
+          (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"))
+            && !noteArchived && !noteTrashed;
+
+        idbWrites.push(
+          idbPutNote({ ...val, id: nid, user_id: val.user_id || uid }, uid, sid).catch(() => {})
+        );
+
+        if (belongsInView) {
+          upserts.set(nid, val);
+        } else {
+          removals.add(nid);
+        }
+      }
+
+      // Fire IDB writes in parallel (best-effort)
+      await Promise.allSettled(idbWrites);
+
+      // Single atomic state update — no intermediate re-renders
+      if (upserts.size > 0 || removals.size > 0) {
+        setNotes((prev) => {
+          let next = prev;
+          // Apply removals
+          if (removals.size > 0) {
+            next = next.filter((n) => !removals.has(String(n.id)));
+          }
+          // Apply upserts
+          if (upserts.size > 0) {
+            const updated = next.map((n) => {
+              const sn = upserts.get(String(n.id));
+              return sn ? sn : n;
+            });
+            // Add any truly new notes (not already in list)
+            const existingIds = new Set(updated.map((n) => String(n.id)));
+            const newNotes = [];
+            for (const [nid, sn] of upserts) {
+              if (!existingIds.has(nid)) newNotes.push(sn);
+            }
+            next = newNotes.length > 0
+              ? sortNotesByRecency([...updated, ...newNotes])
+              : updated;
+          }
+          return next;
+        });
       }
     };
 
