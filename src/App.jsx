@@ -6388,6 +6388,7 @@ export default function App() {
       // Build final list: server notes + locally-only notes with pending sync
       const serverIds = new Set(serverNotes.map((n) => String(n.id)));
       const localOnly = [];
+      const deadIds = [];
       try {
         const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "active");
         for (const ln of allLocal) {
@@ -6395,12 +6396,15 @@ export default function App() {
             if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) {
               localOnly.push(ln);
             } else {
-              // Dead note: absent from server, no pending changes — purge from IDB
-              try { await idbDeleteNote(String(ln.id), currentUser?.id, sessionId); } catch (e) {}
+              deadIds.push(String(ln.id));
             }
           }
         }
       } catch (e) {}
+      // Purge dead notes from IDB in parallel
+      if (deadIds.length > 0) {
+        await Promise.allSettled(deadIds.map((id) => idbDeleteNote(id, currentUser?.id, sessionId)));
+      }
 
       // For notes with pending changes, use local version
       const merged = [];
@@ -6488,6 +6492,7 @@ export default function App() {
       // Merge with local-only archived notes that have pending sync
       const serverIds = new Set(notesArray.map((n) => String(n.id)));
       const localOnly = [];
+      const deadIds = [];
       try {
         const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "archived");
         for (const ln of allLocal) {
@@ -6495,11 +6500,14 @@ export default function App() {
             if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) {
               localOnly.push(ln);
             } else {
-              try { await idbDeleteNote(String(ln.id), currentUser?.id, sessionId); } catch (e) {}
+              deadIds.push(String(ln.id));
             }
           }
         }
       } catch (e) {}
+      if (deadIds.length > 0) {
+        await Promise.allSettled(deadIds.map((id) => idbDeleteNote(id, currentUser?.id, sessionId)));
+      }
 
       const merged = [];
       for (const sn of notesArray) {
@@ -6573,6 +6581,7 @@ export default function App() {
       // Merge with locally-trashed notes that have pending sync
       const serverIds = new Set(notesArray.map((n) => String(n.id)));
       const localOnly = [];
+      const deadIds = [];
       try {
         const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "trashed");
         for (const ln of allLocal) {
@@ -6580,11 +6589,14 @@ export default function App() {
             if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) {
               localOnly.push(ln);
             } else {
-              try { await idbDeleteNote(String(ln.id), currentUser?.id, sessionId); } catch (e) {}
+              deadIds.push(String(ln.id));
             }
           }
         }
       } catch (e) {}
+      if (deadIds.length > 0) {
+        await Promise.allSettled(deadIds.map((id) => idbDeleteNote(id, currentUser?.id, sessionId)));
+      }
 
       // For notes with pending changes, use local version
       const merged = [];
