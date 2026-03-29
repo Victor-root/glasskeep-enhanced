@@ -7,6 +7,7 @@ import {
   removeQueueItem,
   collapseQueue,
   getQueueStats,
+  getNote as idbGetNote,
 } from "./localDb.js";
 
 const API_BASE = "/api";
@@ -145,16 +146,34 @@ export class SyncEngine {
               console.error("[SyncEngine] onSyncComplete error:", e);
             }
             continue;
-          } else if ((isNotFound || isForbidden) && item.noteId) {
-            // Note gone (404) or access revoked (403) — terminal for any note mutation.
-            // No point retrying: the note either doesn't exist or we lost access.
-            console.warn(`[SyncEngine] ${item.type} ${err.status}: note ${item.noteId}, dropping queue item`);
+          } else if (isNotFound && item.noteId) {
+            // Note gone on server — terminal for any note mutation, no retry.
+            console.warn(`[SyncEngine] ${item.type} 404: note ${item.noteId}, dropping queue item`);
             this._serverReachable = true;
             await removeQueueItem(item.queueId);
             continue;
+          } else if (isForbidden && item.noteId) {
+            // 403 on a note mutation — access may have been revoked.
+            // If the note was already removed locally (via note_access_revoked SSE),
+            // convergence is achieved: drop silently. Otherwise treat as a real
+            // authorization error — mark failed, no retry, surface to caller.
+            this._serverReachable = true;
+            const localNote = await idbGetNote(item.noteId, this._userId, this._sessionId).catch(() => null);
+            if (!localNote) {
+              // Note already purged locally — expected after access revocation
+              await removeQueueItem(item.queueId);
+              continue;
+            }
+            // Note still present locally — unexpected 403, surface as error
+            console.warn(`[SyncEngine] ${item.type} 403: note ${item.noteId}, access denied`);
+            await updateQueueItem(item.queueId, {
+              status: "failed",
+              lastError: "Access denied (HTTP 403)",
+              attempts: MAX_RETRIES,
+            });
+            this.onSyncError(item, err);
           } else if (isRateLimited) {
-            // Rate limited by reverse proxy (403/429). Server IS reachable,
-            // just rejecting rapid requests. Pause briefly then retry.
+            // Rate limited (HTTP 429). Server IS reachable, just throttling.
             this._serverReachable = true;
             this._lastSyncError = `Rate limited (HTTP ${err.status})`;
             const nextAttempts = item.attempts + 1;

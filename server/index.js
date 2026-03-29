@@ -475,9 +475,9 @@ const updateNoteWithEditor = db.prepare(`
 `);
 
 // ---------- Realtime (SSE) ----------
-// Map of userId (Number) -> Set of response streams.
-// All access goes through sseKey() to guarantee consistent Number keys,
-// preventing string/number mismatch bugs (e.g. req.params vs req.user.id).
+// Map of userId (integer) -> Set of response streams.
+// All access goes through parseSseKey() which rejects non-integer values,
+// preventing NaN keys and string/number mismatch bugs.
 const sseClients = new Map();
 
 // Parse a userId to a valid integer key, or null if invalid.
