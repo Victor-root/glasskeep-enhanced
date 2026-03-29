@@ -5658,20 +5658,21 @@ export default function App() {
   const notesAreRegular = useRef(true); // tracks whether notes[] holds regular (non-archive/trash) notes
 
   // ─── Per-noteId lease-based protection against SSE overwrite ───
-  // Invariant: a note is protected as long as at least one local mutation
-  // hasn't written its queue item (or has explicitly failed and stays guarded).
-  // Each local operation (text save, draw flush, checklist sync) acquires a
-  // unique lease. Two concurrent operations on the same note each hold their
-  // own lease — finishing one cannot accidentally release the other's protection.
-  // Map<noteId, Map<leaseId, true>>
+  // Each local mutation acquires a unique lease with a monotonic sequence number.
+  // A note is protected as long as it holds at least one active lease.
+  // On successful enqueue, the caller releases its lease AND prunes all older
+  // leases for the same note (seq <= its own), clearing zombie leases left by
+  // earlier failed operations. Newer leases (higher seq) are never touched.
+  // Map<noteId, Map<leaseId, { seq: number }>>
   const localLeaseRef = useRef(new Map());
   const leaseSeqRef = useRef(0);
 
   const acquireLocalLease = (noteId) => {
-    const leaseId = `L${++leaseSeqRef.current}`;
+    const seq = ++leaseSeqRef.current;
+    const leaseId = `L${seq}`;
     const map = localLeaseRef.current;
     if (!map.has(noteId)) map.set(noteId, new Map());
-    map.get(noteId).set(leaseId, true);
+    map.get(noteId).set(leaseId, { seq });
     return leaseId;
   };
   const releaseLocalLease = (noteId, leaseId) => {
@@ -5679,6 +5680,23 @@ export default function App() {
     const leases = map.get(noteId);
     if (!leases) return;
     leases.delete(leaseId);
+    if (leases.size === 0) map.delete(noteId);
+  };
+  // Release own lease + prune all older leases for the same note.
+  // Called after a successful enqueueAndSync — any earlier failed lease on this
+  // note is now superseded because a newer mutation reached the queue safely.
+  const releaseLocalLeaseWithPrune = (noteId, leaseId) => {
+    const map = localLeaseRef.current;
+    const leases = map.get(noteId);
+    if (!leases) return;
+    const own = leases.get(leaseId);
+    const maxSeq = own ? own.seq : -1;
+    // Collect IDs to delete (cannot mutate Map during iteration in all engines)
+    const toDelete = [];
+    for (const [lid, meta] of leases) {
+      if (meta.seq <= maxSeq) toDelete.push(lid);
+    }
+    for (const lid of toDelete) leases.delete(lid);
     if (leases.size === 0) map.delete(noteId);
   };
   const isNoteLocallyProtected = (noteId) => {
@@ -7063,8 +7081,8 @@ export default function App() {
       return;
     }
 
-    // Queue item exists — safe to release this draw lease
-    releaseLocalLease(noteId, leaseId);
+    // Queue item exists — release this lease + prune older zombies for this note
+    releaseLocalLeaseWithPrune(noteId, leaseId);
   }, [currentUser?.id, sessionId, enqueueAndSync]);
 
   // Auto-save drawing changes (local-first)
@@ -8263,7 +8281,7 @@ export default function App() {
       return;
     }
     // hasPendingChanges() now returns true → SSE protection via queue takes over
-    releaseLocalLease(nId, lid);
+    releaseLocalLeaseWithPrune(nId, lid);
   }, [enqueueAndSync]);
 
   // Local-first auto-save for text metadata (color, tags, images) — immediate, no debounce
@@ -8721,8 +8739,8 @@ export default function App() {
       // Next successful syncChecklistItems for this note will naturally hold a new lease.
       return;
     }
-    // Queue item exists — safe to release this lease
-    releaseLocalLease(noteId, leaseId);
+    // Queue item exists — release this lease + prune older zombies for this note
+    releaseLocalLeaseWithPrune(noteId, leaseId);
   };
 
   const onChecklistDragStart = (itemId, ev) => {
