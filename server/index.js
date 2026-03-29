@@ -890,6 +890,11 @@ app.post("/api/notes/reorder", auth, (req, res) => {
     }
   });
   reorder();
+
+  // Notify other sessions so they converge on the new order
+  const allIds = [...pinnedIds, ...otherIds];
+  for (const nid of allIds) broadcastNoteUpdated(nid);
+
   res.json({ ok: true });
 });
 
@@ -1167,7 +1172,15 @@ app.delete("/api/notes/:id/permanent", auth, (req, res) => {
     return res.status(400).json({ error: "Note must be in trash to permanently delete" });
   }
 
+  // Capture recipients before deletion (row will be gone after deleteNote)
+  const recipientIds = new Set([existing.user_id, ...getCollaboratorUserIdsForNote(id)]);
+
   deleteNote.run(id, req.user.id);
+
+  // Notify other sessions so they remove the note without a full reload
+  const evt = { type: "note_deleted", noteId: id };
+  for (const uid of recipientIds) sendEventToUser(uid, evt);
+
   res.json({ ok: true });
 });
 

@@ -6964,6 +6964,13 @@ export default function App() {
             const msg = JSON.parse(e.data || "{}");
             if (msg && msg.type === "note_updated" && msg.noteId) {
               debouncedPatch(msg.noteId);
+            } else if (msg && msg.type === "note_deleted" && msg.noteId) {
+              // Another session permanently deleted this note — remove locally
+              const nid = String(msg.noteId);
+              if (!isDeleteTombstoned(nid)) {
+                setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+                idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
+              }
             }
           } catch (_) {}
         };
