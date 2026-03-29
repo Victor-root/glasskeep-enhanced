@@ -479,10 +479,17 @@ const updateNoteWithEditor = db.prepare(`
 // All access goes through sseKey() to guarantee consistent Number keys,
 // preventing string/number mismatch bugs (e.g. req.params vs req.user.id).
 const sseClients = new Map();
-const sseKey = (id) => Number(id);
+
+// Parse a userId to a valid integer key, or null if invalid.
+// Prevents NaN from entering sseClients as a Map key.
+function parseSseKey(id) {
+  const n = Number(id);
+  return Number.isInteger(n) ? n : null;
+}
 
 function addSseClient(userId, res) {
-  const key = sseKey(userId);
+  const key = parseSseKey(userId);
+  if (key === null) { console.warn("[SSE] addSseClient: invalid userId", userId); return; }
   let set = sseClients.get(key);
   if (!set) {
     set = new Set();
@@ -492,7 +499,8 @@ function addSseClient(userId, res) {
 }
 
 function removeSseClient(userId, res) {
-  const key = sseKey(userId);
+  const key = parseSseKey(userId);
+  if (key === null) return;
   const set = sseClients.get(key);
   if (!set) return;
   set.delete(res);
@@ -500,7 +508,8 @@ function removeSseClient(userId, res) {
 }
 
 function sendEventToUser(userId, event) {
-  const key = sseKey(userId);
+  const key = parseSseKey(userId);
+  if (key === null) { console.warn("[SSE] sendEventToUser: invalid userId", userId); return; }
   const set = sseClients.get(key);
   if (!set || set.size === 0) return;
   const payload = `data: ${JSON.stringify(event)}\n\n`;

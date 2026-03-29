@@ -124,11 +124,12 @@ export class SyncEngine {
           await new Promise((r) => setTimeout(r, QUEUE_ITEM_DELAY));
         } catch (err) {
           const isAuthError = err.status === 401;
+          const isForbidden = err.status === 403;
           const isConflict = err.status === 409;
           const isNotFound = err.status === 404;
-          const isRateLimited = err.status === 403 || err.status === 429;
+          const isRateLimited = err.status === 429;
           const isTimeout = !!err.isTimeout;
-          const isNetworkError = !isTimeout && !isRateLimited && (err.isNetworkError || err.status === 0 || !err.status);
+          const isNetworkError = !isTimeout && !isRateLimited && !isForbidden && (err.isNetworkError || err.status === 0 || !err.status);
 
           if (isAuthError) {
             await updateQueueItem(item.queueId, {
@@ -144,14 +145,10 @@ export class SyncEngine {
               console.error("[SyncEngine] onSyncComplete error:", e);
             }
             continue;
-          } else if (isNotFound && (item.type === "trash" || item.type === "restore")) {
-            this._serverReachable = true;
-            await removeQueueItem(item.queueId);
-            continue;
-          } else if (isNotFound && (item.type === "update" || item.type === "patch" || item.type === "archive")) {
-            // Note no longer exists on server — terminal, nothing to retry.
-            // Remove from queue so it doesn't pollute stats as a permanent failure.
-            console.warn(`[SyncEngine] ${item.type} 404: note ${item.noteId} gone from server, dropping queue item`);
+          } else if ((isNotFound || isForbidden) && item.noteId) {
+            // Note gone (404) or access revoked (403) — terminal for any note mutation.
+            // No point retrying: the note either doesn't exist or we lost access.
+            console.warn(`[SyncEngine] ${item.type} ${err.status}: note ${item.noteId}, dropping queue item`);
             this._serverReachable = true;
             await removeQueueItem(item.queueId);
             continue;
