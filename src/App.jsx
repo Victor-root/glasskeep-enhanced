@@ -6384,6 +6384,14 @@ export default function App() {
     }
   };
 
+  // Helper: combines queue-based protection (hasPendingChanges, async/IDB) with
+  // in-memory lease protection (isNoteLocallyProtected, sync/ref).
+  // Used by all global loaders to decide whether the server version can replace the local one.
+  const isProtectedFromServerOverwrite = async (noteId, userId, sid) => {
+    if (isNoteLocallyProtected(noteId)) return true;
+    return hasPendingChanges(noteId, userId, sid);
+  };
+
   const loadNotes = async () => {
     if (!token) return;
     const expectedFilter = tagFilterRef.current;
@@ -6415,14 +6423,13 @@ export default function App() {
       if (tagFilterRef.current !== expectedFilter) return; // view changed during fetch
       const serverNotes = Array.isArray(data) ? data : [];
 
-      // Snapshot pending status ONCE to avoid race conditions:
-      // The sync queue runs concurrently — if we check hasPendingChanges
-      // multiple times, an item could be removed between checks, causing
-      // us to skip the IDB write (pending=true) but then use the stale
-      // server version (pending=false) instead of the correct local version.
+      // Snapshot protection status ONCE to avoid race conditions:
+      // The sync queue runs concurrently — if we check multiple times, an
+      // item could be removed between checks. We also check in-memory leases
+      // so notes in the pre-enqueue or failed-enqueue window are protected.
       const pendingSet = new Set();
       for (const sn of serverNotes) {
-        if (await hasPendingChanges(String(sn.id), currentUser?.id, sessionId)) pendingSet.add(String(sn.id));
+        if (await isProtectedFromServerOverwrite(String(sn.id), currentUser?.id, sessionId)) pendingSet.add(String(sn.id));
       }
 
       // Hydrate IndexedDB, skipping notes with pending local changes
@@ -6442,7 +6449,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "active");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) {
+            if (await isProtectedFromServerOverwrite(String(ln.id), currentUser?.id, sessionId)) {
               localOnly.push(ln);
             } else {
               deadIds.push(String(ln.id));
@@ -6523,10 +6530,10 @@ export default function App() {
       if (tagFilterRef.current !== expectedFilter) return;
       const notesArray = Array.isArray(data) ? data : [];
 
-      // Snapshot pending status once to avoid race with concurrent queue processing
+      // Snapshot protection status once to avoid race with concurrent queue processing
       const pendingSet = new Set();
       for (const sn of notesArray) {
-        if (await hasPendingChanges(String(sn.id), currentUser?.id, sessionId)) pendingSet.add(String(sn.id));
+        if (await isProtectedFromServerOverwrite(String(sn.id), currentUser?.id, sessionId)) pendingSet.add(String(sn.id));
       }
 
       // Hydrate IndexedDB
@@ -6546,7 +6553,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "archived");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) {
+            if (await isProtectedFromServerOverwrite(String(ln.id), currentUser?.id, sessionId)) {
               localOnly.push(ln);
             } else {
               deadIds.push(String(ln.id));
@@ -6612,10 +6619,10 @@ export default function App() {
       if (tagFilterRef.current !== expectedFilter) return;
       const notesArray = Array.isArray(data) ? data : [];
 
-      // Snapshot pending status once to avoid race with concurrent queue processing
+      // Snapshot protection status once to avoid race with concurrent queue processing
       const pendingSet = new Set();
       for (const sn of notesArray) {
-        if (await hasPendingChanges(String(sn.id), currentUser?.id, sessionId)) pendingSet.add(String(sn.id));
+        if (await isProtectedFromServerOverwrite(String(sn.id), currentUser?.id, sessionId)) pendingSet.add(String(sn.id));
       }
 
       // Hydrate IndexedDB
@@ -6635,7 +6642,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "trashed");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await hasPendingChanges(String(ln.id), currentUser?.id, sessionId)) {
+            if (await isProtectedFromServerOverwrite(String(ln.id), currentUser?.id, sessionId)) {
               localOnly.push(ln);
             } else {
               deadIds.push(String(ln.id));
