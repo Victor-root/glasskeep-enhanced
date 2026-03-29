@@ -117,7 +117,9 @@ export class SyncEngine {
           this._serverReachable = true;
           this._lastSyncAt = Date.now();
           this._lastSyncError = null;
-          this.onSyncComplete(item, result);
+          try { await this.onSyncComplete(item, result); } catch (e) {
+            console.error("[SyncEngine] onSyncComplete error:", e);
+          }
           // Small delay between items to avoid triggering reverse proxy rate limits
           await new Promise((r) => setTimeout(r, QUEUE_ITEM_DELAY));
         } catch (err) {
@@ -138,7 +140,9 @@ export class SyncEngine {
             await removeQueueItem(item.queueId);
             this._serverReachable = true;
             this._lastSyncAt = Date.now();
-            this.onSyncComplete(item);
+            try { await this.onSyncComplete(item); } catch (e) {
+              console.error("[SyncEngine] onSyncComplete error:", e);
+            }
             continue;
           } else if (isNotFound && (item.type === "trash" || item.type === "restore")) {
             this._serverReachable = true;
