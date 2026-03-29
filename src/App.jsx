@@ -5716,6 +5716,18 @@ export default function App() {
     }
     releaseLocalLeaseWithPrune(noteId, leaseId);
   };
+
+  // ─── Permanent-delete tombstones ───
+  // When a note is permanently deleted locally but not yet confirmed by the
+  // server, its id lives here. Loaders and patchSingleNote skip tombstoned
+  // notes entirely — they cannot reappear from server data while pending.
+  // Cleared per-note by onSyncComplete after server confirms, or globally
+  // by cleanupClientSession on sign-out.
+  const localDeleteTombstoneRef = useRef(new Set());
+  const addDeleteTombstone = (noteId) => localDeleteTombstoneRef.current.add(String(noteId));
+  const removeDeleteTombstone = (noteId) => localDeleteTombstoneRef.current.delete(String(noteId));
+  const isDeleteTombstoned = (noteId) => localDeleteTombstoneRef.current.has(String(noteId));
+
   // Remove lazy loading state
 
   // -------- Multi-select state --------
@@ -5873,6 +5885,7 @@ export default function App() {
           const count = selectedIds.length;
           for (const id of selectedIds) {
             const nid = String(id);
+            addDeleteTombstone(nid);
             const leaseId = acquireLocalLease(nid);
             try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
             await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid }, leaseId);
@@ -6201,6 +6214,7 @@ export default function App() {
   //   - IndexedDB syncQueue          ← ONLY written by idbEnqueue + syncEngine queue updates
   //   - IndexedDB notes store        ← Written by load functions, auto-save, patchSingleNote
   //   - localLeaseRef                 ← Per-noteId lease-based SSE protection (Map<noteId, Map<leaseId, { seq }>>); success prunes older leases
+  //   - localDeleteTombstoneRef       ← Set<noteId> of pending permanent deletes; prevents resurrection by loaders/SSE
   //
   useEffect(() => {
     if (!token || !currentUser?.id) {
@@ -6244,9 +6258,10 @@ export default function App() {
               });
             }
           } else if (item.type === "permanentDelete" && item.noteId) {
-            // Server confirmed permanent deletion — remove stale cache entry
+            // Server confirmed permanent deletion — remove stale cache entry + tombstone
             const nid = String(item.noteId);
             try { await idbDeleteNote(nid, uid, sid); } catch {}
+            removeDeleteTombstone(nid);
           }
         } catch (e) {
           console.error("[Sync] reconciliation error:", e);
@@ -6413,6 +6428,7 @@ export default function App() {
   // in-memory lease protection (isNoteLocallyProtected, sync/ref).
   // Used by all global loaders to decide whether the server version can replace the local one.
   const isProtectedFromServerOverwrite = async (noteId, userId, sid) => {
+    if (isDeleteTombstoned(noteId)) return true;
     if (isNoteLocallyProtected(noteId)) return true;
     return hasPendingChanges(noteId, userId, sid);
   };
@@ -6487,12 +6503,14 @@ export default function App() {
         await Promise.allSettled(deadIds.map((id) => idbDeleteNote(id, currentUser?.id, sessionId)));
       }
 
-      // For notes with pending changes, use local version
+      // For notes with pending changes, use local version; skip tombstoned notes
       const merged = [];
       for (const sn of serverNotes) {
-        if (pendingSet.has(String(sn.id))) {
-          const localVer = await idbGetNote(String(sn.id), currentUser?.id, sessionId);
-          merged.push(localVer || sn);
+        const nid = String(sn.id);
+        if (isDeleteTombstoned(nid)) continue;
+        if (pendingSet.has(nid)) {
+          const localVer = await idbGetNote(nid, currentUser?.id, sessionId);
+          if (localVer) merged.push(localVer);
         } else {
           merged.push(sn);
         }
@@ -6592,9 +6610,11 @@ export default function App() {
 
       const merged = [];
       for (const sn of notesArray) {
-        if (pendingSet.has(String(sn.id))) {
-          const localVer = await idbGetNote(String(sn.id), currentUser?.id, sessionId);
-          merged.push(localVer || sn);
+        const nid = String(sn.id);
+        if (isDeleteTombstoned(nid)) continue;
+        if (pendingSet.has(nid)) {
+          const localVer = await idbGetNote(nid, currentUser?.id, sessionId);
+          if (localVer) merged.push(localVer);
         } else {
           merged.push(sn);
         }
@@ -6679,12 +6699,14 @@ export default function App() {
         await Promise.allSettled(deadIds.map((id) => idbDeleteNote(id, currentUser?.id, sessionId)));
       }
 
-      // For notes with pending changes, use local version
+      // For notes with pending changes, use local version; skip tombstoned notes
       const merged = [];
       for (const sn of notesArray) {
-        if (pendingSet.has(String(sn.id))) {
-          const localVer = await idbGetNote(String(sn.id), currentUser?.id, sessionId);
-          merged.push(localVer || sn);
+        const nid = String(sn.id);
+        if (isDeleteTombstoned(nid)) continue;
+        if (pendingSet.has(nid)) {
+          const localVer = await idbGetNote(nid, currentUser?.id, sessionId);
+          if (localVer) merged.push(localVer);
         } else {
           merged.push(sn);
         }
@@ -6817,6 +6839,9 @@ export default function App() {
     const patchSingleNote = async (noteId) => {
       if (!noteId) return;
       const nid = String(noteId);
+
+      // Note permanently deleted locally — never resurrect from server
+      if (isDeleteTombstoned(nid)) return;
 
       // Don't overwrite notes with pending local changes (already in sync queue)
       const pending = await hasPendingChanges(nid, currentUser?.id, sessionId);
@@ -7377,8 +7402,9 @@ export default function App() {
       idbClearNotesForSession(userId, sid).catch(() => {});
       idbClearQueueForSession(userId, sid).catch(() => {});
     }
-    // Clear all local leases — no protection zombies between sessions
+    // Clear all local leases + delete tombstones — no zombies between sessions
     clearAllLocalLeases();
+    localDeleteTombstoneRef.current.clear();
     // Tear down sync engine
     if (syncEngineRef.current) {
       syncEngineRef.current.destroy();
@@ -8569,7 +8595,8 @@ export default function App() {
     const leaseId = acquireLocalLease(nid);
 
     if (tagFilter === "TRASHED") {
-      // Local-first: permanent delete
+      // Local-first: permanent delete — tombstone prevents resurrection by loaders/SSE
+      addDeleteTombstone(nid);
       try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
       invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
