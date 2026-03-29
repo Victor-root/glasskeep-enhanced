@@ -5559,7 +5559,6 @@ export default function App() {
   const [mItems, setMItems] = useState([]);
   const skipNextItemsAutosave = useRef(false);
   const prevItemsRef = useRef([]);
-  const unsafeChecklistNoteIdRef = useRef(null); // noteId whose checklist sync hasn't completed
   const [mInput, setMInput] = useState("");
 
   // Drawing modal
@@ -5657,7 +5656,26 @@ export default function App() {
   // Loading state for notes
   const [notesLoading, setNotesLoading] = useState(false);
   const notesAreRegular = useRef(true); // tracks whether notes[] holds regular (non-archive/trash) notes
-  const localEditDirtyRef = useRef(null); // noteId with unsaved local edits (set before debounce fires)
+  // Per-noteId local protection registry: prevents SSE patchSingleNote from overwriting
+  // notes that have unsaved local edits, pending IDB writes, or failed enqueue attempts.
+  // Map<noteId, Set<reason>>  —  a note is protected if it has at least one reason.
+  const localProtectionRef = useRef(new Map());
+  const addLocalProtection = (noteId, reason) => {
+    const map = localProtectionRef.current;
+    if (!map.has(noteId)) map.set(noteId, new Set());
+    map.get(noteId).add(reason);
+  };
+  const removeLocalProtection = (noteId, reason) => {
+    const map = localProtectionRef.current;
+    const reasons = map.get(noteId);
+    if (!reasons) return;
+    reasons.delete(reason);
+    if (reasons.size === 0) map.delete(noteId);
+  };
+  const isLocallyProtected = (noteId) => {
+    const reasons = localProtectionRef.current.get(noteId);
+    return !!reasons && reasons.size > 0;
+  };
   // Remove lazy loading state
 
   // -------- Multi-select state --------
@@ -6127,7 +6145,7 @@ export default function App() {
   //   - syncStatus (React state)     ← ONLY written by syncEngine.onStatusChange + reset points
   //   - IndexedDB syncQueue          ← ONLY written by idbEnqueue + syncEngine queue updates
   //   - IndexedDB notes store        ← Written by load functions, auto-save, patchSingleNote
-  //   - localEditDirtyRef            ← Protects IDB from SSE overwrite during debounce window
+  //   - localProtectionRef            ← Per-noteId protection against SSE overwrite (Map<noteId, Set<reason>>)
   //
   useEffect(() => {
     if (!token || !currentUser?.id) {
@@ -6742,12 +6760,9 @@ export default function App() {
       const pending = await hasPendingChanges(nid, currentUser?.id, sessionId);
       if (pending) return;
 
-      // Don't overwrite note currently being edited in modal (debounce may not have fired yet)
-      if (localEditDirtyRef.current === nid) return;
-
-      // Don't overwrite a checklist whose local sync failed (no queue item exists,
-      // but IDB has the correct local data — dirty flag may have been reused by another note)
-      if (unsafeChecklistNoteIdRef.current === nid) return;
+      // Don't overwrite note with active local protection (debounce, pending IDB write,
+      // in-flight enqueue, or failed enqueue not yet recovered)
+      if (isLocallyProtected(nid)) return;
 
       try {
         const serverNote = await api(`/notes/${nid}`, { token });
@@ -7032,14 +7047,12 @@ export default function App() {
       });
     } catch (e) {
       console.error("Drawing enqueue failed:", e);
-      // Don't clear dirty flag on failure — keep SSE protection active
+      // Don't remove protection on failure — keep SSE guard active
       return;
     }
 
-    // Only NOW is it safe to release dirty flag — queue item exists
-    if (localEditDirtyRef.current === noteId) {
-      localEditDirtyRef.current = null;
-    }
+    // Queue item exists — safe to release draw protection for this noteId
+    removeLocalProtection(noteId, "draw-pending");
   }, [currentUser?.id, sessionId, enqueueAndSync]);
 
   // Auto-save drawing changes (local-first)
@@ -7058,10 +7071,10 @@ export default function App() {
     );
     if (prevJson === currentJson) return;
 
-    // Mark dirty BEFORE debounce fires — protects against SSE patchSingleNote()
-    // overwriting local drawing state during the 500ms debounce window.
+    // Protect BEFORE debounce fires — prevents SSE patchSingleNote()
+    // from overwriting local drawing state during the 500ms debounce window.
     const dirtyNoteId = String(activeId);
-    localEditDirtyRef.current = dirtyNoteId;
+    addLocalProtection(dirtyNoteId, "draw-pending");
 
     // Store pending payload so flush can pick it up if modal closes mid-debounce
     pendingDrawingSaveRef.current = { noteId: dirtyNoteId, drawingData: mDrawingData };
@@ -8213,16 +8226,19 @@ export default function App() {
     invalidateNotesCache();
 
     // Enqueue targeted patch (only the changed fields)
-    await enqueueAndSync({
-      type: "patch",
-      noteId: nId,
-      payload: { ...fields, type: "text" },
-    });
-    // hasPendingChanges() now returns true → SSE protection via queue takes over
-    // Clear the dirty ref only if it still points to this note
-    if (localEditDirtyRef.current === nId) {
-      localEditDirtyRef.current = null;
+    try {
+      await enqueueAndSync({
+        type: "patch",
+        noteId: nId,
+        payload: { ...fields, type: "text" },
+      });
+    } catch (e) {
+      console.error("Text enqueue failed:", e);
+      // Don't remove protection on failure — keep SSE guard active
+      return;
     }
+    // hasPendingChanges() now returns true → SSE protection via queue takes over
+    removeLocalProtection(nId, "text-pending");
   }, [enqueueAndSync]);
 
   // Local-first auto-save for text metadata (color, tags, images) — immediate, no debounce
@@ -8237,8 +8253,8 @@ export default function App() {
 
     if (!colorChanged && !tagsChanged && !imagesChanged) return;
 
-    // Mark note as locally dirty before enqueue (protects against SSE overwrite)
-    localEditDirtyRef.current = String(activeId);
+    // Protect note before async enqueue (prevents SSE overwrite)
+    addLocalProtection(String(activeId), "text-pending");
 
     // Build patch with only changed metadata fields
     const metaPatch = {};
@@ -8267,9 +8283,9 @@ export default function App() {
     const contentChanged = initial.content !== mBody;
     if (!titleChanged && !contentChanged) return;
 
-    // Mark note as locally dirty IMMEDIATELY (before debounce fires).
-    // This protects against SSE overwriting IDB during the debounce window.
-    localEditDirtyRef.current = String(activeId);
+    // Protect IMMEDIATELY (before debounce fires).
+    // Prevents SSE overwriting IDB during the debounce window.
+    addLocalProtection(String(activeId), "text-pending");
 
     const timeoutId = setTimeout(() => {
       // Build patch with only changed content fields
@@ -8355,14 +8371,9 @@ export default function App() {
       }
     }
 
-    // Clear dirty flag, but never for:
-    // - Draw notes: owned by async flushPendingDrawingSave
-    // - A checklist noteId still waiting for its queue write to complete
-    //   (unsafeChecklistNoteIdRef is non-null and matches the dirty noteId)
-    const unsafeCl = unsafeChecklistNoteIdRef.current;
-    if (mType !== "draw" && !(unsafeCl && localEditDirtyRef.current === unsafeCl)) {
-      localEditDirtyRef.current = null;
-    }
+    // No dirty flag management needed here — each flow (text, draw, checklist)
+    // owns its own protection via addLocalProtection/removeLocalProtection,
+    // released only after successful enqueueAndSync.
 
     // Start exit animation, then actually unmount after it completes
     setIsModalClosing(true);
@@ -8641,10 +8652,9 @@ export default function App() {
     const noteId = String(activeId);
     const nowIso = new Date().toISOString();
 
-    // Mark dirty and unsafe BEFORE any async work — protects against SSE
-    // patchSingleNote() and prevents closeModal() from clearing dirty prematurely.
-    localEditDirtyRef.current = noteId;
-    unsafeChecklistNoteIdRef.current = noteId;
+    // Protect BEFORE any async work — prevents SSE patchSingleNote() from
+    // overwriting local checklist state during the IDB write + enqueue window.
+    addLocalProtection(noteId, "checklist-sync");
 
     // Update notes state
     setNotes((prev) =>
@@ -8673,19 +8683,12 @@ export default function App() {
       });
     } catch (e) {
       console.error("Checklist enqueue failed:", e);
-      // Don't release dirty flag or unsafe ref on failure.
-      // Keeps closeModal() from clearing dirty prematurely since no queue item exists.
-      // Next successful syncChecklistItems call will reset both.
+      // Don't remove protection on failure — keep SSE guard active.
+      // Next successful syncChecklistItems call will remove it.
       return;
     }
-    // Queue item exists — safe to release protection for this noteId
-    if (unsafeChecklistNoteIdRef.current === noteId) {
-      unsafeChecklistNoteIdRef.current = null;
-    }
-    // Release dirty flag only if still ours (a newer edit may have re-set it)
-    if (localEditDirtyRef.current === noteId) {
-      localEditDirtyRef.current = null;
-    }
+    // Queue item exists — safe to release checklist protection
+    removeLocalProtection(noteId, "checklist-sync");
   };
 
   const onChecklistDragStart = (itemId, ev) => {
