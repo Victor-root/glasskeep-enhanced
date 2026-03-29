@@ -5716,18 +5716,12 @@ export default function App() {
     }
     releaseLocalLeaseWithPrune(noteId, leaseId);
   };
-  // Batch variant: acquire leases for multiple notes, enqueue one action,
-  // prune all on success. Used by reorder (one queue item, many affected notes).
-  const enqueueWithLeases = async (noteLeases, syncAction) => {
-    try {
-      await enqueueAndSync(syncAction);
-    } catch (e) {
-      return; // all leases stay active
-    }
-    for (const { noteId, leaseId } of noteLeases) {
-      releaseLocalLeaseWithPrune(noteId, leaseId);
-    }
-  };
+  // ─── Pending reorder leases ───
+  // Reorder queue items use noteId:"__reorder__", so hasPendingChanges(realNoteId)
+  // returns false after enqueue. We hold per-note leases here until onSyncComplete
+  // confirms the reorder server-side. Map<reorderToken, Array<{noteId, leaseId}>>
+  const pendingReorderLeasesRef = useRef(new Map());
+  const reorderTokenSeqRef = useRef(0);
 
   // ─── Permanent-delete tombstones ───
   // When a note is permanently deleted locally but not yet confirmed by the
@@ -6274,6 +6268,16 @@ export default function App() {
             const nid = String(item.noteId);
             try { await idbDeleteNote(nid, uid, sid); } catch {}
             removeDeleteTombstone(nid);
+          } else if (item.type === "reorder" && item.payload?._reorderToken) {
+            // Server confirmed reorder — release held per-note leases
+            const token = item.payload._reorderToken;
+            const leases = pendingReorderLeasesRef.current.get(token);
+            if (leases) {
+              for (const { noteId, leaseId } of leases) {
+                releaseLocalLeaseWithPrune(noteId, leaseId);
+              }
+              pendingReorderLeasesRef.current.delete(token);
+            }
           }
         } catch (e) {
           console.error("[Sync] reconciliation error:", e);
@@ -7419,9 +7423,10 @@ export default function App() {
       idbClearNotesForSession(userId, sid).catch(() => {});
       idbClearQueueForSession(userId, sid).catch(() => {});
     }
-    // Clear all local leases + delete tombstones — no zombies between sessions
+    // Clear all local leases, delete tombstones, pending reorder refs — no zombies between sessions
     clearAllLocalLeases();
     localDeleteTombstoneRef.current.clear();
+    pendingReorderLeasesRef.current.clear();
     // Tear down sync engine
     if (syncEngineRef.current) {
       syncEngineRef.current.destroy();
@@ -8685,7 +8690,7 @@ export default function App() {
     });
 
     // Acquire a lease per note BEFORE any local write — protects positions
-    // from being overwritten by loaders / SSE until reorder reaches the queue.
+    // from being overwritten by loaders / SSE until server confirms reorder.
     const noteLeases = sorted.map((n) => {
       const nid = String(n.id);
       return { noteId: nid, leaseId: acquireLocalLease(nid) };
@@ -8711,7 +8716,14 @@ export default function App() {
 
     const pinnedIds = sorted.filter((n) => n.pinned).map((n) => String(n.id));
     const otherIds = sorted.filter((n) => !n.pinned).map((n) => String(n.id));
-    enqueueWithLeases(noteLeases, { type: "reorder", noteId: "__reorder__", payload: { pinnedIds, otherIds } });
+    // Hold leases until onSyncComplete confirms server-side
+    const reorderToken = `R${++reorderTokenSeqRef.current}`;
+    pendingReorderLeasesRef.current.set(reorderToken, noteLeases);
+    try {
+      await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds, otherIds, _reorderToken: reorderToken } });
+    } catch (e) {
+      // enqueue failed — leases stay active
+    }
     showToast?.(t("noteOrderReset"));
   };
 
@@ -8788,8 +8800,15 @@ export default function App() {
 
     invalidateNotesCache();
 
-    // Enqueue reorder for server sync — leases protect all notes until queue takes over
-    enqueueWithLeases(noteLeases, { type: "reorder", noteId: "__reorder__", payload: { pinnedIds: newPinned, otherIds: newOthers } });
+    // Enqueue reorder — leases are held until onSyncComplete confirms server-side.
+    // Tag payload with token so onSyncComplete can find and release the leases.
+    const reorderToken = `R${++reorderTokenSeqRef.current}`;
+    pendingReorderLeasesRef.current.set(reorderToken, noteLeases);
+    try {
+      await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds: newPinned, otherIds: newOthers, _reorderToken: reorderToken } });
+    } catch (e) {
+      // enqueue failed — leases stay active (SSE protection maintained)
+    }
     dragGroup.current = null;
   };
   const onDragEnd = (ev) => {
