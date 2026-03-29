@@ -5512,6 +5512,8 @@ export default function App() {
   // Modal state
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState(null);
+  const activeIdRef = useRef(null);
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
   const [mType, setMType] = useState("text");
   const [mTitle, setMTitle] = useState("");
   const [mBody, setMBody] = useState("");
@@ -6970,6 +6972,11 @@ export default function App() {
               if (!isDeleteTombstoned(nid)) {
                 setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
                 idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
+                // If this note is currently open in the modal, force-close
+                // without triggering any save/flush (the note no longer exists)
+                if (String(activeIdRef.current) === nid) {
+                  forceCloseModalForRemoteDelete(nid);
+                }
               }
             }
           } catch (_) {}
@@ -8488,6 +8495,47 @@ export default function App() {
       setMColor(serverState.color);
     }
   }, [notes, open, activeId, hasNoteBeenModified]);
+
+  // Force-close modal without any save/flush — used when a remote session
+  // permanently deletes the note that is currently open. Must not trigger
+  // autoSaveTextNote, flushPendingDrawingSave, or any enqueueAndSync.
+  const forceCloseModalForRemoteDelete = (noteId) => {
+    const nid = String(noteId);
+
+    // Cancel any pending drawing debounce so flush never fires.
+    // Release the lease since the note no longer exists.
+    const pending = pendingDrawingSaveRef.current;
+    if (pending && String(pending.noteId) === nid) {
+      if (drawingDebounceTimerRef.current) {
+        clearTimeout(drawingDebounceTimerRef.current);
+        drawingDebounceTimerRef.current = null;
+      }
+      if (pending.leaseId) releaseLocalLease(nid, pending.leaseId);
+      pendingDrawingSaveRef.current = null;
+    }
+
+    // Cancel in-flight close animation (if any)
+    if (modalClosingTimerRef.current) {
+      clearTimeout(modalClosingTimerRef.current);
+      modalClosingTimerRef.current = null;
+    }
+
+    // Clean up history state without going through closeModal
+    if (modalHistoryRef.current) {
+      modalHistoryRef.current = false;
+      window.history.back();
+    }
+
+    // Reset all modal state immediately — no animation, no save
+    setOpen(false);
+    setActiveId(null);
+    setViewMode(true);
+    setModalMenuOpen(false);
+    setConfirmDeleteOpen(false);
+    setShowModalFmt(false);
+    setIsModalClosing(false);
+    setImgViewOpen(false);
+  };
 
   const closeModal = () => {
     // Prevent double-triggering while exit animation is running
