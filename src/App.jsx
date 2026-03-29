@@ -6152,11 +6152,22 @@ export default function App() {
           if (!uid || !sid) return;
 
           if (item.type === "create" && result && result.id) {
-            // Server returned canonical note — write to IDB if no newer local edit is pending
+            // Server returned canonical note — reconcile if no newer local edit is pending
             const nid = String(result.id);
             const pending = await hasPendingChanges(nid, uid, sid);
             if (!pending) {
               await idbPutNote(result, uid, sid);
+              // Update React state: replace optimistic note with server canonical version
+              setNotes((prev) => {
+                const idx = prev.findIndex((n) => String(n.id) === nid);
+                if (idx !== -1) {
+                  const updated = prev.slice();
+                  updated[idx] = { ...prev[idx], ...result };
+                  return updated;
+                }
+                // Note not in current view (e.g. archived/trashed) — skip
+                return prev;
+              });
             }
           } else if (item.type === "permanentDelete" && item.noteId) {
             // Server confirmed permanent deletion — remove stale cache entry
