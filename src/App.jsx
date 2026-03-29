@@ -5559,7 +5559,7 @@ export default function App() {
   const [mItems, setMItems] = useState([]);
   const skipNextItemsAutosave = useRef(false);
   const prevItemsRef = useRef([]);
-  const checklistSyncInFlightRef = useRef(false);
+  const unsafeChecklistNoteIdRef = useRef(null); // noteId whose checklist sync hasn't completed
   const [mInput, setMInput] = useState("");
 
   // Drawing modal
@@ -8351,11 +8351,12 @@ export default function App() {
       }
     }
 
-    // Clear dirty flag for non-draw, non-in-flight-checklist notes.
-    // Draw: dirty flag managed by async flushPendingDrawingSave.
-    // Checklist with sync in flight: dirty flag managed by syncChecklistItems
-    // (cleared only after queue write completes).
-    if (mType !== "draw" && !(mType === "checklist" && checklistSyncInFlightRef.current)) {
+    // Clear dirty flag, but never for:
+    // - Draw notes: owned by async flushPendingDrawingSave
+    // - A checklist noteId still waiting for its queue write to complete
+    //   (unsafeChecklistNoteIdRef is non-null and matches the dirty noteId)
+    const unsafeCl = unsafeChecklistNoteIdRef.current;
+    if (mType !== "draw" && !(unsafeCl && localEditDirtyRef.current === unsafeCl)) {
       localEditDirtyRef.current = null;
     }
 
@@ -8636,10 +8637,10 @@ export default function App() {
     const noteId = String(activeId);
     const nowIso = new Date().toISOString();
 
-    // Mark dirty and in-flight BEFORE any async work — protects against SSE
+    // Mark dirty and unsafe BEFORE any async work — protects against SSE
     // patchSingleNote() and prevents closeModal() from clearing dirty prematurely.
     localEditDirtyRef.current = noteId;
-    checklistSyncInFlightRef.current = true;
+    unsafeChecklistNoteIdRef.current = noteId;
 
     // Update notes state
     setNotes((prev) =>
@@ -8668,12 +8669,15 @@ export default function App() {
       });
     } catch (e) {
       console.error("Checklist enqueue failed:", e);
-      // Don't release dirty flag OR in-flight flag on failure.
+      // Don't release dirty flag or unsafe ref on failure.
       // Keeps closeModal() from clearing dirty prematurely since no queue item exists.
-      // Next successful syncChecklistItems call will reset both flags.
+      // Next successful syncChecklistItems call will reset both.
       return;
     }
-    checklistSyncInFlightRef.current = false;
+    // Queue item exists — safe to release protection for this noteId
+    if (unsafeChecklistNoteIdRef.current === noteId) {
+      unsafeChecklistNoteIdRef.current = null;
+    }
     // Release dirty flag only if still ours (a newer edit may have re-set it)
     if (localEditDirtyRef.current === noteId) {
       localEditDirtyRef.current = null;
