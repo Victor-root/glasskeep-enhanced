@@ -6175,7 +6175,7 @@ export default function App() {
   //   - syncStatus (React state)     ← ONLY written by syncEngine.onStatusChange + reset points
   //   - IndexedDB syncQueue          ← ONLY written by idbEnqueue + syncEngine queue updates
   //   - IndexedDB notes store        ← Written by load functions, auto-save, patchSingleNote
-  //   - localLeaseRef                 ← Per-noteId lease-based SSE protection (Map<noteId, Map<leaseId, true>>)
+  //   - localLeaseRef                 ← Per-noteId lease-based SSE protection (Map<noteId, Map<leaseId, { seq }>>); success prunes older leases
   //
   useEffect(() => {
     if (!token || !currentUser?.id) {
