@@ -5559,6 +5559,7 @@ export default function App() {
   const [mItems, setMItems] = useState([]);
   const skipNextItemsAutosave = useRef(false);
   const prevItemsRef = useRef([]);
+  const checklistSyncInFlightRef = useRef(false);
   const [mInput, setMInput] = useState("");
 
   // Drawing modal
@@ -8350,9 +8351,11 @@ export default function App() {
       }
     }
 
-    // Clear dirty flag for non-draw notes — draw notes' dirty flag is managed
-    // by the async flushPendingDrawingSave (cleared only after queue write).
-    if (mType !== "draw") {
+    // Clear dirty flag for non-draw, non-in-flight-checklist notes.
+    // Draw: dirty flag managed by async flushPendingDrawingSave.
+    // Checklist with sync in flight: dirty flag managed by syncChecklistItems
+    // (cleared only after queue write completes).
+    if (mType !== "draw" && !(mType === "checklist" && checklistSyncInFlightRef.current)) {
       localEditDirtyRef.current = null;
     }
 
@@ -8633,9 +8636,10 @@ export default function App() {
     const noteId = String(activeId);
     const nowIso = new Date().toISOString();
 
-    // Mark dirty BEFORE any async work — protects against SSE patchSingleNote()
-    // overwriting local checklist state during the IDB write + enqueue window.
+    // Mark dirty and in-flight BEFORE any async work — protects against SSE
+    // patchSingleNote() and prevents closeModal() from clearing dirty prematurely.
     localEditDirtyRef.current = noteId;
+    checklistSyncInFlightRef.current = true;
 
     // Update notes state
     setNotes((prev) =>
@@ -8665,8 +8669,10 @@ export default function App() {
     } catch (e) {
       console.error("Checklist enqueue failed:", e);
       // Don't release dirty flag on failure — keep SSE protection
+      checklistSyncInFlightRef.current = false;
       return;
     }
+    checklistSyncInFlightRef.current = false;
     // Release dirty flag only if still ours (a newer edit may have re-set it)
     if (localEditDirtyRef.current === noteId) {
       localEditDirtyRef.current = null;
