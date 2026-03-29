@@ -5706,6 +5706,16 @@ export default function App() {
   const clearAllLocalLeases = () => {
     localLeaseRef.current.clear();
   };
+  // Acquire lease → await enqueue → prune on success. Lease stays on failure.
+  // Caller acquires lease BEFORE local mutations, passes leaseId here.
+  const enqueueWithLease = async (noteId, syncAction, leaseId) => {
+    try {
+      await enqueueAndSync(syncAction);
+    } catch (e) {
+      return; // lease stays active — SSE protection maintained
+    }
+    releaseLocalLeaseWithPrune(noteId, leaseId);
+  };
   // Remove lazy loading state
 
   // -------- Multi-select state --------
@@ -5862,8 +5872,10 @@ export default function App() {
         onConfirm: async () => {
           const count = selectedIds.length;
           for (const id of selectedIds) {
-            try { await idbDeleteNote(String(id), currentUser?.id, sessionId); } catch (e) { console.error(e); }
-            enqueueAndSync({ type: "permanentDelete", noteId: String(id) });
+            const nid = String(id);
+            const leaseId = acquireLocalLease(nid);
+            try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
+            await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid }, leaseId);
           }
           invalidateTrashedNotesCache();
           setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
@@ -5880,11 +5892,13 @@ export default function App() {
         onConfirm: async () => {
           const count = selectedIds.length;
           for (const id of selectedIds) {
+            const nid = String(id);
+            const leaseId = acquireLocalLease(nid);
             try {
-              const existing = await idbGetNote(String(id), currentUser?.id, sessionId);
+              const existing = await idbGetNote(nid, currentUser?.id, sessionId);
               if (existing) await idbPutNote({ ...existing, trashed: true }, currentUser?.id, sessionId);
             } catch (e) { console.error(e); }
-            enqueueAndSync({ type: "trash", noteId: String(id) });
+            await enqueueWithLease(nid, { type: "trash", noteId: nid }, leaseId);
           }
           invalidateNotesCache();
           invalidateArchivedNotesCache();
@@ -5908,11 +5922,13 @@ export default function App() {
       ),
     );
     for (const id of selectedIds) {
+      const nid = String(id);
+      const leaseId = acquireLocalLease(nid);
       try {
-        const existing = await idbGetNote(String(id), currentUser?.id, sessionId);
+        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
         if (existing) await idbPutNote({ ...existing, pinned: !!pinnedVal }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
-      enqueueAndSync({ type: "patch", noteId: String(id), payload: { pinned: !!pinnedVal } });
+      await enqueueWithLease(nid, { type: "patch", noteId: nid, payload: { pinned: !!pinnedVal } }, leaseId);
     }
     invalidateNotesCache();
     invalidateArchivedNotesCache();
@@ -5922,11 +5938,13 @@ export default function App() {
     if (!selectedIds.length) return;
     const count = selectedIds.length;
     for (const id of selectedIds) {
+      const nid = String(id);
+      const leaseId = acquireLocalLease(nid);
       try {
-        const existing = await idbGetNote(String(id), currentUser?.id, sessionId);
+        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
         if (existing) await idbPutNote({ ...existing, trashed: false }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
-      enqueueAndSync({ type: "restore", noteId: String(id) });
+      await enqueueWithLease(nid, { type: "restore", noteId: nid }, leaseId);
     }
     invalidateNotesCache();
     invalidateArchivedNotesCache();
@@ -5946,11 +5964,13 @@ export default function App() {
     // Local-first: update IndexedDB + UI, then enqueue
     setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
     for (const id of selectedIds) {
+      const nid = String(id);
+      const leaseId = acquireLocalLease(nid);
       try {
-        const existing = await idbGetNote(String(id), currentUser?.id, sessionId);
+        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
         if (existing) await idbPutNote({ ...existing, archived: !!archivedValue }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
-      enqueueAndSync({ type: "archive", noteId: String(id), payload: { archived: !!archivedValue } });
+      await enqueueWithLease(nid, { type: "archive", noteId: nid, payload: { archived: !!archivedValue } }, leaseId);
     }
     invalidateNotesCache();
     invalidateArchivedNotesCache();
@@ -5972,6 +5992,9 @@ export default function App() {
     const note = notes.find((n) => String(n.id) === String(noteId));
     if (!note) return;
 
+    const nid = String(noteId);
+    const leaseId = acquireLocalLease(nid);
+
     const updatedItems = (note.items || []).map((item) =>
       item.id === itemId ? { ...item, done: checked } : item,
     );
@@ -5979,16 +6002,16 @@ export default function App() {
 
     // Local-first: update UI + IndexedDB, then enqueue
     setNotes((prev) =>
-      prev.map((n) => (String(n.id) === String(noteId) ? updatedNote : n)),
+      prev.map((n) => (String(n.id) === nid ? updatedNote : n)),
     );
     try {
-      const existing = await idbGetNote(String(noteId), currentUser?.id, sessionId);
+      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
       if (existing) await idbPutNote({ ...existing, items: updatedItems }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
 
     invalidateNotesCache();
     invalidateArchivedNotesCache();
-    enqueueAndSync({ type: "patch", noteId: String(noteId), payload: { items: updatedItems, type: "checklist", content: "" } });
+    await enqueueWithLease(nid, { type: "patch", noteId: nid, payload: { items: updatedItems, type: "checklist", content: "" } }, leaseId);
   };
 
   const onBulkColor = async (colorName) => {
@@ -5999,11 +6022,13 @@ export default function App() {
       ),
     );
     for (const id of selectedIds) {
+      const nid = String(id);
+      const leaseId = acquireLocalLease(nid);
       try {
-        const existing = await idbGetNote(String(id), currentUser?.id, sessionId);
+        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
         if (existing) await idbPutNote({ ...existing, color: colorName }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
-      enqueueAndSync({ type: "patch", noteId: String(id), payload: { color: colorName } });
+      await enqueueWithLease(nid, { type: "patch", noteId: nid, payload: { color: colorName } }, leaseId);
     }
   };
 
@@ -7493,6 +7518,7 @@ export default function App() {
       archived: false,
       trashed: false,
     };
+    const leaseId = acquireLocalLease(String(newNote.id));
     try {
       await idbPutNote(localNote, currentUser?.id, sessionId);
     } catch (e) {
@@ -7505,8 +7531,8 @@ export default function App() {
     );
     invalidateNotesCache();
 
-    // Enqueue for server sync
-    enqueueAndSync({ type: "create", noteId: newNote.id, payload: newNote });
+    // Enqueue for server sync (lease protects until queue takes over)
+    enqueueWithLease(String(newNote.id), { type: "create", noteId: newNote.id, payload: newNote }, leaseId);
 
     // Reset composer immediately (don't wait for server)
     setTitle("");
@@ -7534,9 +7560,12 @@ export default function App() {
 
   /** -------- Archive/Unarchive note -------- */
   const handleArchiveNote = async (noteId, archived) => {
+    const nid = String(noteId);
+    const leaseId = acquireLocalLease(nid);
+
     // Local-first: apply archive state immediately
     try {
-      const existing = await idbGetNote(String(noteId), currentUser?.id, sessionId);
+      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
       if (existing) await idbPutNote({ ...existing, archived: !!archived }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
 
@@ -7549,14 +7578,14 @@ export default function App() {
     if (tagFilter === "ARCHIVED") {
       if (!archived) {
         // Unarchiving from archived view — switch view and remove from list
-        setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
+        setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
         setTagFilter(null);
       }
       // If archiving within archived view, note stays (no-op)
     } else {
       if (archived) {
         // Archiving from normal view — remove from list
-        setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
+        setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       }
       // If unarchiving from normal view, note stays (no-op)
     }
@@ -7565,8 +7594,8 @@ export default function App() {
       closeModal();
     }
 
-    // Enqueue for server sync
-    enqueueAndSync({ type: "archive", noteId: String(noteId), payload: { archived: !!archived } });
+    // Enqueue for server sync (lease protects until queue takes over)
+    await enqueueWithLease(nid, { type: "archive", noteId: nid, payload: { archived: !!archived } }, leaseId);
   };
 
   /** -------- Admin Panel Functions -------- */
@@ -8506,6 +8535,7 @@ export default function App() {
         lastEditedAt: nowIso,
       };
 
+      const leaseId = acquireLocalLease(noteId);
       try {
         const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
         if (existing) {
@@ -8521,7 +8551,7 @@ export default function App() {
         ),
       );
       invalidateNotesCache();
-      enqueueAndSync({ type: "update", noteId, payload });
+      await enqueueWithLease(noteId, { type: "update", noteId, payload }, leaseId);
     }
 
     setSavingModal(false);
@@ -8535,58 +8565,65 @@ export default function App() {
       return;
     }
 
+    const nid = String(activeId);
+    const leaseId = acquireLocalLease(nid);
+
     if (tagFilter === "TRASHED") {
       // Local-first: permanent delete
-      try { await idbDeleteNote(String(activeId), currentUser?.id, sessionId); } catch (e) { console.error(e); }
+      try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
       invalidateTrashedNotesCache();
-      setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
+      setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("notePermanentlyDeleted"), "success");
-      enqueueAndSync({ type: "permanentDelete", noteId: String(activeId) });
+      await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid }, leaseId);
     } else {
       // Local-first: move to trash
       try {
-        const existing = await idbGetNote(String(activeId), currentUser?.id, sessionId);
+        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
         if (existing) await idbPutNote({ ...existing, trashed: true }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
       invalidateNotesCache();
       invalidateArchivedNotesCache();
       invalidateTrashedNotesCache();
-      setNotes((prev) => prev.filter((n) => String(n.id) !== String(activeId)));
+      setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("noteMovedToTrash"), "success");
-      enqueueAndSync({ type: "trash", noteId: String(activeId) });
+      await enqueueWithLease(nid, { type: "trash", noteId: nid }, leaseId);
     }
   };
 
   const restoreFromTrash = async (noteId) => {
+    const nid = String(noteId);
+    const leaseId = acquireLocalLease(nid);
     // Local-first: restore immediately
     try {
-      const existing = await idbGetNote(String(noteId), currentUser?.id, sessionId);
+      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
       if (existing) await idbPutNote({ ...existing, trashed: false }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
     invalidateNotesCache();
     invalidateArchivedNotesCache();
     invalidateTrashedNotesCache();
-    setNotes((prev) => prev.filter((n) => String(n.id) !== String(noteId)));
+    setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
     closeModal();
     showToast(t("noteRestoredFromTrash"), "success");
-    enqueueAndSync({ type: "restore", noteId: String(noteId) });
+    await enqueueWithLease(nid, { type: "restore", noteId: nid }, leaseId);
   };
   const togglePin = async (id, toPinned) => {
+    const nid = String(id);
+    const leaseId = acquireLocalLease(nid);
     // Local-first: apply pin immediately
     try {
-      const existing = await idbGetNote(String(id), currentUser?.id, sessionId);
+      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
       if (existing) await idbPutNote({ ...existing, pinned: !!toPinned }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
     invalidateNotesCache();
 
     setNotes((prev) =>
       prev.map((n) =>
-        String(n.id) === String(id) ? { ...n, pinned: !!toPinned } : n,
+        String(n.id) === nid ? { ...n, pinned: !!toPinned } : n,
       ),
     );
-    enqueueAndSync({ type: "patch", noteId: String(id), payload: { pinned: !!toPinned } });
+    await enqueueWithLease(nid, { type: "patch", noteId: nid, payload: { pinned: !!toPinned } }, leaseId);
   };
 
   /** -------- Reset note order -------- */
