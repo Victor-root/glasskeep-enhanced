@@ -7040,24 +7040,38 @@ export default function App() {
 
     const pollTimeout = setTimeout(startPolling, 15000);
 
-    // Visibility change: reconnect SSE if dead, trigger SyncEngine
-    // No full reload — trust SSE to have kept state up to date
+    // Visibility change: reconnect SSE if dead, kick sync engine recovery.
+    // CRITICAL: use the engine's healthCheck() — NOT a separate api("/health") —
+    // so that _serverReachable gets updated. Without this, processQueue()
+    // early-exits when _serverReachable===false (stuck "offline" on mobile
+    // after the health-check timer chain breaks during tab suspension).
     const handleVisibilityChange = async () => {
       if (document.visibilityState !== "visible") return;
 
-      // Reconnect SSE if needed
-      if (es && es.readyState === EventSource.CLOSED) {
+      const engine = syncEngineRef.current;
+
+      // Run engine health check — this updates _serverReachable and
+      // auto-triggers processQueue on recovery. Also restarts the
+      // health timer chain if it was broken by tab suspension.
+      if (engine) {
+        const ok = await engine.healthCheck();
+        // Restart the health timer chain unconditionally — mobile browsers
+        // may have GC'd the previous setTimeout during background suspension.
+        engine.restartHealthTimer();
+
+        // Reconnect SSE if dead and server is reachable
+        if (ok && es && es.readyState === EventSource.CLOSED) {
+          connectSSE();
+        }
+      } else if (es && es.readyState === EventSource.CLOSED) {
+        // No engine but SSE dead — try to reconnect SSE anyway
         try {
           await api("/health", { token });
           connectSSE();
         } catch (error) {
           if (error.status === 401) return;
-          // Server might be down, ignore
         }
       }
-
-      // Trigger sync engine to process any pending queue items
-      triggerSync();
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -7066,10 +7080,15 @@ export default function App() {
     const handleOnline = () => {
       setIsOnline(true);
       // Browser detected network recovery — run health check first,
-      // then process queue if server is reachable
-      syncEngineRef.current?.healthCheck().then((ok) => {
-        if (ok) triggerSync();
-      });
+      // then process queue if server is reachable.
+      // Also restart health timer chain (may have broken while offline).
+      const engine = syncEngineRef.current;
+      if (engine) {
+        engine.healthCheck().then((ok) => {
+          engine.restartHealthTimer();
+          if (ok) triggerSync();
+        });
+      }
       // Reconnect SSE if it was dead
       if (es && es.readyState === EventSource.CLOSED) {
         reconnectAttempts = 0;

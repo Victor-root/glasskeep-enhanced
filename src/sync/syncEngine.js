@@ -370,6 +370,16 @@ export class SyncEngine {
     this._scheduleNextHealth();
   }
 
+  /**
+   * Restart the health-check timer chain without firing an immediate check.
+   * Use after an explicit healthCheck() call to ensure the periodic chain
+   * hasn't been broken (e.g. by mobile tab suspension GC'ing the timer).
+   */
+  restartHealthTimer() {
+    this.stopHealthChecks();
+    this._scheduleNextHealth();
+  }
+
   stopHealthChecks() {
     if (this._healthTimer) {
       clearTimeout(this._healthTimer);
