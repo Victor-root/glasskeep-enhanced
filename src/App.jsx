@@ -5716,6 +5716,18 @@ export default function App() {
     }
     releaseLocalLeaseWithPrune(noteId, leaseId);
   };
+  // Batch variant: acquire leases for multiple notes, enqueue one action,
+  // prune all on success. Used by reorder (one queue item, many affected notes).
+  const enqueueWithLeases = async (noteLeases, syncAction) => {
+    try {
+      await enqueueAndSync(syncAction);
+    } catch (e) {
+      return; // all leases stay active
+    }
+    for (const { noteId, leaseId } of noteLeases) {
+      releaseLocalLeaseWithPrune(noteId, leaseId);
+    }
+  };
 
   // ─── Permanent-delete tombstones ───
   // When a note is permanently deleted locally but not yet confirmed by the
@@ -8672,6 +8684,13 @@ export default function App() {
       return bCre - aCre;
     });
 
+    // Acquire a lease per note BEFORE any local write — protects positions
+    // from being overwritten by loaders / SSE until reorder reaches the queue.
+    const noteLeases = sorted.map((n) => {
+      const nid = String(n.id);
+      return { noteId: nid, leaseId: acquireLocalLease(nid) };
+    });
+
     // Assign new position values so the order persists across reloads
     if (overridePositions) {
       const now = Date.now();
@@ -8692,7 +8711,7 @@ export default function App() {
 
     const pinnedIds = sorted.filter((n) => n.pinned).map((n) => String(n.id));
     const otherIds = sorted.filter((n) => !n.pinned).map((n) => String(n.id));
-    enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds, otherIds } });
+    enqueueWithLeases(noteLeases, { type: "reorder", noteId: "__reorder__", payload: { pinnedIds, otherIds } });
     showToast?.(t("noteOrderReset"));
   };
 
@@ -8744,6 +8763,12 @@ export default function App() {
     const positionMap = new Map();
     orderedIds.forEach((id, i) => positionMap.set(id, now - i));
 
+    // Acquire a lease per affected note BEFORE any local write
+    const noteLeases = orderedIds.map((id) => ({
+      noteId: id,
+      leaseId: acquireLocalLease(id),
+    }));
+
     // Optimistic update with positions baked in
     const byId = new Map(notes.map((n) => [String(n.id), n]));
     const reordered = orderedIds.map((id) => {
@@ -8763,8 +8788,8 @@ export default function App() {
 
     invalidateNotesCache();
 
-    // Enqueue reorder for server sync
-    enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds: newPinned, otherIds: newOthers } });
+    // Enqueue reorder for server sync — leases protect all notes until queue takes over
+    enqueueWithLeases(noteLeases, { type: "reorder", noteId: "__reorder__", payload: { pinnedIds: newPinned, otherIds: newOthers } });
     dragGroup.current = null;
   };
   const onDragEnd = (ev) => {
