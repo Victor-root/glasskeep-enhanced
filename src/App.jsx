@@ -5656,25 +5656,37 @@ export default function App() {
   // Loading state for notes
   const [notesLoading, setNotesLoading] = useState(false);
   const notesAreRegular = useRef(true); // tracks whether notes[] holds regular (non-archive/trash) notes
-  // Per-noteId local protection registry: prevents SSE patchSingleNote from overwriting
-  // notes that have unsaved local edits, pending IDB writes, or failed enqueue attempts.
-  // Map<noteId, Set<reason>>  —  a note is protected if it has at least one reason.
-  const localProtectionRef = useRef(new Map());
-  const addLocalProtection = (noteId, reason) => {
-    const map = localProtectionRef.current;
-    if (!map.has(noteId)) map.set(noteId, new Set());
-    map.get(noteId).add(reason);
+
+  // ─── Per-noteId lease-based protection against SSE overwrite ───
+  // Invariant: a note is protected as long as at least one local mutation
+  // hasn't written its queue item (or has explicitly failed and stays guarded).
+  // Each local operation (text save, draw flush, checklist sync) acquires a
+  // unique lease. Two concurrent operations on the same note each hold their
+  // own lease — finishing one cannot accidentally release the other's protection.
+  // Map<noteId, Map<leaseId, true>>
+  const localLeaseRef = useRef(new Map());
+  const leaseSeqRef = useRef(0);
+
+  const acquireLocalLease = (noteId) => {
+    const leaseId = `L${++leaseSeqRef.current}`;
+    const map = localLeaseRef.current;
+    if (!map.has(noteId)) map.set(noteId, new Map());
+    map.get(noteId).set(leaseId, true);
+    return leaseId;
   };
-  const removeLocalProtection = (noteId, reason) => {
-    const map = localProtectionRef.current;
-    const reasons = map.get(noteId);
-    if (!reasons) return;
-    reasons.delete(reason);
-    if (reasons.size === 0) map.delete(noteId);
+  const releaseLocalLease = (noteId, leaseId) => {
+    const map = localLeaseRef.current;
+    const leases = map.get(noteId);
+    if (!leases) return;
+    leases.delete(leaseId);
+    if (leases.size === 0) map.delete(noteId);
   };
-  const isLocallyProtected = (noteId) => {
-    const reasons = localProtectionRef.current.get(noteId);
-    return !!reasons && reasons.size > 0;
+  const isNoteLocallyProtected = (noteId) => {
+    const leases = localLeaseRef.current.get(noteId);
+    return !!leases && leases.size > 0;
+  };
+  const clearAllLocalLeases = () => {
+    localLeaseRef.current.clear();
   };
   // Remove lazy loading state
 
@@ -6145,7 +6157,7 @@ export default function App() {
   //   - syncStatus (React state)     ← ONLY written by syncEngine.onStatusChange + reset points
   //   - IndexedDB syncQueue          ← ONLY written by idbEnqueue + syncEngine queue updates
   //   - IndexedDB notes store        ← Written by load functions, auto-save, patchSingleNote
-  //   - localProtectionRef            ← Per-noteId protection against SSE overwrite (Map<noteId, Set<reason>>)
+  //   - localLeaseRef                 ← Per-noteId lease-based SSE protection (Map<noteId, Map<leaseId, true>>)
   //
   useEffect(() => {
     if (!token || !currentUser?.id) {
@@ -6760,9 +6772,9 @@ export default function App() {
       const pending = await hasPendingChanges(nid, currentUser?.id, sessionId);
       if (pending) return;
 
-      // Don't overwrite note with active local protection (debounce, pending IDB write,
+      // Don't overwrite note with an active local lease (debounce, pending IDB write,
       // in-flight enqueue, or failed enqueue not yet recovered)
-      if (isLocallyProtected(nid)) return;
+      if (isNoteLocallyProtected(nid)) return;
 
       try {
         const serverNote = await api(`/notes/${nid}`, { token });
@@ -7014,7 +7026,7 @@ export default function App() {
       drawingDebounceTimerRef.current = null;
     }
 
-    const { noteId, drawingData } = pending;
+    const { noteId, drawingData, leaseId } = pending;
     prevDrawingRef.current = drawingData;
     const nowIso = new Date().toISOString();
     const drawingContent = JSON.stringify(drawingData);
@@ -7047,12 +7059,12 @@ export default function App() {
       });
     } catch (e) {
       console.error("Drawing enqueue failed:", e);
-      // Don't remove protection on failure — keep SSE guard active
+      // Don't release lease on failure — keep SSE guard active
       return;
     }
 
-    // Queue item exists — safe to release draw protection for this noteId
-    removeLocalProtection(noteId, "draw-pending");
+    // Queue item exists — safe to release this draw lease
+    releaseLocalLease(noteId, leaseId);
   }, [currentUser?.id, sessionId, enqueueAndSync]);
 
   // Auto-save drawing changes (local-first)
@@ -7071,13 +7083,21 @@ export default function App() {
     );
     if (prevJson === currentJson) return;
 
-    // Protect BEFORE debounce fires — prevents SSE patchSingleNote()
-    // from overwriting local drawing state during the 500ms debounce window.
     const dirtyNoteId = String(activeId);
-    addLocalProtection(dirtyNoteId, "draw-pending");
 
-    // Store pending payload so flush can pick it up if modal closes mid-debounce
-    pendingDrawingSaveRef.current = { noteId: dirtyNoteId, drawingData: mDrawingData };
+    // Release the lease from the previous superseded debounce (if it didn't fire yet).
+    // If it DID fire, flush already consumed pendingDrawingSaveRef (set to null).
+    const prev = pendingDrawingSaveRef.current;
+    if (prev && prev.leaseId) {
+      releaseLocalLease(prev.noteId, prev.leaseId);
+    }
+
+    // Acquire a fresh lease BEFORE debounce fires — prevents SSE patchSingleNote()
+    // from overwriting local drawing state during the 500ms debounce window.
+    const leaseId = acquireLocalLease(dirtyNoteId);
+
+    // Store pending payload + lease so flush can pick it up if modal closes mid-debounce
+    pendingDrawingSaveRef.current = { noteId: dirtyNoteId, drawingData: mDrawingData, leaseId };
 
     // Debounce local-first save by 500ms — timeout calls flush which consumes
     // and clears pendingDrawingSaveRef, so no double-execute is possible.
@@ -7307,6 +7327,8 @@ export default function App() {
       idbClearNotesForSession(userId, sid).catch(() => {});
       idbClearQueueForSession(userId, sid).catch(() => {});
     }
+    // Clear all local leases — no protection zombies between sessions
+    clearAllLocalLeases();
     // Tear down sync engine
     if (syncEngineRef.current) {
       syncEngineRef.current.destroy();
@@ -8201,8 +8223,11 @@ export default function App() {
 
   // Local-first auto-save for text notes: persist to IndexedDB + enqueue patch
   // Works for ALL text notes (not just collaborative) — mirrors drawing/checklist pattern
-  const autoSaveTextNote = useCallback(async (noteId, fields) => {
+  // If existingLeaseId is provided, this function owns that lease and releases it on
+  // success. Otherwise acquires its own (used when called directly from closeModal).
+  const autoSaveTextNote = useCallback(async (noteId, fields, existingLeaseId) => {
     const nId = String(noteId);
+    const lid = existingLeaseId || acquireLocalLease(nId);
     const nowIso = new Date().toISOString();
 
     // Update notes state with only provided fields
@@ -8234,11 +8259,11 @@ export default function App() {
       });
     } catch (e) {
       console.error("Text enqueue failed:", e);
-      // Don't remove protection on failure — keep SSE guard active
+      // Don't release lease on failure — keep SSE guard active
       return;
     }
     // hasPendingChanges() now returns true → SSE protection via queue takes over
-    removeLocalProtection(nId, "text-pending");
+    releaseLocalLease(nId, lid);
   }, [enqueueAndSync]);
 
   // Local-first auto-save for text metadata (color, tags, images) — immediate, no debounce
@@ -8253,8 +8278,8 @@ export default function App() {
 
     if (!colorChanged && !tagsChanged && !imagesChanged) return;
 
-    // Protect note before async enqueue (prevents SSE overwrite)
-    addLocalProtection(String(activeId), "text-pending");
+    // Acquire lease before async enqueue (prevents SSE overwrite)
+    const leaseId = acquireLocalLease(String(activeId));
 
     // Build patch with only changed metadata fields
     const metaPatch = {};
@@ -8262,7 +8287,7 @@ export default function App() {
     if (tagsChanged) metaPatch.tags = mTagList;
     if (imagesChanged) metaPatch.images = mImages;
 
-    autoSaveTextNote(activeId, metaPatch);
+    autoSaveTextNote(activeId, metaPatch, leaseId);
 
     // Update initial state so we don't re-trigger
     initialModalStateRef.current = {
@@ -8283,17 +8308,21 @@ export default function App() {
     const contentChanged = initial.content !== mBody;
     if (!titleChanged && !contentChanged) return;
 
-    // Protect IMMEDIATELY (before debounce fires).
+    // Acquire lease IMMEDIATELY (before debounce fires).
     // Prevents SSE overwriting IDB during the debounce window.
-    addLocalProtection(String(activeId), "text-pending");
+    const nId = String(activeId);
+    const leaseId = acquireLocalLease(nId);
+    let transferred = false;
 
     const timeoutId = setTimeout(() => {
+      transferred = true;
       // Build patch with only changed content fields
       const contentPatch = {};
       if (titleChanged) contentPatch.title = mTitle.trim();
       if (contentChanged) contentPatch.content = mBody;
 
-      autoSaveTextNote(activeId, contentPatch);
+      // Transfer lease ownership to autoSaveTextNote — it will release after enqueue
+      autoSaveTextNote(activeId, contentPatch, leaseId);
 
       // Update initial state so subsequent comparisons are against the saved version
       if (initialModalStateRef.current) {
@@ -8305,7 +8334,12 @@ export default function App() {
       }
     }, 1000); // 1 second debounce
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      // If debounce was cancelled (new keystroke / modal close), release this lease.
+      // If it fired, autoSaveTextNote owns the lease and will release it.
+      if (!transferred) releaseLocalLease(nId, leaseId);
+    };
   }, [mBody, mTitle, open, activeId, mType, viewMode, autoSaveTextNote]);
 
   // Update initial state reference when note is updated from server (for collaborative notes)
@@ -8372,7 +8406,7 @@ export default function App() {
     }
 
     // No dirty flag management needed here — each flow (text, draw, checklist)
-    // owns its own protection via addLocalProtection/removeLocalProtection,
+    // owns its own lease via acquireLocalLease/releaseLocalLease,
     // released only after successful enqueueAndSync.
 
     // Start exit animation, then actually unmount after it completes
@@ -8652,9 +8686,9 @@ export default function App() {
     const noteId = String(activeId);
     const nowIso = new Date().toISOString();
 
-    // Protect BEFORE any async work — prevents SSE patchSingleNote() from
+    // Acquire lease BEFORE any async work — prevents SSE patchSingleNote() from
     // overwriting local checklist state during the IDB write + enqueue window.
-    addLocalProtection(noteId, "checklist-sync");
+    const leaseId = acquireLocalLease(noteId);
 
     // Update notes state
     setNotes((prev) =>
@@ -8683,12 +8717,12 @@ export default function App() {
       });
     } catch (e) {
       console.error("Checklist enqueue failed:", e);
-      // Don't remove protection on failure — keep SSE guard active.
-      // Next successful syncChecklistItems call will remove it.
+      // Don't release lease on failure — keep SSE guard active.
+      // Next successful syncChecklistItems for this note will naturally hold a new lease.
       return;
     }
-    // Queue item exists — safe to release checklist protection
-    removeLocalProtection(noteId, "checklist-sync");
+    // Queue item exists — safe to release this lease
+    releaseLocalLease(noteId, leaseId);
   };
 
   const onChecklistDragStart = (itemId, ev) => {
