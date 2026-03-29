@@ -26,6 +26,7 @@ import {
   hasPendingChanges,
   clearQueueForSession as idbClearQueueForSession,
   clearNotesForSession as idbClearNotesForSession,
+  purgeQueueForNote as idbPurgeQueueForNote,
 } from "./sync/localDb.js";
 
 function trColorName(name) {
@@ -7166,6 +7167,7 @@ export default function App() {
               if (!isDeleteTombstoned(nid)) {
                 setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
                 idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
+                idbPurgeQueueForNote(nid, currentUser?.id, sessionId).catch(() => {});
                 // If this note is currently open in the modal, force-close
                 // without triggering any save/flush (the note no longer exists)
                 if (String(activeIdRef.current) === nid) {
@@ -7178,6 +7180,7 @@ export default function App() {
               const nid = String(msg.noteId);
               setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
               idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
+              idbPurgeQueueForNote(nid, currentUser?.id, sessionId).catch(() => {});
               // Force-close if this note is currently open in modal
               if (String(activeIdRef.current) === nid) {
                 forceCloseModalForRemoteDelete(nid);

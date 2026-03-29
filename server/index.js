@@ -475,27 +475,33 @@ const updateNoteWithEditor = db.prepare(`
 `);
 
 // ---------- Realtime (SSE) ----------
-// Map of userId -> Set of response streams
+// Map of userId (Number) -> Set of response streams.
+// All access goes through sseKey() to guarantee consistent Number keys,
+// preventing string/number mismatch bugs (e.g. req.params vs req.user.id).
 const sseClients = new Map();
+const sseKey = (id) => Number(id);
 
 function addSseClient(userId, res) {
-  let set = sseClients.get(userId);
+  const key = sseKey(userId);
+  let set = sseClients.get(key);
   if (!set) {
     set = new Set();
-    sseClients.set(userId, set);
+    sseClients.set(key, set);
   }
   set.add(res);
 }
 
 function removeSseClient(userId, res) {
-  const set = sseClients.get(userId);
+  const key = sseKey(userId);
+  const set = sseClients.get(key);
   if (!set) return;
   set.delete(res);
-  if (set.size === 0) sseClients.delete(userId);
+  if (set.size === 0) sseClients.delete(key);
 }
 
 function sendEventToUser(userId, event) {
-  const set = sseClients.get(userId);
+  const key = sseKey(userId);
+  const set = sseClients.get(key);
   if (!set || set.size === 0) return;
   const payload = `data: ${JSON.stringify(event)}\n\n`;
   const toRemove = [];

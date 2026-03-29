@@ -347,3 +347,29 @@ export async function hasPendingChanges(noteId, userId, sessionId) {
     req.onerror = () => reject(req.error);
   });
 }
+
+/**
+ * Remove all queue entries for a specific note within a session.
+ * Used when access to a note is revoked or the note is remotely deleted,
+ * so stale mutations don't retry and generate 403/404 noise.
+ */
+export async function purgeQueueForNote(noteId, userId, sessionId) {
+  const db = await openDb();
+  const t = db.transaction(QUEUE_STORE, "readwrite");
+  const store = t.objectStore(QUEUE_STORE);
+  const req = store.index("noteId").openCursor(IDBKeyRange.only(noteId));
+  req.onsuccess = (e) => {
+    const cursor = e.target.result;
+    if (cursor) {
+      const item = cursor.value;
+      if (item.userId === userId && item.sessionId === sessionId) {
+        cursor.delete();
+      }
+      cursor.continue();
+    }
+  };
+  return new Promise((resolve, reject) => {
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
+  });
+}
