@@ -6263,13 +6263,29 @@ export default function App() {
             const pending = await hasPendingChanges(nid, uid, sid);
             if (!pending && !isNoteLocallyProtected(nid)) {
               await idbPutNote(canonical, uid, sid);
+              // Determine if canonical note belongs in the current view
+              const currentFilter = tagFilterRef.current;
+              const noteArchived = !!canonical.archived;
+              const noteTrashed = !!canonical.trashed;
+              const belongsInView =
+                (currentFilter === "ARCHIVED" && noteArchived && !noteTrashed) ||
+                (currentFilter === "TRASHED" && noteTrashed) ||
+                (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"))
+                  && !noteArchived && !noteTrashed;
               setNotes((prev) => {
                 const idx = prev.findIndex((n) => String(n.id) === nid);
-                if (idx !== -1) {
-                  const updated = prev.slice();
-                  updated[idx] = { ...prev[idx], ...canonical };
-                  return updated;
+                if (belongsInView) {
+                  if (idx !== -1) {
+                    // Update in place
+                    const updated = prev.slice();
+                    updated[idx] = canonical;
+                    return updated;
+                  }
+                  // Note should appear in this view but isn't present — insert it
+                  return sortNotesByRecency([...prev, canonical]);
                 }
+                // Note doesn't belong in this view — remove if present
+                if (idx !== -1) return prev.filter((n) => String(n.id) !== nid);
                 return prev;
               });
             }
@@ -6300,7 +6316,31 @@ export default function App() {
             const nid = String(item.noteId);
             const pending = await hasPendingChanges(nid, uid, sid);
             if (!pending && !isNoteLocallyProtected(nid)) {
-              await idbPutNote({ ...serverNote, id: nid }, uid, sid);
+              const canonical = { ...serverNote, id: nid };
+              await idbPutNote(canonical, uid, sid);
+              // Converge React state: note may have changed view membership
+              // (e.g. archive from active view, restore from trash view)
+              const currentFilter = tagFilterRef.current;
+              const noteArchived = !!canonical.archived;
+              const noteTrashed = !!canonical.trashed;
+              const belongsInView =
+                (currentFilter === "ARCHIVED" && noteArchived && !noteTrashed) ||
+                (currentFilter === "TRASHED" && noteTrashed) ||
+                (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"))
+                  && !noteArchived && !noteTrashed;
+              setNotes((prev) => {
+                const idx = prev.findIndex((n) => String(n.id) === nid);
+                if (belongsInView) {
+                  if (idx !== -1) {
+                    const updated = prev.slice();
+                    updated[idx] = canonical;
+                    return updated;
+                  }
+                  return sortNotesByRecency([...prev, canonical]);
+                }
+                if (idx !== -1) return prev.filter((n) => String(n.id) !== nid);
+                return prev;
+              });
             }
           } else if (item.type === "permanentDelete" && item.noteId) {
             const nid = String(item.noteId);

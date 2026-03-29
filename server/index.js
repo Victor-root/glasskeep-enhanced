@@ -257,12 +257,26 @@ if (ADMIN_EMAILS.length) {
 const nowISO = () => new Date().toISOString();
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-// LWW timestamp comparison: returns true if incoming >= stored (newer or equal wins).
-// Rule: equal timestamps → incoming wins (idempotent replays are harmless).
+// ── LWW timestamp comparison ──
+// Strategy: PROGRESSIVE COMPATIBILITY (Strategy A)
+//
+// All current clients emit client_updated_at on every mutation. However,
+// we keep backward compat for edge cases (legacy sessions still in-flight,
+// import without explicit timestamps, collaboration edits from older builds).
+//
+// Rules:
+//   1. No stored timestamp → always accept (first write or migrated row)
+//   2. No incoming timestamp → accept (legacy compat — logged as warning)
+//   3. incoming >= stored → accept (equal wins for idempotent replays)
+//   4. incoming < stored → reject (stale write)
 function isNewerOrEqual(incomingTs, storedTs) {
-  if (!storedTs) return true; // no stored value → always accept
-  if (!incomingTs) return true; // legacy client without timestamp → accept (compat)
-  return incomingTs >= storedTs; // ISO-8601 strings compare lexicographically
+  if (!storedTs) return true;
+  if (!incomingTs) {
+    // Legacy compat: accept the write but log so we can track adoption
+    console.warn("[LWW] Write accepted without client_updated_at (legacy compat)");
+    return true;
+  }
+  return incomingTs >= storedTs;
 }
 
 // Serialize a DB row into the canonical JSON note object returned by all endpoints.
