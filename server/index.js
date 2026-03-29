@@ -215,7 +215,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
       if (!names.has("client_updated_at")) {
         db.exec(`ALTER TABLE notes ADD COLUMN client_updated_at TEXT`);
         // Backfill: use updated_at → timestamp → now, so no NULL values break LWW comparison
-        db.exec(`UPDATE notes SET client_updated_at = COALESCE(updated_at, timestamp, '${nowISO()}')`);
+        db.exec(`UPDATE notes SET client_updated_at = COALESCE(updated_at, timestamp, '${new Date().toISOString()}')`);
       }
     });
     tx();
