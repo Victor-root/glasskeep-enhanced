@@ -8632,6 +8632,11 @@ export default function App() {
     if (!activeId) return;
     const noteId = String(activeId);
     const nowIso = new Date().toISOString();
+
+    // Mark dirty BEFORE any async work — protects against SSE patchSingleNote()
+    // overwriting local checklist state during the IDB write + enqueue window.
+    localEditDirtyRef.current = noteId;
+
     // Update notes state
     setNotes((prev) =>
       prev.map((n) =>
@@ -8650,12 +8655,22 @@ export default function App() {
       console.error("IndexedDB checklist update failed:", e);
     }
     invalidateNotesCache();
-    // Enqueue for server sync
-    enqueueAndSync({
-      type: "patch",
-      noteId,
-      payload: { items: newItems, type: "checklist", content: "" },
-    });
+    // Enqueue for server sync — after this, hasPendingChanges() protects the note
+    try {
+      await enqueueAndSync({
+        type: "patch",
+        noteId,
+        payload: { items: newItems, type: "checklist", content: "" },
+      });
+    } catch (e) {
+      console.error("Checklist enqueue failed:", e);
+      // Don't release dirty flag on failure — keep SSE protection
+      return;
+    }
+    // Release dirty flag only if still ours (a newer edit may have re-set it)
+    if (localEditDirtyRef.current === noteId) {
+      localEditDirtyRef.current = null;
+    }
   };
 
   const onChecklistDragStart = (itemId, ev) => {
