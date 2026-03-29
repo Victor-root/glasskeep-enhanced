@@ -597,11 +597,13 @@ export class SyncEngine {
       case "trash":
         return doFetch(`/notes/${item.noteId}/trash`, {
           method: "POST",
+          body: JSON.stringify(item.payload || {}),
         });
 
       case "restore":
         return doFetch(`/notes/${item.noteId}/restore`, {
           method: "POST",
+          body: JSON.stringify(item.payload || {}),
         });
 
       case "permanentDelete":

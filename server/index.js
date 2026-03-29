@@ -212,6 +212,11 @@ CREATE TABLE IF NOT EXISTS user_settings (
       if (!names.has("trashed")) {
         db.exec(`ALTER TABLE notes ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0`);
       }
+      if (!names.has("client_updated_at")) {
+        db.exec(`ALTER TABLE notes ADD COLUMN client_updated_at TEXT`);
+        // Backfill: use updated_at → timestamp → now, so no NULL values break LWW comparison
+        db.exec(`UPDATE notes SET client_updated_at = COALESCE(updated_at, timestamp, '${nowISO()}')`);
+      }
     });
     tx();
   } catch {
@@ -251,6 +256,38 @@ if (ADMIN_EMAILS.length) {
 // ---------- Helpers ----------
 const nowISO = () => new Date().toISOString();
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+// LWW timestamp comparison: returns true if incoming >= stored (newer or equal wins).
+// Rule: equal timestamps → incoming wins (idempotent replays are harmless).
+function isNewerOrEqual(incomingTs, storedTs) {
+  if (!storedTs) return true; // no stored value → always accept
+  if (!incomingTs) return true; // legacy client without timestamp → accept (compat)
+  return incomingTs >= storedTs; // ISO-8601 strings compare lexicographically
+}
+
+// Serialize a DB row into the canonical JSON note object returned by all endpoints.
+function serializeNote(r) {
+  return {
+    id: r.id,
+    user_id: r.user_id,
+    type: r.type,
+    title: r.title,
+    content: r.content,
+    items: JSON.parse(r.items_json || "[]"),
+    tags: JSON.parse(r.tags_json || "[]"),
+    images: JSON.parse(r.images_json || "[]"),
+    color: r.color,
+    pinned: !!r.pinned,
+    position: r.position,
+    timestamp: r.timestamp,
+    updated_at: r.updated_at,
+    client_updated_at: r.client_updated_at,
+    lastEditedBy: r.last_edited_by,
+    lastEditedAt: r.last_edited_at,
+    archived: !!r.archived,
+    trashed: !!r.trashed,
+  };
+}
 
 function signToken(user) {
   return jwt.sign(
@@ -340,25 +377,27 @@ const getNoteWithCollaboration = db.prepare(`
   WHERE n.id = ? AND (n.user_id = ? OR nc.user_id IS NOT NULL)
 `);
 const insertNote = db.prepare(`
-  INSERT INTO notes (id,user_id,type,title,content,items_json,tags_json,images_json,color,pinned,position,timestamp,archived,trashed)
-  VALUES (@id,@user_id,@type,@title,@content,@items_json,@tags_json,@images_json,@color,@pinned,@position,@timestamp,0,0)
+  INSERT INTO notes (id,user_id,type,title,content,items_json,tags_json,images_json,color,pinned,position,timestamp,archived,trashed,client_updated_at)
+  VALUES (@id,@user_id,@type,@title,@content,@items_json,@tags_json,@images_json,@color,@pinned,@position,@timestamp,0,0,@client_updated_at)
 `);
 const insertNoteIdempotent = db.prepare(`
-  INSERT OR IGNORE INTO notes (id,user_id,type,title,content,items_json,tags_json,images_json,color,pinned,position,timestamp,archived,trashed)
-  VALUES (@id,@user_id,@type,@title,@content,@items_json,@tags_json,@images_json,@color,@pinned,@position,@timestamp,0,0)
+  INSERT OR IGNORE INTO notes (id,user_id,type,title,content,items_json,tags_json,images_json,color,pinned,position,timestamp,archived,trashed,client_updated_at)
+  VALUES (@id,@user_id,@type,@title,@content,@items_json,@tags_json,@images_json,@color,@pinned,@position,@timestamp,0,0,@client_updated_at)
 `);
 const updateNote = db.prepare(`
   UPDATE notes SET
     type=@type, title=@title, content=@content, items_json=@items_json, tags_json=@tags_json,
-    images_json=@images_json, color=@color, pinned=@pinned, position=@position, timestamp=@timestamp
+    images_json=@images_json, color=@color, pinned=@pinned, position=@position, timestamp=@timestamp,
+    client_updated_at=@client_updated_at
   WHERE id=@id AND user_id=@user_id
 `);
 const updateNoteWithCollaboration = db.prepare(`
   UPDATE notes SET
     type=@type, title=@title, content=@content, items_json=@items_json, tags_json=@tags_json,
-    images_json=@images_json, color=@color, pinned=@pinned, position=@position, timestamp=@timestamp
+    images_json=@images_json, color=@color, pinned=@pinned, position=@position, timestamp=@timestamp,
+    client_updated_at=@client_updated_at
   WHERE id=@id AND (user_id=@user_id OR EXISTS(
-    SELECT 1 FROM note_collaborators nc 
+    SELECT 1 FROM note_collaborators nc
     WHERE nc.note_id=@id AND nc.user_id=@user_id
   ))
 `);
@@ -370,7 +409,8 @@ const patchPartial = db.prepare(`
                    images_json=COALESCE(@images_json,images_json),
                    color=COALESCE(@color,color),
                    pinned=COALESCE(@pinned,pinned),
-                   timestamp=COALESCE(@timestamp,timestamp)
+                   timestamp=COALESCE(@timestamp,timestamp),
+                   client_updated_at=COALESCE(@client_updated_at,client_updated_at)
   WHERE id=@id AND user_id=@user_id
 `);
 const patchPartialWithCollaboration = db.prepare(`
@@ -381,9 +421,10 @@ const patchPartialWithCollaboration = db.prepare(`
                    images_json=COALESCE(@images_json,images_json),
                    color=COALESCE(@color,color),
                    pinned=COALESCE(@pinned,pinned),
-                   timestamp=COALESCE(@timestamp,timestamp)
+                   timestamp=COALESCE(@timestamp,timestamp),
+                   client_updated_at=COALESCE(@client_updated_at,client_updated_at)
   WHERE id=@id AND (user_id=@user_id OR EXISTS(
-    SELECT 1 FROM note_collaborators nc 
+    SELECT 1 FROM note_collaborators nc
     WHERE nc.note_id=@id AND nc.user_id=@user_id
   ))
 `);
@@ -721,6 +762,7 @@ app.get("/api/notes", auth, (req, res) => {
         position: r.position,
         timestamp: r.timestamp,
         updated_at: r.updated_at,
+        client_updated_at: r.client_updated_at,
         lastEditedBy: r.last_edited_by,
         lastEditedAt: r.last_edited_at,
         archived: !!r.archived,
@@ -733,6 +775,7 @@ app.get("/api/notes", auth, (req, res) => {
 app.post("/api/notes", auth, (req, res) => {
   const body = req.body || {};
   const noteId = body.id || uid();
+  const clientTs = body.client_updated_at || body.timestamp || nowISO();
   const n = {
     id: noteId,
     user_id: req.user.id,
@@ -746,6 +789,7 @@ app.post("/api/notes", auth, (req, res) => {
     pinned: body.pinned ? 1 : 0,
     position: typeof body.position === "number" ? body.position : Date.now(),
     timestamp: body.timestamp || nowISO(),
+    client_updated_at: clientTs,
   };
 
   // Idempotent creation: if client provides an ID that already exists,
@@ -753,39 +797,16 @@ app.post("/api/notes", auth, (req, res) => {
   if (body.id) {
     const existing = getNoteById.get(body.id);
     if (existing && existing.user_id === req.user.id) {
-      return res.status(200).json({
-        id: existing.id,
-        type: existing.type,
-        title: existing.title,
-        content: existing.content,
-        items: JSON.parse(existing.items_json || "[]"),
-        tags: JSON.parse(existing.tags_json || "[]"),
-        images: JSON.parse(existing.images_json || "[]"),
-        color: existing.color,
-        pinned: !!existing.pinned,
-        position: existing.position,
-        timestamp: existing.timestamp,
-        user_id: existing.user_id,
-      });
+      return res.status(200).json(serializeNote(existing));
     }
   }
 
   insertNote.run(n);
+  updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), n.id);
   broadcastNoteUpdated(n.id);
-  res.status(201).json({
-    id: n.id,
-    type: n.type,
-    title: n.title,
-    content: n.content,
-    items: JSON.parse(n.items_json),
-    tags: JSON.parse(n.tags_json),
-    images: JSON.parse(n.images_json),
-    color: n.color,
-    pinned: !!n.pinned,
-    position: n.position,
-    timestamp: n.timestamp,
-    user_id: n.user_id,
-  });
+  // Re-read to get updated_at/last_edited_* set by updateNoteWithEditor
+  const created = getNoteById.get(n.id);
+  res.status(201).json(serializeNote(created || n));
 });
 
 app.put("/api/notes/:id", auth, (req, res) => {
@@ -794,6 +815,13 @@ app.put("/api/notes/:id", auth, (req, res) => {
   if (!existing) return res.status(404).json({ error: "Note not found" });
 
   const b = req.body || {};
+  const incomingTs = b.client_updated_at || null;
+
+  // LWW: reject stale writes
+  if (!isNewerOrEqual(incomingTs, existing.client_updated_at)) {
+    return res.json({ ok: true, stale: true, note: serializeNote(existing) });
+  }
+
   const updated = {
     id,
     user_id: req.user.id,
@@ -807,24 +835,32 @@ app.put("/api/notes/:id", auth, (req, res) => {
     pinned: b.pinned ? 1 : 0,
     position: typeof b.position === "number" ? b.position : existing.position,
     timestamp: b.timestamp || existing.timestamp,
+    client_updated_at: incomingTs || existing.client_updated_at || nowISO(),
   };
-  // Use collaboration-aware update
   const result = updateNoteWithCollaboration.run(updated);
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
   }
 
-  // Update editor tracking (store display name)
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
   broadcastNoteUpdated(id);
-  res.json({ ok: true });
+  const fresh = getNoteById.get(id);
+  res.json({ ok: true, note: serializeNote(fresh || existing) });
 });
 
 app.patch("/api/notes/:id", auth, (req, res) => {
   const id = req.params.id;
   const existing = getNoteWithCollaboration.get(req.user.id, id, req.user.id);
   if (!existing) return res.status(404).json({ error: "Note not found" });
+
+  const incomingTs = req.body.client_updated_at || null;
+
+  // LWW: reject stale writes
+  if (!isNewerOrEqual(incomingTs, existing.client_updated_at)) {
+    return res.json({ ok: true, stale: true, note: serializeNote(existing) });
+  }
+
   const p = {
     id,
     user_id: req.user.id,
@@ -836,19 +872,18 @@ app.patch("/api/notes/:id", auth, (req, res) => {
     color: typeof req.body.color === "string" ? req.body.color : null,
     pinned: typeof req.body.pinned === "boolean" ? (req.body.pinned ? 1 : 0) : null,
     timestamp: req.body.timestamp || null,
+    client_updated_at: incomingTs || null,
   };
-  // Use collaboration-aware patch
   const result = patchPartialWithCollaboration.run(p);
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
   }
 
-  // Update editor tracking (store display name)
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
   broadcastNoteUpdated(id);
-
-  res.json({ ok: true });
+  const fresh = getNoteById.get(id);
+  res.json({ ok: true, note: serializeNote(fresh || existing) });
 });
 
 app.delete("/api/notes/:id", auth, (req, res) => {
@@ -858,10 +893,11 @@ app.delete("/api/notes/:id", auth, (req, res) => {
   if (!existing) {
     return res.status(404).json({ error: "Note not found" });
   }
+  const newTs = nowISO();
   const updateTrashed = db.prepare(`
-    UPDATE notes SET trashed = 1 WHERE id = ? AND user_id = ?
+    UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
-  updateTrashed.run(id, req.user.id);
+  updateTrashed.run(newTs, id, req.user.id);
   broadcastNoteUpdated(id);
   res.json({ ok: true });
 });
@@ -1007,95 +1043,68 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
 
 app.get("/api/notes/collaborated", auth, (req, res) => {
   const rows = getCollaboratedNotes.all(req.user.id);
-  res.json(
-    rows.map((r) => ({
-      id: r.id,
-      type: r.type,
-      title: r.title,
-      content: r.content,
-      items: JSON.parse(r.items_json || "[]"),
-      tags: JSON.parse(r.tags_json || "[]"),
-      images: JSON.parse(r.images_json || "[]"),
-      color: r.color,
-      pinned: !!r.pinned,
-      position: r.position,
-      timestamp: r.timestamp,
-      updated_at: r.updated_at,
-      lastEditedBy: r.last_edited_by,
-      lastEditedAt: r.last_edited_at,
-    }))
-  );
+  res.json(rows.map((r) => serializeNote(r)));
 });
 
 // Archive/Unarchive notes
 app.post("/api/notes/:id/archive", auth, (req, res) => {
   const id = req.params.id;
-  const { archived } = req.body || {};
+  const { archived, client_updated_at: incomingTs } = req.body || {};
 
-  // Check if note exists and user owns it
   const existing = getNote.get(id, req.user.id);
   if (!existing) {
     return res.status(404).json({ error: "Note not found" });
   }
 
-  // Update archived status
+  // LWW: reject stale writes
+  if (!isNewerOrEqual(incomingTs, existing.client_updated_at)) {
+    return res.json({ ok: true, stale: true, note: serializeNote(existing) });
+  }
+
+  const newTs = incomingTs || nowISO();
   const updateArchived = db.prepare(`
-    UPDATE notes SET archived = ? WHERE id = ? AND user_id = ?
+    UPDATE notes SET archived = ?, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
 
-  const result = updateArchived.run(archived ? 1 : 0, id, req.user.id);
+  const result = updateArchived.run(archived ? 1 : 0, newTs, id, req.user.id);
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
   }
 
-  // Update editor tracking
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
   broadcastNoteUpdated(id);
-
-  res.json({ ok: true });
+  const fresh = getNoteById.get(id);
+  res.json({ ok: true, note: serializeNote(fresh || existing) });
 });
 
 // Get archived notes
 app.get("/api/notes/archived", auth, (req, res) => {
   const rows = listArchivedNotes.all(req.user.id);
-  res.json(
-    rows.map((r) => ({
-      id: r.id,
-      type: r.type,
-      title: r.title,
-      content: r.content,
-      items: JSON.parse(r.items_json || "[]"),
-      tags: JSON.parse(r.tags_json || "[]"),
-      images: JSON.parse(r.images_json || "[]"),
-      color: r.color,
-      pinned: !!r.pinned,
-      position: r.position,
-      timestamp: r.timestamp,
-      updated_at: r.updated_at,
-      lastEditedBy: r.last_edited_by,
-      lastEditedAt: r.last_edited_at,
-      archived: !!r.archived,
-    }))
-  );
+  res.json(rows.map((r) => serializeNote(r)));
 });
 
 // Trash/Restore notes
 app.post("/api/notes/:id/trash", auth, (req, res) => {
   const id = req.params.id;
+  const { client_updated_at: incomingTs } = req.body || {};
 
-  // Check if note exists and user owns it
   const existing = getNote.get(id, req.user.id);
   if (!existing) {
     return res.status(404).json({ error: "Note not found" });
   }
 
-  // Move to trash (keep archived state intact)
+  // LWW: reject stale writes
+  if (!isNewerOrEqual(incomingTs, existing.client_updated_at)) {
+    return res.json({ ok: true, stale: true, note: serializeNote(existing) });
+  }
+
+  const newTs = incomingTs || nowISO();
   const updateTrashed = db.prepare(`
-    UPDATE notes SET trashed = 1 WHERE id = ? AND user_id = ?
+    UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
 
-  const result = updateTrashed.run(id, req.user.id);
+  const result = updateTrashed.run(newTs, id, req.user.id);
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
@@ -1103,25 +1112,30 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
 
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
   broadcastNoteUpdated(id);
-
-  res.json({ ok: true });
+  const fresh = getNoteById.get(id);
+  res.json({ ok: true, note: serializeNote(fresh || existing) });
 });
 
 app.post("/api/notes/:id/restore", auth, (req, res) => {
   const id = req.params.id;
+  const { client_updated_at: incomingTs } = req.body || {};
 
-  // Check if note exists and user owns it
   const existing = getNote.get(id, req.user.id);
   if (!existing) {
     return res.status(404).json({ error: "Note not found" });
   }
 
-  // Restore from trash (archived state is preserved)
+  // LWW: reject stale writes
+  if (!isNewerOrEqual(incomingTs, existing.client_updated_at)) {
+    return res.json({ ok: true, stale: true, note: serializeNote(existing) });
+  }
+
+  const newTs = incomingTs || nowISO();
   const updateTrashed = db.prepare(`
-    UPDATE notes SET trashed = 0 WHERE id = ? AND user_id = ?
+    UPDATE notes SET trashed = 0, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
 
-  const result = updateTrashed.run(id, req.user.id);
+  const result = updateTrashed.run(newTs, id, req.user.id);
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
@@ -1129,34 +1143,14 @@ app.post("/api/notes/:id/restore", auth, (req, res) => {
 
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
   broadcastNoteUpdated(id);
-
-  res.json({ ok: true });
+  const fresh = getNoteById.get(id);
+  res.json({ ok: true, note: serializeNote(fresh || existing) });
 });
 
 // Get trashed notes
 app.get("/api/notes/trashed", auth, (req, res) => {
   const rows = listTrashedNotes.all(req.user.id);
-  res.json(
-    rows.map((r) => ({
-      id: r.id,
-      user_id: r.user_id,
-      type: r.type,
-      title: r.title,
-      content: r.content,
-      items: JSON.parse(r.items_json || "[]"),
-      tags: JSON.parse(r.tags_json || "[]"),
-      images: JSON.parse(r.images_json || "[]"),
-      color: r.color,
-      pinned: !!r.pinned,
-      position: r.position,
-      timestamp: r.timestamp,
-      updated_at: r.updated_at,
-      lastEditedBy: r.last_edited_by,
-      lastEditedAt: r.last_edited_at,
-      archived: !!r.archived,
-      trashed: true,
-    }))
-  );
+  res.json(rows.map((r) => serializeNote(r)));
 });
 
 // Permanently delete a note (only from trash)
@@ -1231,6 +1225,7 @@ app.get("/api/notes/:id", auth, (req, res) => {
     position: r.position,
     timestamp: r.timestamp,
     updated_at: r.updated_at,
+    client_updated_at: r.client_updated_at,
     lastEditedBy: r.last_edited_by,
     lastEditedAt: r.last_edited_at,
     archived: !!r.archived,
@@ -1271,6 +1266,7 @@ app.post("/api/notes/import", auth, (req, res) => {
           pinned: n.pinned ? 1 : 0,
           position: typeof n.position === "number" ? n.position : Date.now(),
           timestamp: n.timestamp || nowISO(),
+          client_updated_at: n.client_updated_at || n.timestamp || nowISO(),
         });
       }
     });
