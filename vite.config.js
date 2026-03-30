@@ -37,6 +37,11 @@ export default defineConfig({
         ]
       },
       workbox: {
+        // Activate new SW immediately — critical for mobile PWAs where there
+        // is only one "tab". Without this, a stale SW can stay in control
+        // indefinitely after long background suspension on Android.
+        skipWaiting: true,
+        clientsClaim: true,
         navigateFallback: "/index.html",
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
         runtimeCaching: [
@@ -51,7 +56,7 @@ export default defineConfig({
             handler: 'NetworkFirst',
             options: {
               cacheName: 'notes-cache',
-              networkTimeoutSeconds: 2,
+              networkTimeoutSeconds: 5,
               cacheableResponse: {
                 statuses: [0, 200]
               },
@@ -66,7 +71,7 @@ export default defineConfig({
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
-              networkTimeoutSeconds: 2,
+              networkTimeoutSeconds: 5,
               cacheableResponse: {
                 statuses: [0, 200]
               },

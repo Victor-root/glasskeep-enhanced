@@ -375,6 +375,15 @@ export class SyncEngine {
       this._serverReachable = false;
       this._lastSyncError = err?.name === "AbortError" ? "Health check timeout" : "Server unreachable";
       this._failedChecks++;
+
+      // On mobile PWAs, a stuck Service Worker can make all fetches fail even
+      // though the network is up. After several consecutive failures while the
+      // browser reports online, nudge the SW to update — a fresh SW often
+      // resolves the stuck state without clearing all browsing data.
+      if (this._failedChecks >= 3 && typeof navigator !== "undefined" && navigator.onLine && "serviceWorker" in navigator) {
+        navigator.serviceWorker.ready.then((reg) => reg.update()).catch(() => {});
+      }
+
       this._adjustHealthInterval();
       await this._emitStatus();
       return false;
