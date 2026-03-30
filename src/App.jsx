@@ -7275,7 +7275,13 @@ export default function App() {
       // auto-triggers processQueue on recovery. Also restarts the
       // health timer chain if it was broken by tab suspension.
       if (engine) {
-        const ok = await engine.healthCheck();
+        let ok = await engine.healthCheck();
+        // On mobile after long background, the first fetch often fails because
+        // the browser hasn't fully restored network sockets. Retry once.
+        if (!ok) {
+          await new Promise((r) => setTimeout(r, 1500));
+          ok = await engine.healthCheck();
+        }
         // Restart the health timer chain unconditionally — mobile browsers
         // may have GC'd the previous setTimeout during background suspension.
         engine.restartHealthTimer();
@@ -7306,7 +7312,11 @@ export default function App() {
       // the health check that sets _serverReachable = true.
       const engine = syncEngineRef.current;
       if (engine) {
-        const ok = await engine.healthCheck();
+        let ok = await engine.healthCheck();
+        if (!ok) {
+          await new Promise((r) => setTimeout(r, 1500));
+          ok = await engine.healthCheck();
+        }
         engine.restartHealthTimer();
         if (ok) {
           triggerSync();

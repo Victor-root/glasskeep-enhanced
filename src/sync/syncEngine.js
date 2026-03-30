@@ -264,7 +264,14 @@ export class SyncEngine {
     await this._emitStatus();
 
     try {
-      await this.healthCheck();
+      let ok = await this.healthCheck();
+      // On mobile after long background suspension, the first fetch often fails
+      // because the browser hasn't fully restored network sockets yet. One retry
+      // after a short pause is enough to recover in most cases.
+      if (!ok) {
+        await new Promise((r) => setTimeout(r, 1500));
+        ok = await this.healthCheck();
+      }
     } finally {
       this._isChecking = false;
     }
@@ -381,8 +388,16 @@ export class SyncEngine {
    */
   startHealthChecks() {
     this.stopHealthChecks();
-    // Initial check to establish server reachability
-    this.healthCheck();
+    // Initial check to establish server reachability.
+    // On mobile after long background / page refresh, the first fetch may fail
+    // because the browser is still restoring sockets. Retry once after a pause.
+    this.healthCheck().then((ok) => {
+      if (!ok && !this._destroyed) {
+        setTimeout(() => {
+          if (!this._destroyed) this.healthCheck();
+        }, 2000);
+      }
+    });
     this._scheduleNextHealth();
   }
 
