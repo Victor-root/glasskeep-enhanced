@@ -6302,12 +6302,26 @@ export default function App() {
             const pending = await hasPendingChanges(nid, uid, sid);
             if (!pending) {
               await idbPutNote(serverNote, uid, sid);
+              // Determine if the created note belongs in the current view
+              const currentFilter = tagFilterRef.current;
+              const noteArchived = !!serverNote.archived;
+              const noteTrashed = !!serverNote.trashed;
+              const belongsInView =
+                (currentFilter === "ARCHIVED" && noteArchived && !noteTrashed) ||
+                (currentFilter === "TRASHED" && noteTrashed) ||
+                (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"))
+                  && !noteArchived && !noteTrashed;
               setNotes((prev) => {
                 const idx = prev.findIndex((n) => String(n.id) === nid);
                 if (idx !== -1) {
                   const updated = prev.slice();
                   updated[idx] = { ...prev[idx], ...serverNote };
                   return updated;
+                }
+                // Note not in state (e.g. state cleared by page refresh while
+                // queue item was pending) — insert if it belongs in current view
+                if (belongsInView) {
+                  return sortNotesByRecency([...prev, serverNote]);
                 }
                 return prev;
               });
@@ -7284,20 +7298,25 @@ export default function App() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     // Handle online/offline events
-    const handleOnline = () => {
+    const handleOnline = async () => {
       setIsOnline(true);
       // Browser detected network recovery — run health check first,
-      // then process queue if server is reachable.
-      // Also restart health timer chain (may have broken while offline).
+      // then process queue and reconnect SSE only after confirming
+      // the server is reachable. Avoids racing SSE reconnect against
+      // the health check that sets _serverReachable = true.
       const engine = syncEngineRef.current;
       if (engine) {
-        engine.healthCheck().then((ok) => {
-          engine.restartHealthTimer();
-          if (ok) triggerSync();
-        });
-      }
-      // Reconnect SSE if it was dead
-      if (es && es.readyState === EventSource.CLOSED) {
+        const ok = await engine.healthCheck();
+        engine.restartHealthTimer();
+        if (ok) {
+          triggerSync();
+          // Reconnect SSE after confirmed server reachability
+          if (es && es.readyState === EventSource.CLOSED) {
+            reconnectAttempts = 0;
+            connectSSE();
+          }
+        }
+      } else if (es && es.readyState === EventSource.CLOSED) {
         reconnectAttempts = 0;
         connectSSE();
       }
