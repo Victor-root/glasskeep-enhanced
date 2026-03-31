@@ -164,8 +164,10 @@ export async function clearNotesForSession(userId, sessionId) {
 }
 
 // ─── Sync Queue Store ───
-// All queue read functions require userId + sessionId for per-session isolation.
-// Entries without sessionId (v1/v2) are silently excluded by the compound index.
+// Queue entries carry userId + sessionId but are queried primarily by userId
+// so that pending mutations survive session changes (token refresh, re-login)
+// for the same user. Session isolation is only enforced at cleanup time
+// (sign-out / user change).
 
 /**
  * Queue action types:
@@ -198,17 +200,22 @@ export async function enqueue(action) {
   });
 }
 
-export async function getQueueItems(userId, sessionId) {
+/**
+ * Get all queue items for a user (across all sessions).
+ * This ensures pending mutations from a previous session are still visible
+ * after token refresh or re-login.
+ */
+export async function getQueueItems(userId) {
   const store = await tx(QUEUE_STORE);
   return new Promise((resolve, reject) => {
-    const req = store.index("userSession").getAll([userId, sessionId]);
+    const req = store.index("userId").getAll(userId);
     req.onsuccess = () => resolve(req.result || []);
     req.onerror = () => reject(req.error);
   });
 }
 
-export async function getPendingQueue(userId, sessionId) {
-  const items = await getQueueItems(userId, sessionId);
+export async function getPendingQueue(userId) {
+  const items = await getQueueItems(userId);
   return items
     .filter((i) => i.status === "pending" || i.status === "retry" || i.status === "failed")
     .sort((a, b) => a.createdAt - b.createdAt);
@@ -241,8 +248,31 @@ export async function removeQueueItem(queueId) {
 }
 
 /**
+ * Clear ALL queue items for a user (across all sessions).
+ * Used at explicit sign-out / user change to prevent cross-user data leaks.
+ */
+export async function clearQueueForUser(userId) {
+  const db = await openDb();
+  const t = db.transaction(QUEUE_STORE, "readwrite");
+  const store = t.objectStore(QUEUE_STORE);
+  const idx = store.index("userId");
+  const req = idx.openCursor(IDBKeyRange.only(userId));
+  req.onsuccess = (e) => {
+    const cursor = e.target.result;
+    if (cursor) {
+      cursor.delete();
+      cursor.continue();
+    }
+  };
+  return new Promise((resolve, reject) => {
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
+  });
+}
+
+/**
  * Clear queue items for a specific session only.
- * Used at sign-out / auth-expired for strict session-scoped cleanup.
+ * Kept for targeted cleanup; prefer clearQueueForUser at sign-out.
  */
 export async function clearQueueForSession(userId, sessionId) {
   const db = await openDb();
@@ -263,8 +293,8 @@ export async function clearQueueForSession(userId, sessionId) {
   });
 }
 
-export async function getQueueStats(userId, sessionId) {
-  const items = await getQueueItems(userId, sessionId);
+export async function getQueueStats(userId) {
+  const items = await getQueueItems(userId);
   const pending = items.filter((i) => i.status === "pending").length;
   const processing = items.filter((i) => i.status === "processing").length;
   const retry = items.filter((i) => i.status === "retry").length;
@@ -277,8 +307,8 @@ export async function getQueueStats(userId, sessionId) {
  * E.g. if a note was updated 3 times before sync, keep only the latest.
  * Create actions are never collapsed (they must execute once).
  */
-export async function collapseQueue(userId, sessionId) {
-  const items = await getQueueItems(userId, sessionId);
+export async function collapseQueue(userId) {
+  const items = await getQueueItems(userId);
   const toRemove = [];
   const seen = new Map(); // noteId:type -> latest queue entry
 
@@ -328,17 +358,19 @@ export async function collapseQueue(userId, sessionId) {
 }
 
 /**
- * Check if a note has pending local changes in the queue for a given session.
+ * Check if a note has pending local changes in the queue for a given user.
+ * Scoped by userId only (not sessionId) so that pending mutations from a
+ * previous session are still detected after token refresh / re-login.
  * Failed items with "Note not found on server" are excluded — those are
  * permanent failures that should not protect zombie local notes.
  */
-export async function hasPendingChanges(noteId, userId, sessionId) {
+export async function hasPendingChanges(noteId, userId) {
   const store = await tx(QUEUE_STORE);
   return new Promise((resolve, reject) => {
     const req = store.index("noteId").getAll(noteId);
     req.onsuccess = () => {
       const items = (req.result || []).filter(
-        (i) => i.userId === userId && i.sessionId === sessionId &&
+        (i) => i.userId === userId &&
           (i.status === "pending" || i.status === "processing" || i.status === "retry" ||
            (i.status === "failed" && !i.lastError?.startsWith("Note not found")))
       );
@@ -349,11 +381,13 @@ export async function hasPendingChanges(noteId, userId, sessionId) {
 }
 
 /**
- * Remove all queue entries for a specific note within a session.
+ * Remove all queue entries for a specific note for a given user.
+ * Scoped by userId only (not sessionId) so that orphaned entries from
+ * previous sessions are also cleaned up.
  * Used when access to a note is revoked or the note is remotely deleted,
  * so stale mutations don't retry and generate 403/404 noise.
  */
-export async function purgeQueueForNote(noteId, userId, sessionId) {
+export async function purgeQueueForNote(noteId, userId) {
   const db = await openDb();
   const t = db.transaction(QUEUE_STORE, "readwrite");
   const store = t.objectStore(QUEUE_STORE);
@@ -362,7 +396,7 @@ export async function purgeQueueForNote(noteId, userId, sessionId) {
     const cursor = e.target.result;
     if (cursor) {
       const item = cursor.value;
-      if (item.userId === userId && item.sessionId === sessionId) {
+      if (item.userId === userId) {
         cursor.delete();
       }
       cursor.continue();

@@ -24,7 +24,7 @@ import {
   enqueue as idbEnqueue,
   getQueueStats,
   hasPendingChanges,
-  clearQueueForSession as idbClearQueueForSession,
+  clearQueueForUser as idbClearQueueForUser,
   clearNotesForSession as idbClearNotesForSession,
   purgeQueueForNote as idbPurgeQueueForNote,
 } from "./sync/localDb.js";
@@ -6255,7 +6255,7 @@ export default function App() {
           if (result && result.stale && result.note) {
             const canonical = result.note;
             const nid = String(canonical.id || item.noteId);
-            const pending = await hasPendingChanges(nid, uid, sid);
+            const pending = await hasPendingChanges(nid, uid);
             if (!pending && !isNoteLocallyProtected(nid)) {
               await idbPutNote(canonical, uid, sid);
               // Determine if canonical note belongs in the current view
@@ -6293,7 +6293,7 @@ export default function App() {
 
           if (item.type === "create" && serverNote && serverNote.id) {
             const nid = String(serverNote.id);
-            const pending = await hasPendingChanges(nid, uid, sid);
+            const pending = await hasPendingChanges(nid, uid);
             if (!pending) {
               await idbPutNote(serverNote, uid, sid);
               // Determine if the created note belongs in the current view
@@ -6323,7 +6323,7 @@ export default function App() {
           } else if (serverNote && item.noteId) {
             // update/patch/archive/trash/restore — reconcile with canonical note
             const nid = String(item.noteId);
-            const pending = await hasPendingChanges(nid, uid, sid);
+            const pending = await hasPendingChanges(nid, uid);
             if (!pending && !isNoteLocallyProtected(nid)) {
               const canonical = { ...serverNote, id: nid };
               await idbPutNote(canonical, uid, sid);
@@ -6549,10 +6549,10 @@ export default function App() {
   // in-memory lease protection (isNoteLocallyProtected, sync/ref) and delete
   // tombstones. Used as both early snapshot AND late "final guard before write"
   // to close TOCTOU races where protection appears between check and write.
-  const isProtectedFromServerOverwrite = async (noteId, userId, sid) => {
+  const isProtectedFromServerOverwrite = async (noteId, userId) => {
     if (isDeleteTombstoned(noteId)) return true;
     if (isNoteLocallyProtected(noteId)) return true;
-    return hasPendingChanges(noteId, userId, sid);
+    return hasPendingChanges(noteId, userId);
   };
 
   const loadNotes = async () => {
@@ -6592,7 +6592,7 @@ export default function App() {
       // so notes in the pre-enqueue or failed-enqueue window are protected.
       const pendingSet = new Set();
       for (const sn of serverNotes) {
-        if (await isProtectedFromServerOverwrite(String(sn.id), currentUser?.id, sessionId)) pendingSet.add(String(sn.id));
+        if (await isProtectedFromServerOverwrite(String(sn.id), currentUser?.id)) pendingSet.add(String(sn.id));
       }
 
       // Hydrate IndexedDB, skipping protected notes.
@@ -6600,7 +6600,7 @@ export default function App() {
       const toWrite = [];
       for (const sn of serverNotes) {
         const nid = String(sn.id);
-        if (pendingSet.has(nid) || await isProtectedFromServerOverwrite(nid, currentUser?.id, sessionId)) continue;
+        if (pendingSet.has(nid) || await isProtectedFromServerOverwrite(nid, currentUser?.id)) continue;
         toWrite.push({ ...sn, id: nid, user_id: sn.user_id || currentUser?.id, archived: false, trashed: false });
       }
       if (toWrite.length > 0) await idbPutNotes(toWrite, currentUser?.id, sessionId);
@@ -6613,7 +6613,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "active");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await isProtectedFromServerOverwrite(String(ln.id), currentUser?.id, sessionId)) {
+            if (await isProtectedFromServerOverwrite(String(ln.id), currentUser?.id)) {
               localOnly.push(ln);
             } else {
               deadIds.push(String(ln.id));
@@ -6631,7 +6631,7 @@ export default function App() {
       const merged = [];
       for (const sn of serverNotes) {
         const nid = String(sn.id);
-        if (await isProtectedFromServerOverwrite(nid, currentUser?.id, sessionId)) {
+        if (await isProtectedFromServerOverwrite(nid, currentUser?.id)) {
           const localVer = await idbGetNote(nid, currentUser?.id, sessionId);
           if (localVer) merged.push(localVer);
         } else {
@@ -6699,14 +6699,14 @@ export default function App() {
       // Snapshot protection status once to avoid race with concurrent queue processing
       const pendingSet = new Set();
       for (const sn of notesArray) {
-        if (await isProtectedFromServerOverwrite(String(sn.id), currentUser?.id, sessionId)) pendingSet.add(String(sn.id));
+        if (await isProtectedFromServerOverwrite(String(sn.id), currentUser?.id)) pendingSet.add(String(sn.id));
       }
 
       // Hydrate IndexedDB, late-checking each note for protection
       const toWrite = [];
       for (const sn of notesArray) {
         const nid = String(sn.id);
-        if (pendingSet.has(nid) || await isProtectedFromServerOverwrite(nid, currentUser?.id, sessionId)) continue;
+        if (pendingSet.has(nid) || await isProtectedFromServerOverwrite(nid, currentUser?.id)) continue;
         toWrite.push({ ...sn, id: nid, user_id: sn.user_id || currentUser?.id, archived: true, trashed: false });
       }
       if (toWrite.length > 0) await idbPutNotes(toWrite, currentUser?.id, sessionId);
@@ -6719,7 +6719,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "archived");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await isProtectedFromServerOverwrite(String(ln.id), currentUser?.id, sessionId)) {
+            if (await isProtectedFromServerOverwrite(String(ln.id), currentUser?.id)) {
               localOnly.push(ln);
             } else {
               deadIds.push(String(ln.id));
@@ -6735,7 +6735,7 @@ export default function App() {
       const merged = [];
       for (const sn of notesArray) {
         const nid = String(sn.id);
-        if (await isProtectedFromServerOverwrite(nid, currentUser?.id, sessionId)) {
+        if (await isProtectedFromServerOverwrite(nid, currentUser?.id)) {
           const localVer = await idbGetNote(nid, currentUser?.id, sessionId);
           if (localVer) merged.push(localVer);
         } else {
@@ -6790,14 +6790,14 @@ export default function App() {
       // Snapshot protection status once to avoid race with concurrent queue processing
       const pendingSet = new Set();
       for (const sn of notesArray) {
-        if (await isProtectedFromServerOverwrite(String(sn.id), currentUser?.id, sessionId)) pendingSet.add(String(sn.id));
+        if (await isProtectedFromServerOverwrite(String(sn.id), currentUser?.id)) pendingSet.add(String(sn.id));
       }
 
       // Hydrate IndexedDB, late-checking each note for protection
       const toWrite = [];
       for (const sn of notesArray) {
         const nid = String(sn.id);
-        if (pendingSet.has(nid) || await isProtectedFromServerOverwrite(nid, currentUser?.id, sessionId)) continue;
+        if (pendingSet.has(nid) || await isProtectedFromServerOverwrite(nid, currentUser?.id)) continue;
         toWrite.push({ ...sn, id: nid, user_id: sn.user_id || currentUser?.id, archived: false, trashed: true });
       }
       if (toWrite.length > 0) await idbPutNotes(toWrite, currentUser?.id, sessionId);
@@ -6810,7 +6810,7 @@ export default function App() {
         const allLocal = await idbGetAllNotes(currentUser?.id, sessionId, "trashed");
         for (const ln of allLocal) {
           if (!serverIds.has(String(ln.id))) {
-            if (await isProtectedFromServerOverwrite(String(ln.id), currentUser?.id, sessionId)) {
+            if (await isProtectedFromServerOverwrite(String(ln.id), currentUser?.id)) {
               localOnly.push(ln);
             } else {
               deadIds.push(String(ln.id));
@@ -6826,7 +6826,7 @@ export default function App() {
       const merged = [];
       for (const sn of notesArray) {
         const nid = String(sn.id);
-        if (await isProtectedFromServerOverwrite(nid, currentUser?.id, sessionId)) {
+        if (await isProtectedFromServerOverwrite(nid, currentUser?.id)) {
           const localVer = await idbGetNote(nid, currentUser?.id, sessionId);
           if (localVer) merged.push(localVer);
         } else {
@@ -6964,7 +6964,7 @@ export default function App() {
       for (const nid of ids) {
         if (isDeleteTombstoned(nid)) continue;
         if (isNoteLocallyProtected(nid)) continue;
-        if (await hasPendingChanges(nid, uid, sid)) continue;
+        if (await hasPendingChanges(nid, uid)) continue;
         toFetch.push(nid);
       }
       if (toFetch.length === 0) return;
@@ -6976,7 +6976,7 @@ export default function App() {
             const serverNote = await api(`/notes/${nid}`, { token });
             if (!serverNote || !serverNote.id) return null;
             // Final TOCTOU guard
-            if (await isProtectedFromServerOverwrite(nid, uid, sid)) return null;
+            if (await isProtectedFromServerOverwrite(nid, uid)) return null;
             return serverNote;
           } catch (e) {
             return e.status === 404 ? { _deleted: true, _nid: nid } : null;
@@ -7073,7 +7073,7 @@ export default function App() {
       if (isDeleteTombstoned(nid)) return;
 
       // Don't overwrite notes with pending local changes (already in sync queue)
-      const pending = await hasPendingChanges(nid, currentUser?.id, sessionId);
+      const pending = await hasPendingChanges(nid, currentUser?.id);
       if (pending) return;
 
       // Don't overwrite note with an active local lease (debounce, pending IDB write,
@@ -7086,7 +7086,7 @@ export default function App() {
 
         // ── Final guard before write (closes TOCTOU race) ──
         // A local mutation may have started while the fetch was in flight.
-        if (await isProtectedFromServerOverwrite(nid, currentUser?.id, sessionId)) return;
+        if (await isProtectedFromServerOverwrite(nid, currentUser?.id)) return;
 
         const currentFilter = tagFilterRef.current;
         const noteArchived = !!serverNote.archived;
@@ -7194,7 +7194,7 @@ export default function App() {
               if (!isDeleteTombstoned(nid)) {
                 setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
                 idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
-                idbPurgeQueueForNote(nid, currentUser?.id, sessionId).catch(() => {});
+                idbPurgeQueueForNote(nid, currentUser?.id).catch(() => {});
                 // If this note is currently open in the modal, force-close
                 // without triggering any save/flush (the note no longer exists)
                 if (String(activeIdRef.current) === nid) {
@@ -7207,7 +7207,7 @@ export default function App() {
               const nid = String(msg.noteId);
               setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
               idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
-              idbPurgeQueueForNote(nid, currentUser?.id, sessionId).catch(() => {});
+              idbPurgeQueueForNote(nid, currentUser?.id).catch(() => {});
               // Force-close if this note is currently open in modal
               if (String(activeIdRef.current) === nid) {
                 forceCloseModalForRemoteDelete(nid);
@@ -7696,14 +7696,20 @@ export default function App() {
 
   // Centralised cleanup for sign-out AND auth-expired — single source of truth.
   // Uses refs so it's safe to call from stale closures (e.g. event listeners).
-  const cleanupClientSession = () => {
+  // Shared teardown: resets UI state, clears notes cache, tears down sync engine.
+  // Does NOT purge the sync queue — that is handled separately depending on context.
+  const cleanupClientSession = (purgeQueue = false) => {
     const userId = currentUserIdRef.current;
     const sid = sessionIdRef.current;
-    // IndexedDB cleanup (best-effort, never throws)
-    // Both notes cache and sync queue are session-scoped.
+    // Notes cache is session-scoped and disposable — always clear it.
     if (userId && sid) {
       idbClearNotesForSession(userId, sid).catch(() => {});
-      idbClearQueueForSession(userId, sid).catch(() => {});
+    }
+    // Only purge the sync queue on explicit sign-out / user change.
+    // Token expiration must NOT purge the queue — pending offline mutations
+    // will be replayed after re-login with a fresh token.
+    if (purgeQueue && userId) {
+      idbClearQueueForUser(userId).catch(() => {});
     }
     // Clear all local leases, delete tombstones, pending reorder refs — no zombies between sessions
     clearAllLocalLeases();
@@ -7737,7 +7743,7 @@ export default function App() {
   };
 
   const signOut = () => {
-    cleanupClientSession();
+    cleanupClientSession(true); // explicit sign-out → purge queue
   };
   const signIn = async (email, password) => {
     const res = await api("/login", {
