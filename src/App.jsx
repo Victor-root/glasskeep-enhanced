@@ -6364,9 +6364,10 @@ export default function App() {
               }
               pendingReorderLeasesRef.current.delete(token);
             }
-            // If server rejected the reorder as stale, reload canonical positions
-            if (result?.stale) {
-              console.warn("[Sync] Stale reorder detected, reloading notes for canonical order");
+            // If server rejected the reorder as stale or the item was dropped,
+            // reload canonical positions so local state converges.
+            if (result?.stale || result?.dropped) {
+              console.warn("[Sync] Reorder not applied (stale/dropped), reloading notes for canonical order");
               loadNotes().catch(() => {});
             }
           }

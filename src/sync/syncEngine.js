@@ -152,18 +152,31 @@ export class SyncEngine {
             console.warn(`[SyncEngine] ${item.type} 404: note ${item.noteId}, dropping queue item`);
             this._serverReachable = true;
             await removeQueueItem(item.queueId);
+            // Notify so reorder leases (and other resources) are released
+            try { await this.onSyncComplete(item, { dropped: true }); } catch (e) {
+              console.error("[SyncEngine] onSyncComplete (dropped) error:", e);
+            }
             continue;
           } else if (isForbidden && item.noteId) {
-            // 403 on a note mutation — access revoked or note no longer ours.
-            // Purge this queue item AND all remaining items for the same note,
-            // then notify the UI so it can remove the zombie note locally.
-            // This handles the case where note_access_revoked SSE was missed
-            // (e.g. client was offline when access was revoked).
             this._serverReachable = true;
-            console.warn(`[SyncEngine] ${item.type} 403: note ${item.noteId}, purging locally`);
-            await purgeQueueForNote(item.noteId, this._userId, this._sessionId);
-            try { await this.onNoteInaccessible(item.noteId); } catch (e) {
-              console.error("[SyncEngine] onNoteInaccessible error:", e);
+            if (item.noteId === "__reorder__") {
+              // Meta-item (reorder) — no real note to purge. Just drop and release leases.
+              console.warn(`[SyncEngine] reorder 403, dropping queue item`);
+              await removeQueueItem(item.queueId);
+              try { await this.onSyncComplete(item, { dropped: true }); } catch (e) {
+                console.error("[SyncEngine] onSyncComplete (dropped) error:", e);
+              }
+            } else {
+              // 403 on a note mutation — access revoked or note no longer ours.
+              // Purge this queue item AND all remaining items for the same note,
+              // then notify the UI so it can remove the zombie note locally.
+              // This handles the case where note_access_revoked SSE was missed
+              // (e.g. client was offline when access was revoked).
+              console.warn(`[SyncEngine] ${item.type} 403: note ${item.noteId}, purging locally`);
+              await purgeQueueForNote(item.noteId, this._userId, this._sessionId);
+              try { await this.onNoteInaccessible(item.noteId); } catch (e) {
+                console.error("[SyncEngine] onNoteInaccessible error:", e);
+              }
             }
             continue;
           } else if (isRateLimited) {
