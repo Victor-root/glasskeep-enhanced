@@ -7,7 +7,7 @@ import {
   removeQueueItem,
   collapseQueue,
   getQueueStats,
-  getNote as idbGetNote,
+  purgeQueueForNote,
 } from "./localDb.js";
 
 const API_BASE = "/api";
@@ -35,13 +35,14 @@ const HEALTH_OFFLINE_INTERVAL = 3000;    // 3s when server is known to be down
  *   pending/processing/failed/total/items: queue stats
  */
 export class SyncEngine {
-  constructor({ getToken, userId, sessionId, onStatusChange, onSyncComplete, onSyncError }) {
+  constructor({ getToken, userId, sessionId, onStatusChange, onSyncComplete, onSyncError, onNoteInaccessible }) {
     this.getToken = getToken;
     this._userId = userId;
     this._sessionId = sessionId;
     this.onStatusChange = onStatusChange || (() => {});
     this.onSyncComplete = onSyncComplete || (() => {});
     this.onSyncError = onSyncError || (() => {});
+    this.onNoteInaccessible = onNoteInaccessible || (() => {});
     this._processing = false;
     this._isChecking = false; // true while forceSync health-checks (immediate UI feedback)
     this._healthTimer = null;
@@ -153,25 +154,18 @@ export class SyncEngine {
             await removeQueueItem(item.queueId);
             continue;
           } else if (isForbidden && item.noteId) {
-            // 403 on a note mutation — access may have been revoked.
-            // If the note was already removed locally (via note_access_revoked SSE),
-            // convergence is achieved: drop silently. Otherwise treat as a real
-            // authorization error — mark failed, no retry, surface to caller.
+            // 403 on a note mutation — access revoked or note no longer ours.
+            // Purge this queue item AND all remaining items for the same note,
+            // then notify the UI so it can remove the zombie note locally.
+            // This handles the case where note_access_revoked SSE was missed
+            // (e.g. client was offline when access was revoked).
             this._serverReachable = true;
-            const localNote = await idbGetNote(item.noteId, this._userId, this._sessionId).catch(() => null);
-            if (!localNote) {
-              // Note already purged locally — expected after access revocation
-              await removeQueueItem(item.queueId);
-              continue;
+            console.warn(`[SyncEngine] ${item.type} 403: note ${item.noteId}, purging locally`);
+            await purgeQueueForNote(item.noteId, this._userId, this._sessionId);
+            try { await this.onNoteInaccessible(item.noteId); } catch (e) {
+              console.error("[SyncEngine] onNoteInaccessible error:", e);
             }
-            // Note still present locally — unexpected 403, surface as error
-            console.warn(`[SyncEngine] ${item.type} 403: note ${item.noteId}, access denied`);
-            await updateQueueItem(item.queueId, {
-              status: "failed",
-              lastError: "Access denied (HTTP 403)",
-              attempts: MAX_RETRIES,
-            });
-            this.onSyncError(item, err);
+            continue;
           } else if (isRateLimited) {
             // Rate limited (HTTP 429). Server IS reachable, just throttling.
             this._serverReachable = true;

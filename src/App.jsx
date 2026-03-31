@@ -6370,6 +6370,19 @@ export default function App() {
         }
       },
       onSyncError: (item, err) => console.warn("[Sync] Failed:", item.type, item.noteId, err.message),
+      onNoteInaccessible: async (noteId) => {
+        // Server returned 403 on a note mutation — access was revoked while
+        // we were offline (SSE note_access_revoked was missed). Force full
+        // local convergence: remove note from UI, IDB, leases, and modal.
+        const nid = String(noteId);
+        setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+        idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
+        // Queue already purged by the sync engine before calling us
+        localLeaseRef.current.delete(nid);
+        if (String(activeIdRef.current) === nid) {
+          forceCloseModalForRemoteDelete(nid);
+        }
+      },
     });
     syncEngineRef.current = engine;
     engine.startHealthChecks();
