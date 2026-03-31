@@ -3501,12 +3501,6 @@ function AdminPanel({
   });
   const [isUpdatingUser, setIsUpdatingUser] = useState(false);
 
-  console.log("AdminPanel render:", {
-    open,
-    adminSettings,
-    allUsers: allUsers?.length,
-  });
-
   const handleCreateUser = async (e) => {
     e.preventDefault();
     if (!newUserForm.name || !newUserForm.email || !newUserForm.password) {
@@ -11077,11 +11071,6 @@ export default function App() {
       />
 
       {/* Admin Panel */}
-      {console.log("Rendering AdminPanel with:", {
-        adminPanelOpen,
-        adminSettings,
-        allUsers: allUsers?.length,
-      })}
       <AdminPanel
         open={adminPanelOpen}
         onClose={() => setAdminPanelOpen(false)}
