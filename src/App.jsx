@@ -6364,6 +6364,11 @@ export default function App() {
               }
               pendingReorderLeasesRef.current.delete(token);
             }
+            // If server rejected the reorder as stale, reload canonical positions
+            if (result?.stale) {
+              console.warn("[Sync] Stale reorder detected, reloading notes for canonical order");
+              loadNotes().catch(() => {});
+            }
           }
         } catch (e) {
           console.error("[Sync] reconciliation error:", e);
@@ -9038,7 +9043,7 @@ export default function App() {
     const reorderToken = `R${++reorderTokenSeqRef.current}`;
     pendingReorderLeasesRef.current.set(reorderToken, noteLeases);
     try {
-      await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds, otherIds, _reorderToken: reorderToken } });
+      await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds, otherIds, _reorderToken: reorderToken, client_reordered_at: new Date().toISOString() } });
     } catch (e) {
       // enqueue failed — leases stay active
     }
@@ -9123,7 +9128,7 @@ export default function App() {
     const reorderToken = `R${++reorderTokenSeqRef.current}`;
     pendingReorderLeasesRef.current.set(reorderToken, noteLeases);
     try {
-      await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds: newPinned, otherIds: newOthers, _reorderToken: reorderToken } });
+      await enqueueAndSync({ type: "reorder", noteId: "__reorder__", payload: { pinnedIds: newPinned, otherIds: newOthers, _reorderToken: reorderToken, client_reordered_at: new Date().toISOString() } });
     } catch (e) {
       // enqueue failed — leases stay active (SSE protection maintained)
     }

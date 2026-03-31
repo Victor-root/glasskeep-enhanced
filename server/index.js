@@ -161,6 +161,12 @@ CREATE TABLE IF NOT EXISTS user_settings (
   settings_json TEXT NOT NULL DEFAULT '{}',
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS user_reorder_state (
+  user_id INTEGER PRIMARY KEY,
+  last_reorder_at TEXT NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 `);
 
 // Tiny migrations (safe to run repeatedly)
@@ -444,6 +450,11 @@ const patchPartialWithCollaboration = db.prepare(`
 `);
 const patchPosition = db.prepare(`
   UPDATE notes SET position=@position, pinned=@pinned WHERE id=@id AND user_id=@user_id
+`);
+const getLastReorderAt = db.prepare("SELECT last_reorder_at FROM user_reorder_state WHERE user_id = ?");
+const upsertReorderAt = db.prepare(`
+  INSERT INTO user_reorder_state (user_id, last_reorder_at) VALUES (?, ?)
+  ON CONFLICT(user_id) DO UPDATE SET last_reorder_at = excluded.last_reorder_at
 `);
 const deleteNote = db.prepare("DELETE FROM notes WHERE id = ? AND user_id = ?");
 
@@ -931,9 +942,20 @@ app.delete("/api/notes/:id", auth, (req, res) => {
   res.json({ ok: true });
 });
 
-// Reorder within sections
+// Reorder within sections (LWW-protected)
 app.post("/api/notes/reorder", auth, (req, res) => {
-  const { pinnedIds = [], otherIds = [] } = req.body || {};
+  const { pinnedIds = [], otherIds = [], client_reordered_at } = req.body || {};
+
+  // LWW stale check: reject if a newer reorder already applied
+  const stored = getLastReorderAt.get(req.user.id);
+  if (client_reordered_at && stored && stored.last_reorder_at > client_reordered_at) {
+    console.warn(`[LWW] Stale reorder from user ${req.user.id}: client=${client_reordered_at} < stored=${stored.last_reorder_at}`);
+    return res.json({ ok: true, stale: true });
+  }
+  if (!client_reordered_at) {
+    console.warn("[LWW] Reorder accepted without client_reordered_at (legacy compat)");
+  }
+
   const base = Date.now();
   const step = 1;
   const reorder = db.transaction(() => {
@@ -953,6 +975,9 @@ app.post("/api/notes/reorder", auth, (req, res) => {
         pinned: 0,
       });
     }
+    // Record timestamp for future LWW checks
+    const ts = client_reordered_at || new Date().toISOString();
+    upsertReorderAt.run(req.user.id, ts);
   });
   reorder();
 
