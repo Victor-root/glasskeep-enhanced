@@ -5709,9 +5709,10 @@ export default function App() {
     try {
       await enqueueAndSync(syncAction);
     } catch (e) {
-      return; // lease stays active — SSE protection maintained
+      return false; // lease stays active — SSE protection maintained
     }
     releaseLocalLeaseWithPrune(noteId, leaseId);
+    return true;
   };
   // ─── Pending reorder leases ───
   // Reorder queue items use noteId:"__reorder__", so hasPendingChanges(realNoteId)
@@ -8970,11 +8971,9 @@ export default function App() {
         ),
       );
       invalidateNotesCache();
-      try {
-        await enqueueWithLease(noteId, { type: "update", noteId, payload }, leaseId);
-      } catch (e) {
-        console.error("Enqueue failed in saveModal:", e);
-        // Enqueue failed — don't advance baselines so retry can detect diff
+      const enqueued = await enqueueWithLease(noteId, { type: "update", noteId, payload }, leaseId);
+      if (!enqueued) {
+        // Enqueue failed — don't advance baselines so closeModal retry can detect diff
         setSavingModal(false);
         return;
       }
