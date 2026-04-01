@@ -59,6 +59,22 @@ export class SyncEngine {
   // ─── Public API ───
 
   /**
+   * Signal that the server is reachable (e.g. SSE connected).
+   * Bypasses healthCheck — useful when fetch-based checks fail due to
+   * SW cache issues but SSE (EventSource) connects fine.
+   */
+  async notifyServerReachable() {
+    if (this._destroyed) return;
+    if (this._serverReachable === true && this._failedChecks === 0) return; // already known
+    this._serverReachable = true;
+    this._lastSyncError = null;
+    this._failedChecks = 0;
+    this._adjustHealthInterval();
+    await this._emitStatus();
+    this.processQueue();
+  }
+
+  /**
    * Trigger sync processing. Safe to call repeatedly.
    */
   async processQueue() {

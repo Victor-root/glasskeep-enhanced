@@ -7146,6 +7146,12 @@ export default function App() {
         es.onopen = () => {
           console.log("SSE connected");
           setSseConnected(true);
+          // SSE connected = server is definitely reachable. Inform the sync
+          // engine so it unblocks the queue even when fetch-based health checks
+          // fail (e.g. Service Worker cache issues causing fetch timeouts).
+          if (syncEngineRef.current) {
+            syncEngineRef.current.notifyServerReachable();
+          }
           // On reconnection (not first connect), reload the view — but only
           // AFTER the sync queue has finished processing. If we reload while
           // processQueue is running, the server may return stale data (patches
