@@ -8755,8 +8755,13 @@ export default function App() {
       initial.color !== serverState.color;
 
     // If server changed and user hasn't edited locally, update initial state to server state
-    // This prevents overwriting server changes when user closes without editing
-    if (serverChanged && !hasNoteBeenModified()) {
+    // This prevents overwriting server changes when user closes without editing.
+    // Skip if the note has an active local lease — a local save (auto-save metadata,
+    // auto-save text, drawing save) is in flight and the `notes` state hasn't caught up
+    // yet with the optimistic setNotes. Without this guard, the stale `notes` value
+    // would briefly reset modal state, causing a visible flicker (e.g. deleted image
+    // reappearing then disappearing).
+    if (serverChanged && !hasNoteBeenModified() && !isNoteLocallyProtected(String(activeId))) {
       initialModalStateRef.current = serverState;
       // Update local modal state to match server (user hasn't edited, so safe to update)
       setMTitle(serverState.title);
