@@ -8519,6 +8519,11 @@ export default function App() {
   // Track initial state when opening modal to detect if user actually edited
   // Must be defined before openModal
   const initialModalStateRef = useRef(null);
+  // Committed baseline: only advances when autoSaveTextNote actually succeeds
+  // (IDB write + enqueue). closeModal uses this to detect unsaved diffs, so a
+  // failed autosave still gets retried on close. initialModalStateRef may advance
+  // eagerly to prevent effect re-triggers — this ref is the safety net.
+  const committedBaselineRef = useRef(null);
   // Track if we pushed a history entry for the modal (Android back button support)
   const modalHistoryRef = useRef(false);
 
@@ -8558,13 +8563,15 @@ export default function App() {
     setMColor(n.color || "default");
 
     // Store initial state to detect if user actually edited
-    initialModalStateRef.current = {
+    const baselineState = {
       title: n.title || "",
       content: n.type === "draw" ? "" : n.content || "",
       tags: Array.isArray(n.tags) ? n.tags : [],
       images: Array.isArray(n.images) ? n.images : [],
       color: n.color || "default",
     };
+    initialModalStateRef.current = baselineState;
+    committedBaselineRef.current = { ...baselineState };
 
     setViewMode(true);
     setModalMenuOpen(false);
@@ -8617,6 +8624,8 @@ export default function App() {
   // Works for ALL text notes (not just collaborative) — mirrors drawing/checklist pattern
   // If existingLeaseId is provided, this function owns that lease and releases it on
   // success. Otherwise acquires its own (used when called directly from closeModal).
+  // Returns true if IDB + enqueue both succeeded, false otherwise.
+  // Callers use this to decide whether to advance committedBaselineRef.
   const autoSaveTextNote = useCallback(async (noteId, fields, existingLeaseId) => {
     const nId = String(noteId);
     const lid = existingLeaseId || acquireLocalLease(nId);
@@ -8639,6 +8648,8 @@ export default function App() {
       }
     } catch (e) {
       console.error("IndexedDB text auto-save failed:", e);
+      // IDB failed — don't enqueue, keep lease, signal failure
+      return false;
     }
     invalidateNotesCache();
 
@@ -8652,10 +8663,11 @@ export default function App() {
     } catch (e) {
       console.error("Text enqueue failed:", e);
       // Don't release lease on failure — keep SSE guard active
-      return;
+      return false;
     }
     // hasPendingChanges() now returns true → SSE protection via queue takes over
     releaseLocalLeaseWithPrune(nId, lid);
+    return true;
   }, [enqueueAndSync]);
 
   // Local-first auto-save for text metadata (color, tags, images) — immediate, no debounce
@@ -8679,15 +8691,16 @@ export default function App() {
     if (tagsChanged) metaPatch.tags = mTagList;
     if (imagesChanged) metaPatch.images = mImages;
 
-    autoSaveTextNote(activeId, metaPatch, leaseId);
+    // Advance initialModalStateRef eagerly to prevent effect re-trigger,
+    // but only advance committedBaselineRef after confirmed persistence.
+    const committedFields = { ...(colorChanged ? { color: mColor } : {}), ...(tagsChanged ? { tags: mTagList } : {}), ...(imagesChanged ? { images: mImages } : {}) };
+    initialModalStateRef.current = { ...initial, ...committedFields };
 
-    // Update initial state so we don't re-trigger
-    initialModalStateRef.current = {
-      ...initial,
-      ...(colorChanged ? { color: mColor } : {}),
-      ...(tagsChanged ? { tags: mTagList } : {}),
-      ...(imagesChanged ? { images: mImages } : {}),
-    };
+    autoSaveTextNote(activeId, metaPatch, leaseId).then((ok) => {
+      if (ok && committedBaselineRef.current) {
+        committedBaselineRef.current = { ...committedBaselineRef.current, ...committedFields };
+      }
+    });
   }, [mColor, mTagList, mImages, open, activeId, mType, autoSaveTextNote]);
 
   // Auto-save text content (title + body): debounced local-first persist + patch sync
@@ -8713,17 +8726,19 @@ export default function App() {
       if (titleChanged) contentPatch.title = mTitle.trim();
       if (contentChanged) contentPatch.content = mBody;
 
-      // Transfer lease ownership to autoSaveTextNote — it will release after enqueue
-      autoSaveTextNote(activeId, contentPatch, leaseId);
-
-      // Update initial state so subsequent comparisons are against the saved version
+      // Transfer lease ownership to autoSaveTextNote — it will release after enqueue.
+      // Advance initialModalStateRef eagerly (prevent re-trigger), but only advance
+      // committedBaselineRef after confirmed IDB + enqueue success.
+      const committedFields = { ...(titleChanged ? { title: mTitle.trim() } : {}), ...(contentChanged ? { content: mBody } : {}) };
       if (initialModalStateRef.current) {
-        initialModalStateRef.current = {
-          ...initialModalStateRef.current,
-          ...(titleChanged ? { title: mTitle.trim() } : {}),
-          ...(contentChanged ? { content: mBody } : {}),
-        };
+        initialModalStateRef.current = { ...initialModalStateRef.current, ...committedFields };
       }
+
+      autoSaveTextNote(activeId, contentPatch, leaseId).then((ok) => {
+        if (ok && committedBaselineRef.current) {
+          committedBaselineRef.current = { ...committedBaselineRef.current, ...committedFields };
+        }
+      });
     }, 1000); // 1 second debounce
 
     return () => {
@@ -8768,6 +8783,7 @@ export default function App() {
     // reappearing then disappearing).
     if (serverChanged && !hasNoteBeenModified() && !isNoteLocallyProtected(String(activeId))) {
       initialModalStateRef.current = serverState;
+      committedBaselineRef.current = { ...serverState };
       // Update local modal state to match server (user hasn't edited, so safe to update)
       setMTitle(serverState.title);
       setMBody(serverState.content);
@@ -8827,16 +8843,18 @@ export default function App() {
       flushPendingDrawingSave();
     }
 
-    // Flush any pending text changes immediately before closing (local-first)
+    // Flush any pending text changes immediately before closing (local-first).
+    // Use committedBaselineRef (not initialModalStateRef) so that a failed
+    // autosave still produces a diff here and gets retried.
     if (activeId && mType === "text" && !viewMode) {
-      const initial = initialModalStateRef.current;
-      if (initial) {
+      const baseline = committedBaselineRef.current;
+      if (baseline) {
         const patch = {};
-        if (initial.title !== mTitle.trim()) patch.title = mTitle.trim();
-        if (initial.content !== mBody) patch.content = mBody;
-        if (initial.color !== mColor) patch.color = mColor;
-        if (JSON.stringify(initial.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
-        if (JSON.stringify(initial.images) !== JSON.stringify(mImages)) patch.images = mImages;
+        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
+        if (baseline.content !== mBody) patch.content = mBody;
+        if (baseline.color !== mColor) patch.color = mColor;
+        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
+        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
         if (Object.keys(patch).length > 0) {
           autoSaveTextNote(activeId, patch);
         }
@@ -8873,15 +8891,16 @@ export default function App() {
     const nowIso = new Date().toISOString();
 
     if (mType === "text") {
-      // Text notes: use targeted patch with only changed fields
+      // Text notes: use targeted patch with only changed fields.
+      // Use committedBaselineRef so a failed autosave is retried here.
       const patch = {};
-      const initial = initialModalStateRef.current;
-      if (initial) {
-        if (initial.title !== mTitle.trim()) patch.title = mTitle.trim();
-        if (initial.content !== mBody) patch.content = mBody;
-        if (initial.color !== mColor) patch.color = mColor;
-        if (JSON.stringify(initial.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
-        if (JSON.stringify(initial.images) !== JSON.stringify(mImages)) patch.images = mImages;
+      const baseline = committedBaselineRef.current;
+      if (baseline) {
+        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
+        if (baseline.content !== mBody) patch.content = mBody;
+        if (baseline.color !== mColor) patch.color = mColor;
+        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
+        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
       } else {
         // No initial state — send everything
         Object.assign(patch, { title: mTitle.trim(), content: mBody, color: mColor, tags: mTagList, images: mImages });
