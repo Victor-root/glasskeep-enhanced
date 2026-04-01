@@ -6290,6 +6290,21 @@ export default function App() {
             return; // stale write fully handled — skip normal reconciliation
           }
 
+          // ── Dropped mutation (404): note gone on server ──
+          // Purge local ghost so UI converges without a full reload.
+          const DROPPABLE_TYPES = new Set(["update", "patch", "archive", "trash", "restore"]);
+          if (result?.dropped && DROPPABLE_TYPES.has(item.type) && item.noteId) {
+            const nid = String(item.noteId);
+            console.warn(`[Sync] ${item.type} dropped (404) for note ${nid}, purging locally`);
+            setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+            try { await idbDeleteNote(nid, uid, sid); } catch {}
+            localLeaseRef.current.delete(nid);
+            if (String(activeIdRef.current) === nid) {
+              forceCloseModalForRemoteDelete(nid);
+            }
+            return;
+          }
+
           // ── Normal reconciliation: server accepted the write ──
           // Endpoints now return { ok, note } — reconcile with canonical note.
           const serverNote = result?.note || (result?.id ? result : null);
