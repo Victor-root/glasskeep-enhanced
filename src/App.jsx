@@ -7044,7 +7044,7 @@ export default function App() {
             }
             next = newNotes.length > 0
               ? sortNotesByRecency([...updated, ...newNotes])
-              : updated;
+              : sortNotesByRecency(updated);
           }
           return next;
         });
