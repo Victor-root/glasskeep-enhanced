@@ -147,10 +147,10 @@ export class SyncEngine {
           const isNotFound = err.status === 404;
           const isRateLimited = err.status === 429;
           const isTimeout = !!err.isTimeout;
-          const isBadTimestamp = err.status === 400 && (/client_(updated|reordered)_at is required/i.test(err.message) || /Invalid timestamp format/i.test(err.message) || /Timestamp too far in the future/i.test(err.message));
+          const isMissingTimestamp = err.status === 400 && /client_(updated|reordered)_at is required/i.test(err.message);
           const isNetworkError = !isTimeout && !isRateLimited && !isForbidden && (err.isNetworkError || err.status === 0 || !err.status);
 
-          if (isBadTimestamp) {
+          if (isMissingTimestamp) {
             // Legacy queue item without required LWW timestamp — permanently invalid.
             // Drop immediately: retrying will never help.
             console.warn(`[SyncEngine] ${item.type} 400: missing LWW timestamp, dropping queue item (noteId=${item.noteId})`);

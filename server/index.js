@@ -1284,33 +1284,14 @@ app.get("/api/notes/trashed", auth, (req, res) => {
 app.delete("/api/notes/:id/permanent", auth, (req, res) => {
   const id = req.params.id;
 
-  // LWW guard — prevents a stale permanent delete from winning over a newer restore.
-  // client_updated_at is optional for backward compat during rollout; if present, validated.
-  const rawTs = req.body?.client_updated_at;
-  if (rawTs) {
-    const tsResult = validateLwwTimestamp(rawTs);
-    if (tsResult.error) {
-      return res.status(400).json({ error: tsResult.error });
-    }
-    const existing = getNote.get(id, req.user.id);
-    if (!existing) {
-      return res.status(404).json({ error: "Note not found" });
-    }
-    if (!existing.trashed) {
-      return res.status(400).json({ error: "Note must be in trash to permanently delete" });
-    }
-    if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
-      return res.json({ ok: true, stale: true, note: serializeNote(existing) });
-    }
-
-    const recipientIds = new Set([existing.user_id, ...getCollaboratorUserIdsForNote(id)]);
-    deleteNote.run(id, req.user.id);
-    const evt = { type: "note_deleted", noteId: id };
-    for (const uid of recipientIds) sendEventToUser(uid, evt);
-    return res.json({ ok: true });
+  if (!req.body?.client_updated_at) {
+    return res.status(400).json({ error: "client_updated_at is required" });
+  }
+  const tsResult = validateLwwTimestamp(req.body.client_updated_at);
+  if (tsResult.error) {
+    return res.status(400).json({ error: tsResult.error });
   }
 
-  // Fallback path (no timestamp): trashed check only — hard win.
   const existing = getNote.get(id, req.user.id);
   if (!existing) {
     return res.status(404).json({ error: "Note not found" });
@@ -1319,12 +1300,14 @@ app.delete("/api/notes/:id/permanent", auth, (req, res) => {
     return res.status(400).json({ error: "Note must be in trash to permanently delete" });
   }
 
-  // Capture recipients before deletion (row will be gone after deleteNote)
-  const recipientIds = new Set([existing.user_id, ...getCollaboratorUserIdsForNote(id)]);
+  // LWW: reject if a newer restore/update already applied
+  if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
+    return res.json({ ok: true, stale: true, note: serializeNote(existing) });
+  }
 
+  const recipientIds = new Set([existing.user_id, ...getCollaboratorUserIdsForNote(id)]);
   deleteNote.run(id, req.user.id);
 
-  // Notify other sessions so they remove the note without a full reload
   const evt = { type: "note_deleted", noteId: id };
   for (const uid of recipientIds) sendEventToUser(uid, evt);
 
