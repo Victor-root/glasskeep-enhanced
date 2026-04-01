@@ -7402,6 +7402,8 @@ export default function App() {
   const flushPendingDrawingSave = useCallback(async () => {
     const pending = pendingDrawingSaveRef.current;
     if (!pending) return;
+    // Clear pending ref eagerly to prevent double-flush from concurrent callers,
+    // but restore it on failure so closeModal retry can still pick it up.
     pendingDrawingSaveRef.current = null;
 
     if (drawingDebounceTimerRef.current) {
@@ -7410,7 +7412,6 @@ export default function App() {
     }
 
     const { noteId, drawingData, leaseId } = pending;
-    prevDrawingRef.current = drawingData;
     const nowIso = new Date().toISOString();
     const drawingContent = JSON.stringify(drawingData);
 
@@ -7430,6 +7431,9 @@ export default function App() {
       }
     } catch (e) {
       console.error("IndexedDB drawing flush failed:", e);
+      // IDB failed — restore pending ref so closeModal can retry
+      pendingDrawingSaveRef.current = pending;
+      return;
     }
     invalidateNotesCache();
 
@@ -7442,10 +7446,14 @@ export default function App() {
       });
     } catch (e) {
       console.error("Drawing enqueue failed:", e);
-      // Don't release lease on failure — keep SSE guard active
+      // Enqueue failed — restore pending ref so closeModal can retry.
+      // Don't release lease on failure — keep SSE guard active.
+      pendingDrawingSaveRef.current = pending;
       return;
     }
 
+    // IDB + enqueue both succeeded — advance committed baseline
+    prevDrawingRef.current = drawingData;
     // Queue item exists — release this lease + prune older zombies for this note
     releaseLocalLeaseWithPrune(noteId, leaseId);
   }, [currentUser?.id, sessionId, enqueueAndSync]);
@@ -8838,9 +8846,20 @@ export default function App() {
     // Prevent double-triggering while exit animation is running
     if (modalClosingTimerRef.current) return;
 
-    // Flush any pending drawing debounce before closing
+    // Flush any pending drawing debounce before closing.
+    // flushPendingDrawingSave restores pendingDrawingSaveRef on failure,
+    // so a second close attempt can retry.
     if (activeId && mType === "draw") {
       flushPendingDrawingSave();
+    }
+
+    // Retry checklist if the last autosave failed (prevItemsRef wasn't advanced).
+    if (activeId && mType === "checklist" && mItems) {
+      const prevJson = JSON.stringify(prevItemsRef.current || []);
+      const currentJson = JSON.stringify(mItems);
+      if (prevJson !== currentJson) {
+        syncChecklistItems(mItems);
+      }
     }
 
     // Flush any pending text changes immediately before closing (local-first).
@@ -8924,13 +8943,6 @@ export default function App() {
           ? { ...base, type: "checklist", content: "", items: mItems, client_updated_at: nowIso }
           : { ...base, type: "draw", content: JSON.stringify(mDrawingData), items: [], client_updated_at: nowIso };
 
-      prevItemsRef.current =
-        mType === "checklist" ? (Array.isArray(mItems) ? mItems : []) : [];
-      prevDrawingRef.current =
-        mType === "draw"
-          ? mDrawingData || { paths: [], dimensions: null }
-          : { paths: [], dimensions: null };
-
       const updatedFields = {
         ...payload,
         updated_at: nowIso,
@@ -8947,6 +8959,9 @@ export default function App() {
         }
       } catch (e) {
         console.error("IndexedDB update failed:", e);
+        // IDB failed — don't advance baselines
+        setSavingModal(false);
+        return;
       }
 
       setNotes((prev) =>
@@ -8955,7 +8970,22 @@ export default function App() {
         ),
       );
       invalidateNotesCache();
-      await enqueueWithLease(noteId, { type: "update", noteId, payload }, leaseId);
+      try {
+        await enqueueWithLease(noteId, { type: "update", noteId, payload }, leaseId);
+      } catch (e) {
+        console.error("Enqueue failed in saveModal:", e);
+        // Enqueue failed — don't advance baselines so retry can detect diff
+        setSavingModal(false);
+        return;
+      }
+
+      // IDB + enqueue both succeeded — advance committed baselines
+      prevItemsRef.current =
+        mType === "checklist" ? (Array.isArray(mItems) ? mItems : []) : [];
+      prevDrawingRef.current =
+        mType === "draw"
+          ? mDrawingData || { paths: [], dimensions: null }
+          : { paths: [], dimensions: null };
     }
 
     setSavingModal(false);
@@ -9178,7 +9208,6 @@ export default function App() {
 
   // Local-first helper: persist checklist changes to IndexedDB + sync queue
   const syncChecklistItems = async (newItems) => {
-    prevItemsRef.current = newItems;
     if (!activeId) return;
     const noteId = String(activeId);
     const nowIso = new Date().toISOString();
@@ -9203,6 +9232,8 @@ export default function App() {
       }
     } catch (e) {
       console.error("IndexedDB checklist update failed:", e);
+      // IDB failed — don't advance baseline, keep lease, signal failure
+      return;
     }
     invalidateNotesCache();
     // Enqueue for server sync — after this, hasPendingChanges() protects the note
@@ -9215,9 +9246,11 @@ export default function App() {
     } catch (e) {
       console.error("Checklist enqueue failed:", e);
       // Don't release lease on failure — keep SSE guard active.
-      // Next successful syncChecklistItems for this note will naturally hold a new lease.
+      // Don't advance prevItemsRef — closeModal retry can still detect the diff.
       return;
     }
+    // IDB + enqueue both succeeded — advance committed baseline
+    prevItemsRef.current = newItems;
     // Queue item exists — release this lease + prune older zombies for this note
     releaseLocalLeaseWithPrune(noteId, leaseId);
   };
