@@ -2202,24 +2202,26 @@ function NoteCard({
   const displayTags = allTags.slice(0, MAX_TAG_CHIPS);
 
   const group = n.pinned ? "pinned" : "others";
+  const isOwned = !currentUser || !n.user_id || n.user_id === currentUser.id;
+  const canDrag = !multiMode && isOwned;
 
   return (
     <div
-      draggable={!multiMode}
+      draggable={canDrag}
       onDragStart={(e) => {
-        if (!multiMode) onDragStart(n.id, e);
+        if (canDrag) onDragStart(n.id, e);
       }}
       onDragOver={(e) => {
-        if (!multiMode) onDragOver(n.id, group, e);
+        if (canDrag) onDragOver(n.id, group, e);
       }}
       onDragLeave={(e) => {
-        if (!multiMode) onDragLeave(e);
+        if (canDrag) onDragLeave(e);
       }}
       onDrop={(e) => {
-        if (!multiMode) onDrop(n.id, group, e);
+        if (canDrag) onDrop(n.id, group, e);
       }}
       onDragEnd={(e) => {
-        if (!multiMode) onDragEnd(e);
+        if (canDrag) onDragEnd(e);
       }}
       onClick={(e) => {
         if (multiMode) {
@@ -6369,7 +6371,10 @@ export default function App() {
             // reload canonical positions so local state converges.
             if (result?.stale || result?.dropped) {
               console.warn("[Sync] Reorder not applied (stale/dropped), reloading notes for canonical order");
-              loadNotes().catch(() => {});
+              const cf = tagFilterRef.current;
+              if (cf === "ARCHIVED") loadArchivedNotes().catch(() => {});
+              else if (cf === "TRASHED") loadTrashedNotes().catch(() => {});
+              else loadNotes().catch(() => {});
             }
           }
         } catch (e) {
@@ -9065,6 +9070,12 @@ export default function App() {
 
   /** -------- Reset note order -------- */
   const resetNoteOrder = async (overridePositions = true) => {
+    // Block if any note in the view is not owned — server rejects mixed payloads.
+    if (currentUser && notes.some((n) => n.user_id && n.user_id !== currentUser.id)) {
+      showToast(t("reorderBlockedCollabNotes"), "error");
+      return;
+    }
+
     const sorted = notes.slice().sort((a, b) => {
       const ap = a?.pinned ? 1 : 0;
       const bp = b?.pinned ? 1 : 0;
@@ -9147,6 +9158,14 @@ export default function App() {
     dragId.current = null;
     if (!dragged || String(dragged) === String(overId)) return;
     if (dragGroup.current !== group) return;
+
+    // Block reorder if any note in the view is not owned by the current user.
+    // Server rejects partial-ownership payloads, so don't even attempt it.
+    if (currentUser && notes.some((n) => n.user_id && n.user_id !== currentUser.id)) {
+      showToast(t("reorderBlockedCollabNotes"), "error");
+      dragGroup.current = null;
+      return;
+    }
 
     const pinnedIds = notes.filter((n) => n.pinned).map((n) => String(n.id));
     const otherIds = notes.filter((n) => !n.pinned).map((n) => String(n.id));

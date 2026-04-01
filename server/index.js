@@ -943,6 +943,16 @@ app.post("/api/notes/reorder", auth, (req, res) => {
     return res.status(400).json({ error: "client_reordered_at is required" });
   }
 
+  // Ownership check: every noteId must belong to the requesting user.
+  // Reject the entire payload if any note is not owned — no partial apply.
+  const reorderIds = [...pinnedIds, ...otherIds];
+  for (const nid of reorderIds) {
+    const note = getNoteById.get(nid);
+    if (note && note.user_id !== req.user.id) {
+      return res.status(403).json({ error: "Reorder payload contains notes not owned by you" });
+    }
+  }
+
   // LWW stale check: reject if a newer reorder already applied
   const stored = getLastReorderAt.get(req.user.id);
   if (stored && stored.last_reorder_at > client_reordered_at) {
