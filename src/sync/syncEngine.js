@@ -147,9 +147,20 @@ export class SyncEngine {
           const isNotFound = err.status === 404;
           const isRateLimited = err.status === 429;
           const isTimeout = !!err.isTimeout;
+          const isMissingTimestamp = err.status === 400 && /client_(updated|reordered)_at is required/i.test(err.message);
           const isNetworkError = !isTimeout && !isRateLimited && !isForbidden && (err.isNetworkError || err.status === 0 || !err.status);
 
-          if (isAuthError) {
+          if (isMissingTimestamp) {
+            // Legacy queue item without required LWW timestamp — permanently invalid.
+            // Drop immediately: retrying will never help.
+            console.warn(`[SyncEngine] ${item.type} 400: missing LWW timestamp, dropping queue item (noteId=${item.noteId})`);
+            this._serverReachable = true;
+            await removeQueueItem(item.queueId);
+            try { await this.onSyncComplete(item, { dropped: true }); } catch (e) {
+              console.error("[SyncEngine] onSyncComplete (dropped) error:", e);
+            }
+            continue;
+          } else if (isAuthError) {
             await updateQueueItem(item.queueId, {
               status: "failed",
               lastError: "Authentication expired",
