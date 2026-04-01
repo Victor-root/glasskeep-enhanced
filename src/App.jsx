@@ -7109,14 +7109,13 @@ export default function App() {
         } catch (e) {}
 
         if (belongsInView) {
-          // Upsert into current notes list
+          // Upsert into current notes list and re-sort (position/pinned may have changed)
           setNotes((prev) => {
             const idx = prev.findIndex((n) => String(n.id) === nid);
             if (idx >= 0) {
-              // Update existing note in place
               const updated = [...prev];
               updated[idx] = serverNote;
-              return updated;
+              return sortNotesByRecency(updated);
             } else {
               // New note that belongs in this view - add to list
               return sortNotesByRecency([...prev, serverNote]);
