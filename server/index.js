@@ -263,22 +263,52 @@ if (ADMIN_EMAILS.length) {
 const nowISO = () => new Date().toISOString();
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-// ── LWW timestamp comparison ──
-// Strategy: PROGRESSIVE COMPATIBILITY (Strategy A)
-//
-// All current clients emit client_updated_at on every mutation. However,
-// we keep backward compat for edge cases (legacy sessions still in-flight,
-// import without explicit timestamps, collaboration edits from older builds).
-//
-// Rules:
-//   1. No stored timestamp → always accept (first write or migrated row)
-//   2. No incoming timestamp → accept (legacy compat — logged as warning)
-//   3. incoming >= stored → accept (equal wins for idempotent replays)
-//   4. incoming < stored → reject (stale write)
-function isNewerOrEqual(incomingTs, storedTs) {
-  if (!storedTs) return true;
-  if (!incomingTs) return false;
-  return incomingTs >= storedTs;
+// ── LWW timestamp validation & comparison ──
+// All timestamps must be valid ISO 8601 UTC. We parse, validate, and normalize
+// before storage so comparisons are always reliable (millisecond precision).
+// Rejects: non-ISO strings, offsets other than Z (force canonical UTC),
+// absurd future skew (>5 min ahead).
+const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Parse and validate an ISO timestamp string.
+ * Returns { ms, iso } on success, null on failure.
+ * Only accepts full ISO 8601 with Z suffix (canonical UTC).
+ */
+function parseIsoTimestamp(ts) {
+  if (typeof ts !== "string" || !ts) return null;
+  // Must be a valid ISO string ending in Z (UTC)
+  // Accept: 2026-04-01T12:34:56.789Z or 2026-04-01T12:34:56Z
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(ts)) return null;
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return null;
+  return { ms: d.getTime(), iso: d.toISOString() };
+}
+
+/**
+ * Validate a client timestamp for LWW.
+ * Returns { ms, iso } on success.
+ * Returns { error: string } if invalid or too far in the future.
+ */
+function validateLwwTimestamp(ts) {
+  const parsed = parseIsoTimestamp(ts);
+  if (!parsed) return { error: `Invalid timestamp format (expected ISO 8601 UTC ending in Z): ${ts}` };
+  if (parsed.ms > Date.now() + MAX_FUTURE_SKEW_MS) {
+    return { error: `Timestamp too far in the future: ${ts}` };
+  }
+  return parsed;
+}
+
+/**
+ * LWW comparison on milliseconds.
+ * Returns true if incoming should win (newer or equal).
+ */
+function isNewerOrEqual(incomingMs, storedTs) {
+  if (!storedTs) return true;       // no stored timestamp → first write wins
+  if (!incomingMs) return false;    // no incoming → reject
+  const storedParsed = parseIsoTimestamp(storedTs);
+  if (!storedParsed) return true;   // stored is corrupt → accept to fix it
+  return incomingMs >= storedParsed.ms;
 }
 
 // Serialize a DB row into the canonical JSON note object returned by all endpoints.
@@ -811,7 +841,9 @@ app.get("/api/notes", auth, (req, res) => {
 app.post("/api/notes", auth, (req, res) => {
   const body = req.body || {};
   const noteId = body.id || uid();
-  const clientTs = body.client_updated_at || body.timestamp || nowISO();
+  const rawClientTs = body.client_updated_at || body.timestamp || nowISO();
+  const parsedClientTs = parseIsoTimestamp(rawClientTs);
+  const clientTs = parsedClientTs ? parsedClientTs.iso : nowISO();
   const n = {
     id: noteId,
     user_id: req.user.id,
@@ -851,13 +883,16 @@ app.put("/api/notes/:id", auth, (req, res) => {
   if (!existing) return res.status(404).json({ error: "Note not found" });
 
   const b = req.body || {};
-  const incomingTs = b.client_updated_at || null;
-  if (!incomingTs) {
+  if (!b.client_updated_at) {
     return res.status(400).json({ error: "client_updated_at is required" });
   }
+  const tsResult = validateLwwTimestamp(b.client_updated_at);
+  if (tsResult.error) {
+    return res.status(400).json({ error: tsResult.error });
+  }
 
-  // LWW: reject stale writes
-  if (!isNewerOrEqual(incomingTs, existing.client_updated_at)) {
+  // LWW: reject stale writes (compare milliseconds)
+  if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
     return res.json({ ok: true, stale: true, note: serializeNote(existing) });
   }
 
@@ -874,7 +909,7 @@ app.put("/api/notes/:id", auth, (req, res) => {
     pinned: b.pinned ? 1 : 0,
     position: typeof b.position === "number" ? b.position : existing.position,
     timestamp: b.timestamp || existing.timestamp,
-    client_updated_at: incomingTs,
+    client_updated_at: tsResult.iso,
   };
   const result = updateNoteWithCollaboration.run(updated);
 
@@ -893,13 +928,16 @@ app.patch("/api/notes/:id", auth, (req, res) => {
   const existing = getNoteWithCollaboration.get(req.user.id, id, req.user.id);
   if (!existing) return res.status(404).json({ error: "Note not found" });
 
-  const incomingTs = req.body.client_updated_at || null;
-  if (!incomingTs) {
+  if (!req.body.client_updated_at) {
     return res.status(400).json({ error: "client_updated_at is required" });
   }
+  const tsResult = validateLwwTimestamp(req.body.client_updated_at);
+  if (tsResult.error) {
+    return res.status(400).json({ error: tsResult.error });
+  }
 
-  // LWW: reject stale writes
-  if (!isNewerOrEqual(incomingTs, existing.client_updated_at)) {
+  // LWW: reject stale writes (compare milliseconds)
+  if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
     return res.json({ ok: true, stale: true, note: serializeNote(existing) });
   }
 
@@ -914,7 +952,7 @@ app.patch("/api/notes/:id", auth, (req, res) => {
     color: typeof req.body.color === "string" ? req.body.color : null,
     pinned: typeof req.body.pinned === "boolean" ? (req.body.pinned ? 1 : 0) : null,
     timestamp: req.body.timestamp || null,
-    client_updated_at: incomingTs,
+    client_updated_at: tsResult.iso,
   };
   const result = patchPartialWithCollaboration.run(p);
 
@@ -942,6 +980,10 @@ app.post("/api/notes/reorder", auth, (req, res) => {
   if (!client_reordered_at) {
     return res.status(400).json({ error: "client_reordered_at is required" });
   }
+  const reorderTsResult = validateLwwTimestamp(client_reordered_at);
+  if (reorderTsResult.error) {
+    return res.status(400).json({ error: reorderTsResult.error });
+  }
 
   // Ownership check: every noteId must belong to the requesting user.
   // Reject the entire payload if any note is not owned — no partial apply.
@@ -953,11 +995,14 @@ app.post("/api/notes/reorder", auth, (req, res) => {
     }
   }
 
-  // LWW stale check: reject if a newer reorder already applied
+  // LWW stale check: reject if a newer reorder already applied (compare milliseconds)
   const stored = getLastReorderAt.get(req.user.id);
-  if (stored && stored.last_reorder_at > client_reordered_at) {
-    console.warn(`[LWW] Stale reorder from user ${req.user.id}: client=${client_reordered_at} < stored=${stored.last_reorder_at}`);
-    return res.json({ ok: true, stale: true });
+  if (stored) {
+    const storedReorder = parseIsoTimestamp(stored.last_reorder_at);
+    if (storedReorder && reorderTsResult.ms < storedReorder.ms) {
+      console.warn(`[LWW] Stale reorder from user ${req.user.id}: client=${client_reordered_at} < stored=${stored.last_reorder_at}`);
+      return res.json({ ok: true, stale: true });
+    }
   }
 
   const base = Date.now();
@@ -979,8 +1024,8 @@ app.post("/api/notes/reorder", auth, (req, res) => {
         pinned: 0,
       });
     }
-    // Record timestamp for future LWW checks
-    upsertReorderAt.run(req.user.id, client_reordered_at);
+    // Record normalized timestamp for future LWW checks
+    upsertReorderAt.run(req.user.id, reorderTsResult.iso);
   });
   reorder();
 
@@ -1115,9 +1160,13 @@ app.get("/api/notes/collaborated", auth, (req, res) => {
 // Archive/Unarchive notes
 app.post("/api/notes/:id/archive", auth, (req, res) => {
   const id = req.params.id;
-  const { archived, client_updated_at: incomingTs } = req.body || {};
-  if (!incomingTs) {
+  const { archived } = req.body || {};
+  if (!req.body?.client_updated_at) {
     return res.status(400).json({ error: "client_updated_at is required" });
+  }
+  const tsResult = validateLwwTimestamp(req.body.client_updated_at);
+  if (tsResult.error) {
+    return res.status(400).json({ error: tsResult.error });
   }
 
   const existing = getNote.get(id, req.user.id);
@@ -1125,17 +1174,16 @@ app.post("/api/notes/:id/archive", auth, (req, res) => {
     return res.status(404).json({ error: "Note not found" });
   }
 
-  // LWW: reject stale writes
-  if (!isNewerOrEqual(incomingTs, existing.client_updated_at)) {
+  // LWW: reject stale writes (compare milliseconds)
+  if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
     return res.json({ ok: true, stale: true, note: serializeNote(existing) });
   }
 
-  const newTs = incomingTs;
   const updateArchived = db.prepare(`
     UPDATE notes SET archived = ?, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
 
-  const result = updateArchived.run(archived ? 1 : 0, newTs, id, req.user.id);
+  const result = updateArchived.run(archived ? 1 : 0, tsResult.iso, id, req.user.id);
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
@@ -1156,9 +1204,12 @@ app.get("/api/notes/archived", auth, (req, res) => {
 // Trash/Restore notes
 app.post("/api/notes/:id/trash", auth, (req, res) => {
   const id = req.params.id;
-  const { client_updated_at: incomingTs } = req.body || {};
-  if (!incomingTs) {
+  if (!req.body?.client_updated_at) {
     return res.status(400).json({ error: "client_updated_at is required" });
+  }
+  const tsResult = validateLwwTimestamp(req.body.client_updated_at);
+  if (tsResult.error) {
+    return res.status(400).json({ error: tsResult.error });
   }
 
   const existing = getNote.get(id, req.user.id);
@@ -1166,17 +1217,16 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     return res.status(404).json({ error: "Note not found" });
   }
 
-  // LWW: reject stale writes
-  if (!isNewerOrEqual(incomingTs, existing.client_updated_at)) {
+  // LWW: reject stale writes (compare milliseconds)
+  if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
     return res.json({ ok: true, stale: true, note: serializeNote(existing) });
   }
 
-  const newTs = incomingTs;
   const updateTrashed = db.prepare(`
     UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
 
-  const result = updateTrashed.run(newTs, id, req.user.id);
+  const result = updateTrashed.run(tsResult.iso, id, req.user.id);
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
@@ -1190,9 +1240,12 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
 
 app.post("/api/notes/:id/restore", auth, (req, res) => {
   const id = req.params.id;
-  const { client_updated_at: incomingTs } = req.body || {};
-  if (!incomingTs) {
+  if (!req.body?.client_updated_at) {
     return res.status(400).json({ error: "client_updated_at is required" });
+  }
+  const tsResult = validateLwwTimestamp(req.body.client_updated_at);
+  if (tsResult.error) {
+    return res.status(400).json({ error: tsResult.error });
   }
 
   const existing = getNote.get(id, req.user.id);
@@ -1200,17 +1253,16 @@ app.post("/api/notes/:id/restore", auth, (req, res) => {
     return res.status(404).json({ error: "Note not found" });
   }
 
-  // LWW: reject stale writes
-  if (!isNewerOrEqual(incomingTs, existing.client_updated_at)) {
+  // LWW: reject stale writes (compare milliseconds)
+  if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
     return res.json({ ok: true, stale: true, note: serializeNote(existing) });
   }
 
-  const newTs = incomingTs;
   const updateTrashed = db.prepare(`
     UPDATE notes SET trashed = 0, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
 
-  const result = updateTrashed.run(newTs, id, req.user.id);
+  const result = updateTrashed.run(tsResult.iso, id, req.user.id);
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
@@ -1228,11 +1280,37 @@ app.get("/api/notes/trashed", auth, (req, res) => {
   res.json(rows.map((r) => serializeNote(r)));
 });
 
-// Permanently delete a note (only from trash)
+// Permanently delete a note (only from trash, LWW-protected)
 app.delete("/api/notes/:id/permanent", auth, (req, res) => {
   const id = req.params.id;
 
-  // Check if note exists, user owns it, and it's in trash
+  // LWW guard — prevents a stale permanent delete from winning over a newer restore.
+  // client_updated_at is optional for backward compat during rollout; if present, validated.
+  const rawTs = req.body?.client_updated_at;
+  if (rawTs) {
+    const tsResult = validateLwwTimestamp(rawTs);
+    if (tsResult.error) {
+      return res.status(400).json({ error: tsResult.error });
+    }
+    const existing = getNote.get(id, req.user.id);
+    if (!existing) {
+      return res.status(404).json({ error: "Note not found" });
+    }
+    if (!existing.trashed) {
+      return res.status(400).json({ error: "Note must be in trash to permanently delete" });
+    }
+    if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
+      return res.json({ ok: true, stale: true, note: serializeNote(existing) });
+    }
+
+    const recipientIds = new Set([existing.user_id, ...getCollaboratorUserIdsForNote(id)]);
+    deleteNote.run(id, req.user.id);
+    const evt = { type: "note_deleted", noteId: id };
+    for (const uid of recipientIds) sendEventToUser(uid, evt);
+    return res.json({ ok: true });
+  }
+
+  // Fallback path (no timestamp): trashed check only — hard win.
   const existing = getNote.get(id, req.user.id);
   if (!existing) {
     return res.status(404).json({ error: "Note not found" });
@@ -1341,7 +1419,7 @@ app.post("/api/notes/import", auth, (req, res) => {
           pinned: n.pinned ? 1 : 0,
           position: typeof n.position === "number" ? n.position : Date.now(),
           timestamp: n.timestamp || nowISO(),
-          client_updated_at: n.client_updated_at || n.timestamp || nowISO(),
+          client_updated_at: (parseIsoTimestamp(n.client_updated_at || n.timestamp) || {}).iso || nowISO(),
         });
       }
     });

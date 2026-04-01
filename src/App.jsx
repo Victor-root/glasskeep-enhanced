@@ -5894,7 +5894,7 @@ export default function App() {
             addDeleteTombstone(nid);
             const leaseId = acquireLocalLease(nid);
             try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
-            await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid }, leaseId);
+            await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
           }
           invalidateTrashedNotesCache();
           setNotes((prev) => prev.filter((n) => !selectedIds.includes(String(n.id))));
@@ -6356,8 +6356,20 @@ export default function App() {
             }
           } else if (item.type === "permanentDelete" && item.noteId) {
             const nid = String(item.noteId);
-            try { await idbDeleteNote(nid, uid, sid); } catch {}
             removeDeleteTombstone(nid);
+            if (result?.stale && result?.note) {
+              // Server rejected delete (note was restored by another device).
+              // Re-add the canonical note to local state so it reappears.
+              console.warn(`[Sync] permanentDelete stale for ${nid}, note was restored — re-adding`);
+              const canonical = result.note;
+              await idbPutNote(canonical, uid, sid);
+              setNotes((prev) => {
+                if (prev.some((n) => String(n.id) === nid)) return prev;
+                return sortNotesByRecency([...prev, canonical]);
+              });
+            } else {
+              try { await idbDeleteNote(nid, uid, sid); } catch {}
+            }
           } else if (item.type === "reorder" && item.payload?._reorderToken) {
             const token = item.payload._reorderToken;
             const leases = pendingReorderLeasesRef.current.get(token);
@@ -9014,7 +9026,7 @@ export default function App() {
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("notePermanentlyDeleted"), "success");
-      await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid }, leaseId);
+      await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
     } else {
       // Local-first: move to trash
       const nowIso = new Date().toISOString();
