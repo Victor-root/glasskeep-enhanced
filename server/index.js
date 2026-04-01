@@ -277,11 +277,7 @@ const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 //   4. incoming < stored → reject (stale write)
 function isNewerOrEqual(incomingTs, storedTs) {
   if (!storedTs) return true;
-  if (!incomingTs) {
-    // Legacy compat: accept the write but log so we can track adoption
-    console.warn("[LWW] Write accepted without client_updated_at (legacy compat)");
-    return true;
-  }
+  if (!incomingTs) return false;
   return incomingTs >= storedTs;
 }
 
@@ -856,6 +852,9 @@ app.put("/api/notes/:id", auth, (req, res) => {
 
   const b = req.body || {};
   const incomingTs = b.client_updated_at || null;
+  if (!incomingTs) {
+    return res.status(400).json({ error: "client_updated_at is required" });
+  }
 
   // LWW: reject stale writes
   if (!isNewerOrEqual(incomingTs, existing.client_updated_at)) {
@@ -875,7 +874,7 @@ app.put("/api/notes/:id", auth, (req, res) => {
     pinned: b.pinned ? 1 : 0,
     position: typeof b.position === "number" ? b.position : existing.position,
     timestamp: b.timestamp || existing.timestamp,
-    client_updated_at: incomingTs || existing.client_updated_at || nowISO(),
+    client_updated_at: incomingTs,
   };
   const result = updateNoteWithCollaboration.run(updated);
 
@@ -895,6 +894,9 @@ app.patch("/api/notes/:id", auth, (req, res) => {
   if (!existing) return res.status(404).json({ error: "Note not found" });
 
   const incomingTs = req.body.client_updated_at || null;
+  if (!incomingTs) {
+    return res.status(400).json({ error: "client_updated_at is required" });
+  }
 
   // LWW: reject stale writes
   if (!isNewerOrEqual(incomingTs, existing.client_updated_at)) {
@@ -912,7 +914,7 @@ app.patch("/api/notes/:id", auth, (req, res) => {
     color: typeof req.body.color === "string" ? req.body.color : null,
     pinned: typeof req.body.pinned === "boolean" ? (req.body.pinned ? 1 : 0) : null,
     timestamp: req.body.timestamp || null,
-    client_updated_at: incomingTs || null,
+    client_updated_at: incomingTs,
   };
   const result = patchPartialWithCollaboration.run(p);
 
@@ -926,34 +928,26 @@ app.patch("/api/notes/:id", auth, (req, res) => {
   res.json({ ok: true, note: serializeNote(fresh || existing) });
 });
 
+// Legacy soft-delete route — disabled.
+// Bypassed LWW (stamped nowISO() without client_updated_at check).
+// Modern client uses POST /api/notes/:id/trash with LWW protection instead.
 app.delete("/api/notes/:id", auth, (req, res) => {
-  // Soft delete: move to trash instead of permanent deletion
-  const id = req.params.id;
-  const existing = getNote.get(id, req.user.id);
-  if (!existing) {
-    return res.status(404).json({ error: "Note not found" });
-  }
-  const newTs = nowISO();
-  const updateTrashed = db.prepare(`
-    UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ? AND user_id = ?
-  `);
-  updateTrashed.run(newTs, id, req.user.id);
-  broadcastNoteUpdated(id);
-  res.json({ ok: true });
+  return res.status(410).json({ error: "Deprecated: use POST /api/notes/:id/trash with client_updated_at" });
 });
 
 // Reorder within sections (LWW-protected)
 app.post("/api/notes/reorder", auth, (req, res) => {
   const { pinnedIds = [], otherIds = [], client_reordered_at } = req.body || {};
 
+  if (!client_reordered_at) {
+    return res.status(400).json({ error: "client_reordered_at is required" });
+  }
+
   // LWW stale check: reject if a newer reorder already applied
   const stored = getLastReorderAt.get(req.user.id);
-  if (client_reordered_at && stored && stored.last_reorder_at > client_reordered_at) {
+  if (stored && stored.last_reorder_at > client_reordered_at) {
     console.warn(`[LWW] Stale reorder from user ${req.user.id}: client=${client_reordered_at} < stored=${stored.last_reorder_at}`);
     return res.json({ ok: true, stale: true });
-  }
-  if (!client_reordered_at) {
-    console.warn("[LWW] Reorder accepted without client_reordered_at (legacy compat)");
   }
 
   const base = Date.now();
@@ -976,8 +970,7 @@ app.post("/api/notes/reorder", auth, (req, res) => {
       });
     }
     // Record timestamp for future LWW checks
-    const ts = client_reordered_at || new Date().toISOString();
-    upsertReorderAt.run(req.user.id, ts);
+    upsertReorderAt.run(req.user.id, client_reordered_at);
   });
   reorder();
 
@@ -1113,6 +1106,9 @@ app.get("/api/notes/collaborated", auth, (req, res) => {
 app.post("/api/notes/:id/archive", auth, (req, res) => {
   const id = req.params.id;
   const { archived, client_updated_at: incomingTs } = req.body || {};
+  if (!incomingTs) {
+    return res.status(400).json({ error: "client_updated_at is required" });
+  }
 
   const existing = getNote.get(id, req.user.id);
   if (!existing) {
@@ -1124,7 +1120,7 @@ app.post("/api/notes/:id/archive", auth, (req, res) => {
     return res.json({ ok: true, stale: true, note: serializeNote(existing) });
   }
 
-  const newTs = incomingTs || nowISO();
+  const newTs = incomingTs;
   const updateArchived = db.prepare(`
     UPDATE notes SET archived = ?, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
@@ -1151,6 +1147,9 @@ app.get("/api/notes/archived", auth, (req, res) => {
 app.post("/api/notes/:id/trash", auth, (req, res) => {
   const id = req.params.id;
   const { client_updated_at: incomingTs } = req.body || {};
+  if (!incomingTs) {
+    return res.status(400).json({ error: "client_updated_at is required" });
+  }
 
   const existing = getNote.get(id, req.user.id);
   if (!existing) {
@@ -1162,7 +1161,7 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     return res.json({ ok: true, stale: true, note: serializeNote(existing) });
   }
 
-  const newTs = incomingTs || nowISO();
+  const newTs = incomingTs;
   const updateTrashed = db.prepare(`
     UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
@@ -1182,6 +1181,9 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
 app.post("/api/notes/:id/restore", auth, (req, res) => {
   const id = req.params.id;
   const { client_updated_at: incomingTs } = req.body || {};
+  if (!incomingTs) {
+    return res.status(400).json({ error: "client_updated_at is required" });
+  }
 
   const existing = getNote.get(id, req.user.id);
   if (!existing) {
@@ -1193,7 +1195,7 @@ app.post("/api/notes/:id/restore", auth, (req, res) => {
     return res.json({ ok: true, stale: true, note: serializeNote(existing) });
   }
 
-  const newTs = incomingTs || nowISO();
+  const newTs = incomingTs;
   const updateTrashed = db.prepare(`
     UPDATE notes SET trashed = 0, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
