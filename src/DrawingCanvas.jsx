@@ -326,6 +326,44 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
     }
   }, [readOnly, mode, paths, canvasWidth, canvasHeight, onChange, data, height]);
 
+  // Attach touch handlers with { passive: false } so preventDefault() works
+  // on Chrome mobile (React attaches touch listeners as passive by default).
+  // Without this, drawing on mobile causes scroll/zoom interference and
+  // floods the console with "Unable to preventDefault inside passive event listener".
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleTouchStart = (e) => {
+      if (mode === 'draw' && !readOnly) {
+        e.preventDefault();
+        startDrawing(e);
+      }
+    };
+    const handleTouchMove = (e) => {
+      if (mode === 'draw' && !readOnly) {
+        e.preventDefault();
+        draw(e);
+      }
+    };
+    const handleTouchEnd = (e) => {
+      if (mode === 'draw' && !readOnly) {
+        e.preventDefault();
+        stopDrawing();
+      }
+    };
+
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
+      canvas.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [mode, readOnly, startDrawing, draw, stopDrawing]);
+
   return (
     <div className="drawing-canvas-container">
       {/* View/Draw Mode Toggle - only when drawing is allowed and not hidden */}
@@ -449,39 +487,15 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
           width={canvasWidth}
           height={canvasHeight}
           className={`block ${mode === 'draw' && !readOnly ? 'cursor-crosshair' : 'cursor-default'}`}
-          style={{ 
-            maxWidth: '100%', 
-            height: 'auto', 
-            touchAction: mode === 'draw' && !readOnly ? 'none' : 'auto' 
+          style={{
+            maxWidth: '100%',
+            height: 'auto',
+            touchAction: mode === 'draw' && !readOnly ? 'none' : 'auto'
           }}
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
           onMouseLeave={stopDrawing}
-          onTouchStart={(e) => {
-            // Only prevent default and handle drawing in draw mode
-            if (mode === 'draw' && !readOnly) {
-              e.preventDefault();
-              startDrawing(e);
-            }
-            // In view mode, allow normal touch scrolling
-          }}
-          onTouchMove={(e) => {
-            // Only prevent default and handle drawing in draw mode
-            if (mode === 'draw' && !readOnly) {
-              e.preventDefault();
-              draw(e);
-            }
-            // In view mode, allow normal touch scrolling
-          }}
-          onTouchEnd={(e) => {
-            // Only prevent default and handle drawing in draw mode
-            if (mode === 'draw' && !readOnly) {
-              e.preventDefault();
-              stopDrawing();
-            }
-            // In view mode, allow normal touch scrolling
-          }}
         />
       </div>
 
