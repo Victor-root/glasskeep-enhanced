@@ -7226,6 +7226,10 @@ export default function App() {
             const msg = JSON.parse(e.data || "{}");
             if (msg && msg.type === "note_updated" && msg.noteId) {
               debouncedPatch(msg.noteId);
+            } else if (msg && msg.type === "notes_reordered") {
+              // Another session reordered notes — reload the full list once
+              // instead of fetching each note individually (avoids rate limits).
+              reloadCurrentViewRef.current?.();
             } else if (msg && msg.type === "note_deleted" && msg.noteId) {
               // Another session permanently deleted this note — remove locally
               const nid = String(msg.noteId);

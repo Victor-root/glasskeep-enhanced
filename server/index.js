@@ -1029,9 +1029,11 @@ app.post("/api/notes/reorder", auth, (req, res) => {
   });
   reorder();
 
-  // Notify other sessions so they converge on the new order
+  // Notify other sessions with a single event (avoids N individual note_updated
+  // events that cause N parallel fetches and trip reverse proxy rate limits).
   const allIds = [...pinnedIds, ...otherIds];
-  for (const nid of allIds) broadcastNoteUpdated(nid);
+  const evt = { type: "notes_reordered", noteIds: allIds };
+  sendEventToUser(req.user.id, evt);
 
   res.json({ ok: true });
 });
