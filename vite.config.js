@@ -44,44 +44,13 @@ export default defineConfig({
         clientsClaim: true,
         navigateFallback: "/index.html",
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
-        runtimeCaching: [
-          {
-            // Health check must NEVER be served from cache — sync engine
-            // relies on it to detect server downtime accurately.
-            urlPattern: /^https?:\/\/.*\/api\/health(\?.*)?$/,
-            handler: 'NetworkOnly',
-          },
-          {
-            urlPattern: /^https?:\/\/.*\/api\/notes.*$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'notes-cache',
-              networkTimeoutSeconds: 5,
-              cacheableResponse: {
-                statuses: [0, 200]
-              },
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 24 * 60 * 60 // 24 hours
-              }
-            }
-          },
-          {
-            urlPattern: /^https?:\/\/.*\/api\/.*$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              networkTimeoutSeconds: 5,
-              cacheableResponse: {
-                statuses: [0, 200]
-              },
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 // 1 hour
-              }
-            }
-          }
-        ]
+        // All /api/* requests bypass the Service Worker entirely.
+        // On mobile, a suspended/stuck SW can intercept fetch and cause
+        // AbortError timeouts even when the network is fine. API calls
+        // are live data — caching them causes stale reads and sync bugs.
+        // Only static assets (JS, CSS, images) benefit from SW caching.
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: []
       }
       // devOptions: { enabled: true } // ← uncomment to test SW in dev (remember to disable later)
     })
