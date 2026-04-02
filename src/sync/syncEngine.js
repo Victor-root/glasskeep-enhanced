@@ -54,6 +54,7 @@ export class SyncEngine {
     this._lastSyncError = null;
     this._failedChecks = 0; // consecutive failed health checks (reset on success)
     this._healthCheckInFlight = false; // guard against concurrent health checks
+    this._sseConnected = false; // true while SSE EventSource is open
   }
 
   // ─── Public API ───
@@ -63,8 +64,13 @@ export class SyncEngine {
    * Bypasses healthCheck — useful when fetch-based checks fail due to
    * SW cache issues but SSE (EventSource) connects fine.
    */
+  notifySseDisconnected() {
+    this._sseConnected = false;
+  }
+
   async notifyServerReachable() {
     if (this._destroyed) return;
+    this._sseConnected = true;
     if (this._serverReachable === true && this._failedChecks === 0) return; // already known
     this._serverReachable = true;
     this._lastSyncError = null;
@@ -406,9 +412,18 @@ export class SyncEngine {
       return false;
     } catch (err) {
       console.warn("[SyncEngine] healthCheck failed:", err?.name, err?.message);
-      this._serverReachable = false;
-      this._lastSyncError = err?.name === "AbortError" ? "Health check timeout" : "Server unreachable";
-      this._failedChecks++;
+      // If SSE is actively connected, the server is reachable — don't let a
+      // flaky fetch (AbortError, SW interference) override that evidence.
+      if (this._sseConnected) {
+        console.warn("[SyncEngine] healthCheck failed but SSE is connected — server is reachable");
+        this._serverReachable = true;
+        this._lastSyncError = null;
+        this._failedChecks = 0;
+      } else {
+        this._serverReachable = false;
+        this._lastSyncError = err?.name === "AbortError" ? "Health check timeout" : "Server unreachable";
+        this._failedChecks++;
+      }
 
       // On mobile PWAs, a stuck Service Worker can make all fetches fail even
       // though the network is up. After several consecutive failures while the

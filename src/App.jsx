@@ -7261,6 +7261,9 @@ export default function App() {
         es.onerror = (error) => {
           console.log("SSE error, attempting reconnect...", error);
           setSseConnected(false);
+          if (syncEngineRef.current) {
+            syncEngineRef.current.notifySseDisconnected();
+          }
 
           if (es.readyState === EventSource.CLOSED) {
             const currentAuth = getAuth();
