@@ -7271,6 +7271,9 @@ export default function App() {
           setSseConnected(false);
           if (syncEngineRef.current) {
             syncEngineRef.current.notifySseDisconnected();
+            // SSE died — trigger an immediate health check to detect server
+            // outage fast instead of waiting for the next scheduled check.
+            syncEngineRef.current.healthCheck();
           }
 
           if (es.readyState === EventSource.CLOSED) {

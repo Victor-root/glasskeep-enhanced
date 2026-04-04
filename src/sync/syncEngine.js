@@ -365,7 +365,7 @@ export class SyncEngine {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
       // No Authorization header needed — /api/health has no auth middleware.
       // Cache-busting param forces the browser to open a fresh connection,
       // which avoids stale TCP sockets after a server restart (common on mobile).
