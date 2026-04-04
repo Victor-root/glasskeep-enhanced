@@ -68,6 +68,19 @@ export class SyncEngine {
     this._sseConnected = false;
   }
 
+  /**
+   * Browser fired the "offline" event — mark server unreachable immediately
+   * without waiting for the next health check cycle.
+   */
+  async notifyOffline() {
+    if (this._destroyed) return;
+    this._serverReachable = false;
+    this._lastSyncError = "Browser offline";
+    this._failedChecks++;
+    this._adjustHealthInterval();
+    await this._emitStatus();
+  }
+
   async notifyServerReachable() {
     if (this._destroyed) return;
     this._sseConnected = true;

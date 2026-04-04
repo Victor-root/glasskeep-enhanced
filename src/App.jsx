@@ -7392,6 +7392,13 @@ export default function App() {
 
     const handleOffline = () => {
       setIsOnline(false);
+      // Immediately tell the sync engine — don't wait for the next health check.
+      // The browser "offline" event is instant proof the network is down.
+      const engine = syncEngineRef.current;
+      if (engine) {
+        engine.notifySseDisconnected();
+        engine.notifyOffline();
+      }
     };
 
     window.addEventListener("online", handleOnline);
