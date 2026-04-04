@@ -5964,10 +5964,7 @@ export default function App() {
       const leaseId = acquireLocalLease(nid);
       try {
         const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) {
-          const restoredPos = new Date(existing.client_updated_at || existing.updated_at || existing.timestamp || 0).getTime() || Date.now();
-          await idbPutNote({ ...existing, trashed: false, position: restoredPos, client_updated_at: nowIso }, currentUser?.id, sessionId);
-        }
+        if (existing) await idbPutNote({ ...existing, trashed: false, position: Date.now(), client_updated_at: nowIso }, currentUser?.id, sessionId);
       } catch (e) { console.error(e); }
       await enqueueWithLease(nid, { type: "restore", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
     }
@@ -9094,10 +9091,7 @@ export default function App() {
     // Local-first: restore immediately
     try {
       const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-      if (existing) {
-        const restoredPos = new Date(existing.client_updated_at || existing.updated_at || existing.timestamp || 0).getTime() || Date.now();
-        await idbPutNote({ ...existing, trashed: false, position: restoredPos, client_updated_at: nowIso }, currentUser?.id, sessionId);
-      }
+      if (existing) await idbPutNote({ ...existing, trashed: false, position: Date.now(), client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
     invalidateNotesCache();
     invalidateArchivedNotesCache();
