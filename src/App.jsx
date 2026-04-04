@@ -6468,11 +6468,17 @@ export default function App() {
   const reloadCurrentViewRef = useRef(null);
 
   const handleSyncNow = useCallback(async () => {
-    await syncEngineRef.current?.forceSync();
+    const engine = syncEngineRef.current;
+    await engine?.forceSync();
     // After syncing the queue, also reload notes from server to pick up
     // changes made by other devices (new notes, edits, etc.)
-    if (syncEngineRef.current?.serverReachable) {
-      reloadCurrentViewRef.current?.();
+    if (engine?.serverReachable) {
+      if (engine) await engine.beginPull();
+      try {
+        await reloadCurrentViewRef.current?.();
+      } finally {
+        if (engine) await engine.endPull();
+      }
     }
   }, []);
 
@@ -6925,15 +6931,17 @@ export default function App() {
   };
 
   // Keep ref up to date so handleSyncNow always calls the latest version
-  reloadCurrentViewRef.current = () => {
+  reloadCurrentViewRef.current = async () => {
     const currentFilter = tagFilterRef.current;
-    if (currentFilter === "ARCHIVED") {
-      loadArchivedNotes().catch(() => {});
-    } else if (currentFilter === "TRASHED") {
-      loadTrashedNotes().catch(() => {});
-    } else {
-      loadNotes().catch(() => {});
-    }
+    try {
+      if (currentFilter === "ARCHIVED") {
+        await loadArchivedNotes();
+      } else if (currentFilter === "TRASHED") {
+        await loadTrashedNotes();
+      } else {
+        await loadNotes();
+      }
+    } catch (_) {}
   };
 
   useEffect(() => {
@@ -7216,7 +7224,7 @@ export default function App() {
           // not yet applied) and overwrite correct local state.
           if (hasConnectedOnce) {
             console.log("[SSE] reconnected — will reload after queue drains");
-            const waitForQueue = () => {
+            const waitForQueue = async () => {
               const engine = syncEngineRef.current;
               if (engine && engine._processing) {
                 // Queue still running — check again in 500ms
@@ -7226,7 +7234,13 @@ export default function App() {
               console.log("[SSE] queue idle — reloading current view");
               cooldownDeferredIds = new Set(); // clear before cooldown starts
               reloadCooldownUntil = Date.now() + 3000;
-              reloadCurrentViewRef.current?.();
+              // Use beginPull/endPull so status stays "syncing" until reload completes
+              if (engine) await engine.beginPull();
+              try {
+                await reloadCurrentViewRef.current?.();
+              } finally {
+                if (engine) await engine.endPull();
+              }
               // After cooldown expires, flush any SSE events that arrived during the
               // reload window (e.g. another device synced while reload was in flight).
               setTimeout(() => {
@@ -7473,13 +7487,21 @@ export default function App() {
       // Reload the view to pick up changes from other devices, but WAIT for
       // the local queue to drain first. Otherwise we fetch stale server data
       // that overwrites local offline edits that haven't been pushed yet.
-      const waitThenReload = () => {
+      // Use beginPull()/endPull() so the status stays "syncing" (not green)
+      // until the view has been fully refreshed.
+      const waitThenReload = async () => {
         const engine = syncEngineRef.current;
         if (engine && engine._processing) {
           setTimeout(waitThenReload, 500);
           return;
         }
-        reloadCurrentViewRef.current?.();
+        // Signal that we're now pulling remote changes — keeps status "syncing"
+        if (engine) await engine.beginPull();
+        try {
+          await reloadCurrentViewRef.current?.();
+        } finally {
+          if (engine) await engine.endPull();
+        }
       };
       // Small delay to let processQueue start (healthCheck triggers it)
       setTimeout(waitThenReload, 500);

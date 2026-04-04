@@ -44,6 +44,7 @@ export class SyncEngine {
     this.onSyncError = onSyncError || (() => {});
     this.onNoteInaccessible = onNoteInaccessible || (() => {});
     this._processing = false;
+    this._pulling = false; // true while view is being refreshed from server (remote pull)
     this._isChecking = false; // true while forceSync health-checks (immediate UI feedback)
     this._healthTimer = null;
     this._destroyed = false;
@@ -96,6 +97,23 @@ export class SyncEngine {
     this._adjustHealthInterval();
     await this._emitStatus();
     this.processQueue();
+  }
+
+  /**
+   * Mark that a remote pull (view reload from server) is in progress.
+   * While pulling, syncState stays "syncing" — never "synced".
+   * Call endPull() when the reload completes.
+   */
+  async beginPull() {
+    if (this._destroyed) return;
+    this._pulling = true;
+    await this._emitStatus();
+  }
+
+  async endPull() {
+    if (this._destroyed) return;
+    this._pulling = false;
+    await this._emitStatus();
   }
 
   /**
@@ -658,7 +676,10 @@ export class SyncEngine {
       syncState = "offline";
     } else if (this._isChecking || this._serverReachable === null) {
       syncState = "checking";
-    } else if (this._processing) {
+    } else if (this._processing || this._pulling) {
+      // _processing = pushing local changes to server
+      // _pulling = fetching remote changes from server (view reload)
+      // Both must be done before we can say "synced"
       syncState = "syncing";
     } else if (stats.failed > 0 && stats.pending === 0 && stats.processing === 0 && stats.retry === 0) {
       // Only show "error" when ALL remaining items are permanently failed (max retries).
@@ -674,7 +695,7 @@ export class SyncEngine {
     // this attempt. Never show "Server OK" based on a stale previous check.
     // Only confirmed states: false stays false, true becomes null during processing.
     let emittedServerReachable = this._serverReachable;
-    if (this._processing || this._isChecking) {
+    if (this._processing || this._isChecking || this._pulling) {
       // If currently attempting network calls, server state is uncertain
       // false = already confirmed down (keep it), true/null = not yet confirmed for this attempt
       if (this._serverReachable !== false) {
