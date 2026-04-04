@@ -285,6 +285,16 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
                 )}
               </div>
 
+              {/* Error detail when server is down */}
+              {serverReachable === false && lastSyncError && lastSyncError !== "Server unreachable" && lastSyncError !== "Browser offline" && (
+                <div className={`mt-0.5 text-xs ${dark ? "text-red-400/70" : "text-red-500/70"}`}>
+                  {lastSyncError.startsWith("Backend not responding") ? (t("syncErrorBackendDown") || "The proxy is responding but GlassKeep is not accessible") :
+                   lastSyncError.startsWith("Server error") ? (t("syncErrorServerError") || `The server returned an error (${lastSyncError})`) :
+                   lastSyncError === "Health check timeout" ? (t("syncErrorTimeout") || "Health check timed out") :
+                   lastSyncError}
+                </div>
+              )}
+
               {/* Reconnection attempts */}
               {failedChecks > 0 && syncState === "offline" && (
                 <div className={`mt-1 text-xs ${dark ? "text-amber-400" : "text-amber-600"}`}>
