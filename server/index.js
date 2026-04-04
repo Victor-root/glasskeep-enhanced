@@ -1261,10 +1261,10 @@ app.post("/api/notes/:id/restore", auth, (req, res) => {
   }
 
   const updateTrashed = db.prepare(`
-    UPDATE notes SET trashed = 0, client_updated_at = ? WHERE id = ? AND user_id = ?
+    UPDATE notes SET trashed = 0, position = ?, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
 
-  const result = updateTrashed.run(tsResult.iso, id, req.user.id);
+  const result = updateTrashed.run(Date.now(), tsResult.iso, id, req.user.id);
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
