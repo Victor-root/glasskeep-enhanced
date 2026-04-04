@@ -53,6 +53,7 @@ export class SyncEngine {
     this._lastSyncAt = null;
     this._lastSyncError = null;
     this._failedChecks = 0; // consecutive failed health checks (reset on success)
+    this._consecutiveTimeouts = 0; // consecutive AbortErrors (reset on success or hard failure)
     this._healthCheckInFlight = false; // guard against concurrent health checks
     this._sseConnected = false; // true while SSE EventSource is open
   }
@@ -88,6 +89,7 @@ export class SyncEngine {
     this._serverReachable = true;
     this._lastSyncError = null;
     this._failedChecks = 0;
+    this._consecutiveTimeouts = 0;
     this._adjustHealthInterval();
     await this._emitStatus();
     this.processQueue();
@@ -379,6 +381,7 @@ export class SyncEngine {
         this._serverReachable = true;
         this._lastSyncError = null;
         this._failedChecks = 0;
+        this._consecutiveTimeouts = 0;
 
         // Server confirmed reachable — reset all transient failures so they retry.
         // Fatal errors (auth expired, note not found) are already at MAX_RETRIES
@@ -436,25 +439,29 @@ export class SyncEngine {
       if (!isAbort) {
         // Real network failure — mark offline immediately, clear stale SSE flag
         this._sseConnected = false;
+        this._consecutiveTimeouts = 0;
         this._serverReachable = false;
         this._lastSyncError = "Server unreachable";
         this._failedChecks++;
-      } else if (this._sseConnected || browserSaysOnline) {
-        // AbortError (timeout) while SSE is connected or browser says online:
-        // Chrome mobile aggressively throttles background fetch/timers, causing
-        // AbortErrors even when the network is perfectly fine. Don't mark offline.
-        if (this._sseConnected) {
-          console.warn("[SyncEngine] healthCheck AbortError but SSE is connected — tolerating");
-        } else {
-          console.warn("[SyncEngine] healthCheck AbortError but browser is online — likely throttled");
-        }
-        this._serverReachable = true;
-        this._lastSyncError = null;
-        this._failedChecks = 0;
       } else {
-        this._serverReachable = false;
-        this._lastSyncError = "Health check timeout";
-        this._failedChecks++;
+        this._consecutiveTimeouts++;
+        // AbortError (timeout). Could be Chrome mobile throttling background
+        // fetches, OR the server/proxy is genuinely down (nginx accepts the
+        // TCP connection but backend never responds → timeout).
+        // Policy: tolerate ONE timeout if browser says online (covers Chrome
+        // throttle). Two consecutive timeouts = server is actually down.
+        const tolerate = this._consecutiveTimeouts < 2 && (this._sseConnected || browserSaysOnline);
+        if (tolerate) {
+          console.warn("[SyncEngine] healthCheck timeout #%d — tolerating (sse=%s, online=%s)",
+            this._consecutiveTimeouts, this._sseConnected, browserSaysOnline);
+          // Don't change _serverReachable — keep previous state
+        } else {
+          console.warn("[SyncEngine] healthCheck timeout #%d — marking offline",
+            this._consecutiveTimeouts);
+          this._serverReachable = false;
+          this._lastSyncError = "Health check timeout";
+          this._failedChecks++;
+        }
       }
 
       // On mobile PWAs, a stuck Service Worker can make all fetches fail even
