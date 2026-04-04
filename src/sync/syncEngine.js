@@ -55,6 +55,8 @@ export class SyncEngine {
     this._failedChecks = 0; // consecutive failed health checks (reset on success)
     this._consecutiveTimeouts = 0; // consecutive AbortErrors (reset on success or hard failure)
     this._healthCheckInFlight = false; // guard against concurrent health checks
+    this._lastHealthCheckAt = 0; // timestamp of last healthCheck start (for throttling)
+    this._rateLimited = false; // true when server returns 403/429 — backs off more aggressively
     this._sseConnected = false; // true while SSE EventSource is open
   }
 
@@ -319,13 +321,13 @@ export class SyncEngine {
     await this._emitStatus();
 
     try {
-      let ok = await this.healthCheck();
+      let ok = await this.healthCheck(true);
       // On mobile after long background suspension, the first fetch often fails
       // because the browser hasn't fully restored network sockets yet. One retry
       // after a short pause is enough to recover in most cases.
       if (!ok) {
         await new Promise((r) => setTimeout(r, 1500));
-        ok = await this.healthCheck();
+        ok = await this.healthCheck(true);
       }
     } finally {
       this._isChecking = false;
@@ -355,12 +357,22 @@ export class SyncEngine {
    * Lightweight health check to detect server availability.
    * Always emits a status update so UI stays in sync.
    */
-  async healthCheck() {
+  async healthCheck(force = false) {
     const token = this.getToken();
     if (!token) return false;
 
     // Prevent concurrent health checks (e.g. forceSync + scheduled check)
     if (this._healthCheckInFlight) return this._serverReachable ?? false;
+
+    // Throttle: reject calls within 3s of the last one (prevents SSE onerror
+    // storm from flooding the server with health checks). Scheduled checks
+    // and forceSync bypass the throttle.
+    const MIN_GAP = 3000;
+    const now = Date.now();
+    if (!force && this._lastHealthCheckAt && (now - this._lastHealthCheckAt) < MIN_GAP) {
+      return this._serverReachable ?? false;
+    }
+    this._lastHealthCheckAt = now;
     this._healthCheckInFlight = true;
 
     try {
@@ -421,6 +433,7 @@ export class SyncEngine {
         this._lastSyncError = null;
         this._failedChecks = 0;
         this._consecutiveTimeouts = 0;
+        this._rateLimited = false;
 
         // Server confirmed reachable — reset all transient failures so they retry.
         // Fatal errors (auth expired, note not found) are already at MAX_RETRIES
@@ -448,18 +461,24 @@ export class SyncEngine {
       }
 
       // Server responded with an error status — it IS reachable, just unhappy.
-      // 403 = rate-limited or auth issue on proxy, NOT "server down".
       // Only 5xx should be treated as a server problem.
       const isServerError = res.status >= 500;
+      const isRateLimited = res.status === 403 || res.status === 429;
       console.warn("[SyncEngine] healthCheck: server responded", res.status);
       if (isServerError) {
         this._serverReachable = false;
+        this._rateLimited = false;
         this._lastSyncError = `Server error (${res.status})`;
         this._failedChecks++;
+      } else if (isRateLimited) {
+        // 403/429 on unauth health endpoint = proxy rate-limiting us.
+        // Don't mark offline, but signal callers to back off.
+        this._rateLimited = true;
+        this._lastSyncError = null; // Don't show error to user for rate limiting
       } else {
-        // 4xx (403, 429, etc.) — server is reachable but rejecting requests
-        // Don't mark as unreachable, just note the issue
+        // Other 4xx — server is reachable but rejecting requests
         this._serverReachable = true;
+        this._rateLimited = false;
         this._lastSyncError = `HTTP ${res.status}`;
       }
       this._adjustHealthInterval();
@@ -527,10 +546,10 @@ export class SyncEngine {
     // Initial check to establish server reachability.
     // On mobile after long background / page refresh, the first fetch may fail
     // because the browser is still restoring sockets. Retry once after a pause.
-    this.healthCheck().then((ok) => {
+    this.healthCheck(true).then((ok) => {
       if (!ok && !this._destroyed) {
         setTimeout(() => {
-          if (!this._destroyed) this.healthCheck();
+          if (!this._destroyed) this.healthCheck(true);
         }, 2000);
       }
     });
@@ -556,6 +575,10 @@ export class SyncEngine {
 
   get serverReachable() {
     return this._serverReachable;
+  }
+
+  get isRateLimited() {
+    return this._rateLimited;
   }
 
   get lastSyncAt() {
@@ -585,7 +608,10 @@ export class SyncEngine {
 
     getQueueStats(this._userId).then((stats) => {
       let interval;
-      if (this._serverReachable === false) {
+      if (this._rateLimited) {
+        // Rate-limited by proxy — back off significantly to let it cool down
+        interval = 15000;
+      } else if (this._serverReachable === false) {
         // Always aggressive when offline — detect recovery ASAP
         interval = HEALTH_OFFLINE_INTERVAL;
       } else if (stats.total > 0) {
@@ -596,7 +622,7 @@ export class SyncEngine {
 
       this._healthTimer = setTimeout(async () => {
         if (!this._destroyed) {
-          await this.healthCheck();
+          await this.healthCheck(true);
           this._scheduleNextHealth();
         }
       }, interval);
@@ -604,7 +630,7 @@ export class SyncEngine {
       // Fallback: idle interval
       this._healthTimer = setTimeout(() => {
         if (!this._destroyed) {
-          this.healthCheck().then(() => this._scheduleNextHealth());
+          this.healthCheck(true).then(() => this._scheduleNextHealth());
         }
       }, HEALTH_IDLE_INTERVAL);
     });

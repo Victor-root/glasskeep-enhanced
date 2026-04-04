@@ -7207,7 +7207,7 @@ export default function App() {
           // alive — the proxy accepts the TCP connection even when the backend
           // is down. Only a real SSE data message (onmessage) is proof.
           // Trigger a health check instead to verify properly.
-          if (syncEngineRef.current) {
+          if (syncEngineRef.current && !syncEngineRef.current.isRateLimited) {
             syncEngineRef.current.healthCheck();
           }
           // On reconnection (not first connect), reload the view — but only
@@ -7294,11 +7294,15 @@ export default function App() {
         es.onerror = (error) => {
           console.log("SSE error, attempting reconnect...", error);
           setSseConnected(false);
-          if (syncEngineRef.current) {
-            syncEngineRef.current.notifySseDisconnected();
-            // SSE died — trigger an immediate health check to detect server
-            // outage fast instead of waiting for the next scheduled check.
-            syncEngineRef.current.healthCheck();
+          const engine = syncEngineRef.current;
+          if (engine) {
+            engine.notifySseDisconnected();
+            // SSE died — trigger a health check to detect server outage fast.
+            // healthCheck() has built-in throttling (3s min gap) so rapid SSE
+            // errors won't flood the server.
+            if (!engine.isRateLimited) {
+              engine.healthCheck();
+            }
           }
 
           if (es.readyState === EventSource.CLOSED) {
@@ -7310,8 +7314,11 @@ export default function App() {
 
           es.close();
 
-          // Always retry — never give up. Cap backoff at maxReconnectDelay.
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
+          // Backoff: exponential with cap. When rate-limited (403/429),
+          // use a much longer minimum delay to let the proxy cool down.
+          const isRL = engine?.isRateLimited;
+          const minDelay = isRL ? 10000 : 1000;
+          const delay = Math.max(minDelay, Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay));
           reconnectTimeout = setTimeout(() => {
             reconnectAttempts++;
             const currentAuth = getAuth();
