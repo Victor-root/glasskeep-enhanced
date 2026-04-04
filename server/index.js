@@ -1260,11 +1260,15 @@ app.post("/api/notes/:id/restore", auth, (req, res) => {
     return res.json({ ok: true, stale: true, note: serializeNote(existing) });
   }
 
+  // Restore position based on the note's last real edit time so it slots
+  // back among notes from the same period, not at the top or bottom.
+  const restoredPosition = new Date(existing.client_updated_at || existing.updated_at || existing.timestamp || 0).getTime() || Date.now();
+
   const updateTrashed = db.prepare(`
     UPDATE notes SET trashed = 0, position = ?, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
 
-  const result = updateTrashed.run(Date.now(), tsResult.iso, id, req.user.id);
+  const result = updateTrashed.run(restoredPosition, tsResult.iso, id, req.user.id);
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
