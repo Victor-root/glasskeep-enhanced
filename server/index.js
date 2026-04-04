@@ -1747,7 +1747,7 @@ ${question}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 });
 
 // ---------- Health ----------
-app.get("/api/health", (_req, res) => res.json({ ok: true, env: NODE_ENV }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, service: "glasskeep", env: NODE_ENV }));
 
 // ---------- Static (production) ----------
 if (NODE_ENV === "production") {

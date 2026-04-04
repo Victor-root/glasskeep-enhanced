@@ -365,7 +365,7 @@ export class SyncEngine {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
       // No Authorization header needed — /api/health has no auth middleware.
       // Cache-busting param forces the browser to open a fresh connection,
       // which avoids stale TCP sockets after a server restart (common on mobile).
@@ -377,6 +377,45 @@ export class SyncEngine {
       clearTimeout(timeoutId);
 
       if (res.ok) {
+        // Validate that the actual GlassKeep backend responded, not just a
+        // reverse proxy (nginx) returning a cached/generic 200. This catches
+        // cases where nginx is up but the backend process is stopped: nginx
+        // returns 502/504 (caught below as 5xx), or a load balancer returns
+        // a generic health page that isn't GlassKeep.
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          try {
+            const body = await res.json();
+            if (body?.service !== "glasskeep") {
+              console.warn("[SyncEngine] healthCheck: response missing service marker — not GlassKeep backend");
+              this._serverReachable = false;
+              this._lastSyncError = "Backend not responding (proxy only)";
+              this._failedChecks++;
+              this._adjustHealthInterval();
+              await this._emitStatus();
+              return false;
+            }
+          } catch (_) {
+            // JSON parse failed — not a valid GlassKeep response
+            console.warn("[SyncEngine] healthCheck: invalid JSON in health response");
+            this._serverReachable = false;
+            this._lastSyncError = "Invalid health response";
+            this._failedChecks++;
+            this._adjustHealthInterval();
+            await this._emitStatus();
+            return false;
+          }
+        } else {
+          // Not JSON — probably a proxy error page or captive portal
+          console.warn("[SyncEngine] healthCheck: non-JSON response (content-type: %s)", contentType);
+          this._serverReachable = false;
+          this._lastSyncError = "Backend not responding (proxy only)";
+          this._failedChecks++;
+          this._adjustHealthInterval();
+          await this._emitStatus();
+          return false;
+        }
+
         const wasOffline = this._serverReachable === false;
         this._serverReachable = true;
         this._lastSyncError = null;
