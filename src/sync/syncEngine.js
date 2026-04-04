@@ -92,6 +92,7 @@ export class SyncEngine {
     this._lastSyncError = null;
     this._failedChecks = 0;
     this._consecutiveTimeouts = 0;
+    this._rateLimited = false;
     this._adjustHealthInterval();
     await this._emitStatus();
     this.processQueue();

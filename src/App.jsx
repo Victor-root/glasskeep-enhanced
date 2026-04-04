@@ -7336,6 +7336,8 @@ export default function App() {
     // Expose reconnect for use when sync engine detects server recovery
     reconnectSseRef.current = () => {
       if (!es || es.readyState === EventSource.CLOSED) {
+        // Cancel any pending backoff timer to avoid duplicate connections
+        if (reconnectTimeout) clearTimeout(reconnectTimeout);
         reconnectAttempts = 0; // reset backoff on explicit reconnect
         connectSSE();
       }
@@ -7460,13 +7462,17 @@ export default function App() {
     };
   }, [token]);
 
-  // Reconnect SSE when server recovers from offline
+  // Reconnect SSE and reload view when server recovers from offline
   const prevSyncStateRef = useRef(syncStatus.syncState);
   useEffect(() => {
     const prev = prevSyncStateRef.current;
     prevSyncStateRef.current = syncStatus.syncState;
     if (prev === "offline" && syncStatus.syncState !== "offline" && syncStatus.syncState !== "checking") {
+      // Server just recovered — reconnect SSE immediately
       reconnectSseRef.current?.();
+      // Also reload the view right away to pick up changes from other devices
+      // (don't wait for SSE onopen which may be delayed by reconnection).
+      reloadCurrentViewRef.current?.();
     }
   }, [syncStatus.syncState]);
 
