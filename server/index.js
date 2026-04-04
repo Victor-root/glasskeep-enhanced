@@ -223,6 +223,11 @@ CREATE TABLE IF NOT EXISTS user_reorder_state (
         // Backfill: use updated_at → timestamp → now, so no NULL values break LWW comparison
         db.exec(`UPDATE notes SET client_updated_at = COALESCE(updated_at, timestamp, '${new Date().toISOString()}')`);
       }
+      if (!names.has("position")) {
+        db.exec(`ALTER TABLE notes ADD COLUMN position REAL NOT NULL DEFAULT 0`);
+        // Backfill: set position = creation timestamp (ms) so notes sort by creation date
+        db.exec(`UPDATE notes SET position = CAST(strftime('%s', COALESCE(timestamp, '1970-01-01')) AS REAL) * 1000`);
+      }
     });
     tx();
   } catch {
@@ -1260,11 +1265,44 @@ app.post("/api/notes/:id/restore", auth, (req, res) => {
     return res.json({ ok: true, stale: true, note: serializeNote(existing) });
   }
 
+  // Calculate a position that places the restored note among active notes
+  // at the chronologically correct spot (by creation timestamp).
+  // Without this, notes restored after a reorder end up at the bottom because
+  // all active notes received new (higher) positions during the reorder while
+  // the trashed note kept its old (lower) position.
+  const noteTs = new Date(existing.timestamp).getTime() || 0;
+  const activeNotes = db.prepare(`
+    SELECT position, timestamp FROM notes
+    WHERE user_id = ? AND trashed = 0 AND archived = 0 AND id != ?
+    ORDER BY position DESC
+  `).all(req.user.id, id);
+
+  let restoredPosition = existing.position;
+  if (activeNotes.length > 0) {
+    // Find insertion point: where does this note's creation time fit
+    // among active notes sorted by position (highest first)?
+    let insertIdx = activeNotes.length; // default: after all (bottom)
+    for (let i = 0; i < activeNotes.length; i++) {
+      const ts = new Date(activeNotes[i].timestamp).getTime() || 0;
+      if (noteTs >= ts) {
+        insertIdx = i;
+        break;
+      }
+    }
+    if (insertIdx === 0) {
+      restoredPosition = activeNotes[0].position + 1;
+    } else if (insertIdx >= activeNotes.length) {
+      restoredPosition = activeNotes[activeNotes.length - 1].position - 1;
+    } else {
+      restoredPosition = (activeNotes[insertIdx - 1].position + activeNotes[insertIdx].position) / 2;
+    }
+  }
+
   const updateTrashed = db.prepare(`
-    UPDATE notes SET trashed = 0, client_updated_at = ? WHERE id = ? AND user_id = ?
+    UPDATE notes SET trashed = 0, position = ?, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
 
-  const result = updateTrashed.run(tsResult.iso, id, req.user.id);
+  const result = updateTrashed.run(restoredPosition, tsResult.iso, id, req.user.id);
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });

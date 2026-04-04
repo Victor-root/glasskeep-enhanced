@@ -5959,12 +5959,37 @@ export default function App() {
     if (!selectedIds.length) return;
     const count = selectedIds.length;
     const nowIso = new Date().toISOString();
+    // Pre-load active notes once for position calculation
+    let activeNotes = [];
+    try {
+      activeNotes = (await idbGetAllNotes(currentUser?.id, sessionId, "active"))
+        .sort((a, b) => (+b.position || 0) - (+a.position || 0));
+    } catch (e) {}
     for (const id of selectedIds) {
       const nid = String(id);
       const leaseId = acquireLocalLease(nid);
       try {
         const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) await idbPutNote({ ...existing, trashed: false, client_updated_at: nowIso }, currentUser?.id, sessionId);
+        if (existing) {
+          // Compute restored position by timestamp among active notes
+          const noteTs = new Date(existing.timestamp).getTime() || 0;
+          let restoredPosition = existing.position;
+          if (activeNotes.length > 0) {
+            let insertIdx = activeNotes.length;
+            for (let i = 0; i < activeNotes.length; i++) {
+              const ts = new Date(activeNotes[i].timestamp).getTime() || 0;
+              if (noteTs >= ts) { insertIdx = i; break; }
+            }
+            if (insertIdx === 0) {
+              restoredPosition = (+activeNotes[0].position || 0) + 1;
+            } else if (insertIdx >= activeNotes.length) {
+              restoredPosition = (+activeNotes[activeNotes.length - 1].position || 0) - 1;
+            } else {
+              restoredPosition = ((+activeNotes[insertIdx - 1].position || 0) + (+activeNotes[insertIdx].position || 0)) / 2;
+            }
+          }
+          await idbPutNote({ ...existing, trashed: false, position: restoredPosition, client_updated_at: nowIso }, currentUser?.id, sessionId);
+        }
       } catch (e) { console.error(e); }
       await enqueueWithLease(nid, { type: "restore", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
     }
@@ -9088,10 +9113,35 @@ export default function App() {
     const nid = String(noteId);
     const leaseId = acquireLocalLease(nid);
     const nowIso = new Date().toISOString();
-    // Local-first: restore immediately
+    // Local-first: restore immediately, computing a position that places the note
+    // among active notes at the right chronological spot (by creation timestamp).
     try {
       const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-      if (existing) await idbPutNote({ ...existing, trashed: false, client_updated_at: nowIso }, currentUser?.id, sessionId);
+      if (existing) {
+        // Compute restored position: find where this note fits by timestamp
+        // among currently active notes sorted by position DESC.
+        const activeNotes = await idbGetAllNotes(currentUser?.id, sessionId, "active");
+        const sorted = activeNotes
+          .filter((n) => String(n.id) !== nid)
+          .sort((a, b) => (+b.position || 0) - (+a.position || 0));
+        const noteTs = new Date(existing.timestamp).getTime() || 0;
+        let restoredPosition = existing.position;
+        if (sorted.length > 0) {
+          let insertIdx = sorted.length;
+          for (let i = 0; i < sorted.length; i++) {
+            const ts = new Date(sorted[i].timestamp).getTime() || 0;
+            if (noteTs >= ts) { insertIdx = i; break; }
+          }
+          if (insertIdx === 0) {
+            restoredPosition = (+sorted[0].position || 0) + 1;
+          } else if (insertIdx >= sorted.length) {
+            restoredPosition = (+sorted[sorted.length - 1].position || 0) - 1;
+          } else {
+            restoredPosition = ((+sorted[insertIdx - 1].position || 0) + (+sorted[insertIdx].position || 0)) / 2;
+          }
+        }
+        await idbPutNote({ ...existing, trashed: false, position: restoredPosition, client_updated_at: nowIso }, currentUser?.id, sessionId);
+      }
     } catch (e) { console.error(e); }
     invalidateNotesCache();
     invalidateArchivedNotesCache();
