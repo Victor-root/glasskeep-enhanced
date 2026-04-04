@@ -7178,11 +7178,12 @@ export default function App() {
         es.onopen = () => {
           console.log("SSE connected");
           setSseConnected(true);
-          // SSE connected = server is definitely reachable. Inform the sync
-          // engine so it unblocks the queue even when fetch-based health checks
-          // fail (e.g. Service Worker cache issues causing fetch timeouts).
+          // SSE onopen through a reverse proxy does NOT prove the backend is
+          // alive — the proxy accepts the TCP connection even when the backend
+          // is down. Only a real SSE data message (onmessage) is proof.
+          // Trigger a health check instead to verify properly.
           if (syncEngineRef.current) {
-            syncEngineRef.current.notifyServerReachable();
+            syncEngineRef.current.healthCheck();
           }
           // On reconnection (not first connect), reload the view — but only
           // AFTER the sync queue has finished processing. If we reload while
@@ -7223,6 +7224,13 @@ export default function App() {
         // SSE message handler (server sends generic data: messages)
         es.onmessage = (e) => {
           try {
+            // A real SSE data message = proof the GlassKeep backend is alive.
+            // This is the ONLY place we call notifyServerReachable from SSE
+            // (onopen doesn't count — the proxy can accept connections even
+            // when the backend is down).
+            if (syncEngineRef.current) {
+              syncEngineRef.current.notifyServerReachable();
+            }
             const msg = JSON.parse(e.data || "{}");
             if (msg && msg.type === "note_updated" && msg.noteId) {
               debouncedPatch(msg.noteId);
