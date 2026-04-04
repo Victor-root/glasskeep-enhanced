@@ -484,19 +484,19 @@ export class SyncEngine {
         this._failedChecks++;
       } else {
         this._consecutiveTimeouts++;
-        // AbortError (timeout). Could be Chrome mobile throttling background
-        // fetches, OR the server/proxy is genuinely down (nginx accepts the
-        // TCP connection but backend never responds → timeout).
-        // Policy: tolerate ONE timeout if browser says online (covers Chrome
-        // throttle). Two consecutive timeouts = server is actually down.
-        const tolerate = this._consecutiveTimeouts < 2 && (this._sseConnected || browserSaysOnline);
+        const tabHidden = typeof document !== "undefined" && document.hidden;
+        // AbortError (timeout). Only tolerate when the tab is in background:
+        // Chrome mobile aggressively throttles background fetches, causing
+        // timeouts even when the network is fine. When the tab is VISIBLE,
+        // the user is looking at the app — a timeout = server is down.
+        const tolerate = tabHidden && this._consecutiveTimeouts < 2;
         if (tolerate) {
-          console.warn("[SyncEngine] healthCheck timeout #%d — tolerating (sse=%s, online=%s)",
-            this._consecutiveTimeouts, this._sseConnected, browserSaysOnline);
+          console.warn("[SyncEngine] healthCheck timeout #%d — tolerating (background tab)",
+            this._consecutiveTimeouts);
           // Don't change _serverReachable — keep previous state
         } else {
-          console.warn("[SyncEngine] healthCheck timeout #%d — marking offline",
-            this._consecutiveTimeouts);
+          console.warn("[SyncEngine] healthCheck timeout #%d — marking offline (tab=%s)",
+            this._consecutiveTimeouts, tabHidden ? "hidden" : "visible");
           this._serverReachable = false;
           this._lastSyncError = "Health check timeout";
           this._failedChecks++;
