@@ -7470,9 +7470,19 @@ export default function App() {
     if (prev === "offline" && syncStatus.syncState !== "offline" && syncStatus.syncState !== "checking") {
       // Server just recovered — reconnect SSE immediately
       reconnectSseRef.current?.();
-      // Also reload the view right away to pick up changes from other devices
-      // (don't wait for SSE onopen which may be delayed by reconnection).
-      reloadCurrentViewRef.current?.();
+      // Reload the view to pick up changes from other devices, but WAIT for
+      // the local queue to drain first. Otherwise we fetch stale server data
+      // that overwrites local offline edits that haven't been pushed yet.
+      const waitThenReload = () => {
+        const engine = syncEngineRef.current;
+        if (engine && engine._processing) {
+          setTimeout(waitThenReload, 500);
+          return;
+        }
+        reloadCurrentViewRef.current?.();
+      };
+      // Small delay to let processQueue start (healthCheck triggers it)
+      setTimeout(waitThenReload, 500);
     }
   }, [syncStatus.syncState]);
 
