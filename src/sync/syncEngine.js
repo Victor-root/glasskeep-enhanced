@@ -415,25 +415,32 @@ export class SyncEngine {
       const isAbort = err?.name === "AbortError";
       const browserSaysOnline = typeof navigator !== "undefined" && navigator.onLine;
 
-      // If SSE is actively connected, the server is reachable — don't let a
-      // flaky fetch (AbortError, SW interference) override that evidence.
-      // Also: if the browser reports online and the failure is just an AbortError
-      // (timeout / throttle), don't mark server as unreachable — Chrome mobile
-      // aggressively throttles background fetch/timers, causing AbortErrors even
-      // when the network is perfectly fine. Only mark offline on real network errors
-      // or when the browser itself says we're offline.
-      if (this._sseConnected || (isAbort && browserSaysOnline)) {
+      // Hard network error (TypeError: Failed to fetch) = real proof the
+      // server is unreachable. The _sseConnected flag is NOT reliable here:
+      // TCP keepalive may not have detected the dead connection yet, so
+      // EventSource still reports OPEN while the network is actually down.
+      // Only AbortError (timeout/throttle) is ambiguous enough to tolerate.
+      if (!isAbort) {
+        // Real network failure — mark offline immediately, clear stale SSE flag
+        this._sseConnected = false;
+        this._serverReachable = false;
+        this._lastSyncError = "Server unreachable";
+        this._failedChecks++;
+      } else if (this._sseConnected || browserSaysOnline) {
+        // AbortError (timeout) while SSE is connected or browser says online:
+        // Chrome mobile aggressively throttles background fetch/timers, causing
+        // AbortErrors even when the network is perfectly fine. Don't mark offline.
         if (this._sseConnected) {
-          console.warn("[SyncEngine] healthCheck failed but SSE is connected — server is reachable");
+          console.warn("[SyncEngine] healthCheck AbortError but SSE is connected — tolerating");
         } else {
-          console.warn("[SyncEngine] healthCheck AbortError but browser is online — likely throttled, not offline");
+          console.warn("[SyncEngine] healthCheck AbortError but browser is online — likely throttled");
         }
         this._serverReachable = true;
         this._lastSyncError = null;
         this._failedChecks = 0;
       } else {
         this._serverReachable = false;
-        this._lastSyncError = isAbort ? "Health check timeout" : "Server unreachable";
+        this._lastSyncError = "Health check timeout";
         this._failedChecks++;
       }
 
