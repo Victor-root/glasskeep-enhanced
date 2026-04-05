@@ -61,6 +61,7 @@ import ModalFooter from "./components/modal/ModalFooter.jsx";
 import ModalImagesGrid from "./components/modal/ModalImagesGrid.jsx";
 import useAdminActions from "./hooks/useAdminActions.js";
 import useImportExport from "./hooks/useImportExport.js";
+import useCollaboration from "./hooks/useCollaboration.js";
 
 
 /** ---------- NotesUI (presentational) ---------- */
@@ -592,19 +593,7 @@ export default function App() {
     }
   }, [composerType]);
 
-  // Collaboration modal
-  const [collaborationModalOpen, setCollaborationModalOpen] = useState(false);
-  const [collaboratorUsername, setCollaboratorUsername] = useState("");
-  const [addModalCollaborators, setAddModalCollaborators] = useState([]);
-  const [availableUsers, setAvailableUsers] = useState([]);
-  const [filteredUsers, setFilteredUsers] = useState([]);
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState({
-    top: 0,
-    left: 0,
-    width: 0,
-  });
+  // Collaboration (ref must be declared before hook)
   const collaboratorInputRef = useRef(null);
 
   // Modal formatting
@@ -3147,205 +3136,27 @@ export default function App() {
   const { exportAll, importAll, importGKeep, importMd, downloadSecretKey } =
     useImportExport(token, { currentUser, loadNotes });
 
-  /** -------- Collaboration actions -------- */
-  const [collaborationDialogOpen, setCollaborationDialogOpen] = useState(false);
-  const [collaborationDialogNoteId, setCollaborationDialogNoteId] =
-    useState(null);
-  const [noteCollaborators, setNoteCollaborators] = useState([]);
-  const [isNoteOwner, setIsNoteOwner] = useState(false);
-
-  const loadNoteCollaborators = useCallback(
-    async (noteId) => {
-      try {
-        const collaborators = await api(`/notes/${noteId}/collaborators`, {
-          token,
-        });
-        setNoteCollaborators(collaborators || []);
-
-        // Check if current user is the owner
-        // Try to get note from current notes list
-        const note = notes.find((n) => String(n.id) === String(noteId));
-        // If note has user_id, use it; otherwise check if user is in collaborators list
-        if (note?.user_id) {
-          setIsNoteOwner(note.user_id === currentUser?.id);
-        } else {
-          // If note doesn't have user_id, check if current user is NOT in collaborators
-          // (if they're not a collaborator and can see the note, they're likely the owner)
-          const isCollaborator = collaborators.some(
-            (c) => c.id === currentUser?.id,
-          );
-          setIsNoteOwner(!isCollaborator);
-        }
-      } catch (e) {
-        console.error("Failed to load collaborators:", e);
-        setNoteCollaborators([]);
-        setIsNoteOwner(false);
-      }
-    },
-    [token, notes, currentUser],
-  );
-
-  const showCollaborationDialog = useCallback(
-    (noteId) => {
-      setCollaborationDialogNoteId(noteId);
-      setCollaborationDialogOpen(true);
-      loadNoteCollaborators(noteId);
-    },
-    [loadNoteCollaborators],
-  );
-
-  const removeCollaborator = async (collaboratorId, noteId = null) => {
-    try {
-      const targetNoteId = noteId || collaborationDialogNoteId || activeId;
-      if (!targetNoteId) return;
-      await api(`/notes/${targetNoteId}/collaborate/${collaboratorId}`, {
-        method: "DELETE",
-        token,
-      });
-      showToast(t("collaboratorRemovedSuccessfully"), "success");
-      if (collaborationDialogNoteId) {
-        loadNoteCollaborators(collaborationDialogNoteId);
-      }
-      if (activeId) {
-        await loadCollaboratorsForAddModal(activeId);
-      }
-      invalidateNotesCache();
-    } catch (e) {
-      showToast(e.message || t("failedRemoveCollaborator"), "error");
-    }
-  };
-
-  const loadCollaboratorsForAddModal = useCallback(
-    async (noteId) => {
-      try {
-        const collaborators = await api(`/notes/${noteId}/collaborators`, {
-          token,
-        });
-        setAddModalCollaborators(collaborators || []);
-      } catch (e) {
-        console.error("Failed to load collaborators:", e);
-        setAddModalCollaborators([]);
-      }
-    },
-    [token],
-  );
-
-  // Search users for collaboration dropdown
-  const searchUsers = useCallback(
-    async (query) => {
-      setLoadingUsers(true);
-      try {
-        const searchQuery =
-          query && query.trim().length > 0 ? query.trim() : "";
-        const users = await api(
-          `/users/search?q=${encodeURIComponent(searchQuery)}`,
-          { token },
-        );
-        // Filter out current user and existing collaborators
-        const existingCollaboratorIds = new Set(
-          addModalCollaborators.map((c) => c.id),
-        );
-        const filtered = users.filter(
-          (u) => u.id !== currentUser?.id && !existingCollaboratorIds.has(u.id),
-        );
-        setFilteredUsers(filtered);
-        setShowUserDropdown(filtered.length > 0);
-      } catch (e) {
-        console.error("Failed to search users:", e);
-        setFilteredUsers([]);
-        setShowUserDropdown(false);
-      } finally {
-        setLoadingUsers(false);
-      }
-    },
-    [token, addModalCollaborators, currentUser],
-  );
-
-  // Update dropdown position based on input field
-  const updateDropdownPosition = useCallback(() => {
-    if (collaboratorInputRef.current) {
-      const rect = collaboratorInputRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 4, // fixed positioning is relative to viewport
-        left: rect.left,
-        width: rect.width,
-      });
-    }
-  }, []);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        collaboratorInputRef.current &&
-        !collaboratorInputRef.current.contains(event.target) &&
-        !event.target.closest("[data-user-dropdown]")
-      ) {
-        setShowUserDropdown(false);
-      }
-    };
-
-    if (showUserDropdown) {
-      updateDropdownPosition();
-      // Use setTimeout to ensure the portal is rendered
-      setTimeout(() => {
-        document.addEventListener("mousedown", handleClickOutside);
-      }, 0);
-      window.addEventListener("scroll", updateDropdownPosition, true);
-      window.addEventListener("resize", updateDropdownPosition);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-        window.removeEventListener("scroll", updateDropdownPosition, true);
-        window.removeEventListener("resize", updateDropdownPosition);
-      };
-    }
-  }, [showUserDropdown, updateDropdownPosition]);
-
-  // Load collaborators when Add Collaborator modal opens
-  useEffect(() => {
-    if (collaborationModalOpen && activeId) {
-      loadCollaboratorsForAddModal(activeId);
-    }
-  }, [collaborationModalOpen, activeId, loadCollaboratorsForAddModal]);
-
-  const addCollaborator = async (username) => {
-    try {
-      if (!activeId) return;
-
-      // Add collaborator to the note
-      const result = await api(`/notes/${activeId}/collaborate`, {
-        method: "POST",
-        token,
-        body: { username },
-      });
-
-      // Update local note with collaborator info
-      setNotes((prev) =>
-        prev.map((n) =>
-          String(n.id) === String(activeId)
-            ? {
-                ...n,
-                collaborators: [...(n.collaborators || []), username],
-                lastEditedBy: currentUser?.email || currentUser?.name,
-                lastEditedAt: new Date().toISOString(),
-              }
-            : n,
-        ),
-      );
-
-      showToast(t("addedCollaboratorSuccessfully").replace("{username}", String(username)), "success");
-      setCollaboratorUsername("");
-      setShowUserDropdown(false);
-      setFilteredUsers([]);
-      // Reload collaborators for both dialogs
-      await loadCollaboratorsForAddModal(activeId);
-      if (collaborationDialogNoteId === activeId) {
-        loadNoteCollaborators(activeId);
-      }
-    } catch (e) {
-      showToast(e.message || t("failedAddCollaborator"), "error");
-    }
-  };
+  // Collaboration actions (hook)
+  const {
+    collaborationModalOpen, setCollaborationModalOpen,
+    collaboratorUsername, setCollaboratorUsername,
+    addModalCollaborators,
+    filteredUsers, setFilteredUsers,
+    showUserDropdown, setShowUserDropdown,
+    loadingUsers,
+    dropdownPosition,
+    loadNoteCollaborators,
+    showCollaborationDialog,
+    removeCollaborator,
+    loadCollaboratorsForAddModal,
+    searchUsers,
+    updateDropdownPosition,
+    addCollaborator,
+  } = useCollaboration(token, {
+    notes, currentUser, activeId,
+    showToast, invalidateNotesCache, setNotes,
+    collaboratorInputRef,
+  });
 
   /** -------- Modal tag helpers -------- */
   const addTags = (raw) => {
