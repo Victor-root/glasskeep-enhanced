@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { t } from "../../i18n";
 import { SearchIcon, CloseIcon } from "../../icons/index.jsx";
-
-const ALL_IMAGES = "__ALL_IMAGES__";
+import { ALL_IMAGES } from "../../utils/constants.js";
 
 // Sidebar icons (Material Design style)
 const NotesIcon = () => (
@@ -41,7 +40,7 @@ const TagIcon = () => (
   </svg>
 );
 
-export { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon, ALL_IMAGES };
+export { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon };
 
 export default function TagSidebar({
   open,

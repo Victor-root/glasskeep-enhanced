@@ -32,6 +32,7 @@ import { renderSafeMarkdown, mdToPlain, mdForDownload, linkifyPhoneNumbers } fro
 import { uid, sanitizeFilename, downloadText, downloadDataUrl, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, normalizeImageFilename, formatEditedStamp, fileToCompressedDataURL } from "./utils/helpers.js";
 import { PinOutline, PinFilled, Trash, Sun, Moon, ImageIcon, GalleryIcon, CloseIcon, DownloadIcon, ArrowLeft, ArrowRight, SearchIcon, Kebab, Hamburger, FormatIcon, SettingsIcon, GridIcon, ListIcon, SunIcon, Sparkles, MoonIcon, CheckSquareIcon, ShieldIcon, LogOutIcon, FloatingCardsIcon, ArchiveIcon, PinIcon, TextNoteIcon, ChecklistIcon, BrushIcon, AddImageIcon } from "./icons/index.jsx";
 import { globalCSS } from "./styles/globalCSS.js";
+import { ALL_IMAGES } from "./utils/constants.js";
 import ChecklistRow from "./components/common/ChecklistRow.jsx";
 import { ColorDot } from "./components/common/ColorDot.jsx";
 import PaletteColorIcon from "./components/common/PaletteColorIcon.jsx";
@@ -51,10 +52,13 @@ import SettingsPanel from "./components/panels/SettingsPanel.jsx";
 import AdminPanel from "./components/panels/AdminPanel.jsx";
 import NoteCard from "./components/notes/NoteCard.jsx";
 import AdminView from "./components/notes/AdminView.jsx";
+import MultiSelectToolbar from "./components/notes/MultiSelectToolbar.jsx";
+import NotesHeader from "./components/notes/NotesHeader.jsx";
+import NotesComposer from "./components/notes/NotesComposer.jsx";
+import NotesSections from "./components/notes/NotesSections.jsx";
+import GenericConfirmDialog from "./components/common/GenericConfirmDialog.jsx";
+import ToastContainer from "./components/common/ToastContainer.jsx";
 
-
-/** ---------- Special tag filters ---------- */
-const ALL_IMAGES = "__ALL_IMAGES__";
 
 /** ---------- NotesUI (presentational) ---------- */
 function NotesUI({
@@ -184,10 +188,6 @@ function NotesUI({
   syncStatus,
   handleSyncNow,
 }) {
-  // Multi-select color popover (local UI state)
-  const multiColorBtnRef = useRef(null);
-  const [showMultiColorPop, setShowMultiColorPop] = useState(false);
-
   // Mobile search expand
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const mobileSearchRef = useRef(null);
@@ -256,1075 +256,136 @@ function NotesUI({
       className="min-h-screen"
       style={{ marginLeft: sidebarPermanent ? `${sidebarWidth}px` : "0px", position:"relative", zIndex:2 }}
     >
-      {/* Multi-select toolbar (floats above header when active) */}
-      {multiMode && (
-        <div
-          className="p-3 sm:p-4 flex items-center justify-between sticky top-0 z-[25] glass-card mb-2"
-          style={{ position: "sticky" }}
-        >
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
-              onClick={onBulkDownloadZip}
-            >{t("downloadZip")}</button>
-            {activeTagFilter === "TRASHED" ? (
-              <>
-                <button
-                  className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1"
-                  onClick={onBulkRestore}
-                >{t("restoreFromTrash")}</button>
-                <button
-                  className="px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm"
-                  onClick={onBulkDelete}
-                >{t("permanentlyDelete")}</button>
-              </>
-            ) : (
-              <>
-                <button
-                  className="px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm"
-                  onClick={onBulkDelete}
-                >{t("moveToTrash")}</button>
-                <button
-                  ref={multiColorBtnRef}
-                  type="button"
-                  onClick={() => setShowMultiColorPop((v) => !v)}
-                  className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
-                  data-tooltip={t("color")}
-                >{t("colorEmoji")}</button>
-                <ColorPickerPanel
-                  anchorRef={multiColorBtnRef}
-                  open={showMultiColorPop}
-                  onClose={() => setShowMultiColorPop(false)}
-                  colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
-                  selectedColor={null}
-                  darkMode={dark}
-                  onSelect={(name) => { onBulkColor(name); }}
-                />
-                {activeTagFilter !== "ARCHIVED" && (
-                  <button
-                    className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1"
-                    onClick={() => onBulkPin(true)}
-                  >
-                    <PinIcon />{t("pin")}</button>
-                )}
-                <button
-                  className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm flex items-center gap-1"
-                  onClick={onBulkArchive}
-                >
-                  <ArchiveIcon />
-                  {activeTagFilter === "ARCHIVED" ? t("unarchive") : t("archive")}
-                </button>
-              </>
-            )}
-            <span className="text-xs opacity-70 ml-2">{t("selectedPrefix")} {selectedIds.length}
-            </span>
-          </div>
-          <button
-            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-            data-tooltip={t("exitMultiSelect")}
-            onClick={onExitMulti}
-          >
-            <CloseIcon />
-          </button>
-        </div>
-      )}
+      <MultiSelectToolbar
+        multiMode={multiMode}
+        dark={dark}
+        activeTagFilter={activeTagFilter}
+        selectedIds={selectedIds}
+        onBulkDownloadZip={onBulkDownloadZip}
+        onBulkRestore={onBulkRestore}
+        onBulkDelete={onBulkDelete}
+        onBulkColor={onBulkColor}
+        onBulkPin={onBulkPin}
+        onBulkArchive={onBulkArchive}
+        onExitMulti={onExitMulti}
+      />
 
-      {/* Header */}
-      <header
-        className={`p-4 sm:p-6 flex justify-between items-center sticky top-0 ${mobileSearchOpen ? "z-[1000]" : "z-20"} glass-card mb-6 relative`}
-        style={{
-          transform: !headerVisible && windowWidth < 700 ? "translateY(-100%)" : "translateY(0)",
-          transition: "transform 0.3s ease",
-        }}
-      >
-        <div className="flex items-center gap-3 shrink-0">
-          {/* Hamburger - only show when sidebar is not permanent */}
-          {!sidebarPermanent && (
-            <button
-              onClick={openSidebar}
-              className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              data-tooltip={t("openTags")}
-              aria-label={t("openTags")}
-            >
-              <Hamburger />
-            </button>
-          )}
+      <NotesHeader
+        dark={dark}
+        headerVisible={headerVisible}
+        windowWidth={windowWidth}
+        sidebarPermanent={sidebarPermanent}
+        mobileSearchOpen={mobileSearchOpen}
+        setMobileSearchOpen={setMobileSearchOpen}
+        mobileSearchRef={mobileSearchRef}
+        search={search}
+        setSearch={setSearch}
+        localAiEnabled={localAiEnabled}
+        onAiSearch={onAiSearch}
+        isOnline={isOnline}
+        listView={listView}
+        onToggleViewMode={onToggleViewMode}
+        toggleDark={toggleDark}
+        syncStatus={syncStatus}
+        handleSyncNow={handleSyncNow}
+        onStartMulti={onStartMulti}
+        openSettingsPanel={openSettingsPanel}
+        openAdminPanel={openAdminPanel}
+        currentUser={currentUser}
+        signOut={signOut}
+        headerMenuOpen={headerMenuOpen}
+        setHeaderMenuOpen={setHeaderMenuOpen}
+        headerMenuRef={headerMenuRef}
+        headerBtnRef={headerBtnRef}
+        importFileRef={importFileRef}
+        gkeepFileRef={gkeepFileRef}
+        mdFileRef={mdFileRef}
+        onImportAll={onImportAll}
+        onImportGKeep={onImportGKeep}
+        onImportMd={onImportMd}
+        sectionLabel={sectionLabel}
+        SectionIcon={SectionIcon}
+        openSidebar={openSidebar}
+        activeTagFilter={activeTagFilter}
+      />
 
-          {/* App logo */}
-          <img
-            src="/favicon-32x32.png"
-            srcSet="/pwa-192.png 2x, /pwa-512.png 3x"
-            alt={t("glassKeepLogo")}
-            className="h-7 w-7 rounded-xl shadow-sm select-none pointer-events-none"
-            draggable="false"
-          />
+      <NotesComposer
+        dark={dark}
+        activeTagFilter={activeTagFilter}
+        composerType={composerType}
+        setComposerType={setComposerType}
+        title={title}
+        setTitle={setTitle}
+        content={content}
+        setContent={setContent}
+        contentRef={contentRef}
+        clInput={clInput}
+        setClInput={setClInput}
+        addComposerItem={addComposerItem}
+        clItems={clItems}
+        composerDrawingData={composerDrawingData}
+        setComposerDrawingData={setComposerDrawingData}
+        composerImages={composerImages}
+        setComposerImages={setComposerImages}
+        composerFileRef={composerFileRef}
+        composerTagList={composerTagList}
+        setComposerTagList={setComposerTagList}
+        composerTagInput={composerTagInput}
+        setComposerTagInput={setComposerTagInput}
+        composerTagFocused={composerTagFocused}
+        setComposerTagFocused={setComposerTagFocused}
+        composerTagInputRef={composerTagInputRef}
+        tagsWithCounts={tagsWithCounts}
+        composerColor={composerColor}
+        setComposerColor={setComposerColor}
+        addNote={addNote}
+        formatComposer={formatComposer}
+        showComposerFmt={showComposerFmt}
+        setShowComposerFmt={setShowComposerFmt}
+        composerFmtBtnRef={composerFmtBtnRef}
+        onComposerKeyDown={onComposerKeyDown}
+        composerCollapsed={composerCollapsed}
+        setComposerCollapsed={setComposerCollapsed}
+        titleRef={titleRef}
+        composerRef={composerRef}
+        colorBtnRef={colorBtnRef}
+        showColorPop={showColorPop}
+        setShowColorPop={setShowColorPop}
+        localAiEnabled={localAiEnabled}
+        aiResponse={aiResponse}
+        setAiResponse={setAiResponse}
+        isAiLoading={isAiLoading}
+        aiLoadingProgress={aiLoadingProgress}
+        onAiSearch={onAiSearch}
+        search={search}
+        setSearch={setSearch}
+        syncStatus={syncStatus}
+      />
 
-          {/* Mobile: stacked name + badge */}
-          <div className="flex flex-col sm:hidden leading-tight">
-            <h1 className="text-lg font-bold">Glass Keep</h1>
-            <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1 max-w-[160px]">
-              <span className="shrink-0 w-3 h-3 [&>svg]:w-3 [&>svg]:h-3"><SectionIcon /></span>
-              <span className="truncate">{sectionLabel}</span>
-            </span>
-          </div>
-
-          {/* Desktop: inline name + separator + badge */}
-          <h1 className="hidden sm:block text-2xl sm:text-3xl font-bold">
-            Glass Keep
-          </h1>
-          <span className="hidden sm:inline-block h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
-          <span className="hidden sm:flex text-base font-medium px-3 py-1 rounded-lg bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20 items-center gap-1.5 max-w-[200px]">
-            <span className="shrink-0 w-4 h-4 [&>svg]:w-4 [&>svg]:h-4"><SectionIcon /></span>
-            <span className="truncate">{sectionLabel}</span>
-          </span>
-
-          {/* Offline indicator */}
-          {!isOnline && (
-            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20">{t("offline")}</span>
-          )}
-        </div>
-
-        {/* Desktop: full search bar */}
-        <div className="hidden sm:flex flex-grow min-w-0 justify-center px-2 sm:px-8">
-          <div className="relative w-full max-w-lg">
-            <input
-              type="text"
-              placeholder={localAiEnabled ? t("searchOrAskAi") : t("search")}
-              className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-4 ${localAiEnabled ? "pr-14" : "pr-8"} py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  localAiEnabled &&
-                  search.trim().length > 0
-                ) {
-                  onAiSearch?.(search);
-                }
-              }}
-            />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              {localAiEnabled && search.trim().length > 0 && (
-                <button
-                  type="button"
-                  data-tooltip={t("askAi")}
-                  className="h-7 w-7 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
-                  onClick={() => onAiSearch?.(search)}
-                >
-                  <Sparkles />
-                </button>
-              )}
-              {search && (
-                <button
-                  type="button"
-                  aria-label={t("clearSearch")}
-                  className="h-6 w-6 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
-                  onClick={() => setSearch("")}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile: search icon that expands into a full search bar */}
-        <div className="sm:hidden flex items-center ml-auto mr-1">
-          {!mobileSearchOpen && (
-            <button
-              type="button"
-              className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-600 dark:text-gray-300"
-              aria-label={t("search")}
-              onClick={() => {
-                setMobileSearchOpen(true);
-                setTimeout(() => mobileSearchRef.current?.focus(), 50);
-              }}
-            >
-              <SearchIcon />
-            </button>
-          )}
-        </div>
-        {/* Mobile expanded search overlay - covers the header content */}
-        {mobileSearchOpen && createPortal(
-          <div
-            className="sm:hidden fixed inset-0 z-[999]"
-            onClick={() => setMobileSearchOpen(false)}
-          />,
-          document.body
-        )}
-        {mobileSearchOpen && (
-          <div className="sm:hidden absolute inset-0 z-30 flex items-center px-3 gap-2 bg-[var(--bg-card,_var(--bg-primary))] backdrop-blur-xl">
-            <div className="relative flex-1 min-w-0">
-              <input
-                ref={mobileSearchRef}
-                type="text"
-                placeholder={localAiEnabled ? t("searchOrAskAi") : t("search")}
-                className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-3 ${localAiEnabled ? "pr-12" : "pr-8"} py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setMobileSearchOpen(false);
-                  }
-                  if (
-                    e.key === "Enter" &&
-                    localAiEnabled &&
-                    search.trim().length > 0
-                  ) {
-                    onAiSearch?.(search);
-                  }
-                }}
-              />
-              <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                {localAiEnabled && search.trim().length > 0 && (
-                  <button
-                    type="button"
-                    className="h-6 w-6 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"
-                    onClick={() => onAiSearch?.(search)}
-                  >
-                    <Sparkles />
-                  </button>
-                )}
-                {search && (
-                  <button
-                    type="button"
-                    aria-label={t("clearSearch")}
-                    className="h-5 w-5 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
-                    onClick={() => setSearch("")}
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="relative flex items-center gap-3 shrink-0">
-          {/* Desktop: icon buttons directly in header bar */}
-          <div className="hidden sm:flex items-center gap-1">
-            <button
-              onClick={() => onToggleViewMode?.()}
-              className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-blue-400 hover:text-blue-300 hover:bg-blue-500/15 focus:ring-blue-500" : "text-blue-600 hover:text-blue-700 hover:bg-blue-100 focus:ring-blue-400"}`}
-              data-tooltip={listView ? t("gridView") : t("listView")}
-              aria-label={listView ? t("gridView") : t("listView")}
-            >
-              {listView ? <GridIcon /> : <ListIcon />}
-            </button>
-            <button
-              onClick={() => toggleDark?.()}
-              className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-amber-400 hover:text-amber-300 hover:bg-amber-500/15 focus:ring-amber-500" : "text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 focus:ring-indigo-400"}`}
-              data-tooltip={dark ? t("lightMode") : t("darkMode")}
-              aria-label={dark ? t("lightMode") : t("darkMode")}
-            >
-              {dark ? <SunIcon /> : <MoonIcon />}
-            </button>
-            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
-            <button
-              onClick={() => onStartMulti?.()}
-              className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-violet-400 hover:text-violet-300 hover:bg-violet-500/15 focus:ring-violet-500" : "text-violet-600 hover:text-violet-700 hover:bg-violet-100 focus:ring-violet-400"}`}
-              data-tooltip={t("multiSelect")}
-              aria-label={t("multiSelect")}
-            >
-              <CheckSquareIcon />
-            </button>
-            <button
-              onClick={() => openSettingsPanel?.()}
-              className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700 focus:ring-gray-500" : "text-gray-500 hover:text-gray-700 hover:bg-gray-200 focus:ring-gray-400"}`}
-              data-tooltip={t("settings")}
-              aria-label={t("settings")}
-            >
-              <SettingsIcon />
-            </button>
-            <span className={`mx-1 w-px h-5 ${dark ? "bg-gray-600" : "bg-gray-300"}`} />
-            {currentUser?.is_admin && (
-              <button
-                onClick={() => openAdminPanel?.()}
-                className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-red-400 hover:text-red-300 hover:bg-red-500/15 focus:ring-red-500" : "text-red-600 hover:text-red-700 hover:bg-red-100 focus:ring-red-400"}`}
-                data-tooltip={t("adminPanel")}
-                aria-label={t("adminPanel")}
-              >
-                <ShieldIcon />
-              </button>
-            )}
-            <span className="flex items-center gap-2">
-              <UserAvatar
-                name={currentUser?.name}
-                email={currentUser?.email}
-                avatarUrl={currentUser?.avatar_url}
-                size="w-7 h-7"
-                textSize="text-xs"
-                dark={dark}
-              />
-              <span className={`text-sm font-medium ${dark ? "text-gray-200" : "text-gray-700"}`}>
-                {currentUser?.name || currentUser?.email}
-              </span>
-            </span>
-            <button
-              onClick={() => signOut?.()}
-              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 text-red-500 dark:text-red-400"
-              data-tooltip={t("signOut")}
-              aria-label={t("signOut")}
-            >
-              <LogOutIcon />
-            </button>
-          </div>
-
-          {/* Mobile: sync icon + 3-dot menu */}
-          <div className="sm:hidden flex items-center gap-1">
-            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
-            <button
-              ref={headerBtnRef}
-              onClick={() => setHeaderMenuOpen((v) => !v)}
-              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
-              data-tooltip={t("menu")}
-              aria-haspopup="menu"
-              aria-expanded={headerMenuOpen}
-            >
-              <Kebab />
-            </button>
-
-            {headerMenuOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-[1099]"
-                  onClick={() => setHeaderMenuOpen(false)}
-                />
-                <div
-                  ref={headerMenuRef}
-                  className={`absolute top-12 right-0 min-w-[220px] z-[1100] border border-[var(--border-light)] rounded-lg shadow-lg overflow-hidden ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
-                  style={{ backgroundColor: dark ? "#222222" : undefined }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      openSettingsPanel?.();
-                    }}
-                  >
-                    <span className={dark ? "text-gray-400" : "text-gray-500"}><SettingsIcon /></span>{t("settings")}</button>
-                  <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      onToggleViewMode?.();
-                    }}
-                  >
-                    <span className={dark ? "text-blue-400" : "text-blue-600"}>{listView ? <GridIcon /> : <ListIcon />}</span>
-                    {listView ? t("gridView") : t("listView")}
-                  </button>
-                  <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      toggleDark?.();
-                    }}
-                  >
-                    <span className={dark ? "text-amber-400" : "text-indigo-600"}>{dark ? <SunIcon /> : <MoonIcon />}</span>
-                    {dark ? t("lightMode") : t("darkMode")}
-                  </button>
-                  <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      onStartMulti?.();
-                    }}
-                  >
-                    <span className={dark ? "text-violet-400" : "text-violet-600"}><CheckSquareIcon /></span>{t("multiSelect")}</button>
-                  {currentUser?.is_admin && (
-                    <button
-                      className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                      onClick={() => {
-                        setHeaderMenuOpen(false);
-                        openAdminPanel?.();
-                      }}
-                    >
-                      <span className={dark ? "text-red-400" : "text-red-600"}><ShieldIcon /></span>{t("adminPanel")}</button>
-                  )}
-                  <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      signOut?.();
-                    }}
-                  >
-                    <LogOutIcon />{t("signOut")}</button>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Hidden import input */}
-          <input
-            ref={importFileRef}
-            type="file"
-            accept="application/json"
-            className="hidden"
-            onChange={async (e) => {
-              if (e.target.files && e.target.files.length) {
-                await onImportAll?.(e.target.files);
-                e.target.value = "";
-              }
-            }}
-          />
-          {/* Hidden Google Keep import input (multiple) */}
-          <input
-            ref={gkeepFileRef}
-            type="file"
-            accept="application/json"
-            multiple
-            className="hidden"
-            onChange={async (e) => {
-              if (e.target.files && e.target.files.length) {
-                await onImportGKeep?.(e.target.files);
-                e.target.value = "";
-              }
-            }}
-          />
-          {/* Hidden Markdown import input (multiple) */}
-          <input
-            ref={mdFileRef}
-            type="file"
-            accept=".md,text/markdown"
-            multiple
-            className="hidden"
-            onChange={async (e) => {
-              if (e.target.files && e.target.files.length) {
-                await onImportMd?.(e.target.files);
-                e.target.value = "";
-              }
-            }}
-          />
-        </div>
-      </header>
-
-      {/* AI Response Box */}
-      {localAiEnabled && (aiResponse || isAiLoading) && (
-        <div className="px-4 sm:px-6 md:px-8 lg:px-12 mb-6">
-          <div className="max-w-2xl mx-auto glass-card rounded-xl shadow-lg p-5 border border-indigo-500/30 relative bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/30 dark:to-purple-950/30 z-[50]">
-            {isAiLoading && (
-              <div
-                className="absolute top-0 left-0 h-1 bg-indigo-500 transition-all duration-300"
-                style={{
-                  width: aiLoadingProgress ? `${aiLoadingProgress}%` : "5%",
-                }}
-              />
-            )}
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="text-indigo-600 dark:text-indigo-400" />
-              <h3 className="font-semibold text-indigo-700 dark:text-indigo-300">{t("aiAssistant")}</h3>
-              {aiResponse && !isAiLoading && (
-                <button
-                  onClick={() => {
-                    setAiResponse(null);
-                    setSearch("");
-                  }}
-                  className="ml-auto p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
-                  data-tooltip={t("clearResponse")}
-                >
-                  <CloseIcon />
-                </button>
-              )}
-            </div>
-            <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
-              {isAiLoading ? (
-                <p className="animate-pulse text-gray-500 italic flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" />{t("aiAssistantThinking")}</p>
-              ) : (
-                <div
-                  className="text-gray-800 dark:text-gray-200 note-content"
-                  dangerouslySetInnerHTML={{
-                    __html: renderSafeMarkdown(aiResponse),
-                  }}
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Composer — hidden in trash and archive views */}
-      {activeTagFilter !== "TRASHED" && activeTagFilter !== "ARCHIVED" && (
-      <div className="px-4 sm:px-6 md:px-8 lg:px-12">
-        <div className="max-w-2xl mx-auto">
-          {(
-            <div
-              ref={composerRef}
-              className="glass-card rounded-xl shadow-lg p-4 mb-8 relative"
-              style={{ backgroundColor: bgFor(composerColor, dark) }}
-            >
-              {/* Collapsed single input */}
-              {composerCollapsed ? (
-                <input
-                  value={content}
-                  onChange={(e) => {}}
-                  onFocus={() => {
-                    // expand and focus title
-                    setComposerCollapsed(false);
-                    setTimeout(() => titleRef.current?.focus(), 10);
-                  }}
-                  placeholder={t("writeNote")}
-                  className="w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2"
-                />
-              ) : (
-                <>
-                  {/* Title */}
-                  <input
-                    ref={titleRef}
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder={t("noteTitle")}
-                    className="w-full bg-transparent text-lg font-semibold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none mb-2 p-2"
-                  />
-
-                  {/* Body, Checklist, or Drawing */}
-                  {composerType === "text" ? (
-                    <textarea
-                      ref={contentRef}
-                      value={content}
-                      onChange={(e) => setContent(e.target.value)}
-                      onKeyDown={onComposerKeyDown}
-                      placeholder={t("writeNote")}
-                      className="w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none p-2"
-                      rows={1}
-                    />
-                  ) : composerType === "checklist" ? (
-                    <div className="space-y-3">
-                      <div className="flex gap-2">
-                        <input
-                          value={clInput}
-                          onChange={(e) => setClInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              addComposerItem();
-                            }
-                          }}
-                          placeholder={t("listItemEllipsis")}
-                          className="flex-1 bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2 border-b border-[var(--border-light)]"
-                        />
-                        <button
-                          onClick={addComposerItem}
-                          className="px-3 py-1.5 rounded-lg whitespace-nowrap font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
-                        >{t("add")}</button>
-                      </div>
-                      {clItems.length > 0 && (
-                        <div className="space-y-2">
-                          {clItems.map((it) => (
-                            <ChecklistRow
-                              key={it.id}
-                              item={it}
-                              readOnly
-                              disableToggle
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <DrawingCanvas
-                      data={composerDrawingData}
-                      onChange={setComposerDrawingData}
-                      width={650}
-                      height={450}
-                      readOnly={false}
-                      darkMode={dark}
-                      hideModeToggle={true}
-                    />
-                  )}
-
-                  {/* Composer image thumbnails */}
-                  {composerImages.length > 0 && (
-                    <div className="mt-3 flex gap-2 overflow-x-auto">
-                      {composerImages.map((im) => (
-                        <div key={im.id} className="relative">
-                          <img
-                            src={im.src}
-                            alt={im.name}
-                            className="h-16 w-24 object-cover rounded-md border border-[var(--border-light)]"
-                          />
-                          <button
-                            data-tooltip={t("removeImage")}
-                            className="absolute -top-2 -right-2 bg-black/70 text-white rounded-full w-5 h-5 text-xs"
-                            onClick={() =>
-                              setComposerImages((prev) =>
-                                prev.filter((x) => x.id !== im.id),
-                              )
-                            }
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Responsive composer footer */}
-                  <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:gap-3 gap-3 relative" style={{ zIndex: 200, position: "relative" }}>
-                    {/* Tag chips + suggestions (composer) */}
-                    <div className="w-full sm:flex-1 flex flex-wrap items-center gap-1 p-2 min-h-[36px] relative z-[100]">
-                      {composerTagList.map((ctag, i) => (
-                        <span
-                          key={ctag + i}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200"
-                        >
-                          {ctag}
-                          <button
-                            type="button"
-                            onClick={() => setComposerTagList((prev) => prev.filter((_, idx) => idx !== i))}
-                            className="hover:text-red-500 font-bold"
-                          >×</button>
-                        </span>
-                      ))}
-                      {(
-                        <div className="relative flex-1 min-w-[8ch]">
-                          <input
-                            ref={composerTagInputRef}
-                            value={composerTagInput}
-                            onChange={(e) => setComposerTagInput(e.target.value)}
-                            onFocus={() => setComposerTagFocused(true)}
-                            onKeyDown={(e) => {
-                              if ((e.key === "Enter" || e.key === ",") && composerTagInput.trim()) {
-                                e.preventDefault();
-                                const val = composerTagInput.trim().replace(/,+$/, "");
-                                if (val && !composerTagList.map((x) => x.toLowerCase()).includes(val.toLowerCase())) {
-                                  setComposerTagList((prev) => [...prev, val]);
-                                }
-                                setComposerTagInput("");
-                              } else if (e.key === "Backspace" && !composerTagInput && composerTagList.length) {
-                                setComposerTagList((prev) => prev.slice(0, -1));
-                              }
-                            }}
-                            onBlur={() => {
-                              setTimeout(() => {
-                                const val = composerTagInput.trim().replace(/,+$/, "");
-                                if (val && !composerTagList.map((x) => x.toLowerCase()).includes(val.toLowerCase())) {
-                                  setComposerTagList((prev) => [...prev, val]);
-                                }
-                                setComposerTagInput("");
-                                setComposerTagFocused(false);
-                              }, 200);
-                            }}
-                            onPaste={(e) => {
-                              e.preventDefault();
-                              const pasted = e.clipboardData.getData("text");
-                              const newTags = pasted.split(",").map((t) => t.trim()).filter(Boolean);
-                              const unique = newTags.filter(
-                                (t) => !composerTagList.map((x) => x.toLowerCase()).includes(t.toLowerCase())
-                              );
-                              if (unique.length) setComposerTagList((prev) => [...prev, ...unique]);
-                            }}
-                            type="text"
-                            placeholder={composerTagList.length ? t("addTag") : t("addTagsCommaSeparated")}
-                            className="bg-transparent text-sm placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none w-full"
-                          />
-                          {composerTagFocused && (() => {
-                            const suggestions = tagsWithCounts
-                              .filter(
-                                ({ tag: t }) =>
-                                  (!composerTagInput.trim() || t.toLowerCase().includes(composerTagInput.toLowerCase())) &&
-                                  !composerTagList.map((x) => x.toLowerCase()).includes(t.toLowerCase())
-                              );
-                            const trimmed = composerTagInput.trim();
-                            const isNew = trimmed && !tagsWithCounts.some(({ tag: t }) => t.toLowerCase() === trimmed.toLowerCase()) && !composerTagList.some((t) => t.toLowerCase() === trimmed.toLowerCase());
-                            if (suggestions.length === 0 && !isNew) return null;
-                            const rect = composerTagInputRef.current?.getBoundingClientRect();
-                            if (!rect) return null;
-                            const spaceBelow = window.innerHeight - rect.bottom;
-                            const dropUp = spaceBelow < 220;
-                            return createPortal(
-                              <div
-                                style={{
-                                  position: "fixed",
-                                  ...(dropUp
-                                    ? { bottom: window.innerHeight - rect.top + 6, left: rect.left }
-                                    : { top: rect.bottom + 6, left: rect.left }),
-                                  width: Math.max(rect.width, 220),
-                                  zIndex: 99999,
-                                }}
-                                className="rounded-2xl shadow-2xl bg-white/98 dark:bg-gray-900/98 backdrop-blur-xl border border-indigo-100/80 dark:border-indigo-800/50 max-h-52 overflow-y-auto overflow-x-hidden ring-1 ring-black/5 dark:ring-white/5"
-                              >
-                                {suggestions.length > 0 && (
-                                  <div className="px-3 pt-2.5 pb-1.5">
-                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{t("existingTags") || "Tags"}</span>
-                                  </div>
-                                )}
-                                <div className="px-1.5 pb-1.5">
-                                  {suggestions.map(({ tag: stag, count }) => (
-                                    <button
-                                      key={stag}
-                                      type="button"
-                                      onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        if (!composerTagList.map((x) => x.toLowerCase()).includes(stag.toLowerCase())) {
-                                          setComposerTagList((prev) => [...prev, stag]);
-                                        }
-                                        setComposerTagInput("");
-                                        composerTagInputRef.current?.blur();
-                                      }}
-                                      className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-indigo-50/80 dark:hover:bg-indigo-900/30 text-sm text-gray-700 dark:text-gray-200 flex items-center justify-between gap-2 transition-all duration-150 group cursor-pointer"
-                                    >
-                                      <span className="flex items-center gap-2 min-w-0">
-                                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-indigo-100/80 dark:bg-indigo-800/40 text-indigo-500 dark:text-indigo-400 shrink-0 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-700/50 transition-colors duration-150">
-                                          <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                            <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
-                                          </svg>
-                                        </span>
-                                        <span className="truncate font-medium">{stag}</span>
-                                      </span>
-                                      <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 tabular-nums shrink-0">{count}</span>
-                                    </button>
-                                  ))}
-                                </div>
-                                {isNew && (
-                                  <>
-                                    {suggestions.length > 0 && <div className="mx-3 border-t border-gray-100 dark:border-gray-800"/>}
-                                    <div className="px-1.5 py-1.5">
-                                      <button
-                                        type="button"
-                                        onMouseDown={(e) => {
-                                          e.preventDefault();
-                                          if (!composerTagList.map((x) => x.toLowerCase()).includes(trimmed.toLowerCase())) {
-                                            setComposerTagList((prev) => [...prev, trimmed]);
-                                          }
-                                          setComposerTagInput("");
-                                          composerTagInputRef.current?.blur();
-                                        }}
-                                        className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-emerald-50/80 dark:hover:bg-emerald-900/20 text-sm flex items-center gap-2 transition-all duration-150 group cursor-pointer"
-                                      >
-                                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-100/80 dark:bg-emerald-800/40 text-emerald-500 dark:text-emerald-400 shrink-0 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-700/50 transition-colors duration-150">
-                                          <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                                            <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
-                                          </svg>
-                                        </span>
-                                        <span className="font-medium text-emerald-600 dark:text-emerald-400">{t("createTag") || "Créer"} "<span className="font-semibold">{trimmed}</span>"</span>
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>,
-                              document.body
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:flex-none relative">
-                      {/* Formatting button (composer) - only for text mode */}
-                      {composerType === "text" && (
-                        <>
-                          <button
-                            ref={composerFmtBtnRef}
-                            type="button"
-                            onClick={() => setShowComposerFmt((v) => !v)}
-                            className="px-2.5 py-1.5 rounded-xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-purple-50 text-violet-600 hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 hover:scale-105 hover:shadow-md hover:shadow-violet-200/60 dark:hover:shadow-none active:scale-95 dark:from-violet-900/30 dark:to-purple-900/20 dark:border-violet-700/60 dark:text-violet-400 dark:hover:from-violet-800/40 dark:hover:to-purple-800/30 flex items-center gap-1.5 text-sm font-medium transition-all duration-200 flex-shrink-0"
-                            data-tooltip={t("formatting")}
-                          >
-                            <FormatIcon />{t("formatting")}</button>
-                          <Popover
-                            anchorRef={composerFmtBtnRef}
-                            open={showComposerFmt}
-                            onClose={() => setShowComposerFmt(false)}
-                          >
-                            <FormatToolbar
-                              dark={dark}
-                              onAction={(t) => {
-                                setShowComposerFmt(false);
-                                formatComposer(t);
-                              }}
-                            />
-                          </Popover>
-                        </>
-                      )}
-
-                      {/* Type selection buttons */}
-                      <div className="flex gap-1 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
-                        <button
-                          type="button"
-                          onClick={() => setComposerType("text")}
-                          className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
-                            composerType === "text"
-                              ? "bg-gradient-to-br from-rose-400 to-pink-500 text-white border-transparent shadow-md shadow-rose-300/50 dark:shadow-none scale-105"
-                              : "border-rose-200/80 bg-gradient-to-br from-rose-50 to-pink-50/60 text-rose-400 hover:from-rose-100 hover:to-pink-100 hover:border-rose-300 hover:scale-105 hover:shadow-sm hover:shadow-rose-200/50 dark:hover:shadow-none dark:from-rose-900/20 dark:to-pink-900/10 dark:border-rose-700/50 dark:text-rose-400 dark:hover:from-rose-800/30 dark:hover:to-pink-800/20"
-                          }`}
-                          data-tooltip={t("textNote")}
-                        >
-                          <TextNoteIcon />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setComposerType("checklist")}
-                          className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
-                            composerType === "checklist"
-                              ? "bg-gradient-to-br from-emerald-400 to-green-500 text-white border-transparent shadow-md shadow-emerald-300/50 dark:shadow-none scale-105"
-                              : "border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-green-50/60 text-emerald-500 hover:from-emerald-100 hover:to-green-100 hover:border-emerald-300 hover:scale-105 hover:shadow-sm hover:shadow-emerald-200/50 dark:hover:shadow-none dark:from-emerald-900/20 dark:to-green-900/10 dark:border-emerald-700/50 dark:text-emerald-400 dark:hover:from-emerald-800/30 dark:hover:to-green-800/20"
-                          }`}
-                          data-tooltip={t("checklist")}
-                        >
-                          <ChecklistIcon />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setComposerType("draw")}
-                          className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
-                            composerType === "draw"
-                              ? "bg-gradient-to-br from-orange-400 to-amber-500 text-white border-transparent shadow-md shadow-orange-300/50 dark:shadow-none scale-105"
-                              : "border-orange-200/80 bg-gradient-to-br from-orange-50 to-amber-50/60 text-orange-400 hover:from-orange-100 hover:to-amber-100 hover:border-orange-300 hover:scale-105 hover:shadow-sm hover:shadow-orange-200/50 dark:hover:shadow-none dark:from-orange-900/20 dark:to-amber-900/10 dark:border-orange-700/50 dark:text-orange-400 dark:hover:from-orange-800/30 dark:hover:to-amber-800/20"
-                          }`}
-                          data-tooltip={t("drawing")}
-                        >
-                          <BrushIcon />
-                        </button>
-                      </div>
-
-                      {/* Color dropdown (composer) */}
-                      <button
-                        ref={colorBtnRef}
-                        type="button"
-                        onClick={() => setShowColorPop((v) => !v)}
-                        className="p-1.5 rounded-xl border-2 border-gray-200/80 bg-gradient-to-br from-white to-gray-50/60 hover:from-gray-50 hover:to-slate-100/60 hover:border-gray-300 hover:scale-105 hover:shadow-sm active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:from-gray-800/60 dark:to-gray-700/40 dark:border-gray-600/60 dark:hover:from-gray-700/70 dark:hover:to-gray-600/50 dark:hover:border-gray-500 transition-all duration-200 flex items-center justify-center"
-                        data-tooltip={t("color")}
-                      >
-                        <PaletteColorIcon size={22} />
-                      </button>
-                      <ColorPickerPanel
-                        anchorRef={colorBtnRef}
-                        open={showColorPop}
-                        onClose={() => setShowColorPop(false)}
-                        colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
-                        selectedColor={composerColor}
-                        darkMode={dark}
-                        onSelect={(name) => setComposerColor(name)}
-                      />
-
-                      {/* Add Image (composer) */}
-                      <input
-                        ref={composerFileRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={async (e) => {
-                          const files = Array.from(e.target.files || []);
-                          const results = [];
-                          for (const f of files) {
-                            try {
-                              const src = await fileToCompressedDataURL(f);
-                              results.push({ id: uid(), src, name: f.name });
-                            } catch (e) {}
-                          }
-                          if (results.length)
-                            setComposerImages((prev) => [...prev, ...results]);
-                          e.target.value = "";
-                        }}
-                      />
-                      <button
-                        onClick={() => composerFileRef.current?.click()}
-                        className="p-1.5 text-sky-500 dark:text-sky-400 hover:text-sky-600 dark:hover:text-sky-300 flex-shrink-0 transition-colors duration-200"
-                        data-tooltip={t("addImages")}
-                      >
-                        <AddImageIcon />
-                      </button>
-
-                      {/* Add Note */}
-                      <button
-                        onClick={addNote}
-                        className="px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-all duration-200 whitespace-nowrap flex-shrink-0 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
-                      >{t("addNote")}</button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-      )}
-
-      {/* Notes lists */}
-      <main className="px-4 sm:px-6 md:px-8 lg:px-12 pb-12">
-        {pinned.length > 0 && (
-          <section className="mb-10">
-            {listView ? (
-              <div className="max-w-2xl mx-auto">
-                <h2 className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
-                  {t("pinned")}
-                </h2>
-              </div>
-            ) : (
-              <h2 className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
-                {t("pinned")}
-              </h2>
-            )}
-            {listView ? (
-              <div className="max-w-2xl mx-auto space-y-6">
-                {pinned.map((n) => (
-                  <div key={n.id}>
-                  <NoteCard
-                    n={n}
-                    dark={dark}
-                    openModal={openModal}
-                    togglePin={togglePin}
-                    multiMode={multiMode}
-                    selected={selectedIds.includes(String(n.id))}
-                    onToggleSelect={onToggleSelect}
-                    disablePin={
-                      "ontouchstart" in window ||
-                      navigator.maxTouchPoints > 0 ||
-                      activeTagFilter === "ARCHIVED" || activeTagFilter === "TRASHED"
-                    }
-                    onDragStart={onDragStart}
-                    onDragOver={onDragOver}
-                    onDragLeave={onDragLeave}
-                    onDrop={onDrop}
-                    onDragEnd={onDragEnd}
-                    isOnline={isOnline}
-                    onUpdateChecklistItem={onUpdateChecklistItem}
-                    currentUser={currentUser}
-                  />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <Masonry
-                breakpointCols={{default: 7, 1835: 6, 1587: 5, 1339: 4, 1089: 3, 767: 2}}
-                className="masonry-grid"
-                columnClassName="masonry-grid-column"
-              >
-                {pinned.map((n) => (
-                  <div key={n.id}>
-                  <NoteCard
-                    n={n}
-                    dark={dark}
-                    openModal={openModal}
-                    togglePin={togglePin}
-                    multiMode={multiMode}
-                    selected={selectedIds.includes(String(n.id))}
-                    onToggleSelect={onToggleSelect}
-                    disablePin={
-                      "ontouchstart" in window ||
-                      navigator.maxTouchPoints > 0 ||
-                      activeTagFilter === "ARCHIVED" || activeTagFilter === "TRASHED"
-                    }
-                    onDragStart={onDragStart}
-                    onDragOver={onDragOver}
-                    onDragLeave={onDragLeave}
-                    onDrop={onDrop}
-                    onDragEnd={onDragEnd}
-                    isOnline={isOnline}
-                    onUpdateChecklistItem={onUpdateChecklistItem}
-                    currentUser={currentUser}
-                  />
-                  </div>
-                ))}
-              </Masonry>
-            )}
-          </section>
-        )}
-
-        {others.length > 0 && (
-          <section>
-            {pinned.length > 0 &&
-              (listView ? (
-                <div className="max-w-2xl mx-auto">
-                  <h2 className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
-                    {t("others")}
-                  </h2>
-                </div>
-              ) : (
-                <h2 className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3 ml-1">
-                  {t("others")}
-                </h2>
-              ))}
-            {listView ? (
-              <div className="max-w-2xl mx-auto space-y-6">
-                {others.map((n) => (
-                  <div key={n.id}>
-                  <NoteCard
-                    n={n}
-                    dark={dark}
-                    openModal={openModal}
-                    togglePin={togglePin}
-                    multiMode={multiMode}
-                    selected={selectedIds.includes(String(n.id))}
-                    onToggleSelect={onToggleSelect}
-                    disablePin={
-                      "ontouchstart" in window ||
-                      navigator.maxTouchPoints > 0 ||
-                      activeTagFilter === "ARCHIVED" || activeTagFilter === "TRASHED"
-                    }
-                    onDragStart={onDragStart}
-                    onDragOver={onDragOver}
-                    onDragLeave={onDragLeave}
-                    onDrop={onDrop}
-                    onDragEnd={onDragEnd}
-                    isOnline={isOnline}
-                    onUpdateChecklistItem={onUpdateChecklistItem}
-                    currentUser={currentUser}
-                  />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <Masonry
-                breakpointCols={{default: 7, 1835: 6, 1587: 5, 1339: 4, 1089: 3, 767: 2}}
-                className="masonry-grid"
-                columnClassName="masonry-grid-column"
-              >
-                {others.map((n) => (
-                  <div key={n.id}>
-                  <NoteCard
-                    n={n}
-                    dark={dark}
-                    openModal={openModal}
-                    togglePin={togglePin}
-                    multiMode={multiMode}
-                    selected={selectedIds.includes(String(n.id))}
-                    onToggleSelect={onToggleSelect}
-                    disablePin={
-                      "ontouchstart" in window ||
-                      navigator.maxTouchPoints > 0 ||
-                      activeTagFilter === "ARCHIVED" || activeTagFilter === "TRASHED"
-                    }
-                    onDragStart={onDragStart}
-                    onDragOver={onDragOver}
-                    onDragLeave={onDragLeave}
-                    onDrop={onDrop}
-                    onDragEnd={onDragEnd}
-                    isOnline={isOnline}
-                    onUpdateChecklistItem={onUpdateChecklistItem}
-                    currentUser={currentUser}
-                  />
-                  </div>
-                ))}
-              </Masonry>
-            )}
-          </section>
-        )}
-
-        {notesLoading && pinned.length + others.length === 0 && (
-          <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
-            Loading Notes…
-          </p>
-        )}
-        {!notesLoading && filteredEmptyWithSearch && (
-          <p className="text-center text-gray-500 dark:text-gray-400 mt-10">{t("noMatchingNotes")}</p>
-        )}
-        {!notesLoading && allEmpty && (
-          <div className="text-center mt-10 px-4">
-            <p className="text-gray-500 dark:text-gray-400">
-              {activeTagFilter === "TRASHED" ? t("noTrashedNotes") : activeTagFilter === "ARCHIVED" ? t("noMatchingNotes") : t("noNotesYet")}
-            </p>
-            {syncStatus?.syncState === "offline" && (
-              <p className="mt-2 text-sm text-amber-500 dark:text-amber-400">
-                {t("offlineViewNotLoaded")}
-              </p>
-            )}
-          </div>
-        )}
-      </main>
+      <NotesSections
+        pinned={pinned}
+        others={others}
+        dark={dark}
+        openModal={openModal}
+        togglePin={togglePin}
+        multiMode={multiMode}
+        selectedIds={selectedIds}
+        onToggleSelect={onToggleSelect}
+        activeTagFilter={activeTagFilter}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        onDragEnd={onDragEnd}
+        isOnline={isOnline}
+        onUpdateChecklistItem={onUpdateChecklistItem}
+        currentUser={currentUser}
+        listView={listView}
+        notesLoading={notesLoading}
+        filteredEmptyWithSearch={filteredEmptyWithSearch}
+        allEmpty={allEmpty}
+        syncStatus={syncStatus}
+      />
     </div>
   );
 }
@@ -7451,70 +6512,14 @@ export default function App() {
       />
       {modal}
 
-      {/* Generic Confirmation Dialog */}
-      {genericConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setGenericConfirmOpen(false)}
-          />
-          <div
-            className="glass-card rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative"
-            style={{
-              backgroundColor: dark
-                ? "rgba(40,40,40,0.95)"
-                : "rgba(255,255,255,0.95)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold mb-2">
-              {genericConfirmConfig.title || "Confirm Action"}
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              {genericConfirmConfig.message}
-            </p>
-            <div className="mt-5 flex justify-end gap-3">
-              <button
-                className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
-                onClick={() => setGenericConfirmOpen(false)}
-              >
-                {genericConfirmConfig.cancelText || t("cancel")}
-              </button>
-              <button
-                className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.98] btn-gradient ${genericConfirmConfig.danger ? "bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-300/40 dark:shadow-none hover:shadow-lg hover:shadow-red-300/50 dark:hover:shadow-none" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none"}`}
-                onClick={async () => {
-                  setGenericConfirmOpen(false);
-                  if (genericConfirmConfig.onConfirm) {
-                    await genericConfirmConfig.onConfirm();
-                  }
-                }}
-              >
-                {genericConfirmConfig.confirmText || "Confirm"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <GenericConfirmDialog
+        open={genericConfirmOpen}
+        dark={dark}
+        config={genericConfirmConfig}
+        onClose={() => setGenericConfirmOpen(false)}
+      />
 
-      {/* Toast Notifications */}
-      {toasts.length > 0 && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] space-y-2 flex flex-col items-center">
-          {toasts.map((toast) => (
-            <div
-              key={toast.id}
-              className={`px-4 py-2 rounded-lg shadow-lg max-w-sm animate-in slide-in-from-top-2 ${
-                toast.type === "success"
-                  ? "bg-green-600 text-white"
-                  : toast.type === "error"
-                    ? "bg-red-600 text-white"
-                    : "bg-blue-600 text-white"
-              }`}
-            >
-              {toast.message}
-            </div>
-          ))}
-        </div>
-      )}
+      <ToastContainer toasts={toasts} />
     </>
   );
 }
