@@ -600,6 +600,10 @@ export class SyncEngine {
     return this._rateLimited;
   }
 
+  get isPulling() {
+    return this._pulling;
+  }
+
   get lastSyncAt() {
     return this._lastSyncAt;
   }

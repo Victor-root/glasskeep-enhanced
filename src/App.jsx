@@ -7237,13 +7237,15 @@ export default function App() {
                 setTimeout(waitForQueue, 500);
                 return;
               }
-              // Only reload if the server is confirmed reachable by health check.
-              // SSE onopen through a proxy does NOT prove the backend is alive —
-              // loadNotes() would skip the server fetch and endPull() would mark
-              // status green with stale IDB data. The recovery useEffect handles
-              // the reload when serverReachable becomes true.
-              if (engine && engine.serverReachable !== true) {
-                console.log("[SSE] queue idle but server not confirmed reachable — skipping reload (recovery useEffect will handle it)");
+              // Skip reload if:
+              // 1. Server not confirmed reachable — loadNotes() would skip the
+              //    server fetch and we'd go green with stale IDB data.
+              // 2. A pull is already in progress (recovery useEffect owns it) —
+              //    avoid duplicate reloads racing each other.
+              // In both cases, the recovery useEffect handles the reload.
+              if (engine && (engine.serverReachable !== true || engine.isPulling)) {
+                console.log("[SSE] queue idle but %s — skipping reload (recovery useEffect will handle it)",
+                  engine.isPulling ? "pull already in progress" : "server not confirmed reachable");
                 return;
               }
               console.log("[SSE] queue idle — reloading current view");
@@ -7504,7 +7506,11 @@ export default function App() {
       // that overwrites local offline edits that haven't been pushed yet.
       // Use beginPull()/endPull() so the status stays "syncing" (not green)
       // until the view has been fully refreshed.
-      let pullRetries = 0;
+      //
+      // After the initial reload, wait a settling period (3s) then reload
+      // again. This gives OTHER devices time to push their pending changes
+      // (e.g. PC reordered notes while offline — it needs a few seconds to
+      // push the reorder after it also detects recovery).
       const waitThenReload = async () => {
         const engine = syncEngineRef.current;
         if (engine && engine._processing) {
@@ -7514,23 +7520,20 @@ export default function App() {
         // Signal that we're now pulling remote changes — keeps status "syncing"
         if (engine) await engine.beginPull();
         try {
-          const ok = await reloadCurrentViewRef.current?.();
-          if (!ok && pullRetries < 5) {
-            // Server fetch failed (e.g. still rate-limited) — retry after a delay.
-            // Don't call endPull yet so status stays "syncing".
-            pullRetries++;
-            setTimeout(async () => {
-              try {
-                const retryOk = await reloadCurrentViewRef.current?.();
-                if (!retryOk && pullRetries < 5) {
-                  pullRetries++;
-                  setTimeout(waitThenReload, 2000 * pullRetries);
-                  return;
-                }
-              } catch (_) {}
-              if (engine) await engine.endPull();
-            }, 2000 * pullRetries);
-            return;
+          // First reload: get whatever the server has right now
+          let ok = await reloadCurrentViewRef.current?.();
+          if (!ok) {
+            // Server fetch failed — retry a few times
+            for (let i = 1; i <= 4 && !ok; i++) {
+              await new Promise((r) => setTimeout(r, 2000 * i));
+              ok = await reloadCurrentViewRef.current?.();
+            }
+          }
+          if (ok) {
+            // Settling period: other devices may still be pushing changes.
+            // Wait 3s then reload once more to catch late arrivals.
+            await new Promise((r) => setTimeout(r, 3000));
+            await reloadCurrentViewRef.current?.();
           }
         } catch (_) {}
         if (engine) await engine.endPull();
