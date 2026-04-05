@@ -26,7 +26,9 @@ export default function NotesSections({
   filteredEmptyWithSearch,
   allEmpty,
   syncStatus,
+  windowWidth,
 }) {
+  const maxPreviewItems = windowWidth < 640 ? 4 : 8;
   return (
       <main className="px-4 sm:px-6 md:px-8 lg:px-12 pb-12">
         {pinned.length > 0 && (
@@ -67,6 +69,7 @@ export default function NotesSections({
                     isOnline={isOnline}
                     onUpdateChecklistItem={onUpdateChecklistItem}
                     currentUser={currentUser}
+                    maxPreviewItems={maxPreviewItems}
                   />
                   </div>
                 ))}
@@ -100,6 +103,7 @@ export default function NotesSections({
                     isOnline={isOnline}
                     onUpdateChecklistItem={onUpdateChecklistItem}
                     currentUser={currentUser}
+                    maxPreviewItems={maxPreviewItems}
                   />
                   </div>
                 ))}
@@ -147,6 +151,7 @@ export default function NotesSections({
                     isOnline={isOnline}
                     onUpdateChecklistItem={onUpdateChecklistItem}
                     currentUser={currentUser}
+                    maxPreviewItems={maxPreviewItems}
                   />
                   </div>
                 ))}
@@ -180,6 +185,7 @@ export default function NotesSections({
                     isOnline={isOnline}
                     onUpdateChecklistItem={onUpdateChecklistItem}
                     currentUser={currentUser}
+                    maxPreviewItems={maxPreviewItems}
                   />
                   </div>
                 ))}

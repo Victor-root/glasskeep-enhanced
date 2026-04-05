@@ -26,6 +26,7 @@ export default function NoteCard({
   // checklist update callback
   onUpdateChecklistItem,
   currentUser,
+  maxPreviewItems = 8,
 }) {
   const isChecklist = n.type === "checklist";
   const isDraw = n.type === "draw";
@@ -43,7 +44,6 @@ export default function NoteCard({
     if (a.done === b.done) return 0; // Same status, maintain order
     return a.done ? 1 : -1; // Unchecked (false) comes before checked (true)
   });
-  const maxPreviewItems = (typeof window !== "undefined" && window.innerWidth < 640) ? 4 : 8;
   const visibleItems = sortedItems.slice(0, maxPreviewItems);
   const extraCount =
     total > visibleItems.length ? total - visibleItems.length : 0;

@@ -104,7 +104,7 @@ export const mixWithWhite = (rgbaStr, whiteRatio = 0.8, outAlpha = 0.92) => {
   const bb = Math.round(255 * whiteRatio + b * (1 - whiteRatio));
   return `rgba(${rr}, ${gg}, ${bb}, ${outAlpha})`;
 };
-export const modalBgFor = (colorKey, dark, opaque = false) => {
+export const modalBgFor = (colorKey, dark) => {
   const base = bgFor(colorKey, dark);
   if (dark) return base.replace(/,\s*[\d.]+\)$/, ', 1)');
   return mixWithWhite(solid(base), 0.8, 1);

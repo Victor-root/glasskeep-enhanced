@@ -385,6 +385,7 @@ function NotesUI({
         filteredEmptyWithSearch={filteredEmptyWithSearch}
         allEmpty={allEmpty}
         syncStatus={syncStatus}
+        windowWidth={windowWidth}
       />
     </div>
   );
@@ -4862,7 +4863,7 @@ export default function App() {
       >
         <div
           className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-2xl w-full h-full max-w-none sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl flex flex-col relative overflow-hidden`}
-          style={{ backgroundColor: modalBgFor(mColor, dark, windowWidth < 640) }}
+          style={{ backgroundColor: modalBgFor(mColor, dark) }}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
@@ -4883,7 +4884,7 @@ export default function App() {
             {/* Sticky header (kept single line on desktop, wraps on mobile) */}
             <div
               className="sticky top-0 z-20 pt-4 modal-header-blur rounded-t-none sm:rounded-t-xl"
-              style={{ backgroundColor: modalBgFor(mColor, dark, windowWidth < 640) }}
+              style={{ backgroundColor: modalBgFor(mColor, dark) }}
             >
               <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6 pb-3">
                 <input

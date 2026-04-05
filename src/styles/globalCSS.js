@@ -311,8 +311,6 @@ html.dark .modal-icon-btn--active:hover {
 /* Copy buttons */
 /* Hide scrollbars on mobile (keep scrolling) */
 @media (max-width: 639px) {
-
-  /* Hide PAGE scrollbars on mobile (keep scrolling) */
   html, body {
     scrollbar-width: none;      /* Firefox */
     -ms-overflow-style: none;   /* IE/Edge legacy */
@@ -321,14 +319,12 @@ html.dark .modal-icon-btn--active:hover {
   body::-webkit-scrollbar {
     display: none;              /* Chrome/Safari/Brave */
   }
-  @media (max-width: 639px) {
-    .mobile-hide-scrollbar {
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-    }
-    .mobile-hide-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
+  .mobile-hide-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .mobile-hide-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 }
 
