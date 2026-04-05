@@ -6,7 +6,6 @@ import React, {
   useLayoutEffect,
   useCallback,
 } from "react";
-import { createPortal } from "react-dom";
 import { askAI } from "./ai";
 import DrawingCanvas from "./DrawingCanvas";
 import { t } from "./i18n";
@@ -30,16 +29,11 @@ import { trColorName, LIGHT_COLORS, DARK_COLORS, COLOR_ORDER, solid, bgFor, pars
 import { api, getAuth, setAuth, AUTH_KEY } from "./utils/api.js";
 import { renderSafeMarkdown, mdToPlain, mdForDownload, linkifyPhoneNumbers } from "./utils/markdown.jsx";
 import { uid, sanitizeFilename, downloadText, downloadDataUrl, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, normalizeImageFilename, formatEditedStamp, fileToCompressedDataURL } from "./utils/helpers.js";
-import { PinOutline, PinFilled, Trash, Sun, Moon, ImageIcon, GalleryIcon, CloseIcon, DownloadIcon, ArrowLeft, ArrowRight, SearchIcon, Kebab, Hamburger, FormatIcon, SettingsIcon, GridIcon, ListIcon, SunIcon, Sparkles, MoonIcon, CheckSquareIcon, ShieldIcon, LogOutIcon, FloatingCardsIcon, ArchiveIcon, PinIcon, TextNoteIcon, ChecklistIcon, BrushIcon, AddImageIcon } from "./icons/index.jsx";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES } from "./utils/constants.js";
 import ChecklistRow from "./components/common/ChecklistRow.jsx";
 import { ColorDot } from "./components/common/ColorDot.jsx";
-import PaletteColorIcon from "./components/common/PaletteColorIcon.jsx";
-import ColorPickerPanel from "./components/common/ColorPickerPanel.jsx";
 import { wrapSelection, fencedBlock, selectionBounds, toggleList, prefixLines, handleSmartEnter } from "./components/common/FormatToolbar.jsx";
-import FormatToolbar from "./components/common/FormatToolbar.jsx";
-import Popover from "./components/common/Popover.jsx";
 import DrawingPreview from "./components/common/DrawingPreview.jsx";
 import UserAvatar from "./components/common/UserAvatar.jsx";
 import TooltipPortal from "./components/common/TooltipPortal.jsx";
@@ -58,6 +52,12 @@ import NotesComposer from "./components/notes/NotesComposer.jsx";
 import NotesSections from "./components/notes/NotesSections.jsx";
 import GenericConfirmDialog from "./components/common/GenericConfirmDialog.jsx";
 import ToastContainer from "./components/common/ToastContainer.jsx";
+import FloatingCardsBackground from "./components/common/FloatingCardsBackground.jsx";
+import FullscreenImageViewer from "./components/modal/FullscreenImageViewer.jsx";
+import ConfirmDeleteDialog from "./components/modal/ConfirmDeleteDialog.jsx";
+import CollaborationModal from "./components/modal/CollaborationModal.jsx";
+import ModalHeader from "./components/modal/ModalHeader.jsx";
+import ModalFooter from "./components/modal/ModalFooter.jsx";
 
 
 /** ---------- NotesUI (presentational) ---------- */
@@ -4881,272 +4881,44 @@ export default function App() {
               return { scrollbarColor: `${sc.thumb} ${sc.track}`, '--sb-thumb': sc.thumb, '--sb-track': sc.track, '--note-color': noteColorBtn, '--note-color-opaque': noteColorOpaque };
             })()}
           >
-            {/* Sticky header (kept single line on desktop, wraps on mobile) */}
-            <div
-              className="sticky top-0 z-20 pt-4 modal-header-blur rounded-t-none sm:rounded-t-xl"
-              style={{ backgroundColor: modalBgFor(mColor, dark) }}
-            >
-              <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6 pb-3">
-                <input
-                  className="flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none pr-2"
-                  style={windowWidth < 700 ? {
-                    fontSize: mTitle.length > 40 ? "0.85rem"
-                      : mTitle.length > 28 ? "1rem"
-                      : mTitle.length > 18 ? "1.15rem"
-                      : "1.25rem"
-                  } : undefined}
-                  value={mTitle}
-                  onChange={(e) => setMTitle(e.target.value)}
-                  placeholder={t("noteTitle")}
-                />
-                <div className="flex items-center gap-2 flex-none ml-auto">
-                  {/* Icon buttons group – pill container */}
-                  <div className="modal-icon-group">
-                  {/* View/Edit toggle only for TEXT notes */}
-                  {mType === "text" && (
-                    <button
-                      className="modal-icon-btn modal-icon-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]"
-                      onClick={() => {
-                        const el = modalScrollRef.current;
-                        const maxScroll = el ? el.scrollHeight - el.clientHeight : 0;
-                        savedModalScrollRatioRef.current = maxScroll > 0 ? el.scrollTop / maxScroll : 0;
-                        setViewMode((v) => !v);
-                        setShowModalFmt(false);
-                      }}
-                      data-tooltip={
-                        viewMode ? t("switchToEditMode") : t("switchToViewMode")
-                      }
-                      aria-label={viewMode ? t("editMode") : t("viewMode")}
-                    >
-                      {viewMode ? (
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                          <path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25Z" fill="currentColor" />
-                          <path d="m14.06 4.94 3.75 3.75 1.41-1.41a1.5 1.5 0 0 0 0-2.12l-1.63-1.63a1.5 1.5 0 0 0-2.12 0l-1.41 1.41Z" fill="currentColor" />
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                          <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />
-                          <circle cx="12" cy="12" r="3.2" fill="currentColor" />
-                        </svg>
-                      )}
-                    </button>
-                  )}
-                  {/* Collaboration button - always visible */}
-                  <button
-                    className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-                    data-tooltip={t("collaborate")}
-                    onClick={async () => {
-                      setCollaborationModalOpen(true);
-                      if (activeId) {
-                        await loadCollaboratorsForAddModal(activeId);
-                      }
-                    }}
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-                    </svg>
-                    <svg
-                      className="w-3 h-3 absolute -top-1 -right-1"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
-                    </svg>
-                  </button>
-
-                  {/* Formatting button + popover: mobile only (desktop uses inline toolbar below) */}
-                  {mType === "text" && !viewMode && windowWidth < 768 && (
-                    <>
-                      <button
-                        ref={modalFmtBtnRef}
-                        className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-                        data-tooltip={t("formatting")}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowModalFmt((v) => !v);
-                        }}
-                      >
-                        <FormatIcon />
-                      </button>
-                      <Popover
-                        anchorRef={modalFmtBtnRef}
-                        open={showModalFmt}
-                        onClose={() => setShowModalFmt(false)}
-                      >
-                        <FormatToolbar
-                          dark={dark}
-                          onAction={(t) => {
-                            setShowModalFmt(false);
-                            formatModal(t);
-                          }}
-                        />
-                      </Popover>
-                    </>
-                  )}
-
-                  {/* 3-dots menu */}
-                  <>
-                    <button
-                      ref={modalMenuBtnRef}
-                        className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-                        data-tooltip={t("moreOptions")}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setModalMenuOpen((v) => !v);
-                        }}
-                      >
-                        <Kebab />
-                      </button>
-                      <Popover
-                        anchorRef={modalMenuBtnRef}
-                        open={modalMenuOpen}
-                        onClose={() => setModalMenuOpen(false)}
-                      >
-                        <div
-                          className={`min-w-[180px] border border-[var(--border-light)] rounded-lg shadow-lg overflow-hidden ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
-                          style={{
-                            backgroundColor: dark ? "#222222" : undefined,
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                            onClick={() => {
-                              const n = notes.find(
-                                (nn) => String(nn.id) === String(activeId),
-                              );
-                              if (n) handleDownloadNote(n);
-                              setModalMenuOpen(false);
-                            }}
-                          >
-                            <DownloadIcon />{t("downloadMd")}</button>
-                          {tagFilter === "TRASHED" ? (
-                            <>
-                              <button
-                                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                                onClick={() => {
-                                  restoreFromTrash(activeId);
-                                  setModalMenuOpen(false);
-                                }}
-                              >
-                                <ArchiveIcon />{t("restoreFromTrash")}
-                              </button>
-                              <button
-                                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                                onClick={() => {
-                                  setConfirmDeleteOpen(true);
-                                  setModalMenuOpen(false);
-                                }}
-                              >
-                                <Trash />{t("permanentlyDelete")}
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                                onClick={() => {
-                                  const note = notes.find(
-                                    (nn) => String(nn.id) === String(activeId),
-                                  );
-                                  if (note) {
-                                    handleArchiveNote(activeId, !note.archived);
-                                    setModalMenuOpen(false);
-                                  }
-                                }}
-                              >
-                                <ArchiveIcon />
-                                {activeNoteObj?.archived ? t("unarchive") : t("archive")}
-                              </button>
-                              <button
-                                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-600 ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                                onClick={() => {
-                                  setConfirmDeleteOpen(true);
-                                  setModalMenuOpen(false);
-                                }}
-                              >
-                                <Trash />{t("moveToTrash")}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                    </Popover>
-                  </>
-
-                  {/* Pin button - hidden in archived view */}
-                  {tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED" && (
-                    <button
-                      className={`modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)] ${
-                        notes.find((n) => String(n.id) === String(activeId))?.pinned
-                          ? "modal-icon-btn--active"
-                          : ""
-                      }`}
-                      data-tooltip={t("pinUnpin")}
-                      onClick={() =>
-                        activeId != null &&
-                        togglePin(
-                          activeId,
-                          !notes.find((n) => String(n.id) === String(activeId))
-                            ?.pinned,
-                        )
-                      }
-                    >
-                      {notes.find((n) => String(n.id) === String(activeId))
-                        ?.pinned ? (
-                        <PinFilled />
-                      ) : (
-                        <PinOutline />
-                      )}
-                    </button>
-                  )}
-
-                  <button
-                    className="modal-icon-btn modal-icon-btn--close focus:outline-none"
-                    data-tooltip={t("close")}
-                    onClick={closeModal}
-                  >
-                    <CloseIcon />
-                  </button>
-                  </div>{/* end icon pill group */}
-                </div>
-
-              </div>
-
-              {/* Desktop inline formatting toolbar (always visible in edit mode) */}
-              {mType === "text" && !viewMode && windowWidth >= 768 && (
-                <div
-                  className={`px-4 sm:px-6 pt-2 pb-3 border-t flex flex-wrap items-center gap-1 ${
-                    dark ? "border-white/10" : "border-black/8"
-                  }`}
-                >
-                  {(() => {
-                    const base = `fmt-btn ${dark ? "hover:bg-white/10" : "hover:bg-black/5"}`;
-                    return (
-                      <>
-                        <button className={base} onClick={() => formatModal("h1")}>H1</button>
-                        <button className={base} onClick={() => formatModal("h2")}>H2</button>
-                        <button className={base} onClick={() => formatModal("h3")}>H3</button>
-                        <span className="mx-1 opacity-40">|</span>
-                        <button className={base} onClick={() => formatModal("bold")}><strong>B</strong></button>
-                        <button className={base} onClick={() => formatModal("italic")}><em>I</em></button>
-                        <button className={base} onClick={() => formatModal("strike")}><span className="line-through">S</span></button>
-                        <button className={base} onClick={() => formatModal("code")}>`code`</button>
-                        <button className={base} onClick={() => formatModal("codeblock")}>&lt;/&gt;</button>
-                        <span className="mx-1 opacity-40">|</span>
-                        <button className={base} onClick={() => formatModal("quote")}>&gt;</button>
-                        <button className={base} onClick={() => formatModal("ul")}>{t("bulletListLabel")}</button>
-                        <button className={base} onClick={() => formatModal("ol")}>{t("orderedListLabel")}</button>
-                        <button className={base} onClick={() => formatModal("link")}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
+            <ModalHeader
+              dark={dark}
+              mColor={mColor}
+              mTitle={mTitle}
+              setMTitle={setMTitle}
+              mType={mType}
+              viewMode={viewMode}
+              windowWidth={windowWidth}
+              onToggleViewMode={() => {
+                setViewMode((v) => !v);
+                setShowModalFmt(false);
+              }}
+              onOpenCollaboration={async () => {
+                setCollaborationModalOpen(true);
+                if (activeId) {
+                  await loadCollaboratorsForAddModal(activeId);
+                }
+              }}
+              modalFmtBtnRef={modalFmtBtnRef}
+              showModalFmt={showModalFmt}
+              setShowModalFmt={setShowModalFmt}
+              onFormatModal={formatModal}
+              modalMenuBtnRef={modalMenuBtnRef}
+              modalMenuOpen={modalMenuOpen}
+              setModalMenuOpen={setModalMenuOpen}
+              activeId={activeId}
+              notes={notes}
+              tagFilter={tagFilter}
+              activeNoteObj={activeNoteObj}
+              onDownloadNote={handleDownloadNote}
+              onRestoreFromTrash={restoreFromTrash}
+              onArchiveNote={handleArchiveNote}
+              onOpenConfirmDelete={() => setConfirmDeleteOpen(true)}
+              onTogglePin={togglePin}
+              onClose={closeModal}
+              modalScrollRef={modalScrollRef}
+              savedModalScrollRatioRef={savedModalScrollRatioRef}
+            />
 
             {/* Images - Google Keep style grid */}
             {mImages.length > 0 && (
@@ -5542,576 +5314,87 @@ export default function App() {
             )}
           </div>
 
-          {/* Footer */}
-          <div className="border-t border-[var(--border-light)] p-4 flex flex-wrap items-center gap-3">
-            {/* Tags chips editor */}
-            <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-              {mTagList.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-700/40 backdrop-blur-sm transition-all duration-150 hover:bg-indigo-200/90 dark:hover:bg-indigo-800/60 hover:scale-105 hover:shadow-sm"
-                >
-                  <svg className="w-3 h-3 opacity-70 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                    <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
-                  </svg>
-                  {tag}
-                  <button
-                    className="w-3.5 h-3.5 rounded-full text-indigo-400 dark:text-indigo-300 hover:bg-red-400 dark:hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none leading-none"
-                    data-tooltip={t("removeTag")}
-                    onClick={() =>
-                      setMTagList((prev) => prev.filter((t) => t !== tag))
-                    }
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              {/* Tag add button */}
-              <div className="relative">
-                  <button
-                    ref={modalTagBtnRef}
-                    type="button"
-                    onClick={() => {
-                      setModalTagFocused((v) => {
-                        if (!v) setTimeout(() => { if (windowWidth >= 640) modalTagInputRef.current?.focus(); }, 0);
-                        return !v;
-                      });
-                      setTagInput("");
-                    }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-indigo-300 dark:border-indigo-600 text-indigo-500 dark:text-indigo-400 hover:border-indigo-400 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all duration-200 cursor-pointer"
-                  >
-                    <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
-                    </svg>
-                    {t("addTag")}
-                  </button>
-                  {modalTagFocused && (() => {
-                    const rect = modalTagBtnRef.current?.getBoundingClientRect();
-                    if (!rect) return null;
-                    const spaceBelow = window.innerHeight - rect.bottom;
-                    const dropUp = spaceBelow < 280;
-                    const dropWidth = 240;
-                    const dropLeft = Math.min(rect.left, window.innerWidth - dropWidth - 8);
-                    const suggestions = tagsWithCounts
-                      .filter(
-                        ({ tag: t }) =>
-                          (!tagInput.trim() || t.toLowerCase().includes(tagInput.toLowerCase())) &&
-                          !mTagList.map((x) => x.toLowerCase()).includes(t.toLowerCase())
-                      );
-                    const trimmed = tagInput.trim();
-                    const isNew = trimmed && !tagsWithCounts.some(({ tag: t }) => t.toLowerCase() === trimmed.toLowerCase()) && !mTagList.some((t) => t.toLowerCase() === trimmed.toLowerCase());
-                    return createPortal(
-                      <div
-                        style={{
-                          position: "fixed",
-                          ...(dropUp
-                            ? { bottom: window.innerHeight - rect.top + 6, left: dropLeft }
-                            : { top: rect.bottom + 6, left: dropLeft }),
-                          width: dropWidth,
-                          zIndex: 99999,
-                        }}
-                        className="rounded-2xl shadow-2xl bg-white/98 dark:bg-gray-900/98 backdrop-blur-xl border border-indigo-100/80 dark:border-indigo-800/50 overflow-hidden ring-1 ring-black/5 dark:ring-white/5"
-                      >
-                        {/* Search input inside dropdown */}
-                        <div className="px-2 pt-2 pb-1.5">
-                          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-800/80 border border-gray-200/80 dark:border-gray-700/60 focus-within:border-indigo-300 dark:focus-within:border-indigo-600 transition-colors duration-150">
-                            <svg className="w-3 h-3 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="6.5" cy="6.5" r="4"/><line x1="10" y1="10" x2="14" y2="14"/>
-                            </svg>
-                            <input
-                              ref={modalTagInputRef}
-                              value={tagInput}
-                              onChange={(e) => setTagInput(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Escape") { setTagInput(""); setModalTagFocused(false); return; }
-                                handleTagKeyDown(e);
-                              }}
-                              onBlur={() => {
-                                setTimeout(() => {
-                                  if (!suppressTagBlurRef.current) handleTagBlur();
-                                  suppressTagBlurRef.current = false;
-                                  setModalTagFocused(false);
-                                }, 200);
-                              }}
-                              onPaste={handleTagPaste}
-                              placeholder={t("searchOrCreateTag") || "Rechercher ou créer…"}
-                              className="flex-1 bg-transparent text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none min-w-0"
-                            />
-                          </div>
-                        </div>
-                        {/* Tag list */}
-                        {suggestions.length > 0 && (
-                          <>
-                            <div className="px-3 pt-1 pb-1">
-                              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{t("existingTags") || "Tags"}</span>
-                            </div>
-                            <div className="px-1.5 pb-1.5 max-h-44 overflow-y-auto">
-                              {suggestions.map(({ tag, count }) => (
-                                <button
-                                  key={tag}
-                                  type="button"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    suppressTagBlurRef.current = true;
-                                    addTags(tag);
-                                    setTagInput("");
-                                    setModalTagFocused(false);
-                                  }}
-                                  className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-indigo-50/80 dark:hover:bg-indigo-900/30 text-sm text-gray-700 dark:text-gray-200 flex items-center justify-between gap-2 transition-all duration-150 group cursor-pointer"
-                                >
-                                  <span className="flex items-center gap-2 min-w-0">
-                                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-indigo-100/80 dark:bg-indigo-800/40 text-indigo-500 dark:text-indigo-400 shrink-0 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-700/50 transition-colors duration-150">
-                                      <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                        <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
-                                      </svg>
-                                    </span>
-                                    <span className="truncate font-medium">{tag}</span>
-                                  </span>
-                                  <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 tabular-nums shrink-0">{count}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                        {suggestions.length === 0 && !isNew && (
-                          <div className="px-3 py-3 text-sm text-gray-400 dark:text-gray-500 text-center">{t("noTagsFound") || "Aucun tag trouvé"}</div>
-                        )}
-                        {isNew && (
-                          <>
-                            {suggestions.length > 0 && <div className="mx-3 border-t border-gray-100 dark:border-gray-800"/>}
-                            <div className="px-1.5 py-1.5">
-                              <button
-                                type="button"
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  suppressTagBlurRef.current = true;
-                                  addTags(trimmed);
-                                  setTagInput("");
-                                  setModalTagFocused(false);
-                                }}
-                                className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-emerald-50/80 dark:hover:bg-emerald-900/20 text-sm flex items-center gap-2 transition-all duration-150 group cursor-pointer"
-                              >
-                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-100/80 dark:bg-emerald-800/40 text-emerald-500 dark:text-emerald-400 shrink-0 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-700/50 transition-colors duration-150">
-                                  <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                                    <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
-                                  </svg>
-                                </span>
-                                <span className="font-medium text-emerald-600 dark:text-emerald-400">{t("createTag") || "Créer"} "<span className="font-semibold">{trimmed}</span>"</span>
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>,
-                      document.body
-                    );
-                  })()}
-              </div>
-            </div>
+          <ModalFooter
+            dark={dark}
+            windowWidth={windowWidth}
+            mTagList={mTagList}
+            setMTagList={setMTagList}
+            tagInput={tagInput}
+            setTagInput={setTagInput}
+            modalTagFocused={modalTagFocused}
+            setModalTagFocused={setModalTagFocused}
+            modalTagInputRef={modalTagInputRef}
+            modalTagBtnRef={modalTagBtnRef}
+            suppressTagBlurRef={suppressTagBlurRef}
+            tagsWithCounts={tagsWithCounts}
+            addTags={addTags}
+            handleTagKeyDown={handleTagKeyDown}
+            handleTagBlur={handleTagBlur}
+            handleTagPaste={handleTagPaste}
+            mColor={mColor}
+            setMColor={setMColor}
+            modalColorBtnRef={modalColorBtnRef}
+            showModalColorPop={showModalColorPop}
+            setShowModalColorPop={setShowModalColorPop}
+            modalFileRef={modalFileRef}
+            addImagesToState={addImagesToState}
+            setMImages={setMImages}
+            modalHasChanges={modalHasChanges}
+            mType={mType}
+            isCollaborativeNote={isCollaborativeNote}
+            activeId={activeId}
+            savingModal={savingModal}
+            onSave={saveModal}
+          />
 
-            {/* Right controls */}
-            <div className="ml-auto flex items-center gap-3 flex-shrink-0">
-              {/* Color dropdown (modal) */}
-              <button
-                ref={modalColorBtnRef}
-                type="button"
-                onClick={() => setShowModalColorPop((v) => !v)}
-                className="w-6 h-6 flex items-center justify-center rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-opacity"
-                data-tooltip={t("color")}
-              >
-                <PaletteColorIcon size={22} />
-              </button>
-              <ColorPickerPanel
-                anchorRef={modalColorBtnRef}
-                open={showModalColorPop}
-                onClose={() => setShowModalColorPop(false)}
-                colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
-                selectedColor={mColor}
-                darkMode={dark}
-                onSelect={(name) => setMColor(name)}
-              />
+          <ConfirmDeleteDialog
+            open={confirmDeleteOpen}
+            dark={dark}
+            isTrashed={tagFilter === "TRASHED"}
+            onClose={() => setConfirmDeleteOpen(false)}
+            onConfirm={async () => {
+              setConfirmDeleteOpen(false);
+              await deleteModal();
+            }}
+          />
 
-              {/* Add images */}
-              <input
-                ref={modalFileRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={async (e) => {
-                  const f = e.target.files;
-                  if (f && f.length) {
-                    await addImagesToState(f, setMImages);
-                  }
-                  e.target.value = "";
-                }}
-              />
-              <button
-                onClick={() => modalFileRef.current?.click()}
-                className="p-1.5 text-sky-500 dark:text-sky-400 hover:text-sky-600 dark:hover:text-sky-300 flex-shrink-0 transition-colors duration-200"
-                data-tooltip={t("addImages")}
-              >
-                <AddImageIcon />
-              </button>
-
-              {/* Save button - hidden for collaborative text notes (they auto-save) */}
-              {modalHasChanges &&
-                !(mType === "text" && isCollaborativeNote(activeId)) && (
-                  <button
-                    onClick={saveModal}
-                    disabled={savingModal}
-                    className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 whitespace-nowrap transition-all duration-200 ${savingModal ? "bg-gradient-to-r from-indigo-400 to-violet-500 text-white cursor-not-allowed opacity-70" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient focus:ring-indigo-500"}`}
-                  >
-                    {savingModal ? t("saving") : t("save")}
-                  </button>
-                )}
-              {/* Delete button moved to modal 3-dot menu */}
-            </div>
-          </div>
-
-          {/* Confirm Delete Dialog */}
-          {confirmDeleteOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center">
-              <div
-                className="absolute inset-0 bg-black/40"
-                onClick={() => setConfirmDeleteOpen(false)}
-              />
-              <div
-                className="glass-card rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative"
-                style={{
-                  backgroundColor: dark
-                    ? "rgba(40,40,40,0.95)"
-                    : "rgba(255,255,255,0.95)",
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="text-lg font-semibold mb-2">
-                  {tagFilter === "TRASHED" ? t("permanentlyDeleteQuestion") : t("moveToTrashQuestion")}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  {tagFilter === "TRASHED" ? t("permanentlyDeleteConfirm") : t("moveToTrashConfirm")}
-                </p>
-                <div className="mt-5 flex justify-end gap-3">
-                  <button
-                    className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
-                    onClick={() => setConfirmDeleteOpen(false)}
-                  >{t("cancel")}</button>
-                  <button
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                    onClick={async () => {
-                      setConfirmDeleteOpen(false);
-                      await deleteModal();
-                    }}
-                  >{tagFilter === "TRASHED" ? t("permanentlyDelete") : t("moveToTrash")}</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Collaboration Modal */}
-          {collaborationModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center">
-              <div
-                className="absolute inset-0 bg-black/40"
-                onClick={() => {
-                  setCollaborationModalOpen(false);
-                  setCollaboratorUsername("");
-                  setShowUserDropdown(false);
-                  setFilteredUsers([]);
-                }}
-              />
-              <div
-                className="glass-card rounded-xl shadow-2xl w-[90%] max-w-md p-6 relative max-h-[90vh] overflow-y-auto"
-                style={{
-                  backgroundColor: dark
-                    ? "rgba(40,40,40,0.95)"
-                    : "rgba(255,255,255,0.95)",
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {(() => {
-                  // Check if user owns the note (or if it's a new note)
-                  const note = activeId
-                    ? notes.find((n) => String(n.id) === String(activeId))
-                    : null;
-                  const isOwner =
-                    !activeId || note?.user_id === currentUser?.id;
-
-                  return (
-                    <>
-                      <h3 className="text-lg font-semibold mb-4">
-                        {isOwner ? t("addCollaborator") : t("collaborators")}
-                      </h3>
-
-                      {/* Show existing collaborators with remove option */}
-                      {addModalCollaborators.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t("currentCollaborators")}</p>
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {addModalCollaborators.map((collab) => {
-                              const canRemove =
-                                isOwner || collab.id === currentUser?.id;
-
-                              return (
-                                <div
-                                  key={collab.id}
-                                  className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"
-                                >
-                                  <div>
-                                    <p className="font-medium text-sm">
-                                      {collab.name || collab.email}
-                                    </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                      {collab.email}
-                                    </p>
-                                  </div>
-                                  {canRemove && (
-                                    <button
-                                      onClick={async () => {
-                                        await removeCollaborator(
-                                          collab.id,
-                                          activeId,
-                                        );
-                                      }}
-                                      className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                                      data-tooltip={
-                                        collab.id === currentUser?.id
-                                          ? "Remove yourself"
-                                          : "Remove collaborator"
-                                      }
-                                    >
-                                      {collab.id === currentUser?.id
-                                        ? "Leave"
-                                        : t("remove")}
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Only show add collaborator input/button if user owns the note */}
-                      {isOwner && (
-                        <>
-                          <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                            {t("collaborateInstructions")}
-                          </p>
-                          <div ref={collaboratorInputRef} className="relative">
-                            <input
-                              type="text"
-                              value={collaboratorUsername}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setCollaboratorUsername(value);
-                                updateDropdownPosition();
-                                searchUsers(value);
-                              }}
-                              onFocus={() => {
-                                updateDropdownPosition();
-                                searchUsers(collaboratorUsername || "");
-                              }}
-                              placeholder={t("searchByUsernameOrEmail")}
-                              className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-transparent"
-                              onKeyDown={(e) => {
-                                if (
-                                  e.key === "Enter" &&
-                                  collaboratorUsername.trim()
-                                ) {
-                                  // If dropdown is open and there's a filtered user, select the first one
-                                  if (
-                                    showUserDropdown &&
-                                    filteredUsers.length > 0
-                                  ) {
-                                    const firstUser = filteredUsers[0];
-                                    setCollaboratorUsername(
-                                      firstUser.name || firstUser.email,
-                                    );
-                                    setShowUserDropdown(false);
-                                  } else {
-                                    addCollaborator(
-                                      collaboratorUsername.trim(),
-                                    );
-                                  }
-                                } else if (e.key === "Escape") {
-                                  setShowUserDropdown(false);
-                                }
-                              }}
-                            />
-                          </div>
-                          <div className="mt-5 flex justify-end gap-3">
-                            <button
-                              className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
-                              onClick={() => {
-                                setCollaborationModalOpen(false);
-                                setCollaboratorUsername("");
-                                setShowUserDropdown(false);
-                                setFilteredUsers([]);
-                              }}
-                            >{t("cancel")}</button>
-                            <button
-                              className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
-                              onClick={async () => {
-                                if (collaboratorUsername.trim()) {
-                                  await addCollaborator(
-                                    collaboratorUsername.trim(),
-                                  );
-                                }
-                              }}
-                            >{t("addCollaborator")}</button>
-                          </div>
-                        </>
-                      )}
-
-                      {/* If user doesn't own the note, show only cancel button */}
-                      {!isOwner && (
-                        <div className="mt-5 flex justify-end gap-3">
-                          <button
-                            className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
-                            onClick={() => {
-                              setCollaborationModalOpen(false);
-                              setCollaboratorUsername("");
-                              setShowUserDropdown(false);
-                              setFilteredUsers([]);
-                            }}
-                          >{t("close")}</button>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
-
-          {/* User dropdown portal - rendered outside modal */}
-          {showUserDropdown &&
-            filteredUsers.length > 0 &&
-            createPortal(
-              <div
-                data-user-dropdown
-                className="fixed z-[60] bg-white dark:bg-[#272727] border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto"
-                style={{
-                  top: `${dropdownPosition.top}px`,
-                  left: `${dropdownPosition.left}px`,
-                  width: `${dropdownPosition.width}px`,
-                }}
-              >
-                {loadingUsers ? (
-                  <div className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">{t("searching")}</div>
-                ) : (
-                  filteredUsers.map((user) => (
-                    <div
-                      key={user.id}
-                      className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0"
-                      onClick={() => {
-                        setCollaboratorUsername(user.name || user.email);
-                        setShowUserDropdown(false);
-                      }}
-                    >
-                      <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                        {user.name || user.email}
-                      </div>
-                      {user.name && (
-                        <div className="text-xs text-gray-600 dark:text-gray-400">
-                          {user.email}
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>,
-              document.body,
-            )}
+          <CollaborationModal
+            open={collaborationModalOpen}
+            dark={dark}
+            activeId={activeId}
+            notes={notes}
+            currentUser={currentUser}
+            collaboratorUsername={collaboratorUsername}
+            setCollaboratorUsername={setCollaboratorUsername}
+            addModalCollaborators={addModalCollaborators}
+            showUserDropdown={showUserDropdown}
+            setShowUserDropdown={setShowUserDropdown}
+            filteredUsers={filteredUsers}
+            setFilteredUsers={setFilteredUsers}
+            loadingUsers={loadingUsers}
+            dropdownPosition={dropdownPosition}
+            collaboratorInputRef={collaboratorInputRef}
+            onClose={() => setCollaborationModalOpen(false)}
+            onAddCollaborator={addCollaborator}
+            onRemoveCollaborator={removeCollaborator}
+            searchUsers={searchUsers}
+            updateDropdownPosition={updateDropdownPosition}
+          />
         </div>
       </div>
 
       {/* Fullscreen Image Viewer */}
-      {imgViewOpen && mImages.length > 0 && createPortal(
-        <div
-          className="fixed inset-0 z-[9999] backdrop-blur-md bg-black/30 flex items-center justify-center"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeImageViewer();
-            resetMobileNav();
-          }}
-        >
-          {/* Controls */}
-          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-            <button
-              className="px-3 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20"
-              data-tooltip={t("downloadShortcut")}
-              onClick={async (e) => {
-                e.stopPropagation();
-                const im = mImages[imgViewIndex];
-                if (im) {
-                  const fname = normalizeImageFilename(
-                    im.name,
-                    im.src,
-                    imgViewIndex + 1,
-                  );
-                  await downloadDataUrl(fname, im.src);
-                }
-              }}
-            >
-              <DownloadIcon />
-            </button>
-            <button
-              className="px-3 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20"
-              data-tooltip={t("closeEsc")}
-              onClick={(e) => {
-                e.stopPropagation();
-                closeImageViewer();
-              }}
-            >
-              <CloseIcon />
-            </button>
-          </div>
-
-          {/* Prev / Next */}
-          {mImages.length > 1 && (
-            <>
-              <button
-                className={`absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-opacity duration-300 sm:opacity-100 ${mobileNavVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-                data-tooltip={t("previousArrow")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  prevImage();
-                  resetMobileNav();
-                }}
-              >
-                <ArrowLeft />
-              </button>
-              <button
-                className={`absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-opacity duration-300 sm:opacity-100 ${mobileNavVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-                data-tooltip={t("nextArrow")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  nextImage();
-                  resetMobileNav();
-                }}
-              >
-                <ArrowRight />
-              </button>
-            </>
-          )}
-
-          {/* Image */}
-          <img
-            src={mImages[imgViewIndex].src}
-            alt={mImages[imgViewIndex].name || `image-${imgViewIndex + 1}`}
-            className="max-w-[92vw] max-h-[92vh] object-contain rounded-lg shadow-2xl"
-            style={{ background: dark ? "#000" : "#fff" }}
-            onClick={(e) => { e.stopPropagation(); resetMobileNav(); }}
-          />
-          {/* Caption */}
-          <div className="absolute top-4 left-0 right-0 z-10 text-xs text-white text-center">
-            <span className="hidden sm:inline">{mImages[imgViewIndex].name || `image-${imgViewIndex + 1}`} </span>
-            {mImages.length > 1 && (
-              <span>{imgViewIndex + 1}/{mImages.length}</span>
-            )}
-          </div>
-        </div>,
-        document.body,
+      {imgViewOpen && mImages.length > 0 && (
+        <FullscreenImageViewer
+          images={mImages}
+          currentIndex={imgViewIndex}
+          dark={dark}
+          onClose={closeImageViewer}
+          onNext={nextImage}
+          onPrev={prevImage}
+          mobileNavVisible={mobileNavVisible}
+          onResetMobileNav={resetMobileNav}
+        />
       )}
     </>
   );
@@ -6207,103 +5490,7 @@ export default function App() {
   return (
     <>
       <TooltipPortal />
-      {/* Decorative floating background — fixed wallpaper, z-1 keeps it below all UI (desktop only) */}
-      {floatingCardsEnabled && <div aria-hidden="true" style={{position:"fixed",inset:0,zIndex:1,pointerEvents:"none",overflow:"hidden"}}>
-        {/* Colonne gauche */}
-        <div className="login-deco-card" style={{"--rot":"-12deg","--dur":"7s","--delay":"0s",top:"5%",left:"2%",borderTop:"3px solid rgba(99,102,241,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(99,102,241,0.5)"}}/>
-          <div className="deco-line" style={{width:"90%"}}/>
-          <div className="deco-line" style={{width:"75%"}}/>
-          <div className="deco-line" style={{width:"60%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"5deg","--dur":"9s","--delay":"-2s",top:"32%",left:"1%",borderTop:"3px solid rgba(168,85,247,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(168,85,247,0.5)"}}/>
-          <div className="deco-line" style={{width:"85%"}}/>
-          <div className="deco-line" style={{width:"55%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"8deg","--dur":"8s","--delay":"-4s",top:"60%",left:"3%",borderTop:"3px solid rgba(16,185,129,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(16,185,129,0.5)"}}/>
-          <div className="deco-line" style={{width:"80%"}}/>
-          <div className="deco-line" style={{width:"65%"}}/>
-          <div className="deco-line" style={{width:"45%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"-6deg","--dur":"10s","--delay":"-7s",top:"83%",left:"5%",borderTop:"3px solid rgba(245,158,11,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(245,158,11,0.5)"}}/>
-          <div className="deco-line" style={{width:"78%"}}/>
-          <div className="deco-line" style={{width:"55%"}}/>
-        </div>
-        {/* Colonne centre-gauche */}
-        <div className="login-deco-card" style={{"--rot":"10deg","--dur":"8.5s","--delay":"-1.5s",top:"12%",left:"22%",borderTop:"3px solid rgba(249,115,22,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(249,115,22,0.5)"}}/>
-          <div className="deco-line" style={{width:"82%"}}/>
-          <div className="deco-line" style={{width:"64%"}}/>
-          <div className="deco-line" style={{width:"50%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"-7deg","--dur":"9.5s","--delay":"-6s",top:"46%",left:"20%",borderTop:"3px solid rgba(14,165,233,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(14,165,233,0.5)"}}/>
-          <div className="deco-line" style={{width:"88%"}}/>
-          <div className="deco-line" style={{width:"58%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"13deg","--dur":"7.5s","--delay":"-3.5s",top:"75%",left:"25%",borderTop:"3px solid rgba(132,204,22,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(132,204,22,0.5)"}}/>
-          <div className="deco-line" style={{width:"76%"}}/>
-          <div className="deco-line" style={{width:"52%"}}/>
-          <div className="deco-line" style={{width:"68%"}}/>
-        </div>
-        {/* Colonne centre */}
-        <div className="login-deco-card" style={{"--rot":"-4deg","--dur":"11s","--delay":"-0.5s",top:"4%",left:"44%",borderTop:"3px solid rgba(236,72,153,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(236,72,153,0.5)"}}/>
-          <div className="deco-line" style={{width:"90%"}}/>
-          <div className="deco-line" style={{width:"70%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"9deg","--dur":"9s","--delay":"-8s",top:"80%",left:"48%",borderTop:"3px solid rgba(20,184,166,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(20,184,166,0.5)"}}/>
-          <div className="deco-line" style={{width:"74%"}}/>
-          <div className="deco-line" style={{width:"88%"}}/>
-          <div className="deco-line" style={{width:"55%"}}/>
-        </div>
-        {/* Colonne centre-droite */}
-        <div className="login-deco-card" style={{"--rot":"-9deg","--dur":"10.5s","--delay":"-2.5s",top:"10%",left:"65%",borderTop:"3px solid rgba(244,63,94,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(244,63,94,0.5)"}}/>
-          <div className="deco-line" style={{width:"76%"}}/>
-          <div className="deco-line" style={{width:"92%"}}/>
-          <div className="deco-line" style={{width:"55%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"7deg","--dur":"8s","--delay":"-7s",top:"44%",left:"63%",borderTop:"3px solid rgba(99,102,241,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(99,102,241,0.5)"}}/>
-          <div className="deco-line" style={{width:"80%"}}/>
-          <div className="deco-line" style={{width:"62%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"-11deg","--dur":"9s","--delay":"-4.5s",top:"73%",left:"67%",borderTop:"3px solid rgba(168,85,247,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(168,85,247,0.5)"}}/>
-          <div className="deco-line" style={{width:"85%"}}/>
-          <div className="deco-line" style={{width:"60%"}}/>
-          <div className="deco-line" style={{width:"72%"}}/>
-        </div>
-        {/* Colonne droite */}
-        <div className="login-deco-card" style={{"--rot":"6deg","--dur":"10s","--delay":"-1s",top:"6%",right:"3%",borderTop:"3px solid rgba(16,185,129,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(16,185,129,0.5)"}}/>
-          <div className="deco-line" style={{width:"88%"}}/>
-          <div className="deco-line" style={{width:"70%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"-8deg","--dur":"7.5s","--delay":"-3s",top:"35%",right:"2%",borderTop:"3px solid rgba(245,158,11,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(245,158,11,0.5)"}}/>
-          <div className="deco-line" style={{width:"90%"}}/>
-          <div className="deco-line" style={{width:"60%"}}/>
-          <div className="deco-line" style={{width:"78%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"-15deg","--dur":"11s","--delay":"-5s",top:"62%",right:"4%",borderTop:"3px solid rgba(249,115,22,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(249,115,22,0.5)"}}/>
-          <div className="deco-line" style={{width:"75%"}}/>
-          <div className="deco-line" style={{width:"50%"}}/>
-        </div>
-        <div className="login-deco-card" style={{"--rot":"4deg","--dur":"8s","--delay":"-9s",top:"85%",right:"6%",borderTop:"3px solid rgba(14,165,233,0.7)"}}>
-          <div className="deco-title" style={{background:"rgba(14,165,233,0.5)"}}/>
-          <div className="deco-line" style={{width:"82%"}}/>
-          <div className="deco-line" style={{width:"66%"}}/>
-          <div className="deco-line" style={{width:"50%"}}/>
-        </div>
-      </div>}
+      {floatingCardsEnabled && <FloatingCardsBackground />}
       {/* Tag Sidebar / Drawer */}
       <TagSidebar
         open={sidebarOpen}
