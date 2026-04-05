@@ -7411,9 +7411,10 @@ export default function App() {
       if (engine) {
         let ok = await engine.healthCheck();
         // On mobile after long background, the first fetch often fails because
-        // the browser hasn't fully restored network sockets. Retry once.
-        if (!ok) {
-          await new Promise((r) => setTimeout(r, 1500));
+        // Chrome reuses stale TCP sockets from before suspension. Retry with
+        // increasing delays to give the browser time to recycle the socket pool.
+        for (let i = 0; i < 3 && !ok; i++) {
+          await new Promise((r) => setTimeout(r, 1500 + i * 1500));
           ok = await engine.healthCheck();
         }
         // Restart the health timer chain unconditionally — mobile browsers
@@ -7447,8 +7448,10 @@ export default function App() {
       const engine = syncEngineRef.current;
       if (engine) {
         let ok = await engine.healthCheck();
-        if (!ok) {
-          await new Promise((r) => setTimeout(r, 1500));
+        // On mobile, stale TCP sockets survive the offline→online transition.
+        // Retry with increasing delays so the browser can recycle them.
+        for (let i = 0; i < 3 && !ok; i++) {
+          await new Promise((r) => setTimeout(r, 1500 + i * 1500));
           ok = await engine.healthCheck();
         }
         engine.restartHealthTimer();

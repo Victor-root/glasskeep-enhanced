@@ -404,6 +404,7 @@ export class SyncEngine {
       const res = await fetch(`${API_BASE}/health?_t=${Date.now()}`, {
         signal: controller.signal,
         cache: "no-store",
+        headers: { "Connection": "close" },
       });
       clearTimeout(timeoutId);
 
