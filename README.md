@@ -1,8 +1,17 @@
 # Glass Keep — Enhanced Fork
 
-> **Fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with UI improvements, smart tag suggestions, Material Design icons, and added French translation (language follows browser locale).
+> **Fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with local-first sync (offline support), real-time multi-device sync, UI improvements, and French translation.
 
 ## 🆕 What this fork adds
+
+### 🔄 Local-first sync (offline support)
+- **Works offline** — create, edit, reorder, pin, archive, trash and restore notes without network
+- Changes are queued locally (IndexedDB) and synced automatically when the server is reachable
+- **Real-time sync** between devices via SSE (Server-Sent Events)
+- **Smart conflict handling** — queue collapsing merges rapid edits into a single request
+- **Sync status indicator** — shows offline (grey), syncing (blue), or synced (green) in real time
+- Green = everything is done: local queue drained AND remote changes fetched and displayed
+- Automatic recovery with retry logic after network loss (including mobile-specific stale socket handling)
 
 ### 🌍 French translation (+ i18n groundwork)
 - French added as a second language — the app follows your **browser locale** automatically
@@ -29,15 +38,6 @@
 - **Permanent deletion** is only possible from the Trash, with a clear confirmation dialog
 - Works with single notes and bulk selection
 - Full EN/FR translations
-
-### 🔄 Local-first sync (offline support)
-- **Works offline** — create, edit, reorder, pin, archive, trash and restore notes without network
-- Changes are queued locally (IndexedDB) and synced automatically when the server is reachable
-- **Real-time sync** between devices via SSE (Server-Sent Events)
-- **Smart conflict handling** — queue collapsing merges rapid edits into a single request
-- **Sync status indicator** — shows offline (grey), syncing (blue), or synced (green) in real time
-- Green = everything is done: local queue drained AND remote changes fetched and displayed
-- Automatic recovery with retry logic after network loss (including mobile-specific stale socket handling)
 
 <details>
 <summary>📋 Full changelog since fork</summary>
