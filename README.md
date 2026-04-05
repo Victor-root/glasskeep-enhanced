@@ -30,6 +30,15 @@
 - Works with single notes and bulk selection
 - Full EN/FR translations
 
+### 🔄 Local-first sync (offline support)
+- **Works offline** — create, edit, reorder, pin, archive, trash and restore notes without network
+- Changes are queued locally (IndexedDB) and synced automatically when the server is reachable
+- **Real-time sync** between devices via SSE (Server-Sent Events)
+- **Smart conflict handling** — queue collapsing merges rapid edits into a single request
+- **Sync status indicator** — shows offline (red), syncing (blue), or synced (green) in real time
+- Green = everything is done: local queue drained AND remote changes fetched and displayed
+- Automatic recovery with retry logic after network loss (including mobile-specific stale socket handling)
+
 <details>
 <summary>📋 Full changelog since fork</summary>
 
@@ -71,6 +80,16 @@
 - Archived state preserved through trash/restore cycle
 - Composer hidden in trash view
 - Bulk trash, restore and permanent delete support
+
+### 🔄 Local-first sync
+- IndexedDB queue for all write operations (offline-capable)
+- SyncEngine with automatic retry, exponential backoff, and queue collapsing
+- SSE for real-time cross-device sync with auto-reconnection
+- Health check system with rate-limit detection (403/429 backoff)
+- Pull tracking (beginPull/endPull) — green status only after full data refresh
+- Position interpolation on restore from trash
+- Mobile recovery: Connection: close header + progressive retry on visibility/online events
+- Service Worker configured to never cache API calls (NetworkOnly for /api/)
 
 ### 📝 Notes & Modal
 - Close note modal with Escape key
