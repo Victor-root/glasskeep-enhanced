@@ -454,6 +454,14 @@ export class SyncEngine {
         this._consecutiveTimeouts = 0;
         this._rateLimited = false;
 
+        // When recovering from offline, a view reload will be needed to fetch
+        // remote changes from other devices. Pre-set _pulling so the very first
+        // emitted status is "syncing", not "synced" — avoids a green flash
+        // before the recovery useEffect has time to call beginPull().
+        if (wasOffline) {
+          this._pulling = true;
+        }
+
         // Server confirmed reachable — reset all transient failures so they retry.
         // Fatal errors (auth expired, note not found) are already at MAX_RETRIES
         // or removed, so this only affects retryable items.
