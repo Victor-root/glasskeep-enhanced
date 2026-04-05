@@ -1,6 +1,6 @@
 # Glass Keep — Enhanced Fork
 
-> **Fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with local-first sync (offline support), real-time multi-device sync, UI improvements, and French translation.
+> **Fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with local-first sync (offline support), real-time multi-device sync, multi-language i18n support, and UI improvements.
 
 ## 🆕 What this fork adds
 
@@ -13,10 +13,11 @@
 - Green = everything is done: local queue drained AND remote changes fetched and displayed
 - Automatic recovery with retry logic after network loss (including mobile-specific stale socket handling)
 
-### 🌍 French translation (+ i18n groundwork)
-- French added as a second language — the app follows your **browser locale** automatically
-- Entire UI translated (notes, editor, modal, admin, toasts, dates...)
-- i18n architecture ready for adding other languages easily
+### 🌍 Multi-language i18n infrastructure
+- Complete i18n architecture with locale auto-detection based on **browser settings**
+- Full UI translation support (notes, editor, modal, admin, toasts, dates, placeholders...)
+- Currently implemented: English + French — easy to add more languages
+- Missing translation keys gracefully fall back to English
 
 ### 🏷️ Smart tag suggestions
 - **When creating a note**: a dropdown suggests existing tags as soon as you click the tag field
@@ -113,12 +114,12 @@
 - Fixed note sorting when positions are equal
 - Fixed missing "Confirm" i18n key
 
-### 🌍 i18n (French)
-- Full French translation of the interface
-- Translated all toasts, alerts, modals and UI labels
-- French date format with 4-digit years
-- Translated DrawingCanvas and tag placeholders
-- i18n groundwork for adding other languages easily
+### 🌍 i18n (Multi-language)
+- Complete i18n infrastructure with locale auto-detection
+- English (base language) + French as first implementation
+- Translated all toasts, alerts, modals, UI labels, and placeholders
+- Locale-aware date formatting (EN: MM/DD/YYYY, FR: DD/MM/YYYY)
+- Architecture ready for adding more languages easily
 
 </details>
 
