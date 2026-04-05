@@ -58,6 +58,9 @@ import ConfirmDeleteDialog from "./components/modal/ConfirmDeleteDialog.jsx";
 import CollaborationModal from "./components/modal/CollaborationModal.jsx";
 import ModalHeader from "./components/modal/ModalHeader.jsx";
 import ModalFooter from "./components/modal/ModalFooter.jsx";
+import ModalImagesGrid from "./components/modal/ModalImagesGrid.jsx";
+import useAdminActions from "./hooks/useAdminActions.js";
+import useImportExport from "./hooks/useImportExport.js";
 
 
 /** ---------- NotesUI (presentational) ---------- */
@@ -1118,18 +1121,18 @@ export default function App() {
   const [sseConnected, setSseConnected] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Admin panel state
-  const [adminPanelOpen, setAdminPanelOpen] = useState(false);
-  const [adminSettings, setAdminSettings] = useState({
-    allowNewAccounts: true,
-    loginSlogan: "",
-  });
-  const [allUsers, setAllUsers] = useState([]);
-  const [newUserForm, setNewUserForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    is_admin: false,
+  // Admin panel state (hook)
+  const {
+    adminPanelOpen, setAdminPanelOpen,
+    adminSettings, setAdminSettings,
+    allUsers,
+    newUserForm, setNewUserForm,
+    updateAdminSettings, createUser, deleteUser, updateUser,
+    openAdminPanel,
+  } = useAdminActions(token, {
+    onSettingsUpdated: (settings) => {
+      if (typeof settings.loginSlogan === 'string') setLoginSlogan(settings.loginSlogan);
+    },
   });
   const [allowRegistration, setAllowRegistration] = useState(true);
   const [loginSlogan, setLoginSlogan] = useState("");
@@ -3115,91 +3118,6 @@ export default function App() {
     await enqueueWithLease(nid, { type: "archive", noteId: nid, payload: { archived: !!archived, client_updated_at: nowIso } }, leaseId);
   };
 
-  /** -------- Admin Panel Functions -------- */
-  const loadAdminSettings = async () => {
-    try {
-      console.log("Loading admin settings...");
-      const settings = await api("/admin/settings", { token });
-      console.log("Admin settings loaded:", settings);
-      setAdminSettings(settings);
-    } catch (e) {
-      console.error("Failed to load admin settings:", e);
-    }
-  };
-
-  const updateAdminSettings = async (newSettings) => {
-    try {
-      const settings = await api("/admin/settings", {
-        method: "PATCH",
-        token,
-        body: newSettings,
-      });
-      setAdminSettings(settings);
-      if (typeof settings.loginSlogan === 'string') {
-        setLoginSlogan(settings.loginSlogan);
-      }
-    } catch (e) {
-      alert(e.message || t("failedUpdateAdminSettings"));
-    }
-  };
-
-  const loadAllUsers = async () => {
-    try {
-      console.log("Loading all users...");
-      const users = await api("/admin/users", { token });
-      console.log("Users loaded:", users);
-      setAllUsers(users);
-    } catch (e) {
-      console.error("Failed to load users:", e);
-    }
-  };
-
-  const createUser = async (userData) => {
-    try {
-      const newUser = await api("/admin/users", {
-        method: "POST",
-        token,
-        body: userData,
-      });
-      setAllUsers((prev) => [newUser, ...prev]);
-      setNewUserForm({ name: "", email: "", password: "", is_admin: false });
-      return newUser;
-    } catch (e) {
-      alert(e.message || t("failedCreateUser"));
-      throw e;
-    }
-  };
-
-  const deleteUser = async (userId) => {
-    try {
-      await api(`/admin/users/${userId}`, { method: "DELETE", token });
-      setAllUsers((prev) => prev.filter((u) => u.id !== userId));
-    } catch (e) {
-      alert(e.message || t("failedDeleteUser"));
-    }
-  };
-
-  const updateUser = async (userId, userData) => {
-    const updatedUser = await api(`/admin/users/${userId}`, {
-      method: "PATCH",
-      token,
-      body: userData,
-    });
-    setAllUsers((prev) => prev.map((u) => (u.id === userId ? updatedUser : u)));
-    return updatedUser;
-  };
-
-  const openAdminPanel = async () => {
-    console.log("Opening admin panel...");
-    setAdminPanelOpen(true);
-    try {
-      await Promise.all([loadAdminSettings(), loadAllUsers()]);
-      console.log("Admin panel data loaded successfully");
-    } catch (error) {
-      console.error("Error loading admin panel data:", error);
-    }
-  };
-
   const openSettingsPanel = () => {
     setSettingsPanelOpen(true);
   };
@@ -3225,196 +3143,9 @@ export default function App() {
     }
   };
 
-  /** -------- Export / Import All -------- */
-  const triggerJSONDownload = (filename, jsonText) => {
-    const blob = new Blob([jsonText], {
-      type: "application/json;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportAll = async () => {
-    try {
-      const payload = await api("/notes/export", { token });
-      const json = JSON.stringify(payload, null, 2);
-      const ts = new Date().toISOString().replace(/[:.]/g, "-");
-      const fname =
-        sanitizeFilename(
-          `glass-keep-notes-${currentUser?.email || "user"}-${ts}`,
-        ) + ".json";
-      triggerJSONDownload(fname, json);
-    } catch (e) {
-      alert(e.message || t("exportFailed"));
-    }
-  };
-
-  const importAll = async (fileList) => {
-    try {
-      if (!fileList || !fileList.length) return;
-      const file = fileList[0];
-      const text = await file.text();
-      const parsed = JSON.parse(text);
-      const notesArr = Array.isArray(parsed?.notes)
-        ? parsed.notes
-        : Array.isArray(parsed)
-          ? parsed
-          : [];
-      if (!notesArr.length) {
-        alert(t("noNotesFoundInFile"));
-        return;
-      }
-      await api("/notes/import", {
-        method: "POST",
-        token,
-        body: { notes: notesArr },
-      });
-      await loadNotes();
-      alert(t("importedNotesSuccessfully").replace("{count}", String(notesArr.length)));
-    } catch (e) {
-      alert(e.message || t("importFailed"));
-    }
-  };
-
-  /** -------- Import Google Keep single-note JSON files (multiple) -------- */
-  const importGKeep = async (fileList) => {
-    try {
-      const files = Array.from(fileList || []);
-      if (!files.length) return;
-      const texts = await Promise.all(
-        files.map((f) => f.text().catch(() => null)),
-      );
-      const notesArr = [];
-      for (const t of texts) {
-        if (!t) continue;
-        try {
-          const obj = JSON.parse(t);
-          if (!obj || typeof obj !== "object") continue;
-          const title = String(obj.title || "");
-          const hasChecklist =
-            Array.isArray(obj.listContent) && obj.listContent.length > 0;
-          const items = hasChecklist
-            ? obj.listContent.map((it) => ({
-                id: uid(),
-                text: String(it?.text || ""),
-                done: !!it?.isChecked,
-              }))
-            : [];
-          const content = hasChecklist ? "" : String(obj.textContent || "");
-          const usec = Number(
-            obj.userEditedTimestampUsec || obj.createdTimestampUsec || 0,
-          );
-          const ms =
-            Number.isFinite(usec) && usec > 0
-              ? Math.floor(usec / 1000)
-              : Date.now();
-          const timestamp = new Date(ms).toISOString();
-          // Extract labels to tags
-          const tags = Array.isArray(obj.labels)
-            ? obj.labels
-                .map((l) => (typeof l?.name === "string" ? l.name.trim() : ""))
-                .filter(Boolean)
-            : [];
-          notesArr.push({
-            id: uid(),
-            type: hasChecklist ? "checklist" : "text",
-            title,
-            content,
-            items,
-            tags,
-            images: [],
-            color: "default",
-            pinned: !!obj.isPinned,
-            position: ms,
-            timestamp,
-          });
-        } catch (e) {}
-      }
-      if (!notesArr.length) {
-        alert(t("noValidGoogleKeepNotesFound"));
-        return;
-      }
-      await api("/notes/import", {
-        method: "POST",
-        token,
-        body: { notes: notesArr },
-      });
-      await loadNotes();
-      alert(t("importedGoogleKeepNotes").replace("{count}", String(notesArr.length)));
-    } catch (e) {
-      alert(e.message || t("googleKeepImportFailed"));
-    }
-  };
-
-  /** -------- Import Markdown files (multiple) -------- */
-  const importMd = async (fileList) => {
-    try {
-      const files = Array.from(fileList || []);
-      if (!files.length) return;
-      const notesArr = [];
-
-      for (const file of files) {
-        try {
-          const text = await file.text();
-          const lines = text.split("\n");
-
-          // Extract title from first line if it starts with #
-          let title = "";
-          let contentStartIndex = 0;
-
-          if (lines[0] && lines[0].trim().startsWith("#")) {
-            // Remove # symbols and trim
-            title = lines[0].replace(/^#+\s*/, "").trim();
-            contentStartIndex = 1;
-          } else {
-            // Use filename as title (without .md extension)
-            title = file.name.replace(/\.md$/i, "");
-          }
-
-          // Join remaining lines as content
-          const content = lines.slice(contentStartIndex).join("\n").trim();
-
-          if (title || content) {
-            notesArr.push({
-              id: uid(),
-              type: "text",
-              title,
-              content,
-              items: [],
-              tags: [],
-              images: [],
-              color: "default",
-              pinned: false,
-              timestamp: new Date().toISOString(),
-            });
-          }
-        } catch (e) {
-          console.error(`Failed to process file ${file.name}:`, e);
-        }
-      }
-
-      if (!notesArr.length) {
-        alert(t("noValidMarkdownFilesFound"));
-        return;
-      }
-
-      await api("/notes/import", {
-        method: "POST",
-        token,
-        body: { notes: notesArr },
-      });
-      await loadNotes();
-      alert(t("importedMarkdownFilesSuccessfully").replace("{count}", String(notesArr.length)));
-    } catch (e) {
-      alert(e.message || t("markdownImportFailed"));
-    }
-  };
+  // Import/Export actions (hook)
+  const { exportAll, importAll, importGKeep, importMd, downloadSecretKey } =
+    useImportExport(token, { currentUser, loadNotes });
 
   /** -------- Collaboration actions -------- */
   const [collaborationDialogOpen, setCollaborationDialogOpen] = useState(false);
@@ -3613,28 +3344,6 @@ export default function App() {
       }
     } catch (e) {
       showToast(e.message || t("failedAddCollaborator"), "error");
-    }
-  };
-
-  /** -------- Secret Key actions -------- */
-  const downloadSecretKey = async () => {
-    try {
-      const data = await api("/secret-key", { method: "POST", token });
-      if (!data?.key) throw new Error(t("secretKeyNotReturned"));
-      const ts = new Date().toISOString().replace(/[:.]/g, "-");
-      const fname = `glass-keep-secret-key-${ts}.txt`;
-      const content =
-        `Glass Keep — Secret Recovery Key\n\n` +
-        `Keep this key safe. Anyone with this key can sign in as you.\n\n` +
-        `Secret Key:\n${data.key}\n\n` +
-        `Instructions:\n` +
-        `1) Go to the login page.\n` +
-        `2) Click ${t("forgotUsernamePassword")}.\n` +
-        `3) Choose "${t("signInWithSecretKey")}" and paste this key.\n`;
-      downloadText(fname, content);
-      alert(t("secretKeyDownloadedSafe"));
-    } catch (e) {
-      alert(e.message || t("couldNotGenerateSecretKey"));
     }
   };
 
@@ -4920,42 +4629,11 @@ export default function App() {
               savedModalScrollRatioRef={savedModalScrollRatioRef}
             />
 
-            {/* Images - Google Keep style grid */}
-            {mImages.length > 0 && (
-              <div className="flex flex-wrap gap-2 justify-center px-2 pb-2">
-                {mImages.map((im, idx) => (
-                  <div
-                    key={im.id}
-                    className="group relative overflow-hidden rounded-md border border-[var(--border-light)]"
-                    style={{
-                      width: mImages.length === 1 ? "100%" : "calc(50% - 4px)",
-                    }}
-                  >
-                    <img
-                      src={im.src}
-                      alt={im.name}
-                      className="w-full h-auto object-contain object-center cursor-pointer"
-                      style={{ maxHeight: "360px" }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openImageViewer(idx);
-                      }}
-                    />
-                    <button
-                      data-tooltip={t("removeImage")}
-                      className="absolute -top-1 right-0 text-black dark:text-white text-2xl leading-none opacity-0 group-hover:opacity-100 hover:opacity-60 transition-opacity cursor-pointer"
-                      onClick={() =>
-                        setMImages((prev) =>
-                          prev.filter((x) => x.id !== im.id),
-                        )
-                      }
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <ModalImagesGrid
+              images={mImages}
+              onOpenViewer={openImageViewer}
+              onRemoveImage={(id) => setMImages((prev) => prev.filter((x) => x.id !== id))}
+            />
 
             {/* Content area */}
             <div
