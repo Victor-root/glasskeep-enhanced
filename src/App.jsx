@@ -6709,6 +6709,7 @@ export default function App() {
       if (tagFilterRef.current !== expectedFilter) return; // view changed
       setNotes(sortNotesByRecency(final));
       persistNotesCache(final);
+      return true; // server data fetched successfully
     } catch (error) {
       console.error("Error loading notes from server:", error);
       // Notify sync engine so it detects offline state quickly
@@ -6815,6 +6816,7 @@ export default function App() {
         localStorage.setItem(ARCHIVED_NOTES_CACHE_KEY, JSON.stringify(final));
         localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
       } catch (e) {}
+      return true; // server data fetched successfully
     } catch (error) {
       console.error("Error loading archived notes from server:", error);
       syncEngineRef.current?.healthCheck();
@@ -6905,6 +6907,7 @@ export default function App() {
       try {
         localStorage.setItem(TRASHED_NOTES_CACHE_KEY, JSON.stringify(final));
       } catch (e) {}
+      return true; // server data fetched successfully
     } catch (error) {
       console.error("Error loading trashed notes from server:", error);
       syncEngineRef.current?.healthCheck();
@@ -6931,17 +6934,20 @@ export default function App() {
   };
 
   // Keep ref up to date so handleSyncNow always calls the latest version
+  // Returns true if server data was fetched, false/undefined if fallback to IDB
   reloadCurrentViewRef.current = async () => {
     const currentFilter = tagFilterRef.current;
     try {
       if (currentFilter === "ARCHIVED") {
-        await loadArchivedNotes();
+        return await loadArchivedNotes();
       } else if (currentFilter === "TRASHED") {
-        await loadTrashedNotes();
+        return await loadTrashedNotes();
       } else {
-        await loadNotes();
+        return await loadNotes();
       }
-    } catch (_) {}
+    } catch (_) {
+      return false;
+    }
   };
 
   useEffect(() => {
@@ -7231,6 +7237,15 @@ export default function App() {
                 setTimeout(waitForQueue, 500);
                 return;
               }
+              // Only reload if the server is confirmed reachable by health check.
+              // SSE onopen through a proxy does NOT prove the backend is alive —
+              // loadNotes() would skip the server fetch and endPull() would mark
+              // status green with stale IDB data. The recovery useEffect handles
+              // the reload when serverReachable becomes true.
+              if (engine && engine.serverReachable !== true) {
+                console.log("[SSE] queue idle but server not confirmed reachable — skipping reload (recovery useEffect will handle it)");
+                return;
+              }
               console.log("[SSE] queue idle — reloading current view");
               cooldownDeferredIds = new Set(); // clear before cooldown starts
               reloadCooldownUntil = Date.now() + 3000;
@@ -7489,6 +7504,7 @@ export default function App() {
       // that overwrites local offline edits that haven't been pushed yet.
       // Use beginPull()/endPull() so the status stays "syncing" (not green)
       // until the view has been fully refreshed.
+      let pullRetries = 0;
       const waitThenReload = async () => {
         const engine = syncEngineRef.current;
         if (engine && engine._processing) {
@@ -7498,10 +7514,26 @@ export default function App() {
         // Signal that we're now pulling remote changes — keeps status "syncing"
         if (engine) await engine.beginPull();
         try {
-          await reloadCurrentViewRef.current?.();
-        } finally {
-          if (engine) await engine.endPull();
-        }
+          const ok = await reloadCurrentViewRef.current?.();
+          if (!ok && pullRetries < 5) {
+            // Server fetch failed (e.g. still rate-limited) — retry after a delay.
+            // Don't call endPull yet so status stays "syncing".
+            pullRetries++;
+            setTimeout(async () => {
+              try {
+                const retryOk = await reloadCurrentViewRef.current?.();
+                if (!retryOk && pullRetries < 5) {
+                  pullRetries++;
+                  setTimeout(waitThenReload, 2000 * pullRetries);
+                  return;
+                }
+              } catch (_) {}
+              if (engine) await engine.endPull();
+            }, 2000 * pullRetries);
+            return;
+          }
+        } catch (_) {}
+        if (engine) await engine.endPull();
       };
       // Small delay to let processQueue start (healthCheck triggers it)
       setTimeout(waitThenReload, 500);
