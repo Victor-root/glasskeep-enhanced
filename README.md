@@ -35,7 +35,7 @@
 - Changes are queued locally (IndexedDB) and synced automatically when the server is reachable
 - **Real-time sync** between devices via SSE (Server-Sent Events)
 - **Smart conflict handling** — queue collapsing merges rapid edits into a single request
-- **Sync status indicator** — shows offline (red), syncing (blue), or synced (green) in real time
+- **Sync status indicator** — shows offline (grey), syncing (blue), or synced (green) in real time
 - Green = everything is done: local queue drained AND remote changes fetched and displayed
 - Automatic recovery with retry logic after network loss (including mobile-specific stale socket handling)
 
