@@ -7094,6 +7094,7 @@ export default function App() {
         token={token}
         currentUser={currentUser}
         dark={dark}
+        showGenericConfirm={showGenericConfirm}
         onToggleDark={toggleDark}
         onBackToNotes={() => (window.location.hash = "#/notes")}
       />
