@@ -51,7 +51,7 @@ export default function NotesHeader({
           transition: "transform 0.3s ease",
         }}
       >
-        <div className="flex items-center gap-3 min-w-0 sm:shrink-0">
+        <div className="flex items-center gap-3 shrink-0">
           {/* Hamburger - show when sidebar is not permanently visible */}
           {!sidebarPermanent && (
             <button
@@ -74,9 +74,9 @@ export default function NotesHeader({
           />
 
           {/* Mobile: stacked name + badge */}
-          <div className="flex flex-col sm:hidden leading-tight min-w-0 max-w-[150px]">
-            <h1 className="text-lg font-bold truncate">Glass Keep</h1>
-            <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1 min-w-0">
+          <div className="flex flex-col sm:hidden leading-tight">
+            <h1 className="text-lg font-bold">Glass Keep</h1>
+            <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1 max-w-[160px]">
               <span className="shrink-0 w-3 h-3 [&>svg]:w-3 [&>svg]:h-3"><SectionIcon /></span>
               <span className="truncate">{sectionLabel}</span>
             </span>
@@ -287,10 +287,10 @@ export default function NotesHeader({
           {/* Mobile: sync icon + 3-dot menu */}
           <div className="sm:hidden flex items-center gap-1">
             <div className="flex flex-col items-center gap-0.5">
-              <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
               {!isOnline && (
                 <span className="text-[9px] leading-none px-1.5 py-0.5 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20 whitespace-nowrap">{t("offline")}</span>
               )}
+              <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
             </div>
             <button
               ref={headerBtnRef}
