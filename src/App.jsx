@@ -3171,22 +3171,39 @@ export default function App() {
     const nid = String(id);
     const leaseId = acquireLocalLease(nid);
     const nowIso = new Date().toISOString();
-    // Local-first: apply pin immediately
+
+    // Update React state FIRST (synchronous, before any await) for instant UI
+    setNotes((prev) => {
+      const updated = prev.map((n) => {
+        if (String(n.id) !== nid) return n;
+        if (toPinned) return { ...n, pinned: true };
+        // When unpinning, give the note a position that places it where it
+        // was relative to other "others" notes based on its updated_at.
+        // Find the first "others" note whose updated_at is older, and use
+        // a position just above it so the sort is consistent.
+        const others = prev.filter((o) => !o.pinned && String(o.id) !== nid);
+        const noteTime = new Date(n.updated_at || n.timestamp || 0).getTime();
+        // Find where the note belongs by date among others
+        let insertPos = null;
+        for (const o of others) {
+          const oTime = new Date(o.updated_at || o.timestamp || 0).getTime();
+          const oPos = Number.isFinite(+o.position) ? +o.position : null;
+          if (noteTime >= oTime && oPos != null) {
+            insertPos = oPos + 1;
+            break;
+          }
+        }
+        return { ...n, pinned: false, position: insertPos };
+      });
+      return sortNotesByRecency(updated);
+    });
+
+    // Then persist to IndexedDB and server
     try {
       const existing = await idbGetNote(nid, currentUser?.id, sessionId);
       if (existing) await idbPutNote({ ...existing, pinned: !!toPinned, client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
     invalidateNotesCache();
-
-    setNotes((prev) => {
-      // When unpinning, remove position so the note falls back to
-      // its updated_at order instead of keeping the pinned-group position
-      // which would incorrectly place it first among "others".
-      const updated = prev.map((n) =>
-        String(n.id) === nid ? { ...n, pinned: !!toPinned, ...(!toPinned ? { position: undefined } : {}) } : n,
-      );
-      return sortNotesByRecency(updated);
-    });
     await enqueueWithLease(nid, { type: "patch", noteId: nid, payload: { pinned: !!toPinned, client_updated_at: nowIso } }, leaseId);
   };
 
