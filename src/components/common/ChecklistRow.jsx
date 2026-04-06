@@ -12,9 +12,10 @@ export default function ChecklistRow({
   showRemove = false,
   size = "md", // "sm" | "md" | "lg"
   preview = false,
+  initialEditing = false,
 }) {
   const isMobile = typeof window !== "undefined" && window.innerWidth < 700;
-  const [editing, setEditing] = React.useState(false);
+  const [editing, setEditing] = React.useState(initialEditing);
   const clickOffsetRef = React.useRef(null);
 
   const boxSize =
@@ -72,7 +73,10 @@ export default function ChecklistRow({
             e.target.style.height = "auto";
             e.target.style.height = e.target.scrollHeight + "px";
           }}
-          onBlur={() => setEditing(false)}
+          onBlur={() => {
+            setEditing(false);
+            if (!item.text.trim()) onRemove?.();
+          }}
           ref={(el) => {
             if (el) {
               el.style.height = "auto";

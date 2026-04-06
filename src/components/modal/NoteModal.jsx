@@ -131,6 +131,7 @@ export default function NoteModal({
   syncChecklistItems,
   checklistInsertPosition,
 }) {
+  const [autoEditId, setAutoEditId] = React.useState(null);
   const { handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } =
     useChecklistDrag(mItems, setMItems, syncChecklistItems);
 
@@ -303,43 +304,20 @@ export default function NoteModal({
               ) : mType === "checklist" ? (
                 <div className="space-y-4 md:space-y-2">
                   {/* Add new item row */}
-                  <div className="flex gap-2">
-                      <input
-                        value={mInput}
-                        onChange={(e) => setMInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            const t = mInput.trim();
-                            if (t) {
-                              const newItem = { id: uid(), text: t, done: false };
-                              const newItems = checklistInsertPosition === "top"
-                                ? [newItem, ...mItems]
-                                : [...mItems, newItem];
-                              setMItems(newItems);
-                              setMInput("");
-                              syncChecklistItems(newItems);
-                            }
-                          }
-                        }}
-                        placeholder={t("listItemEllipsis")}
-                        className="flex-1 bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2 border-b border-[var(--border-light)]"
-                      />
-                      <button
-                        onClick={() => {
-                          const t = mInput.trim();
-                          if (t) {
-                            const newItem = { id: uid(), text: t, done: false };
-                            const newItems = checklistInsertPosition === "top"
-                              ? [newItem, ...mItems]
-                              : [...mItems, newItem];
-                            setMItems(newItems);
-                            setMInput("");
-                            syncChecklistItems(newItems);
-                          }
-                        }}
-                        className="px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
-                      >{t("add")}</button>
+                  <div
+                    className="flex items-center gap-2 cursor-pointer p-2 border-b border-[var(--border-light)] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    onClick={() => {
+                      const newItem = { id: uid(), text: "", done: false };
+                      const newItems = checklistInsertPosition === "top"
+                        ? [newItem, ...mItems]
+                        : [...mItems, newItem];
+                      setMItems(newItems);
+                      setAutoEditId(newItem.id);
+                      syncChecklistItems(newItems);
+                    }}
+                  >
+                    <span className="text-lg leading-none">+</span>
+                    <span className="text-sm">{t("listItemEllipsis")}</span>
                   </div>
 
                   {mItems.length > 0 ? (
@@ -379,6 +357,7 @@ export default function NoteModal({
                                 disableToggle={false}
                                 showRemove={true}
                                 size="lg"
+                                initialEditing={autoEditId === it.id}
                                 onToggle={(checked, e) => {
                                   e?.stopPropagation();
                                   const newItems = mItems.map((p) =>
