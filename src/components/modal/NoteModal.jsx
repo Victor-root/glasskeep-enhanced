@@ -423,11 +423,24 @@ export default function NoteModal({
                                   size="lg"
                                   onToggle={(checked, e) => {
                                     e?.stopPropagation();
-                                    const newItems = mItems.map((p) =>
-                                      p.id === it.id ? { ...p, done: checked } : p,
-                                    );
-                                    setMItems(newItems);
-                                    syncChecklistItems(newItems);
+                                    if (!checked) {
+                                      // Unchecking: move to top or bottom of unchecked list
+                                      const unchecked = mItems.filter((p) => !p.done && p.id !== it.id);
+                                      const checkedItems = mItems.filter((p) => p.done && p.id !== it.id);
+                                      const restored = { ...it, done: false };
+                                      const newUnchecked = checklistInsertPosition === "top"
+                                        ? [restored, ...unchecked]
+                                        : [...unchecked, restored];
+                                      const newItems = [...newUnchecked, ...checkedItems];
+                                      setMItems(newItems);
+                                      syncChecklistItems(newItems);
+                                    } else {
+                                      const newItems = mItems.map((p) =>
+                                        p.id === it.id ? { ...p, done: checked } : p,
+                                      );
+                                      setMItems(newItems);
+                                      syncChecklistItems(newItems);
+                                    }
                                   }}
                                   onChange={(txt) => {
                                     const newItems = mItems.map((p) =>
