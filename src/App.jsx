@@ -1013,7 +1013,7 @@ export default function App() {
                   if (idx !== -1) {
                     const updated = prev.slice();
                     updated[idx] = canonical;
-                    return updated;
+                    return sortNotesByRecency(updated);
                   }
                   return sortNotesByRecency([...prev, canonical]);
                 }
