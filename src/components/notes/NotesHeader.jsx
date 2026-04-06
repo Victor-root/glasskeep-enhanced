@@ -74,12 +74,15 @@ export default function NotesHeader({
           />
 
           {/* Mobile: stacked name + badge */}
-          <div className="flex flex-col sm:hidden leading-tight">
+          <div className="flex flex-col sm:hidden leading-tight relative">
             <h1 className="text-lg font-bold">Glass Keep</h1>
             <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1 max-w-[160px]">
               <span className="shrink-0 w-3 h-3 [&>svg]:w-3 [&>svg]:h-3"><SectionIcon /></span>
               <span className="truncate">{sectionLabel}</span>
             </span>
+            {!isOnline && (
+              <span className="absolute -bottom-4 left-0 text-[9px] leading-none px-1.5 py-0.5 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20 whitespace-nowrap">{t("offline")}</span>
+            )}
           </div>
 
           {/* Desktop: inline name + separator + badge */}
@@ -286,12 +289,7 @@ export default function NotesHeader({
 
           {/* Mobile: sync icon + 3-dot menu */}
           <div className="sm:hidden flex items-center gap-1">
-            <div className="flex flex-col items-center gap-0.5">
-              {!isOnline && (
-                <span className="text-[9px] leading-none px-1.5 py-0.5 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20 whitespace-nowrap">{t("offline")}</span>
-              )}
-              <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
-            </div>
+            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
             <button
               ref={headerBtnRef}
               onClick={() => setHeaderMenuOpen((v) => !v)}
