@@ -2,6 +2,7 @@ export const fr = {
   login: "Connexion",
   logout: "Déconnexion",
   save: "Enregistrer",
+  saved: "Sauvegardé",
   delete: "Supprimer",
   cancel: "Annuler",
   confirm: "Confirmer",

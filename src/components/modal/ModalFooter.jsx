@@ -258,17 +258,20 @@ export default function ModalFooter({
           <AddImageIcon />
         </button>
 
-        {/* Save button - hidden for collaborative text notes (they auto-save) */}
-        {modalHasChanges &&
-          !(mType === "text" && isCollaborativeNote(activeId)) && (
-            <button
-              onClick={onSave}
-              disabled={savingModal}
-              className={`px-4 py-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 whitespace-nowrap transition-all duration-200 ${savingModal ? "bg-gradient-to-r from-indigo-400 to-violet-500 text-white cursor-not-allowed opacity-70" : "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient focus:ring-indigo-500"}`}
-            >
-              {savingModal ? t("saving") : t("save")}
-            </button>
-          )}
+        {/* Save check – always visible, bright green when unsaved, faded when saved */}
+        {!(mType === "text" && isCollaborativeNote(activeId)) && (
+          <button
+            onClick={modalHasChanges ? onSave : undefined}
+            disabled={savingModal || !modalHasChanges}
+            className={`modal-icon-btn flex-shrink-0 transition-all duration-200 ${modalHasChanges ? "text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/10" : "text-emerald-500/30 dark:text-emerald-400/25"}`}
+            data-tooltip={modalHasChanges ? (savingModal ? t("saving") : t("save")) : t("saved")}
+            style={{ cursor: modalHasChanges ? "pointer" : "default" }}
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );

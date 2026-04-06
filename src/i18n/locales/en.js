@@ -2,6 +2,7 @@ export const en = {
   login: "Login",
   logout: "Logout",
   save: "Save",
+  saved: "Saved",
   delete: "Delete",
   cancel: "Cancel",
   confirm: "Confirm",
