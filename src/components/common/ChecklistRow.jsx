@@ -57,7 +57,7 @@ export default function ChecklistRow({
       ) : (
         <textarea
           rows={1}
-          className={`flex-1 bg-transparent text-sm focus:outline-none border-b border-transparent focus:border-[var(--border-light)] pb-0.5 resize-none overflow-hidden ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
+          className={`flex-1 bg-transparent text-sm focus:outline-none border-b border-transparent focus:border-[var(--border-light)] p-0 pb-0.5 resize-none overflow-hidden break-words min-w-0 ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
           value={item.text}
           onChange={(e) => {
             onChange?.(e.target.value);
