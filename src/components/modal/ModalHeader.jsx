@@ -130,7 +130,7 @@ export default function ModalHeader({
 
               {/* Collaborate */}
               <button
-                className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
+                className="modal-icon-btn modal-icon-btn--collab focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
                 data-tooltip={t("collaborate")}
                 onClick={onOpenCollaboration}
               >
@@ -144,7 +144,7 @@ export default function ModalHeader({
 
               {/* Download */}
               <button
-                className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
+                className="modal-icon-btn modal-icon-btn--download focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
                 data-tooltip={t("downloadMd")}
                 onClick={handleDownload}
               >
@@ -154,7 +154,7 @@ export default function ModalHeader({
               {/* Archive / Restore */}
               {isTrashed ? (
                 <button
-                  className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
+                  className="modal-icon-btn modal-icon-btn--archive focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
                   data-tooltip={t("restoreFromTrash")}
                   onClick={() => { onRestoreFromTrash(activeId); }}
                 >
@@ -162,7 +162,7 @@ export default function ModalHeader({
                 </button>
               ) : (
                 <button
-                  className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
+                  className="modal-icon-btn modal-icon-btn--archive focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
                   data-tooltip={activeNoteObj?.archived ? t("unarchive") : t("archive")}
                   onClick={handleArchiveToggle}
                 >
@@ -172,10 +172,9 @@ export default function ModalHeader({
 
               {/* Delete */}
               <button
-                className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
+                className="modal-icon-btn modal-icon-btn--trash focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
                 data-tooltip={isTrashed ? t("permanentlyDelete") : t("moveToTrash")}
                 onClick={onOpenConfirmDelete}
-                style={{ color: "var(--delete-icon-color, inherit)" }}
               >
                 <Trash />
               </button>

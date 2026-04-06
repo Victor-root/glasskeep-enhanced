@@ -337,6 +337,67 @@ html.dark .modal-icon-btn--active:hover {
     inset 0 0 0 1px rgba(255, 255, 255, 0.28) !important;
 }
 
+/* ── Colored icon variants (desktop inline) ───────────────────────────── */
+.modal-icon-btn--trash {
+  color: #dc2626;
+}
+.modal-icon-btn--trash:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: #b91c1c !important;
+}
+html.dark .modal-icon-btn--trash {
+  color: #f87171;
+}
+html.dark .modal-icon-btn--trash:hover {
+  background: rgba(239, 68, 68, 0.18) !important;
+  color: #fca5a5 !important;
+}
+
+.modal-icon-btn--download {
+  color: #16a34a;
+}
+.modal-icon-btn--download:hover {
+  background: rgba(22, 163, 74, 0.1) !important;
+  color: #15803d !important;
+}
+html.dark .modal-icon-btn--download {
+  color: #4ade80;
+}
+html.dark .modal-icon-btn--download:hover {
+  background: rgba(34, 197, 94, 0.15) !important;
+  color: #86efac !important;
+}
+
+.modal-icon-btn--archive {
+  color: #a16207;
+}
+.modal-icon-btn--archive:hover {
+  background: rgba(161, 98, 7, 0.1) !important;
+  color: #854d0e !important;
+}
+html.dark .modal-icon-btn--archive {
+  color: #fbbf24;
+}
+html.dark .modal-icon-btn--archive:hover {
+  background: rgba(251, 191, 36, 0.15) !important;
+  color: #fcd34d !important;
+}
+
+.modal-icon-btn--collab {
+  color: #7c3aed;
+}
+.modal-icon-btn--collab:hover {
+  background: rgba(124, 58, 237, 0.1) !important;
+  color: #6d28d9 !important;
+}
+html.dark .modal-icon-btn--collab {
+  color: #a78bfa;
+}
+html.dark .modal-icon-btn--collab:hover {
+  background: rgba(167, 139, 250, 0.15) !important;
+  color: #c4b5fd !important;
+}
+
 /* Copy buttons */
 /* Hide scrollbars on mobile (keep scrolling) */
 @media (max-width: 639px) {
