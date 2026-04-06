@@ -97,6 +97,7 @@ export default function App() {
   const tagFilterRef = useRef(tagFilter);
   const [activeTagFilters, setActiveTagFilters] = useState([]); // multi-tag filter
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [desktopSidebarHidden, setDesktopSidebarHidden] = useState(false);
   const [alwaysShowSidebarOnWide, setAlwaysShowSidebarOnWide] = useState(() => {
     try {
       const stored = localStorage.getItem("sidebarAlwaysVisible");
@@ -3762,7 +3763,7 @@ export default function App() {
           }
         }}
         dark={dark}
-        permanent={alwaysShowSidebarOnWide && windowWidth >= 700}
+        permanent={alwaysShowSidebarOnWide && windowWidth >= 700 && !desktopSidebarHidden}
         width={sidebarWidth}
         onResize={setSidebarWidth}
       />
@@ -3873,10 +3874,16 @@ export default function App() {
         setHeaderMenuOpen={setHeaderMenuOpen}
         headerMenuRef={headerMenuRef}
         headerBtnRef={headerBtnRef}
-        openSidebar={() => setSidebarOpen(true)}
+        openSidebar={() => {
+          if (alwaysShowSidebarOnWide && windowWidth >= 700) {
+            setDesktopSidebarHidden(h => !h);
+          } else {
+            setSidebarOpen(true);
+          }
+        }}
         activeTagFilter={tagFilter}
         activeTagFilters={activeTagFilters}
-        sidebarPermanent={alwaysShowSidebarOnWide && windowWidth >= 700}
+        sidebarPermanent={alwaysShowSidebarOnWide && windowWidth >= 700 && !desktopSidebarHidden}
         sidebarWidth={sidebarWidth}
         // AI props
         localAiEnabled={localAiEnabled}

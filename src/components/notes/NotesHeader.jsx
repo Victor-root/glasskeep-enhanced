@@ -52,17 +52,15 @@ export default function NotesHeader({
         }}
       >
         <div className="flex items-center gap-3 shrink-0">
-          {/* Hamburger - only show when sidebar is not permanent */}
-          {!sidebarPermanent && (
-            <button
-              onClick={openSidebar}
-              className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              data-tooltip={t("openTags")}
-              aria-label={t("openTags")}
-            >
-              <Hamburger />
-            </button>
-          )}
+          {/* Hamburger - always visible, toggles sidebar */}
+          <button
+            onClick={openSidebar}
+            className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            data-tooltip={t("openTags")}
+            aria-label={t("openTags")}
+          >
+            <Hamburger />
+          </button>
 
           {/* App logo */}
           <img
