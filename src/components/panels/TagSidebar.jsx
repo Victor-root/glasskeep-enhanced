@@ -85,7 +85,7 @@ export default function TagSidebar({
             className={`w-full text-left px-3 py-2 rounded-md mb-1 flex items-center gap-3 ${isAllNotes ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
             onClick={() => {
               onSelect(null);
-              onClose();
+              if (!permanent) onClose();
             }}
           ><NotesIcon />{t("notesAll")}</button>
 
@@ -94,7 +94,7 @@ export default function TagSidebar({
             className={`w-full text-left px-3 py-2 rounded-md mb-2 flex items-center gap-3 ${isAllImages ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
             onClick={() => {
               onSelect(ALL_IMAGES);
-              onClose();
+              if (!permanent) onClose();
             }}
           ><ImagesIcon />{t("allImages")}</button>
 
@@ -103,7 +103,7 @@ export default function TagSidebar({
             className={`w-full text-left px-3 py-2 rounded-md mb-2 flex items-center gap-3 ${activeTag === "ARCHIVED" ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
             onClick={() => {
               onSelect("ARCHIVED");
-              onClose();
+              if (!permanent) onClose();
             }}
           ><ArchiveSidebarIcon />{t("archivedNotes")}</button>
 
@@ -112,7 +112,7 @@ export default function TagSidebar({
             className={`w-full text-left px-3 py-2 rounded-md mb-2 flex items-center gap-3 ${activeTag === "TRASHED" ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
             onClick={() => {
               onSelect("TRASHED");
-              onClose();
+              if (!permanent) onClose();
             }}
           ><TrashSidebarIcon />{t("trashedNotes")}</button>
 
@@ -134,8 +134,8 @@ export default function TagSidebar({
                     return;
                   }
                   onSelect(tag, e);
-                  // Ne ferme la sidebar que si c'est un clic simple (pas Ctrl/Cmd+clic)
-                  if (!e.ctrlKey && !e.metaKey) {
+                  // Ne ferme la sidebar que si c'est un clic simple et pas en mode permanent
+                  if (!permanent && !e.ctrlKey && !e.metaKey) {
                     onClose();
                   }
                 }}
