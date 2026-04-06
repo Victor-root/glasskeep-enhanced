@@ -129,6 +129,7 @@ export default function NoteModal({
   resizeModalTextarea,
   // checklist handlers
   syncChecklistItems,
+  checklistInsertPosition,
 }) {
   const { handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } =
     useChecklistDrag(mItems, setMItems, syncChecklistItems);
@@ -310,10 +311,10 @@ export default function NoteModal({
                             e.preventDefault();
                             const t = mInput.trim();
                             if (t) {
-                              const newItems = [
-                                ...mItems,
-                                { id: uid(), text: t, done: false },
-                              ];
+                              const newItem = { id: uid(), text: t, done: false };
+                              const newItems = checklistInsertPosition === "top"
+                                ? [newItem, ...mItems]
+                                : [...mItems, newItem];
                               setMItems(newItems);
                               setMInput("");
                               syncChecklistItems(newItems);
@@ -327,10 +328,10 @@ export default function NoteModal({
                         onClick={() => {
                           const t = mInput.trim();
                           if (t) {
-                            const newItems = [
-                              ...mItems,
-                              { id: uid(), text: t, done: false },
-                            ];
+                            const newItem = { id: uid(), text: t, done: false };
+                            const newItems = checklistInsertPosition === "top"
+                              ? [newItem, ...mItems]
+                              : [...mItems, newItem];
                             setMItems(newItems);
                             setMInput("");
                             syncChecklistItems(newItems);

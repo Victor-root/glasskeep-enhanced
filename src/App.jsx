@@ -143,6 +143,15 @@ export default function App() {
       return false;
     }
   });
+  // Checklist insert position: "top" or "bottom"
+  const [checklistInsertPosition, setChecklistInsertPosition] = useState(() => {
+    try {
+      const stored = localStorage.getItem("checklistInsertPosition");
+      return stored === "bottom" ? "bottom" : "top";
+    } catch (e) {
+      return "top";
+    }
+  });
   const [aiResponse, setAiResponse] = useState(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiLoadingProgress, setAiLoadingProgress] = useState(null);
@@ -503,6 +512,12 @@ export default function App() {
     } catch (e) {}
     if (!localAiEnabled) setAiResponse(null);
   }, [localAiEnabled]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("checklistInsertPosition", checklistInsertPosition);
+    } catch (e) {}
+  }, [checklistInsertPosition]);
 
   // Window resize listener for responsive sidebar behavior
   useEffect(() => {
@@ -2418,7 +2433,10 @@ export default function App() {
   const addComposerItem = () => {
     const t = clInput.trim();
     if (!t) return;
-    setClItems((prev) => [...prev, { id: uid(), text: t, done: false }]);
+    const newItem = { id: uid(), text: t, done: false };
+    setClItems((prev) =>
+      checklistInsertPosition === "top" ? [newItem, ...prev] : [...prev, newItem]
+    );
     setClInput("");
   };
 
@@ -3576,6 +3594,7 @@ export default function App() {
       onModalBodyClick={onModalBodyClick}
       resizeModalTextarea={resizeModalTextarea}
       syncChecklistItems={syncChecklistItems}
+      checklistInsertPosition={checklistInsertPosition}
     />
   );
 
@@ -3728,6 +3747,8 @@ export default function App() {
         setLocalAiEnabled={setLocalAiEnabled}
         floatingCardsEnabled={floatingCardsEnabled}
         setFloatingCardsEnabled={setFloatingCardsEnabled}
+        checklistInsertPosition={checklistInsertPosition}
+        setChecklistInsertPosition={setChecklistInsertPosition}
         showGenericConfirm={showGenericConfirm}
         showToast={showToast}
         onResetNoteOrder={resetNoteOrder}

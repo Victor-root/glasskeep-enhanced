@@ -20,6 +20,8 @@ export default function SettingsPanel({
   setLocalAiEnabled,
   floatingCardsEnabled,
   setFloatingCardsEnabled,
+  checklistInsertPosition,
+  setChecklistInsertPosition,
   showGenericConfirm,
   showToast,
   onResetNoteOrder,
@@ -345,6 +347,25 @@ export default function SettingsPanel({
                       floatingCardsEnabled ? "translate-x-6" : "translate-x-1"
                     }`}
                   />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="font-medium">{t("checklistInsertPosition")}</div>
+                  <div className="text-sm text-gray-500">{t("checklistInsertPositionDesc")}</div>
+                </div>
+                <button
+                  className="ml-3 flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  onClick={() =>
+                    setChecklistInsertPosition((prev) =>
+                      prev === "top" ? "bottom" : "top"
+                    )
+                  }
+                >
+                  {checklistInsertPosition === "top"
+                    ? t("checklistInsertTop")
+                    : t("checklistInsertBottom")}
                 </button>
               </div>
             </div>
