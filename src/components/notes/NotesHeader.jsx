@@ -80,12 +80,6 @@ export default function NotesHeader({
               <span className="shrink-0 w-3 h-3 [&>svg]:w-3 [&>svg]:h-3"><SectionIcon /></span>
               <span className="truncate">{sectionLabel}</span>
             </span>
-            {!isOnline && (
-              <span className="flex items-center gap-1 mt-0.5">
-                <span className="shrink-0 w-3 h-3" />
-                <span className="text-[10px] px-1.5 py-0 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20">{t("offline")}</span>
-              </span>
-            )}
           </div>
 
           {/* Desktop: inline name + separator + badge */}
@@ -291,7 +285,8 @@ export default function NotesHeader({
           </div>
 
           {/* Mobile: sync icon + 3-dot menu */}
-          <div className="sm:hidden flex items-center gap-1">
+          <div className="sm:hidden flex flex-col items-end gap-0">
+            <div className="flex items-center gap-1">
             <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
             <button
               ref={headerBtnRef}
@@ -303,6 +298,11 @@ export default function NotesHeader({
             >
               <Kebab />
             </button>
+
+            </div>
+            {!isOnline && (
+              <span className="text-[10px] px-1.5 py-0 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20 mr-1">{t("offline")}</span>
+            )}
 
             {headerMenuOpen && (
               <>
