@@ -7,7 +7,6 @@ import React, {
   useCallback,
 } from "react";
 import { askAI } from "./ai";
-import DrawingCanvas from "./DrawingCanvas";
 import { t } from "./i18n";
 import Masonry from "react-masonry-css";
 import SyncStatusIcon from "./sync/SyncStatusIcon.jsx";
@@ -25,13 +24,11 @@ import {
   clearNotesForSession as idbClearNotesForSession,
   purgeQueueForNote as idbPurgeQueueForNote,
 } from "./sync/localDb.js";
-import { trColorName, LIGHT_COLORS, DARK_COLORS, COLOR_ORDER, solid, bgFor, parseRGBA, mixWithWhite, modalBgFor, scrollColorsFor } from "./utils/colors.js";
 import { api, getAuth, setAuth, AUTH_KEY } from "./utils/api.js";
-import { renderSafeMarkdown, mdToPlain, mdForDownload, linkifyPhoneNumbers } from "./utils/markdown.jsx";
-import { uid, sanitizeFilename, downloadText, downloadDataUrl, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, normalizeImageFilename, formatEditedStamp, fileToCompressedDataURL } from "./utils/helpers.js";
+import { mdForDownload } from "./utils/markdown.jsx";
+import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, fileToCompressedDataURL } from "./utils/helpers.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES } from "./utils/constants.js";
-import ChecklistRow from "./components/common/ChecklistRow.jsx";
 import { ColorDot } from "./components/common/ColorDot.jsx";
 import { wrapSelection, fencedBlock, selectionBounds, toggleList, prefixLines, handleSmartEnter } from "./components/common/FormatToolbar.jsx";
 import DrawingPreview from "./components/common/DrawingPreview.jsx";
@@ -53,12 +50,8 @@ import NotesSections from "./components/notes/NotesSections.jsx";
 import GenericConfirmDialog from "./components/common/GenericConfirmDialog.jsx";
 import ToastContainer from "./components/common/ToastContainer.jsx";
 import FloatingCardsBackground from "./components/common/FloatingCardsBackground.jsx";
-import FullscreenImageViewer from "./components/modal/FullscreenImageViewer.jsx";
-import ConfirmDeleteDialog from "./components/modal/ConfirmDeleteDialog.jsx";
-import CollaborationModal from "./components/modal/CollaborationModal.jsx";
-import ModalHeader from "./components/modal/ModalHeader.jsx";
-import ModalFooter from "./components/modal/ModalFooter.jsx";
-import ModalImagesGrid from "./components/modal/ModalImagesGrid.jsx";
+import NoteModal from "./components/modal/NoteModal.jsx";
+import useModalState from "./hooks/useModalState.js";
 import useAdminActions from "./hooks/useAdminActions.js";
 import useImportExport from "./hooks/useImportExport.js";
 import useCollaboration from "./hooks/useCollaboration.js";
@@ -515,32 +508,143 @@ export default function App() {
     dimensions: null,
   });
 
-  // Modal state
-  const [open, setOpen] = useState(false);
-  const [activeId, setActiveId] = useState(null);
-  const activeIdRef = useRef(null);
-  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-  const [mType, setMType] = useState("text");
-  const [mTitle, setMTitle] = useState("");
-  const [mBody, setMBody] = useState("");
-  const [mTagList, setMTagList] = useState([]);
-  const [tagInput, setTagInput] = useState("");
-  const [modalTagFocused, setModalTagFocused] = useState(false);
-  const modalTagInputRef = useRef(null);
-  const modalTagBtnRef = useRef(null);
-  const suppressTagBlurRef = useRef(false);
-  const [mColor, setMColor] = useState("default");
-  const [viewMode, setViewMode] = useState(true);
-  const [mImages, setMImages] = useState([]);
-  const [savingModal, setSavingModal] = useState(false);
-  const mBodyRef = useRef(null);
-  const modalFileRef = useRef(null);
-  const [modalMenuOpen, setModalMenuOpen] = useState(false);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  // ─── Ref for closeModal (passed to useModalState for Escape handler) ───
+  const closeModalRef = useRef(null);
+
+  // ─── Shared formatting helper (used by both composer and modal) ───
+  const runFormat = useCallback((getter, setter, ref, type) => {
+    const el = ref.current;
+    if (!el) return;
+    const value = getter();
+    const start = el.selectionStart ?? value.length;
+    const end = el.selectionEnd ?? value.length;
+
+    // Insert defaults when editor is empty for quote / ul / ol
+    if (
+      (type === "ul" || type === "ol" || type === "quote") &&
+      value.trim().length === 0
+    ) {
+      const snippet = type === "ul" ? "- " : type === "ol" ? "1. " : "> ";
+      setter(snippet);
+      requestAnimationFrame(() => {
+        el.focus({ preventScroll: true });
+        try {
+          el.setSelectionRange(snippet.length, snippet.length);
+        } catch (e) {}
+      });
+      return;
+    }
+
+    // Handle list formatting when no text is selected
+    if ((type === "ul" || type === "ol") && start === end) {
+      const snippet = type === "ul" ? "- " : "1. ";
+      const newValue = value.slice(0, start) + snippet + value.slice(end);
+      setter(newValue);
+      requestAnimationFrame(() => {
+        el.focus({ preventScroll: true });
+        try {
+          el.setSelectionRange(start + snippet.length, start + snippet.length);
+        } catch (e) {}
+      });
+      return;
+    }
+
+    let result;
+    switch (type) {
+      case "h1":
+        result = prefixLines(value, start, end, "# ");
+        break;
+      case "h2":
+        result = prefixLines(value, start, end, "## ");
+        break;
+      case "h3":
+        result = prefixLines(value, start, end, "### ");
+        break;
+      case "bold":
+        result = wrapSelection(value, start, end, "**", "**");
+        break;
+      case "italic":
+        result = wrapSelection(value, start, end, "_", "_");
+        break;
+      case "strike":
+        result = wrapSelection(value, start, end, "~~", "~~");
+        break;
+      case "code":
+        result = wrapSelection(value, start, end, "`", "`");
+        break;
+      case "codeblock":
+        result = fencedBlock(value, start, end);
+        break;
+      case "quote":
+        result = prefixLines(value, start, end, "> ");
+        break;
+      case "ul":
+        result = toggleList(value, start, end, "ul");
+        break;
+      case "ol":
+        result = toggleList(value, start, end, "ol");
+        break;
+      case "link":
+        result = wrapSelection(value, start, end, "[", "](https://)");
+        break;
+      default:
+        return;
+    }
+    setter(result.text);
+    requestAnimationFrame(() => {
+      el.focus({ preventScroll: true });
+      try {
+        el.setSelectionRange(result.range[0], result.range[1]);
+      } catch (e) {}
+    });
+  }, []);
+
+  // ─── Modal state (hook) ───
+  const {
+    open, setOpen,
+    activeId, setActiveId,
+    activeIdRef,
+    mType, setMType,
+    mTitle, setMTitle,
+    mBody, setMBody,
+    mTagList, setMTagList,
+    tagInput, setTagInput,
+    modalTagFocused, setModalTagFocused,
+    mColor, setMColor,
+    viewMode, setViewMode,
+    mImages, setMImages,
+    savingModal, setSavingModal,
+    modalMenuOpen, setModalMenuOpen,
+    confirmDeleteOpen, setConfirmDeleteOpen,
+    isModalClosing, setIsModalClosing,
+    modalClosingTimerRef,
+    mItems, setMItems,
+    mInput, setMInput,
+    mDrawingData, setMDrawingData,
+    showModalFmt, setShowModalFmt,
+    showModalColorPop, setShowModalColorPop,
+    imgViewOpen, imgViewIndex,
+    mobileNavVisible,
+    modalScrollable,
+    // Refs
+    modalTagInputRef, modalTagBtnRef, suppressTagBlurRef,
+    mBodyRef, modalFileRef, modalFmtBtnRef, modalColorBtnRef,
+    checklistDragId, modalMenuBtnRef, scrimClickStartRef,
+    noteViewRef, modalScrollRef, savedModalScrollRatioRef,
+    modalHistoryRef,
+    // Derived
+    activeNoteObj, editedStamp, modalHasChanges,
+    // Tag helpers
+    addTags, handleTagKeyDown, handleTagBlur, handleTagPaste,
+    // Image viewer
+    openImageViewer, closeImageViewer, nextImage, prevImage, resetMobileNav,
+    // Handlers
+    onModalBodyClick, isCollaborativeNote, formatModal, resizeModalTextarea,
+  } = useModalState({ notes, currentUser, closeModalRef, runFormat });
+
+  // Generic confirmation dialog
   const [genericConfirmOpen, setGenericConfirmOpen] = useState(false);
   const [genericConfirmConfig, setGenericConfirmConfig] = useState({});
-  const [isModalClosing, setIsModalClosing] = useState(false);
-  const modalClosingTimerRef = useRef(null);
 
   // Toast notification system
   const [toasts, setToasts] = useState([]);
@@ -564,19 +668,13 @@ export default function App() {
     setGenericConfirmConfig(config);
     setGenericConfirmOpen(true);
   };
-  const [mItems, setMItems] = useState([]);
+
+  // Sync-domain refs (owned by autosave, not by modal UI hook)
   const skipNextItemsAutosave = useRef(false);
   const prevItemsRef = useRef([]);
-  const [mInput, setMInput] = useState("");
-
-  // Drawing modal
-  const [mDrawingData, setMDrawingData] = useState({
-    paths: [],
-    dimensions: null,
-  });
   const skipNextDrawingAutosave = useRef(false);
   const prevDrawingRef = useRef({ paths: [], dimensions: null });
-  const pendingDrawingSaveRef = useRef(null); // { noteId, drawingData } when debounce is pending
+  const pendingDrawingSaveRef = useRef(null);
   const drawingDebounceTimerRef = useRef(null);
 
   // Clear data when switching composer types
@@ -596,32 +694,9 @@ export default function App() {
   // Collaboration (ref must be declared before hook)
   const collaboratorInputRef = useRef(null);
 
-  // Modal formatting
-  const [showModalFmt, setShowModalFmt] = useState(false);
-  const modalFmtBtnRef = useRef(null);
-
-  // Modal color popover
-  const modalColorBtnRef = useRef(null);
-  const [showModalColorPop, setShowModalColorPop] = useState(false);
-
-  // Image Viewer state (fullscreen)
-  const [imgViewOpen, setImgViewOpen] = useState(false);
-  const [imgViewIndex, setImgViewIndex] = useState(0);
-  const [mobileNavVisible, setMobileNavVisible] = useState(true);
-  const mobileNavTimer = useRef(null);
-  const resetMobileNav = () => {
-    setMobileNavVisible(true);
-    clearTimeout(mobileNavTimer.current);
-    mobileNavTimer.current = setTimeout(() => setMobileNavVisible(false), 3000);
-  };
-
   // Drag
   const dragId = useRef(null);
   const dragGroup = useRef(null);
-
-  // Checklist item drag (for modal reordering)
-  const checklistDragId = useRef(null);
-
 
   // Header menu refs + state
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
@@ -631,9 +706,6 @@ export default function App() {
   const gkeepFileRef = useRef(null);
   const mdFileRef = useRef(null);
 
-  // Modal kebab anchor
-  const modalMenuBtnRef = useRef(null);
-
   // Composer collapse + refs
   const [composerCollapsed, setComposerCollapsed] = useState(true);
   const titleRef = useRef(null);
@@ -642,12 +714,6 @@ export default function App() {
   // Color dropdown (composer)
   const colorBtnRef = useRef(null);
   const [showColorPop, setShowColorPop] = useState(false);
-
-  // Scrim click tracking to avoid closing when drag starts inside modal
-  const scrimClickStartRef = useRef(false);
-
-  // For code copy buttons in view mode
-  const noteViewRef = useRef(null);
 
   // Loading state for notes
   const [notesLoading, setNotesLoading] = useState(false);
@@ -1101,11 +1167,6 @@ export default function App() {
     }
   };
 
-  // NEW: modal scroll container ref + state to place Edited at bottom when not scrollable
-  const modalScrollRef = useRef(null);
-  const [modalScrollable, setModalScrollable] = useState(false);
-  const savedModalScrollRatioRef = useRef(0);
-
   // SSE connection status
   const [sseConnected, setSseConnected] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -1130,46 +1191,6 @@ export default function App() {
   // Settings panel state
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
 
-  // Derived: Active note + edited text
-  const activeNoteObj = useMemo(
-    () => notes.find((x) => String(x.id) === String(activeId)),
-    [notes, activeId],
-  );
-  const editedStamp = useMemo(() => {
-    const ts = activeNoteObj?.updated_at || activeNoteObj?.timestamp;
-    const baseStamp = ts ? formatEditedStamp(ts) : "";
-
-    // Add collaborator info if available
-    if (activeNoteObj?.lastEditedBy && activeNoteObj?.lastEditedAt) {
-      const editorName = activeNoteObj.lastEditedBy;
-      const editTime = formatEditedStamp(activeNoteObj.lastEditedAt);
-      return `${editorName}, ${editTime}`;
-    }
-
-    return baseStamp;
-  }, [activeNoteObj]);
-
-  const modalHasChanges = useMemo(() => {
-    if (!activeNoteObj) return false;
-    if ((mTitle || "") !== (activeNoteObj.title || "")) return true;
-    if ((mColor || "default") !== (activeNoteObj.color || "default"))
-      return true;
-    const tagsA = JSON.stringify(mTagList || []);
-    const tagsB = JSON.stringify(activeNoteObj.tags || []);
-    if (tagsA !== tagsB) return true;
-    const imagesA = JSON.stringify(mImages || []);
-    const imagesB = JSON.stringify(activeNoteObj.images || []);
-    if (imagesA !== imagesB) return true;
-    if ((mType || "text") !== (activeNoteObj.type || "text")) return true;
-    if ((mType || "text") === "text") {
-      if ((mBody || "") !== (activeNoteObj.content || "")) return true;
-    } else {
-      const itemsA = JSON.stringify(mItems || []);
-      const itemsB = JSON.stringify(activeNoteObj.items || []);
-      if (itemsA !== itemsB) return true;
-    }
-    return false;
-  }, [activeNoteObj, mTitle, mColor, mTagList, mImages, mType, mBody, mItems]);
 
   useEffect(() => {
     // Only close header kebab on outside click (modal kebab is handled by Popover)
@@ -2699,174 +2720,12 @@ export default function App() {
 
   // No infinite scroll
 
-  // Lock body scroll on modal & image viewer
-  useEffect(() => {
-    if (!open && !imgViewOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open, imgViewOpen]);
-
-  // Close image viewer if modal closes
-  useEffect(() => {
-    if (!open) setImgViewOpen(false);
-  }, [open]);
-
-  // Keyboard nav for image viewer
-  useEffect(() => {
-    if (!imgViewOpen) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") setImgViewOpen(false);
-      if (e.key.toLowerCase() === "d") {
-        const im = mImages[imgViewIndex];
-        if (im) {
-          const fname = normalizeImageFilename(
-            im.name,
-            im.src,
-            imgViewIndex + 1,
-          );
-          downloadDataUrl(fname, im.src);
-        }
-      }
-      if (e.key === "ArrowRight" && mImages.length > 1) {
-        setImgViewIndex((i) => (i + 1) % mImages.length);
-      }
-      if (e.key === "ArrowLeft" && mImages.length > 1) {
-        setImgViewIndex((i) => (i - 1 + mImages.length) % mImages.length);
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [imgViewOpen, mImages, imgViewIndex]);
-
-  // Close note modal with Escape key
-  useEffect(() => {
-    if (activeId == null) return;
-    const onKey = (e) => {
-      if (e.key === "Escape" && !imgViewOpen) closeModal();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [activeId, imgViewOpen]);
-
-  // Close note modal with Android back button (popstate)
-  useEffect(() => {
-    const onPopState = () => {
-      if (modalHistoryRef.current) {
-        modalHistoryRef.current = false;
-        setOpen(false);
-        setActiveId(null);
-        setViewMode(true);
-        setModalMenuOpen(false);
-        setConfirmDeleteOpen(false);
-        setShowModalFmt(false);
-      }
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
-
   // Auto-resize composer textarea
   useEffect(() => {
     if (!contentRef.current) return;
     contentRef.current.style.height = "auto";
     contentRef.current.style.height = contentRef.current.scrollHeight + "px";
   }, [content, composerType]);
-
-  // Auto-resize modal textarea with debouncing
-  const resizeModalTextarea = useMemo(() => {
-    let timeoutId = null;
-    return () => {
-      const el = mBodyRef.current;
-      if (!el) return;
-
-      // Clear previous timeout
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-
-      // Debounce the resize to prevent excessive updates
-      timeoutId = setTimeout(() => {
-        const modalScrollEl = modalScrollRef.current;
-
-        // Save scroll position before collapsing textarea height
-        const savedScrollTop = modalScrollEl ? modalScrollEl.scrollTop : 0;
-
-        const MIN = 160;
-        el.style.height = MIN + "px";
-        el.style.height = Math.max(el.scrollHeight, MIN) + "px";
-
-        requestAnimationFrame(() => {
-          if (!modalScrollEl) return;
-          // Mode-switch ratio takes priority, otherwise restore pre-resize position
-          const ratio = savedModalScrollRatioRef.current;
-          if (ratio > 0) {
-            const maxScroll = modalScrollEl.scrollHeight - modalScrollEl.clientHeight;
-            modalScrollEl.scrollTop = ratio * maxScroll;
-            savedModalScrollRatioRef.current = 0;
-          } else {
-            modalScrollEl.scrollTop = savedScrollTop;
-          }
-        });
-      }, 10); // Small delay to batch rapid changes
-    };
-  }, []);
-  useEffect(() => {
-    if (!open || mType !== "text") return;
-    if (!viewMode) resizeModalTextarea();
-  }, [open, viewMode, mBody, mType]);
-
-  // Restore scroll ratio when switching edit→view (no textarea resize in this direction)
-  useEffect(() => {
-    if (!viewMode) return; // view→edit is handled inside resizeModalTextarea
-    const el = modalScrollRef.current;
-    const ratio = savedModalScrollRatioRef.current;
-    if (!el || ratio === 0) return;
-    requestAnimationFrame(() => {
-      const maxScroll = el.scrollHeight - el.clientHeight;
-      if (maxScroll > 0) el.scrollTop = ratio * maxScroll;
-      savedModalScrollRatioRef.current = 0;
-    });
-  }, [viewMode]);
-
-  // Ensure modal formatting menu hides when switching to view mode or non-text
-  useEffect(() => {
-    if (viewMode || mType !== "text") setShowModalFmt(false);
-  }, [viewMode, mType]);
-
-  // Detect if modal body is scrollable to decide Edited stamp placement
-  useEffect(() => {
-    if (!open) return;
-    const el = modalScrollRef.current;
-    if (!el) return;
-
-    const check = () => {
-      // +1 fudge factor to avoid off-by-one on some browsers
-      setModalScrollable(el.scrollHeight > el.clientHeight + 1);
-    };
-    check();
-
-    // React to container size changes and window resizes
-    let ro;
-    if ("ResizeObserver" in window) {
-      ro = new ResizeObserver(check);
-      ro.observe(el);
-    }
-    window.addEventListener("resize", check);
-
-    // Also recheck shortly after (images rendering, fonts, etc.)
-    const t1 = setTimeout(check, 50);
-    const t2 = setTimeout(check, 200);
-
-    return () => {
-      window.removeEventListener("resize", check);
-      clearTimeout(t1);
-      clearTimeout(t2);
-      ro?.disconnect();
-    };
-  }, [open, mBody, mTitle, mItems.length, mImages.length, viewMode, mType]);
 
   /** -------- Auth actions -------- */
 
@@ -3158,49 +3017,6 @@ export default function App() {
     collaboratorInputRef,
   });
 
-  /** -------- Modal tag helpers -------- */
-  const addTags = (raw) => {
-    const parts = String(raw)
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
-    if (!parts.length) return;
-    setMTagList((prev) => {
-      const set = new Set(prev.map((x) => x.toLowerCase()));
-      const merged = [...prev];
-      for (const p of parts)
-        if (!set.has(p.toLowerCase())) {
-          merged.push(p);
-          set.add(p.toLowerCase());
-        }
-      return merged;
-    });
-  };
-  const handleTagKeyDown = (e) => {
-    if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
-      e.preventDefault();
-      if (tagInput.trim()) {
-        addTags(tagInput);
-        setTagInput("");
-      }
-    } else if (e.key === "Backspace" && !tagInput) {
-      setMTagList((prev) => prev.slice(0, -1));
-    }
-  };
-  const handleTagBlur = () => {
-    if (tagInput.trim()) {
-      addTags(tagInput);
-      setTagInput("");
-    }
-  };
-  const handleTagPaste = (e) => {
-    const text = e.clipboardData?.getData("text");
-    if (text && text.includes(",")) {
-      e.preventDefault();
-      addTags(text);
-    }
-  };
-
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
     const results = [];
@@ -3223,9 +3039,6 @@ export default function App() {
   // failed autosave still gets retried on close. initialModalStateRef may advance
   // eagerly to prevent effect re-triggers — this ref is the safety net.
   const committedBaselineRef = useRef(null);
-  // Track if we pushed a history entry for the modal (Android back button support)
-  const modalHistoryRef = useRef(false);
-
   const openModal = (id) => {
     const n = notes.find((x) => String(x.id) === String(id));
     if (!n) return;
@@ -3278,24 +3091,6 @@ export default function App() {
     window.history.pushState({ noteModal: true }, "");
     modalHistoryRef.current = true;
   };
-
-  // Check if note is collaborative (has collaborators or is owned by someone else)
-  const isCollaborativeNote = useCallback(
-    (noteId) => {
-      if (!noteId) return false;
-      const note = notes.find((n) => String(n.id) === String(noteId));
-      if (!note) return false;
-      const hasCollaborators =
-        note.collaborators !== undefined && note.collaborators !== null;
-      const isOwnedByOther =
-        note.user_id && currentUser && note.user_id !== currentUser.id;
-      return hasCollaborators || isOwnedByOther;
-    },
-    [notes, currentUser],
-  );
-
-  // Auto-save timeout ref - must be defined before closeModal
-
 
   // Check if the note has been modified from initial state
   const hasNoteBeenModified = useCallback(() => {
@@ -3592,6 +3387,7 @@ export default function App() {
       setIsModalClosing(false);
     }, 180);
   };
+  closeModalRef.current = closeModal;
 
   const saveModal = async () => {
     if (activeId == null) return;
@@ -4126,125 +3922,8 @@ export default function App() {
     !!(search || (tagFilter && tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED") || activeTagFilters.length > 0);
   const allEmpty = notes.length === 0;
 
-  /** -------- Modal link handler: open links in new tab (no auto-enter edit) -------- */
-  const onModalBodyClick = (e) => {
-    if (!(viewMode && mType === "text")) return;
-
-    const a = e.target.closest("a");
-    if (a) {
-      const href = a.getAttribute("href") || "";
-      if (/^(https?:|mailto:|tel:)/i.test(href)) {
-        e.preventDefault();
-        e.stopPropagation();
-        window.open(href, "_blank", "noopener,noreferrer");
-        return;
-      }
-    }
-    // NO automatic edit-mode toggle
-  };
-
-  /** -------- Image viewer helpers -------- */
-  const openImageViewer = (index) => {
-    setImgViewIndex(index);
-    setImgViewOpen(true);
-    resetMobileNav();
-  };
-  const closeImageViewer = () => setImgViewOpen(false);
-  const nextImage = () => setImgViewIndex((i) => (i + 1) % mImages.length);
-  const prevImage = () =>
-    setImgViewIndex((i) => (i - 1 + mImages.length) % mImages.length);
-
-  /** -------- Formatting actions (composer & modal) -------- */
-  const runFormat = (getter, setter, ref, type) => {
-    const el = ref.current;
-    if (!el) return;
-    const value = getter();
-    const start = el.selectionStart ?? value.length;
-    const end = el.selectionEnd ?? value.length;
-
-    // Insert defaults when editor is empty for quote / ul / ol
-    if (
-      (type === "ul" || type === "ol" || type === "quote") &&
-      value.trim().length === 0
-    ) {
-      const snippet = type === "ul" ? "- " : type === "ol" ? "1. " : "> ";
-      setter(snippet);
-      requestAnimationFrame(() => {
-        el.focus({ preventScroll: true });
-        try {
-          el.setSelectionRange(snippet.length, snippet.length);
-        } catch (e) {}
-      });
-      return;
-    }
-
-    // Handle list formatting when no text is selected
-    if ((type === "ul" || type === "ol") && start === end) {
-      const snippet = type === "ul" ? "- " : "1. ";
-      const newValue = value.slice(0, start) + snippet + value.slice(end);
-      setter(newValue);
-      requestAnimationFrame(() => {
-        el.focus({ preventScroll: true });
-        try {
-          el.setSelectionRange(start + snippet.length, start + snippet.length);
-        } catch (e) {}
-      });
-      return;
-    }
-
-    let result;
-    switch (type) {
-      case "h1":
-        result = prefixLines(value, start, end, "# ");
-        break;
-      case "h2":
-        result = prefixLines(value, start, end, "## ");
-        break;
-      case "h3":
-        result = prefixLines(value, start, end, "### ");
-        break;
-      case "bold":
-        result = wrapSelection(value, start, end, "**", "**");
-        break;
-      case "italic":
-        result = wrapSelection(value, start, end, "_", "_");
-        break;
-      case "strike":
-        result = wrapSelection(value, start, end, "~~", "~~");
-        break;
-      case "code":
-        result = wrapSelection(value, start, end, "`", "`");
-        break;
-      case "codeblock":
-        result = fencedBlock(value, start, end);
-        break;
-      case "quote":
-        result = prefixLines(value, start, end, "> ");
-        break;
-      case "ul":
-        result = toggleList(value, start, end, "ul");
-        break;
-      case "ol":
-        result = toggleList(value, start, end, "ol");
-        break;
-      case "link":
-        result = wrapSelection(value, start, end, "[", "](https://)");
-        break;
-      default:
-        return;
-    }
-    setter(result.text);
-    requestAnimationFrame(() => {
-      el.focus({ preventScroll: true });
-      try {
-        el.setSelectionRange(result.range[0], result.range[1]);
-      } catch (e) {}
-    });
-  };
   const formatComposer = (type) =>
     runFormat(() => content, setContent, contentRef, type);
-  const formatModal = (type) =>
-    runFormat(() => mBody, setMBody, mBodyRef, type);
 
   /** Composer smart-enter handler */
   const onComposerKeyDown = (e) => {
@@ -4269,623 +3948,115 @@ export default function App() {
     }
   };
 
-  /** Add copy buttons to code (view mode, text notes) */
-  useEffect(() => {
-    if (!(open && viewMode && mType === "text")) return;
-    const root = noteViewRef.current;
-    if (!root) return;
-
-    const attach = () => {
-      // Wrap code blocks so the copy button can stay fixed even on horizontal scroll
-      root.querySelectorAll("pre").forEach((pre) => {
-        // Ensure wrapper
-        let wrapper = pre.closest(".code-block-wrapper");
-        if (!wrapper) {
-          wrapper = document.createElement("div");
-          wrapper.className = "code-block-wrapper";
-          pre.parentNode?.insertBefore(wrapper, pre);
-          wrapper.appendChild(pre);
-        }
-        if (wrapper.querySelector(".code-copy-btn")) return;
-        const btn = document.createElement("button");
-        btn.className = "code-copy-btn";
-        btn.textContent = t("copy");
-        btn.setAttribute("data-copy-btn", "1");
-        btn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const codeEl = pre.querySelector("code");
-          const text = codeEl ? codeEl.textContent : pre.textContent;
-          navigator.clipboard?.writeText(text || "");
-          btn.textContent = t("copied");
-          setTimeout(() => (btn.textContent = t("copy")), 1200);
-        });
-        wrapper.appendChild(btn);
-
-        // Keep copy button visible when code block top scrolls past the modal header
-        const scrollEl = wrapper.closest(".modal-scroll-themed");
-        if (scrollEl) {
-          const stickyHeader = scrollEl.querySelector(".sticky");
-          const adjustPos = () => {
-            const headerBottom = stickyHeader
-              ? stickyHeader.getBoundingClientRect().bottom
-              : scrollEl.getBoundingClientRect().top;
-            const wrapperTop = wrapper.getBoundingClientRect().top;
-            const offset = headerBottom - wrapperTop;
-            if (offset > 8) {
-              const maxTop = wrapper.offsetHeight - btn.offsetHeight - 8;
-              btn.style.top = Math.min(offset + 8, maxTop) + "px";
-            } else {
-              btn.style.top = "8px";
-            }
-          };
-          scrollEl.addEventListener("scroll", adjustPos, { passive: true });
-        }
-      });
-
-      // Inline code
-      root.querySelectorAll("code").forEach((code) => {
-        if (code.closest("pre")) return; // skip fenced
-        if (
-          code.nextSibling &&
-          code.nextSibling.nodeType === 1 &&
-          code.nextSibling.classList?.contains("inline-code-copy-btn")
-        )
-          return;
-        const btn = document.createElement("button");
-        btn.className = "inline-code-copy-btn";
-        btn.textContent = t("copy");
-        btn.setAttribute("data-copy-btn", "1");
-        btn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          navigator.clipboard?.writeText(code.textContent || "");
-          btn.textContent = t("copied");
-          setTimeout(() => (btn.textContent = t("copy")), 1200);
-        });
-        code.insertAdjacentElement("afterend", btn);
-      });
-    };
-
-    attach();
-    // Ensure buttons after layout/async renders
-    requestAnimationFrame(attach);
-    const t1 = setTimeout(attach, 50);
-    const t2 = setTimeout(attach, 200);
-
-    // Observe DOM changes while in view mode
-    const mo = new MutationObserver(() => attach());
-    try {
-      mo.observe(root, { childList: true, subtree: true });
-    } catch (e) {}
-
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      mo.disconnect();
-    };
-  }, [open, viewMode, mType, mBody, activeId]);
-
   /** -------- Modal JSX -------- */
-  const modal = (open || isModalClosing) && (
-    <>
-      <div
-        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 bg-black/40 z-40 flex items-center justify-center overscroll-contain`}
-        onMouseDown={(e) => {
-          // Only consider closing if the press STARTS on the scrim
-          scrimClickStartRef.current = e.target === e.currentTarget;
-        }}
-        onClick={(e) => {
-          // Close only if press started AND ended on scrim (prevents drag-outside-close)
-          if (scrimClickStartRef.current && e.target === e.currentTarget) {
-            closeModal();
-          }
-          scrimClickStartRef.current = false;
-        }}
-      >
-        <div
-          className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-2xl w-full h-full max-w-none sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl flex flex-col relative overflow-hidden`}
-          style={{ backgroundColor: modalBgFor(mColor, dark) }}
-          onMouseDown={(e) => e.stopPropagation()}
-          onMouseUp={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Scroll container */}
-          <div
-            ref={modalScrollRef}
-            className="relative flex-1 min-h-0 overflow-y-auto overflow-x-auto mobile-hide-scrollbar modal-scroll-themed"
-            style={(() => {
-              const sc = scrollColorsFor(mColor, dark);
-              const noteColorBtn = (!dark && (!mColor || mColor === "default"))
-                ? "#a78bfa"
-                : solid(bgFor(mColor, dark));
-              const noteColorOpaque = typeof noteColorBtn === "string" ? noteColorBtn.replace(/,\s*[\d.]+\)$/, ', 1)') : noteColorBtn;
-              return { scrollbarColor: `${sc.thumb} ${sc.track}`, '--sb-thumb': sc.thumb, '--sb-track': sc.track, '--note-color': noteColorBtn, '--note-color-opaque': noteColorOpaque };
-            })()}
-          >
-            <ModalHeader
-              dark={dark}
-              mColor={mColor}
-              mTitle={mTitle}
-              setMTitle={setMTitle}
-              mType={mType}
-              viewMode={viewMode}
-              windowWidth={windowWidth}
-              onToggleViewMode={() => {
-                setViewMode((v) => !v);
-                setShowModalFmt(false);
-              }}
-              onOpenCollaboration={async () => {
-                setCollaborationModalOpen(true);
-                if (activeId) {
-                  await loadCollaboratorsForAddModal(activeId);
-                }
-              }}
-              modalFmtBtnRef={modalFmtBtnRef}
-              showModalFmt={showModalFmt}
-              setShowModalFmt={setShowModalFmt}
-              onFormatModal={formatModal}
-              modalMenuBtnRef={modalMenuBtnRef}
-              modalMenuOpen={modalMenuOpen}
-              setModalMenuOpen={setModalMenuOpen}
-              activeId={activeId}
-              notes={notes}
-              tagFilter={tagFilter}
-              activeNoteObj={activeNoteObj}
-              onDownloadNote={handleDownloadNote}
-              onRestoreFromTrash={restoreFromTrash}
-              onArchiveNote={handleArchiveNote}
-              onOpenConfirmDelete={() => setConfirmDeleteOpen(true)}
-              onTogglePin={togglePin}
-              onClose={closeModal}
-              modalScrollRef={modalScrollRef}
-              savedModalScrollRatioRef={savedModalScrollRatioRef}
-            />
-
-            <ModalImagesGrid
-              images={mImages}
-              onOpenViewer={openImageViewer}
-              onRemoveImage={(id) => setMImages((prev) => prev.filter((x) => x.id !== id))}
-            />
-
-            {/* Content area */}
-            <div
-              className={mType === "draw" ? "p-2 pb-6" : "p-6 pb-12"}
-              onClick={onModalBodyClick}
-            >
-
-              {/* Text, Checklist, or Drawing */}
-              {mType === "text" ? (
-                viewMode ? (
-                  <div
-                    ref={noteViewRef}
-                    className="note-content note-content--dense whitespace-pre-wrap"
-                    dangerouslySetInnerHTML={{
-                      __html: renderSafeMarkdown(mBody),
-                    }}
-                  />
-                ) : (
-                  <div className="relative min-h-[160px]">
-                    <textarea
-                      ref={mBodyRef}
-                      className="w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden min-h-[160px]"
-                      style={{ scrollBehavior: "unset" }}
-                      value={mBody}
-                      onChange={(e) => {
-                        setMBody(e.target.value);
-                        resizeModalTextarea();
-                      }}
-                      onKeyDown={(e) => {
-                        if (
-                          e.key === "Enter" &&
-                          !e.shiftKey &&
-                          !e.altKey &&
-                          !e.ctrlKey &&
-                          !e.metaKey
-                        ) {
-                          const el = mBodyRef.current;
-                          const value = mBody;
-                          const start = el.selectionStart ?? value.length;
-                          const end = el.selectionEnd ?? value.length;
-
-                          // Check if cursor is on the last line before Enter
-                          const lastNewlineIndex = value.lastIndexOf("\n");
-                          const isOnLastLine = start > lastNewlineIndex;
-
-                          const res = handleSmartEnter(value, start, end);
-                          if (res) {
-                            e.preventDefault();
-                            setMBody(res.text);
-                            requestAnimationFrame(() => {
-                              try {
-                                el.setSelectionRange(
-                                  res.range[0],
-                                  res.range[1],
-                                );
-                              } catch (e) {}
-                              resizeModalTextarea();
-
-                              // If we were on the last line, scroll down a bit to ensure cursor visibility
-                              if (isOnLastLine) {
-                                const modalScrollEl = modalScrollRef.current;
-                                if (modalScrollEl) {
-                                  setTimeout(() => {
-                                    modalScrollEl.scrollTop += 30; // Scroll down by 30px
-                                  }, 50);
-                                }
-                              }
-                            });
-                          } else if (isOnLastLine) {
-                            // If not handled by smart enter but on last line, allow normal Enter but scroll down
-                            setTimeout(() => {
-                              const modalScrollEl = modalScrollRef.current;
-                              if (modalScrollEl) {
-                                modalScrollEl.scrollTop += 30; // Scroll down by 30px
-                              }
-                            }, 10);
-                          }
-                        }
-                      }}
-                      placeholder={t("writeYourNoteEllipsis")}
-                    />
-                  </div>
-                )
-              ) : mType === "checklist" ? (
-                <div className="space-y-4 md:space-y-2">
-                  {/* Add new item row */}
-                  <div className="flex gap-2">
-                      <input
-                        value={mInput}
-                        onChange={(e) => setMInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            const t = mInput.trim();
-                            if (t) {
-                              const newItems = [
-                                ...mItems,
-                                { id: uid(), text: t, done: false },
-                              ];
-                              setMItems(newItems);
-                              setMInput("");
-                              syncChecklistItems(newItems);
-                            }
-                          }
-                        }}
-                        placeholder={t("listItemEllipsis")}
-                        className="flex-1 bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none p-2 border-b border-[var(--border-light)]"
-                      />
-                      <button
-                        onClick={() => {
-                          const t = mInput.trim();
-                          if (t) {
-                            const newItems = [
-                              ...mItems,
-                              { id: uid(), text: t, done: false },
-                            ];
-                            setMItems(newItems);
-                            setMInput("");
-                            syncChecklistItems(newItems);
-                          }
-                        }}
-                        className="px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
-                      >{t("add")}</button>
-                  </div>
-
-                  {mItems.length > 0 ? (
-                    <div className="space-y-4 md:space-y-2">
-                      {/* Unchecked items */}
-                      {mItems
-                        .filter((it) => !it.done)
-                        .map((it) => (
-                          <div
-                            key={it.id}
-                            data-checklist-item={it.id}
-                            onDragOver={(e) => onChecklistDragOver(it.id, e)}
-                            onDragLeave={onChecklistDragLeave}
-                            onDrop={(e) => onChecklistDrop(it.id, e)}
-                            className="group flex items-center gap-2"
-                          >
-                            {/* Drag handle */}
-                            <div
-                              draggable
-                              onDragStart={(e) =>
-                                onChecklistDragStart(it.id, e)
-                              }
-                              onDragEnd={onChecklistDragEnd}
-                              onTouchStart={(e) => {
-                                // Handle touch drag start - only when touching the handle
-                                const target = e.currentTarget.closest(
-                                  "[data-checklist-item]",
-                                );
-                                if (target) {
-                                  checklistDragId.current = String(it.id);
-                                  target.classList.add("dragging");
-                                }
-                              }}
-                              onTouchMove={(e) => {
-                                if (!checklistDragId.current) return;
-
-                                const touch = e.touches[0];
-                                const elementAtPoint =
-                                  document.elementFromPoint(
-                                    touch.clientX,
-                                    touch.clientY,
-                                  );
-                                if (elementAtPoint) {
-                                  // Find the checklist item container
-                                  const checklistItem = elementAtPoint.closest(
-                                    "[data-checklist-item]",
-                                  );
-                                  if (
-                                    checklistItem &&
-                                    checklistItem !==
-                                      e.currentTarget.closest(
-                                        "[data-checklist-item]",
-                                      )
-                                  ) {
-                                    const dragOverEvent = new Event(
-                                      "dragover",
-                                      { bubbles: true },
-                                    );
-                                    checklistItem.dispatchEvent(dragOverEvent);
-                                  }
-                                }
-                              }}
-                              onTouchEnd={(e) => {
-                                if (!checklistDragId.current) return;
-                                const touch = e.changedTouches[0];
-                                const elementAtPoint =
-                                  document.elementFromPoint(
-                                    touch.clientX,
-                                    touch.clientY,
-                                  );
-                                const target = e.currentTarget.closest(
-                                  "[data-checklist-item]",
-                                );
-
-                                if (elementAtPoint) {
-                                  const checklistItem = elementAtPoint.closest(
-                                    "[data-checklist-item]",
-                                  );
-                                  if (
-                                    checklistItem &&
-                                    checklistItem !== target
-                                  ) {
-                                    const dropEvent = new Event("drop", {
-                                      bubbles: true,
-                                    });
-                                    checklistItem.dispatchEvent(dropEvent);
-                                  }
-                                }
-
-                                if (target) {
-                                  target.classList.remove("dragging");
-                                }
-                                checklistDragId.current = null;
-
-                                // Clean up any remaining drag-over states
-                                document
-                                  .querySelectorAll(".drag-over")
-                                  .forEach((el) => {
-                                    el.classList.remove("drag-over");
-                                  });
-                              }}
-                              className="flex items-center justify-center px-1 cursor-grab active:cursor-grabbing opacity-40 group-hover:opacity-70 transition-opacity"
-                              style={{ touchAction: "none" }}
-                            >
-                              <div className="grid grid-cols-2 gap-0.5">
-                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                              </div>
-                            </div>
-
-                            <div className="flex-1">
-                              <ChecklistRow
-                                item={it}
-                                readOnly={false}
-                                disableToggle={false}
-                                showRemove={true}
-                                size="lg"
-                                onToggle={(checked, e) => {
-                                  e?.stopPropagation();
-                                  const newItems = mItems.map((p) =>
-                                    p.id === it.id ? { ...p, done: checked } : p,
-                                  );
-                                  setMItems(newItems);
-                                  syncChecklistItems(newItems);
-                                }}
-                                onChange={(txt) => {
-                                  const newItems = mItems.map((p) =>
-                                    p.id === it.id ? { ...p, text: txt } : p,
-                                  );
-                                  setMItems(newItems);
-                                  syncChecklistItems(newItems);
-                                }}
-                                onRemove={() => {
-                                  const newItems = mItems.filter(
-                                    (p) => p.id !== it.id,
-                                  );
-                                  setMItems(newItems);
-                                  syncChecklistItems(newItems);
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-
-                      {/* Done section */}
-                      {mItems.filter((it) => it.done).length > 0 && (
-                        <>
-                          <div className="border-t border-[var(--border-light)] pt-4 mt-4">
-                            <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3">{t("done")}</h4>
-                            {mItems
-                              .filter((it) => it.done)
-                              .map((it) => (
-                                <ChecklistRow
-                                  key={it.id}
-                                  item={it}
-                                  readOnly={false}
-                                  disableToggle={false}
-                                  showRemove={true}
-                                  size="lg"
-                                  onToggle={(checked, e) => {
-                                    e?.stopPropagation();
-                                    const newItems = mItems.map((p) =>
-                                      p.id === it.id ? { ...p, done: checked } : p,
-                                    );
-                                    setMItems(newItems);
-                                    syncChecklistItems(newItems);
-                                  }}
-                                  onChange={(txt) => {
-                                    const newItems = mItems.map((p) =>
-                                      p.id === it.id ? { ...p, text: txt } : p,
-                                    );
-                                    setMItems(newItems);
-                                    syncChecklistItems(newItems);
-                                  }}
-                                  onRemove={() => {
-                                    const newItems = mItems.filter(
-                                      (p) => p.id !== it.id,
-                                    );
-                                    setMItems(newItems);
-                                    syncChecklistItems(newItems);
-                                  }}
-                                />
-                              ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500">{t("noItemsYet")}</p>
-                  )}
-                </div>
-              ) : (
-                <DrawingCanvas
-                  data={mDrawingData}
-                  onChange={setMDrawingData}
-                  width={750}
-                  height={850}
-                  readOnly={false}
-                  darkMode={dark}
-                  initialMode="view"
-                />
-              )}
-
-              {/* Inline Edited stamp: only when scrollable (appears at very end) */}
-              {editedStamp && modalScrollable && (
-                <div className="mt-6 text-xs text-gray-600 dark:text-gray-300 text-right flex items-center justify-end gap-1.5">
-                  <span>{t("editedPrefix")} {editedStamp}</span>
-                  {activeId && (
-                    <span
-                      className="opacity-30 hover:opacity-100 cursor-default transition-opacity"
-                      data-tooltip={`Note ID : ${activeId}`}
-                    >ⓘ</span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Absolute Edited stamp: only when NOT scrollable (sits just above footer) */}
-            {editedStamp && !modalScrollable && (
-              <div className="absolute bottom-3 right-4 text-xs text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
-                <span className="pointer-events-none">{t("editedPrefix")} {editedStamp}</span>
-                {activeId && (
-                  <span
-                    className="opacity-30 hover:opacity-100 cursor-default transition-opacity"
-                    data-tooltip={`Note ID : ${activeId}`}
-                  >ⓘ</span>
-                )}
-              </div>
-            )}
-          </div>
-
-          <ModalFooter
-            dark={dark}
-            windowWidth={windowWidth}
-            mTagList={mTagList}
-            setMTagList={setMTagList}
-            tagInput={tagInput}
-            setTagInput={setTagInput}
-            modalTagFocused={modalTagFocused}
-            setModalTagFocused={setModalTagFocused}
-            modalTagInputRef={modalTagInputRef}
-            modalTagBtnRef={modalTagBtnRef}
-            suppressTagBlurRef={suppressTagBlurRef}
-            tagsWithCounts={tagsWithCounts}
-            addTags={addTags}
-            handleTagKeyDown={handleTagKeyDown}
-            handleTagBlur={handleTagBlur}
-            handleTagPaste={handleTagPaste}
-            mColor={mColor}
-            setMColor={setMColor}
-            modalColorBtnRef={modalColorBtnRef}
-            showModalColorPop={showModalColorPop}
-            setShowModalColorPop={setShowModalColorPop}
-            modalFileRef={modalFileRef}
-            addImagesToState={addImagesToState}
-            setMImages={setMImages}
-            modalHasChanges={modalHasChanges}
-            mType={mType}
-            isCollaborativeNote={isCollaborativeNote}
-            activeId={activeId}
-            savingModal={savingModal}
-            onSave={saveModal}
-          />
-
-          <ConfirmDeleteDialog
-            open={confirmDeleteOpen}
-            dark={dark}
-            isTrashed={tagFilter === "TRASHED"}
-            onClose={() => setConfirmDeleteOpen(false)}
-            onConfirm={async () => {
-              setConfirmDeleteOpen(false);
-              await deleteModal();
-            }}
-          />
-
-          <CollaborationModal
-            open={collaborationModalOpen}
-            dark={dark}
-            activeId={activeId}
-            notes={notes}
-            currentUser={currentUser}
-            collaboratorUsername={collaboratorUsername}
-            setCollaboratorUsername={setCollaboratorUsername}
-            addModalCollaborators={addModalCollaborators}
-            showUserDropdown={showUserDropdown}
-            setShowUserDropdown={setShowUserDropdown}
-            filteredUsers={filteredUsers}
-            setFilteredUsers={setFilteredUsers}
-            loadingUsers={loadingUsers}
-            dropdownPosition={dropdownPosition}
-            collaboratorInputRef={collaboratorInputRef}
-            onClose={() => setCollaborationModalOpen(false)}
-            onAddCollaborator={addCollaborator}
-            onRemoveCollaborator={removeCollaborator}
-            searchUsers={searchUsers}
-            updateDropdownPosition={updateDropdownPosition}
-          />
-        </div>
-      </div>
-
-      {/* Fullscreen Image Viewer */}
-      {imgViewOpen && mImages.length > 0 && (
-        <FullscreenImageViewer
-          images={mImages}
-          currentIndex={imgViewIndex}
-          dark={dark}
-          onClose={closeImageViewer}
-          onNext={nextImage}
-          onPrev={prevImage}
-          mobileNavVisible={mobileNavVisible}
-          onResetMobileNav={resetMobileNav}
-        />
-      )}
-    </>
+  const modal = (
+    <NoteModal
+      open={open}
+      isModalClosing={isModalClosing}
+      dark={dark}
+      windowWidth={windowWidth}
+      activeId={activeId}
+      mType={mType}
+      mTitle={mTitle}
+      setMTitle={setMTitle}
+      mBody={mBody}
+      setMBody={setMBody}
+      mColor={mColor}
+      setMColor={setMColor}
+      viewMode={viewMode}
+      setViewMode={setViewMode}
+      mImages={mImages}
+      setMImages={setMImages}
+      mItems={mItems}
+      setMItems={setMItems}
+      mInput={mInput}
+      setMInput={setMInput}
+      mDrawingData={mDrawingData}
+      setMDrawingData={setMDrawingData}
+      mTagList={mTagList}
+      setMTagList={setMTagList}
+      tagInput={tagInput}
+      setTagInput={setTagInput}
+      modalTagFocused={modalTagFocused}
+      setModalTagFocused={setModalTagFocused}
+      modalScrollRef={modalScrollRef}
+      mBodyRef={mBodyRef}
+      noteViewRef={noteViewRef}
+      modalFileRef={modalFileRef}
+      modalMenuBtnRef={modalMenuBtnRef}
+      modalFmtBtnRef={modalFmtBtnRef}
+      modalTagInputRef={modalTagInputRef}
+      modalTagBtnRef={modalTagBtnRef}
+      suppressTagBlurRef={suppressTagBlurRef}
+      modalColorBtnRef={modalColorBtnRef}
+      scrimClickStartRef={scrimClickStartRef}
+      savedModalScrollRatioRef={savedModalScrollRatioRef}
+      checklistDragId={checklistDragId}
+      activeNoteObj={activeNoteObj}
+      editedStamp={editedStamp}
+      modalHasChanges={modalHasChanges}
+      modalScrollable={modalScrollable}
+      tagsWithCounts={tagsWithCounts}
+      addTags={addTags}
+      handleTagKeyDown={handleTagKeyDown}
+      handleTagBlur={handleTagBlur}
+      handleTagPaste={handleTagPaste}
+      modalMenuOpen={modalMenuOpen}
+      setModalMenuOpen={setModalMenuOpen}
+      showModalFmt={showModalFmt}
+      setShowModalFmt={setShowModalFmt}
+      formatModal={formatModal}
+      showModalColorPop={showModalColorPop}
+      setShowModalColorPop={setShowModalColorPop}
+      confirmDeleteOpen={confirmDeleteOpen}
+      setConfirmDeleteOpen={setConfirmDeleteOpen}
+      savingModal={savingModal}
+      collaborationModalOpen={collaborationModalOpen}
+      setCollaborationModalOpen={setCollaborationModalOpen}
+      collaboratorUsername={collaboratorUsername}
+      setCollaboratorUsername={setCollaboratorUsername}
+      addModalCollaborators={addModalCollaborators}
+      showUserDropdown={showUserDropdown}
+      setShowUserDropdown={setShowUserDropdown}
+      filteredUsers={filteredUsers}
+      setFilteredUsers={setFilteredUsers}
+      loadingUsers={loadingUsers}
+      dropdownPosition={dropdownPosition}
+      collaboratorInputRef={collaboratorInputRef}
+      addCollaborator={addCollaborator}
+      removeCollaborator={removeCollaborator}
+      searchUsers={searchUsers}
+      updateDropdownPosition={updateDropdownPosition}
+      loadCollaboratorsForAddModal={loadCollaboratorsForAddModal}
+      imgViewOpen={imgViewOpen}
+      imgViewIndex={imgViewIndex}
+      mobileNavVisible={mobileNavVisible}
+      openImageViewer={openImageViewer}
+      closeImageViewer={closeImageViewer}
+      nextImage={nextImage}
+      prevImage={prevImage}
+      resetMobileNav={resetMobileNav}
+      notes={notes}
+      currentUser={currentUser}
+      tagFilter={tagFilter}
+      closeModal={closeModal}
+      saveModal={saveModal}
+      deleteModal={deleteModal}
+      restoreFromTrash={restoreFromTrash}
+      handleArchiveNote={handleArchiveNote}
+      handleDownloadNote={handleDownloadNote}
+      togglePin={togglePin}
+      addImagesToState={addImagesToState}
+      isCollaborativeNote={isCollaborativeNote}
+      onModalBodyClick={onModalBodyClick}
+      resizeModalTextarea={resizeModalTextarea}
+      syncChecklistItems={syncChecklistItems}
+      onChecklistDragStart={onChecklistDragStart}
+      onChecklistDragOver={onChecklistDragOver}
+      onChecklistDragLeave={onChecklistDragLeave}
+      onChecklistDrop={onChecklistDrop}
+      onChecklistDragEnd={onChecklistDragEnd}
+    />
   );
 
   // Redirect if already logged in
