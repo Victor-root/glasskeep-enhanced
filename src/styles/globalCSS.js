@@ -363,8 +363,11 @@ html:not(.dark) .code-block-wrapper .code-copy-btn {
   background: rgba(0,0,0,0.06);
 }
 
-.dragging { opacity: 0.5; transform: scale(1.05); }
-.drag-over { outline: 2px dashed rgba(99,102,241,.6); outline-offset: 6px; }
+.checklist-drag-clone {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  border-radius: 8px;
+  will-change: top;
+}
 .masonry-grid { display: flex; margin-left: -0.75rem; width: auto; }
 .masonry-grid-column { padding-left: 0.75rem; background-clip: padding-box; }
 .masonry-grid-column > div { margin-bottom: 0.75rem; }

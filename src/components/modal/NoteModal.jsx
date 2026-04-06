@@ -8,6 +8,7 @@ import ModalImagesGrid from "./ModalImagesGrid.jsx";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog.jsx";
 import CollaborationModal from "./CollaborationModal.jsx";
 import FullscreenImageViewer from "./FullscreenImageViewer.jsx";
+import useChecklistDrag from "../../hooks/useChecklistDrag.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { handleSmartEnter } from "../common/FormatToolbar.jsx";
 import { uid } from "../../utils/helpers.js";
@@ -58,7 +59,6 @@ export default function NoteModal({
   modalColorBtnRef,
   scrimClickStartRef,
   savedModalScrollRatioRef,
-  checklistDragId,
   // derived
   activeNoteObj,
   editedStamp,
@@ -129,12 +129,10 @@ export default function NoteModal({
   resizeModalTextarea,
   // checklist handlers
   syncChecklistItems,
-  onChecklistDragStart,
-  onChecklistDragOver,
-  onChecklistDragLeave,
-  onChecklistDrop,
-  onChecklistDragEnd,
 }) {
+  const { handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } =
+    useChecklistDrag(mItems, setMItems, syncChecklistItems);
+
   if (!open && !isModalClosing) return null;
 
   return (
@@ -351,96 +349,14 @@ export default function NoteModal({
                           <div
                             key={it.id}
                             data-checklist-item={it.id}
-                            onDragOver={(e) => onChecklistDragOver(it.id, e)}
-                            onDragLeave={onChecklistDragLeave}
-                            onDrop={(e) => onChecklistDrop(it.id, e)}
                             className="group flex items-center gap-2"
                           >
                             {/* Drag handle */}
                             <div
-                              draggable
-                              onDragStart={(e) =>
-                                onChecklistDragStart(it.id, e)
-                              }
-                              onDragEnd={onChecklistDragEnd}
-                              onTouchStart={(e) => {
-                                // Handle touch drag start - only when touching the handle
-                                const target = e.currentTarget.closest(
-                                  "[data-checklist-item]",
-                                );
-                                if (target) {
-                                  checklistDragId.current = String(it.id);
-                                  target.classList.add("dragging");
-                                }
-                              }}
-                              onTouchMove={(e) => {
-                                if (!checklistDragId.current) return;
-
-                                const touch = e.touches[0];
-                                const elementAtPoint =
-                                  document.elementFromPoint(
-                                    touch.clientX,
-                                    touch.clientY,
-                                  );
-                                if (elementAtPoint) {
-                                  // Find the checklist item container
-                                  const checklistItem = elementAtPoint.closest(
-                                    "[data-checklist-item]",
-                                  );
-                                  if (
-                                    checklistItem &&
-                                    checklistItem !==
-                                      e.currentTarget.closest(
-                                        "[data-checklist-item]",
-                                      )
-                                  ) {
-                                    const dragOverEvent = new Event(
-                                      "dragover",
-                                      { bubbles: true },
-                                    );
-                                    checklistItem.dispatchEvent(dragOverEvent);
-                                  }
-                                }
-                              }}
-                              onTouchEnd={(e) => {
-                                if (!checklistDragId.current) return;
-                                const touch = e.changedTouches[0];
-                                const elementAtPoint =
-                                  document.elementFromPoint(
-                                    touch.clientX,
-                                    touch.clientY,
-                                  );
-                                const target = e.currentTarget.closest(
-                                  "[data-checklist-item]",
-                                );
-
-                                if (elementAtPoint) {
-                                  const checklistItem = elementAtPoint.closest(
-                                    "[data-checklist-item]",
-                                  );
-                                  if (
-                                    checklistItem &&
-                                    checklistItem !== target
-                                  ) {
-                                    const dropEvent = new Event("drop", {
-                                      bubbles: true,
-                                    });
-                                    checklistItem.dispatchEvent(dropEvent);
-                                  }
-                                }
-
-                                if (target) {
-                                  target.classList.remove("dragging");
-                                }
-                                checklistDragId.current = null;
-
-                                // Clean up any remaining drag-over states
-                                document
-                                  .querySelectorAll(".drag-over")
-                                  .forEach((el) => {
-                                    el.classList.remove("drag-over");
-                                  });
-                              }}
+                              onPointerDown={(e) => handlePointerDown(it.id, e)}
+                              onPointerMove={handlePointerMove}
+                              onPointerUp={handlePointerUp}
+                              onPointerCancel={handlePointerCancel}
                               className="flex items-center justify-center px-1 cursor-grab active:cursor-grabbing opacity-40 group-hover:opacity-70 transition-opacity"
                               style={{ touchAction: "none" }}
                             >

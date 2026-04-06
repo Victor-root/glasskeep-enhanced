@@ -3361,63 +3361,7 @@ export default function App() {
     releaseLocalLeaseWithPrune(noteId, leaseId);
   };
 
-  const onChecklistDragStart = (itemId, ev) => {
-    checklistDragId.current = String(itemId);
-    ev.currentTarget.classList.add("dragging");
-  };
-  const onChecklistDragOver = (overItemId, ev) => {
-    ev.preventDefault();
-    if (!checklistDragId.current) return;
-    if (String(checklistDragId.current) === String(overItemId)) return;
-    ev.currentTarget.classList.add("drag-over");
-  };
-  const onChecklistDragLeave = (ev) => {
-    ev.currentTarget.classList.remove("drag-over");
-  };
-  const onChecklistDrop = async (overItemId, ev) => {
-    ev.preventDefault();
-    ev.currentTarget.classList.remove("drag-over");
-    const dragged = checklistDragId.current;
-    checklistDragId.current = null;
-
-    if (!dragged || String(dragged) === String(overItemId)) return;
-
-    // Only allow reordering unchecked items
-    const draggedItem = mItems.find((it) => String(it.id) === String(dragged));
-    const overItem = mItems.find((it) => String(it.id) === String(overItemId));
-
-    if (!draggedItem || !overItem || draggedItem.done || overItem.done) return;
-
-    // Reorder the unchecked items
-    const uncheckedItems = mItems.filter((it) => !it.done);
-    const checkedItems = mItems.filter((it) => it.done);
-
-    const draggedIndex = uncheckedItems.findIndex(
-      (it) => String(it.id) === String(dragged),
-    );
-    const overIndex = uncheckedItems.findIndex(
-      (it) => String(it.id) === String(overItemId),
-    );
-
-    if (draggedIndex === -1 || overIndex === -1) return;
-
-    // Remove dragged item and insert at new position
-    const [removed] = uncheckedItems.splice(draggedIndex, 1);
-    uncheckedItems.splice(overIndex, 0, removed);
-
-    // Combine back with checked items
-    const newItems = [...uncheckedItems, ...checkedItems];
-
-    setMItems(newItems);
-    syncChecklistItems(newItems);
-  };
-  const onChecklistDragEnd = (ev) => {
-    ev.currentTarget.classList.remove("dragging");
-    // Clean up any remaining drag-over states
-    document.querySelectorAll(".drag-over").forEach((el) => {
-      el.classList.remove("drag-over");
-    });
-  };
+  // Checklist drag-and-drop is handled by useChecklistDrag inside NoteModal
 
   /** -------- Tags list (unique + counts) -------- */
   // Keep allNotesForTags in sync with notes when in normal view,
@@ -3573,7 +3517,6 @@ export default function App() {
       modalColorBtnRef={modalColorBtnRef}
       scrimClickStartRef={scrimClickStartRef}
       savedModalScrollRatioRef={savedModalScrollRatioRef}
-      checklistDragId={checklistDragId}
       activeNoteObj={activeNoteObj}
       editedStamp={editedStamp}
       modalHasChanges={modalHasChanges}
@@ -3633,11 +3576,6 @@ export default function App() {
       onModalBodyClick={onModalBodyClick}
       resizeModalTextarea={resizeModalTextarea}
       syncChecklistItems={syncChecklistItems}
-      onChecklistDragStart={onChecklistDragStart}
-      onChecklistDragOver={onChecklistDragOver}
-      onChecklistDragLeave={onChecklistDragLeave}
-      onChecklistDrop={onChecklistDrop}
-      onChecklistDragEnd={onChecklistDragEnd}
     />
   );
 
