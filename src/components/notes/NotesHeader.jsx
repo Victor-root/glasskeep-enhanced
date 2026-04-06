@@ -80,6 +80,9 @@ export default function NotesHeader({
               <span className="shrink-0 w-3 h-3 [&>svg]:w-3 [&>svg]:h-3"><SectionIcon /></span>
               <span className="truncate">{sectionLabel}</span>
             </span>
+            {!isOnline && (
+              <span className="mt-0.5 text-[10px] px-1.5 py-0 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20 w-fit">{t("offline")}</span>
+            )}
           </div>
 
           {/* Desktop: inline name + separator + badge */}
@@ -92,9 +95,9 @@ export default function NotesHeader({
             <span className="truncate">{sectionLabel}</span>
           </span>
 
-          {/* Offline indicator */}
+          {/* Offline indicator - desktop only (mobile is inside stacked block above) */}
           {!isOnline && (
-            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20">{t("offline")}</span>
+            <span className="hidden sm:inline ml-2 text-xs px-2 py-0.5 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20">{t("offline")}</span>
           )}
         </div>
 
