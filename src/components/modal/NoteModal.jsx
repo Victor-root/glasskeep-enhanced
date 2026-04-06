@@ -303,22 +303,22 @@ export default function NoteModal({
                 )
               ) : mType === "checklist" ? (
                 <div className="space-y-4 md:space-y-2">
-                  {/* Add new item row */}
-                  <div
-                    className="flex items-center gap-2 cursor-pointer p-2 border-b border-[var(--border-light)] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                    onClick={() => {
-                      const newItem = { id: uid(), text: "", done: false };
-                      const newItems = checklistInsertPosition === "top"
-                        ? [newItem, ...mItems]
-                        : [...mItems, newItem];
-                      setMItems(newItems);
-                      setAutoEditId(newItem.id);
-                      syncChecklistItems(newItems);
-                    }}
-                  >
-                    <span className="text-lg leading-none">+</span>
-                    <span className="text-sm">{t("listItemEllipsis")}</span>
-                  </div>
+                  {/* Add new item row — top position */}
+                  {checklistInsertPosition === "top" && (
+                    <div
+                      className="flex items-center gap-2 cursor-pointer p-2 border-b border-[var(--border-light)] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      onClick={() => {
+                        const newItem = { id: uid(), text: "", done: false };
+                        const newItems = [newItem, ...mItems];
+                        setMItems(newItems);
+                        setAutoEditId(newItem.id);
+                        syncChecklistItems(newItems);
+                      }}
+                    >
+                      <span className="text-lg leading-none">+</span>
+                      <span className="text-sm">{t("listItemEllipsis")}</span>
+                    </div>
+                  )}
 
                   {mItems.length > 0 ? (
                     <div className="space-y-4 md:space-y-2">
@@ -443,6 +443,23 @@ export default function NoteModal({
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500">{t("noItemsYet")}</p>
+                  )}
+
+                  {/* Add new item row — bottom position */}
+                  {checklistInsertPosition === "bottom" && (
+                    <div
+                      className="flex items-center gap-2 cursor-pointer p-2 border-t border-[var(--border-light)] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      onClick={() => {
+                        const newItem = { id: uid(), text: "", done: false };
+                        const newItems = [...mItems, newItem];
+                        setMItems(newItems);
+                        setAutoEditId(newItem.id);
+                        syncChecklistItems(newItems);
+                      }}
+                    >
+                      <span className="text-lg leading-none">+</span>
+                      <span className="text-sm">{t("listItemEllipsis")}</span>
+                    </div>
                   )}
                 </div>
               ) : (
