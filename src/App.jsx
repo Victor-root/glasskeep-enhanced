@@ -3178,11 +3178,15 @@ export default function App() {
     } catch (e) { console.error(e); }
     invalidateNotesCache();
 
-    setNotes((prev) =>
-      prev.map((n) =>
-        String(n.id) === nid ? { ...n, pinned: !!toPinned } : n,
-      ),
-    );
+    setNotes((prev) => {
+      // When unpinning, remove position so the note falls back to
+      // its updated_at order instead of keeping the pinned-group position
+      // which would incorrectly place it first among "others".
+      const updated = prev.map((n) =>
+        String(n.id) === nid ? { ...n, pinned: !!toPinned, ...(!toPinned ? { position: undefined } : {}) } : n,
+      );
+      return sortNotesByRecency(updated);
+    });
     await enqueueWithLease(nid, { type: "patch", noteId: nid, payload: { pinned: !!toPinned, client_updated_at: nowIso } }, leaseId);
   };
 
