@@ -196,9 +196,13 @@ export default function NoteModal({
               showModalFmt={showModalFmt}
               setShowModalFmt={setShowModalFmt}
               onFormatModal={formatModal}
-              modalMenuBtnRef={modalMenuBtnRef}
-              modalMenuOpen={modalMenuOpen}
-              setModalMenuOpen={setModalMenuOpen}
+              setMColor={setMColor}
+              modalColorBtnRef={modalColorBtnRef}
+              showModalColorPop={showModalColorPop}
+              setShowModalColorPop={setShowModalColorPop}
+              modalFileRef={modalFileRef}
+              addImagesToState={addImagesToState}
+              setMImages={setMImages}
               activeId={activeId}
               notes={notes}
               tagFilter={tagFilter}

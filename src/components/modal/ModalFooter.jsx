@@ -215,49 +215,6 @@ export default function ModalFooter({
 
       {/* Right controls */}
       <div className="ml-auto flex items-center gap-3 flex-shrink-0">
-        {/* Color dropdown (modal) */}
-        <button
-          ref={modalColorBtnRef}
-          type="button"
-          onClick={() => setShowModalColorPop((v) => !v)}
-          className="w-6 h-6 flex items-center justify-center rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 transition-opacity"
-          data-tooltip={t("color")}
-        >
-          <PaletteColorIcon size={22} />
-        </button>
-        <ColorPickerPanel
-          anchorRef={modalColorBtnRef}
-          open={showModalColorPop}
-          onClose={() => setShowModalColorPop(false)}
-          colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
-          selectedColor={mColor}
-          darkMode={dark}
-          onSelect={(name) => setMColor(name)}
-        />
-
-        {/* Add images */}
-        <input
-          ref={modalFileRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={async (e) => {
-            const f = e.target.files;
-            if (f && f.length) {
-              await addImagesToState(f, setMImages);
-            }
-            e.target.value = "";
-          }}
-        />
-        <button
-          onClick={() => modalFileRef.current?.click()}
-          className="p-1.5 text-sky-500 dark:text-sky-400 hover:text-sky-600 dark:hover:text-sky-300 flex-shrink-0 transition-colors duration-200"
-          data-tooltip={t("addImages")}
-        >
-          <AddImageIcon />
-        </button>
-
         {/* Save check – always visible, bright green when unsaved, faded when saved */}
         {!(mType === "text" && isCollaborativeNote(activeId)) && (
           <button

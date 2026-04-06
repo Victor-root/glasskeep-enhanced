@@ -1,8 +1,10 @@
 import React, { useRef, useEffect, useCallback } from "react";
-import { PinOutline, PinFilled, CloseIcon, DownloadIcon, FormatIcon, ArchiveIcon, Trash } from "../../icons/index.jsx";
+import { PinOutline, PinFilled, CloseIcon, DownloadIcon, FormatIcon, ArchiveIcon, Trash, AddImageIcon } from "../../icons/index.jsx";
+import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
+import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
 import FormatToolbar from "../common/FormatToolbar.jsx";
 import Popover from "../common/Popover.jsx";
-import { modalBgFor } from "../../utils/colors.js";
+import { modalBgFor, COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 import { t } from "../../i18n";
 
 /**
@@ -33,10 +35,15 @@ export default function ModalHeader({
   showModalFmt,
   setShowModalFmt,
   onFormatModal,
-  // kebab menu (kept for prop compat, unused now)
-  modalMenuBtnRef,
-  modalMenuOpen,
-  setModalMenuOpen,
+  // color picker
+  setMColor,
+  modalColorBtnRef,
+  showModalColorPop,
+  setShowModalColorPop,
+  // image upload
+  modalFileRef,
+  addImagesToState,
+  setMImages,
   // actions
   activeId,
   notes,
@@ -151,6 +158,50 @@ export default function ModalHeader({
               <FormatIcon />
             </button>
           )}
+
+          {/* Add images — visible in edit mode for text, always for checklist */}
+          {(mType === "checklist" || (mType === "text" && !viewMode)) && (
+            <>
+              <input
+                ref={modalFileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files;
+                  if (f && f.length) await addImagesToState(f, setMImages);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                className="modal-icon-btn modal-icon-btn--image focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
+                data-tooltip={t("addImages")}
+                onClick={() => modalFileRef.current?.click()}
+              >
+                <AddImageIcon />
+              </button>
+            </>
+          )}
+
+          {/* Color picker */}
+          <button
+            ref={modalColorBtnRef}
+            className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
+            data-tooltip={t("color")}
+            onClick={() => setShowModalColorPop((v) => !v)}
+          >
+            <PaletteColorIcon size={20} />
+          </button>
+          <ColorPickerPanel
+            anchorRef={modalColorBtnRef}
+            open={showModalColorPop}
+            onClose={() => setShowModalColorPop(false)}
+            colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
+            selectedColor={mColor}
+            darkMode={dark}
+            onSelect={(name) => setMColor(name)}
+          />
 
           {/* Download */}
           <button

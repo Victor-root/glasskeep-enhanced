@@ -398,6 +398,21 @@ html.dark .modal-icon-btn--collab:hover {
   color: #c4b5fd !important;
 }
 
+.modal-icon-btn--image {
+  color: #0284c7;
+}
+.modal-icon-btn--image:hover {
+  background: rgba(2, 132, 199, 0.1) !important;
+  color: #0369a1 !important;
+}
+html.dark .modal-icon-btn--image {
+  color: #38bdf8;
+}
+html.dark .modal-icon-btn--image:hover {
+  background: rgba(56, 189, 248, 0.15) !important;
+  color: #7dd3fc !important;
+}
+
 /* Copy buttons */
 /* Hide scrollbars on mobile (keep scrolling) */
 @media (max-width: 639px) {
