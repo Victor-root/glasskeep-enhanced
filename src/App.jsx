@@ -459,6 +459,10 @@ export default function App() {
           setFloatingCardsEnabled(settings.floatingCardsEnabled);
           localStorage.setItem("floatingCardsEnabled", String(settings.floatingCardsEnabled));
         }
+        if (settings?.checklistInsertPosition) {
+          setChecklistInsertPosition(settings.checklistInsertPosition);
+          localStorage.setItem("checklistInsertPosition", settings.checklistInsertPosition);
+        }
       } catch (e) {
         // Network error — default to true
         setAlwaysShowSidebarOnWide((prev) => prev === null ? true : prev);
@@ -517,6 +521,14 @@ export default function App() {
     try {
       localStorage.setItem("checklistInsertPosition", checklistInsertPosition);
     } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { checklistInsertPosition },
+      }).catch(() => {});
+    }
   }, [checklistInsertPosition]);
 
   // Window resize listener for responsive sidebar behavior
