@@ -84,20 +84,8 @@ export default function ModalHeader({
       className="sticky top-0 z-20 pt-4 modal-header-blur rounded-t-none sm:rounded-t-xl"
       style={{ backgroundColor: modalBgFor(mColor, dark) }}
     >
-      <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6 pb-3">
-        <input
-          className="flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none pr-2"
-          style={windowWidth < 700 ? {
-            fontSize: mTitle.length > 40 ? "0.85rem"
-              : mTitle.length > 28 ? "1rem"
-              : mTitle.length > 18 ? "1.15rem"
-              : "1.25rem"
-          } : undefined}
-          value={mTitle}
-          onChange={(e) => setMTitle(e.target.value)}
-          placeholder={t("noteTitle")}
-        />
-        <div className="flex items-center gap-2 flex-none ml-auto">
+      <div className={`flex flex-wrap items-center gap-2 px-4 sm:px-6 pb-3 ${!isDesktop ? "flex-row-reverse" : ""}`}>
+        <div className={`flex items-center gap-2 flex-none ${!isDesktop ? "" : "ml-auto"}`}>
           {/* Icon buttons group – pill container */}
           <div className="modal-icon-group">
 
@@ -193,10 +181,32 @@ export default function ModalHeader({
           )}
 
           {/* ══════════════════════════════════════════════════════════
-              MOBILE LAYOUT (< 768): only Kebab + Close
+              MOBILE LAYOUT (< 768): View/Edit + Kebab + Close
               ══════════════════════════════════════════════════════════ */}
           {!isDesktop && (
             <>
+              {/* View/Edit toggle — icon button, same gradient style as desktop */}
+              {mType === "text" && (
+                <button
+                  className="modal-icon-btn modal-icon-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]"
+                  onClick={handleToggleViewMode}
+                  data-tooltip={viewMode ? t("switchToEditMode") : t("switchToViewMode")}
+                  aria-label={viewMode ? t("editMode") : t("viewMode")}
+                >
+                  {viewMode ? (
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25Z" fill="currentColor" />
+                      <path d="m14.06 4.94 3.75 3.75 1.41-1.41a1.5 1.5 0 0 0 0-2.12l-1.63-1.63a1.5 1.5 0 0 0-2.12 0l-1.41 1.41Z" fill="currentColor" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />
+                      <circle cx="12" cy="12" r="3.2" fill="currentColor" />
+                    </svg>
+                  )}
+                </button>
+              )}
+
               <button
                 ref={modalMenuBtnRef}
                 className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
@@ -218,30 +228,6 @@ export default function ModalHeader({
                   style={{ backgroundColor: dark ? "#222222" : undefined }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {/* View/Edit toggle — text notes only */}
-                  {mType === "text" && (
-                    <button
-                      className={menuItemClass}
-                      onClick={() => {
-                        handleToggleViewMode();
-                        setModalMenuOpen(false);
-                      }}
-                    >
-                      {viewMode ? (
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                          <path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25Z" fill="currentColor" />
-                          <path d="m14.06 4.94 3.75 3.75 1.41-1.41a1.5 1.5 0 0 0 0-2.12l-1.63-1.63a1.5 1.5 0 0 0-2.12 0l-1.41 1.41Z" fill="currentColor" />
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                          <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />
-                          <circle cx="12" cy="12" r="3.2" fill="currentColor" />
-                        </svg>
-                      )}
-                      {viewMode ? t("switchToEditMode") : t("switchToViewMode")}
-                    </button>
-                  )}
-
                   {/* Collaborate */}
                   <button
                     className={menuItemClass}
@@ -361,6 +347,21 @@ export default function ModalHeader({
           </div>{/* end icon pill group */}
         </div>
 
+        {/* Title input — on mobile it wraps below the buttons thanks to flex-row-reverse + wrap */}
+        <input
+          className={`min-w-0 bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none ${
+            isDesktop ? "flex-[1_0_50%] sm:min-w-[240px] shrink-0 pr-2 order-first" : "w-full mt-1"
+          }`}
+          style={windowWidth < 700 ? {
+            fontSize: mTitle.length > 40 ? "0.85rem"
+              : mTitle.length > 28 ? "1rem"
+              : mTitle.length > 18 ? "1.15rem"
+              : "1.25rem"
+          } : undefined}
+          value={mTitle}
+          onChange={(e) => setMTitle(e.target.value)}
+          placeholder={t("noteTitle")}
+        />
       </div>
 
       {/* Formatting popover anchor for mobile (triggered from kebab menu item) */}
