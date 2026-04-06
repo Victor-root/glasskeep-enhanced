@@ -49,7 +49,7 @@ export default function ChecklistRow({
       />
       {readOnly || (!editing && !readOnly) ? (
         <span
-          className={`text-sm break-words min-w-0 ${!readOnly ? "cursor-pointer" : ""} ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
+          className={`flex-1 text-sm break-words min-w-0 ${!readOnly ? "cursor-pointer" : ""} ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
           onClick={!readOnly ? (e) => { e.stopPropagation(); setEditing(true); } : undefined}
         >
           {isMobile && !preview ? linkifyPhoneNumbers(item.text) : item.text}
@@ -57,7 +57,7 @@ export default function ChecklistRow({
       ) : (
         <textarea
           rows={1}
-          className={`flex-1 bg-transparent text-sm focus:outline-none border-b border-transparent focus:border-[var(--border-light)] p-0 pb-0.5 resize-none overflow-hidden break-words min-w-0 ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
+          className={`flex-1 bg-transparent text-sm focus:outline-none border-0 border-b border-transparent focus:border-[var(--border-light)] m-0 p-0 pb-0.5 resize-none overflow-hidden break-words min-w-0 ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
           value={item.text}
           onChange={(e) => {
             onChange?.(e.target.value);
