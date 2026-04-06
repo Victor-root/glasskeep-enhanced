@@ -357,7 +357,7 @@ export default function NoteModal({
                               onPointerMove={handlePointerMove}
                               onPointerUp={handlePointerUp}
                               onPointerCancel={handlePointerCancel}
-                              className="flex items-center justify-center px-1 cursor-grab active:cursor-grabbing opacity-40 group-hover:opacity-70 transition-opacity"
+                              className="flex items-center justify-center px-1 checklist-grab-handle opacity-40 group-hover:opacity-70 transition-opacity"
                               style={{ touchAction: "none" }}
                             >
                               <div className="grid grid-cols-2 gap-0.5">
