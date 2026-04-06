@@ -42,20 +42,25 @@ export default function useChecklistDrag(mItems, setMItems, syncChecklistItems) 
     const rects = itemEls.map((el) => el.getBoundingClientRect());
     const rowRect = rects[fromIndex];
 
+    // Resolve the modal's background color (open note color)
+    const modalEl = rowEl.closest(".glass-card");
+    const noteBg = modalEl ? getComputedStyle(modalEl).backgroundColor : "";
+
     // Create floating clone
     const clone = rowEl.cloneNode(true);
     clone.style.position = "fixed";
     clone.style.left = `${rowRect.left}px`;
     clone.style.top = `${rowRect.top}px`;
-    clone.style.width = `${rowRect.width}px`;
-    clone.style.height = `${rowRect.height}px`;
+    clone.style.width = "fit-content";
+    clone.style.maxWidth = `${rowRect.width}px`;
     clone.style.zIndex = "9999";
     clone.style.pointerEvents = "none";
     clone.style.transition = "box-shadow 0.2s, transform 0.2s";
     clone.style.boxShadow = "0 8px 24px rgba(0,0,0,0.18)";
     clone.style.transform = "scale(1.03)";
     clone.style.borderRadius = "8px";
-    clone.style.background = "var(--bg-card, #fff)";
+    clone.style.background = noteBg || "var(--bg-card, #fff)";
+    clone.style.padding = "4px 12px 4px 4px";
     clone.style.opacity = "1";
     clone.className = rowEl.className + " checklist-drag-clone";
     document.body.appendChild(clone);
