@@ -285,9 +285,13 @@ export default function NotesHeader({
           </div>
 
           {/* Mobile: sync icon + 3-dot menu */}
-          <div className="sm:hidden flex flex-col items-end gap-0">
-            <div className="flex items-center gap-1">
-            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
+          <div className="sm:hidden flex items-center gap-1">
+            <div className="flex flex-col items-center gap-0.5">
+              <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
+              {!isOnline && (
+                <span className="text-[9px] leading-none px-1.5 py-0.5 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20 whitespace-nowrap">{t("offline")}</span>
+              )}
+            </div>
             <button
               ref={headerBtnRef}
               onClick={() => setHeaderMenuOpen((v) => !v)}
@@ -298,11 +302,6 @@ export default function NotesHeader({
             >
               <Kebab />
             </button>
-
-            </div>
-            {!isOnline && (
-              <span className="text-[10px] px-1.5 py-0 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20 mr-1">{t("offline")}</span>
-            )}
 
             {headerMenuOpen && (
               <>
