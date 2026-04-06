@@ -15,6 +15,7 @@ export default function ChecklistRow({
 }) {
   const isMobile = typeof window !== "undefined" && window.innerWidth < 700;
   const [editing, setEditing] = React.useState(false);
+  const clickOffsetRef = React.useRef(null);
 
   const boxSize =
     size === "lg"
@@ -50,7 +51,14 @@ export default function ChecklistRow({
       {readOnly || (!editing && !readOnly) ? (
         <span
           className={`flex-1 text-sm break-words min-w-0 ${!readOnly ? "cursor-pointer" : ""} ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
-          onClick={!readOnly ? (e) => { e.stopPropagation(); setEditing(true); } : undefined}
+          onClick={!readOnly ? (e) => {
+            e.stopPropagation();
+            let offset = item.text.length;
+            const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+            if (range) offset = range.startOffset;
+            clickOffsetRef.current = offset;
+            setEditing(true);
+          } : undefined}
         >
           {isMobile && !preview ? linkifyPhoneNumbers(item.text) : item.text}
         </span>
@@ -67,11 +75,12 @@ export default function ChecklistRow({
           onBlur={() => setEditing(false)}
           ref={(el) => {
             if (el) {
-              el.focus();
-              const len = el.value.length;
-              el.setSelectionRange(len, len);
               el.style.height = "auto";
               el.style.height = el.scrollHeight + "px";
+              el.focus();
+              const pos = clickOffsetRef.current ?? el.value.length;
+              el.setSelectionRange(pos, pos);
+              clickOffsetRef.current = null;
             }
           }}
           placeholder={t("listItem")}
