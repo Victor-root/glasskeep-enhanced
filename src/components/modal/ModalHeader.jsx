@@ -223,13 +223,7 @@ export default function ModalHeader({
           <textarea
             ref={mobileTitleRef}
             className="w-full mt-1 bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden"
-            style={{
-              fontSize: mTitle.length > 40 ? "0.85rem"
-                : mTitle.length > 28 ? "1rem"
-                : mTitle.length > 18 ? "1.15rem"
-                : "1.25rem",
-              lineHeight: 1.3,
-            }}
+            style={{ fontSize: "1.25rem", lineHeight: 1.3 }}
             rows={1}
             value={mTitle}
             onChange={(e) => setMTitle(e.target.value)}
