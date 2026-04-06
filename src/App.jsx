@@ -3172,11 +3172,14 @@ export default function App() {
     const leaseId = acquireLocalLease(nid);
     const nowIso = new Date().toISOString();
 
-    // Update React state FIRST (synchronous, before any await) for instant UI
+    // Update React state FIRST (synchronous, before any await) for instant UI.
+    // Mark the toggled note as _transitioning so NoteCard can hide it for one
+    // frame, preventing the Masonry flash where it briefly appears at the wrong
+    // column before the layout settles.
     setNotes((prev) => {
       const updated = prev.map((n) => {
         if (String(n.id) !== nid) return n;
-        if (toPinned) return { ...n, pinned: true };
+        if (toPinned) return { ...n, pinned: true, _transitioning: true };
         // When unpinning, give the note a position that places it where it
         // was relative to other "others" notes based on its updated_at.
         // Find the first "others" note whose updated_at is older, and use
@@ -3193,9 +3196,22 @@ export default function App() {
             break;
           }
         }
-        return { ...n, pinned: false, position: insertPos };
+        return { ...n, pinned: false, position: insertPos, _transitioning: true };
       });
       return sortNotesByRecency(updated);
+    });
+    // Clear _transitioning flag after two animation frames so Masonry has
+    // finished its layout pass and the note appears at the correct position.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setNotes((prev) =>
+          prev.map((n) =>
+            String(n.id) === nid && n._transitioning
+              ? { ...n, _transitioning: undefined }
+              : n,
+          ),
+        );
+      });
     });
 
     // Then persist to IndexedDB and server
