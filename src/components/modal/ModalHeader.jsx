@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect, useCallback } from "react";
 import { PinOutline, PinFilled, CloseIcon, DownloadIcon, FormatIcon, ArchiveIcon, Trash } from "../../icons/index.jsx";
 import FormatToolbar from "../common/FormatToolbar.jsx";
 import Popover from "../common/Popover.jsx";
@@ -54,10 +54,24 @@ export default function ModalHeader({
   modalScrollRef,
   savedModalScrollRatioRef,
 }) {
+  const mobileTitleRef = useRef(null);
   const isDesktop = windowWidth >= 768;
   const isPinned = !!notes.find((n) => String(n.id) === String(activeId))?.pinned;
   const showPinBtn = tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED";
   const isTrashed = tagFilter === "TRASHED";
+
+  /* ── auto-resize mobile title textarea on mount & content change ── */
+  const autoResizeTitle = useCallback((el) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktop && mobileTitleRef.current) {
+      autoResizeTitle(mobileTitleRef.current);
+    }
+  }, [mTitle, isDesktop, autoResizeTitle]);
 
   /* ── shared action handlers ────────────────────────────────── */
   const handleDownload = () => {
@@ -207,6 +221,7 @@ export default function ModalHeader({
           />
         ) : (
           <textarea
+            ref={mobileTitleRef}
             className="w-full mt-1 bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden"
             style={{
               fontSize: mTitle.length > 40 ? "0.85rem"
@@ -217,17 +232,7 @@ export default function ModalHeader({
             }}
             rows={1}
             value={mTitle}
-            onChange={(e) => {
-              setMTitle(e.target.value);
-              const el = e.target;
-              el.style.height = "auto";
-              el.style.height = el.scrollHeight + "px";
-            }}
-            onFocus={(e) => {
-              const el = e.target;
-              el.style.height = "auto";
-              el.style.height = el.scrollHeight + "px";
-            }}
+            onChange={(e) => setMTitle(e.target.value)}
             placeholder={t("noteTitle")}
           />
         )}
