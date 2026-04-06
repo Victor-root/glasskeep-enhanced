@@ -233,7 +233,7 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
         const savedScrollTop = modalScrollEl ? modalScrollEl.scrollTop : 0;
 
         const MIN = 160;
-        el.style.height = MIN + "px";
+        el.style.height = "0px";
         el.style.height = Math.max(el.scrollHeight, MIN) + "px";
 
         requestAnimationFrame(() => {
