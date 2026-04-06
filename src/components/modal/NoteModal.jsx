@@ -236,7 +236,7 @@ export default function NoteModal({
                     }}
                   />
                 ) : (
-                  <div className="relative min-h-[160px]">
+                  <div className="relative min-h-[160px] pb-6">
                     <textarea
                       ref={mBodyRef}
                       className="w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden min-h-[160px]"
