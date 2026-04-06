@@ -369,13 +369,9 @@ html:not(.dark) .code-block-wrapper .code-copy-btn {
   will-change: top;
 }
 
-/* Custom drag cursors – bold filled hands, white halo for contrast */
-.checklist-grab-handle {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='28' viewBox='0 0 24 28'%3E%3Cg fill='white'%3E%3Crect x='3.5' y='1' width='4.5' height='13' rx='2.25'/%3E%3Crect x='8.5' y='-0.5' width='4.5' height='15' rx='2.25'/%3E%3Crect x='13.5' y='1' width='4.5' height='13' rx='2.25'/%3E%3Crect x='17.5' y='3.5' width='4.5' height='10.5' rx='2.25'/%3E%3Crect x='2' y='10' width='20' height='14' rx='5'/%3E%3C/g%3E%3Cg fill='%23222'%3E%3Crect x='4.5' y='2' width='2.5' height='11' rx='1.25'/%3E%3Crect x='9.5' y='0.5' width='2.5' height='13' rx='1.25'/%3E%3Crect x='14.5' y='2' width='2.5' height='11' rx='1.25'/%3E%3Crect x='18.5' y='4.5' width='2.5' height='8.5' rx='1.25'/%3E%3Crect x='3' y='11' width='18' height='12' rx='4'/%3E%3C/g%3E%3C/svg%3E") 12 6, grab;
-}
-.checklist-grab-handle:active, .checklist-grab-handle.grabbing {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='white'%3E%3Crect x='3.5' y='2' width='4.5' height='9' rx='2.25'/%3E%3Crect x='8.5' y='1' width='4.5' height='10' rx='2.25'/%3E%3Crect x='13.5' y='2' width='4.5' height='9' rx='2.25'/%3E%3Crect x='17.5' y='3' width='4.5' height='8' rx='2.25'/%3E%3Crect x='2' y='7.5' width='20' height='13' rx='5'/%3E%3C/g%3E%3Cg fill='%23111'%3E%3Crect x='4.5' y='3' width='2.5' height='7' rx='1.25'/%3E%3Crect x='9.5' y='2' width='2.5' height='8' rx='1.25'/%3E%3Crect x='14.5' y='3' width='2.5' height='7' rx='1.25'/%3E%3Crect x='18.5' y='4' width='2.5' height='6' rx='1.25'/%3E%3Crect x='3' y='8.5' width='18' height='11' rx='4'/%3E%3C/g%3E%3C/svg%3E") 12 10, grabbing;
-}
+/* Drag handle cursor – native OS move cursor */
+.checklist-grab-handle { cursor: move; }
+.checklist-grab-handle:active { cursor: move; }
 .masonry-grid { display: flex; margin-left: -0.75rem; width: auto; }
 .masonry-grid-column { padding-left: 0.75rem; background-clip: padding-box; }
 .masonry-grid-column > div { margin-bottom: 0.75rem; }
