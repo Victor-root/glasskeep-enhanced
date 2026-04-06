@@ -369,12 +369,12 @@ html:not(.dark) .code-block-wrapper .code-copy-btn {
   will-change: top;
 }
 
-/* Custom modern drag cursors (override OS defaults) */
+/* Custom drag cursors – Scheme-inspired (bold filled arrows) */
 .checklist-grab-handle {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 11V6a2 2 0 0 0-4 0v1'/%3E%3Cpath d='M14 10V4a2 2 0 0 0-4 0v2'/%3E%3Cpath d='M10 10.5V6a2 2 0 0 0-4 0v8'/%3E%3Cpath d='M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15'/%3E%3C/svg%3E") 12 2, grab;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='28' viewBox='0 0 20 28'%3E%3Cpath d='M10 1 L4 8 L8 8 L8 12 L12 12 L12 8 L16 8 Z' fill='%23222'/%3E%3Cpath d='M10 27 L16 20 L12 20 L12 16 L8 16 L8 20 L4 20 Z' fill='%23222'/%3E%3C/svg%3E") 10 14, grab;
 }
 .checklist-grab-handle:active, .checklist-grab-handle.grabbing {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 11.5V9a2 2 0 0 0-4 0v1.4'/%3E%3Cpath d='M14 10V8a2 2 0 0 0-4 0v2'/%3E%3Cpath d='M10 9.9V9a2 2 0 0 0-4 0v5'/%3E%3Cpath d='M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15'/%3E%3C/svg%3E") 12 12, grabbing;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='28' viewBox='0 0 20 28'%3E%3Cpath d='M10 0 L3 8 L7.5 8 L7.5 12.5 L12.5 12.5 L12.5 8 L17 8 Z' fill='%23000'/%3E%3Cpath d='M10 28 L17 20 L12.5 20 L12.5 15.5 L7.5 15.5 L7.5 20 L3 20 Z' fill='%23000'/%3E%3C/svg%3E") 10 14, grabbing;
 }
 .masonry-grid { display: flex; margin-left: -0.75rem; width: auto; }
 .masonry-grid-column { padding-left: 0.75rem; background-clip: padding-box; }
