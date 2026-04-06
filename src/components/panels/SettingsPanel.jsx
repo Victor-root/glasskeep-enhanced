@@ -355,18 +355,28 @@ export default function SettingsPanel({
                   <div className="font-medium">{t("checklistInsertPosition")}</div>
                   <div className="text-sm text-gray-500">{t("checklistInsertPositionDesc")}</div>
                 </div>
-                <button
-                  className="ml-3 flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
-                  onClick={() =>
-                    setChecklistInsertPosition((prev) =>
-                      prev === "top" ? "bottom" : "top"
-                    )
-                  }
-                >
-                  {checklistInsertPosition === "top"
-                    ? t("checklistInsertTop")
-                    : t("checklistInsertBottom")}
-                </button>
+                <div className="ml-3 flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+                  <button
+                    className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
+                      checklistInsertPosition === "top"
+                        ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-300/40 dark:shadow-none"
+                        : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                    onClick={() => setChecklistInsertPosition("top")}
+                  >
+                    {t("checklistInsertTop")}
+                  </button>
+                  <button
+                    className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
+                      checklistInsertPosition === "bottom"
+                        ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-300/40 dark:shadow-none"
+                        : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                    onClick={() => setChecklistInsertPosition("bottom")}
+                  >
+                    {t("checklistInsertBottom")}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
