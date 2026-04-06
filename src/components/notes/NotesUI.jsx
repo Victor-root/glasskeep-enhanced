@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
 import { ALL_IMAGES } from "../../utils/constants.js";
-import { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon } from "../panels/TagSidebar.jsx";
+import { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon } from "../../icons/sidebarIcons.jsx";
 import MultiSelectToolbar from "./MultiSelectToolbar.jsx";
 import NotesHeader from "./NotesHeader.jsx";
 import NotesComposer from "./NotesComposer.jsx";
