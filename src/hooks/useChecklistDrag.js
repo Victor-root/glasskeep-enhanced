@@ -16,11 +16,60 @@ export default function useChecklistDrag(mItems, setMItems, syncChecklistItems) 
   useEffect(() => {
     return () => {
       if (dragState.current?.clone) {
+        if (dragState.current.autoScrollRaf) cancelAnimationFrame(dragState.current.autoScrollRaf);
         dragState.current.clone.remove();
         dragState.current = null;
       }
     };
   }, []);
+
+  /** Recalculate which index the dragged item hovers over and shift siblings */
+  const updateDragPosition = (ds) => {
+    if (!ds) return;
+
+    const scrollDelta = ds.scrollEl ? (ds.scrollEl.scrollTop - ds.startScrollTop) : 0;
+
+    // Clone center in viewport coordinates
+    const cloneTopViewport = ds.rects[ds.fromIndex].top + (ds.lastY - ds.startY);
+    const draggedCenterY = cloneTopViewport + ds.rects[ds.fromIndex].height / 2;
+
+    // Items' current viewport positions = original rect - scrollDelta
+    let newIndex = ds.fromIndex;
+    for (let i = 0; i < ds.rects.length; i++) {
+      const rect = ds.rects[i];
+      const midY = rect.top - scrollDelta + rect.height / 2;
+      if (draggedCenterY > midY) {
+        newIndex = i;
+      }
+    }
+    newIndex = Math.max(0, Math.min(ds.itemEls.length - 1, newIndex));
+    ds.currentIndex = newIndex;
+
+    // Shift other items to make room
+    const draggedHeight = ds.rects[ds.fromIndex].height;
+    let gap = 0;
+    if (ds.rects.length >= 2) {
+      gap = ds.rects[1].top - ds.rects[0].bottom;
+      if (gap < 0) gap = 0;
+    }
+    const shift = draggedHeight + gap;
+
+    ds.itemEls.forEach((el, i) => {
+      if (i === ds.fromIndex) return;
+
+      let offset = 0;
+      if (ds.fromIndex < ds.currentIndex) {
+        if (i > ds.fromIndex && i <= ds.currentIndex) {
+          offset = -shift;
+        }
+      } else if (ds.fromIndex > ds.currentIndex) {
+        if (i >= ds.currentIndex && i < ds.fromIndex) {
+          offset = shift;
+        }
+      }
+      el.style.transform = offset ? `translateY(${offset}px)` : "";
+    });
+  };
 
   const handlePointerDown = useCallback((itemId, e) => {
     // Only primary button (mouse) or touch
@@ -123,6 +172,8 @@ export default function useChecklistDrag(mItems, setMItems, syncChecklistItems) 
 
       if (speed !== 0) {
         ds.scrollEl.scrollTop += speed;
+        // Recalculate positions after scroll (cursor didn't move but items did)
+        updateDragPosition(ds);
       }
 
       ds.autoScrollRaf = requestAnimationFrame(autoScroll);
@@ -136,59 +187,10 @@ export default function useChecklistDrag(mItems, setMItems, syncChecklistItems) 
 
     ds.lastY = e.clientY;
 
-    // Account for scroll that happened since drag started
-    const scrollDelta = ds.scrollEl ? (ds.scrollEl.scrollTop - ds.startScrollTop) : 0;
-    const deltaY = e.clientY - ds.startY + scrollDelta;
-
-    // Move clone (clone is position:fixed so no scroll offset needed)
+    // Move clone (position:fixed, viewport coords)
     ds.clone.style.top = `${ds.rects[ds.fromIndex].top + (e.clientY - ds.startY)}px`;
 
-    // Determine which index the dragged item is hovering over
-    // Rects were captured at start, so add scrollDelta to compare correctly
-    const draggedCenterY = ds.rects[ds.fromIndex].top + deltaY + ds.rects[ds.fromIndex].height / 2;
-
-    let newIndex = ds.fromIndex;
-    for (let i = 0; i < ds.rects.length; i++) {
-      const rect = ds.rects[i];
-      const midY = rect.top + rect.height / 2 + scrollDelta;
-      if (draggedCenterY > midY) {
-        newIndex = i;
-      }
-    }
-    // Clamp
-    newIndex = Math.max(0, Math.min(ds.itemEls.length - 1, newIndex));
-
-    if (newIndex !== ds.currentIndex) {
-      ds.currentIndex = newIndex;
-    }
-
-    // Shift other items to make room
-    const draggedHeight = ds.rects[ds.fromIndex].height;
-    // Detect gap from actual spacing between consecutive items
-    let gap = 0;
-    if (ds.rects.length >= 2) {
-      gap = ds.rects[1].top - ds.rects[0].bottom;
-      if (gap < 0) gap = 0;
-    }
-    const shift = draggedHeight + gap;
-
-    ds.itemEls.forEach((el, i) => {
-      if (i === ds.fromIndex) return; // the original (hidden)
-
-      let offset = 0;
-      if (ds.fromIndex < ds.currentIndex) {
-        // Dragged downward: items between fromIndex+1..currentIndex shift up
-        if (i > ds.fromIndex && i <= ds.currentIndex) {
-          offset = -shift;
-        }
-      } else if (ds.fromIndex > ds.currentIndex) {
-        // Dragged upward: items between currentIndex..fromIndex-1 shift down
-        if (i >= ds.currentIndex && i < ds.fromIndex) {
-          offset = shift;
-        }
-      }
-      el.style.transform = offset ? `translateY(${offset}px)` : "";
-    });
+    updateDragPosition(ds);
   }, []);
 
   const handlePointerUp = useCallback((e) => {
@@ -201,7 +203,8 @@ export default function useChecklistDrag(mItems, setMItems, syncChecklistItems) 
     // Release capture
     try { ds.handle.releasePointerCapture(ds.pointerId); } catch (_) {}
 
-    // Animate clone to final position (account for scroll delta)
+    // Animate clone to final position
+    // Target item's current viewport position = original rect - scrollDelta
     const scrollDelta = ds.scrollEl ? (ds.scrollEl.scrollTop - ds.startScrollTop) : 0;
     const targetRect = ds.rects[ds.currentIndex];
     ds.clone.style.transition = "top 0.2s cubic-bezier(.2,0,0,1), box-shadow 0.2s, transform 0.2s";
