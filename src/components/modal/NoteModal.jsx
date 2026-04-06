@@ -385,6 +385,23 @@ export default function NoteModal({
                           </div>
                         ))}
 
+                      {/* Add new item row — bottom position (before Done section) */}
+                      {checklistInsertPosition === "bottom" && (
+                        <div
+                          className="flex items-center gap-2 cursor-pointer p-2 border-b border-[var(--border-light)] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                          onClick={() => {
+                            const newItem = { id: uid(), text: "", done: false };
+                            const newItems = [...mItems, newItem];
+                            setMItems(newItems);
+                            setAutoEditId(newItem.id);
+                            syncChecklistItems(newItems);
+                          }}
+                        >
+                          <span className="text-lg leading-none">+</span>
+                          <span className="text-sm">{t("listItemEllipsis")}</span>
+                        </div>
+                      )}
+
                       {/* Done section */}
                       {mItems.filter((it) => it.done).length > 0 && (
                         <>
@@ -445,22 +462,6 @@ export default function NoteModal({
                     <p className="text-sm text-gray-500">{t("noItemsYet")}</p>
                   )}
 
-                  {/* Add new item row — bottom position */}
-                  {checklistInsertPosition === "bottom" && (
-                    <div
-                      className="flex items-center gap-2 cursor-pointer p-2 border-t border-[var(--border-light)] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                      onClick={() => {
-                        const newItem = { id: uid(), text: "", done: false };
-                        const newItems = [...mItems, newItem];
-                        setMItems(newItems);
-                        setAutoEditId(newItem.id);
-                        syncChecklistItems(newItems);
-                      }}
-                    >
-                      <span className="text-lg leading-none">+</span>
-                      <span className="text-sm">{t("listItemEllipsis")}</span>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <DrawingCanvas
