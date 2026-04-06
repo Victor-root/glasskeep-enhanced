@@ -3204,6 +3204,18 @@ export default function App() {
         } else {
           insertPos = Date.now(); // no others have positions
         }
+        console.log("[togglePin] UNPIN debug:", {
+          noteId: nid,
+          noteTime: new Date(noteTime).toISOString(),
+          noteOriginalPosition: n.position,
+          othersCount: others.length,
+          insertIdx,
+          aboveNote: above ? { id: above.id, pos: above.position, title: (above.title||"").slice(0,20) } : null,
+          belowNote: below ? { id: below.id, pos: below.position, title: (below.title||"").slice(0,20) } : null,
+          abovePos, belowPos,
+          computedInsertPos: insertPos,
+          allOthersPositions: others.map(o => ({ id: o.id, pos: o.position, title: (o.title||"").slice(0,20) })),
+        });
         return { ...n, pinned: false, position: insertPos };
       });
       return sortNotesByRecency(updated);
