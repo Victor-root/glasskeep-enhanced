@@ -65,9 +65,11 @@ export default function ChecklistRow({
             e.target.style.height = e.target.scrollHeight + "px";
           }}
           onBlur={() => setEditing(false)}
-          autoFocus
           ref={(el) => {
             if (el) {
+              el.focus();
+              const len = el.value.length;
+              el.setSelectionRange(len, len);
               el.style.height = "auto";
               el.style.height = el.scrollHeight + "px";
             }
