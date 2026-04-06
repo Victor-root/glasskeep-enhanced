@@ -41,6 +41,11 @@ html.dark body {
   content-visibility: auto;
   contain-intrinsic-size: auto 200px;
   contain: layout style paint;
+  animation: noteAppear 0.15s ease-out;
+}
+@keyframes noteAppear {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 header.glass-card {
   background: linear-gradient(
