@@ -88,11 +88,11 @@ export default function NoteCard({
           openModal(n.id);
         }
       }}
-      className={`note-card glass-card rounded-xl p-2 sm:p-3 mb-2 sm:mb-3 cursor-pointer transform hover:scale-[1.02] transition-all duration-200 relative min-h-[54px] overflow-hidden group ${
+      className={`note-card glass-card rounded-xl p-2 sm:p-3 mb-2 sm:mb-3 cursor-pointer transform hover:scale-[1.02] transition-transform duration-200 relative min-h-[54px] overflow-hidden group ${
         multiMode && selected
           ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent"
           : ""
-      } ${n._transitioning ? "opacity-0" : ""}`}
+      }`}
       style={{
         backgroundColor: bgFor(n.color, dark),
         '--note-color': (!dark && (!n.color || n.color === 'default')) ? '#a78bfa' : solid(bgFor(n.color, dark)),

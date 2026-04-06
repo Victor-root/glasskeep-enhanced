@@ -3173,13 +3173,10 @@ export default function App() {
     const nowIso = new Date().toISOString();
 
     // Update React state FIRST (synchronous, before any await) for instant UI.
-    // Mark the toggled note as _transitioning so NoteCard can hide it for one
-    // frame, preventing the Masonry flash where it briefly appears at the wrong
-    // column before the layout settles.
     setNotes((prev) => {
       const updated = prev.map((n) => {
         if (String(n.id) !== nid) return n;
-        if (toPinned) return { ...n, pinned: true, _transitioning: true };
+        if (toPinned) return { ...n, pinned: true };
         // When unpinning, give the note a position that places it where it
         // was relative to other "others" notes based on its updated_at.
         // Find the first "others" note whose updated_at is older, and use
@@ -3196,22 +3193,9 @@ export default function App() {
             break;
           }
         }
-        return { ...n, pinned: false, position: insertPos, _transitioning: true };
+        return { ...n, pinned: false, position: insertPos };
       });
       return sortNotesByRecency(updated);
-    });
-    // Clear _transitioning flag after two animation frames so Masonry has
-    // finished its layout pass and the note appears at the correct position.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setNotes((prev) =>
-          prev.map((n) =>
-            String(n.id) === nid && n._transitioning
-              ? { ...n, _transitioning: undefined }
-              : n,
-          ),
-        );
-      });
     });
 
     // Then persist to IndexedDB and server
@@ -3220,7 +3204,21 @@ export default function App() {
       if (existing) await idbPutNote({ ...existing, pinned: !!toPinned, client_updated_at: nowIso }, currentUser?.id, sessionId);
     } catch (e) { console.error(e); }
     invalidateNotesCache();
-    await enqueueWithLease(nid, { type: "patch", noteId: nid, payload: { pinned: !!toPinned, client_updated_at: nowIso } }, leaseId);
+    // Don't use enqueueWithLease here — it releases the lease immediately after
+    // the server responds, but the server also sends an SSE note_updated event
+    // that triggers patchSingleNote after a 300ms debounce. If the lease is
+    // already released by then, patchSingleNote fetches the server note (which
+    // may have a different position) and overwrites the optimistic state, causing
+    // a visual flash in Masonry. Instead, release the lease with a delay that
+    // covers the SSE debounce window.
+    try {
+      await enqueueAndSync({ type: "patch", noteId: nid, payload: { pinned: !!toPinned, client_updated_at: nowIso } });
+    } catch (e) {
+      // On failure, lease stays active — SSE protection maintained
+      return;
+    }
+    // Delay lease release past the SSE debounce (300ms) + patchSingleNote fetch time
+    setTimeout(() => releaseLocalLeaseWithPrune(nid, leaseId), 1000);
   };
 
   /** -------- Reset note order -------- */
