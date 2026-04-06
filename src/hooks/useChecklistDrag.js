@@ -74,6 +74,8 @@ export default function useChecklistDrag(mItems, setMItems, syncChecklistItems) 
   const handlePointerDown = useCallback((itemId, e) => {
     // Only primary button (mouse) or touch
     if (e.button && e.button !== 0) return;
+    // Prevent native drag (forbidden cursor) on subsequent drags
+    e.preventDefault();
 
     const handle = e.currentTarget;
     const rowEl = handle.closest("[data-checklist-item]");
