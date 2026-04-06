@@ -74,9 +74,9 @@ export default function NotesHeader({
           />
 
           {/* Mobile: stacked name + badge */}
-          <div className="flex flex-col sm:hidden leading-tight">
-            <h1 className="text-lg font-bold">Glass Keep</h1>
-            <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1 max-w-[160px]">
+          <div className="flex flex-col sm:hidden leading-tight min-w-0 max-w-[150px]">
+            <h1 className="text-lg font-bold truncate">Glass Keep</h1>
+            <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1 min-w-0">
               <span className="shrink-0 w-3 h-3 [&>svg]:w-3 [&>svg]:h-3"><SectionIcon /></span>
               <span className="truncate">{sectionLabel}</span>
             </span>
