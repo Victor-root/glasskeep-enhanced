@@ -3177,46 +3177,10 @@ export default function App() {
       const updated = prev.map((n) => {
         if (String(n.id) !== nid) return n;
         if (toPinned) return { ...n, pinned: true };
-        // When unpinning, compute a position that places the note where it
-        // belongs chronologically among the "others" notes. prev is already
-        // sorted (pinned first, then others by position), so filtering gives
-        // us others in display order.
-        const others = prev.filter((o) => !o.pinned && String(o.id) !== nid);
-        const noteTime = new Date(n.updated_at || n.timestamp || 0).getTime();
-        // Find insertion index: where this note belongs by updated_at
-        let insertIdx = others.length; // default: end (oldest)
-        for (let i = 0; i < others.length; i++) {
-          const oTime = new Date(others[i].updated_at || others[i].timestamp || 0).getTime();
-          if (noteTime >= oTime) { insertIdx = i; break; }
-        }
-        // Interpolate a position value between the two neighbours
-        const above = insertIdx > 0 ? others[insertIdx - 1] : null;
-        const below = insertIdx < others.length ? others[insertIdx] : null;
-        const abovePos = above && Number.isFinite(+above.position) ? +above.position : null;
-        const belowPos = below && Number.isFinite(+below.position) ? +below.position : null;
-        let insertPos;
-        if (abovePos != null && belowPos != null) {
-          insertPos = (abovePos + belowPos) / 2;
-        } else if (belowPos != null) {
-          insertPos = belowPos + 1; // before all others (newest)
-        } else if (abovePos != null) {
-          insertPos = abovePos - 1; // after all others (oldest)
-        } else {
-          insertPos = Date.now(); // no others have positions
-        }
-        console.log("[togglePin] UNPIN debug:", {
-          noteId: nid,
-          noteTime: new Date(noteTime).toISOString(),
-          noteOriginalPosition: n.position,
-          othersCount: others.length,
-          insertIdx,
-          aboveNote: above ? { id: above.id, pos: above.position, title: (above.title||"").slice(0,20) } : null,
-          belowNote: below ? { id: below.id, pos: below.position, title: (below.title||"").slice(0,20) } : null,
-          abovePos, belowPos,
-          computedInsertPos: insertPos,
-          allOthersPositions: others.map(o => ({ id: o.id, pos: o.position, title: (o.title||"").slice(0,20) })),
-        });
-        return { ...n, pinned: false, position: insertPos };
+        // When unpinning, just keep the note's existing position — it was
+        // assigned when the note was originally in the "others" section and
+        // is still valid. No need to recompute.
+        return { ...n, pinned: false };
       });
       return sortNotesByRecency(updated);
     });
