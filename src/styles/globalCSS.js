@@ -16,6 +16,7 @@ html.dark {
   --text-light: var(--text-dark);
   --border-light: var(--border-dark);
 }
+button, [role="button"] { cursor: pointer; }
 body {
   background: linear-gradient(135deg, #f0e8ff 0%, #e8f4fd 50%, #fde8f0 100%);
   background-attachment: fixed;
