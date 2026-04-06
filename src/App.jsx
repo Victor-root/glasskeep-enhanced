@@ -3177,21 +3177,32 @@ export default function App() {
       const updated = prev.map((n) => {
         if (String(n.id) !== nid) return n;
         if (toPinned) return { ...n, pinned: true };
-        // When unpinning, give the note a position that places it where it
-        // was relative to other "others" notes based on its updated_at.
-        // Find the first "others" note whose updated_at is older, and use
-        // a position just above it so the sort is consistent.
+        // When unpinning, compute a position that places the note where it
+        // belongs chronologically among the "others" notes. prev is already
+        // sorted (pinned first, then others by position), so filtering gives
+        // us others in display order.
         const others = prev.filter((o) => !o.pinned && String(o.id) !== nid);
         const noteTime = new Date(n.updated_at || n.timestamp || 0).getTime();
-        // Find where the note belongs by date among others
-        let insertPos = null;
-        for (const o of others) {
-          const oTime = new Date(o.updated_at || o.timestamp || 0).getTime();
-          const oPos = Number.isFinite(+o.position) ? +o.position : null;
-          if (noteTime >= oTime && oPos != null) {
-            insertPos = oPos + 1;
-            break;
-          }
+        // Find insertion index: where this note belongs by updated_at
+        let insertIdx = others.length; // default: end (oldest)
+        for (let i = 0; i < others.length; i++) {
+          const oTime = new Date(others[i].updated_at || others[i].timestamp || 0).getTime();
+          if (noteTime >= oTime) { insertIdx = i; break; }
+        }
+        // Interpolate a position value between the two neighbours
+        const above = insertIdx > 0 ? others[insertIdx - 1] : null;
+        const below = insertIdx < others.length ? others[insertIdx] : null;
+        const abovePos = above && Number.isFinite(+above.position) ? +above.position : null;
+        const belowPos = below && Number.isFinite(+below.position) ? +below.position : null;
+        let insertPos;
+        if (abovePos != null && belowPos != null) {
+          insertPos = (abovePos + belowPos) / 2;
+        } else if (belowPos != null) {
+          insertPos = belowPos + 1; // before all others (newest)
+        } else if (abovePos != null) {
+          insertPos = abovePos - 1; // after all others (oldest)
+        } else {
+          insertPos = Date.now(); // no others have positions
         }
         return { ...n, pinned: false, position: insertPos };
       });
