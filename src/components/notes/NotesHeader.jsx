@@ -51,7 +51,7 @@ export default function NotesHeader({
           transition: "transform 0.3s ease",
         }}
       >
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 min-w-0 sm:shrink-0">
           {/* Hamburger - show when sidebar is not permanently visible */}
           {!sidebarPermanent && (
             <button
