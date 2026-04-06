@@ -81,7 +81,7 @@ export default function NotesHeader({
               <span className="truncate">{sectionLabel}</span>
             </span>
             {!isOnline && (
-              <span className="absolute -bottom-4 left-0 text-[11px] leading-none px-2 py-0.5 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20 font-medium whitespace-nowrap">{t("offline")}</span>
+              <span className="absolute -bottom-5 left-0 text-[11px] leading-none px-2 py-0.5 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20 font-medium whitespace-nowrap">{t("offline")}</span>
             )}
           </div>
 
