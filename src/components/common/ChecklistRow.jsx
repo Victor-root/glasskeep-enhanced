@@ -55,12 +55,23 @@ export default function ChecklistRow({
           {isMobile && !preview ? linkifyPhoneNumbers(item.text) : item.text}
         </span>
       ) : (
-        <input
-          className={`flex-1 bg-transparent text-sm focus:outline-none border-b border-transparent focus:border-[var(--border-light)] pb-0.5 ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
+        <textarea
+          rows={1}
+          className={`flex-1 bg-transparent text-sm focus:outline-none border-b border-transparent focus:border-[var(--border-light)] pb-0.5 resize-none overflow-hidden ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
           value={item.text}
-          onChange={(e) => onChange?.(e.target.value)}
+          onChange={(e) => {
+            onChange?.(e.target.value);
+            e.target.style.height = "auto";
+            e.target.style.height = e.target.scrollHeight + "px";
+          }}
           onBlur={() => setEditing(false)}
           autoFocus
+          ref={(el) => {
+            if (el) {
+              el.style.height = "auto";
+              el.style.height = el.scrollHeight + "px";
+            }
+          }}
           placeholder={t("listItem")}
         />
       )}
