@@ -33,6 +33,9 @@ export default function useChecklistDrag(mItems, setMItems, syncChecklistItems) 
     const containerEl = rowEl.parentElement;
     if (!containerEl) return;
 
+    // Find the scrollable modal container
+    const scrollEl = rowEl.closest("[data-modal-scroll]") || rowEl.closest(".overflow-y-auto") || rowEl.closest(".glass-card");
+
     // Gather all unchecked item elements
     const itemEls = Array.from(containerEl.querySelectorAll("[data-checklist-item]"));
     const fromIndex = itemEls.indexOf(rowEl);
@@ -41,6 +44,9 @@ export default function useChecklistDrag(mItems, setMItems, syncChecklistItems) 
     // Capture bounding rects before any transforms
     const rects = itemEls.map((el) => el.getBoundingClientRect());
     const rowRect = rects[fromIndex];
+
+    // Capture initial scroll position
+    const startScrollTop = scrollEl ? scrollEl.scrollTop : 0;
 
     // Resolve the modal's background color (open note color)
     const modalEl = rowEl.closest(".glass-card");
@@ -95,26 +101,56 @@ export default function useChecklistDrag(mItems, setMItems, syncChecklistItems) 
       rowEl,
       pointerId: e.pointerId,
       handle,
+      scrollEl,
+      startScrollTop,
+      autoScrollRaf: null,
     };
+
+    // Start auto-scroll loop
+    const autoScroll = () => {
+      const ds = dragState.current;
+      if (!ds || !ds.scrollEl) return;
+      const scrollRect = ds.scrollEl.getBoundingClientRect();
+      const edgeZone = 60;
+      const cursorY = ds.lastY;
+
+      let speed = 0;
+      if (cursorY > scrollRect.bottom - edgeZone) {
+        speed = Math.min(12, ((cursorY - (scrollRect.bottom - edgeZone)) / edgeZone) * 12);
+      } else if (cursorY < scrollRect.top + edgeZone) {
+        speed = -Math.min(12, (((scrollRect.top + edgeZone) - cursorY) / edgeZone) * 12);
+      }
+
+      if (speed !== 0) {
+        ds.scrollEl.scrollTop += speed;
+      }
+
+      ds.autoScrollRaf = requestAnimationFrame(autoScroll);
+    };
+    dragState.current.autoScrollRaf = requestAnimationFrame(autoScroll);
   }, []);
 
   const handlePointerMove = useCallback((e) => {
     const ds = dragState.current;
     if (!ds) return;
 
-    const deltaY = e.clientY - ds.startY;
-
-    // Move clone
-    ds.clone.style.top = `${ds.rects[ds.fromIndex].top + deltaY}px`;
     ds.lastY = e.clientY;
 
+    // Account for scroll that happened since drag started
+    const scrollDelta = ds.scrollEl ? (ds.scrollEl.scrollTop - ds.startScrollTop) : 0;
+    const deltaY = e.clientY - ds.startY + scrollDelta;
+
+    // Move clone (clone is position:fixed so no scroll offset needed)
+    ds.clone.style.top = `${ds.rects[ds.fromIndex].top + (e.clientY - ds.startY)}px`;
+
     // Determine which index the dragged item is hovering over
+    // Rects were captured at start, so add scrollDelta to compare correctly
     const draggedCenterY = ds.rects[ds.fromIndex].top + deltaY + ds.rects[ds.fromIndex].height / 2;
 
     let newIndex = ds.fromIndex;
     for (let i = 0; i < ds.rects.length; i++) {
       const rect = ds.rects[i];
-      const midY = rect.top + rect.height / 2;
+      const midY = rect.top + rect.height / 2 + scrollDelta;
       if (draggedCenterY > midY) {
         newIndex = i;
       }
@@ -159,13 +195,17 @@ export default function useChecklistDrag(mItems, setMItems, syncChecklistItems) 
     const ds = dragState.current;
     if (!ds) return;
 
+    // Stop auto-scroll
+    if (ds.autoScrollRaf) cancelAnimationFrame(ds.autoScrollRaf);
+
     // Release capture
     try { ds.handle.releasePointerCapture(ds.pointerId); } catch (_) {}
 
-    // Animate clone to final position
+    // Animate clone to final position (account for scroll delta)
+    const scrollDelta = ds.scrollEl ? (ds.scrollEl.scrollTop - ds.startScrollTop) : 0;
     const targetRect = ds.rects[ds.currentIndex];
     ds.clone.style.transition = "top 0.2s cubic-bezier(.2,0,0,1), box-shadow 0.2s, transform 0.2s";
-    ds.clone.style.top = `${targetRect.top}px`;
+    ds.clone.style.top = `${targetRect.top - scrollDelta}px`;
     ds.clone.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
     ds.clone.style.transform = "scale(1)";
 
@@ -207,6 +247,7 @@ export default function useChecklistDrag(mItems, setMItems, syncChecklistItems) 
     const ds = dragState.current;
     if (!ds) return;
 
+    if (ds.autoScrollRaf) cancelAnimationFrame(ds.autoScrollRaf);
     ds.clone.remove();
     ds.rowEl.style.opacity = "";
     ds.rowEl.style.transition = "";

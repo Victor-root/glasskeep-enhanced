@@ -162,6 +162,7 @@ export default function NoteModal({
           {/* Scroll container */}
           <div
             ref={modalScrollRef}
+            data-modal-scroll
             className="relative flex-1 min-h-0 overflow-y-auto overflow-x-auto mobile-hide-scrollbar modal-scroll-themed"
             style={(() => {
               const sc = scrollColorsFor(mColor, dark);
