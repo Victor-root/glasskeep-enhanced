@@ -3736,7 +3736,13 @@ export default function App() {
       {/* Tag Sidebar / Drawer */}
       <TagSidebar
         open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        onClose={() => {
+          if (alwaysShowSidebarOnWide && windowWidth >= 700) {
+            setDesktopSidebarHidden(true);
+          } else {
+            setSidebarOpen(false);
+          }
+        }}
         tagsWithCounts={tagsWithCounts}
         activeTag={tagFilter}
         activeTagFilters={activeTagFilters}

@@ -71,15 +71,13 @@ export default function TagSidebar({
       >
         <div className="p-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold">{t("tags")}</h3>
-          {!permanent && (
-            <button
-              className="p-2 rounded hover:bg-black/5 dark:hover:bg-white/10"
-              onClick={onClose}
-              data-tooltip={t("close")}
-            >
-              <CloseIcon />
-            </button>
-          )}
+          <button
+            className="p-2 rounded hover:bg-black/5 dark:hover:bg-white/10"
+            onClick={onClose}
+            data-tooltip={t("close")}
+          >
+            <CloseIcon />
+          </button>
         </div>
         <nav className="p-2 overflow-y-auto h-[calc(100%-56px)]">
           {/* Notes (All) */}
