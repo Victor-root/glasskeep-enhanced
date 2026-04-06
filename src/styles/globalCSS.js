@@ -253,6 +253,29 @@ html.dark .modal-icon-btn--mode {
 }
 
 
+/* ── Save checkmark states ──────────────────────────────────────────── */
+.modal-icon-btn--save-active {
+  color: #fff !important;
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%) !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35) !important;
+}
+.modal-icon-btn--save-active:hover {
+  background: linear-gradient(90deg, #059669 0%, #047857 100%) !important;
+  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.45) !important;
+}
+html.dark .modal-icon-btn--save-active {
+  color: #fff !important;
+}
+.modal-icon-btn--save-idle {
+  color: rgba(16, 185, 129, 0.25) !important;
+  border: 1.5px solid rgba(16, 185, 129, 0.15) !important;
+  background: transparent !important;
+}
+html.dark .modal-icon-btn--save-idle {
+  color: rgba(52, 211, 153, 0.2) !important;
+  border-color: rgba(52, 211, 153, 0.1) !important;
+}
+
 /* ── Séparateur avant le bouton close ──────────────────────────────────── */
 .modal-icon-btn--close {
   margin-left: 1rem;

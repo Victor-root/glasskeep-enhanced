@@ -263,12 +263,12 @@ export default function ModalFooter({
           <button
             onClick={modalHasChanges ? onSave : undefined}
             disabled={savingModal || !modalHasChanges}
-            className={`modal-icon-btn flex-shrink-0 transition-all duration-200 ${modalHasChanges ? "text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/10" : "text-emerald-500/30 dark:text-emerald-400/25"}`}
+            className={`modal-icon-btn flex-shrink-0 transition-all duration-200 ${modalHasChanges ? "modal-icon-btn--save-active" : "modal-icon-btn--save-idle"}`}
             data-tooltip={modalHasChanges ? (savingModal ? t("saving") : t("save")) : t("saved")}
             style={{ cursor: modalHasChanges ? "pointer" : "default" }}
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         )}
