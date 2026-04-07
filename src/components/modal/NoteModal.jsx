@@ -239,7 +239,7 @@ export default function NoteModal({
                 viewMode ? (
                   <div
                     ref={noteViewRef}
-                    className="note-content note-content--dense whitespace-pre-wrap"
+                    className="note-content note-content--dense"
                     dangerouslySetInnerHTML={{
                       __html: renderSafeMarkdown(mBody),
                     }}
