@@ -379,4 +379,6 @@ loginFailed: "Échec de la connexion",
   syncActionRestore: "Restauration",
   syncActionDelete: "Suppression",
   syncActionReorder: "Réorganisation",
+  undo: "Annuler (Ctrl+Z)",
+  redo: "Rétablir (Ctrl+Y)",
 };

@@ -379,4 +379,6 @@ loginFailed: "Login failed",
   syncActionRestore: "Restore",
   syncActionDelete: "Delete",
   syncActionReorder: "Reorder",
+  undo: "Undo (Ctrl+Z)",
+  redo: "Redo (Ctrl+Y)",
 };
