@@ -80,6 +80,9 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
   // Track if we pushed a history entry for the modal (Android back button support)
   const modalHistoryRef = useRef(false);
 
+  // Ref populated by NoteModal with captureSnapshot() — called by autosave on success
+  const historySnapshotRef = useRef(null);
+
   // ─── Derived values ───
   const activeNoteObj = useMemo(
     () => notes.find((x) => String(x.id) === String(activeId)),
@@ -516,6 +519,7 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
     modalScrollRef,
     savedModalScrollRatioRef,
     modalHistoryRef,
+    historySnapshotRef,
     // Derived
     activeNoteObj,
     editedStamp,

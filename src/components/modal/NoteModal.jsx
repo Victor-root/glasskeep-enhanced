@@ -131,17 +131,24 @@ export default function NoteModal({
   // checklist handlers
   syncChecklistItems,
   checklistInsertPosition,
+  // history ref — App.jsx calls historySnapshotRef.current() after autosave
+  historySnapshotRef,
 }) {
   const [autoEditId, setAutoEditId] = React.useState(null);
   const { handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } =
     useChecklistDrag(mItems, setMItems, syncChecklistItems);
 
   /* ── Undo / Redo history ── */
-  const { undo, redo, canUndo, canRedo } = useModalHistory({
+  const { undo, redo, canUndo, canRedo, captureSnapshot } = useModalHistory({
     mTitle, mBody, mItems, mColor, mTagList,
     setMTitle, setMBody, setMItems, setMColor, setMTagList,
     open, activeId,
   });
+
+  // Expose captureSnapshot to App.jsx via ref
+  React.useEffect(() => {
+    if (historySnapshotRef) historySnapshotRef.current = captureSnapshot;
+  }, [captureSnapshot, historySnapshotRef]);
 
   /* Intercept Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z at modal level */
   const handleModalKeyDown = React.useCallback(

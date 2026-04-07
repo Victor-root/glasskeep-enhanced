@@ -372,7 +372,7 @@ export default function ModalFooter({
 
         {/* ── Undo ── */}
         <button
-          className={`modal-footer-btn focus:outline-none ${!canUndo ? "opacity-30 pointer-events-none" : ""}`}
+          className={`modal-footer-btn focus:outline-none ${!canUndo ? "opacity-30" : ""}`}
           data-tooltip={t("undo")}
           onClick={undo}
           disabled={!canUndo}
@@ -386,7 +386,7 @@ export default function ModalFooter({
 
         {/* ── Redo ── */}
         <button
-          className={`modal-footer-btn focus:outline-none ${!canRedo ? "opacity-30 pointer-events-none" : ""}`}
+          className={`modal-footer-btn focus:outline-none ${!canRedo ? "opacity-30" : ""}`}
           data-tooltip={t("redo")}
           onClick={redo}
           disabled={!canRedo}

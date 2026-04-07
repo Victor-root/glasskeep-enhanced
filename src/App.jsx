@@ -223,6 +223,7 @@ export default function App() {
     checklistDragId, modalMenuBtnRef, scrimClickStartRef,
     noteViewRef, modalScrollRef, savedModalScrollRatioRef,
     modalHistoryRef,
+    historySnapshotRef,
     // Derived
     activeNoteObj, editedStamp, modalHasChanges,
     // Tag helpers
@@ -2806,6 +2807,7 @@ export default function App() {
       if (ok && committedBaselineRef.current) {
         committedBaselineRef.current = { ...committedBaselineRef.current, ...committedFields };
       }
+      if (ok) historySnapshotRef.current?.();
     });
   }, [mColor, mTagList, mImages, open, activeId, mType, autoSaveTextNote]);
 
@@ -2844,6 +2846,7 @@ export default function App() {
         if (ok && committedBaselineRef.current) {
           committedBaselineRef.current = { ...committedBaselineRef.current, ...committedFields };
         }
+        if (ok) historySnapshotRef.current?.();
       });
     }, 1000); // 1 second debounce
 
@@ -3411,6 +3414,8 @@ export default function App() {
     prevItemsRef.current = newItems;
     // Queue item exists — release this lease + prune older zombies for this note
     releaseLocalLeaseWithPrune(noteId, leaseId);
+    // Capture undo/redo snapshot
+    historySnapshotRef.current?.();
   };
 
   // Checklist drag-and-drop is handled by useChecklistDrag inside NoteModal
@@ -3629,6 +3634,7 @@ export default function App() {
       resizeModalTextarea={resizeModalTextarea}
       syncChecklistItems={syncChecklistItems}
       checklistInsertPosition={checklistInsertPosition}
+      historySnapshotRef={historySnapshotRef}
     />
   );
 

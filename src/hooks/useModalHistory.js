@@ -1,19 +1,21 @@
 import { useRef, useCallback, useEffect, useState } from "react";
 
 /**
- * Undo / Redo history for the note modal.
+ * Undo / Redo history for the note modal — aligned with autosave.
  *
- * Tracks snapshots of: mTitle, mBody, mItems, mColor, mTagList.
- * Snapshots are created after 500 ms of inactivity (debounced) to group
- * rapid keystrokes into a single history entry — similar to Google Keep.
+ * Instead of its own debounce timer, the hook exposes `captureSnapshot()`
+ * which must be called by the autosave logic each time a save succeeds.
+ * This guarantees 1 undo step = 1 persisted save, so undo/redo never
+ * drifts out of sync with what's actually stored.
  *
- * Drawing data is NOT tracked here (DrawingCanvas has its own undo).
+ * Tracked state: mTitle, mBody, mItems, mColor, mTagList.
+ * Drawing data is NOT tracked (DrawingCanvas has its own undo).
  *
- * Usage:
- *   const { undo, redo, canUndo, canRedo } = useModalHistory({ ...props });
+ * Usage in NoteModal:
+ *   const { undo, redo, canUndo, canRedo, captureSnapshot } = useModalHistory({ ... });
+ *   // pass captureSnapshot up via ref so App.jsx can call it after autosave
  */
 
-const DEBOUNCE_MS = 500;
 const MAX_HISTORY = 100;
 
 function deepCloneItems(items) {
@@ -33,57 +35,46 @@ function snapshotsEqual(a, b) {
 }
 
 export default function useModalHistory({
-  // current state values
   mTitle,
   mBody,
   mItems,
   mColor,
   mTagList,
-  // setters to apply snapshots
   setMTitle,
   setMBody,
   setMItems,
   setMColor,
   setMTagList,
-  // modal lifecycle
   open,
   activeId,
 }) {
-  /* ── internal refs ──────────────────────────────────────────────── */
-  const historyRef = useRef([]);       // array of snapshots
-  const indexRef = useRef(-1);         // current position in history
-  const restoringRef = useRef(false);  // true while applying a snapshot
-  const debounceRef = useRef(null);
-  const lastSnapRef = useRef(null);    // last committed snapshot (for comparison)
+  const historyRef = useRef([]);
+  const indexRef = useRef(-1);
+  const restoringRef = useRef(false);
+  const lastSnapRef = useRef(null);
 
-  // Keep a ref to latest state so undo flush always reads current values
+  // Always-fresh state ref for captureSnapshot (avoids stale closures)
   const stateRef = useRef({ mTitle, mBody, mItems, mColor, mTagList });
   useEffect(() => {
     stateRef.current = { mTitle, mBody, mItems, mColor, mTagList };
   });
 
-  // Force re-render to update canUndo / canRedo
   const [, bump] = useState(0);
 
   /* ── helpers ────────────────────────────────────────────────────── */
-  const snap = useCallback(
-    (src) => ({
-      mTitle: src?.mTitle ?? mTitle,
-      mBody: src?.mBody ?? mBody,
-      mItems: deepCloneItems(src?.mItems ?? mItems),
-      mColor: src?.mColor ?? mColor,
-      mTagList: [...(src?.mTagList ?? mTagList ?? [])],
-    }),
-    [mTitle, mBody, mItems, mColor, mTagList],
-  );
+  const makeSnap = (src) => ({
+    mTitle: src.mTitle ?? "",
+    mBody: src.mBody ?? "",
+    mItems: deepCloneItems(src.mItems),
+    mColor: src.mColor ?? "default",
+    mTagList: [...(src.mTagList ?? [])],
+  });
 
   const pushSnapshot = useCallback((s) => {
     const h = historyRef.current;
     const idx = indexRef.current;
-    // truncate forward history if we're in the middle
     const next = h.slice(0, idx + 1);
     next.push(s);
-    // cap size
     if (next.length > MAX_HISTORY) next.shift();
     historyRef.current = next;
     indexRef.current = next.length - 1;
@@ -105,11 +96,8 @@ export default function useModalHistory({
 
   /* ── reset when a different note is opened ──────────────────────── */
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
     if (open && activeId != null) {
-      // Capture initial state after the render that set all values
-      const initial = snap();
+      const initial = makeSnap(stateRef.current);
       historyRef.current = [initial];
       indexRef.current = 0;
       lastSnapRef.current = initial;
@@ -123,67 +111,47 @@ export default function useModalHistory({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, activeId]);
 
-  /* ── watch for changes → debounced snapshot ─────────────────────── */
-  const itemsKey = JSON.stringify(mItems);
-  const tagsKey = JSON.stringify(mTagList);
-
-  useEffect(() => {
-    if (!open || activeId == null) return;
-
-    // Skip if this render was caused by undo/redo applying a snapshot
+  /* ── captureSnapshot: called by autosave on success ─────────────── */
+  const captureSnapshot = useCallback(() => {
+    // Skip if this render was caused by undo/redo restoring state
     if (restoringRef.current) {
       restoringRef.current = false;
       return;
     }
-
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    debounceRef.current = setTimeout(() => {
-      const current = snap();
-      if (!snapshotsEqual(current, lastSnapRef.current)) {
-        pushSnapshot(current);
-      }
-    }, DEBOUNCE_MS);
-
-    return () => {
-      // don't clear on unmount — only on next change
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mTitle, mBody, mColor, itemsKey, tagsKey, open, activeId]);
-
-  /* ── flush any pending debounce, returns true if a new snap was pushed */
-  const flush = useCallback(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = null;
-    }
-    const current = snap(stateRef.current);
+    const current = makeSnap(stateRef.current);
     if (!snapshotsEqual(current, lastSnapRef.current)) {
       pushSnapshot(current);
-      return true;
     }
-    return false;
-  }, [snap, pushSnapshot]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pushSnapshot]);
 
-  /* ── public API ─────────────────────────────────────────────────── */
+  /* ── undo / redo ────────────────────────────────────────────────── */
   const undo = useCallback(() => {
-    flush(); // save current state before going back
     const idx = indexRef.current;
-    if (idx > 0) {
+    if (idx <= 0) return;
+
+    // If there are unsaved changes since last snapshot, save them as a new
+    // entry so redo can get back to them.
+    const current = makeSnap(stateRef.current);
+    if (!snapshotsEqual(current, lastSnapRef.current)) {
+      pushSnapshot(current);
+      // Index was bumped by pushSnapshot, go back two steps
+      indexRef.current = indexRef.current - 1;
+      applySnapshot(historyRef.current[indexRef.current]);
+    } else {
       indexRef.current = idx - 1;
       applySnapshot(historyRef.current[idx - 1]);
-      bump((n) => n + 1);
     }
-  }, [flush, applySnapshot]);
+    bump((n) => n + 1);
+  }, [applySnapshot, pushSnapshot]);
 
   const redo = useCallback(() => {
     const idx = indexRef.current;
     const h = historyRef.current;
-    if (idx < h.length - 1) {
-      indexRef.current = idx + 1;
-      applySnapshot(h[idx + 1]);
-      bump((n) => n + 1);
-    }
+    if (idx >= h.length - 1) return;
+    indexRef.current = idx + 1;
+    applySnapshot(h[idx + 1]);
+    bump((n) => n + 1);
   }, [applySnapshot]);
 
   return {
@@ -191,5 +159,6 @@ export default function useModalHistory({
     redo,
     canUndo: indexRef.current > 0,
     canRedo: indexRef.current < historyRef.current.length - 1,
+    captureSnapshot,
   };
 }
