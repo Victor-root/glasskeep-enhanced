@@ -432,12 +432,11 @@ export default function ModalFooter({
         {/* ── Kebab menu (Download + Collaborate) ── */}
         <button
           ref={kebabRef}
-          className={`${btnClass} focus:outline-none`}
+          className="modal-footer-btn focus:outline-none"
           onClick={(e) => { e.stopPropagation(); setKebabOpen((v) => !v); }}
-          data-tooltip={!isDesktop ? t("moreOptions") : undefined}
+          data-tooltip={t("moreOptions")}
         >
           <Kebab />
-          {isDesktop && <span>{t("moreOptions")}</span>}
         </button>
         <Popover
           anchorRef={kebabRef}
