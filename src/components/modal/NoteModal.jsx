@@ -142,11 +142,9 @@ export default function NoteModal({
       <div
         className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 bg-black/40 z-40 flex items-center justify-center overscroll-contain`}
         onMouseDown={(e) => {
-          // Only consider closing if the press STARTS on the scrim
           scrimClickStartRef.current = e.target === e.currentTarget;
         }}
         onClick={(e) => {
-          // Close only if press started AND ended on scrim (prevents drag-outside-close)
           if (scrimClickStartRef.current && e.target === e.currentTarget) {
             closeModal();
           }
@@ -182,42 +180,22 @@ export default function NoteModal({
               mType={mType}
               viewMode={viewMode}
               windowWidth={windowWidth}
-              onToggleViewMode={() => {
-                setViewMode((v) => !v);
-                setShowModalFmt(false);
-              }}
-              onOpenCollaboration={async () => {
-                setCollaborationModalOpen(true);
-                if (activeId) {
-                  await loadCollaboratorsForAddModal(activeId);
-                }
-              }}
+              // formatting
               modalFmtBtnRef={modalFmtBtnRef}
               showModalFmt={showModalFmt}
               setShowModalFmt={setShowModalFmt}
               onFormatModal={formatModal}
-              setMColor={setMColor}
-              modalColorBtnRef={modalColorBtnRef}
-              showModalColorPop={showModalColorPop}
-              setShowModalColorPop={setShowModalColorPop}
-              modalMenuBtnRef={modalMenuBtnRef}
-              modalMenuOpen={modalMenuOpen}
-              setModalMenuOpen={setModalMenuOpen}
-              modalFileRef={modalFileRef}
-              addImagesToState={addImagesToState}
-              setMImages={setMImages}
+              // pin
+              onTogglePin={togglePin}
               activeId={activeId}
               notes={notes}
               tagFilter={tagFilter}
-              activeNoteObj={activeNoteObj}
-              onDownloadNote={handleDownloadNote}
-              onRestoreFromTrash={restoreFromTrash}
-              onArchiveNote={handleArchiveNote}
-              onOpenConfirmDelete={() => setConfirmDeleteOpen(true)}
-              onTogglePin={togglePin}
+              // close
               onClose={closeModal}
-              modalScrollRef={modalScrollRef}
-              savedModalScrollRatioRef={savedModalScrollRatioRef}
+              // save
+              modalHasChanges={modalHasChanges}
+              savingModal={savingModal}
+              onSave={saveModal}
             />
 
             <ModalImagesGrid
@@ -266,7 +244,6 @@ export default function NoteModal({
                           const start = el.selectionStart ?? value.length;
                           const end = el.selectionEnd ?? value.length;
 
-                          // Check if cursor is on the last line before Enter
                           const lastNewlineIndex = value.lastIndexOf("\n");
                           const isOnLastLine = start > lastNewlineIndex;
 
@@ -283,22 +260,20 @@ export default function NoteModal({
                               } catch (e) {}
                               resizeModalTextarea();
 
-                              // If we were on the last line, scroll down a bit to ensure cursor visibility
                               if (isOnLastLine) {
                                 const modalScrollEl = modalScrollRef.current;
                                 if (modalScrollEl) {
                                   setTimeout(() => {
-                                    modalScrollEl.scrollTop += 30; // Scroll down by 30px
+                                    modalScrollEl.scrollTop += 30;
                                   }, 50);
                                 }
                               }
                             });
                           } else if (isOnLastLine) {
-                            // If not handled by smart enter but on last line, allow normal Enter but scroll down
                             setTimeout(() => {
                               const modalScrollEl = modalScrollRef.current;
                               if (modalScrollEl) {
-                                modalScrollEl.scrollTop += 30; // Scroll down by 30px
+                                modalScrollEl.scrollTop += 30;
                               }
                             }, 10);
                           }
@@ -338,7 +313,6 @@ export default function NoteModal({
                             data-checklist-item={it.id}
                             className="group flex items-center gap-2"
                           >
-                            {/* Drag handle */}
                             <div
                               onPointerDown={(e) => handlePointerDown(it.id, e)}
                               onPointerMove={handlePointerMove}
@@ -392,7 +366,7 @@ export default function NoteModal({
                           </div>
                         ))}
 
-                      {/* Add new item row — bottom position (before Done section) */}
+                      {/* Add new item row — bottom position */}
                       {checklistInsertPosition === "bottom" && (
                         <div
                           className="flex items-center gap-2 cursor-pointer p-2 border-b border-[var(--border-light)] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -427,7 +401,6 @@ export default function NoteModal({
                                   onToggle={(checked, e) => {
                                     e?.stopPropagation();
                                     if (!checked) {
-                                      // Unchecking: move to top or bottom of unchecked list
                                       const unchecked = mItems.filter((p) => !p.done && p.id !== it.id);
                                       const checkedItems = mItems.filter((p) => p.done && p.id !== it.id);
                                       const restored = { ...it, done: false };
@@ -482,7 +455,7 @@ export default function NoteModal({
                 />
               )}
 
-              {/* Inline Edited stamp: only when scrollable (appears at very end) */}
+              {/* Inline Edited stamp: only when scrollable */}
               {editedStamp && modalScrollable && (
                 <div className="mt-6 text-xs text-gray-600 dark:text-gray-300 text-right flex items-center justify-end gap-1.5">
                   <span>{t("editedPrefix")} {editedStamp}</span>
@@ -496,7 +469,7 @@ export default function NoteModal({
               )}
             </div>
 
-            {/* Absolute Edited stamp: only when NOT scrollable (sits just above footer) */}
+            {/* Absolute Edited stamp: only when NOT scrollable */}
             {editedStamp && !modalScrollable && (
               <div className="absolute bottom-3 right-4 text-xs text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
                 <span className="pointer-events-none">{t("editedPrefix")} {editedStamp}</span>
@@ -513,6 +486,7 @@ export default function NoteModal({
           <ModalFooter
             dark={dark}
             windowWidth={windowWidth}
+            // tags
             mTagList={mTagList}
             setMTagList={setMTagList}
             tagInput={tagInput}
@@ -527,21 +501,45 @@ export default function NoteModal({
             handleTagKeyDown={handleTagKeyDown}
             handleTagBlur={handleTagBlur}
             handleTagPaste={handleTagPaste}
+            // color
             mColor={mColor}
             setMColor={setMColor}
             modalColorBtnRef={modalColorBtnRef}
             showModalColorPop={showModalColorPop}
             setShowModalColorPop={setShowModalColorPop}
+            // images
             modalFileRef={modalFileRef}
             addImagesToState={addImagesToState}
             setMImages={setMImages}
-            modalHasChanges={modalHasChanges}
+            // collaboration
+            onOpenCollaboration={async () => {
+              setCollaborationModalOpen(true);
+              if (activeId) {
+                await loadCollaboratorsForAddModal(activeId);
+              }
+            }}
+            // formatting (mobile)
+            modalFmtBtnRef={modalFmtBtnRef}
+            showModalFmt={showModalFmt}
+            setShowModalFmt={setShowModalFmt}
+            // view/edit toggle
             mType={mType}
-            isCollaborativeNote={isCollaborativeNote}
+            viewMode={viewMode}
+            onToggleViewMode={() => {
+              setViewMode((v) => !v);
+              setShowModalFmt(false);
+            }}
+            modalScrollRef={modalScrollRef}
+            savedModalScrollRatioRef={savedModalScrollRatioRef}
+            // actions
             activeId={activeId}
-            savingModal={savingModal}
-            onSave={saveModal}
-            collaborators={addModalCollaborators}
+            notes={notes}
+            tagFilter={tagFilter}
+            activeNoteObj={activeNoteObj}
+            onDownloadNote={handleDownloadNote}
+            onRestoreFromTrash={restoreFromTrash}
+            onArchiveNote={handleArchiveNote}
+            onOpenConfirmDelete={() => setConfirmDeleteOpen(true)}
           />
 
           <ConfirmDeleteDialog

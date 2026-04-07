@@ -413,6 +413,90 @@ html.dark .modal-icon-btn--image:hover {
   color: #7dd3fc !important;
 }
 
+/* ── Modal footer toolbar (Google Keep style) ─────────────────────────── */
+.modal-footer-toolbar {
+  flex-shrink: 0;
+}
+.modal-footer-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.54);
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    color      0.14s ease,
+    transform  0.18s cubic-bezier(0.34, 1.5, 0.64, 1);
+}
+.modal-footer-btn svg {
+  display: block;
+  transition: transform 0.18s cubic-bezier(0.34, 1.5, 0.64, 1);
+}
+.modal-footer-btn:hover {
+  background: rgba(0, 0, 0, 0.07);
+  color: #111827;
+}
+.modal-footer-btn:hover svg {
+  transform: scale(1.12);
+}
+.modal-footer-btn:active {
+  transform: scale(0.9) !important;
+  transition: transform 0.08s ease !important;
+}
+html.dark .modal-footer-btn {
+  color: rgba(255, 255, 255, 0.6);
+}
+html.dark .modal-footer-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+/* Footer colored variants – reuse same colors as header */
+.modal-footer-btn--trash { color: #dc2626; }
+.modal-footer-btn--trash:hover { background: rgba(239, 68, 68, 0.1) !important; color: #b91c1c !important; }
+html.dark .modal-footer-btn--trash { color: #f87171; }
+html.dark .modal-footer-btn--trash:hover { background: rgba(239, 68, 68, 0.18) !important; color: #fca5a5 !important; }
+
+.modal-footer-btn--download { color: #16a34a; }
+.modal-footer-btn--download:hover { background: rgba(22, 163, 74, 0.1) !important; color: #15803d !important; }
+html.dark .modal-footer-btn--download { color: #4ade80; }
+html.dark .modal-footer-btn--download:hover { background: rgba(34, 197, 94, 0.15) !important; color: #86efac !important; }
+
+.modal-footer-btn--archive { color: #a16207; }
+.modal-footer-btn--archive:hover { background: rgba(161, 98, 7, 0.1) !important; color: #854d0e !important; }
+html.dark .modal-footer-btn--archive { color: #fbbf24; }
+html.dark .modal-footer-btn--archive:hover { background: rgba(251, 191, 36, 0.15) !important; color: #fcd34d !important; }
+
+.modal-footer-btn--collab { color: #7c3aed; }
+.modal-footer-btn--collab:hover { background: rgba(124, 58, 237, 0.1) !important; color: #6d28d9 !important; }
+html.dark .modal-footer-btn--collab { color: #a78bfa; }
+html.dark .modal-footer-btn--collab:hover { background: rgba(167, 139, 250, 0.15) !important; color: #c4b5fd !important; }
+
+.modal-footer-btn--image { color: #0284c7; }
+.modal-footer-btn--image:hover { background: rgba(2, 132, 199, 0.1) !important; color: #0369a1 !important; }
+html.dark .modal-footer-btn--image { color: #38bdf8; }
+html.dark .modal-footer-btn--image:hover { background: rgba(56, 189, 248, 0.15) !important; color: #7dd3fc !important; }
+
+.modal-footer-btn--mode {
+  background: linear-gradient(90deg, #6366f1 0%, #7c3aed 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35) !important;
+}
+.modal-footer-btn--mode:hover {
+  background: linear-gradient(90deg, #4f46e5 0%, #6d28d9 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 18px rgba(99, 102, 241, 0.45) !important;
+}
+html.dark .modal-footer-btn--mode {
+  color: #fff !important;
+}
+
 /* Copy buttons */
 /* Hide scrollbars on mobile (keep scrolling) */
 @media (max-width: 639px) {

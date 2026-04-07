@@ -1,22 +1,18 @@
 import React, { useRef, useEffect, useCallback } from "react";
-import { PinOutline, PinFilled, CloseIcon, DownloadIcon, FormatIcon, ArchiveIcon, Trash, AddImageIcon, Kebab } from "../../icons/index.jsx";
-import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
-import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
+import { PinOutline, PinFilled, CloseIcon } from "../../icons/index.jsx";
 import FormatToolbar from "../common/FormatToolbar.jsx";
 import Popover from "../common/Popover.jsx";
-import { modalBgFor, COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
+import { modalBgFor } from "../../utils/colors.js";
 import { t } from "../../i18n";
 
 /**
- * Sticky header of the note modal — title input, action buttons,
+ * Sticky header of the note modal — title input, save/pin/close buttons,
  * desktop formatting toolbar.
  * Purely presentational: all handlers are passed via props.
  *
- * Responsive behaviour:
- *   Both desktop and mobile show all action buttons inline (colored icons).
- *   Desktop (≥ 768): title left, buttons right, inline formatting toolbar below.
- *   Mobile  (< 768): buttons top-row, title wraps below (textarea for multiline),
- *                     formatting via popover button.
+ * After refactor: only save checkmark, pin and close remain in header.
+ * All action tools (color, image, tags, collaborate, archive, trash,
+ * download, edit/view) have moved to ModalFooter (Google Keep style).
  */
 export default function ModalHeader({
   dark,
@@ -26,50 +22,27 @@ export default function ModalHeader({
   mType,
   viewMode,
   windowWidth,
-  // view/edit toggle
-  onToggleViewMode,
-  // collaboration
-  onOpenCollaboration,
   // formatting (mobile popover)
   modalFmtBtnRef,
   showModalFmt,
   setShowModalFmt,
   onFormatModal,
-  // color picker
-  setMColor,
-  modalColorBtnRef,
-  showModalColorPop,
-  setShowModalColorPop,
-  // kebab menu (desktop: download + archive)
-  modalMenuBtnRef,
-  modalMenuOpen,
-  setModalMenuOpen,
-  // image upload
-  modalFileRef,
-  addImagesToState,
-  setMImages,
-  // actions
+  // pin
+  onTogglePin,
   activeId,
   notes,
   tagFilter,
-  activeNoteObj,
-  onDownloadNote,
-  onRestoreFromTrash,
-  onArchiveNote,
-  onOpenConfirmDelete,
-  // pin
-  onTogglePin,
   // close
   onClose,
-  // scroll ref (for view/edit toggle scroll ratio save)
-  modalScrollRef,
-  savedModalScrollRatioRef,
+  // save
+  modalHasChanges,
+  savingModal,
+  onSave,
 }) {
   const mobileTitleRef = useRef(null);
   const isDesktop = windowWidth >= 768;
   const isPinned = !!notes.find((n) => String(n.id) === String(activeId))?.pinned;
   const showPinBtn = tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED";
-  const isTrashed = tagFilter === "TRASHED";
 
   /* ── auto-resize mobile title textarea on mount & content change ── */
   const autoResizeTitle = useCallback((el) => {
@@ -84,24 +57,6 @@ export default function ModalHeader({
     }
   }, [mTitle, isDesktop, autoResizeTitle]);
 
-  /* ── shared action handlers ────────────────────────────────── */
-  const handleDownload = () => {
-    const n = notes.find((nn) => String(nn.id) === String(activeId));
-    if (n) onDownloadNote(n);
-  };
-
-  const handleArchiveToggle = () => {
-    const note = notes.find((nn) => String(nn.id) === String(activeId));
-    if (note) onArchiveNote(activeId, !note.archived);
-  };
-
-  const handleToggleViewMode = () => {
-    const el = modalScrollRef.current;
-    const maxScroll = el ? el.scrollHeight - el.clientHeight : 0;
-    savedModalScrollRatioRef.current = maxScroll > 0 ? el.scrollTop / maxScroll : 0;
-    onToggleViewMode();
-  };
-
   return (
     <div
       className="sticky top-0 z-20 pt-4 modal-header-blur rounded-t-none sm:rounded-t-xl"
@@ -109,195 +64,40 @@ export default function ModalHeader({
     >
       <div className={`flex flex-wrap items-center gap-2 px-4 sm:px-6 pb-3 ${!isDesktop ? "flex-row-reverse" : ""}`}>
         <div className={`flex items-center gap-2 flex-none ${isDesktop ? "ml-auto" : ""}`}>
-          {/* Icon buttons group – pill container */}
           <div className="modal-icon-group">
-
-          {/* View/Edit toggle — text notes only */}
-          {mType === "text" && (
+            {/* Save check */}
             <button
-              className="modal-icon-btn modal-icon-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]"
-              onClick={handleToggleViewMode}
-              data-tooltip={viewMode ? t("switchToEditMode") : t("switchToViewMode")}
-              aria-label={viewMode ? t("editMode") : t("viewMode")}
+              onClick={modalHasChanges ? onSave : undefined}
+              disabled={savingModal || !modalHasChanges}
+              className={`modal-icon-btn flex-shrink-0 transition-all duration-200 ${modalHasChanges ? "modal-icon-btn--save-active" : "modal-icon-btn--save-idle"}`}
+              data-tooltip={modalHasChanges ? (savingModal ? t("saving") : t("save")) : t("saved")}
+              style={{ cursor: modalHasChanges ? "pointer" : "default" }}
             >
-              {viewMode ? (
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25Z" fill="currentColor" />
-                  <path d="m14.06 4.94 3.75 3.75 1.41-1.41a1.5 1.5 0 0 0 0-2.12l-1.63-1.63a1.5 1.5 0 0 0-2.12 0l-1.41 1.41Z" fill="currentColor" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />
-                  <circle cx="12" cy="12" r="3.2" fill="currentColor" />
-                </svg>
-              )}
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </button>
-          )}
 
-          {/* Collaborate */}
-          <button
-            className="modal-icon-btn modal-icon-btn--collab focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-            data-tooltip={t("collaborate")}
-            onClick={onOpenCollaboration}
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-            </svg>
-            <svg className="w-3 h-3 absolute -top-1 -right-1" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
-            </svg>
-          </button>
-
-          {/* Formatting popover button — mobile only (desktop uses inline toolbar below) */}
-          {!isDesktop && mType === "text" && !viewMode && (
-            <button
-              ref={modalFmtBtnRef}
-              className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-              data-tooltip={t("formatting")}
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowModalFmt((v) => !v);
-              }}
-            >
-              <FormatIcon />
-            </button>
-          )}
-
-          {/* Add images — visible in edit mode for text, always for checklist */}
-          {(mType === "checklist" || (mType === "text" && !viewMode)) && (
-            <>
-              <input
-                ref={modalFileRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={async (e) => {
-                  const f = e.target.files;
-                  if (f && f.length) await addImagesToState(f, setMImages);
-                  e.target.value = "";
-                }}
-              />
+            {/* Pin */}
+            {showPinBtn && (
               <button
-                className="modal-icon-btn modal-icon-btn--image focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-                data-tooltip={t("addImages")}
-                onClick={() => modalFileRef.current?.click()}
+                className={`modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)] ${isPinned ? "modal-icon-btn--active" : ""}`}
+                data-tooltip={t("pinUnpin")}
+                onClick={() => activeId != null && onTogglePin(activeId, !isPinned)}
               >
-                <AddImageIcon />
+                {isPinned ? <PinFilled /> : <PinOutline />}
               </button>
-            </>
-          )}
+            )}
 
-          {/* Color picker — visible in edit mode for text, always for checklist */}
-          {(mType === "checklist" || (mType === "text" && !viewMode)) && (
-            <>
-              <button
-                ref={modalColorBtnRef}
-                className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-                data-tooltip={t("color")}
-                onClick={() => setShowModalColorPop((v) => !v)}
-              >
-                <PaletteColorIcon size={20} />
-              </button>
-              <ColorPickerPanel
-                anchorRef={modalColorBtnRef}
-                open={showModalColorPop}
-                onClose={() => setShowModalColorPop(false)}
-                colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
-                selectedColor={mColor}
-                darkMode={dark}
-                onSelect={(name) => setMColor(name)}
-              />
-            </>
-          )}
-
-          {/* Kebab menu — Download & Archive/Restore */}
-          <>
+            {/* Close */}
             <button
-              ref={modalMenuBtnRef}
-              className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-              data-tooltip={t("moreOptions")}
-              onClick={(e) => {
-                e.stopPropagation();
-                setModalMenuOpen((v) => !v);
-              }}
+              className="modal-icon-btn modal-icon-btn--close focus:outline-none"
+              data-tooltip={t("close")}
+              onClick={onClose}
             >
-              <Kebab />
+              <CloseIcon />
             </button>
-            <Popover
-              anchorRef={modalMenuBtnRef}
-              open={modalMenuOpen}
-              onClose={() => setModalMenuOpen(false)}
-            >
-              <div
-                className={`min-w-[180px] border border-[var(--border-light)] rounded-lg shadow-lg overflow-hidden ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
-                style={{ backgroundColor: dark ? "#222222" : undefined }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                  onClick={() => {
-                    handleDownload();
-                    setModalMenuOpen(false);
-                  }}
-                >
-                  <DownloadIcon />{t("downloadMd")}
-                </button>
-                {isTrashed ? (
-                  <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                    onClick={() => {
-                      onRestoreFromTrash(activeId);
-                      setModalMenuOpen(false);
-                    }}
-                  >
-                    <ArchiveIcon />{t("restoreFromTrash")}
-                  </button>
-                ) : (
-                  <button
-                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                    onClick={() => {
-                      handleArchiveToggle();
-                      setModalMenuOpen(false);
-                    }}
-                  >
-                    <ArchiveIcon />
-                    {activeNoteObj?.archived ? t("unarchive") : t("archive")}
-                  </button>
-                )}
-              </div>
-            </Popover>
-          </>
-
-          {/* Delete */}
-          <button
-            className="modal-icon-btn modal-icon-btn--trash focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-            data-tooltip={isTrashed ? t("permanentlyDelete") : t("moveToTrash")}
-            onClick={onOpenConfirmDelete}
-          >
-            <Trash />
-          </button>
-
-          {/* Pin */}
-          {showPinBtn && (
-            <button
-              className={`modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)] ${isPinned ? "modal-icon-btn--active" : ""}`}
-              data-tooltip={t("pinUnpin")}
-              onClick={() => activeId != null && onTogglePin(activeId, !isPinned)}
-            >
-              {isPinned ? <PinFilled /> : <PinOutline />}
-            </button>
-          )}
-
-          {/* Close */}
-          <button
-            className="modal-icon-btn modal-icon-btn--close focus:outline-none"
-            data-tooltip={t("close")}
-            onClick={onClose}
-          >
-            <CloseIcon />
-          </button>
-          </div>{/* end icon pill group */}
+          </div>
         </div>
 
         {/* Title — input on desktop (single line), textarea on mobile (wraps long titles) */}
@@ -321,7 +121,7 @@ export default function ModalHeader({
         )}
       </div>
 
-      {/* Formatting popover for mobile (anchored to format icon button) */}
+      {/* Formatting popover for mobile (anchored to format icon button in footer) */}
       {!isDesktop && mType === "text" && !viewMode && (
         <Popover
           anchorRef={modalFmtBtnRef}

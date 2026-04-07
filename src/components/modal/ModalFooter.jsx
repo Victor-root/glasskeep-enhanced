@@ -1,16 +1,17 @@
-import React from "react";
+import React, { useRef } from "react";
 import { createPortal } from "react-dom";
 import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
-import UserAvatar from "../common/UserAvatar.jsx";
+import Popover from "../common/Popover.jsx";
+import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, FormatIcon } from "../../icons/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
-import { AddImageIcon } from "../../icons/index.jsx";
 import { t } from "../../i18n";
 
 /**
- * Footer of the note modal — tag chips editor, color picker,
- * image upload button, save button.
- * Purely presentational with prop-driven callbacks.
+ * Google Keep-style footer toolbar for the note modal.
+ * All action icons in a single row, left-to-right:
+ *   Color | Image | Tag (checkbox dropdown) | Collaborate | Format (mobile) |
+ *   Archive | Trash | Download | Edit/View toggle
  */
 export default function ModalFooter({
   dark,
@@ -40,224 +41,391 @@ export default function ModalFooter({
   modalFileRef,
   addImagesToState,
   setMImages,
-  // save
-  modalHasChanges,
+  // collaboration
+  onOpenCollaboration,
+  // formatting (mobile)
+  modalFmtBtnRef,
+  showModalFmt,
+  setShowModalFmt,
+  // view/edit toggle
   mType,
-  isCollaborativeNote,
+  viewMode,
+  onToggleViewMode,
+  modalScrollRef,
+  savedModalScrollRatioRef,
+  // actions
   activeId,
-  savingModal,
-  onSave,
-  // collaborators
-  collaborators,
+  notes,
+  tagFilter,
+  activeNoteObj,
+  onDownloadNote,
+  onRestoreFromTrash,
+  onArchiveNote,
+  onOpenConfirmDelete,
 }) {
+  const isDesktop = windowWidth >= 768;
+  const isTrashed = tagFilter === "TRASHED";
+
+  const handleDownload = () => {
+    const n = notes.find((nn) => String(nn.id) === String(activeId));
+    if (n) onDownloadNote(n);
+  };
+
+  const handleArchiveToggle = () => {
+    const note = notes.find((nn) => String(nn.id) === String(activeId));
+    if (note) onArchiveNote(activeId, !note.archived);
+  };
+
+  const handleToggleViewMode = () => {
+    const el = modalScrollRef?.current;
+    const maxScroll = el ? el.scrollHeight - el.clientHeight : 0;
+    if (savedModalScrollRatioRef) {
+      savedModalScrollRatioRef.current = maxScroll > 0 ? el.scrollTop / maxScroll : 0;
+    }
+    onToggleViewMode();
+  };
+
+  /* ── Tag checkbox logic ── */
+  const isTagApplied = (tag) => mTagList.some((t) => t.toLowerCase() === tag.toLowerCase());
+
+  const toggleTag = (tag) => {
+    if (isTagApplied(tag)) {
+      setMTagList((prev) => prev.filter((t) => t.toLowerCase() !== tag.toLowerCase()));
+    } else {
+      addTags(tag);
+    }
+  };
+
   return (
-    <div className="border-t border-[var(--border-light)] p-4 flex flex-wrap items-center gap-3">
-      {/* Tags chips editor */}
-      <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-        {mTagList.map((tag) => (
-          <span
-            key={tag}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-700/40 backdrop-blur-sm transition-all duration-150 hover:bg-indigo-200/90 dark:hover:bg-indigo-800/60 hover:scale-105 hover:shadow-sm"
-          >
-            <svg className="w-3 h-3 opacity-70 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-              <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
-            </svg>
-            {tag}
-            <button
-              className="w-3.5 h-3.5 rounded-full text-indigo-400 dark:text-indigo-300 hover:bg-red-400 dark:hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none leading-none"
-              data-tooltip={t("removeTag")}
-              onClick={() =>
-                setMTagList((prev) => prev.filter((t) => t !== tag))
-              }
-            >
-              ×
-            </button>
-          </span>
-        ))}
-        {/* Tag add button */}
-        <div className="relative">
-            <button
-              ref={modalTagBtnRef}
-              type="button"
-              onClick={() => {
-                setModalTagFocused((v) => {
-                  if (!v) setTimeout(() => { if (windowWidth >= 640) modalTagInputRef.current?.focus(); }, 0);
-                  return !v;
-                });
-                setTagInput("");
+    <div className="modal-footer-toolbar border-t border-[var(--border-light)]">
+      <div className="flex items-center gap-0.5 px-2 sm:px-4 py-1.5 overflow-x-auto">
+
+        {/* ── Color picker ── */}
+        <button
+          ref={modalColorBtnRef}
+          className="modal-footer-btn focus:outline-none"
+          data-tooltip={t("color")}
+          onClick={() => setShowModalColorPop((v) => !v)}
+        >
+          <PaletteColorIcon size={18} />
+        </button>
+        <ColorPickerPanel
+          anchorRef={modalColorBtnRef}
+          open={showModalColorPop}
+          onClose={() => setShowModalColorPop(false)}
+          colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
+          selectedColor={mColor}
+          darkMode={dark}
+          onSelect={(name) => setMColor(name)}
+        />
+
+        {/* ── Add image ── */}
+        {(mType === "checklist" || (mType === "text" && !viewMode)) && (
+          <>
+            <input
+              ref={modalFileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={async (e) => {
+                const f = e.target.files;
+                if (f && f.length) await addImagesToState(f, setMImages);
+                e.target.value = "";
               }}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-indigo-300 dark:border-indigo-600 text-indigo-500 dark:text-indigo-400 hover:border-indigo-400 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all duration-200 cursor-pointer"
+            />
+            <button
+              className="modal-footer-btn modal-footer-btn--image focus:outline-none"
+              data-tooltip={t("addImages")}
+              onClick={() => modalFileRef.current?.click()}
             >
-              <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
-              </svg>
-              {t("addTag")}
+              <AddImageIcon />
             </button>
-            {modalTagFocused && (() => {
-              const rect = modalTagBtnRef.current?.getBoundingClientRect();
-              if (!rect) return null;
-              const spaceBelow = window.innerHeight - rect.bottom;
-              const dropUp = spaceBelow < 280;
-              const dropWidth = 240;
-              const dropLeft = Math.min(rect.left, window.innerWidth - dropWidth - 8);
-              const suggestions = tagsWithCounts
-                .filter(
-                  ({ tag: t }) =>
-                    (!tagInput.trim() || t.toLowerCase().includes(tagInput.toLowerCase())) &&
-                    !mTagList.map((x) => x.toLowerCase()).includes(t.toLowerCase())
-                );
-              const trimmed = tagInput.trim();
-              const isNew = trimmed && !tagsWithCounts.some(({ tag: t }) => t.toLowerCase() === trimmed.toLowerCase()) && !mTagList.some((t) => t.toLowerCase() === trimmed.toLowerCase());
-              return createPortal(
-                <div
-                  style={{
-                    position: "fixed",
-                    ...(dropUp
-                      ? { bottom: window.innerHeight - rect.top + 6, left: dropLeft }
-                      : { top: rect.bottom + 6, left: dropLeft }),
-                    width: dropWidth,
-                    zIndex: 99999,
-                  }}
-                  className="rounded-2xl shadow-2xl bg-white/98 dark:bg-gray-900/98 backdrop-blur-xl border border-indigo-100/80 dark:border-indigo-800/50 overflow-hidden ring-1 ring-black/5 dark:ring-white/5"
-                >
-                  {/* Search input inside dropdown */}
-                  <div className="px-2 pt-2 pb-1.5">
-                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-800/80 border border-gray-200/80 dark:border-gray-700/60 focus-within:border-indigo-300 dark:focus-within:border-indigo-600 transition-colors duration-150">
-                      <svg className="w-3 h-3 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="6.5" cy="6.5" r="4"/><line x1="10" y1="10" x2="14" y2="14"/>
-                      </svg>
-                      <input
-                        ref={modalTagInputRef}
-                        value={tagInput}
-                        onChange={(e) => setTagInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape") { setTagInput(""); setModalTagFocused(false); return; }
-                          handleTagKeyDown(e);
-                        }}
-                        onBlur={() => {
-                          setTimeout(() => {
-                            if (!suppressTagBlurRef.current) handleTagBlur();
-                            suppressTagBlurRef.current = false;
-                            setModalTagFocused(false);
-                          }, 200);
-                        }}
-                        onPaste={handleTagPaste}
-                        placeholder={t("searchOrCreateTag") || "Rechercher ou créer…"}
-                        className="flex-1 bg-transparent text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none min-w-0"
-                      />
-                    </div>
+          </>
+        )}
+
+        {/* ── Tag icon + checkbox dropdown ── */}
+        <div className="relative">
+          <button
+            ref={modalTagBtnRef}
+            className="modal-footer-btn focus:outline-none"
+            data-tooltip={t("addTag")}
+            onClick={() => {
+              setModalTagFocused((v) => {
+                if (!v) setTimeout(() => { if (windowWidth >= 640) modalTagInputRef.current?.focus(); }, 0);
+                return !v;
+              });
+              setTagInput("");
+            }}
+          >
+            {/* Tag/label icon */}
+            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
+              <line x1="7" y1="7" x2="7.01" y2="7" strokeWidth="2.5" />
+            </svg>
+            {/* Badge showing tag count */}
+            {mTagList.length > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-indigo-500 text-white text-[10px] font-bold leading-none px-1">
+                {mTagList.length}
+              </span>
+            )}
+          </button>
+
+          {/* Tag checkbox dropdown */}
+          {modalTagFocused && (() => {
+            const rect = modalTagBtnRef.current?.getBoundingClientRect();
+            if (!rect) return null;
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const dropUp = spaceBelow < 320;
+            const dropWidth = 260;
+            const dropLeft = Math.min(rect.left, window.innerWidth - dropWidth - 8);
+
+            const allTags = tagsWithCounts;
+            const filtered = allTags.filter(
+              ({ tag: tg }) =>
+                !tagInput.trim() || tg.toLowerCase().includes(tagInput.toLowerCase())
+            );
+            const trimmed = tagInput.trim();
+            const isNew = trimmed && !allTags.some(({ tag: tg }) => tg.toLowerCase() === trimmed.toLowerCase());
+
+            return createPortal(
+              <div
+                style={{
+                  position: "fixed",
+                  ...(dropUp
+                    ? { bottom: window.innerHeight - rect.top + 6, left: dropLeft }
+                    : { top: rect.bottom + 6, left: dropLeft }),
+                  width: dropWidth,
+                  zIndex: 99999,
+                }}
+                className="rounded-2xl shadow-2xl bg-white/98 dark:bg-gray-900/98 backdrop-blur-xl border border-indigo-100/80 dark:border-indigo-800/50 overflow-hidden ring-1 ring-black/5 dark:ring-white/5"
+              >
+                {/* Search input */}
+                <div className="px-2 pt-2 pb-1.5">
+                  <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-800/80 border border-gray-200/80 dark:border-gray-700/60 focus-within:border-indigo-300 dark:focus-within:border-indigo-600 transition-colors duration-150">
+                    <svg className="w-3 h-3 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="6.5" cy="6.5" r="4"/><line x1="10" y1="10" x2="14" y2="14"/>
+                    </svg>
+                    <input
+                      ref={modalTagInputRef}
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") { setTagInput(""); setModalTagFocused(false); return; }
+                        handleTagKeyDown(e);
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          if (!suppressTagBlurRef.current) handleTagBlur();
+                          suppressTagBlurRef.current = false;
+                          setModalTagFocused(false);
+                        }, 200);
+                      }}
+                      onPaste={handleTagPaste}
+                      placeholder={t("searchOrCreateTag") || "Rechercher ou créer…"}
+                      className="flex-1 bg-transparent text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none min-w-0"
+                    />
                   </div>
-                  {/* Tag list */}
-                  {suggestions.length > 0 && (
-                    <>
-                      <div className="px-3 pt-1 pb-1">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{t("existingTags") || "Tags"}</span>
-                      </div>
-                      <div className="px-1.5 pb-1.5 max-h-44 overflow-y-auto">
-                        {suggestions.map(({ tag, count }) => (
+                </div>
+
+                {/* Tag list with checkboxes */}
+                {filtered.length > 0 && (
+                  <>
+                    <div className="px-3 pt-1 pb-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{t("existingTags") || "Tags"}</span>
+                    </div>
+                    <div className="px-1.5 pb-1.5 max-h-52 overflow-y-auto">
+                      {filtered.map(({ tag, count }) => {
+                        const checked = isTagApplied(tag);
+                        return (
                           <button
                             key={tag}
                             type="button"
                             onMouseDown={(e) => {
                               e.preventDefault();
                               suppressTagBlurRef.current = true;
-                              addTags(tag);
-                              setTagInput("");
-                              setModalTagFocused(false);
+                              toggleTag(tag);
                             }}
-                            className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-indigo-50/80 dark:hover:bg-indigo-900/30 text-sm text-gray-700 dark:text-gray-200 flex items-center justify-between gap-2 transition-all duration-150 group cursor-pointer"
+                            className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-indigo-50/80 dark:hover:bg-indigo-900/30 text-sm text-gray-700 dark:text-gray-200 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer"
                           >
-                            <span className="flex items-center gap-2 min-w-0">
-                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-indigo-100/80 dark:bg-indigo-800/40 text-indigo-500 dark:text-indigo-400 shrink-0 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-700/50 transition-colors duration-150">
-                                <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                  <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
+                            {/* Checkbox */}
+                            <span className={`inline-flex items-center justify-center w-4.5 h-4.5 rounded-md border-2 transition-all duration-150 shrink-0 ${
+                              checked
+                                ? "bg-indigo-500 border-indigo-500 dark:bg-indigo-600 dark:border-indigo-600"
+                                : "border-gray-300 dark:border-gray-600 group-hover:border-indigo-400 dark:group-hover:border-indigo-500"
+                            }`} style={{ width: 18, height: 18 }}>
+                              {checked && (
+                                <svg className="w-3 h-3 text-white" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M3.5 8.5l3 3 6-6" />
                                 </svg>
-                              </span>
-                              <span className="truncate font-medium">{tag}</span>
+                              )}
+                            </span>
+                            <span className="flex items-center gap-2 min-w-0 flex-1">
+                              <svg className="w-3 h-3 opacity-50 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                <path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/>
+                              </svg>
+                              <span className={`truncate ${checked ? "font-semibold" : "font-medium"}`}>{tag}</span>
                             </span>
                             <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 tabular-nums shrink-0">{count}</span>
                           </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {filtered.length === 0 && !isNew && (
+                  <div className="px-3 py-3 text-sm text-gray-400 dark:text-gray-500 text-center">{t("noTagsFound") || "Aucun tag trouvé"}</div>
+                )}
+
+                {/* Create new tag */}
+                {isNew && (
+                  <>
+                    {filtered.length > 0 && <div className="mx-3 border-t border-gray-100 dark:border-gray-800"/>}
+                    <div className="px-1.5 py-1.5">
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          suppressTagBlurRef.current = true;
+                          addTags(trimmed);
+                          setTagInput("");
+                        }}
+                        className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-emerald-50/80 dark:hover:bg-emerald-900/20 text-sm flex items-center gap-2 transition-all duration-150 group cursor-pointer"
+                      >
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-100/80 dark:bg-emerald-800/40 text-emerald-500 dark:text-emerald-400 shrink-0 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-700/50 transition-colors duration-150">
+                          <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
+                          </svg>
+                        </span>
+                        <span className="font-medium text-emerald-600 dark:text-emerald-400">{t("createTag") || "Créer"} "<span className="font-semibold">{trimmed}</span>"</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {/* Applied tags summary */}
+                {mTagList.length > 0 && (
+                  <>
+                    <div className="mx-3 border-t border-gray-100 dark:border-gray-800"/>
+                    <div className="px-3 py-2">
+                      <div className="flex flex-wrap gap-1">
+                        {mTagList.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-700/40"
+                          >
+                            {tag}
+                            <button
+                              className="w-3 h-3 rounded-full text-indigo-400 dark:text-indigo-300 hover:bg-red-400 dark:hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-150 cursor-pointer focus:outline-none leading-none"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                suppressTagBlurRef.current = true;
+                                setMTagList((prev) => prev.filter((t) => t !== tag));
+                              }}
+                            >
+                              ×
+                            </button>
+                          </span>
                         ))}
                       </div>
-                    </>
-                  )}
-                  {suggestions.length === 0 && !isNew && (
-                    <div className="px-3 py-3 text-sm text-gray-400 dark:text-gray-500 text-center">{t("noTagsFound") || "Aucun tag trouvé"}</div>
-                  )}
-                  {isNew && (
-                    <>
-                      {suggestions.length > 0 && <div className="mx-3 border-t border-gray-100 dark:border-gray-800"/>}
-                      <div className="px-1.5 py-1.5">
-                        <button
-                          type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            suppressTagBlurRef.current = true;
-                            addTags(trimmed);
-                            setTagInput("");
-                            setModalTagFocused(false);
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-emerald-50/80 dark:hover:bg-emerald-900/20 text-sm flex items-center gap-2 transition-all duration-150 group cursor-pointer"
-                        >
-                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-100/80 dark:bg-emerald-800/40 text-emerald-500 dark:text-emerald-400 shrink-0 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-700/50 transition-colors duration-150">
-                            <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                              <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
-                            </svg>
-                          </span>
-                          <span className="font-medium text-emerald-600 dark:text-emerald-400">{t("createTag") || "Créer"} "<span className="font-semibold">{trimmed}</span>"</span>
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>,
-                document.body
-              );
-            })()}
+                    </div>
+                  </>
+                )}
+              </div>,
+              document.body
+            );
+          })()}
         </div>
-      </div>
 
-      {/* Right controls */}
-      <div className="ml-auto flex items-center gap-3 flex-shrink-0">
-        {/* Collaborator avatars */}
-        {collaborators && collaborators.length > 0 && (
-          <div className="flex items-center -space-x-1.5">
-            {collaborators.slice(0, 4).map((collab) => (
-              <div key={collab.id} data-tooltip={collab.name || collab.email}>
-                <UserAvatar
-                  name={collab.name}
-                  email={collab.email}
-                  avatarUrl={collab.avatarUrl}
-                  size="w-6 h-6"
-                  textSize="text-[10px]"
-                  dark={dark}
-                  className="ring-2 ring-white dark:ring-[#1e1e1e]"
-                />
-              </div>
-            ))}
-            {collaborators.length > 4 && (
-              <span
-                data-tooltip={collaborators.slice(4).map((c) => c.name || c.email).join(", ")}
-                className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-semibold ring-2 ring-white dark:ring-[#1e1e1e] ${
-                  dark ? "bg-gray-600 text-gray-200" : "bg-gray-200 text-gray-600"
-                }`}
-              >
-                +{collaborators.length - 4}
-              </span>
-            )}
-          </div>
-        )}
-        {/* Save check – always visible */}
+        {/* ── Collaborate ── */}
         <button
-          onClick={modalHasChanges ? onSave : undefined}
-          disabled={savingModal || !modalHasChanges}
-          className={`modal-icon-btn flex-shrink-0 transition-all duration-200 ${modalHasChanges ? "modal-icon-btn--save-active" : "modal-icon-btn--save-idle"}`}
-          data-tooltip={modalHasChanges ? (savingModal ? t("saving") : t("save")) : t("saved")}
-          style={{ cursor: modalHasChanges ? "pointer" : "default" }}
+          className="modal-footer-btn modal-footer-btn--collab focus:outline-none"
+          data-tooltip={t("collaborate")}
+          onClick={onOpenCollaboration}
         >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
           </svg>
         </button>
+
+        {/* ── Formatting (mobile only) ── */}
+        {!isDesktop && mType === "text" && !viewMode && (
+          <button
+            ref={modalFmtBtnRef}
+            className="modal-footer-btn focus:outline-none"
+            data-tooltip={t("formatting")}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowModalFmt((v) => !v);
+            }}
+          >
+            <FormatIcon />
+          </button>
+        )}
+
+        {/* Spacer to push right-side actions */}
+        <div className="flex-1" />
+
+        {/* ── Archive / Restore ── */}
+        {isTrashed ? (
+          <button
+            className="modal-footer-btn modal-footer-btn--archive focus:outline-none"
+            data-tooltip={t("restoreFromTrash")}
+            onClick={() => onRestoreFromTrash(activeId)}
+          >
+            <ArchiveIcon />
+          </button>
+        ) : (
+          <button
+            className="modal-footer-btn modal-footer-btn--archive focus:outline-none"
+            data-tooltip={activeNoteObj?.archived ? t("unarchive") : t("archive")}
+            onClick={handleArchiveToggle}
+          >
+            <ArchiveIcon />
+          </button>
+        )}
+
+        {/* ── Delete / Trash ── */}
+        <button
+          className="modal-footer-btn modal-footer-btn--trash focus:outline-none"
+          data-tooltip={isTrashed ? t("permanentlyDelete") : t("moveToTrash")}
+          onClick={onOpenConfirmDelete}
+        >
+          <Trash />
+        </button>
+
+        {/* ── Download .md ── */}
+        <button
+          className="modal-footer-btn modal-footer-btn--download focus:outline-none"
+          data-tooltip={t("downloadMd")}
+          onClick={handleDownload}
+        >
+          <DownloadIcon />
+        </button>
+
+        {/* ── Edit/View toggle — text notes only, keeps gradient theme ── */}
+        {mType === "text" && (
+          <button
+            className="modal-footer-btn modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]"
+            onClick={handleToggleViewMode}
+            data-tooltip={viewMode ? t("switchToEditMode") : t("switchToViewMode")}
+            aria-label={viewMode ? t("editMode") : t("viewMode")}
+          >
+            {viewMode ? (
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25Z" fill="currentColor" />
+                <path d="m14.06 4.94 3.75 3.75 1.41-1.41a1.5 1.5 0 0 0 0-2.12l-1.63-1.63a1.5 1.5 0 0 0-2.12 0l-1.41 1.41Z" fill="currentColor" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />
+                <circle cx="12" cy="12" r="3.2" fill="currentColor" />
+              </svg>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
