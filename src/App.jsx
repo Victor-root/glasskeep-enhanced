@@ -2778,7 +2778,8 @@ export default function App() {
 
   // Local-first auto-save for text metadata (color, tags, images) — immediate, no debounce
   useEffect(() => {
-    if (!open || !activeId || mType !== "text") return;
+    if (!open || !activeId) return;
+    if (mType === "draw") return; // drawings handle their own save
     const initial = initialModalStateRef.current;
     if (!initial) return;
 
