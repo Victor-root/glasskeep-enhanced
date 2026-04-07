@@ -62,7 +62,8 @@ html.dark header.glass-card {
   border-bottom: 1px solid var(--border-light);
   box-shadow: none;
 }
-.note-content p { margin-bottom: 0.5rem; }
+.note-content p { margin-bottom: 0.15rem; }
+.note-content p:last-child { margin-bottom: 0; }
 .note-content h1, .note-content h2, .note-content h3 { margin-bottom: 0.75rem; font-weight: 600; }
 .note-content h1 { font-size: 1.5rem; line-height: 1.3; }
 .note-content h2 { font-size: 1.25rem; line-height: 1.35; }
