@@ -154,7 +154,7 @@ export default function NoteModal({
         }}
       >
         <div
-          className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full h-full max-w-none sm:shadow-2xl sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl flex flex-col relative overflow-hidden`}
+          className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full h-full max-w-none sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl flex flex-col relative overflow-hidden`}
           style={{ backgroundColor: modalBgFor(mColor, dark) }}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
