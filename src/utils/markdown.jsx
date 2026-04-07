@@ -21,7 +21,7 @@ const _PURIFY_CONFIG = {
     // "img" intentionally excluded: prevents external image loading (tracking / IP leak)
     "span", "div",
   ],
-  ALLOWED_ATTR: ["href", "title", "class", "target", "rel"],
+  ALLOWED_ATTR: ["href", "title", "class", "target", "rel", "start"],
   ALLOW_DATA_ATTR: false,
 };
 export const renderSafeMarkdown = (md) => {
