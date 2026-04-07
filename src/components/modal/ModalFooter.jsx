@@ -367,7 +367,8 @@ export default function ModalFooter({
         <button
           className={`${btnClass} focus:outline-none ${!canUndo ? "opacity-30" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
-          onClick={undo}
+          onTouchStart={(e) => { e.preventDefault(); undo(); }}
+          onClick={isDesktop ? undo : undefined}
           disabled={!canUndo}
           data-tooltip={!isDesktop ? t("undo") : undefined}
         >
@@ -383,7 +384,8 @@ export default function ModalFooter({
         <button
           className={`${btnClass} focus:outline-none ${!canRedo ? "opacity-30" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
-          onClick={redo}
+          onTouchStart={(e) => { e.preventDefault(); redo(); }}
+          onClick={isDesktop ? redo : undefined}
           disabled={!canRedo}
           data-tooltip={!isDesktop ? t("redo") : undefined}
         >
