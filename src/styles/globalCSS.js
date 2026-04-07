@@ -416,6 +416,12 @@ html.dark .modal-icon-btn--image:hover {
 /* ── Modal footer toolbar (Google Keep style) ─────────────────────────── */
 .modal-footer-toolbar {
   flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.04);
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.06);
+}
+html.dark .modal-footer-toolbar {
+  background: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.2);
 }
 .modal-footer-btn {
   position: relative;
