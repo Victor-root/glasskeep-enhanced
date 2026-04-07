@@ -381,4 +381,5 @@ loginFailed: "Login failed",
   syncActionReorder: "Reorder",
   undo: "Undo (Ctrl+Z)",
   redo: "Redo (Ctrl+Y)",
+  image: "Image",
 };

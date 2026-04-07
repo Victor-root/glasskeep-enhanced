@@ -381,4 +381,5 @@ loginFailed: "Échec de la connexion",
   syncActionReorder: "Réorganisation",
   undo: "Annuler (Ctrl+Z)",
   redo: "Rétablir (Ctrl+Y)",
+  image: "Image",
 };

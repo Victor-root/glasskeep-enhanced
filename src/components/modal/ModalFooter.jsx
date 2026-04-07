@@ -3,16 +3,14 @@ import { createPortal } from "react-dom";
 import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
 import Popover from "../common/Popover.jsx";
-import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, FormatIcon, PinOutline, PinFilled } from "../../icons/index.jsx";
-import UserAvatar from "../common/UserAvatar.jsx";
+import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, FormatIcon } from "../../icons/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 import { t } from "../../i18n";
 
 /**
  * Google Keep-style footer toolbar for the note modal.
- * All action icons in a single row, left-to-right:
- *   Color | Image | Tag (checkbox dropdown) | Collaborate | Format (mobile) |
- *   Archive | Trash | Download | Edit/View toggle
+ * Desktop: icon + text label for each action.
+ * Mobile:  icon-only (compact).
  */
 export default function ModalFooter({
   dark,
@@ -68,19 +66,9 @@ export default function ModalFooter({
   redo,
   canUndo,
   canRedo,
-  // pin (desktop footer)
-  onTogglePin,
-  // save (desktop footer)
-  modalHasChanges,
-  savingModal,
-  onSave,
-  // collaborators (desktop footer)
-  collaborators,
 }) {
   const isDesktop = windowWidth >= 768;
   const isTrashed = tagFilter === "TRASHED";
-  const isPinned = !!notes.find((n) => String(n.id) === String(activeId))?.pinned;
-  const showPinBtn = tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED";
 
   const handleDownload = () => {
     const n = notes.find((nn) => String(nn.id) === String(activeId));
@@ -112,18 +100,22 @@ export default function ModalFooter({
     }
   };
 
+  /* Desktop: labeled button, Mobile: icon-only */
+  const btnClass = isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn";
+
   return (
     <div className="modal-footer-toolbar border-t border-[var(--border-light)]">
-      <div className="flex items-center gap-0.5 px-2 sm:px-4 py-1.5 overflow-x-auto">
+      <div className={`flex items-center px-2 sm:px-3 py-1.5 overflow-x-auto ${isDesktop ? "gap-1" : "gap-0.5"}`}>
 
         {/* ── Color picker ── */}
         <button
           ref={modalColorBtnRef}
-          className="modal-footer-btn focus:outline-none"
-          data-tooltip={t("color")}
+          className={`${btnClass} focus:outline-none`}
           onClick={() => setShowModalColorPop((v) => !v)}
+          data-tooltip={!isDesktop ? t("color") : undefined}
         >
-          <PaletteColorIcon size={18} />
+          <PaletteColorIcon size={isDesktop ? 16 : 18} />
+          {isDesktop && <span>{t("color")}</span>}
         </button>
         <ColorPickerPanel
           anchorRef={modalColorBtnRef}
@@ -151,11 +143,12 @@ export default function ModalFooter({
               }}
             />
             <button
-              className="modal-footer-btn modal-footer-btn--image focus:outline-none"
-              data-tooltip={t("addImages")}
+              className={`${btnClass} modal-footer-btn--image focus:outline-none`}
               onClick={() => modalFileRef.current?.click()}
+              data-tooltip={!isDesktop ? t("addImages") : undefined}
             >
               <AddImageIcon />
+              {isDesktop && <span>{t("image")}</span>}
             </button>
           </>
         )}
@@ -164,8 +157,7 @@ export default function ModalFooter({
         <div className="relative">
           <button
             ref={modalTagBtnRef}
-            className="modal-footer-btn focus:outline-none"
-            data-tooltip={t("addTag")}
+            className={`${btnClass} focus:outline-none`}
             onClick={() => {
               setModalTagFocused((v) => {
                 if (!v) setTimeout(() => { if (windowWidth >= 640) modalTagInputRef.current?.focus(); }, 0);
@@ -173,14 +165,15 @@ export default function ModalFooter({
               });
               setTagInput("");
             }}
+            data-tooltip={!isDesktop ? t("addTag") : undefined}
           >
-            {/* Tag/label icon */}
-            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
               <line x1="7" y1="7" x2="7.01" y2="7" strokeWidth="2.5" />
             </svg>
-            {/* Badge showing tag count */}
-            {mTagList.length > 0 && (
+            {isDesktop && <span>{t("tags")}{mTagList.length > 0 ? ` (${mTagList.length})` : ""}</span>}
+            {/* Badge — mobile only */}
+            {!isDesktop && mTagList.length > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-indigo-500 text-white text-[10px] font-bold leading-none px-1">
                 {mTagList.length}
               </span>
@@ -238,7 +231,7 @@ export default function ModalFooter({
                         }, 200);
                       }}
                       onPaste={handleTagPaste}
-                      placeholder={t("searchOrCreateTag") || "Rechercher ou créer…"}
+                      placeholder={t("searchOrCreateTag") || "Rechercher ou cr\u00e9er\u2026"}
                       className="flex-1 bg-transparent text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none min-w-0"
                     />
                   </div>
@@ -264,8 +257,7 @@ export default function ModalFooter({
                             }}
                             className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-indigo-50/80 dark:hover:bg-indigo-900/30 text-sm text-gray-700 dark:text-gray-200 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer"
                           >
-                            {/* Checkbox */}
-                            <span className={`inline-flex items-center justify-center w-4.5 h-4.5 rounded-md border-2 transition-all duration-150 shrink-0 ${
+                            <span className={`inline-flex items-center justify-center rounded-md border-2 transition-all duration-150 shrink-0 ${
                               checked
                                 ? "bg-indigo-500 border-indigo-500 dark:bg-indigo-600 dark:border-indigo-600"
                                 : "border-gray-300 dark:border-gray-600 group-hover:border-indigo-400 dark:group-hover:border-indigo-500"
@@ -291,10 +283,9 @@ export default function ModalFooter({
                 )}
 
                 {filtered.length === 0 && !isNew && (
-                  <div className="px-3 py-3 text-sm text-gray-400 dark:text-gray-500 text-center">{t("noTagsFound") || "Aucun tag trouvé"}</div>
+                  <div className="px-3 py-3 text-sm text-gray-400 dark:text-gray-500 text-center">{t("noTagsFound") || "Aucun tag trouv\u00e9"}</div>
                 )}
 
-                {/* Create new tag */}
                 {isNew && (
                   <>
                     {filtered.length > 0 && <div className="mx-3 border-t border-gray-100 dark:border-gray-800"/>}
@@ -314,13 +305,12 @@ export default function ModalFooter({
                             <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
                           </svg>
                         </span>
-                        <span className="font-medium text-emerald-600 dark:text-emerald-400">{t("createTag") || "Créer"} "<span className="font-semibold">{trimmed}</span>"</span>
+                        <span className="font-medium text-emerald-600 dark:text-emerald-400">{t("createTag") || "Cr\u00e9er"} "<span className="font-semibold">{trimmed}</span>"</span>
                       </button>
                     </div>
                   </>
                 )}
 
-                {/* Applied tags summary */}
                 {mTagList.length > 0 && (
                   <>
                     <div className="mx-3 border-t border-gray-100 dark:border-gray-800"/>
@@ -357,13 +347,14 @@ export default function ModalFooter({
 
         {/* ── Collaborate ── */}
         <button
-          className="modal-footer-btn modal-footer-btn--collab focus:outline-none"
-          data-tooltip={t("collaborate")}
+          className={`${btnClass} modal-footer-btn--collab focus:outline-none`}
           onClick={onOpenCollaboration}
+          data-tooltip={!isDesktop ? t("collaborate") : undefined}
         >
-          <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 20 20">
+          <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} fill="currentColor" viewBox="0 0 20 20">
             <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
           </svg>
+          {isDesktop && <span>{t("collaborate")}</span>}
         </button>
 
         {/* ── Formatting (mobile only) ── */}
@@ -383,156 +374,86 @@ export default function ModalFooter({
 
         {/* ── Undo ── */}
         <button
-          className={`modal-footer-btn focus:outline-none ${!canUndo ? "opacity-30" : ""}`}
-          data-tooltip={t("undo")}
+          className={`${btnClass} focus:outline-none ${!canUndo ? "opacity-30" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
           onClick={undo}
           disabled={!canUndo}
+          data-tooltip={!isDesktop ? t("undo") : undefined}
         >
-          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 10h13a4 4 0 0 1 0 8H7" />
             <path d="M3 10l4-4" />
             <path d="M3 10l4 4" />
           </svg>
+          {isDesktop && <span>{t("undo")}</span>}
         </button>
 
         {/* ── Redo ── */}
         <button
-          className={`modal-footer-btn focus:outline-none ${!canRedo ? "opacity-30" : ""}`}
-          data-tooltip={t("redo")}
+          className={`${btnClass} focus:outline-none ${!canRedo ? "opacity-30" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
           onClick={redo}
           disabled={!canRedo}
+          data-tooltip={!isDesktop ? t("redo") : undefined}
         >
-          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 10H8a4 4 0 0 0 0 8h10" />
             <path d="M21 10l-4-4" />
             <path d="M21 10l-4 4" />
           </svg>
+          {isDesktop && <span>{t("redo")}</span>}
         </button>
 
-        {/* Spacer to push right-side actions */}
+        {/* Spacer */}
         <div className="flex-1" />
-
-        {/* ── Desktop: applied tag chips (compact) ── */}
-        {isDesktop && mTagList.length > 0 && (
-          <div className="flex items-center gap-1 mr-1">
-            {mTagList.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-100/70 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-700/30 max-w-[90px] truncate"
-              >
-                <svg className="w-2.5 h-2.5 opacity-50 shrink-0" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/></svg>
-                {tag}
-              </span>
-            ))}
-            {mTagList.length > 3 && (
-              <span className="text-[11px] font-medium text-indigo-400 dark:text-indigo-500">+{mTagList.length - 3}</span>
-            )}
-          </div>
-        )}
-
-        {/* ── Desktop: collaborator avatars ── */}
-        {isDesktop && collaborators && collaborators.length > 0 && (
-          <div className="flex items-center -space-x-1.5 mr-1">
-            {collaborators.slice(0, 3).map((collab) => (
-              <div key={collab.id} data-tooltip={collab.name || collab.email}>
-                <UserAvatar
-                  name={collab.name}
-                  email={collab.email}
-                  avatarUrl={collab.avatarUrl}
-                  size="w-6 h-6"
-                  textSize="text-[10px]"
-                  dark={dark}
-                  className="ring-2 ring-white dark:ring-[#1e1e1e]"
-                />
-              </div>
-            ))}
-            {collaborators.length > 3 && (
-              <span
-                data-tooltip={collaborators.slice(3).map((c) => c.name || c.email).join(", ")}
-                className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-semibold ring-2 ring-white dark:ring-[#1e1e1e] ${
-                  dark ? "bg-gray-600 text-gray-200" : "bg-gray-200 text-gray-600"
-                }`}
-              >
-                +{collaborators.length - 3}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* ── Desktop: Pin ── */}
-        {isDesktop && showPinBtn && (
-          <button
-            className={`modal-footer-btn focus:outline-none ${isPinned ? "modal-footer-btn--pin-active" : ""}`}
-            data-tooltip={t("pinUnpin")}
-            onClick={() => activeId != null && onTogglePin(activeId, !isPinned)}
-          >
-            {isPinned ? <PinFilled /> : <PinOutline />}
-          </button>
-        )}
-
-        {/* ── Desktop: Save checkmark ── */}
-        {isDesktop && (
-          <button
-            onClick={modalHasChanges ? onSave : undefined}
-            disabled={savingModal || !modalHasChanges}
-            className={`modal-footer-btn flex-shrink-0 transition-all duration-200 ${modalHasChanges ? "modal-footer-btn--save-active" : "modal-footer-btn--save-idle"}`}
-            data-tooltip={modalHasChanges ? (savingModal ? t("saving") : t("save")) : t("saved")}
-            style={{ cursor: modalHasChanges ? "pointer" : "default" }}
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        )}
-
-        {/* ── Separator before destructive actions (desktop) ── */}
-        {isDesktop && <div className={`w-px h-5 mx-1 ${dark ? "bg-white/12" : "bg-black/10"}`} />}
 
         {/* ── Archive / Restore ── */}
         {isTrashed ? (
           <button
-            className="modal-footer-btn modal-footer-btn--archive focus:outline-none"
-            data-tooltip={t("restoreFromTrash")}
+            className={`${btnClass} modal-footer-btn--archive focus:outline-none`}
             onClick={() => onRestoreFromTrash(activeId)}
+            data-tooltip={!isDesktop ? t("restoreFromTrash") : undefined}
           >
             <ArchiveIcon />
+            {isDesktop && <span>{t("restoreFromTrash")}</span>}
           </button>
         ) : (
           <button
-            className="modal-footer-btn modal-footer-btn--archive focus:outline-none"
-            data-tooltip={activeNoteObj?.archived ? t("unarchive") : t("archive")}
+            className={`${btnClass} modal-footer-btn--archive focus:outline-none`}
             onClick={handleArchiveToggle}
+            data-tooltip={!isDesktop ? (activeNoteObj?.archived ? t("unarchive") : t("archive")) : undefined}
           >
             <ArchiveIcon />
+            {isDesktop && <span>{activeNoteObj?.archived ? t("unarchive") : t("archive")}</span>}
           </button>
         )}
 
         {/* ── Delete / Trash ── */}
         <button
-          className="modal-footer-btn modal-footer-btn--trash focus:outline-none"
-          data-tooltip={isTrashed ? t("permanentlyDelete") : t("moveToTrash")}
+          className={`${btnClass} modal-footer-btn--trash focus:outline-none`}
           onClick={onOpenConfirmDelete}
+          data-tooltip={!isDesktop ? (isTrashed ? t("permanentlyDelete") : t("moveToTrash")) : undefined}
         >
           <Trash />
+          {isDesktop && <span>{isTrashed ? t("permanentlyDelete") : t("trash")}</span>}
         </button>
 
         {/* ── Download .md ── */}
         <button
-          className="modal-footer-btn modal-footer-btn--download focus:outline-none"
-          data-tooltip={t("downloadMd")}
+          className={`${btnClass} modal-footer-btn--download focus:outline-none`}
           onClick={handleDownload}
+          data-tooltip={!isDesktop ? t("downloadMd") : undefined}
         >
           <DownloadIcon />
+          {isDesktop && <span>{t("downloadMd")}</span>}
         </button>
 
-        {/* ── Edit/View toggle — text notes only, keeps gradient theme ── */}
+        {/* ── Edit/View toggle — text notes only ── */}
         {mType === "text" && (
           <button
-            className="modal-footer-btn modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]"
+            className={`${isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn"} modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]`}
             onClick={handleToggleViewMode}
-            data-tooltip={viewMode ? t("switchToEditMode") : t("switchToViewMode")}
+            data-tooltip={!isDesktop ? (viewMode ? t("switchToEditMode") : t("switchToViewMode")) : undefined}
             aria-label={viewMode ? t("editMode") : t("viewMode")}
           >
             {viewMode ? (
@@ -546,6 +467,7 @@ export default function ModalFooter({
                 <circle cx="12" cy="12" r="3.2" fill="currentColor" />
               </svg>
             )}
+            {isDesktop && <span>{viewMode ? t("editMode") : t("viewMode")}</span>}
           </button>
         )}
       </div>
