@@ -729,9 +729,12 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
 .note-scrim-anim         { animation: scrimFadeIn  200ms ease-out both; }
 .note-scrim-anim.closing { animation: scrimFadeOut 180ms ease-in  both; }
 
-/* Remove glass-card shadow on modal to avoid edge halos */
+/* Remove glass-card shadow & backdrop-filter on modal to avoid edge halos */
 .note-modal-anim.glass-card {
   box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
 }
 
 /* formatting popover base */
