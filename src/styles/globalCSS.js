@@ -490,6 +490,21 @@ html.dark .modal-footer-labeled-btn:hover {
   color: rgba(255, 255, 255, 0.95);
 }
 
+/* Responsive: collapse labels to icon-only below 1024px */
+@media (max-width: 1023px) {
+  .modal-footer-labeled-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    justify-content: center;
+    gap: 0;
+  }
+  .modal-footer-labeled-btn > span {
+    display: none;
+  }
+}
+
 /* Footer colored variants (apply to both icon-only and labeled) */
 .modal-footer-btn--trash, .modal-footer-labeled-btn.modal-footer-btn--trash { color: #dc2626; }
 .modal-footer-btn--trash:hover, .modal-footer-labeled-btn.modal-footer-btn--trash:hover { background: rgba(239, 68, 68, 0.1) !important; color: #b91c1c !important; }

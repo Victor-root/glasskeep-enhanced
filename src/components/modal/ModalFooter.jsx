@@ -108,7 +108,7 @@ export default function ModalFooter({
 
   return (
     <div className="modal-footer-toolbar border-t border-[var(--border-light)]">
-      <div className={`flex items-center px-2 sm:px-3 py-1.5 overflow-x-auto ${isDesktop ? "gap-1" : "gap-0.5"}`}>
+      <div className={`flex items-center px-2 sm:px-3 py-1.5 ${isDesktop ? "gap-1" : "gap-0.5"}`}>
 
         {/* ── Color picker ── */}
         <button
@@ -398,27 +398,6 @@ export default function ModalFooter({
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* ── Archive / Restore ── */}
-        {isTrashed ? (
-          <button
-            className={`${btnClass} modal-footer-btn--archive focus:outline-none`}
-            onClick={() => onRestoreFromTrash(activeId)}
-            data-tooltip={!isDesktop ? t("restoreFromTrash") : undefined}
-          >
-            <ArchiveIcon />
-            {isDesktop && <span>{t("restoreFromTrash")}</span>}
-          </button>
-        ) : (
-          <button
-            className={`${btnClass} modal-footer-btn--archive focus:outline-none`}
-            onClick={handleArchiveToggle}
-            data-tooltip={!isDesktop ? (activeNoteObj?.archived ? t("unarchive") : t("archive")) : undefined}
-          >
-            <ArchiveIcon />
-            {isDesktop && <span>{activeNoteObj?.archived ? t("unarchive") : t("archive")}</span>}
-          </button>
-        )}
-
         {/* ── Delete / Trash ── */}
         <button
           className={`${btnClass} modal-footer-btn--trash focus:outline-none`}
@@ -448,14 +427,36 @@ export default function ModalFooter({
             style={{ backgroundColor: dark ? "#222222" : undefined }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Archive / Restore */}
+            {isTrashed ? (
+              <button
+                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                style={{ color: dark ? "#fbbf24" : "#a16207" }}
+                onClick={() => { onRestoreFromTrash(activeId); setKebabOpen(false); }}
+              >
+                <ArchiveIcon />{t("restoreFromTrash")}
+              </button>
+            ) : (
+              <button
+                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                style={{ color: dark ? "#fbbf24" : "#a16207" }}
+                onClick={() => { handleArchiveToggle(); setKebabOpen(false); }}
+              >
+                <ArchiveIcon />{activeNoteObj?.archived ? t("unarchive") : t("archive")}
+              </button>
+            )}
+            {/* Download */}
             <button
               className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+              style={{ color: dark ? "#4ade80" : "#16a34a" }}
               onClick={() => { handleDownload(); setKebabOpen(false); }}
             >
               <DownloadIcon />{t("downloadMd")}
             </button>
+            {/* Collaborate */}
             <button
               className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+              style={{ color: dark ? "#a78bfa" : "#7c3aed" }}
               onClick={() => { onOpenCollaboration(); setKebabOpen(false); }}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
