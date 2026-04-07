@@ -414,7 +414,7 @@ export default function ModalFooter({
               {hasCollabs ? (
                 <span className="flex items-center -space-x-1">
                   {collabs.slice(0, 3).map((c) => (
-                    <span key={c.id} title={c.name || c.email}>
+                    <span key={c.id} data-tooltip={c.name || c.email}>
                       <UserAvatar
                         name={c.name}
                         email={c.email}
@@ -429,7 +429,7 @@ export default function ModalFooter({
                   {collabs.length > 3 && (
                     <span
                       className="text-[10px] font-semibold opacity-70 pl-1.5"
-                      title={collabs.slice(3).map((c) => c.name || c.email).join(", ")}
+                      data-tooltip={collabs.slice(3).map((c) => c.name || c.email).join(", ")}
                     >+{collabs.length - 3}</span>
                   )}
                 </span>
