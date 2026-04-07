@@ -398,6 +398,18 @@ export default function ModalFooter({
         {/* Spacer */}
         <div className="flex-1" />
 
+        {/* ── Collaborate ── */}
+        <button
+          className={`${btnClass} modal-footer-btn--collab focus:outline-none`}
+          onClick={onOpenCollaboration}
+          data-tooltip={!isDesktop ? t("collaborate") : undefined}
+        >
+          <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} fill="currentColor" viewBox="0 0 20 20">
+            <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
+          </svg>
+          {isDesktop && <span>{t("collaborate")}</span>}
+        </button>
+
         {/* ── Delete / Trash ── */}
         <button
           className={`${btnClass} modal-footer-btn--trash focus:outline-none`}
@@ -452,17 +464,6 @@ export default function ModalFooter({
               onClick={() => { handleDownload(); setKebabOpen(false); }}
             >
               <DownloadIcon />{t("downloadMd")}
-            </button>
-            {/* Collaborate */}
-            <button
-              className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-              style={{ color: dark ? "#a78bfa" : "#7c3aed" }}
-              onClick={() => { onOpenCollaboration(); setKebabOpen(false); }}
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-              </svg>
-              {t("collaborate")}
             </button>
           </div>
         </Popover>
