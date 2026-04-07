@@ -222,19 +222,21 @@ export default function ModalFooter({
         {collaborators && collaborators.length > 0 && (
           <div className="flex items-center -space-x-1.5">
             {collaborators.slice(0, 4).map((collab) => (
-              <UserAvatar
-                key={collab.id}
-                name={collab.name}
-                email={collab.email}
-                avatarUrl={collab.avatarUrl}
-                size="w-6 h-6"
-                textSize="text-[10px]"
-                dark={dark}
-                className="ring-2 ring-white dark:ring-[#1e1e1e]"
-              />
+              <div key={collab.id} data-tooltip={collab.name || collab.email}>
+                <UserAvatar
+                  name={collab.name}
+                  email={collab.email}
+                  avatarUrl={collab.avatarUrl}
+                  size="w-6 h-6"
+                  textSize="text-[10px]"
+                  dark={dark}
+                  className="ring-2 ring-white dark:ring-[#1e1e1e]"
+                />
+              </div>
             ))}
             {collaborators.length > 4 && (
               <span
+                data-tooltip={collaborators.slice(4).map((c) => c.name || c.email).join(", ")}
                 className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-semibold ring-2 ring-white dark:ring-[#1e1e1e] ${
                   dark ? "bg-gray-600 text-gray-200" : "bg-gray-200 text-gray-600"
                 }`}
