@@ -163,7 +163,7 @@ export default function NoteModal({
   return (
     <>
       <div
-        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 bg-black/40 z-40 flex items-center justify-center overscroll-contain`}
+        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 bg-black/40 max-sm:bg-black z-40 flex items-center justify-center overscroll-contain`}
         onMouseDown={(e) => {
           scrimClickStartRef.current = e.target === e.currentTarget;
         }}
