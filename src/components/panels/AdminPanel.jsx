@@ -122,7 +122,7 @@ export default function AdminPanel({
         />
       )}
       <div
-        className={`fixed top-0 right-0 z-50 h-full w-full sm:w-96 shadow-2xl transition-transform duration-200 ${open ? "translate-x-0" : "translate-x-full"}`}
+        className={`fixed top-0 right-0 z-50 h-full w-full sm:w-96 transition-transform duration-200 ${open ? "translate-x-0 shadow-2xl" : "translate-x-full shadow-none"}`}
         style={{
           backgroundColor: dark
             ? "rgba(40,40,40,0.95)"
