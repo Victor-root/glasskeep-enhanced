@@ -193,7 +193,7 @@ export default function NoteModal({
                 ? "#a78bfa"
                 : solid(bgFor(mColor, dark));
               const noteColorOpaque = typeof noteColorBtn === "string" ? noteColorBtn.replace(/,\s*[\d.]+\)$/, ', 1)') : noteColorBtn;
-              return { scrollbarColor: `${sc.thumb} ${sc.track}`, '--sb-thumb': sc.thumb, '--sb-track': sc.track, '--note-color': noteColorBtn, '--note-color-opaque': noteColorOpaque, backgroundColor: 'inherit' };
+              return { '--sb-thumb': sc.thumb, '--sb-track': sc.track, '--note-color': noteColorBtn, '--note-color-opaque': noteColorOpaque, backgroundColor: 'inherit' };
             })()}
           >
             <ModalHeader
