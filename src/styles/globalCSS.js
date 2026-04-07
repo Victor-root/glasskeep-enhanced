@@ -762,9 +762,7 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
 .login-deco-card {
   position: absolute;
   pointer-events: none;
-  background-color: var(--card-bg-light);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background-color: rgba(255, 255, 255, 0.55);
   border: 1px solid var(--border-light);
   border-radius: 0.75rem;
   padding: 1rem;
@@ -775,14 +773,6 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
   width: 160px;
 }
 @media (pointer: coarse) {
-  .login-deco-card {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background-color: rgba(255,255,255,0.55);
-  }
-  html.dark .login-deco-card {
-    background-color: rgba(30,30,40,0.65);
-  }
   /* Disable expensive backdrop-filter on touch devices (tablets/phones) */
   .glass-card,
   .modal-scrim,
@@ -816,6 +806,7 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
   }
 }
 html.dark .login-deco-card {
+  background-color: rgba(30, 30, 40, 0.65);
   opacity: 0.35;
 }
 .login-deco-card .deco-title {
