@@ -365,10 +365,9 @@ export default function ModalFooter({
 
         {/* ── Undo ── */}
         <button
-          className={`${btnClass} focus:outline-none ${!canUndo ? "opacity-50" : ""}`}
+          className={`${btnClass} focus:outline-none ${!canUndo ? "opacity-50 cursor-default" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => { if (!isDesktop) document.activeElement?.blur(); undo(); }}
-          disabled={!canUndo}
+          onClick={() => { if (canUndo) { if (!isDesktop) document.activeElement?.blur(); undo(); } }}
           data-tooltip={!isDesktop ? t("undo") : undefined}
         >
           <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -381,10 +380,9 @@ export default function ModalFooter({
 
         {/* ── Redo ── */}
         <button
-          className={`${btnClass} focus:outline-none ${!canRedo ? "opacity-50" : ""}`}
+          className={`${btnClass} focus:outline-none ${!canRedo ? "opacity-50 cursor-default" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => { if (!isDesktop) document.activeElement?.blur(); redo(); }}
-          disabled={!canRedo}
+          onClick={() => { if (canRedo) { if (!isDesktop) document.activeElement?.blur(); redo(); } }}
           data-tooltip={!isDesktop ? t("redo") : undefined}
         >
           <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
