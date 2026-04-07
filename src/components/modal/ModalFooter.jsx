@@ -246,20 +246,18 @@ export default function ModalFooter({
             )}
           </div>
         )}
-        {/* Save check – always visible, bright green when unsaved, faded when saved */}
-        {!(mType === "text" && isCollaborativeNote(activeId)) && (
-          <button
-            onClick={modalHasChanges ? onSave : undefined}
-            disabled={savingModal || !modalHasChanges}
-            className={`modal-icon-btn flex-shrink-0 transition-all duration-200 ${modalHasChanges ? "modal-icon-btn--save-active" : "modal-icon-btn--save-idle"}`}
-            data-tooltip={modalHasChanges ? (savingModal ? t("saving") : t("save")) : t("saved")}
-            style={{ cursor: modalHasChanges ? "pointer" : "default" }}
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        )}
+        {/* Save check – always visible */}
+        <button
+          onClick={modalHasChanges ? onSave : undefined}
+          disabled={savingModal || !modalHasChanges}
+          className={`modal-icon-btn flex-shrink-0 transition-all duration-200 ${modalHasChanges ? "modal-icon-btn--save-active" : "modal-icon-btn--save-idle"}`}
+          data-tooltip={modalHasChanges ? (savingModal ? t("saving") : t("save")) : t("saved")}
+          style={{ cursor: modalHasChanges ? "pointer" : "default" }}
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
       </div>
     </div>
   );
