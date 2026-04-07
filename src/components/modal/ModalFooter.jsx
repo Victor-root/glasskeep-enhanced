@@ -58,6 +58,7 @@ export default function ModalFooter({
   notes,
   tagFilter,
   activeNoteObj,
+  addModalCollaborators,
   onDownloadNote,
   onRestoreFromTrash,
   onArchiveNote,
@@ -399,8 +400,8 @@ export default function ModalFooter({
 
         {/* ── Collaborate (with avatars when collaborators exist) ── */}
         {(() => {
-          const collabs = activeNoteObj?.collaborators;
-          const hasCollabs = Array.isArray(collabs) && collabs.length > 0;
+          const collabs = addModalCollaborators || [];
+          const hasCollabs = collabs.length > 0;
           return (
             <button
               className={`${hasCollabs ? "modal-footer-labeled-btn" : btnClass} modal-footer-btn--collab focus:outline-none`}
@@ -414,10 +415,10 @@ export default function ModalFooter({
                 <span className="flex items-center -space-x-1">
                   {collabs.slice(0, 3).map((c) => (
                     <UserAvatar
-                      key={typeof c === "string" ? c : c.user_id || c.username}
-                      name={typeof c === "string" ? c : c.display_name || c.username}
-                      email={typeof c === "string" ? undefined : c.email}
-                      avatarUrl={typeof c === "string" ? undefined : c.avatar_url}
+                      key={c.id}
+                      name={c.name}
+                      email={c.email}
+                      avatarUrl={c.avatar_url}
                       size="w-5 h-5"
                       textSize="text-[9px]"
                       dark={dark}

@@ -560,6 +560,7 @@ export default function NoteModal({
             notes={notes}
             tagFilter={tagFilter}
             activeNoteObj={activeNoteObj}
+            addModalCollaborators={addModalCollaborators}
             onDownloadNote={handleDownloadNote}
             onRestoreFromTrash={restoreFromTrash}
             onArchiveNote={handleArchiveNote}
