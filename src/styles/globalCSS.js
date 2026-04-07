@@ -62,8 +62,8 @@ html.dark header.glass-card {
   border-bottom: 1px solid var(--border-light);
   box-shadow: none;
 }
-.note-content p { margin: 0; }
-.note-content h1, .note-content h2, .note-content h3 { margin: 0; font-weight: 600; }
+.note-content p { margin-bottom: 0.5rem; }
+.note-content h1, .note-content h2, .note-content h3 { margin-bottom: 0.75rem; font-weight: 600; }
 .note-content h1 { font-size: 1.5rem; line-height: 1.3; }
 .note-content h2 { font-size: 1.25rem; line-height: 1.35; }
 .note-content h3 { font-size: 1.125rem; line-height: 1.4; }
@@ -99,59 +99,6 @@ html.dark header.glass-card {
 .note-content--dense li > p { margin: 0; }
 .note-content--dense li ul, .note-content--dense li ol { margin: 0.1rem 0 0 1.1rem; padding-left: 1.1rem; }
 
-/* Top-level block spacing in dense view mode:
-   Adjacent sibling selectors restore visible gaps between distinct
-   Markdown blocks while keeping list internals compact. */
-.note-content--dense > p + p,
-.note-content--dense > p + pre,
-.note-content--dense > p + .code-block-wrapper,
-.note-content--dense > p + ul,
-.note-content--dense > p + ol,
-.note-content--dense > p + blockquote,
-.note-content--dense > p + h1,
-.note-content--dense > p + h2,
-.note-content--dense > p + h3,
-.note-content--dense > pre + p,
-.note-content--dense > pre + pre,
-.note-content--dense > pre + ul,
-.note-content--dense > pre + ol,
-.note-content--dense > pre + blockquote,
-.note-content--dense > .code-block-wrapper + p,
-.note-content--dense > .code-block-wrapper + .code-block-wrapper,
-.note-content--dense > .code-block-wrapper + ul,
-.note-content--dense > .code-block-wrapper + ol,
-.note-content--dense > .code-block-wrapper + blockquote,
-.note-content--dense > ul + p,
-.note-content--dense > ul + pre,
-.note-content--dense > ul + .code-block-wrapper,
-.note-content--dense > ul + blockquote,
-.note-content--dense > ol + p,
-.note-content--dense > ol + pre,
-.note-content--dense > ol + .code-block-wrapper,
-.note-content--dense > ol + blockquote,
-.note-content--dense > blockquote + p,
-.note-content--dense > blockquote + pre,
-.note-content--dense > blockquote + .code-block-wrapper,
-.note-content--dense > blockquote + ul,
-.note-content--dense > blockquote + ol,
-.note-content--dense > h1 + p,
-.note-content--dense > h1 + pre,
-.note-content--dense > h1 + .code-block-wrapper,
-.note-content--dense > h1 + ul,
-.note-content--dense > h1 + ol,
-.note-content--dense > h2 + p,
-.note-content--dense > h2 + pre,
-.note-content--dense > h2 + .code-block-wrapper,
-.note-content--dense > h2 + ul,
-.note-content--dense > h2 + ol,
-.note-content--dense > h3 + p,
-.note-content--dense > h3 + pre,
-.note-content--dense > h3 + .code-block-wrapper,
-.note-content--dense > h3 + ul,
-.note-content--dense > h3 + ol {
-  margin-top: 0.45em;
-}
-
 /* Hyperlinks in view mode */
 .note-content a {
   color: #2563eb;
@@ -177,7 +124,6 @@ html.dark header.glass-card {
   border: 1px solid var(--border-light);
   border-radius: .6rem;
   padding: .75rem .9rem;
-  margin: 0;
 }
 /* Remove inner background on code inside pre */
 .note-content pre code {
