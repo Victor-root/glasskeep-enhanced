@@ -414,19 +414,23 @@ export default function ModalFooter({
               {hasCollabs ? (
                 <span className="flex items-center -space-x-1">
                   {collabs.slice(0, 3).map((c) => (
-                    <UserAvatar
-                      key={c.id}
-                      name={c.name}
-                      email={c.email}
-                      avatarUrl={c.avatar_url}
-                      size="w-5 h-5"
-                      textSize="text-[9px]"
-                      dark={dark}
-                      className="ring-1 ring-white dark:ring-gray-800"
-                    />
+                    <span key={c.id} title={c.name || c.email}>
+                      <UserAvatar
+                        name={c.name}
+                        email={c.email}
+                        avatarUrl={c.avatar_url}
+                        size="w-5 h-5"
+                        textSize="text-[9px]"
+                        dark={dark}
+                        className="ring-1 ring-white dark:ring-gray-800"
+                      />
+                    </span>
                   ))}
                   {collabs.length > 3 && (
-                    <span className="text-[10px] font-semibold opacity-70 pl-1.5">+{collabs.length - 3}</span>
+                    <span
+                      className="text-[10px] font-semibold opacity-70 pl-1.5"
+                      title={collabs.slice(3).map((c) => c.name || c.email).join(", ")}
+                    >+{collabs.length - 3}</span>
                   )}
                 </span>
               ) : (
