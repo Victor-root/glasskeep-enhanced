@@ -4,10 +4,11 @@ import { createPortal } from "react-dom";
 /** ---------- Portal Popover ---------- */
 export default function Popover({ anchorRef, open, onClose, children, offset = 8 }) {
   const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [ready, setReady] = useState(false);
   const boxRef = useRef(null);
 
   useLayoutEffect(() => {
-    if (!open) return;
+    if (!open) { setReady(false); return; }
     const place = () => {
       const a = anchorRef?.current;
       if (!a) return;
@@ -29,6 +30,7 @@ export default function Popover({ anchorRef, open, onClose, children, offset = 8
           t = Math.max(8, r.top - bh - offset);
         }
         setPos({ top: t, left: l });
+        setReady(true);
       });
     };
     place();
@@ -58,7 +60,7 @@ export default function Popover({ anchorRef, open, onClose, children, offset = 8
   return createPortal(
     <div
       ref={boxRef}
-      style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 10000 }}
+      style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 10000, visibility: ready ? "visible" : "hidden" }}
     >
       {children}
     </div>,
