@@ -487,7 +487,7 @@ export default function ModalFooter({
                 <circle cx="12" cy="12" r="3.2" fill="currentColor" />
               </svg>
             )}
-            <span>{viewMode ? t("editMode") : t("viewMode")}</span>
+            {isDesktop && <span>{viewMode ? t("editMode") : t("viewMode")}</span>}
           </button>
         )}
       </div>
