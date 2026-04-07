@@ -666,16 +666,9 @@ html:not(.dark) .code-block-wrapper .code-copy-btn {
 /* === Scrollbars thématiques === */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
-::-webkit-scrollbar-button:start:decrement,
-::-webkit-scrollbar-button:end:increment { display: none; }
-::-webkit-scrollbar-button:vertical:start:increment,
-::-webkit-scrollbar-button:vertical:end:decrement { display: none; }
 ::-webkit-scrollbar-track { background: #e3d0ff; }
 ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #c4b5fd 0%, #7c3aed 100%); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #ddd6fe 0%, #6d28d9 100%); }
-* { scrollbar-width: thin; scrollbar-color: #a78bfa #e3d0ff; }
-.dark * { scrollbar-color: #7c3aed #3b0764; }
-html.dark { scrollbar-color: #7c3aed #3b0764; scrollbar-width: thin; }
 /* Descendants of html.dark */
 .dark ::-webkit-scrollbar-track { background: #3b0764 !important; }
 .dark ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #7c3aed 0%, #4c1d95 100%) !important; }
@@ -684,6 +677,12 @@ html.dark { scrollbar-color: #7c3aed #3b0764; scrollbar-width: thin; }
 html.dark::-webkit-scrollbar-track { background: #3b0764 !important; }
 html.dark::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #7c3aed 0%, #4c1d95 100%) !important; border-radius: 10px; }
 html.dark::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #8b5cf6 0%, #5b21b6 100%) !important; }
+/* Firefox fallback (no webkit support) */
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: #a78bfa #e3d0ff; }
+  .dark * { scrollbar-color: #7c3aed #3b0764; }
+  html.dark { scrollbar-color: #7c3aed #3b0764; scrollbar-width: thin; }
+}
 /* Modal — scrollbar adaptée à la couleur de la note */
 .modal-scroll-themed::-webkit-scrollbar-track { background: var(--sb-track); }
 .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 10px; }
