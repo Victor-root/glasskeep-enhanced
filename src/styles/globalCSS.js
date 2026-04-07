@@ -98,6 +98,8 @@ html.dark header.glass-card {
 .note-content--dense li { margin: 0; padding: 0; line-height: 1.15; }
 .note-content--dense li > p { margin: 0; }
 .note-content--dense li ul, .note-content--dense li ol { margin: 0.1rem 0 0 1.1rem; padding-left: 1.1rem; }
+.note-content--dense p { margin: 0.2rem 0; }
+.note-content--dense pre { margin: 0.3rem 0; }
 
 /* Hyperlinks in view mode */
 .note-content a {
