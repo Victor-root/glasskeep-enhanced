@@ -6,6 +6,9 @@ import DOMPurify from "dompurify";
 export const marked =
   typeof markedParser === "function" ? { parse: markedParser } : markedParser;
 
+// Convert single newlines to <br> so line breaks render without whitespace-pre-wrap
+if (marked.setOptions) marked.setOptions({ breaks: true });
+
 /** ---------- Secure Markdown Renderer ---------- */
 // Allowlist of tags produced by marked for standard markdown.
 // SVG, style, script and all event-handler attributes are intentionally excluded.
