@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
 import Popover from "../common/Popover.jsx";
+import UserAvatar from "../common/UserAvatar.jsx";
 import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, FormatIcon, Kebab } from "../../icons/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 import { t } from "../../i18n";
@@ -396,17 +397,43 @@ export default function ModalFooter({
         {/* Spacer */}
         <div className="flex-1 modal-footer-spacer" />
 
-        {/* ── Collaborate ── */}
-        <button
-          className={`${btnClass} modal-footer-btn--collab focus:outline-none`}
-          onClick={onOpenCollaboration}
-          data-tooltip={!isDesktop ? t("collaborate") : undefined}
-        >
-          <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} fill="currentColor" viewBox="0 0 20 20">
-            <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-          </svg>
-          {isDesktop && <span>{t("collaborate")}</span>}
-        </button>
+        {/* ── Collaborate (with avatars when collaborators exist) ── */}
+        {(() => {
+          const collabs = activeNoteObj?.collaborators;
+          const hasCollabs = Array.isArray(collabs) && collabs.length > 0;
+          return (
+            <button
+              className={`${hasCollabs ? "modal-footer-labeled-btn" : btnClass} modal-footer-btn--collab focus:outline-none`}
+              onClick={onOpenCollaboration}
+              data-tooltip={!isDesktop && !hasCollabs ? t("collaborate") : undefined}
+            >
+              <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} fill="currentColor" viewBox="0 0 20 20">
+                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
+              </svg>
+              {hasCollabs ? (
+                <span className="flex items-center -space-x-1">
+                  {collabs.slice(0, 3).map((c) => (
+                    <UserAvatar
+                      key={typeof c === "string" ? c : c.user_id || c.username}
+                      name={typeof c === "string" ? c : c.display_name || c.username}
+                      email={typeof c === "string" ? undefined : c.email}
+                      avatarUrl={typeof c === "string" ? undefined : c.avatar_url}
+                      size="w-5 h-5"
+                      textSize="text-[9px]"
+                      dark={dark}
+                      className="ring-1 ring-white dark:ring-gray-800"
+                    />
+                  ))}
+                  {collabs.length > 3 && (
+                    <span className="text-[10px] font-semibold opacity-70 pl-1.5">+{collabs.length - 3}</span>
+                  )}
+                </span>
+              ) : (
+                isDesktop && <span>{t("collaborate")}</span>
+              )}
+            </button>
+          );
+        })()}
 
         {/* ── Delete / Trash ── */}
         <button
