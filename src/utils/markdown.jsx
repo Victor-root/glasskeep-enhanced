@@ -3,15 +3,8 @@ import { marked as markedParser } from "marked";
 import DOMPurify from "dompurify";
 
 // Ensure we can call marked.parse(...)
-const _marked =
+export const marked =
   typeof markedParser === "function" ? { parse: markedParser } : markedParser;
-
-// Configure breaks globally if possible, otherwise pass per-call
-if (_marked.setOptions) _marked.setOptions({ breaks: true });
-
-export const marked = {
-  parse: (md) => _marked.parse(md, { breaks: true }),
-};
 
 /** ---------- Secure Markdown Renderer ---------- */
 // Allowlist of tags produced by marked for standard markdown.

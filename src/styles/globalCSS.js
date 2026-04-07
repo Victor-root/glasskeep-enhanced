@@ -62,8 +62,7 @@ html.dark header.glass-card {
   border-bottom: 1px solid var(--border-light);
   box-shadow: none;
 }
-.note-content p { margin-bottom: 0.15rem; }
-.note-content p:last-child { margin-bottom: 0; }
+.note-content p { margin-bottom: 0.5rem; }
 .note-content h1, .note-content h2, .note-content h3 { margin-bottom: 0.75rem; font-weight: 600; }
 .note-content h1 { font-size: 1.5rem; line-height: 1.3; }
 .note-content h2 { font-size: 1.25rem; line-height: 1.35; }
@@ -125,7 +124,6 @@ html.dark header.glass-card {
   border: 1px solid var(--border-light);
   border-radius: .6rem;
   padding: .75rem .9rem;
-  margin: 0.15rem 0;
 }
 /* Remove inner background on code inside pre */
 .note-content pre code {
