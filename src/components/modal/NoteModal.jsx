@@ -9,7 +9,6 @@ import ConfirmDeleteDialog from "./ConfirmDeleteDialog.jsx";
 import CollaborationModal from "./CollaborationModal.jsx";
 import FullscreenImageViewer from "./FullscreenImageViewer.jsx";
 import useChecklistDrag from "../../hooks/useChecklistDrag.js";
-import useModalHistory from "../../hooks/useModalHistory.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { handleSmartEnter } from "../common/FormatToolbar.jsx";
 import { uid } from "../../utils/helpers.js";
@@ -131,47 +130,11 @@ export default function NoteModal({
   // checklist handlers
   syncChecklistItems,
   checklistInsertPosition,
-  // history ref — App.jsx calls historySnapshotRef.current() after autosave
-  historySnapshotRef,
 }) {
   const [autoEditId, setAutoEditId] = React.useState(null);
   const { handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } =
     useChecklistDrag(mItems, setMItems, syncChecklistItems);
 
-  /* ── Undo / Redo history ── */
-  const { undo, redo, canUndo, canRedo, captureSnapshot } = useModalHistory({
-    mTitle, mBody, mItems, mColor, mTagList,
-    setMTitle, setMBody, setMItems, setMColor, setMTagList,
-    open, activeId,
-  });
-
-  // Expose captureSnapshot to App.jsx via ref
-  React.useEffect(() => {
-    if (historySnapshotRef) historySnapshotRef.current = captureSnapshot;
-  }, [captureSnapshot, historySnapshotRef]);
-
-  /* Intercept Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z at modal level */
-  const handleModalKeyDown = React.useCallback(
-    (e) => {
-      const isCtrl = e.ctrlKey || e.metaKey;
-      if (!isCtrl) return;
-
-      if (e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        undo();
-      } else if (e.key === "z" && e.shiftKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        redo();
-      } else if (e.key === "y") {
-        e.preventDefault();
-        e.stopPropagation();
-        redo();
-      }
-    },
-    [undo, redo],
-  );
 
   if (!open && !isModalClosing) return null;
 
@@ -195,7 +158,6 @@ export default function NoteModal({
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
-          onKeyDown={handleModalKeyDown}
         >
           {/* Scroll container */}
           <div
@@ -579,11 +541,6 @@ export default function NoteModal({
             onRestoreFromTrash={restoreFromTrash}
             onArchiveNote={handleArchiveNote}
             onOpenConfirmDelete={() => setConfirmDeleteOpen(true)}
-            // undo / redo
-            undo={undo}
-            redo={redo}
-            canUndo={canUndo}
-            canRedo={canRedo}
           />
 
           <ConfirmDeleteDialog

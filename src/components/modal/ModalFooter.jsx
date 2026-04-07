@@ -62,11 +62,6 @@ export default function ModalFooter({
   onRestoreFromTrash,
   onArchiveNote,
   onOpenConfirmDelete,
-  // undo / redo
-  undo,
-  redo,
-  canUndo,
-  canRedo,
 }) {
   const isDesktop = windowWidth >= 768;
   const isTrashed = tagFilter === "TRASHED";
@@ -370,12 +365,14 @@ export default function ModalFooter({
           </button>
         )}
 
-        {/* ── Undo ── */}
+        {/* ── Undo (native browser) ── */}
         <button
-          className={`modal-footer-btn focus:outline-none ${!canUndo ? "opacity-30" : ""}`}
+          className="modal-footer-btn focus:outline-none"
           data-tooltip={t("undo")}
-          onClick={undo}
-          disabled={!canUndo}
+          onMouseDown={(e) => {
+            e.preventDefault(); // keep focus on textarea
+            document.execCommand("undo");
+          }}
         >
           <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 10h13a4 4 0 0 1 0 8H7" />
@@ -384,12 +381,14 @@ export default function ModalFooter({
           </svg>
         </button>
 
-        {/* ── Redo ── */}
+        {/* ── Redo (native browser) ── */}
         <button
-          className={`modal-footer-btn focus:outline-none ${!canRedo ? "opacity-30" : ""}`}
+          className="modal-footer-btn focus:outline-none"
           data-tooltip={t("redo")}
-          onClick={redo}
-          disabled={!canRedo}
+          onMouseDown={(e) => {
+            e.preventDefault(); // keep focus on textarea
+            document.execCommand("redo");
+          }}
         >
           <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 10H8a4 4 0 0 0 0 8h10" />
