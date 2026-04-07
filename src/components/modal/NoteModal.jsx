@@ -200,6 +200,9 @@ export default function NoteModal({
               modalColorBtnRef={modalColorBtnRef}
               showModalColorPop={showModalColorPop}
               setShowModalColorPop={setShowModalColorPop}
+              modalMenuBtnRef={modalMenuBtnRef}
+              modalMenuOpen={modalMenuOpen}
+              setModalMenuOpen={setModalMenuOpen}
               modalFileRef={modalFileRef}
               addImagesToState={addImagesToState}
               setMImages={setMImages}
