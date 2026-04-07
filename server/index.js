@@ -497,7 +497,7 @@ const addCollaborator = db.prepare(`
   VALUES (?, ?, ?, ?)
 `);
 const getNoteCollaborators = db.prepare(`
-  SELECT u.id, u.name, u.email, nc.added_at, nc.added_by
+  SELECT u.id, u.name, u.email, u.avatar_url, nc.added_at, nc.added_by
   FROM note_collaborators nc
   JOIN users u ON nc.user_id = u.id
   WHERE nc.note_id = ?
@@ -1108,6 +1108,7 @@ app.get("/api/notes/:id/collaborators", auth, (req, res) => {
     id: c.id,
     name: c.name,
     email: c.email,
+    avatar_url: c.avatar_url || null,
     added_at: c.added_at,
     added_by: c.added_by
   })));
