@@ -1,9 +1,9 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
 import Popover from "../common/Popover.jsx";
-import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, FormatIcon } from "../../icons/index.jsx";
+import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, FormatIcon, Kebab } from "../../icons/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 import { t } from "../../i18n";
 
@@ -100,8 +100,11 @@ export default function ModalFooter({
     }
   };
 
-  /* Desktop: labeled button, Mobile: icon-only */
   const btnClass = isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn";
+
+  /* Kebab menu (download + collaborate) */
+  const kebabRef = useRef(null);
+  const [kebabOpen, setKebabOpen] = useState(false);
 
   return (
     <div className="modal-footer-toolbar border-t border-[var(--border-light)]">
@@ -127,8 +130,8 @@ export default function ModalFooter({
           onSelect={(name) => setMColor(name)}
         />
 
-        {/* ── Add image ── */}
-        {(mType === "checklist" || (mType === "text" && !viewMode)) && (
+        {/* ── Add image (always visible, including view mode) ── */}
+        {(mType === "checklist" || mType === "text") && (
           <>
             <input
               ref={modalFileRef}
@@ -345,18 +348,6 @@ export default function ModalFooter({
           })()}
         </div>
 
-        {/* ── Collaborate ── */}
-        <button
-          className={`${btnClass} modal-footer-btn--collab focus:outline-none`}
-          onClick={onOpenCollaboration}
-          data-tooltip={!isDesktop ? t("collaborate") : undefined}
-        >
-          <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} fill="currentColor" viewBox="0 0 20 20">
-            <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-          </svg>
-          {isDesktop && <span>{t("collaborate")}</span>}
-        </button>
-
         {/* ── Formatting (mobile only) ── */}
         {!isDesktop && mType === "text" && !viewMode && (
           <button
@@ -438,17 +429,45 @@ export default function ModalFooter({
           {isDesktop && <span>{isTrashed ? t("permanentlyDelete") : t("trash")}</span>}
         </button>
 
-        {/* ── Download .md ── */}
+        {/* ── Kebab menu (Download + Collaborate) ── */}
         <button
-          className={`${btnClass} modal-footer-btn--download focus:outline-none`}
-          onClick={handleDownload}
-          data-tooltip={!isDesktop ? t("downloadMd") : undefined}
+          ref={kebabRef}
+          className={`${btnClass} focus:outline-none`}
+          onClick={(e) => { e.stopPropagation(); setKebabOpen((v) => !v); }}
+          data-tooltip={!isDesktop ? t("moreOptions") : undefined}
         >
-          <DownloadIcon />
-          {isDesktop && <span>{t("downloadMd")}</span>}
+          <Kebab />
+          {isDesktop && <span>{t("moreOptions")}</span>}
         </button>
+        <Popover
+          anchorRef={kebabRef}
+          open={kebabOpen}
+          onClose={() => setKebabOpen(false)}
+        >
+          <div
+            className={`min-w-[180px] border border-[var(--border-light)] rounded-lg shadow-lg overflow-hidden ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
+            style={{ backgroundColor: dark ? "#222222" : undefined }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+              onClick={() => { handleDownload(); setKebabOpen(false); }}
+            >
+              <DownloadIcon />{t("downloadMd")}
+            </button>
+            <button
+              className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+              onClick={() => { onOpenCollaboration(); setKebabOpen(false); }}
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
+              </svg>
+              {t("collaborate")}
+            </button>
+          </div>
+        </Popover>
 
-        {/* ── Edit/View toggle — text notes only ── */}
+        {/* ── Edit/View toggle — text notes only, with label ── */}
         {mType === "text" && (
           <button
             className={`${isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn"} modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]`}
@@ -467,7 +486,7 @@ export default function ModalFooter({
                 <circle cx="12" cy="12" r="3.2" fill="currentColor" />
               </svg>
             )}
-            {isDesktop && <span>{viewMode ? t("editMode") : t("viewMode")}</span>}
+            <span>{viewMode ? t("editMode") : t("viewMode")}</span>
           </button>
         )}
       </div>
