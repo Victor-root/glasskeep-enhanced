@@ -490,7 +490,7 @@ html.dark .modal-footer-labeled-btn:hover {
   color: rgba(255, 255, 255, 0.95);
 }
 
-/* Responsive: collapse labels to icon-only below 1024px */
+/* Responsive: collapse labels to icon-only below 1024px, distribute evenly */
 @media (max-width: 1023px) {
   .modal-footer-labeled-btn {
     width: 36px;
@@ -501,6 +501,15 @@ html.dark .modal-footer-labeled-btn:hover {
     gap: 0;
   }
   .modal-footer-labeled-btn > span {
+    display: none;
+  }
+  .modal-footer-inner {
+    justify-content: space-evenly;
+    gap: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .modal-footer-spacer {
     display: none;
   }
 }

@@ -108,7 +108,7 @@ export default function ModalFooter({
 
   return (
     <div className="modal-footer-toolbar border-t border-[var(--border-light)]">
-      <div className={`flex items-center px-2 sm:px-3 py-1.5 ${isDesktop ? "gap-1" : "gap-0.5"}`}>
+      <div className={`modal-footer-inner flex items-center px-2 sm:px-3 py-1.5 ${isDesktop ? "gap-1" : "gap-0.5"}`}>
 
         {/* ── Color picker ── */}
         <button
@@ -396,7 +396,7 @@ export default function ModalFooter({
         </button>
 
         {/* Spacer */}
-        <div className="flex-1" />
+        <div className="flex-1 modal-footer-spacer" />
 
         {/* ── Collaborate ── */}
         <button
