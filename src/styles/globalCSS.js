@@ -547,6 +547,15 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
 .note-scrim-anim         { animation: scrimFadeIn  200ms ease-out both; }
 .note-scrim-anim.closing { animation: scrimFadeOut 180ms ease-in  both; }
 
+/* Remove glass-card shadow on mobile full-width modal to avoid edge halos */
+@media (max-width: 639px) {
+  .note-modal-anim.glass-card {
+    box-shadow: none !important;
+    border-left: none;
+    border-right: none;
+  }
+}
+
 /* formatting popover base */
 .fmt-pop {
   border: 1px solid var(--border-light);
