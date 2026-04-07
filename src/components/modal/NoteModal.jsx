@@ -541,6 +541,7 @@ export default function NoteModal({
             activeId={activeId}
             savingModal={savingModal}
             onSave={saveModal}
+            collaborators={addModalCollaborators}
           />
 
           <ConfirmDeleteDialog

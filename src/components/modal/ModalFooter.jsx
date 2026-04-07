@@ -2,6 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
+import UserAvatar from "../common/UserAvatar.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 import { AddImageIcon } from "../../icons/index.jsx";
 import { t } from "../../i18n";
@@ -46,6 +47,8 @@ export default function ModalFooter({
   activeId,
   savingModal,
   onSave,
+  // collaborators
+  collaborators,
 }) {
   return (
     <div className="border-t border-[var(--border-light)] p-4 flex flex-wrap items-center gap-3">
@@ -215,6 +218,32 @@ export default function ModalFooter({
 
       {/* Right controls */}
       <div className="ml-auto flex items-center gap-3 flex-shrink-0">
+        {/* Collaborator avatars */}
+        {collaborators && collaborators.length > 0 && (
+          <div className="flex items-center -space-x-1.5">
+            {collaborators.slice(0, 4).map((collab) => (
+              <UserAvatar
+                key={collab.id}
+                name={collab.name}
+                email={collab.email}
+                avatarUrl={collab.avatarUrl}
+                size="w-6 h-6"
+                textSize="text-[10px]"
+                dark={dark}
+                className="ring-2 ring-white dark:ring-[#1e1e1e]"
+              />
+            ))}
+            {collaborators.length > 4 && (
+              <span
+                className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-semibold ring-2 ring-white dark:ring-[#1e1e1e] ${
+                  dark ? "bg-gray-600 text-gray-200" : "bg-gray-200 text-gray-600"
+                }`}
+              >
+                +{collaborators.length - 4}
+              </span>
+            )}
+          </div>
+        )}
         {/* Save check – always visible, bright green when unsaved, faded when saved */}
         {!(mType === "text" && isCollaborativeNote(activeId)) && (
           <button

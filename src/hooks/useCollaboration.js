@@ -217,7 +217,13 @@ export default function useCollaboration(token, {
     }
   }, [showUserDropdown, updateDropdownPosition, collaboratorInputRef]);
 
-  // Load collaborators when Add Collaborator modal opens
+  // Load collaborators when note modal opens or Add Collaborator modal opens
+  useEffect(() => {
+    if (activeId) {
+      loadCollaboratorsForAddModal(activeId);
+    }
+  }, [activeId, loadCollaboratorsForAddModal]);
+
   useEffect(() => {
     if (collaborationModalOpen && activeId) {
       loadCollaboratorsForAddModal(activeId);
