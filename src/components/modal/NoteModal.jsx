@@ -9,6 +9,7 @@ import ConfirmDeleteDialog from "./ConfirmDeleteDialog.jsx";
 import CollaborationModal from "./CollaborationModal.jsx";
 import FullscreenImageViewer from "./FullscreenImageViewer.jsx";
 import useChecklistDrag from "../../hooks/useChecklistDrag.js";
+import useModalHistory from "../../hooks/useModalHistory.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { handleSmartEnter } from "../common/FormatToolbar.jsx";
 import { uid } from "../../utils/helpers.js";
@@ -135,6 +136,27 @@ export default function NoteModal({
   const { handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } =
     useChecklistDrag(mItems, setMItems, syncChecklistItems);
 
+  const { undo, redo, canUndo, canRedo } = useModalHistory({
+    mTitle, mBody, setMTitle, setMBody,
+    open, activeId, mType, viewMode,
+  });
+
+  /* Intercept Ctrl+Z / Ctrl+Y at modal level for chunk-level undo */
+  const handleModalKeyDown = React.useCallback(
+    (e) => {
+      if (mType !== "text" || viewMode) return; // let native handle non-text
+      const isCtrl = e.ctrlKey || e.metaKey;
+      if (!isCtrl) return;
+      if (e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if ((e.key === "z" && e.shiftKey) || e.key === "y") {
+        e.preventDefault();
+        redo();
+      }
+    },
+    [undo, redo, mType, viewMode],
+  );
 
   if (!open && !isModalClosing) return null;
 
@@ -158,6 +180,7 @@ export default function NoteModal({
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={handleModalKeyDown}
         >
           {/* Scroll container */}
           <div
@@ -541,6 +564,10 @@ export default function NoteModal({
             onRestoreFromTrash={restoreFromTrash}
             onArchiveNote={handleArchiveNote}
             onOpenConfirmDelete={() => setConfirmDeleteOpen(true)}
+            undo={undo}
+            redo={redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
           />
 
           <ConfirmDeleteDialog
