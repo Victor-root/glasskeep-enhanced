@@ -811,14 +811,16 @@ app.get("/api/notes", auth, (req, res) => {
     : allNotesQuery.all(req.user.id, req.user.id);
 
   // Get collaborators for each note
-  const getNoteCollaboratorsCount = db.prepare(`
-    SELECT COUNT(*) as count FROM note_collaborators WHERE note_id = ?
+  const getNoteCollaboratorsList = db.prepare(`
+    SELECT u.id, u.name, u.email, u.avatar_url
+    FROM note_collaborators nc
+    JOIN users u ON nc.user_id = u.id
+    WHERE nc.note_id = ?
   `);
 
   res.json(
     rows.map((r) => {
-      const collabCount = getNoteCollaboratorsCount.get(r.id);
-      const hasCollaborators = (collabCount?.count || 0) > 0;
+      const collabList = getNoteCollaboratorsList.all(r.id);
       return {
         id: r.id,
         user_id: r.user_id,
@@ -837,7 +839,7 @@ app.get("/api/notes", auth, (req, res) => {
         lastEditedBy: r.last_edited_by,
         lastEditedAt: r.last_edited_at,
         archived: !!r.archived,
-        collaborators: hasCollaborators ? [] : null, // Empty array to indicate has collaborators, null if none
+        collaborators: collabList.length > 0 ? collabList.map(c => ({ id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url || null })) : null,
       };
     })
   );
