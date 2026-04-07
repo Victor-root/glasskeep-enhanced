@@ -184,24 +184,28 @@ export default function ModalHeader({
             </>
           )}
 
-          {/* Color picker */}
-          <button
-            ref={modalColorBtnRef}
-            className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-            data-tooltip={t("color")}
-            onClick={() => setShowModalColorPop((v) => !v)}
-          >
-            <PaletteColorIcon size={20} />
-          </button>
-          <ColorPickerPanel
-            anchorRef={modalColorBtnRef}
-            open={showModalColorPop}
-            onClose={() => setShowModalColorPop(false)}
-            colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
-            selectedColor={mColor}
-            darkMode={dark}
-            onSelect={(name) => setMColor(name)}
-          />
+          {/* Color picker — visible in edit mode for text, always for checklist */}
+          {(mType === "checklist" || (mType === "text" && !viewMode)) && (
+            <>
+              <button
+                ref={modalColorBtnRef}
+                className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
+                data-tooltip={t("color")}
+                onClick={() => setShowModalColorPop((v) => !v)}
+              >
+                <PaletteColorIcon size={20} />
+              </button>
+              <ColorPickerPanel
+                anchorRef={modalColorBtnRef}
+                open={showModalColorPop}
+                onClose={() => setShowModalColorPop(false)}
+                colors={COLOR_ORDER.filter((name) => LIGHT_COLORS[name])}
+                selectedColor={mColor}
+                darkMode={dark}
+                onSelect={(name) => setMColor(name)}
+              />
+            </>
+          )}
 
           {/* Download */}
           <button
