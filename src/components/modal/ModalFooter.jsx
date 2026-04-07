@@ -365,7 +365,7 @@ export default function ModalFooter({
 
         {/* ── Undo ── */}
         <button
-          className={`${btnClass} focus:outline-none ${!canUndo ? "opacity-30" : ""}`}
+          className={`${btnClass} focus:outline-none ${!canUndo ? "opacity-40" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => { if (!isDesktop) document.activeElement?.blur(); undo(); }}
           disabled={!canUndo}
@@ -381,7 +381,7 @@ export default function ModalFooter({
 
         {/* ── Redo ── */}
         <button
-          className={`${btnClass} focus:outline-none ${!canRedo ? "opacity-30" : ""}`}
+          className={`${btnClass} focus:outline-none ${!canRedo ? "opacity-40" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => { if (!isDesktop) document.activeElement?.blur(); redo(); }}
           disabled={!canRedo}
