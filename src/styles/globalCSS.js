@@ -125,6 +125,7 @@ html.dark header.glass-card {
   border: 1px solid var(--border-light);
   border-radius: .6rem;
   padding: .75rem .9rem;
+  margin: 0.15rem 0;
 }
 /* Remove inner background on code inside pre */
 .note-content pre code {
