@@ -3,7 +3,8 @@ import { createPortal } from "react-dom";
 import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
 import Popover from "../common/Popover.jsx";
-import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, FormatIcon } from "../../icons/index.jsx";
+import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, FormatIcon, PinOutline, PinFilled } from "../../icons/index.jsx";
+import UserAvatar from "../common/UserAvatar.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 import { t } from "../../i18n";
 
@@ -67,9 +68,19 @@ export default function ModalFooter({
   redo,
   canUndo,
   canRedo,
+  // pin (desktop footer)
+  onTogglePin,
+  // save (desktop footer)
+  modalHasChanges,
+  savingModal,
+  onSave,
+  // collaborators (desktop footer)
+  collaborators,
 }) {
   const isDesktop = windowWidth >= 768;
   const isTrashed = tagFilter === "TRASHED";
+  const isPinned = !!notes.find((n) => String(n.id) === String(activeId))?.pinned;
+  const showPinBtn = tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED";
 
   const handleDownload = () => {
     const n = notes.find((nn) => String(nn.id) === String(activeId));
@@ -402,6 +413,82 @@ export default function ModalFooter({
 
         {/* Spacer to push right-side actions */}
         <div className="flex-1" />
+
+        {/* ── Desktop: applied tag chips (compact) ── */}
+        {isDesktop && mTagList.length > 0 && (
+          <div className="flex items-center gap-1 mr-1">
+            {mTagList.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-100/70 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-700/30 max-w-[90px] truncate"
+              >
+                <svg className="w-2.5 h-2.5 opacity-50 shrink-0" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A.5.5 0 012.5 2h5.086a.5.5 0 01.353.146l5.915 5.915a.5.5 0 010 .707l-4.586 4.586a.5.5 0 01-.707 0L3.146 7.939A.5.5 0 013 7.586V2.5zM5 5a1 1 0 100-2 1 1 0 000 2z"/></svg>
+                {tag}
+              </span>
+            ))}
+            {mTagList.length > 3 && (
+              <span className="text-[11px] font-medium text-indigo-400 dark:text-indigo-500">+{mTagList.length - 3}</span>
+            )}
+          </div>
+        )}
+
+        {/* ── Desktop: collaborator avatars ── */}
+        {isDesktop && collaborators && collaborators.length > 0 && (
+          <div className="flex items-center -space-x-1.5 mr-1">
+            {collaborators.slice(0, 3).map((collab) => (
+              <div key={collab.id} data-tooltip={collab.name || collab.email}>
+                <UserAvatar
+                  name={collab.name}
+                  email={collab.email}
+                  avatarUrl={collab.avatarUrl}
+                  size="w-6 h-6"
+                  textSize="text-[10px]"
+                  dark={dark}
+                  className="ring-2 ring-white dark:ring-[#1e1e1e]"
+                />
+              </div>
+            ))}
+            {collaborators.length > 3 && (
+              <span
+                data-tooltip={collaborators.slice(3).map((c) => c.name || c.email).join(", ")}
+                className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-semibold ring-2 ring-white dark:ring-[#1e1e1e] ${
+                  dark ? "bg-gray-600 text-gray-200" : "bg-gray-200 text-gray-600"
+                }`}
+              >
+                +{collaborators.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* ── Desktop: Pin ── */}
+        {isDesktop && showPinBtn && (
+          <button
+            className={`modal-footer-btn focus:outline-none ${isPinned ? "modal-footer-btn--pin-active" : ""}`}
+            data-tooltip={t("pinUnpin")}
+            onClick={() => activeId != null && onTogglePin(activeId, !isPinned)}
+          >
+            {isPinned ? <PinFilled /> : <PinOutline />}
+          </button>
+        )}
+
+        {/* ── Desktop: Save checkmark ── */}
+        {isDesktop && (
+          <button
+            onClick={modalHasChanges ? onSave : undefined}
+            disabled={savingModal || !modalHasChanges}
+            className={`modal-footer-btn flex-shrink-0 transition-all duration-200 ${modalHasChanges ? "modal-footer-btn--save-active" : "modal-footer-btn--save-idle"}`}
+            data-tooltip={modalHasChanges ? (savingModal ? t("saving") : t("save")) : t("saved")}
+            style={{ cursor: modalHasChanges ? "pointer" : "default" }}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
+
+        {/* ── Separator before destructive actions (desktop) ── */}
+        {isDesktop && <div className={`w-px h-5 mx-1 ${dark ? "bg-white/12" : "bg-black/10"}`} />}
 
         {/* ── Archive / Restore ── */}
         {isTrashed ? (

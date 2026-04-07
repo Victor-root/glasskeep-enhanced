@@ -65,21 +65,23 @@ export default function ModalHeader({
       <div className={`flex flex-wrap items-center gap-2 px-4 sm:px-6 pb-3 ${!isDesktop ? "flex-row-reverse" : ""}`}>
         <div className={`flex items-center gap-2 flex-none ${isDesktop ? "ml-auto" : ""}`}>
           <div className="modal-icon-group">
-            {/* Save check */}
-            <button
-              onClick={modalHasChanges ? onSave : undefined}
-              disabled={savingModal || !modalHasChanges}
-              className={`modal-icon-btn flex-shrink-0 transition-all duration-200 ${modalHasChanges ? "modal-icon-btn--save-active" : "modal-icon-btn--save-idle"}`}
-              data-tooltip={modalHasChanges ? (savingModal ? t("saving") : t("save")) : t("saved")}
-              style={{ cursor: modalHasChanges ? "pointer" : "default" }}
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+            {/* Save check — mobile only (desktop: in footer) */}
+            {!isDesktop && (
+              <button
+                onClick={modalHasChanges ? onSave : undefined}
+                disabled={savingModal || !modalHasChanges}
+                className={`modal-icon-btn flex-shrink-0 transition-all duration-200 ${modalHasChanges ? "modal-icon-btn--save-active" : "modal-icon-btn--save-idle"}`}
+                data-tooltip={modalHasChanges ? (savingModal ? t("saving") : t("save")) : t("saved")}
+                style={{ cursor: modalHasChanges ? "pointer" : "default" }}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
 
-            {/* Pin */}
-            {showPinBtn && (
+            {/* Pin — mobile only (desktop: in footer) */}
+            {!isDesktop && showPinBtn && (
               <button
                 className={`modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)] ${isPinned ? "modal-icon-btn--active" : ""}`}
                 data-tooltip={t("pinUnpin")}

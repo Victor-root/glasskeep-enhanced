@@ -497,6 +497,47 @@ html.dark .modal-footer-btn--mode {
   color: #fff !important;
 }
 
+/* Footer save checkmark states */
+.modal-footer-btn--save-active {
+  color: #fff !important;
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%) !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35) !important;
+}
+.modal-footer-btn--save-active:hover {
+  background: linear-gradient(90deg, #059669 0%, #047857 100%) !important;
+  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.45) !important;
+}
+html.dark .modal-footer-btn--save-active { color: #fff !important; }
+.modal-footer-btn--save-idle {
+  color: rgba(16, 185, 129, 0.25) !important;
+  border: 1.5px solid rgba(16, 185, 129, 0.15) !important;
+  background: transparent !important;
+}
+html.dark .modal-footer-btn--save-idle {
+  color: rgba(52, 211, 153, 0.2) !important;
+  border-color: rgba(52, 211, 153, 0.1) !important;
+}
+
+/* Footer pin active state */
+.modal-footer-btn--pin-active {
+  background: #1e293b !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22) !important;
+}
+.modal-footer-btn--pin-active:hover {
+  background: #0f172a !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+}
+.modal-footer-btn--pin-active svg { transform: none !important; }
+html.dark .modal-footer-btn--pin-active {
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.2) !important;
+}
+html.dark .modal-footer-btn--pin-active:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+}
+
 /* Copy buttons */
 /* Hide scrollbars on mobile (keep scrolling) */
 @media (max-width: 639px) {

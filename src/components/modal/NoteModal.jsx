@@ -568,6 +568,14 @@ export default function NoteModal({
             redo={redo}
             canUndo={canUndo}
             canRedo={canRedo}
+            // pin (desktop footer)
+            onTogglePin={togglePin}
+            // save (desktop footer)
+            modalHasChanges={modalHasChanges}
+            savingModal={savingModal}
+            onSave={saveModal}
+            // collaborators (desktop footer)
+            collaborators={addModalCollaborators}
           />
 
           <ConfirmDeleteDialog
