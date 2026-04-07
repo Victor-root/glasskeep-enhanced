@@ -61,7 +61,7 @@ export default function TagSidebar({
         />
       )}
       <aside
-        className={`fixed top-0 left-0 z-40 h-full shadow-2xl ${skipTransition ? "" : "transition-transform duration-200 "}${permanent || open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed top-0 left-0 z-40 h-full ${skipTransition ? "" : "transition-transform duration-200 "}${permanent || open ? "translate-x-0 shadow-2xl" : "-translate-x-full shadow-none"}`}
         style={{
           width: permanent ? `${width}px` : "288px",
           backgroundColor: dark ? "#222222" : "rgba(240,232,255,0.97)",
