@@ -53,8 +53,8 @@ export default function CollaborationModal({
           className="glass-card rounded-xl shadow-2xl w-[90%] max-w-md p-6 relative max-h-[90vh] overflow-y-auto"
           style={{
             backgroundColor: dark
-              ? "rgba(40,40,40,0.95)"
-              : "rgba(255,255,255,0.95)",
+              ? "#282828"
+              : "#ffffff",
           }}
           onClick={(e) => e.stopPropagation()}
         >
