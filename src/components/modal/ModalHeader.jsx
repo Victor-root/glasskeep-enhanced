@@ -211,92 +211,63 @@ export default function ModalHeader({
             </>
           )}
 
-          {/* Download & Archive — inline on mobile, kebab menu on desktop */}
-          {!isDesktop ? (
-            <>
-              <button
-                className="modal-icon-btn modal-icon-btn--download focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-                data-tooltip={t("downloadMd")}
-                onClick={handleDownload}
+          {/* Kebab menu — Download & Archive/Restore */}
+          <>
+            <button
+              ref={modalMenuBtnRef}
+              className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
+              data-tooltip={t("moreOptions")}
+              onClick={(e) => {
+                e.stopPropagation();
+                setModalMenuOpen((v) => !v);
+              }}
+            >
+              <Kebab />
+            </button>
+            <Popover
+              anchorRef={modalMenuBtnRef}
+              open={modalMenuOpen}
+              onClose={() => setModalMenuOpen(false)}
+            >
+              <div
+                className={`min-w-[180px] border border-[var(--border-light)] rounded-lg shadow-lg overflow-hidden ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
+                style={{ backgroundColor: dark ? "#222222" : undefined }}
+                onClick={(e) => e.stopPropagation()}
               >
-                <DownloadIcon />
-              </button>
-              {isTrashed ? (
                 <button
-                  className="modal-icon-btn modal-icon-btn--archive focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-                  data-tooltip={t("restoreFromTrash")}
-                  onClick={() => { onRestoreFromTrash(activeId); }}
+                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                  onClick={() => {
+                    handleDownload();
+                    setModalMenuOpen(false);
+                  }}
                 >
-                  <ArchiveIcon />
+                  <DownloadIcon />{t("downloadMd")}
                 </button>
-              ) : (
-                <button
-                  className="modal-icon-btn modal-icon-btn--archive focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-                  data-tooltip={activeNoteObj?.archived ? t("unarchive") : t("archive")}
-                  onClick={handleArchiveToggle}
-                >
-                  <ArchiveIcon />
-                </button>
-              )}
-            </>
-          ) : (
-            <>
-              <button
-                ref={modalMenuBtnRef}
-                className="modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)]"
-                data-tooltip={t("moreOptions")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setModalMenuOpen((v) => !v);
-                }}
-              >
-                <Kebab />
-              </button>
-              <Popover
-                anchorRef={modalMenuBtnRef}
-                open={modalMenuOpen}
-                onClose={() => setModalMenuOpen(false)}
-              >
-                <div
-                  className={`min-w-[180px] border border-[var(--border-light)] rounded-lg shadow-lg overflow-hidden ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
-                  style={{ backgroundColor: dark ? "#222222" : undefined }}
-                  onClick={(e) => e.stopPropagation()}
-                >
+                {isTrashed ? (
                   <button
                     className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                     onClick={() => {
-                      handleDownload();
+                      onRestoreFromTrash(activeId);
                       setModalMenuOpen(false);
                     }}
                   >
-                    <DownloadIcon />{t("downloadMd")}
+                    <ArchiveIcon />{t("restoreFromTrash")}
                   </button>
-                  {isTrashed ? (
-                    <button
-                      className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                      onClick={() => {
-                        onRestoreFromTrash(activeId);
-                        setModalMenuOpen(false);
-                      }}
-                    >
-                      <ArchiveIcon />{t("restoreFromTrash")}
-                    </button>
-                  ) : (
-                    <button
-                      className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                      onClick={() => {
-                        handleArchiveToggle();
-                        setModalMenuOpen(false);
-                      }}
-                    >
-                      <ArchiveIcon />
-                      {activeNoteObj?.archived ? t("unarchive") : t("archive")}
-                    </button>
-                  )}
-                </div>
-              </Popover>
-            </>
-          )}
+                ) : (
+                  <button
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                    onClick={() => {
+                      handleArchiveToggle();
+                      setModalMenuOpen(false);
+                    }}
+                  >
+                    <ArchiveIcon />
+                    {activeNoteObj?.archived ? t("unarchive") : t("archive")}
+                  </button>
+                )}
+              </div>
+            </Popover>
+          </>
 
           {/* Delete */}
           <button
