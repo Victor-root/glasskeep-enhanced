@@ -109,8 +109,8 @@ html.dark header.glass-card {
 .note-content--dense h1, .note-content--dense h2, .note-content--dense h3,
 .note-content--dense h4, .note-content--dense h5, .note-content--dense h6,
 .note-content--dense td, .note-content--dense th { white-space: pre-wrap; }
-.note-content--dense p { margin: 0.25rem 0; }
-.note-content--dense pre { margin: 0.35rem 0; }
+.note-content--dense p { margin: 0.45rem 0; }
+.note-content--dense pre { margin: 0.55rem 0; }
 
 /* Hyperlinks in view mode */
 .note-content a {
