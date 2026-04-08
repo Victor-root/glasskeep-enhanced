@@ -214,7 +214,7 @@ export default function ModalFooter({
                 }}
                 className="rounded-2xl shadow-2xl bg-white/98 dark:bg-gray-900/98 backdrop-blur-xl border border-indigo-100/80 dark:border-indigo-800/50 ring-1 ring-black/5 dark:ring-white/5"
               >
-                <PopoverArrow anchorRef={modalTagBtnRef} direction={dropUp ? "down" : "up"} />
+                <PopoverArrow anchorRef={modalTagBtnRef} />
                 <div className="overflow-hidden rounded-2xl">
                 {/* Search input */}
                 <div className="px-2 pt-2 pb-1.5">
@@ -478,7 +478,7 @@ export default function ModalFooter({
               style={{ backgroundColor: dark ? "#222222" : undefined }}
               onClick={(e) => e.stopPropagation()}
             >
-              <PopoverArrow anchorRef={kebabRef} direction="up" />
+              <PopoverArrow anchorRef={kebabRef} />
             {/* Archive / Restore */}
             {isTrashed ? (
               <button

@@ -58,7 +58,7 @@ export default function ColorPickerPanel({ anchorRef, open, onClose, colors, sel
           : "bg-white/98 border-gray-100/80"
       }`}
     >
-      <PopoverArrow anchorRef={anchorRef} direction={pos.dropUp ? "down" : "up"} />
+      <PopoverArrow anchorRef={anchorRef} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 48px)", gap: "12px" }}>
         {colors.map((name) => (
           <button

@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 
 /** ---------- Popover Arrow ---------- */
-export function PopoverArrow({ anchorRef, direction = "up" }) {
+export function PopoverArrow({ anchorRef }) {
   const ref = React.useRef(null);
   const [left, setLeft] = React.useState(-999);
+  const [dir, setDir] = React.useState("up");
 
   useLayoutEffect(() => {
     const anchor = anchorRef?.current;
@@ -14,16 +15,19 @@ export function PopoverArrow({ anchorRef, direction = "up" }) {
       const aRect = anchor.getBoundingClientRect();
       const pRect = el.parentElement.getBoundingClientRect();
       setLeft(aRect.left + aRect.width / 2 - pRect.left - 6);
+      setDir(pRect.bottom < aRect.top + aRect.height / 2 ? "down" : "up");
     };
     update();
+    // Popover repositions after initial render — re-read after a frame
+    const raf = requestAnimationFrame(() => requestAnimationFrame(update));
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", update); };
   }, [anchorRef]);
 
   return (
     <div
       ref={ref}
-      className={`popover-arrow popover-arrow--${direction}`}
+      className={`popover-arrow popover-arrow--${dir}`}
       style={{ left }}
     />
   );
