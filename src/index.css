@@ -17,6 +17,9 @@ body {
   --tw-ring-offset-shadow: 0 0 #0000;
 }
 
+/* Hide floating background cards until JS-injected CSS positions them */
+.floating-cards-bg { opacity: 0; }
+
 /* Shimmer / light-sweep animation for gradient buttons (dark mode hover) */
 @keyframes btn-shimmer {
   0% {
