@@ -97,6 +97,17 @@ export default function ModalHeader({
 
           <div className={`flex items-center flex-none ${isDesktop ? "ml-auto" : ""}`}>
             <div className={isDesktop ? "modal-icon-group" : "flex items-center gap-0.5"}>
+              {/* Pin */}
+              {showPinBtn && (
+                <button
+                  className={`modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)] ${isPinned ? "modal-icon-btn--active" : ""}`}
+                  data-tooltip={t("pinUnpin")}
+                  onClick={() => activeId != null && onTogglePin(activeId, !isPinned)}
+                >
+                  {isPinned ? <PinFilled /> : <PinOutline />}
+                </button>
+              )}
+
               {/* Save check */}
               <button
                 onClick={modalHasChanges ? onSave : undefined}
@@ -109,17 +120,6 @@ export default function ModalHeader({
                   <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-
-              {/* Pin */}
-              {showPinBtn && (
-                <button
-                  className={`modal-icon-btn focus:outline-none focus:ring-2 focus:ring-[var(--note-color,#6366f1)] ${isPinned ? "modal-icon-btn--active" : ""}`}
-                  data-tooltip={t("pinUnpin")}
-                  onClick={() => activeId != null && onTogglePin(activeId, !isPinned)}
-                >
-                  {isPinned ? <PinFilled /> : <PinOutline />}
-                </button>
-              )}
 
               {/* Close (desktop only — mobile uses back arrow above) */}
               {isDesktop && (
