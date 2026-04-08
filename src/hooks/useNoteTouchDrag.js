@@ -94,7 +94,7 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
     card.addEventListener("touchmove", onTouchMove, { passive: false });
     card.addEventListener("touchend", onTouchEnd);
     card.addEventListener("touchcancel", cleanup);
-    document.addEventListener("touchend", onDocTouchEnd, true);
+    document.addEventListener("touchend", onDocTouchEnd);
 
     return () => {
       clearTimeout(timer);
@@ -108,7 +108,7 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
       card.removeEventListener("touchmove", onTouchMove);
       card.removeEventListener("touchend", onTouchEnd);
       card.removeEventListener("touchcancel", cleanup);
-      document.removeEventListener("touchend", onDocTouchEnd, true);
+      document.removeEventListener("touchend", onDocTouchEnd);
     };
   }, [cardRef]);
 }
