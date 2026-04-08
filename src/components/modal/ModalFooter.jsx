@@ -436,7 +436,9 @@ export default function ModalFooter({
               )}
               {!hasCollabs && isDesktop && <span>{t("collaborate")}</span>}
               {hasCollabs && !isDesktop && (
-                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full ring-2 ring-white dark:ring-gray-800" />
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-[10px] font-bold leading-none shadow-md ring-2 ring-white dark:ring-gray-800 px-1">
+                  {collabs.length}
+                </span>
               )}
             </button>
           );
