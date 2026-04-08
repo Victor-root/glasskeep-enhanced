@@ -116,9 +116,13 @@ export const scrollColorsFor = (colorKey, dark) => {
   const base = solid(bgFor(colorKey, dark));
   if (dark) {
     const { r, g, b } = parseRGBA(base);
+    // Lighten thumb so it stands out against the dark modal background
+    const lr = Math.min(255, Math.round(r + (255 - r) * 0.45));
+    const lg = Math.min(255, Math.round(g + (255 - g) * 0.45));
+    const lb = Math.min(255, Math.round(b + (255 - b) * 0.45));
     return {
-      thumb: `rgba(${r},${g},${b},0.9)`,
-      track: `rgba(${Math.round(r*0.3)},${Math.round(g*0.3)},${Math.round(b*0.3)},0.8)`,
+      thumb: `rgba(${lr},${lg},${lb},0.9)`,
+      track: `rgba(${Math.min(255, Math.round(r * 0.55))},${Math.min(255, Math.round(g * 0.55))},${Math.min(255, Math.round(b * 0.55))},0.5)`,
     };
   }
   return { thumb: mixWithWhite(base, 0.1, 0.85), track: mixWithWhite(base, 0.55, 0.4) };
