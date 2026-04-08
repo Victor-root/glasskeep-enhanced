@@ -512,7 +512,7 @@ html.dark .modal-footer-toolbar {
 }
 html.dark .modal-footer-btn,
 html.dark .modal-footer-labeled-btn {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.85);
 }
 html.dark .modal-footer-btn:hover,
 html.dark .modal-footer-labeled-btn:hover {
