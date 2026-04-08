@@ -772,7 +772,7 @@ export default function App() {
       const ts = new Date().toISOString().replace(/[:.]/g, "-");
       triggerBlobDownload(`glass-keep-selected-${ts}.zip`, blob);
     } catch (e) {
-      alert(e.message || t("zipDownloadFailed"));
+      alert(t("zipDownloadFailed") + (e.message ? `\n\n${e.message}` : ""));
     }
   };
 

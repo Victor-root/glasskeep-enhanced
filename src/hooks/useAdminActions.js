@@ -43,7 +43,7 @@ export default function useAdminActions(token, { onSettingsUpdated } = {}) {
       if (onSettingsUpdated) onSettingsUpdated(settings);
       return settings;
     } catch (e) {
-      alert(e.message || t("failedUpdateAdminSettings"));
+      alert(t("failedUpdateAdminSettings") + (e.message ? `\n\n${e.message}` : ""));
     }
   };
 
@@ -69,7 +69,7 @@ export default function useAdminActions(token, { onSettingsUpdated } = {}) {
       setNewUserForm({ name: "", email: "", password: "", is_admin: false });
       return newUser;
     } catch (e) {
-      alert(e.message || t("failedCreateUser"));
+      alert(t("failedCreateUser") + (e.message ? `\n\n${e.message}` : ""));
       throw e;
     }
   };
@@ -79,7 +79,7 @@ export default function useAdminActions(token, { onSettingsUpdated } = {}) {
       await api(`/admin/users/${userId}`, { method: "DELETE", token });
       setAllUsers((prev) => prev.filter((u) => u.id !== userId));
     } catch (e) {
-      alert(e.message || t("failedDeleteUser"));
+      alert(t("failedDeleteUser") + (e.message ? `\n\n${e.message}` : ""));
     }
   };
 

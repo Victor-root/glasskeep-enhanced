@@ -26,7 +26,7 @@ export default function AdminView({ dark, showGenericConfirm }) {
       if (!res.ok) throw new Error(data?.error || "Failed to load users");
       setUsers(Array.isArray(data) ? data : []);
     } catch (e) {
-      alert(e.message || t("failedLoadAdminData"));
+      alert(t("failedLoadAdminData") + (e.message ? `\n\n${e.message}` : ""));
       setUsers([]);
     } finally {
       setLoading(false);
@@ -43,7 +43,7 @@ export default function AdminView({ dark, showGenericConfirm }) {
       if (!res.ok) throw new Error(data?.error || "Delete failed");
       setUsers((prev) => prev.filter((u) => u.id !== id));
     } catch (e) {
-      alert(e.message || t("deleteFailed"));
+      alert(t("deleteFailed") + (e.message ? `\n\n${e.message}` : ""));
     }
   }
 
