@@ -459,7 +459,7 @@ export default function ModalFooter({
         {/* ── Kebab menu (Download + Collaborate) ── */}
         <button
           ref={kebabRef}
-          className="modal-footer-btn focus:outline-none"
+          className="modal-footer-btn modal-footer-btn--kebab focus:outline-none"
           onClick={(e) => { e.stopPropagation(); setKebabOpen((v) => !v); }}
           data-tooltip={t("moreOptions")}
         >

@@ -529,6 +529,11 @@ html.dark .modal-footer-labeled-btn:hover {
     height: 34px;
     flex-shrink: 0;
   }
+  .modal-footer-btn--kebab {
+    width: 28px;
+    margin: 0 -5px;
+    z-index: 0;
+  }
   .modal-footer-inner {
     justify-content: center;
     gap: 0.15rem;
