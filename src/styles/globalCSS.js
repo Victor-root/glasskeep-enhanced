@@ -841,6 +841,13 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
 }
 
 /* Login decorative floating cards */
+@keyframes fadeInDecoCards {
+  to { opacity: 1; }
+}
+.floating-cards-bg {
+  opacity: 0;
+  animation: fadeInDecoCards 0.6s ease 0.3s forwards;
+}
 @keyframes floatCard {
   0%   { transform: translateY(0px) rotate(var(--rot)); }
   50%  { transform: translateY(-18px) rotate(var(--rot)); }

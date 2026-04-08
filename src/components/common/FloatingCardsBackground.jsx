@@ -3,7 +3,7 @@ import React from "react";
 /** Decorative floating background cards — fixed wallpaper, z-1 keeps it below all UI (desktop only) */
 export default function FloatingCardsBackground() {
   return (
-    <div aria-hidden="true" style={{position:"fixed",inset:0,zIndex:1,pointerEvents:"none",overflow:"hidden"}}>
+    <div aria-hidden="true" className="floating-cards-bg" style={{position:"fixed",inset:0,zIndex:1,pointerEvents:"none",overflow:"hidden"}}>
       {/* Colonne gauche */}
       <div className="login-deco-card" style={{"--rot":"-12deg","--dur":"7s","--delay":"0s",top:"5%",left:"2%",borderTop:"3px solid rgba(99,102,241,0.7)"}}>
         <div className="deco-title" style={{background:"rgba(99,102,241,0.5)"}}/>
