@@ -32,10 +32,9 @@ export function PopoverArrow({ anchorRef }) {
 
       setReady(true);
     };
-    const raf = requestAnimationFrame(() => requestAnimationFrame(update));
     const t = setTimeout(update, 80);
     window.addEventListener("resize", update);
-    return () => { cancelAnimationFrame(raf); clearTimeout(t); window.removeEventListener("resize", update); };
+    return () => { clearTimeout(t); window.removeEventListener("resize", update); };
   }, [anchorRef]);
 
   return (
