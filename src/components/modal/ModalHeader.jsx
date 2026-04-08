@@ -54,10 +54,10 @@ export default function ModalHeader({
   }, []);
 
   useEffect(() => {
-    if (!isDesktop && mobileTitleRef.current) {
+    if (mobileTitleRef.current) {
       autoResizeTitle(mobileTitleRef.current);
     }
-  }, [mTitle, isDesktop, autoResizeTitle]);
+  }, [mTitle, autoResizeTitle]);
 
   return (
     <>
@@ -82,10 +82,12 @@ export default function ModalHeader({
             </button>
           )}
 
-          {/* Desktop: title inline */}
+          {/* Desktop: title inline (textarea for multi-line wrap) */}
           {isDesktop && (
-            <input
-              className="flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 pr-2 order-first bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none"
+            <textarea
+              ref={mobileTitleRef}
+              className="flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 pr-2 order-first bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden"
+              rows={1}
               value={mTitle}
               onChange={(e) => setMTitle(e.target.value)}
               placeholder={t("noteTitle")}
