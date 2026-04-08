@@ -66,7 +66,21 @@ export default function ModalHeader({
         className="sticky top-0 z-20 rounded-t-none sm:rounded-t-xl"
         style={{ backgroundColor: modalBgFor(mColor, dark) }}
       >
-        <div className={`flex items-center ${isDesktop ? "flex-wrap gap-2 px-4 sm:px-6 pt-4 pb-3" : "justify-end px-3 py-1.5"}`}>
+        <div className={`flex items-center ${isDesktop ? "flex-wrap gap-2 px-4 sm:px-6 pt-4 pb-3" : "px-2 py-1.5"}`}>
+
+          {/* Mobile: back arrow on the left */}
+          {!isDesktop && (
+            <button
+              className="modal-icon-btn focus:outline-none"
+              onClick={onClose}
+              aria-label={t("close")}
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5" />
+                <path d="M12 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
 
           {/* Desktop: title inline */}
           {isDesktop && (
@@ -77,6 +91,9 @@ export default function ModalHeader({
               placeholder={t("noteTitle")}
             />
           )}
+
+          {/* Spacer pushes right-side buttons on mobile */}
+          {!isDesktop && <div className="flex-1" />}
 
           <div className={`flex items-center flex-none ${isDesktop ? "ml-auto" : ""}`}>
             <div className={isDesktop ? "modal-icon-group" : "flex items-center gap-0.5"}>
@@ -104,14 +121,16 @@ export default function ModalHeader({
                 </button>
               )}
 
-              {/* Close */}
-              <button
-                className="modal-icon-btn modal-icon-btn--close focus:outline-none"
-                data-tooltip={t("close")}
-                onClick={onClose}
-              >
-                <CloseIcon />
-              </button>
+              {/* Close (desktop only — mobile uses back arrow above) */}
+              {isDesktop && (
+                <button
+                  className="modal-icon-btn modal-icon-btn--close focus:outline-none"
+                  data-tooltip={t("close")}
+                  onClick={onClose}
+                >
+                  <CloseIcon />
+                </button>
+              )}
             </div>
           </div>
         </div>
