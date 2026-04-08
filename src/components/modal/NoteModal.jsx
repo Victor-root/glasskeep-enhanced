@@ -133,6 +133,7 @@ export default function NoteModal({
   checklistInsertPosition,
 }) {
   const [autoEditId, setAutoEditId] = React.useState(null);
+  const [drawMode, setDrawMode] = React.useState("view");
   const { handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } =
     useChecklistDrag(mItems, setMItems, syncChecklistItems);
 
@@ -475,7 +476,9 @@ export default function NoteModal({
                   height={850}
                   readOnly={false}
                   darkMode={dark}
-                  initialMode="view"
+                  hideModeToggle
+                  externalMode={drawMode}
+                  onModeChange={setDrawMode}
                 />
               )}
 
@@ -553,6 +556,9 @@ export default function NoteModal({
               setViewMode((v) => !v);
               setShowModalFmt(false);
             }}
+            // drawing mode toggle
+            drawMode={drawMode}
+            onToggleDrawMode={() => setDrawMode((m) => m === "view" ? "draw" : "view")}
             modalScrollRef={modalScrollRef}
             savedModalScrollRatioRef={savedModalScrollRatioRef}
             // actions

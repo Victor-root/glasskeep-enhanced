@@ -50,7 +50,7 @@ const DeleteToolIcon = () => (
   </svg>
 );
 
-function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = false, darkMode = false, hideModeToggle = false, initialMode = null }) {
+function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = false, darkMode = false, hideModeToggle = false, initialMode = null, externalMode, onModeChange }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState('pen'); // 'pen' or 'eraser'
@@ -66,7 +66,9 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
     if (hideModeToggle) return 'draw'; // Composer - always draw mode
     return 'view'; // Modal - default to view mode
   };
-  const [mode, setMode] = useState(getInitialMode());
+  const [internalMode, setInternalMode] = useState(getInitialMode());
+  const mode = externalMode !== undefined ? externalMode : internalMode;
+  const setMode = onModeChange || setInternalMode;
   const [canvasWidth, setCanvasWidth] = useState(width);
   const [canvasHeight, setCanvasHeight] = useState(height);
 
