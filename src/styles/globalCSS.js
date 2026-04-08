@@ -778,6 +778,33 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
   border-radius: .5rem;
   font-size: .85rem;
 }
+@media (max-width: 639px) {
+  .fmt-pop {
+    position: fixed !important;
+    left: 0.5rem !important;
+    right: 0.5rem !important;
+    bottom: 52px !important;
+    top: auto !important;
+    width: auto !important;
+    border-radius: 1rem;
+    padding: 0.6rem 0.5rem;
+    backdrop-filter: blur(12px);
+  }
+  .fmt-pop-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.3rem;
+  }
+  .fmt-pop-grid .fmt-sep {
+    display: none;
+  }
+  .fmt-pop-grid .fmt-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.45rem 0;
+    font-size: 0.9rem;
+  }
+}
 
 /* Login decorative floating cards */
 @keyframes floatCard {
