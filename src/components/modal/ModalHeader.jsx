@@ -186,7 +186,7 @@ export default function ModalHeader({
 
       {/* ── Mobile title — outside sticky, scrolls with content ── */}
       {!isDesktop && (
-        <div className="px-5 pt-2 pb-1">
+        <div className="px-5 pt-0 pb-1">
           <textarea
             ref={mobileTitleRef}
             className="w-full bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden"
