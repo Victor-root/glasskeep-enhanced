@@ -444,7 +444,8 @@ export default function ModalFooter({
           );
         })()}
 
-        {/* ── Delete / Trash ── */}
+        {/* ── Delete / Trash (hidden on mobile in edit mode) ── */}
+        {(isDesktop || viewMode || mType !== "text") && (
         <button
           className={`${btnClass} modal-footer-btn--trash focus:outline-none`}
           onClick={onOpenConfirmDelete}
@@ -453,6 +454,7 @@ export default function ModalFooter({
           <Trash />
           {isDesktop && <span>{isTrashed ? t("permanentlyDelete") : t("trash")}</span>}
         </button>
+        )}
 
         {/* ── Kebab menu (Download + Collaborate) ── */}
         <button
