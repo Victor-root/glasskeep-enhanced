@@ -763,6 +763,27 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
   box-shadow: none !important;
 }
 
+/* Popover arrow — reusable triangle pointing to anchor button */
+.popover-arrow {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  z-index: 1;
+}
+.popover-arrow--up {
+  top: -6px;
+  border-left: 1px solid var(--border-light);
+  border-top: 1px solid var(--border-light);
+  transform: rotate(45deg);
+}
+.popover-arrow--down {
+  bottom: -6px;
+  border-right: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light);
+  transform: rotate(45deg);
+}
+
 /* formatting popover base */
 .fmt-pop {
   border: 1px solid var(--border-light);

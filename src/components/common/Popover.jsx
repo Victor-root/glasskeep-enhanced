@@ -1,6 +1,34 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 
+/** ---------- Popover Arrow ---------- */
+export function PopoverArrow({ anchorRef, direction = "up" }) {
+  const ref = React.useRef(null);
+  const [left, setLeft] = React.useState(-999);
+
+  useLayoutEffect(() => {
+    const anchor = anchorRef?.current;
+    const el = ref.current;
+    if (!anchor || !el) return;
+    const update = () => {
+      const aRect = anchor.getBoundingClientRect();
+      const pRect = el.parentElement.getBoundingClientRect();
+      setLeft(aRect.left + aRect.width / 2 - pRect.left - 6);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [anchorRef]);
+
+  return (
+    <div
+      ref={ref}
+      className={`popover-arrow popover-arrow--${direction}`}
+      style={{ left }}
+    />
+  );
+}
+
 /** ---------- Portal Popover ---------- */
 export default function Popover({ anchorRef, open, onClose, children, offset = 8 }) {
   const [pos, setPos] = useState({ top: 0, left: 0 });
