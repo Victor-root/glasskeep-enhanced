@@ -512,12 +512,12 @@ html.dark .modal-footer-toolbar {
 }
 html.dark .modal-footer-btn,
 html.dark .modal-footer-labeled-btn {
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.92);
 }
 html.dark .modal-footer-btn:hover,
 html.dark .modal-footer-labeled-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
 
 /* Responsive: collapse labels to icon-only below 1024px, distribute evenly */
@@ -553,28 +553,28 @@ html.dark .modal-footer-labeled-btn:hover {
 /* Footer colored variants (apply to both icon-only and labeled) */
 .modal-footer-btn--trash, .modal-footer-labeled-btn.modal-footer-btn--trash { color: #dc2626; }
 .modal-footer-btn--trash:hover, .modal-footer-labeled-btn.modal-footer-btn--trash:hover { background: rgba(239, 68, 68, 0.1) !important; color: #b91c1c !important; }
-html.dark .modal-footer-btn--trash, html.dark .modal-footer-labeled-btn.modal-footer-btn--trash { color: #f87171; }
-html.dark .modal-footer-btn--trash:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--trash:hover { background: rgba(239, 68, 68, 0.18) !important; color: #fca5a5 !important; }
+html.dark .modal-footer-btn--trash, html.dark .modal-footer-labeled-btn.modal-footer-btn--trash { color: #fca5a5; }
+html.dark .modal-footer-btn--trash:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--trash:hover { background: rgba(239, 68, 68, 0.22) !important; color: #fecaca !important; }
 
 .modal-footer-btn--download, .modal-footer-labeled-btn.modal-footer-btn--download { color: #16a34a; }
 .modal-footer-btn--download:hover, .modal-footer-labeled-btn.modal-footer-btn--download:hover { background: rgba(22, 163, 74, 0.1) !important; color: #15803d !important; }
-html.dark .modal-footer-btn--download, html.dark .modal-footer-labeled-btn.modal-footer-btn--download { color: #4ade80; }
-html.dark .modal-footer-btn--download:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--download:hover { background: rgba(34, 197, 94, 0.15) !important; color: #86efac !important; }
+html.dark .modal-footer-btn--download, html.dark .modal-footer-labeled-btn.modal-footer-btn--download { color: #86efac; }
+html.dark .modal-footer-btn--download:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--download:hover { background: rgba(34, 197, 94, 0.2) !important; color: #bbf7d0 !important; }
 
 .modal-footer-btn--archive, .modal-footer-labeled-btn.modal-footer-btn--archive { color: #a16207; }
 .modal-footer-btn--archive:hover, .modal-footer-labeled-btn.modal-footer-btn--archive:hover { background: rgba(161, 98, 7, 0.1) !important; color: #854d0e !important; }
-html.dark .modal-footer-btn--archive, html.dark .modal-footer-labeled-btn.modal-footer-btn--archive { color: #fbbf24; }
-html.dark .modal-footer-btn--archive:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--archive:hover { background: rgba(251, 191, 36, 0.15) !important; color: #fcd34d !important; }
+html.dark .modal-footer-btn--archive, html.dark .modal-footer-labeled-btn.modal-footer-btn--archive { color: #fcd34d; }
+html.dark .modal-footer-btn--archive:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--archive:hover { background: rgba(251, 191, 36, 0.2) !important; color: #fde68a !important; }
 
 .modal-footer-btn--collab, .modal-footer-labeled-btn.modal-footer-btn--collab { color: #7c3aed; }
 .modal-footer-btn--collab:hover, .modal-footer-labeled-btn.modal-footer-btn--collab:hover { background: rgba(124, 58, 237, 0.1) !important; color: #6d28d9 !important; }
-html.dark .modal-footer-btn--collab, html.dark .modal-footer-labeled-btn.modal-footer-btn--collab { color: #a78bfa; }
-html.dark .modal-footer-btn--collab:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--collab:hover { background: rgba(167, 139, 250, 0.15) !important; color: #c4b5fd !important; }
+html.dark .modal-footer-btn--collab, html.dark .modal-footer-labeled-btn.modal-footer-btn--collab { color: #c4b5fd; }
+html.dark .modal-footer-btn--collab:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--collab:hover { background: rgba(167, 139, 250, 0.2) !important; color: #ddd6fe !important; }
 
 .modal-footer-btn--image, .modal-footer-labeled-btn.modal-footer-btn--image { color: #0284c7; }
 .modal-footer-btn--image:hover, .modal-footer-labeled-btn.modal-footer-btn--image:hover { background: rgba(2, 132, 199, 0.1) !important; color: #0369a1 !important; }
-html.dark .modal-footer-btn--image, html.dark .modal-footer-labeled-btn.modal-footer-btn--image { color: #38bdf8; }
-html.dark .modal-footer-btn--image:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--image:hover { background: rgba(56, 189, 248, 0.15) !important; color: #7dd3fc !important; }
+html.dark .modal-footer-btn--image, html.dark .modal-footer-labeled-btn.modal-footer-btn--image { color: #7dd3fc; }
+html.dark .modal-footer-btn--image:hover, html.dark .modal-footer-labeled-btn.modal-footer-btn--image:hover { background: rgba(56, 189, 248, 0.2) !important; color: #bae6fd !important; }
 
 .modal-footer-btn--mode, .modal-footer-labeled-btn.modal-footer-btn--mode {
   background: linear-gradient(90deg, #6366f1 0%, #7c3aed 100%) !important;
