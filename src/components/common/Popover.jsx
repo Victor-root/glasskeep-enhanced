@@ -4,23 +4,34 @@ import { createPortal } from "react-dom";
 /** ---------- Popover Arrow ---------- */
 export function PopoverArrow({ anchorRef }) {
   const ref = React.useRef(null);
-  const [left, setLeft] = React.useState(-999);
+  const [left, setLeft] = React.useState(0);
   const [dir, setDir] = React.useState("up");
+  const [ready, setReady] = React.useState(false);
 
   useLayoutEffect(() => {
+    setReady(false);
     const anchor = anchorRef?.current;
     const el = ref.current;
     if (!anchor || !el) return;
     const update = () => {
       const aRect = anchor.getBoundingClientRect();
-      const pRect = el.parentElement.getBoundingClientRect();
+      const parent = el.parentElement;
+      const pRect = parent.getBoundingClientRect();
       const raw = aRect.left + aRect.width / 2 - pRect.left - 6;
-      // Clamp: keep arrow at least 14px from popover edges
-      const clamped = Math.max(14, Math.min(raw, pRect.width - 26));
-      setLeft(clamped);
-      setDir(pRect.bottom < aRect.top + aRect.height / 2 ? "down" : "up");
+      setLeft(Math.max(2, Math.min(raw, pRect.width - 14)));
+      const d = pRect.bottom < aRect.top + aRect.height / 2 ? "down" : "up";
+      setDir(d);
+
+      // Flatten the corner nearest the arrow when it's close to the edge
+      const nearLeft = raw < 20;
+      const nearRight = raw > pRect.width - 32;
+      parent.style.borderTopLeftRadius    = (nearLeft && d === "up")   ? "4px" : "";
+      parent.style.borderTopRightRadius   = (nearRight && d === "up")  ? "4px" : "";
+      parent.style.borderBottomLeftRadius  = (nearLeft && d === "down") ? "4px" : "";
+      parent.style.borderBottomRightRadius = (nearRight && d === "down") ? "4px" : "";
+
+      setReady(true);
     };
-    update();
     const raf = requestAnimationFrame(() => requestAnimationFrame(update));
     const t = setTimeout(update, 80);
     window.addEventListener("resize", update);
@@ -31,7 +42,7 @@ export function PopoverArrow({ anchorRef }) {
     <div
       ref={ref}
       className={`popover-arrow popover-arrow--${dir}`}
-      style={{ left }}
+      style={{ left, visibility: ready ? "visible" : "hidden" }}
     />
   );
 }
