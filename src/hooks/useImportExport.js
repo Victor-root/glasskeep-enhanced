@@ -33,7 +33,7 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
         ) + ".json";
       triggerJSONDownload(fname, json);
     } catch (e) {
-      alert(t("exportFailed") + (e.message ? `\n\n${e.message}` : ""));
+      alert(e.message || t("exportFailed"));
     }
   };
 
@@ -60,7 +60,7 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
       await loadNotes();
       alert(t("importedNotesSuccessfully").replace("{count}", String(notesArr.length)));
     } catch (e) {
-      alert(t("importFailed") + (e.message ? `\n\n${e.message}` : ""));
+      alert(e.message || t("importFailed"));
     }
   };
 
@@ -130,7 +130,7 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
       await loadNotes();
       alert(t("importedGoogleKeepNotes").replace("{count}", String(notesArr.length)));
     } catch (e) {
-      alert(t("googleKeepImportFailed") + (e.message ? `\n\n${e.message}` : ""));
+      alert(e.message || t("googleKeepImportFailed"));
     }
   };
 
@@ -194,7 +194,7 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
       await loadNotes();
       alert(t("importedMarkdownFilesSuccessfully").replace("{count}", String(notesArr.length)));
     } catch (e) {
-      alert(t("markdownImportFailed") + (e.message ? `\n\n${e.message}` : ""));
+      alert(e.message || t("markdownImportFailed"));
     }
   };
 
@@ -216,7 +216,7 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
       downloadText(fname, content);
       alert(t("secretKeyDownloadedSafe"));
     } catch (e) {
-      alert(t("couldNotGenerateSecretKey") + (e.message ? `\n\n${e.message}` : ""));
+      alert(e.message || t("couldNotGenerateSecretKey"));
     }
   };
 
