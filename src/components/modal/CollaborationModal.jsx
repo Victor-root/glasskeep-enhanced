@@ -95,12 +95,12 @@ export default function CollaborationModal({
                           className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
                           data-tooltip={
                             collab.id === currentUser?.id
-                              ? "Remove yourself"
-                              : "Remove collaborator"
+                              ? t("removeYourself")
+                              : t("removeCollaborator")
                           }
                         >
                           {collab.id === currentUser?.id
-                            ? "Leave"
+                            ? t("leaveCollaboration")
                             : t("remove")}
                         </button>
                       )}
