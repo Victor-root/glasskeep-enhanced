@@ -43,6 +43,16 @@ html.dark body {
   contain: layout style paint;
   animation: noteAppear 0.15s ease-out;
 }
+/* Drag & drop reorder styles */
+.note-card.dragging {
+  opacity: 0.35;
+  transform: scale(0.97);
+}
+.note-card.drag-over {
+  outline: 2.5px dashed #6366f1;
+  outline-offset: 4px;
+  transition: outline-offset 0.15s ease;
+}
 @keyframes noteAppear {
   from { opacity: 0; }
   to   { opacity: 1; }

@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import { t } from "../../i18n";
 import { bgFor, solid } from "../../utils/colors.js";
 import { renderSafeMarkdown, linkifyPhoneNumbers } from "../../utils/markdown.jsx";
@@ -6,6 +6,7 @@ import { PinOutline, PinFilled, ImageIcon } from "../../icons/index.jsx";
 import ChecklistRow from "../common/ChecklistRow.jsx";
 import DrawingPreview from "../common/DrawingPreview.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
+import useNoteTouchDrag from "../../hooks/useNoteTouchDrag.js";
 
 export default function NoteCard({
   n,
@@ -60,9 +61,13 @@ export default function NoteCard({
   const group = n.pinned ? "pinned" : "others";
   const isOwned = !currentUser || !n.user_id || n.user_id === currentUser.id;
   const canDrag = !multiMode && isOwned;
+  const cardRef = useRef(null);
+  useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId: n.id, group, onDragStart, onDrop, onDragEnd });
 
   return (
     <div
+      ref={cardRef}
+      data-note-id={n.id}
       draggable={canDrag}
       onDragStart={(e) => {
         if (canDrag) onDragStart(n.id, e);
