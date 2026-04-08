@@ -692,7 +692,7 @@ html:not(.dark) .code-block-wrapper .code-copy-btn {
 /* === Scrollbars thématiques (indigo→violet, même thème que les boutons) === */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
-::-webkit-scrollbar-track { background: #eef2ff; }
+::-webkit-scrollbar-track { background: #7547ee3d; }
 ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #6366f1 0%, #7c3aed 100%); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #4f46e5 0%, #6d28d9 100%); }
 /* Descendants of html.dark */
@@ -705,7 +705,7 @@ html.dark::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #6366f1
 html.dark::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #4f46e5 0%, #6d28d9 100%) !important; }
 /* Firefox fallback (no webkit support) */
 @supports not selector(::-webkit-scrollbar) {
-  * { scrollbar-width: thin; scrollbar-color: #6366f1 #eef2ff; }
+  * { scrollbar-width: thin; scrollbar-color: #6366f1 #7547ee3d; }
   .dark * { scrollbar-color: #6366f1 #1e1b4b; }
   html.dark { scrollbar-color: #6366f1 #1e1b4b; scrollbar-width: thin; }
 }
