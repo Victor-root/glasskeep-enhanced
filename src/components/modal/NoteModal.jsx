@@ -230,7 +230,7 @@ export default function NoteModal({
 
             {/* Content area */}
             <div
-              className={mType === "draw" ? "p-2 pb-6" : "p-6 pb-12"}
+              className={mType === "draw" ? "p-2 pb-6" : "px-6 pt-3 pb-12 max-sm:pt-1"}
               onClick={onModalBodyClick}
             >
 
