@@ -256,13 +256,17 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
 
   // ─── UI Effects ───
 
-  // Lock body scroll on modal & image viewer
+  // Lock body scroll on modal & image viewer (compensate scrollbar width to prevent layout shift)
   useEffect(() => {
     if (!open && !imgViewOpen) return;
-    const prev = document.body.style.overflow;
+    const scrollbarW = window.innerWidth - document.documentElement.clientWidth;
+    const prevOverflow = document.body.style.overflow;
+    const prevPaddingRight = document.body.style.paddingRight;
     document.body.style.overflow = "hidden";
+    if (scrollbarW > 0) document.body.style.paddingRight = `${scrollbarW}px`;
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPaddingRight;
     };
   }, [open, imgViewOpen]);
 
