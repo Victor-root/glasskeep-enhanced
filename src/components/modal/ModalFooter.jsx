@@ -404,16 +404,16 @@ export default function ModalFooter({
           const hasCollabs = collabs.length > 0;
           return (
             <button
-              className={`${hasCollabs ? "modal-footer-labeled-btn" : btnClass} modal-footer-btn--collab focus:outline-none`}
+              className={`${hasCollabs && isDesktop ? "modal-footer-labeled-btn" : btnClass} modal-footer-btn--collab focus:outline-none relative`}
               onClick={onOpenCollaboration}
               data-tooltip={hasCollabs || !isDesktop ? t("collaborate") : undefined}
             >
               <svg className={isDesktop ? "w-4 h-4" : "w-[18px] h-[18px]"} fill="currentColor" viewBox="0 0 20 20">
                 <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
               </svg>
-              {hasCollabs ? (
-                <span className={`modal-footer-avatars flex items-center ${isDesktop ? "-space-x-1" : "-space-x-2.5"}`}>
-                  {collabs.slice(0, isDesktop ? 3 : 2).map((c) => (
+              {hasCollabs && isDesktop && (
+                <span className="modal-footer-avatars flex items-center -space-x-1">
+                  {collabs.slice(0, 3).map((c) => (
                     <span key={c.id} data-tooltip={c.name || c.email}>
                       <UserAvatar
                         name={c.name}
@@ -426,15 +426,17 @@ export default function ModalFooter({
                       />
                     </span>
                   ))}
-                  {collabs.length > (isDesktop ? 3 : 2) && (
+                  {collabs.length > 3 && (
                     <span
                       className="text-[10px] font-semibold opacity-70 pl-1.5"
-                      data-tooltip={collabs.slice(isDesktop ? 3 : 2).map((c) => c.name || c.email).join(", ")}
-                    >+{collabs.length - (isDesktop ? 3 : 2)}</span>
+                      data-tooltip={collabs.slice(3).map((c) => c.name || c.email).join(", ")}
+                    >+{collabs.length - 3}</span>
                   )}
                 </span>
-              ) : (
-                isDesktop && <span>{t("collaborate")}</span>
+              )}
+              {!hasCollabs && isDesktop && <span>{t("collaborate")}</span>}
+              {hasCollabs && !isDesktop && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full ring-2 ring-white dark:ring-gray-800" />
               )}
             </button>
           );
