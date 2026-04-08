@@ -146,11 +146,29 @@ export function handleSmartEnter(value, start, end) {
 }
 
 /** Small toolbar UI */
-export default function FormatToolbar({ dark, onAction }) {
+export default function FormatToolbar({ dark, onAction, anchorRef }) {
+  const popRef = React.useRef(null);
+  const [arrowLeft, setArrowLeft] = React.useState(null);
+
+  React.useLayoutEffect(() => {
+    const btn = anchorRef?.current;
+    if (!btn) return;
+    const update = () => {
+      const r = btn.getBoundingClientRect();
+      const popLeft = 8; // 0.5rem left margin of .fmt-pop
+      setArrowLeft(r.left + r.width / 2 - popLeft - 6); // 6 = half arrow width
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [anchorRef]);
+
   const base = `fmt-btn ${dark ? "hover:bg-white/10" : "hover:bg-black/5"}`;
   return (
     <div
+      ref={popRef}
       className={`fmt-pop ${dark ? "bg-gray-800 text-gray-100" : "bg-white text-gray-800"}`}
+      style={arrowLeft != null ? { "--fmt-arrow-left": `${arrowLeft}px` } : undefined}
     >
       <div className="fmt-pop-grid flex flex-wrap gap-1">
         <button className={base} onClick={() => onAction("h1")}>H1</button>

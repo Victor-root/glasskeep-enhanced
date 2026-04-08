@@ -144,6 +144,7 @@ export default function ModalHeader({
           >
             <FormatToolbar
               dark={dark}
+              anchorRef={modalFmtBtnRef}
               onAction={(type) => {
                 setShowModalFmt(false);
                 onFormatModal(type);
