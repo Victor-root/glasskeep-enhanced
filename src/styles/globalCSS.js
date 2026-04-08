@@ -724,8 +724,8 @@ html.dark::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #
 .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 10px; }
 .modal-scroll-themed::-webkit-scrollbar-thumb:hover { filter: brightness(1.15); }
 /* Fallback si CSS vars non résolues sur webkit (Safari) */
-html.dark .modal-scroll-themed::-webkit-scrollbar-track { background: var(--sb-track, #3b0764); }
-html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-thumb, #7c3aed); border-radius: 10px; }
+html.dark .modal-scroll-themed::-webkit-scrollbar-track { background: var(--sb-track, #3b0764) !important; }
+html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-thumb, #7c3aed) !important; border-radius: 10px; }
 
 /* clamp for text preview */
 .line-clamp-6 {
