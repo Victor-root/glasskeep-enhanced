@@ -793,16 +793,14 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
   .fmt-pop::after {
     content: "";
     position: absolute;
-    bottom: -7px;
-    right: 25%;
-    width: 14px;
-    height: 14px;
+    bottom: -6px;
+    right: calc(25% - 4px);
+    width: 12px;
+    height: 12px;
     background: inherit;
-    border: 1px solid var(--border-light);
-    border-top: none;
-    border-left: none;
+    border-right: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border-light);
     transform: rotate(45deg);
-    clip-path: polygon(0 0, 100% 0, 100% 100%);
   }
   .fmt-pop-grid {
     display: grid;
