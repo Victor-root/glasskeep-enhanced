@@ -790,6 +790,20 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
     padding: 0.6rem 0.5rem;
     backdrop-filter: blur(12px);
   }
+  .fmt-pop::after {
+    content: "";
+    position: absolute;
+    bottom: -7px;
+    right: 25%;
+    width: 14px;
+    height: 14px;
+    background: inherit;
+    border: 1px solid var(--border-light);
+    border-top: none;
+    border-left: none;
+    transform: rotate(45deg);
+    clip-path: polygon(0 0, 100% 0, 100% 100%);
+  }
   .fmt-pop-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
