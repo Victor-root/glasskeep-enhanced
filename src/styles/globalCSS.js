@@ -301,8 +301,8 @@ html.dark .modal-icon-btn--save-active {
   background: transparent !important;
 }
 html.dark .modal-icon-btn--save-idle {
-  color: rgba(52, 211, 153, 0.2) !important;
-  border-color: rgba(52, 211, 153, 0.1) !important;
+  color: rgba(52, 211, 153, 0.45) !important;
+  border-color: rgba(52, 211, 153, 0.25) !important;
 }
 
 /* ── Séparateur avant le bouton close ──────────────────────────────────── */
