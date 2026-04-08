@@ -14,14 +14,17 @@ export function PopoverArrow({ anchorRef }) {
     const update = () => {
       const aRect = anchor.getBoundingClientRect();
       const pRect = el.parentElement.getBoundingClientRect();
-      setLeft(aRect.left + aRect.width / 2 - pRect.left - 6);
+      const raw = aRect.left + aRect.width / 2 - pRect.left - 6;
+      // Clamp: keep arrow at least 14px from popover edges
+      const clamped = Math.max(14, Math.min(raw, pRect.width - 26));
+      setLeft(clamped);
       setDir(pRect.bottom < aRect.top + aRect.height / 2 ? "down" : "up");
     };
     update();
-    // Popover repositions after initial render — re-read after a frame
     const raf = requestAnimationFrame(() => requestAnimationFrame(update));
+    const t = setTimeout(update, 80);
     window.addEventListener("resize", update);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", update); };
+    return () => { cancelAnimationFrame(raf); clearTimeout(t); window.removeEventListener("resize", update); };
   }, [anchorRef]);
 
   return (
