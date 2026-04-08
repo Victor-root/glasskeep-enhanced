@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
@@ -108,6 +108,21 @@ export default function ModalFooter({
   const kebabRef = useRef(null);
   const [kebabOpen, setKebabOpen] = useState(false);
 
+  /* Close tag dropdown on outside click */
+  const tagDropdownRef = useRef(null);
+  useEffect(() => {
+    if (!modalTagFocused) return;
+    const onDown = (e) => {
+      const drop = tagDropdownRef.current;
+      const btn = modalTagBtnRef?.current;
+      if (drop && drop.contains(e.target)) return;
+      if (btn && btn.contains(e.target)) return;
+      setModalTagFocused(false);
+    };
+    document.addEventListener("mousedown", onDown, true);
+    return () => document.removeEventListener("mousedown", onDown, true);
+  }, [modalTagFocused, setModalTagFocused, modalTagBtnRef]);
+
   return (
     <div className="modal-footer-toolbar border-t border-[var(--border-light)]">
       <div className={`modal-footer-inner flex items-center px-2 sm:px-3 py-1.5 ${isDesktop ? "gap-1" : "gap-0.5"}`}>
@@ -209,6 +224,7 @@ export default function ModalFooter({
 
             return createPortal(
               <div
+                ref={tagDropdownRef}
                 data-arrow={arrowDir}
                 style={{
                   position: "fixed",

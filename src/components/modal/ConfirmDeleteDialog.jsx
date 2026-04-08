@@ -24,8 +24,8 @@ export default function ConfirmDeleteDialog({
         className="glass-card rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative"
         style={{
           backgroundColor: dark
-            ? "rgba(40,40,40,0.95)"
-            : "rgba(255,255,255,0.95)",
+            ? "#282828"
+            : "#ffffff",
         }}
         onClick={(e) => e.stopPropagation()}
       >
