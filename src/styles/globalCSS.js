@@ -520,8 +520,14 @@ html.dark .modal-footer-labeled-btn:hover {
     justify-content: center;
     gap: 0;
   }
-  .modal-footer-labeled-btn > span {
+  .modal-footer-labeled-btn > span:not(.modal-footer-avatars) {
     display: none;
+  }
+  .modal-footer-btn--collab.modal-footer-labeled-btn {
+    width: auto;
+    height: auto;
+    border-radius: 9999px;
+    padding: 0.35rem 0.5rem;
   }
   .modal-footer-inner {
     justify-content: space-evenly;
