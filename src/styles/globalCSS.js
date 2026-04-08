@@ -794,7 +794,7 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
     content: "";
     position: absolute;
     bottom: -6px;
-    right: calc(25% - 4px);
+    right: 33%;
     width: 12px;
     height: 12px;
     background: inherit;
