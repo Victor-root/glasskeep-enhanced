@@ -524,10 +524,10 @@ html.dark .modal-footer-labeled-btn:hover {
     display: none;
   }
   .modal-footer-inner {
-    justify-content: space-evenly;
-    gap: 0;
-    padding-left: 0;
-    padding-right: 0;
+    justify-content: center;
+    gap: 0.25rem;
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
   }
   .modal-footer-spacer {
     display: none;
