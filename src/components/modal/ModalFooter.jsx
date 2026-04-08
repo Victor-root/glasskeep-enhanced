@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
-import Popover, { PopoverArrow } from "../common/Popover.jsx";
+import Popover from "../common/Popover.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
 import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, FormatIcon, Kebab } from "../../icons/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
@@ -202,8 +202,14 @@ export default function ModalFooter({
             const trimmed = tagInput.trim();
             const isNew = trimmed && !allTags.some(({ tag: tg }) => tg.toLowerCase() === trimmed.toLowerCase());
 
+            const arrowLeft = rect.left + rect.width / 2 - dropLeft - 6;
+            const arrowDir = dropUp ? "down" : "up";
+            const nearLeft = arrowLeft < 20;
+            const nearRight = arrowLeft > dropWidth - 32;
+
             return createPortal(
               <div
+                data-arrow={arrowDir}
                 style={{
                   position: "fixed",
                   ...(dropUp
@@ -211,10 +217,14 @@ export default function ModalFooter({
                     : { top: rect.bottom + 6, left: dropLeft }),
                   width: dropWidth,
                   zIndex: 99999,
+                  '--arrow-left': `${arrowLeft}px`,
+                  ...(nearLeft && arrowDir === "up" && { borderTopLeftRadius: '4px' }),
+                  ...(nearLeft && arrowDir === "down" && { borderBottomLeftRadius: '4px' }),
+                  ...(nearRight && arrowDir === "up" && { borderTopRightRadius: '4px' }),
+                  ...(nearRight && arrowDir === "down" && { borderBottomRightRadius: '4px' }),
                 }}
                 className="rounded-2xl shadow-2xl bg-white/98 dark:bg-gray-900/98 backdrop-blur-xl border border-indigo-100/80 dark:border-indigo-800/50 ring-1 ring-black/5 dark:ring-white/5"
               >
-                <PopoverArrow anchorRef={modalTagBtnRef} />
                 <div className="overflow-hidden rounded-2xl">
                 {/* Search input */}
                 <div className="px-2 pt-2 pb-1.5">
@@ -472,13 +482,13 @@ export default function ModalFooter({
           anchorRef={kebabRef}
           open={kebabOpen}
           onClose={() => setKebabOpen(false)}
+          showArrow
         >
           <div
               className={`min-w-[180px] border border-[var(--border-light)] rounded-lg shadow-lg ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
               style={{ backgroundColor: dark ? "#222222" : undefined }}
               onClick={(e) => e.stopPropagation()}
             >
-              <PopoverArrow anchorRef={kebabRef} />
             {/* Archive / Restore */}
             {isTrashed ? (
               <button

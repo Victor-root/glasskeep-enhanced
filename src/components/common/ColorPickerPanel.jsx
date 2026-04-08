@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { PopoverArrow } from "./Popover.jsx";
 import { trColorName, solid, bgFor } from "../../utils/colors.js";
 
 /** ---------- Color Picker Panel ---------- */
@@ -19,7 +18,8 @@ export default function ColorPickerPanel({ anchorRef, open, onClose, colors, sel
       const dropUp = spaceBelow < 240;
       let left = Math.min(r.left, window.innerWidth - panelW - 8);
       left = Math.max(8, left);
-      setPos({ top: dropUp ? r.top - 8 : r.bottom + 8, left, dropUp });
+      const arrowLeft = r.left + r.width / 2 - left - 6;
+      setPos({ top: dropUp ? r.top - 8 : r.bottom + 8, left, dropUp, arrowLeft });
     };
     place();
     window.addEventListener("resize", place);
@@ -48,17 +48,28 @@ export default function ColorPickerPanel({ anchorRef, open, onClose, colors, sel
       : { top: pos.top }),
   };
 
+  const arrowDir = pos.dropUp ? "down" : "up";
+  const nearLeft = (pos.arrowLeft || 0) < 20;
+  const nearRight = (pos.arrowLeft || 0) > 220;
+
   return createPortal(
     <div
       ref={panelRef}
-      style={panelStyle}
+      data-arrow={arrowDir}
+      style={{
+        ...panelStyle,
+        '--arrow-left': `${pos.arrowLeft || 0}px`,
+        ...(nearLeft && arrowDir === "up" && { borderTopLeftRadius: '4px' }),
+        ...(nearLeft && arrowDir === "down" && { borderBottomLeftRadius: '4px' }),
+        ...(nearRight && arrowDir === "up" && { borderTopRightRadius: '4px' }),
+        ...(nearRight && arrowDir === "down" && { borderBottomRightRadius: '4px' }),
+      }}
       className={`rounded-2xl shadow-2xl backdrop-blur-xl border ring-1 ring-black/5 dark:ring-white/5 p-3 ${
         darkMode
           ? "bg-gray-900/98 border-gray-700/50"
           : "bg-white/98 border-gray-100/80"
       }`}
     >
-      <PopoverArrow anchorRef={anchorRef} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 48px)", gap: "12px" }}>
         {colors.map((name) => (
           <button
