@@ -350,21 +350,6 @@ export default function ModalFooter({
           })()}
         </div>
 
-        {/* ── Formatting (mobile only) ── */}
-        {!isDesktop && mType === "text" && !viewMode && (
-          <button
-            ref={modalFmtBtnRef}
-            className="modal-footer-btn focus:outline-none"
-            data-tooltip={t("formatting")}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowModalFmt((v) => !v);
-            }}
-          >
-            <FormatIcon />
-          </button>
-        )}
-
         {/* ── Undo ── */}
         <button
           className={`${btnClass} focus:outline-none ${!canUndo ? "opacity-50 cursor-default" : ""}`}
@@ -398,8 +383,23 @@ export default function ModalFooter({
         {/* Spacer */}
         <div className="flex-1 modal-footer-spacer" />
 
-        {/* ── Collaborate (with avatars when collaborators exist) ── */}
-        {(() => {
+        {/* ── Formatting (mobile edit mode only — replaces collab in this position) ── */}
+        {!isDesktop && mType === "text" && !viewMode && (
+          <button
+            ref={modalFmtBtnRef}
+            className="modal-footer-btn focus:outline-none"
+            data-tooltip={t("formatting")}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowModalFmt((v) => !v);
+            }}
+          >
+            <FormatIcon />
+          </button>
+        )}
+
+        {/* ── Collaborate (hidden on mobile edit mode — moved to kebab) ── */}
+        {(isDesktop || viewMode || mType !== "text") && (() => {
           const collabs = addModalCollaborators || [];
           const hasCollabs = collabs.length > 0;
           return (
@@ -444,7 +444,7 @@ export default function ModalFooter({
           );
         })()}
 
-        {/* ── Delete / Trash (hidden on mobile in edit mode) ── */}
+        {/* ── Delete / Trash (hidden on mobile edit mode — moved to kebab) ── */}
         {(isDesktop || viewMode || mType !== "text") && (
         <button
           className={`${btnClass} modal-footer-btn--trash focus:outline-none`}
@@ -501,6 +501,28 @@ export default function ModalFooter({
             >
               <DownloadIcon />{t("downloadMd")}
             </button>
+            {/* Collaborate — shown in kebab on mobile edit mode */}
+            {!isDesktop && mType === "text" && !viewMode && (
+              <button
+                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                style={{ color: dark ? "#93c5fd" : "#2563eb" }}
+                onClick={() => { onOpenCollaboration(); setKebabOpen(false); }}
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" /></svg>
+                {t("collaborate")}
+              </button>
+            )}
+            {/* Trash — shown in kebab on mobile edit mode */}
+            {!isDesktop && mType === "text" && !viewMode && (
+              <button
+                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                style={{ color: dark ? "#f87171" : "#dc2626" }}
+                onClick={() => { onOpenConfirmDelete(); setKebabOpen(false); }}
+              >
+                <Trash />
+                {isTrashed ? t("permanentlyDelete") : t("trash")}
+              </button>
+            )}
           </div>
         </Popover>
 
