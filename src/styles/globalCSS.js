@@ -128,6 +128,9 @@ html.dark header.glass-card {
   color: #2563eb;
   text-decoration: underline;
 }
+html.dark .note-content a {
+  color: #93c5fd;
+}
 .note-card .note-content a {
   pointer-events: none;
 }
