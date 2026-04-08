@@ -412,8 +412,8 @@ export default function ModalFooter({
                 <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
               </svg>
               {hasCollabs ? (
-                <span className="modal-footer-avatars flex items-center -space-x-1">
-                  {collabs.slice(0, 3).map((c) => (
+                <span className={`modal-footer-avatars flex items-center ${isDesktop ? "-space-x-1" : "-space-x-1.5"}`}>
+                  {collabs.slice(0, isDesktop ? 3 : 2).map((c) => (
                     <span key={c.id} data-tooltip={c.name || c.email}>
                       <UserAvatar
                         name={c.name}
@@ -426,11 +426,11 @@ export default function ModalFooter({
                       />
                     </span>
                   ))}
-                  {collabs.length > 3 && (
+                  {collabs.length > (isDesktop ? 3 : 2) && (
                     <span
                       className="text-[10px] font-semibold opacity-70 pl-1.5"
-                      data-tooltip={collabs.slice(3).map((c) => c.name || c.email).join(", ")}
-                    >+{collabs.length - 3}</span>
+                      data-tooltip={collabs.slice(isDesktop ? 3 : 2).map((c) => c.name || c.email).join(", ")}
+                    >+{collabs.length - (isDesktop ? 3 : 2)}</span>
                   )}
                 </span>
               ) : (
