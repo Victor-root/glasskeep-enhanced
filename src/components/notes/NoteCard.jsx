@@ -85,12 +85,12 @@ export default function NoteCard({
         if (canDrag) onDragEnd(e);
       }}
       onClick={(e) => {
+        // Ignore click after touch drag release
+        if (cardRef.current?.dataset?.touchDragging) return;
         if (multiMode) {
-          // In multi-select mode, clicking anywhere toggles selection
           e.stopPropagation();
           onToggleSelect?.(n.id, !selected);
         } else {
-          // In normal mode, open the modal
           openModal(n.id);
         }
       }}
