@@ -212,9 +212,10 @@ export default function ModalFooter({
                   width: dropWidth,
                   zIndex: 99999,
                 }}
+                className="rounded-2xl shadow-2xl bg-white/98 dark:bg-gray-900/98 backdrop-blur-xl border border-indigo-100/80 dark:border-indigo-800/50 ring-1 ring-black/5 dark:ring-white/5"
               >
                 <PopoverArrow anchorRef={modalTagBtnRef} direction={dropUp ? "down" : "up"} />
-                <div className="rounded-2xl shadow-2xl bg-white/98 dark:bg-gray-900/98 backdrop-blur-xl border border-indigo-100/80 dark:border-indigo-800/50 overflow-hidden ring-1 ring-black/5 dark:ring-white/5">
+                <div className="overflow-hidden rounded-2xl">
                 {/* Search input */}
                 <div className="px-2 pt-2 pb-1.5">
                   <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-800/80 border border-gray-200/80 dark:border-gray-700/60 focus-within:border-indigo-300 dark:focus-within:border-indigo-600 transition-colors duration-150">
@@ -472,13 +473,12 @@ export default function ModalFooter({
           open={kebabOpen}
           onClose={() => setKebabOpen(false)}
         >
-          <div style={{ position: "relative" }}>
-            <PopoverArrow anchorRef={kebabRef} direction="up" />
-            <div
-              className={`min-w-[180px] border border-[var(--border-light)] rounded-lg shadow-lg overflow-hidden ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
+          <div
+              className={`min-w-[180px] border border-[var(--border-light)] rounded-lg shadow-lg ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
               style={{ backgroundColor: dark ? "#222222" : undefined }}
               onClick={(e) => e.stopPropagation()}
             >
+              <PopoverArrow anchorRef={kebabRef} direction="up" />
             {/* Archive / Restore */}
             {isTrashed ? (
               <button
@@ -527,7 +527,6 @@ export default function ModalFooter({
                 {isTrashed ? t("permanentlyDelete") : t("trash")}
               </button>
             )}
-            </div>
           </div>
         </Popover>
 

@@ -49,16 +49,17 @@ export default function ColorPickerPanel({ anchorRef, open, onClose, colors, sel
   };
 
   return createPortal(
-    <div ref={panelRef} style={panelStyle}>
+    <div
+      ref={panelRef}
+      style={panelStyle}
+      className={`rounded-2xl shadow-2xl backdrop-blur-xl border ring-1 ring-black/5 dark:ring-white/5 p-3 ${
+        darkMode
+          ? "bg-gray-900/98 border-gray-700/50"
+          : "bg-white/98 border-gray-100/80"
+      }`}
+    >
       <PopoverArrow anchorRef={anchorRef} direction={pos.dropUp ? "down" : "up"} />
-      <div
-        className={`rounded-2xl shadow-2xl backdrop-blur-xl border overflow-hidden ring-1 ring-black/5 dark:ring-white/5 p-3 ${
-          darkMode
-            ? "bg-gray-900/98 border-gray-700/50"
-            : "bg-white/98 border-gray-100/80"
-        }`}
-      >
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 48px)", gap: "12px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 48px)", gap: "12px" }}>
         {colors.map((name) => (
           <button
             key={name}
@@ -93,7 +94,6 @@ export default function ColorPickerPanel({ anchorRef, open, onClose, colors, sel
             )}
           </button>
         ))}
-        </div>
       </div>
     </div>,
     document.body
