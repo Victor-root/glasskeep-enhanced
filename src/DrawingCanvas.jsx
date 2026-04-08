@@ -513,7 +513,7 @@ function DrawingCanvas({ data, onChange, width = 800, height = 600, readOnly = f
       )}
 
       {/* Info */}
-      <div className="text-xs text-gray-500 mt-2">
+      <div className="text-xs text-gray-500 dark:text-gray-300 mt-2">
         {paths.length} {paths.length !== 1 ? t("strokeCountPlural") : t("strokeCount")}
         {mode === 'view' && ` (${t('viewMode')})`}
         {readOnly && mode === 'draw' && ` (${t('readOnlyLabel')})`}
