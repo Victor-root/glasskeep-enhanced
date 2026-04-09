@@ -382,8 +382,8 @@ export default function ModalFooter({
           })()}
         </div>
 
-        {/* ── Undo (hidden in draw edit mode — canvas has its own undo) ── */}
-        {!(mType === 'draw' && drawMode === 'draw') && (
+        {/* ── Undo (hidden in draw canvas mode & view mode) ── */}
+        {!(mType === 'draw' && drawMode === 'draw') && !viewMode && (
         <button
           className={`${btnClass} focus:outline-none ${!canUndo ? "opacity-50 cursor-default" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
@@ -399,8 +399,8 @@ export default function ModalFooter({
         </button>
         )}
 
-        {/* ── Redo (hidden in draw edit mode — canvas has its own redo) ── */}
-        {!(mType === 'draw' && drawMode === 'draw') && (
+        {/* ── Redo (hidden in draw canvas mode & view mode) ── */}
+        {!(mType === 'draw' && drawMode === 'draw') && !viewMode && (
         <button
           className={`${btnClass} focus:outline-none ${!canRedo ? "opacity-50 cursor-default" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
@@ -624,8 +624,10 @@ export default function ModalFooter({
                   <path d="M12 19l-7-7 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               ) : (
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M3 17.25V21h3.75l11-11-3.75-3.75-11 11zM20.71 7.04a1.003 1.003 0 000-1.42L18.37 3.29a1.003 1.003 0 00-1.42 0L15.13 5.11l3.75 3.75 1.83-1.82z" />
+                /* Scribble / wave icon to represent drawing */
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M3 17c2-3 4-6 6-3s4 3 6 0 4-3 6 0" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M3 10c2-3 4-6 6-3s4 3 6 0 4-3 6 0" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
               {isDesktop && <span>{drawMode === "draw" ? t("exitDrawMode") : t("drawMode")}</span>}
