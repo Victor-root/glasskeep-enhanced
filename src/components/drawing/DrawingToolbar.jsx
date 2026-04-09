@@ -103,8 +103,8 @@ function TBtn({ active, onClick, disabled, tooltip, variant = 'default', compact
   );
 }
 
-/* ─── Separator ─── */
-const Sep = () => <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-0.5 shrink-0" />;
+/* ─── Separator (desktop only) ─── */
+const Sep = ({ compact }) => compact ? null : <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-0.5 shrink-0" />;
 
 /* ─── Compact Popover (portal, auto-position, outside click to close) ─── */
 function ToolbarPopover({ anchorRef, open, onClose, darkMode, children }) {
@@ -248,7 +248,7 @@ export default function DrawingToolbar({
         </TBtn>
       </div>
 
-      <Sep />
+      <Sep compact={compact} />
 
       {/* ─── Color Palette (visible only for pen) ─── */}
       {tool === 'pen' && (
@@ -369,7 +369,7 @@ export default function DrawingToolbar({
             </div>
           )}
 
-          <Sep />
+          <Sep compact={compact} />
         </>
       )}
 
@@ -451,7 +451,7 @@ export default function DrawingToolbar({
         </div>
       )}
 
-      <Sep />
+      <Sep compact={compact} />
 
       {/* ─── Actions: Undo / Redo / Add Page / Clear ─── */}
       {compact ? (
