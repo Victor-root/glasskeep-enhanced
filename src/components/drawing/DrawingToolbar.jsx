@@ -66,7 +66,7 @@ const TrashIcon = () => (
 /* ─── Toolbar Button ─── */
 function TBtn({ active, onClick, disabled, tooltip, variant = 'default', compact = false, children, className = '' }) {
   const base = compact
-    ? 'flex items-center justify-center rounded-lg transition-all duration-200 active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:scale-100 min-w-[28px] min-h-[28px] p-1 [&_svg]:w-4 [&_svg]:h-4'
+    ? 'flex items-center justify-center rounded-lg transition-all duration-200 active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:scale-100 w-8 h-8 p-1.5 [&_svg]:w-[18px] [&_svg]:h-[18px]'
     : 'flex items-center justify-center rounded-xl transition-all duration-200 active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:scale-100 min-w-[40px] min-h-[40px] p-2';
 
   const variants = {
@@ -145,8 +145,8 @@ export default function DrawingToolbar({
 
   const isCustomColor = !QUICK_COLORS.includes(color);
 
-  const colorSize = compact ? 'w-5 h-5' : 'w-7 h-7';
-  const sizeBtn = compact ? 'w-6 h-6 rounded-lg' : 'w-9 h-9 rounded-xl';
+  const colorSize = compact ? 'w-6 h-6' : 'w-7 h-7';
+  const sizeBtn = compact ? 'w-7 h-7 rounded-lg' : 'w-9 h-9 rounded-xl';
   const iconCls = compact ? 'w-4 h-4' : 'w-5 h-5';
 
   return (
@@ -237,8 +237,8 @@ export default function DrawingToolbar({
                   : 'bg-gray-500 dark:bg-gray-400'
               }`}
               style={{
-                width: Math.max(3, Math.min(preset.icon, compact ? 14 : 18)),
-                height: Math.max(3, Math.min(preset.icon, compact ? 14 : 18)),
+                width: Math.max(3, Math.min(preset.icon, compact ? 16 : 18)),
+                height: Math.max(3, Math.min(preset.icon, compact ? 16 : 18)),
               }}
             />
           </button>
