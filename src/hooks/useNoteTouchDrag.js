@@ -1,12 +1,10 @@
 import { useRef, useEffect } from "react";
 
 /**
- * Unified pointer-based drag for note cards (desktop + mobile).
- * - Mouse: activates after 5px movement (instant, no long-press needed)
- * - Touch: activates after 400ms long-press (avoids scroll conflict)
- * Uses DOM data attributes for state to survive React re-renders.
+ * Touch-based long-press drag for note cards (mobile).
+ * Uses DOM data attributes for drag state so it survives React re-renders.
  */
-export default function useNoteDrag(cardRef, { canDrag, multiMode, noteId, group, onDragStart, onDrop, onDragEnd }) {
+export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, group, onDragStart, onDrop, onDragEnd }) {
   const propsRef = useRef({ canDrag, multiMode, noteId, group, onDragStart, onDrop, onDragEnd });
   propsRef.current = { canDrag, multiMode, noteId, group, onDragStart, onDrop, onDragEnd };
 
@@ -14,33 +12,33 @@ export default function useNoteDrag(cardRef, { canDrag, multiMode, noteId, group
     const card = cardRef.current;
     if (!card) return;
 
+    // Use DOM attributes for state that must survive React re-renders
     const isActive = () => card.dataset.dragActive === "1";
     const setActive = (v) => { if (v) card.dataset.dragActive = "1"; else delete card.dataset.dragActive; };
 
     let timer = null;
     let failsafeTimer = null;
+    let noMoveTimer = null;
+    let gotMove = false;
     let scrollRaf = null;
     let startX = 0;
     let startY = 0;
-    let lastY = 0;
+    let lastTouchY = 0;
     let lastTarget = null;
-    let pointerType = "";
-    let pointerId = -1;
-    let activated = false;
 
     const stopAutoScroll = () => { if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = null; } };
 
     const cleanup = () => {
       clearTimeout(timer);
       clearTimeout(failsafeTimer);
+      clearTimeout(noMoveTimer);
       stopAutoScroll();
       timer = null;
       failsafeTimer = null;
-      activated = false;
+      noMoveTimer = null;
       if (!isActive()) return;
       setActive(false);
       card.classList.remove("dragging");
-      document.body.classList.remove("note-reordering");
       if (lastTarget) { lastTarget.classList.remove("drag-over"); lastTarget = null; }
       card.dataset.touchDragging = "1";
       setTimeout(() => { delete card.dataset.touchDragging; }, 300);
@@ -51,75 +49,50 @@ export default function useNoteDrag(cardRef, { canDrag, multiMode, noteId, group
       const edgeZone = 80;
       const vh = window.innerHeight;
       let speed = 0;
-      if (lastY > vh - edgeZone) speed = Math.min(15, ((lastY - (vh - edgeZone)) / edgeZone) * 15);
-      else if (lastY < edgeZone) speed = -Math.min(15, ((edgeZone - lastY) / edgeZone) * 15);
+      if (lastTouchY > vh - edgeZone) speed = Math.min(15, ((lastTouchY - (vh - edgeZone)) / edgeZone) * 15);
+      else if (lastTouchY < edgeZone) speed = -Math.min(15, ((edgeZone - lastTouchY) / edgeZone) * 15);
       if (speed !== 0) window.scrollBy(0, speed);
       scrollRaf = requestAnimationFrame(autoScroll);
     };
 
-    const activate = () => {
-      const p = propsRef.current;
-      activated = true;
-      setActive(true);
-      lastY = startY;
-      card.classList.add("dragging");
-      document.body.classList.add("note-reordering");
-      p.onDragStart(p.noteId, { currentTarget: card });
-      failsafeTimer = setTimeout(cleanup, 4000);
-      scrollRaf = requestAnimationFrame(autoScroll);
-    };
-
-    const onPointerDown = (e) => {
+    const onTouchStart = (e) => {
       if (isActive()) cleanup();
       const p = propsRef.current;
       if (!p.canDrag || p.multiMode) return;
-      if (e.button && e.button !== 0) return;
-
-      pointerType = e.pointerType;
-      pointerId = e.pointerId;
-      startX = e.clientX;
-      startY = e.clientY;
-      activated = false;
-
-      if (pointerType === "touch") {
-        // Touch: 400ms long-press to activate
-        timer = setTimeout(activate, 400);
-      }
-      // Mouse: activate on movement (handled in pointermove)
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      gotMove = false;
+      timer = setTimeout(() => {
+        setActive(true);
+        lastTouchY = startY;
+        card.classList.add("dragging");
+        p.onDragStart(p.noteId, { currentTarget: card });
+        noMoveTimer = setTimeout(() => { if (isActive() && !gotMove) cleanup(); }, 600);
+        failsafeTimer = setTimeout(cleanup, 3000);
+        scrollRaf = requestAnimationFrame(autoScroll);
+      }, 400);
     };
 
-    const onPointerMove = (e) => {
-      if (e.pointerId !== pointerId) return;
-      const dx = Math.abs(e.clientX - startX);
-      const dy = Math.abs(e.clientY - startY);
-
-      if (!isActive() && pointerType === "touch" && timer) {
-        // Touch: cancel if moved before 400ms
-        if (dx > 10 || dy > 10) {
+    const onTouchMove = (e) => {
+      const touch = e.touches[0];
+      if (!isActive() && timer) {
+        if (Math.abs(touch.clientX - startX) > 10 || Math.abs(touch.clientY - startY) > 10) {
           clearTimeout(timer);
           timer = null;
         }
         return;
       }
-
-      if (!isActive() && pointerType === "mouse") {
-        // Mouse: activate after 5px movement
-        if (dx > 5 || dy > 5) {
-          activate();
-          // Capture pointer so we get events even outside the card
-          try { card.setPointerCapture(pointerId); } catch (_) {}
-        }
-        return;
-      }
-
       if (!isActive()) return;
+      e.preventDefault();
+      gotMove = true;
+      lastTouchY = touch.clientY;
 
-      lastY = e.clientY;
       clearTimeout(failsafeTimer);
-      failsafeTimer = setTimeout(cleanup, 4000);
+      failsafeTimer = setTimeout(cleanup, 3000);
 
       if (lastTarget) lastTarget.classList.remove("drag-over");
-      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const el = document.elementFromPoint(touch.clientX, touch.clientY);
       const target = el?.closest(".note-card");
       if (target && target !== card) {
         target.classList.add("drag-over");
@@ -129,45 +102,43 @@ export default function useNoteDrag(cardRef, { canDrag, multiMode, noteId, group
       }
     };
 
-    const onPointerUp = (e) => {
-      if (e.pointerId !== pointerId) return;
+    const onTouchEnd = () => {
       clearTimeout(timer);
       timer = null;
-      try { card.releasePointerCapture(pointerId); } catch (_) {}
       if (!isActive()) return;
-
       const p = propsRef.current;
       const targetId = lastTarget?.dataset?.noteId;
       cleanup();
-
       if (targetId) {
         p.onDrop(targetId, p.group, { preventDefault() {}, currentTarget: { classList: { remove() {} } } });
       }
     };
 
-    const onPointerCancel = () => {
-      clearTimeout(timer);
-      timer = null;
-      if (isActive()) cleanup();
-    };
+    const onCardTouchCancel = () => cleanup();
+    const onDocTouchEnd = () => { if (isActive()) cleanup(); };
+    const onDocTouchCancel = () => { if (isActive()) cleanup(); };
 
-    const onContextMenu = (e) => e.preventDefault();
-
-    card.addEventListener("pointerdown", onPointerDown);
-    card.addEventListener("pointermove", onPointerMove);
-    card.addEventListener("pointerup", onPointerUp);
-    card.addEventListener("pointercancel", onPointerCancel);
-    card.addEventListener("contextmenu", onContextMenu);
+    card.addEventListener("touchstart", onTouchStart, { passive: true });
+    card.addEventListener("touchmove", onTouchMove, { passive: false });
+    card.addEventListener("touchend", onTouchEnd);
+    card.addEventListener("touchcancel", onCardTouchCancel);
+    document.addEventListener("touchend", onDocTouchEnd);
+    document.addEventListener("touchcancel", onDocTouchCancel);
 
     return () => {
       clearTimeout(timer);
       clearTimeout(failsafeTimer);
+      clearTimeout(noMoveTimer);
       stopAutoScroll();
-      card.removeEventListener("pointerdown", onPointerDown);
-      card.removeEventListener("pointermove", onPointerMove);
-      card.removeEventListener("pointerup", onPointerUp);
-      card.removeEventListener("pointercancel", onPointerCancel);
-      card.removeEventListener("contextmenu", onContextMenu);
+      // DON'T reset drag state here — DOM state persists across re-renders.
+      // Only remove event listeners. The new effect run will re-attach them
+      // and they'll read the current DOM state.
+      card.removeEventListener("touchstart", onTouchStart);
+      card.removeEventListener("touchmove", onTouchMove);
+      card.removeEventListener("touchend", onTouchEnd);
+      card.removeEventListener("touchcancel", onCardTouchCancel);
+      document.removeEventListener("touchend", onDocTouchEnd);
+      document.removeEventListener("touchcancel", onDocTouchCancel);
     };
   }, [cardRef]);
 }
