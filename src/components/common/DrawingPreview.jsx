@@ -71,13 +71,50 @@ export default function DrawingPreview({ data, width, height, darkMode = false }
       return path;
     });
 
-    // Scale to fit preview
-    const scaleX = width / originalWidth;
-    const scaleY = height / firstPageHeight;
-    const scale = Math.min(scaleX, scaleY);
+    if (paths.length === 0) {
+      const emptyW = width;
+      const emptyH = Math.round(width * 0.4);
+      canvas.width = emptyW * dpr;
+      canvas.height = emptyH * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, emptyW, emptyH);
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.strokeRect(10, 10, emptyW - 20, emptyH - 20);
+      ctx.fillStyle = "#9ca3af";
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Empty", emptyW / 2, emptyH / 2 + 3);
+      return;
+    }
 
-    const previewWidth = width;
-    const previewHeight = firstPageHeight * scale;
+    // Calculate actual bounding box of all path content
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const path of paths) {
+      const sw = (path.size || 2) / 2;
+      for (const pt of path.points) {
+        if (pt.x - sw < minX) minX = pt.x - sw;
+        if (pt.y - sw < minY) minY = pt.y - sw;
+        if (pt.x + sw > maxX) maxX = pt.x + sw;
+        if (pt.y + sw > maxY) maxY = pt.y + sw;
+      }
+    }
+
+    // Add padding
+    const pad = 10;
+    minX = Math.max(0, minX - pad);
+    minY = Math.max(0, minY - pad);
+    maxX += pad;
+    maxY += pad;
+
+    const contentW = maxX - minX;
+    const contentH = maxY - minY;
+
+    // Scale to fit preview area while keeping aspect ratio
+    const scale = Math.min(width / contentW, height / contentH);
+    const previewWidth = contentW * scale;
+    const previewHeight = contentH * scale;
 
     // HiDPI: physical pixels for sharp rendering
     canvas.width = previewWidth * dpr;
@@ -86,21 +123,12 @@ export default function DrawingPreview({ data, width, height, darkMode = false }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, previewWidth, previewHeight);
 
-    if (paths.length === 0) {
-      ctx.strokeStyle = "#e5e7eb";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.strokeRect(10, 10, previewWidth - 20, previewHeight - 20);
-
-      ctx.fillStyle = "#9ca3af";
-      ctx.font = "10px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("Empty", previewWidth / 2, previewHeight / 2 + 3);
-      return;
-    }
-
-    // Use shared smooth renderer
-    renderPaths(ctx, paths, scale);
+    // Translate so content starts at (0,0) then scale
+    ctx.save();
+    ctx.scale(scale, scale);
+    ctx.translate(-minX, -minY);
+    renderPaths(ctx, paths, 1);
+    ctx.restore();
   }, [data, width, height, darkMode]);
 
   return (
