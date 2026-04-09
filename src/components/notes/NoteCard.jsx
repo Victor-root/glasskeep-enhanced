@@ -69,7 +69,7 @@ export default function NoteCard({
     <div
       ref={cardRef}
       data-note-id={n.id}
-      draggable={canDrag && !isTouchDevice}
+      draggable={false}
       onDragStart={(e) => {
         if (canDrag) onDragStart(n.id, e);
       }}
