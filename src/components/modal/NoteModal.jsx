@@ -190,7 +190,6 @@ export default function NoteModal({
         <div
           className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full max-w-none ${
             isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen'
-            : mType === 'draw' ? 'sm:w-[98vw] sm:max-w-[98vw] sm:h-[98vh]'
             : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh]'
           } ${isDrawEdit ? '' : 'sm:rounded-xl'} flex flex-col relative overflow-hidden`}
           style={{ backgroundColor: modalBgFor(mColor, dark), height: windowWidth < 640 ? '100dvh' : undefined }}
