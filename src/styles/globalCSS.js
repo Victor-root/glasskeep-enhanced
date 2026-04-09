@@ -47,10 +47,10 @@ html.dark body {
   -webkit-user-select: none;
   user-select: none;
 }
-/* Draw note cards: relax paint containment so canvas is not clipped */
+/* Draw note cards: disable content-visibility which forces paint containment */
 .note-card--draw {
+  content-visibility: visible;
   contain: layout style;
-  contain-intrinsic-size: auto 400px;
 }
 /* Drag & drop reorder styles */
 .note-card.dragging {
