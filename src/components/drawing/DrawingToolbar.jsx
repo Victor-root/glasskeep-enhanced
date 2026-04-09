@@ -270,12 +270,12 @@ export default function DrawingToolbar({
                 onClick={() => { setColorPopOpen(v => !v); setSizePopOpen(false); setActionsPopOpen(false); }}
                 className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 focus:outline-none border border-gray-200/50 dark:border-gray-600/40 hover:scale-105 transition-transform duration-150"
               >
-                {/* 4 overlapping stroke circles */}
+                {/* 4 overlapping filled circles */}
                 <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                  <circle cx="8" cy="7" r="6" stroke="#22C55E" strokeWidth="2" fill="none" />
-                  <circle cx="15" cy="9" r="5.5" stroke="#FACC15" strokeWidth="2" fill="none" />
-                  <circle cx="7" cy="13" r="5.5" stroke="#3B82F6" strokeWidth="2" fill="none" />
-                  <circle cx="13" cy="15" r="6" stroke="#EF4444" strokeWidth="2" fill="none" />
+                  <circle cx="8" cy="7" r="6" fill="#22C55E" />
+                  <circle cx="15" cy="9" r="5.5" fill="#FACC15" />
+                  <circle cx="7" cy="13" r="5.5" fill="#3B82F6" />
+                  <circle cx="13" cy="15" r="6" fill="#EF4444" />
                 </svg>
               </button>
               <ToolbarPopover anchorRef={colorBtnRef} open={colorPopOpen} onClose={() => setColorPopOpen(false)} darkMode={darkMode}>
