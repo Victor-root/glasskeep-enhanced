@@ -28,13 +28,17 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
       if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = null; }
     };
 
-    const cleanup = () => {
+    const log = (...args) => console.log("[DRAG]", ...args);
+
+    const cleanup = (reason) => {
+      if (reason) log("cleanup:", reason);
       clearTimeout(timer);
       clearTimeout(failsafeTimer);
       stopAutoScroll();
       timer = null;
       failsafeTimer = null;
       if (!active) return;
+      log("→ deactivating, removing dragging class");
       active = false;
       card.classList.remove("dragging");
       if (lastTarget) { lastTarget.classList.remove("drag-over"); lastTarget = null; }
@@ -57,17 +61,19 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
     };
 
     const onTouchStart = (e) => {
-      if (active) cleanup();
+      log("touchstart", { active, hasTimer: !!timer, touches: e.touches.length, noteId: propsRef.current.noteId });
+      if (active) { log("⚠ still active, forcing cleanup"); cleanup("stale active"); }
       const p = propsRef.current;
-      if (!p.canDrag || p.multiMode) return;
+      if (!p.canDrag || p.multiMode) { log("skip: canDrag=", p.canDrag, "multi=", p.multiMode); return; }
       const touch = e.touches[0];
       startX = touch.clientX;
       startY = touch.clientY;
       timer = setTimeout(() => {
+        log("✅ 400ms timer → ACTIVATE", { noteId: p.noteId, classList: [...card.classList] });
         active = true;
         card.classList.add("dragging");
         p.onDragStart(p.noteId, { currentTarget: card });
-        failsafeTimer = setTimeout(cleanup, 3000);
+        failsafeTimer = setTimeout(() => cleanup("failsafe 3s"), 3000);
         scrollRaf = requestAnimationFrame(autoScroll);
       }, 400);
     };
@@ -75,14 +81,16 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
     const onTouchMove = (e) => {
       const touch = e.touches[0];
       if (!active && timer) {
-        if (Math.abs(touch.clientX - startX) > 10 || Math.abs(touch.clientY - startY) > 10) {
+        const dx = Math.abs(touch.clientX - startX);
+        const dy = Math.abs(touch.clientY - startY);
+        if (dx > 10 || dy > 10) {
+          log("❌ moved before activation (dx=" + dx.toFixed(0) + " dy=" + dy.toFixed(0) + ") → cancel");
           clearTimeout(timer);
           timer = null;
         }
         return;
       }
       if (!active) return;
-      // Prevent scroll — this is the only scroll-blocking mechanism
       e.preventDefault();
       lastTouchY = touch.clientY;
 
@@ -101,12 +109,14 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
     };
 
     const onTouchEnd = () => {
+      log("touchend on card", { active, hasTimer: !!timer, targetId: lastTarget?.dataset?.noteId });
       clearTimeout(timer);
       timer = null;
-      if (!active) return;
+      if (!active) { log("touchend ignored (not active)"); return; }
 
       const p = propsRef.current;
       const targetId = lastTarget?.dataset?.noteId;
+      log("→ drop", { targetId });
       cleanup();
 
       if (targetId) {
@@ -114,9 +124,9 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
       }
     };
 
-    const onCardTouchCancel = () => cleanup();
-    const onDocTouchEnd = () => { if (active) cleanup(); };
-    const onDocTouchCancel = () => { if (active) cleanup(); };
+    const onCardTouchCancel = () => { log("touchcancel on card"); cleanup("card touchcancel"); };
+    const onDocTouchEnd = () => { if (active) { log("touchend on DOCUMENT fallback"); cleanup("doc touchend"); } };
+    const onDocTouchCancel = () => { if (active) { log("touchcancel on DOCUMENT fallback"); cleanup("doc touchcancel"); } };
 
     card.addEventListener("touchstart", onTouchStart, { passive: true });
     card.addEventListener("touchmove", onTouchMove, { passive: false });
