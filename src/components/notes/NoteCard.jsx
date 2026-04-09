@@ -105,7 +105,7 @@ export default function NoteCard({
         }
       }}
       onContextMenu={(e) => e.preventDefault()}
-      className={`note-card glass-card rounded-xl p-2 sm:p-3 mb-2 sm:mb-3 cursor-pointer transform hover:scale-[1.02] transition-transform duration-200 relative min-h-[54px] overflow-hidden group ${
+      className={`note-card glass-card rounded-xl p-2 sm:p-3 mb-2 sm:mb-3 cursor-pointer transform hover:scale-[1.02] transition-transform duration-200 relative min-h-[54px] ${isDraw ? '' : 'overflow-hidden'} group ${
         multiMode && selected
           ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent"
           : ""
