@@ -83,6 +83,7 @@ function DrawingCanvas({
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const canvasWrapperRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState('pen');
   const [color, setColor] = useState(darkMode ? '#FFFFFF' : '#000000');
@@ -219,6 +220,31 @@ function DrawingCanvas({
     setCanvasWidth(width);
     setCanvasHeight(height);
   }, [width, height, data]);
+
+  // ─── Auto-size canvas to fill container (fillContainer mode, new drawings only) ───
+  useEffect(() => {
+    if (!fillContainer) return;
+    const wrapper = canvasWrapperRef.current;
+    if (!wrapper) return;
+
+    // Only auto-size for new drawings (no stored dimensions)
+    const hasStoredDimensions = data && typeof data === 'object' && !Array.isArray(data) && data.dimensions;
+    if (hasStoredDimensions) return;
+
+    const updateSize = () => {
+      const rect = wrapper.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        setCanvasWidth(Math.round(rect.width));
+        setCanvasHeight(Math.round(rect.height));
+      }
+    };
+
+    // Wait one frame for layout to settle
+    const raf = requestAnimationFrame(updateSize);
+    const ro = new ResizeObserver(updateSize);
+    ro.observe(wrapper);
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+  }, [fillContainer, data]);
 
   // ─── Canvas rendering (HiDPI-aware) ───
   useEffect(() => {
@@ -427,16 +453,14 @@ function DrawingCanvas({
       )}
 
       {/* Canvas with cursor overlay */}
-      <div className={`relative border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden${fillContainer ? ' flex-1 min-h-0 flex items-center justify-center' : ''}`}>
+      <div
+        ref={canvasWrapperRef}
+        className={`relative border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden${fillContainer ? ' flex-1 min-h-0' : ''}`}
+      >
         <canvas
           ref={canvasRef}
           className="block"
-          style={fillContainer ? {
-            maxWidth: '100%',
-            maxHeight: '100%',
-            touchAction: mode === 'draw' && !readOnly ? 'none' : 'auto',
-            cursor: mode === 'draw' && !readOnly ? 'none' : 'default',
-          } : {
+          style={{
             width: '100%',
             height: 'auto',
             touchAction: mode === 'draw' && !readOnly ? 'none' : 'auto',
