@@ -196,10 +196,12 @@ export default function DrawingToolbar({
   const [confirmClear, setConfirmClear] = useState(false);
   const [colorPopOpen, setColorPopOpen] = useState(false);
   const [sizePopOpen, setSizePopOpen] = useState(false);
+  const [actionsPopOpen, setActionsPopOpen] = useState(false);
   const confirmTimer = useRef(null);
   const customColorRef = useRef(null);
   const colorBtnRef = useRef(null);
   const sizeBtnRef = useRef(null);
+  const actionsBtnRef = useRef(null);
 
   // Auto-dismiss confirm after 3s
   useEffect(() => {
@@ -452,37 +454,132 @@ export default function DrawingToolbar({
       <Sep />
 
       {/* ─── Actions: Undo / Redo / Add Page / Clear ─── */}
-      <div className={`flex items-center gap-0.5 shrink-0 ${compact ? '' : 'ml-auto'}`}>
-        <TBtn compact={compact} variant="action" onClick={onUndo} disabled={!canUndo} tooltip={`${t('undo')} (Ctrl+Z)`}>
-          <UndoIcon />
-        </TBtn>
-        <TBtn compact={compact} variant="action" onClick={onRedo} disabled={!canRedo} tooltip={`${t('redo')} (Ctrl+Shift+Z)`}>
-          <RedoIcon />
-        </TBtn>
-        {onAddPage && (
-          <TBtn compact={compact} variant="action" onClick={onAddPage} tooltip={t('addPage')}>
-            <AddPageIcon />
+      {compact ? (
+        /* Mobile: toolbox button → popover with all actions */
+        <>
+          <button
+            ref={actionsBtnRef}
+            onClick={() => { setActionsPopOpen(v => !v); setColorPopOpen(false); setSizePopOpen(false); }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 focus:outline-none border border-gray-200/50 dark:border-gray-600/40 hover:scale-105 transition-transform duration-150"
+          >
+            {/* Toolbox / wrench icon */}
+            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+            </svg>
+          </button>
+          <ToolbarPopover anchorRef={actionsBtnRef} open={actionsPopOpen} onClose={() => setActionsPopOpen(false)} darkMode={darkMode}>
+            <div className="grid grid-cols-3 gap-1.5" style={{ width: 180 }}>
+              {/* Undo */}
+              <button
+                onClick={() => { if (canUndo) { onUndo(); } }}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-150 active:scale-95 ${
+                  !canUndo ? 'opacity-35 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+                disabled={!canUndo}
+              >
+                <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-sm">
+                  <UndoIcon />
+                </span>
+                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">{t('undo')}</span>
+              </button>
+              {/* Redo */}
+              <button
+                onClick={() => { if (canRedo) { onRedo(); } }}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-150 active:scale-95 ${
+                  !canRedo ? 'opacity-35 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+                disabled={!canRedo}
+              >
+                <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-sm">
+                  <RedoIcon />
+                </span>
+                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">{t('redo')}</span>
+              </button>
+              {/* Clear */}
+              <button
+                onClick={() => { handleClear(); if (confirmClear) return; setActionsPopOpen(false); }}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-150 active:scale-95 ${
+                  pathCount === 0 ? 'opacity-35 cursor-not-allowed' : 'hover:bg-red-50 dark:hover:bg-red-900/20'
+                }`}
+                disabled={pathCount === 0}
+              >
+                <span className={`w-8 h-8 flex items-center justify-center rounded-lg text-white shadow-sm ${
+                  confirmClear ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-r from-red-500 to-rose-600'
+                }`}>
+                  {confirmClear ? (
+                    <span className="text-xs font-bold">?</span>
+                  ) : (
+                    <TrashIcon />
+                  )}
+                </span>
+                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                  {confirmClear ? t('confirmQuestion') : t('clearAll')}
+                </span>
+              </button>
+              {/* Add Page */}
+              {onAddPage && (
+                <button
+                  onClick={() => { onAddPage(); }}
+                  className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-150 active:scale-95 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-sm">
+                    <AddPageIcon />
+                  </span>
+                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">{t('addPage')}</span>
+                </button>
+              )}
+              {/* Remove Page */}
+              {onRemovePage && (
+                <button
+                  onClick={() => { if (canRemovePage) { onRemovePage(); } }}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-150 active:scale-95 ${
+                    !canRemovePage ? 'opacity-35 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }`}
+                  disabled={!canRemovePage}
+                >
+                  <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-sm">
+                    <RemovePageIcon />
+                  </span>
+                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">{t('removePage')}</span>
+                </button>
+              )}
+            </div>
+          </ToolbarPopover>
+        </>
+      ) : (
+        /* Desktop: inline action buttons */
+        <div className="flex items-center gap-0.5 shrink-0 ml-auto">
+          <TBtn compact={compact} variant="action" onClick={onUndo} disabled={!canUndo} tooltip={`${t('undo')} (Ctrl+Z)`}>
+            <UndoIcon />
           </TBtn>
-        )}
-        {onRemovePage && (
-          <TBtn compact={compact} variant="action" onClick={onRemovePage} disabled={!canRemovePage} tooltip={t('removePage')}>
-            <RemovePageIcon />
+          <TBtn compact={compact} variant="action" onClick={onRedo} disabled={!canRedo} tooltip={`${t('redo')} (Ctrl+Shift+Z)`}>
+            <RedoIcon />
           </TBtn>
-        )}
-        <TBtn
-          compact={compact}
-          variant="danger"
-          onClick={handleClear}
-          disabled={pathCount === 0}
-          tooltip={confirmClear ? t('confirmClear') : t('clearAll')}
-        >
-          {confirmClear ? (
-            <span className="text-xs font-bold px-0.5 text-red-600 dark:text-red-400 animate-pulse">{t('confirmQuestion')}</span>
-          ) : (
-            <TrashIcon />
+          {onAddPage && (
+            <TBtn compact={compact} variant="action" onClick={onAddPage} tooltip={t('addPage')}>
+              <AddPageIcon />
+            </TBtn>
           )}
-        </TBtn>
-      </div>
+          {onRemovePage && (
+            <TBtn compact={compact} variant="action" onClick={onRemovePage} disabled={!canRemovePage} tooltip={t('removePage')}>
+              <RemovePageIcon />
+            </TBtn>
+          )}
+          <TBtn
+            compact={compact}
+            variant="danger"
+            onClick={handleClear}
+            disabled={pathCount === 0}
+            tooltip={confirmClear ? t('confirmClear') : t('clearAll')}
+          >
+            {confirmClear ? (
+              <span className="text-xs font-bold px-0.5 text-red-600 dark:text-red-400 animate-pulse">{t('confirmQuestion')}</span>
+            ) : (
+              <TrashIcon />
+            )}
+          </TBtn>
+        </div>
+      )}
     </div>
   );
 }
