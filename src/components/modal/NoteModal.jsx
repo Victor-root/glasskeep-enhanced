@@ -267,7 +267,7 @@ export default function NoteModal({
 
             {/* Content area */}
             <div
-              className={isDrawEdit ? "flex-1 min-h-0 flex flex-col" : isDrawView ? "p-4" : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"}
+              className={isDrawEdit ? "flex-1 min-h-0 flex flex-col" : isDrawView ? "px-6 pt-3 pb-6 max-sm:px-4 max-sm:pt-1 max-sm:pb-4" : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"}
               onClick={onModalBodyClick}
             >
 
@@ -504,7 +504,8 @@ export default function NoteModal({
                   )}
 
                 </div>
-              ) : (
+              ) : drawMode === 'draw' ? (
+                /* Fullscreen drawing canvas (draw mode) */
                 <DrawingCanvas
                   data={mDrawingData}
                   onChange={setMDrawingData}
@@ -515,9 +516,35 @@ export default function NoteModal({
                   hideModeToggle
                   externalMode={drawMode}
                   onModeChange={setDrawMode}
-                  fillContainer={drawMode === 'draw'}
+                  fillContainer
                   toolbarPortalTarget={drawToolbarEl}
                 />
+              ) : (
+                /* Edit mode: text body + drawing preview */
+                <>
+                  <textarea
+                    ref={mBodyRef}
+                    className="w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden min-h-[80px] pb-4"
+                    value={mBody}
+                    onChange={(e) => {
+                      setMBody(e.target.value);
+                      resizeModalTextarea();
+                    }}
+                    placeholder={t("writeYourNoteEllipsis")}
+                  />
+                  <DrawingCanvas
+                    data={mDrawingData}
+                    onChange={setMDrawingData}
+                    width={1200}
+                    height={800}
+                    readOnly={false}
+                    darkMode={dark}
+                    hideModeToggle
+                    externalMode="view"
+                    onModeChange={setDrawMode}
+                    fillContainer={false}
+                  />
+                </>
               )}
 
               {/* Inline Edited stamp: only when scrollable (hidden in draw edit mode) */}

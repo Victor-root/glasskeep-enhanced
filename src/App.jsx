@@ -267,6 +267,8 @@ export default function App() {
   const prevDrawingRef = useRef({ paths: [], dimensions: null });
   const pendingDrawingSaveRef = useRef(null);
   const drawingDebounceTimerRef = useRef(null);
+  // Tracks latest mBody for draw notes so flushPendingDrawingSave can include text
+  const drawNoteBodyRef = useRef("");
 
   // Initial draw mode for the modal (null = default "view", "draw" = open in edit mode)
   const [initialDrawMode, setInitialDrawMode] = useState(null);
@@ -2212,7 +2214,9 @@ export default function App() {
 
     const { noteId, drawingData, leaseId } = pending;
     const nowIso = new Date().toISOString();
-    const drawingContent = JSON.stringify(drawingData);
+    // Include text body alongside drawing data so it's not lost on draw saves
+    const textBody = drawNoteBodyRef.current || "";
+    const drawingContent = JSON.stringify({ ...drawingData, text: textBody });
 
     setNotes((prev) =>
       prev.map((n) =>
@@ -2256,6 +2260,9 @@ export default function App() {
     // Queue item exists — release this lease + prune older zombies for this note
     releaseLocalLeaseWithPrune(noteId, leaseId);
   }, [currentUser?.id, sessionId, enqueueAndSync]);
+
+  // Keep drawNoteBodyRef in sync with mBody for draw notes
+  useEffect(() => { drawNoteBodyRef.current = mBody; }, [mBody]);
 
   // Auto-save drawing changes (local-first)
   useEffect(() => {
@@ -2322,11 +2329,13 @@ export default function App() {
       const normalizedData = Array.isArray(serverDrawingData)
         ? { paths: serverDrawingData, dimensions: null }
         : serverDrawingData;
+      // Separate text body from drawing data
+      const { text: serverText, ...serverCleanData } = normalizedData;
       const prevJson = JSON.stringify(prevDrawingRef.current || []);
-      const serverJson = JSON.stringify(normalizedData);
+      const serverJson = JSON.stringify(serverCleanData);
       if (serverJson !== prevJson) {
-        setMDrawingData(normalizedData);
-        prevDrawingRef.current = normalizedData;
+        setMDrawingData(serverCleanData);
+        prevDrawingRef.current = serverCleanData;
       }
     } catch (e) {
       // Invalid JSON, ignore
@@ -2544,11 +2553,12 @@ export default function App() {
   /** -------- Direct draw: create blank draw note and open fullscreen -------- */
   const handleDirectDraw = async () => {
     const nowIso = new Date().toISOString();
+    const composerTitle = title.trim();
     const newNote = {
       id: uid(),
       type: "draw",
-      title: "",
-      content: JSON.stringify({ paths: [], dimensions: null }),
+      title: composerTitle,
+      content: JSON.stringify({ paths: [], dimensions: null, text: "" }),
       items: [],
       tags: composerTagList.length ? composerTagList : [],
       images: [],
@@ -2588,7 +2598,7 @@ export default function App() {
     setSidebarOpen(false);
     setActiveId(String(newNote.id));
     setMType("draw");
-    setMTitle("");
+    setMTitle(composerTitle);
     setMDrawingData({ paths: [], dimensions: null });
     prevDrawingRef.current = { paths: [], dimensions: null };
     setMBody("");
@@ -2600,7 +2610,7 @@ export default function App() {
     setMImages([]);
     setTagInput("");
     setMColor(localNote.color || "default");
-    const baselineState = { title: "", content: "", tags: localNote.tags || [], images: [], color: localNote.color || "default" };
+    const baselineState = { title: composerTitle, content: "", tags: localNote.tags || [], images: [], color: localNote.color || "default" };
     initialModalStateRef.current = baselineState;
     committedBaselineRef.current = { ...baselineState };
     setInitialDrawMode("draw");
@@ -2734,6 +2744,7 @@ export default function App() {
     setActiveId(String(id));
     setMType(n.type || "text");
     setMTitle(n.title || "");
+    let drawNoteText = "";
     if (n.type === "draw") {
       try {
         const drawingData = JSON.parse(n.content || "[]");
@@ -2741,13 +2752,18 @@ export default function App() {
         const normalizedData = Array.isArray(drawingData)
           ? { paths: drawingData, dimensions: null }
           : drawingData;
-        setMDrawingData(normalizedData);
-        prevDrawingRef.current = normalizedData;
+        // Extract text body from drawing JSON (stored alongside paths/dimensions)
+        drawNoteText = normalizedData.text || "";
+        // Remove text from the drawing data object to keep mDrawingData clean
+        const { text: _discardText, ...cleanDrawingData } = normalizedData;
+        setMDrawingData(cleanDrawingData);
+        prevDrawingRef.current = cleanDrawingData;
+        setMBody(drawNoteText);
       } catch (e) {
         setMDrawingData({ paths: [], dimensions: null });
         prevDrawingRef.current = { paths: [], dimensions: null };
+        setMBody("");
       }
-      setMBody("");
       skipNextDrawingAutosave.current = true;
     } else {
       setMBody(n.content || "");
@@ -2763,9 +2779,10 @@ export default function App() {
     setMColor(n.color || "default");
 
     // Store initial state to detect if user actually edited
+    // For draw notes, baseline.content holds the text body (extracted from drawing JSON)
     const baselineState = {
       title: n.title || "",
-      content: n.type === "draw" ? "" : n.content || "",
+      content: n.type === "draw" ? drawNoteText : (n.content || ""),
       tags: Array.isArray(n.tags) ? n.tags : [],
       images: Array.isArray(n.images) ? n.images : [],
       color: n.color || "default",
@@ -2808,7 +2825,7 @@ export default function App() {
   // success. Otherwise acquires its own (used when called directly from closeModal).
   // Returns true if IDB + enqueue both succeeded, false otherwise.
   // Callers use this to decide whether to advance committedBaselineRef.
-  const autoSaveTextNote = useCallback(async (noteId, fields, existingLeaseId) => {
+  const autoSaveTextNote = useCallback(async (noteId, fields, existingLeaseId, noteType = "text") => {
     const nId = String(noteId);
     const lid = existingLeaseId || acquireLocalLease(nId);
     const nowIso = new Date().toISOString();
@@ -2840,7 +2857,7 @@ export default function App() {
       await enqueueAndSync({
         type: "patch",
         noteId: nId,
-        payload: { ...fields, type: "text", client_updated_at: nowIso },
+        payload: { ...fields, type: noteType, client_updated_at: nowIso },
       });
     } catch (e) {
       console.error("Text enqueue failed:", e);
@@ -2852,10 +2869,11 @@ export default function App() {
     return true;
   }, [enqueueAndSync]);
 
-  // Local-first auto-save for text metadata (color, tags, images) — immediate, no debounce
+  // Local-first auto-save for metadata (color, tags, images) — immediate, no debounce
+  // Works for text, checklist, AND draw notes (metadata fields are independent of content).
   useEffect(() => {
     if (!open || !activeId) return;
-    if (mType === "draw") return; // drawings handle their own save
+    if (mType === "checklist") return; // checklists handle their own full save
     const initial = initialModalStateRef.current;
     if (!initial) return;
 
@@ -2879,7 +2897,8 @@ export default function App() {
     const committedFields = { ...(colorChanged ? { color: mColor } : {}), ...(tagsChanged ? { tags: mTagList } : {}), ...(imagesChanged ? { images: mImages } : {}) };
     initialModalStateRef.current = { ...initial, ...committedFields };
 
-    autoSaveTextNote(activeId, metaPatch, leaseId).then((ok) => {
+    const noteType = mType === "draw" ? "draw" : "text";
+    autoSaveTextNote(activeId, metaPatch, leaseId, noteType).then((ok) => {
       if (ok && committedBaselineRef.current) {
         committedBaselineRef.current = { ...committedBaselineRef.current, ...committedFields };
       }
@@ -2931,6 +2950,55 @@ export default function App() {
       if (!transferred) releaseLocalLease(nId, leaseId);
     };
   }, [mBody, mTitle, open, activeId, mType, viewMode, autoSaveTextNote]);
+
+  // Auto-save draw note title + text body: debounced local-first persist + patch sync.
+  // Drawing data changes are handled by the drawing autosave effect above.
+  // This effect handles title and text body changes only.
+  useEffect(() => {
+    if (!open || !activeId || mType !== "draw") return;
+    const initial = initialModalStateRef.current;
+    if (!initial) return;
+
+    const titleChanged = initial.title !== mTitle.trim();
+    const textChanged = initial.content !== mBody;
+    if (!titleChanged && !textChanged) return;
+
+    const nId = String(activeId);
+    const leaseId = acquireLocalLease(nId);
+    let transferred = false;
+
+    const timeoutId = setTimeout(() => {
+      transferred = true;
+      const patch = {};
+      if (titleChanged) patch.title = mTitle.trim();
+      // For text body changes, re-serialize full drawing content (paths + dimensions + text)
+      if (textChanged) {
+        patch.content = JSON.stringify({
+          ...(mDrawingData || { paths: [], dimensions: null }),
+          text: mBody || "",
+        });
+      }
+
+      const committedFields = {};
+      if (titleChanged) committedFields.title = mTitle.trim();
+      if (textChanged) committedFields.content = mBody;
+
+      if (initialModalStateRef.current) {
+        initialModalStateRef.current = { ...initialModalStateRef.current, ...committedFields };
+      }
+
+      autoSaveTextNote(activeId, patch, leaseId, "draw").then((ok) => {
+        if (ok && committedBaselineRef.current) {
+          committedBaselineRef.current = { ...committedBaselineRef.current, ...committedFields };
+        }
+      });
+    }, 1000);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (!transferred) releaseLocalLease(nId, leaseId);
+    };
+  }, [mBody, mTitle, open, activeId, mType, mDrawingData, autoSaveTextNote]);
 
   // Update initial state reference when note is updated from server (for collaborative notes)
   // This prevents overwriting server changes when user hasn't edited locally
@@ -3025,7 +3093,7 @@ export default function App() {
     if (activeId && mType === "draw") {
       const drawPaths = mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []);
       const note = notes.find((n) => String(n.id) === String(activeId));
-      if (drawPaths.length === 0 && note && !note.title?.trim()) {
+      if (drawPaths.length === 0 && note && !note.title?.trim() && !mTitle?.trim() && !mBody?.trim()) {
         // Empty draw note — trash it (server requires trash before permanent delete)
         const nid = String(activeId);
         const nowIso = new Date().toISOString();
@@ -3067,6 +3135,28 @@ export default function App() {
     // so a second close attempt can retry.
     if (activeId && mType === "draw") {
       flushPendingDrawingSave();
+    }
+
+    // Flush title/text/metadata changes for draw notes on close.
+    // flushPendingDrawingSave only covers drawing data changes (paths/dimensions).
+    // Title, text body, color, tags, images need a separate flush.
+    if (activeId && mType === "draw") {
+      const baseline = committedBaselineRef.current;
+      if (baseline) {
+        const patch = {};
+        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
+        if (baseline.color !== mColor) patch.color = mColor;
+        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
+        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
+        // For text body changes, re-serialize full drawing content
+        const textChanged = baseline.content !== mBody;
+        if (textChanged) {
+          patch.content = JSON.stringify({ ...(mDrawingData || { paths: [], dimensions: null }), text: mBody || "" });
+        }
+        if (Object.keys(patch).length > 0) {
+          autoSaveTextNote(activeId, patch, null, "draw");
+        }
+      }
     }
 
     // Retry checklist if the last autosave failed (prevItemsRef wasn't advanced).
@@ -3158,7 +3248,7 @@ export default function App() {
       const payload =
         mType === "checklist"
           ? { ...base, type: "checklist", content: "", items: mItems, client_updated_at: nowIso }
-          : { ...base, type: "draw", content: JSON.stringify(mDrawingData), items: [], client_updated_at: nowIso };
+          : { ...base, type: "draw", content: JSON.stringify({ ...mDrawingData, text: mBody || "" }), items: [], client_updated_at: nowIso };
 
       const updatedFields = {
         ...payload,

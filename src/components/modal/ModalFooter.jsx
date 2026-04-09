@@ -586,26 +586,27 @@ export default function ModalFooter({
           </button>
         )}
 
-        {/* ── Draw/View toggle — drawing notes ── */}
+        {/* ── Draw/Edit toggle — drawing notes ── */}
         {mType === "draw" && (
           <button
             className={`${isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn"} modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]`}
             onClick={onToggleDrawMode}
-            data-tooltip={!isDesktop ? (drawMode === "view" ? t("switchToDrawMode") : t("switchToViewMode")) : undefined}
-            aria-label={drawMode === "view" ? t("drawMode") : t("viewMode")}
+            data-tooltip={!isDesktop ? (drawMode === "view" ? t("switchToDrawMode") : t("switchToEditMode")) : undefined}
+            aria-label={drawMode === "view" ? t("drawMode") : t("editMode")}
           >
             {drawMode === "view" ? (
+              /* In edit mode → button to switch to draw */
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M3 17.25V21h3.75l11-11-3.75-3.75-11 11zM20.71 7.04a1.003 1.003 0 000-1.42L18.37 3.29a1.003 1.003 0 00-1.42 0L15.13 5.11l3.75 3.75 1.83-1.82z" />
+              </svg>
+            ) : (
+              /* In draw mode → button to switch to edit */
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25Z" fill="currentColor" />
                 <path d="m14.06 4.94 3.75 3.75 1.41-1.41a1.5 1.5 0 0 0 0-2.12l-1.63-1.63a1.5 1.5 0 0 0-2.12 0l-1.41 1.41Z" fill="currentColor" />
               </svg>
-            ) : (
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />
-                <circle cx="12" cy="12" r="3.2" fill="currentColor" />
-              </svg>
             )}
-            {isDesktop && <span>{drawMode === "view" ? t("drawMode") : t("viewMode")}</span>}
+            {isDesktop && <span>{drawMode === "view" ? t("drawMode") : t("editMode")}</span>}
           </button>
         )}
       </div>
