@@ -532,6 +532,8 @@ function DrawingCanvas({
     setCursorPos({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
+      clientX: e.clientX,
+      clientY: e.clientY,
       cssSize,
     });
     draw(e);
@@ -614,17 +616,17 @@ function DrawingCanvas({
           onMouseLeave={handleMouseLeave}
         />
 
-        {/* Dynamic cursor (desktop) */}
+        {/* Dynamic cursor (desktop) — fixed position so it renders above header */}
         {showCursor && cursorPos && mode === 'draw' && !readOnly && (
           tool === 'eraser' ? (
             /* Eraser: circle cursor showing erase radius */
             <div
-              className="pointer-events-none absolute rounded-full border"
+              className="pointer-events-none fixed rounded-full border z-50"
               style={{
                 width: Math.max(8, cursorPos.cssSize),
                 height: Math.max(8, cursorPos.cssSize),
-                left: cursorPos.x - Math.max(8, cursorPos.cssSize) / 2,
-                top: cursorPos.y - Math.max(8, cursorPos.cssSize) / 2,
+                left: cursorPos.clientX - Math.max(8, cursorPos.cssSize) / 2,
+                top: cursorPos.clientY - Math.max(8, cursorPos.cssSize) / 2,
                 borderColor: 'rgba(100,100,100,0.6)',
                 backgroundColor: 'rgba(200,200,200,0.15)',
                 transition: 'width 0.1s, height 0.1s',
@@ -633,10 +635,10 @@ function DrawingCanvas({
           ) : (
             /* Pen: pencil icon cursor */
             <svg
-              className="pointer-events-none absolute"
+              className="pointer-events-none fixed z-50"
               style={{
-                left: cursorPos.x - 2,
-                top: cursorPos.y - 24,
+                left: cursorPos.clientX - 2,
+                top: cursorPos.clientY - 24,
                 filter: darkMode
                   ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))'
                   : 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
