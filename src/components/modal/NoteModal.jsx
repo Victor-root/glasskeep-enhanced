@@ -14,6 +14,7 @@ import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { handleSmartEnter } from "../common/FormatToolbar.jsx";
 import { uid } from "../../utils/helpers.js";
 import { modalBgFor, scrollColorsFor, solid, bgFor, toHex } from "../../utils/colors.js";
+import { setThemeColor } from "../../utils/helpers.js";
 
 export default function NoteModal({
   // visibility / animation
@@ -145,14 +146,10 @@ export default function NoteModal({
   /* Sync PWA status bar color with modal note color */
   React.useEffect(() => {
     if (!open) return;
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (!meta) return;
-    const prev = meta.getAttribute("content");
     const color = toHex(modalBgFor(mColor, dark));
-    meta.setAttribute("content", color);
-    return () => {
-      meta.setAttribute("content", prev || (dark ? "#1a1a1a" : "#f0e8ff"));
-    };
+    const prev = document.querySelector('meta[name="theme-color"]')?.getAttribute("content");
+    setThemeColor(color);
+    return () => setThemeColor(prev || (dark ? "#1a1a1a" : "#f0e8ff"));
   }, [open, mColor, dark]);
 
   /* Intercept Ctrl+Z / Ctrl+Y at modal level for chunk-level undo */

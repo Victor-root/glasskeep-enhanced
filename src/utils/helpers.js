@@ -3,6 +3,16 @@ import { t } from "../i18n";
 /** ---------- Utils ---------- */
 export const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+/** Force PWA to update status bar color by replacing the meta tag */
+export function setThemeColor(color) {
+  const old = document.querySelector('meta[name="theme-color"]');
+  if (old) old.remove();
+  const meta = document.createElement("meta");
+  meta.name = "theme-color";
+  meta.setAttribute("content", color);
+  document.head.appendChild(meta);
+}
+
 export const sanitizeFilename = (name, fallback = "note") =>
   (name || fallback)
     .toString()

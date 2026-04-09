@@ -26,7 +26,7 @@ import {
 } from "./sync/localDb.js";
 import { api, getAuth, setAuth, AUTH_KEY } from "./utils/api.js";
 import { mdForDownload } from "./utils/markdown.jsx";
-import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, fileToCompressedDataURL } from "./utils/helpers.js";
+import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, fileToCompressedDataURL, setThemeColor } from "./utils/helpers.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES } from "./utils/constants.js";
 import { ColorDot } from "./components/common/ColorDot.jsx";
@@ -844,16 +844,14 @@ export default function App() {
     setDark(savedDark);
     document.documentElement.classList.toggle("dark", savedDark);
     // Update PWA status/nav bar color to match background
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", savedDark ? "#1a1a1a" : "#f0e8ff");
+    setThemeColor(savedDark ? "#1a1a1a" : "#f0e8ff");
   }, []);
   const toggleDark = () => {
     const next = !dark;
     setDark(next);
     document.documentElement.classList.toggle("dark", next);
     localStorage.setItem("glass-keep-dark-mode", String(next));
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", next ? "#1a1a1a" : "#f0e8ff");
+    setThemeColor(next ? "#1a1a1a" : "#f0e8ff");
   };
 
   // Close sidebar with Escape
