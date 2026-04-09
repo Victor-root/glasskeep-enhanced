@@ -29,8 +29,19 @@ const PenIcon = () => (
 );
 
 const EraserIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M16.24 3.56L21.9 9.22a2 2 0 010 2.83l-7.78 7.78a2 2 0 01-1.41.59H5.83a2 2 0 01-1.41-.59L1.59 17a2 2 0 010-2.83l11.82-11.82a2 2 0 012.83 0zM7 19h5.17l7.78-7.78-4.24-4.24L4 18.71 5.29 20H7z" />
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+    <path d="M22 21H7" />
+    <path d="m5 11 9 9" />
+  </svg>
+);
+
+const AddPageIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="12" y1="18" x2="12" y2="12" />
+    <line x1="9" y1="15" x2="15" y2="15" />
   </svg>
 );
 
@@ -95,6 +106,7 @@ export default function DrawingToolbar({
   onUndo,
   onRedo,
   onClear,
+  onAddPage,
   canUndo,
   canRedo,
   pathCount,
@@ -131,7 +143,7 @@ export default function DrawingToolbar({
   const isCustomColor = !QUICK_COLORS.includes(color);
 
   return (
-    <div className="flex items-center flex-wrap gap-1.5 mb-3 p-2 bg-gray-100/80 dark:bg-gray-800/60 rounded-2xl border border-gray-200/60 dark:border-gray-700/40">
+    <div className="flex items-center flex-wrap gap-1.5 mb-1 p-1.5 bg-gray-100/80 dark:bg-gray-800/60 rounded-2xl border border-gray-200/60 dark:border-gray-700/40">
 
       {/* ─── Tool Group: Pen / Eraser ─── */}
       <div className="flex items-center gap-1">
@@ -225,7 +237,7 @@ export default function DrawingToolbar({
 
       <Sep />
 
-      {/* ─── Actions: Undo / Redo / Clear ─── */}
+      {/* ─── Actions: Undo / Redo / Add Page / Clear ─── */}
       <div className="flex items-center gap-1 ml-auto">
         <TBtn variant="action" onClick={onUndo} disabled={!canUndo} tooltip={`${t('undo')} (Ctrl+Z)`}>
           <UndoIcon />
@@ -233,6 +245,11 @@ export default function DrawingToolbar({
         <TBtn variant="action" onClick={onRedo} disabled={!canRedo} tooltip={`${t('redo')} (Ctrl+Shift+Z)`}>
           <RedoIcon />
         </TBtn>
+        {onAddPage && (
+          <TBtn variant="action" onClick={onAddPage} tooltip={t('addPage')}>
+            <AddPageIcon />
+          </TBtn>
+        )}
         <TBtn
           variant="danger"
           onClick={handleClear}

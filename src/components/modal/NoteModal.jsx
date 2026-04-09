@@ -231,6 +231,8 @@ export default function NoteModal({
               modalHasChanges={modalHasChanges}
               savingModal={savingModal}
               onSave={saveModal}
+              // drawing
+              drawMode={drawMode}
             />
 
             <ModalImagesGrid
@@ -241,7 +243,7 @@ export default function NoteModal({
 
             {/* Content area */}
             <div
-              className={mType === "draw" ? "p-2 flex-1 min-h-0 flex flex-col" : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"}
+              className={mType === "draw" ? (drawMode === "draw" ? "p-1 flex-1 min-h-0 flex flex-col" : "p-2 flex-1 min-h-0 flex flex-col") : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"}
               onClick={onModalBodyClick}
             >
 
@@ -493,8 +495,8 @@ export default function NoteModal({
                 />
               )}
 
-              {/* Inline Edited stamp: only when scrollable */}
-              {editedStamp && modalScrollable && (
+              {/* Inline Edited stamp: only when scrollable (hidden in draw edit mode) */}
+              {editedStamp && modalScrollable && !(mType === 'draw' && drawMode === 'draw') && (
                 <div className="mt-6 text-xs text-gray-600 dark:text-gray-300 text-right flex items-center justify-end gap-1.5">
                   <span>{t("editedPrefix")} {editedStamp}</span>
                   {activeId && (
@@ -507,8 +509,8 @@ export default function NoteModal({
               )}
             </div>
 
-            {/* Absolute Edited stamp: only when NOT scrollable */}
-            {editedStamp && !modalScrollable && (
+            {/* Absolute Edited stamp: only when NOT scrollable (hidden in draw edit mode) */}
+            {editedStamp && !modalScrollable && !(mType === 'draw' && drawMode === 'draw') && (
               <div className="absolute bottom-3 right-4 text-xs text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
                 <span className="pointer-events-none">{t("editedPrefix")} {editedStamp}</span>
                 {activeId && (

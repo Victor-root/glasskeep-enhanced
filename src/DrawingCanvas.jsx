@@ -464,6 +464,7 @@ function DrawingCanvas({
             onUndo={handleUndo}
             onRedo={handleRedo}
             onClear={clearCanvas}
+            onAddPage={addPage}
             canUndo={canUndo}
             canRedo={canRedo}
             pathCount={paths.length}
@@ -475,7 +476,7 @@ function DrawingCanvas({
       {/* Canvas with cursor overlay */}
       <div
         ref={canvasWrapperRef}
-        className={`relative border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden${fillContainer ? ' flex-1 min-h-0' : ''}`}
+        className={`relative overflow-hidden${fillContainer ? ' flex-1 min-h-0 border-0' : ' border border-gray-300 dark:border-gray-600 rounded-lg'}`}
       >
         <canvas
           ref={canvasRef}
@@ -514,8 +515,8 @@ function DrawingCanvas({
         )}
       </div>
 
-      {/* Add Page Button */}
-      {!readOnly && mode === 'draw' && (
+      {/* Add Page Button (only shown outside fillContainer — in fillContainer it's in the toolbar) */}
+      {!readOnly && mode === 'draw' && !fillContainer && (
         <div className="mt-3 flex justify-center shrink-0">
           <button
             data-tooltip={t('addPageTitle')}
@@ -527,12 +528,14 @@ function DrawingCanvas({
         </div>
       )}
 
-      {/* Info */}
-      <div className="text-xs text-gray-500 dark:text-gray-300 mt-2 shrink-0">
-        {paths.length} {paths.length !== 1 ? t("strokeCountPlural") : t("strokeCount")}
-        {mode === 'view' && ` (${t('viewMode')})`}
-        {readOnly && mode === 'draw' && ` (${t('readOnlyLabel')})`}
-      </div>
+      {/* Info (hidden in fillContainer draw mode to maximize canvas space) */}
+      {!(fillContainer && mode === 'draw') && (
+        <div className="text-xs text-gray-500 dark:text-gray-300 mt-2 shrink-0">
+          {paths.length} {paths.length !== 1 ? t("strokeCountPlural") : t("strokeCount")}
+          {mode === 'view' && ` (${t('viewMode')})`}
+          {readOnly && mode === 'draw' && ` (${t('readOnlyLabel')})`}
+        </div>
+      )}
     </div>
   );
 }

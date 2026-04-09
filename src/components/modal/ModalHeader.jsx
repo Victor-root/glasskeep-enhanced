@@ -40,6 +40,8 @@ export default function ModalHeader({
   modalHasChanges,
   savingModal,
   onSave,
+  // drawing
+  drawMode,
 }) {
   const mobileTitleRef = useRef(null);
   const isDesktop = windowWidth >= 768;
@@ -66,7 +68,7 @@ export default function ModalHeader({
         className="sticky top-0 z-20 rounded-t-none sm:rounded-t-xl"
         style={{ backgroundColor: modalBgFor(mColor, dark) }}
       >
-        <div className={`flex items-center ${isDesktop ? "flex-wrap gap-2 px-4 sm:px-6 pt-4 pb-3" : "px-2 py-1.5"}`}>
+        <div className={`flex items-center ${isDesktop ? (mType === 'draw' && drawMode === 'draw' ? "gap-2 px-4 sm:px-6 pt-2 pb-1" : "flex-wrap gap-2 px-4 sm:px-6 pt-4 pb-3") : "px-2 py-1.5"}`}>
 
           {/* Mobile: back arrow on the left */}
           {!isDesktop && (
@@ -82,8 +84,8 @@ export default function ModalHeader({
             </button>
           )}
 
-          {/* Desktop: title inline (textarea for multi-line wrap) */}
-          {isDesktop && (
+          {/* Desktop: title inline (hidden in draw edit mode to maximize canvas) */}
+          {isDesktop && !(mType === 'draw' && drawMode === 'draw') && (
             <textarea
               ref={mobileTitleRef}
               className="flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 pr-2 order-first bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden"
@@ -187,8 +189,8 @@ export default function ModalHeader({
         )}
       </div>
 
-      {/* ── Mobile title — outside sticky, scrolls with content ── */}
-      {!isDesktop && (
+      {/* ── Mobile title — outside sticky, scrolls with content (hidden in draw edit mode) ── */}
+      {!isDesktop && !(mType === 'draw' && drawMode === 'draw') && (
         <div className="px-5 pt-0 pb-1">
           <textarea
             ref={mobileTitleRef}
