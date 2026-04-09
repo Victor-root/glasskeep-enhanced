@@ -219,11 +219,19 @@ function DrawingCanvas({
     setCanvasHeight(height);
   }, [width, height, data]);
 
-  // ─── Canvas rendering ───
+  // ─── Canvas rendering (HiDPI-aware) ───
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+
+    // Set physical pixel dimensions for sharp rendering on HiDPI screens
+    canvas.width = canvasWidth * dpr;
+    canvas.height = canvasHeight * dpr;
+
     const ctx = canvas.getContext('2d');
+    // Scale context so all drawing uses logical coordinates
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
     renderPaths(ctx, paths);
@@ -240,19 +248,20 @@ function DrawingCanvas({
     }
   }, [paths, currentPath, canvasWidth, canvasHeight]);
 
-  // ─── Coordinate helper ───
+  // ─── Coordinate helper (maps CSS pixels → logical canvas coordinates) ───
   const getCanvasCoordinates = useCallback((e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    // Use logical dimensions (not canvas.width which is physical = logical * dpr)
+    const scaleX = canvasWidth / rect.width;
+    const scaleY = canvasHeight / rect.height;
     const clientX = e.clientX !== undefined ? e.clientX : e.touches[0].clientX;
     const clientY = e.clientY !== undefined ? e.clientY : e.touches[0].clientY;
     return {
       x: (clientX - rect.left) * scaleX,
       y: (clientY - rect.top) * scaleY,
     };
-  }, []);
+  }, [canvasWidth, canvasHeight]);
 
   // ─── Drawing handlers ───
   const startDrawing = useCallback((e) => {
@@ -418,8 +427,6 @@ function DrawingCanvas({
       <div className="relative border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
         <canvas
           ref={canvasRef}
-          width={canvasWidth}
-          height={canvasHeight}
           className="block"
           style={{
             width: '100%',

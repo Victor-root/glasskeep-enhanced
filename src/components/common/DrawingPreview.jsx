@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from "react";
 import { renderPaths } from "../../DrawingCanvas";
 
-/** ---------- Drawing Preview ---------- */
+/** ---------- Drawing Preview (HiDPI-aware) ---------- */
 export default function DrawingPreview({ data, width, height, darkMode = false }) {
   const canvasRef = useRef(null);
 
@@ -10,6 +10,7 @@ export default function DrawingPreview({ data, width, height, darkMode = false }
     if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
 
     // Parse drawing data
     let paths = [];
@@ -78,9 +79,11 @@ export default function DrawingPreview({ data, width, height, darkMode = false }
     const previewWidth = width;
     const previewHeight = firstPageHeight * scale;
 
-    canvas.width = previewWidth;
-    canvas.height = previewHeight;
+    // HiDPI: physical pixels for sharp rendering
+    canvas.width = previewWidth * dpr;
+    canvas.height = previewHeight * dpr;
 
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, previewWidth, previewHeight);
 
     if (paths.length === 0) {
@@ -104,8 +107,6 @@ export default function DrawingPreview({ data, width, height, darkMode = false }
     <div className="w-[90%] mx-auto rounded overflow-hidden">
       <canvas
         ref={canvasRef}
-        width={width}
-        height={height}
         className="block"
         style={{ width: "100%", height: "auto" }}
       />
