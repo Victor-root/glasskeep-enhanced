@@ -39,6 +39,15 @@ export default function NoteCard({
     ? previewText.slice(0, MAX_CHARS).trimEnd() + "\u2026"
     : previewText;
 
+  // Extract text body from draw note JSON content
+  const drawText = useMemo(() => {
+    if (!isDraw || !n.content) return "";
+    try {
+      const parsed = typeof n.content === "string" ? JSON.parse(n.content) : n.content;
+      return parsed?.text || "";
+    } catch { return ""; }
+  }, [isDraw, n.content]);
+
   const total = (n.items || []).length;
   const done = (n.items || []).filter((i) => i.done).length;
   // Sort items with unchecked items first, just like in the modal
@@ -236,12 +245,21 @@ export default function NoteCard({
           dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(displayText) }}
         />
       ) : isDraw ? (
-        <DrawingPreview
-          data={n.content}
-          width={800}
-          height={600}
-          darkMode={dark}
-        />
+        <>
+          {drawText && (
+            <div
+              className="text-sm break-words whitespace-pre-wrap overflow-hidden note-content note-content--dense mb-2"
+              style={{ maxHeight: "140px" }}
+              dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(drawText.length > MAX_CHARS ? drawText.slice(0, MAX_CHARS).trimEnd() + "\u2026" : drawText) }}
+            />
+          )}
+          <DrawingPreview
+            data={n.content}
+            width={800}
+            height={600}
+            darkMode={dark}
+          />
+        </>
       ) : (
         <div className="space-y-2">
           {visibleItems.map((it) => (
