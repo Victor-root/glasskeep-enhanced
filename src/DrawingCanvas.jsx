@@ -142,7 +142,8 @@ function DrawingCanvas({
     if (dimensions && dimensions.width && dimensions.height) {
       setCanvasWidth(dimensions.width);
       setCanvasHeight(dimensions.height);
-    } else {
+    } else if (!fillContainer) {
+      // In fillContainer mode without stored dimensions, ResizeObserver handles sizing
       setCanvasWidth(width);
       setCanvasHeight(height);
     }
