@@ -275,7 +275,7 @@ export default function DrawingToolbar({
                   <circle cx="8" cy="7" r="6" fill="#22C55E" />
                   <circle cx="15" cy="9" r="5.5" fill="#FACC15" />
                   <circle cx="7" cy="13" r="5.5" fill="#3B82F6" />
-                  <circle cx="13" cy="15" r="6" fill="#EF4444" />
+                  <circle cx="13" cy="15" r="6" fill={color} />
                 </svg>
               </button>
               <ToolbarPopover anchorRef={colorBtnRef} open={colorPopOpen} onClose={() => setColorPopOpen(false)} darkMode={darkMode}>
@@ -392,9 +392,9 @@ export default function DrawingToolbar({
           >
             {/* Stacked lines showing stroke widths */}
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <line x1="3" y1="3.5" x2="15" y2="3.5" stroke={darkMode ? '#d1d5db' : '#374151'} strokeWidth="1" strokeLinecap="round" />
-              <line x1="3" y1="7.5" x2="15" y2="7.5" stroke={darkMode ? '#d1d5db' : '#374151'} strokeWidth="2.5" strokeLinecap="round" />
-              <line x1="3" y1="12.5" x2="15" y2="12.5" stroke={darkMode ? '#d1d5db' : '#374151'} strokeWidth="4.5" strokeLinecap="round" />
+              <line x1="3" y1="3.5" x2="15" y2="3.5" stroke={color} strokeWidth="1" strokeLinecap="round" />
+              <line x1="3" y1="7.5" x2="15" y2="7.5" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+              <line x1="3" y1="12.5" x2="15" y2="12.5" stroke={color} strokeWidth="4.5" strokeLinecap="round" />
             </svg>
           </button>
           <ToolbarPopover anchorRef={sizeBtnRef} open={sizePopOpen} onClose={() => setSizePopOpen(false)} darkMode={darkMode}>
