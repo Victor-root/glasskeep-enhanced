@@ -785,22 +785,15 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
 /* Smooth expand/collapse when entering/leaving draw canvas mode */
 @media (min-width: 640px) {
   @keyframes drawExpand {
-    0%   { transform: scale(0.72) translateZ(0); border-radius: 12px; opacity: 0.8; }
-    100% { transform: scale(1)    translateZ(0); border-radius: 0;    opacity: 1; }
+    from { transform: scale(0.72); border-radius: 12px; opacity: 0.8; }
+    to   { transform: scale(1);    border-radius: 0;    opacity: 1; }
   }
   @keyframes drawCollapse {
-    0%   { transform: scale(1.18) translateZ(0); opacity: 0.85; }
-    40%  { transform: scale(1.06) translateZ(0); opacity: 0.95; }
-    100% { transform: scale(1)    translateZ(0); opacity: 1; }
+    from { transform: scale(1.15); opacity: 0.7; }
+    to   { transform: scale(1);    opacity: 1; }
   }
-  .draw-expand {
-    will-change: transform, opacity;
-    animation: drawExpand 400ms cubic-bezier(.16,1,.3,1) both;
-  }
-  .draw-collapse {
-    will-change: transform, opacity;
-    animation: drawCollapse 450ms cubic-bezier(.22,1,.36,1) both;
-  }
+  .draw-expand   { animation: drawExpand   400ms cubic-bezier(.16,1,.3,1) both; }
+  .draw-collapse { animation: drawCollapse 350ms cubic-bezier(.16,1,.3,1) both; }
 }
 
 /* Remove glass-card shadow on modal to avoid edge halos */
