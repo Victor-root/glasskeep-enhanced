@@ -151,7 +151,7 @@ export default function NoteModal({
     // status bar change is clearly visible. Default keeps page color.
     const color = (!mColor || mColor === "default")
       ? pageColor
-      : toHex(solid(bgFor(mColor, dark)));
+      : toHex(modalBgFor(mColor, dark));
     setThemeColor(color);
     return () => setThemeColor(pageColor);
   }, [open, mColor, dark]);
