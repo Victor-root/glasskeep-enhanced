@@ -76,6 +76,7 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
         log("✅ 400ms timer → ACTIVATE", { noteId: p.noteId, classList: [...card.classList] });
         active = true;
         gotMoveAfterActivation = false;
+        lastTouchY = startY;
         card.classList.add("dragging");
         p.onDragStart(p.noteId, { currentTarget: card });
         // If browser stole the touch, no touchmove will arrive → cancel quickly
