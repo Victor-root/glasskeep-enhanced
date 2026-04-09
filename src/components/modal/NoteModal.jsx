@@ -498,7 +498,7 @@ export default function NoteModal({
                   hideModeToggle
                   externalMode={drawMode}
                   onModeChange={setDrawMode}
-                  fillContainer
+                  fillContainer={drawMode === 'draw'}
                   toolbarPortalTarget={drawToolbarEl}
                 />
               )}
