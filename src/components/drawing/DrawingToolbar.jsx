@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { t } from '../../i18n';
 
 /* ─── Quick palette: 8 well-chosen defaults ─── */
@@ -105,6 +106,72 @@ function TBtn({ active, onClick, disabled, tooltip, variant = 'default', compact
 /* ─── Separator ─── */
 const Sep = () => <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-0.5 shrink-0" />;
 
+/* ─── Compact Popover (portal, auto-position, outside click to close) ─── */
+function ToolbarPopover({ anchorRef, open, onClose, darkMode, children }) {
+  const panelRef = useRef(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [ready, setReady] = useState(false);
+
+  React.useLayoutEffect(() => {
+    if (!open) { setReady(false); return; }
+    const place = () => {
+      const a = anchorRef?.current;
+      if (!a) return;
+      const r = a.getBoundingClientRect();
+      const gap = 10;
+      // Try below first
+      let top = r.bottom + gap;
+      let left = r.left + r.width / 2;
+      setPos({ top, left });
+      requestAnimationFrame(() => {
+        const el = panelRef.current;
+        if (!el) return;
+        const bw = el.offsetWidth;
+        const bh = el.offsetHeight;
+        let t = top;
+        let l = left - bw / 2; // center on anchor
+        if (l + bw + 8 > window.innerWidth) l = window.innerWidth - bw - 8;
+        if (l < 8) l = 8;
+        if (t + bh + 8 > window.innerHeight) t = r.top - bh - gap;
+        setPos({ top: t, left: l });
+        setReady(true);
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open, anchorRef]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (panelRef.current?.contains(e.target)) return;
+      if (anchorRef?.current?.contains(e.target)) return;
+      onClose?.();
+    };
+    document.addEventListener("mousedown", onDown, true);
+    document.addEventListener("touchstart", onDown, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("touchstart", onDown, true);
+    };
+  }, [open, onClose, anchorRef]);
+
+  if (!open) return null;
+  return createPortal(
+    <div
+      ref={panelRef}
+      style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 99999, visibility: ready ? "visible" : "hidden" }}
+      className={`rounded-2xl shadow-2xl backdrop-blur-xl border ring-1 ring-black/5 dark:ring-white/5 p-3 ${
+        darkMode ? "bg-gray-900/98 border-gray-700/50" : "bg-white/98 border-gray-100/80"
+      }`}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
 /* ─── Main Component ─── */
 export default function DrawingToolbar({
   tool,
@@ -127,8 +194,12 @@ export default function DrawingToolbar({
 }) {
   const [showCustomColor, setShowCustomColor] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [colorPopOpen, setColorPopOpen] = useState(false);
+  const [sizePopOpen, setSizePopOpen] = useState(false);
   const confirmTimer = useRef(null);
   const customColorRef = useRef(null);
+  const colorBtnRef = useRef(null);
+  const sizeBtnRef = useRef(null);
 
   // Auto-dismiss confirm after 3s
   useEffect(() => {
@@ -180,78 +251,203 @@ export default function DrawingToolbar({
       {/* ─── Color Palette (visible only for pen) ─── */}
       {tool === 'pen' && (
         <>
-          <div className={`flex items-center ${compact ? 'gap-0.5' : 'gap-1 flex-wrap'}`}>
-            {QUICK_COLORS.map(c => (
+          {compact ? (
+            /* Mobile: single color button → popover */
+            <>
               <button
-                key={c}
-                onClick={() => setColor(c)}
-                className={`${colorSize} rounded-full shrink-0 focus:outline-none ${
-                  color === c
-                    ? 'border-[3px] border-indigo-500 dark:border-indigo-400 shadow-[0_0_0_2px_rgba(99,102,241,0.5)]'
-                    : 'border-2 border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-400 hover:scale-110 transition-transform duration-150'
-                }`}
-                style={{ backgroundColor: c }}
-                data-tooltip={c}
-              />
-            ))}
-            {/* Custom color button */}
-            <div className="relative">
-              <button
-                onClick={() => customColorRef.current?.click()}
-                className={`${colorSize} rounded-full border-dashed shrink-0 flex items-center justify-center text-xs focus:outline-none ${
-                  isCustomColor
-                    ? 'border-[3px] border-indigo-500 dark:border-indigo-400 shadow-[0_0_0_2px_rgba(99,102,241,0.5)]'
-                    : 'border-2 border-gray-300 dark:border-gray-500 text-gray-400 dark:text-gray-500 hover:scale-110 transition-transform duration-150'
-                }`}
-                style={isCustomColor ? { backgroundColor: color } : {}}
-                data-tooltip={t('customColor')}
+                ref={colorBtnRef}
+                onClick={() => { setColorPopOpen(v => !v); setSizePopOpen(false); }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 focus:outline-none border border-gray-200/50 dark:border-gray-600/40 hover:scale-105 transition-transform duration-150"
               >
-                {!isCustomColor && (
-                  <svg className={compact ? "w-2.5 h-2.5" : "w-3.5 h-3.5"} viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10c1.38 0 2.5-1.12 2.5-2.5 0-.61-.23-1.2-.64-1.67-.08-.1-.13-.21-.13-.33 0-.28.22-.5.5-.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 8 6.5 8 8 8.67 8 9.5 7.33 11 6.5 11zm3-4C8.67 7 8 6.33 8 5.5S8.67 4 9.5 4s1.5.67 1.5 1.5S10.33 7 9.5 7zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 4 14.5 4s1.5.67 1.5 1.5S15.33 7 14.5 7zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 8 17.5 8s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
-                  </svg>
-                )}
+                <span
+                  className={`w-5 h-5 rounded-full border ${
+                    color === '#FFFFFF' || color === '#fff'
+                      ? 'border-gray-300 dark:border-gray-500'
+                      : 'border-transparent'
+                  }`}
+                  style={{ backgroundColor: color }}
+                />
               </button>
-              <input
-                ref={customColorRef}
-                type="color"
-                value={isCustomColor ? color : '#000000'}
-                onChange={handleCustomColorChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                tabIndex={-1}
-              />
+              <ToolbarPopover anchorRef={colorBtnRef} open={colorPopOpen} onClose={() => setColorPopOpen(false)} darkMode={darkMode}>
+                <div className="flex flex-wrap gap-2.5 justify-center" style={{ width: 200 }}>
+                  {QUICK_COLORS.map(c => (
+                    <button
+                      key={c}
+                      onClick={() => { setColor(c); setColorPopOpen(false); }}
+                      className={`w-10 h-10 rounded-full shrink-0 focus:outline-none transition-transform duration-150 hover:scale-110 active:scale-95 ${
+                        color === c
+                          ? 'ring-[3px] ring-indigo-500 ring-offset-2 dark:ring-offset-gray-900'
+                          : `border-2 ${c === '#FFFFFF' || c === '#fff' ? 'border-gray-300 dark:border-gray-500' : 'border-transparent'}`
+                      }`}
+                      style={{ backgroundColor: c }}
+                    >
+                      {color === c && (
+                        <svg className="w-4 h-4 mx-auto drop-shadow-sm" viewBox="0 0 24 24" fill={c === '#FFFFFF' || c === '#fff' || c === '#FACC15' ? '#000' : '#fff'}>
+                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                  {/* Custom color */}
+                  <div className="relative">
+                    <button
+                      onClick={() => customColorRef.current?.click()}
+                      className={`w-10 h-10 rounded-full border-dashed shrink-0 flex items-center justify-center focus:outline-none transition-transform duration-150 hover:scale-110 ${
+                        isCustomColor
+                          ? 'ring-[3px] ring-indigo-500 ring-offset-2 dark:ring-offset-gray-900'
+                          : 'border-2 border-gray-300 dark:border-gray-500 text-gray-400 dark:text-gray-500'
+                      }`}
+                      style={isCustomColor ? { backgroundColor: color } : {}}
+                    >
+                      {isCustomColor ? (
+                        <svg className="w-4 h-4 drop-shadow-sm" viewBox="0 0 24 24" fill="#fff">
+                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10c1.38 0 2.5-1.12 2.5-2.5 0-.61-.23-1.2-.64-1.67-.08-.1-.13-.21-.13-.33 0-.28.22-.5.5-.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 8 6.5 8 8 8.67 8 9.5 7.33 11 6.5 11zm3-4C8.67 7 8 6.33 8 5.5S8.67 4 9.5 4s1.5.67 1.5 1.5S10.33 7 9.5 7zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 4 14.5 4s1.5.67 1.5 1.5S15.33 7 14.5 7zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 8 17.5 8s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
+                        </svg>
+                      )}
+                    </button>
+                    <input
+                      ref={customColorRef}
+                      type="color"
+                      value={isCustomColor ? color : '#000000'}
+                      onChange={(e) => { handleCustomColorChange(e); setColorPopOpen(false); }}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      tabIndex={-1}
+                    />
+                  </div>
+                </div>
+              </ToolbarPopover>
+            </>
+          ) : (
+            /* Desktop: inline color swatches */
+            <div className="flex items-center gap-1 flex-wrap">
+              {QUICK_COLORS.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setColor(c)}
+                  className={`${colorSize} rounded-full shrink-0 focus:outline-none ${
+                    color === c
+                      ? 'border-[3px] border-indigo-500 dark:border-indigo-400 shadow-[0_0_0_2px_rgba(99,102,241,0.5)]'
+                      : 'border-2 border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-400 hover:scale-110 transition-transform duration-150'
+                  }`}
+                  style={{ backgroundColor: c }}
+                  data-tooltip={c}
+                />
+              ))}
+              {/* Custom color button */}
+              <div className="relative">
+                <button
+                  onClick={() => customColorRef.current?.click()}
+                  className={`${colorSize} rounded-full border-dashed shrink-0 flex items-center justify-center text-xs focus:outline-none ${
+                    isCustomColor
+                      ? 'border-[3px] border-indigo-500 dark:border-indigo-400 shadow-[0_0_0_2px_rgba(99,102,241,0.5)]'
+                      : 'border-2 border-gray-300 dark:border-gray-500 text-gray-400 dark:text-gray-500 hover:scale-110 transition-transform duration-150'
+                  }`}
+                  style={isCustomColor ? { backgroundColor: color } : {}}
+                  data-tooltip={t('customColor')}
+                >
+                  {!isCustomColor && (
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10c1.38 0 2.5-1.12 2.5-2.5 0-.61-.23-1.2-.64-1.67-.08-.1-.13-.21-.13-.33 0-.28.22-.5.5-.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 8 6.5 8 8 8.67 8 9.5 7.33 11 6.5 11zm3-4C8.67 7 8 6.33 8 5.5S8.67 4 9.5 4s1.5.67 1.5 1.5S10.33 7 9.5 7zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 4 14.5 4s1.5.67 1.5 1.5S15.33 7 14.5 7zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 8 17.5 8s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
+                    </svg>
+                  )}
+                </button>
+                <input
+                  ref={customColorRef}
+                  type="color"
+                  value={isCustomColor ? color : '#000000'}
+                  onChange={handleCustomColorChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  tabIndex={-1}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <Sep />
         </>
       )}
 
       {/* ─── Size Presets ─── */}
-      <div className="flex items-center gap-0.5 shrink-0">
-        {SIZE_PRESETS.map(preset => (
+      {compact ? (
+        /* Mobile: single size button → popover */
+        <>
           <button
-            key={preset.value}
-            onClick={() => setSize(preset.value)}
-            data-tooltip={`${preset.label()} (${preset.value}px)`}
-            className={`flex items-center justify-center ${sizeBtn} transition-all duration-200 hover:scale-105 ${
-              size === preset.value
-                ? 'bg-gray-800 dark:bg-white border-2 border-gray-800 dark:border-white'
-                : 'border border-gray-200/80 dark:border-gray-600/60 bg-white/80 dark:bg-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-700/60 hover:border-gray-300 dark:hover:border-gray-500'
-            }`}
+            ref={sizeBtnRef}
+            onClick={() => { setSizePopOpen(v => !v); setColorPopOpen(false); }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 focus:outline-none border border-gray-200/50 dark:border-gray-600/40 hover:scale-105 transition-transform duration-150"
           >
             <span
-              className={`block rounded-full ${
-                size === preset.value ? 'bg-white dark:bg-gray-800' : 'bg-gray-500 dark:bg-gray-400'
-              }`}
+              className="block rounded-full bg-gray-700 dark:bg-gray-200"
               style={{
-                width: Math.max(3, Math.min(preset.icon, compact ? 16 : 18)),
-                height: Math.max(3, Math.min(preset.icon, compact ? 16 : 18)),
+                width: Math.max(4, Math.min(size, 16)),
+                height: Math.max(4, Math.min(size, 16)),
               }}
             />
           </button>
-        ))}
-      </div>
+          <ToolbarPopover anchorRef={sizeBtnRef} open={sizePopOpen} onClose={() => setSizePopOpen(false)} darkMode={darkMode}>
+            <div className="flex items-center gap-3 px-1">
+              {SIZE_PRESETS.map(preset => (
+                <button
+                  key={preset.value}
+                  onClick={() => { setSize(preset.value); setSizePopOpen(false); }}
+                  className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 hover:scale-105 active:scale-95 ${
+                    size === preset.value
+                      ? 'bg-gray-800 dark:bg-white'
+                      : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <span
+                    className={`block rounded-full ${
+                      size === preset.value ? 'bg-white dark:bg-gray-800' : 'bg-gray-500 dark:bg-gray-400'
+                    }`}
+                    style={{
+                      width: Math.max(4, Math.min(preset.icon, 20)),
+                      height: Math.max(4, Math.min(preset.icon, 20)),
+                    }}
+                  />
+                  <span className={`text-[10px] font-medium ${
+                    size === preset.value
+                      ? 'text-white dark:text-gray-800'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    {preset.label()}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </ToolbarPopover>
+        </>
+      ) : (
+        /* Desktop: inline size buttons */
+        <div className="flex items-center gap-0.5 shrink-0">
+          {SIZE_PRESETS.map(preset => (
+            <button
+              key={preset.value}
+              onClick={() => setSize(preset.value)}
+              data-tooltip={`${preset.label()} (${preset.value}px)`}
+              className={`flex items-center justify-center ${sizeBtn} transition-all duration-200 hover:scale-105 ${
+                size === preset.value
+                  ? 'bg-gray-800 dark:bg-white border-2 border-gray-800 dark:border-white'
+                  : 'border border-gray-200/80 dark:border-gray-600/60 bg-white/80 dark:bg-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-700/60 hover:border-gray-300 dark:hover:border-gray-500'
+              }`}
+            >
+              <span
+                className={`block rounded-full ${
+                  size === preset.value ? 'bg-white dark:bg-gray-800' : 'bg-gray-500 dark:bg-gray-400'
+                }`}
+                style={{
+                  width: Math.max(3, Math.min(preset.icon, 18)),
+                  height: Math.max(3, Math.min(preset.icon, 18)),
+                }}
+              />
+            </button>
+          ))}
+        </div>
+      )}
 
       <Sep />
 
