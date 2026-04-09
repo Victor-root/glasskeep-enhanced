@@ -257,8 +257,9 @@ export default function NoteCard({
           <DrawingPreview
             data={n.content}
             width={800}
-            height={600}
+            height={1800}
             darkMode={dark}
+            maxPages={3}
           />
         </>
       ) : (

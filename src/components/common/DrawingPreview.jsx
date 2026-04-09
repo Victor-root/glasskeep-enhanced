@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from "react";
 import { renderPaths } from "../../DrawingCanvas";
 
 /** ---------- Drawing Preview (HiDPI-aware) ---------- */
-export default function DrawingPreview({ data, width, height, darkMode = false }) {
+export default function DrawingPreview({ data, width, height, darkMode = false, maxPages = 1 }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -55,10 +55,11 @@ export default function DrawingPreview({ data, width, height, darkMode = false }
       return;
     }
 
-    // Filter to first page
+    // Filter to visible pages
+    const maxVisibleY = firstPageHeight * maxPages;
     paths = paths.filter((path) => {
       if (!path.points || path.points.length === 0) return false;
-      return path.points.some((point) => point.y < firstPageHeight);
+      return path.points.some((point) => point.y < maxVisibleY);
     });
 
     // Theme-convert black/white strokes
