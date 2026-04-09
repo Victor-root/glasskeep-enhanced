@@ -270,12 +270,12 @@ export default function DrawingToolbar({
                 onClick={() => { setColorPopOpen(v => !v); setSizePopOpen(false); setActionsPopOpen(false); }}
                 className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 focus:outline-none border border-gray-200/50 dark:border-gray-600/40 hover:scale-105 transition-transform duration-150"
               >
-                {/* 4 overlapping circles forming a cluster */}
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <circle cx="7.5" cy="12.5" r="4.5" fill="#22C55E" stroke={darkMode ? '#374151' : '#fff'} strokeWidth="1" />
-                  <circle cx="12.5" cy="12.5" r="4.5" fill="#3B82F6" stroke={darkMode ? '#374151' : '#fff'} strokeWidth="1" />
-                  <circle cx="7.5" cy="7.5" r="4.5" fill="#EF4444" stroke={darkMode ? '#374151' : '#fff'} strokeWidth="1" />
-                  <circle cx="12.5" cy="7.5" r="4.5" fill={color} stroke={darkMode ? '#374151' : '#fff'} strokeWidth="1" />
+                {/* 4 color dots in a row */}
+                <svg width="24" height="8" viewBox="0 0 24 8" fill="none">
+                  <circle cx="3" cy="4" r="3.5" fill="#EF4444" />
+                  <circle cx="9" cy="4" r="3.5" fill="#3B82F6" />
+                  <circle cx="15" cy="4" r="3.5" fill="#22C55E" />
+                  <circle cx="21" cy="4" r="3.5" fill={color} />
                 </svg>
               </button>
               <ToolbarPopover anchorRef={colorBtnRef} open={colorPopOpen} onClose={() => setColorPopOpen(false)} darkMode={darkMode}>
