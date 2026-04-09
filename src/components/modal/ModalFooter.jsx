@@ -435,8 +435,8 @@ export default function ModalFooter({
           </button>
         )}
 
-        {/* ── Collaborate (hidden on mobile edit mode — moved to kebab) ── */}
-        {(isDesktop || viewMode || mType !== "text") && (() => {
+        {/* ── Collaborate (hidden on mobile text edit mode & draw edit mode — moved to kebab) ── */}
+        {(isDesktop || viewMode || mType !== "text") && !(mType === "draw" && drawMode !== "draw" && !viewMode) && (() => {
           const collabs = addModalCollaborators || [];
           const hasCollabs = collabs.length > 0;
           return (
@@ -539,8 +539,8 @@ export default function ModalFooter({
             >
               <DownloadIcon />{t("downloadMd")}
             </button>
-            {/* Collaborate — shown in kebab on mobile edit mode */}
-            {!isDesktop && mType === "text" && !viewMode && (
+            {/* Collaborate — shown in kebab on mobile text edit mode & draw edit mode */}
+            {((!isDesktop && mType === "text" && !viewMode) || (mType === "draw" && drawMode !== "draw" && !viewMode)) && (
               <button
                 className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                 style={{ color: dark ? "#93c5fd" : "#2563eb" }}
