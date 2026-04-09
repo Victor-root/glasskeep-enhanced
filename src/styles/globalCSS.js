@@ -44,6 +44,8 @@ html.dark body {
   contain-intrinsic-size: auto 200px;
   contain: layout style paint;
   animation: noteAppear 0.15s ease-out;
+  -webkit-user-select: none;
+  user-select: none;
 }
 /* Drag & drop reorder styles */
 .note-card.dragging {
