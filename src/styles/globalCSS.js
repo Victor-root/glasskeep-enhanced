@@ -782,6 +782,16 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
 }
 .modal-content-fade { animation: modalContentFade 200ms ease-out both; }
 
+/* Smooth expand/collapse when entering/leaving draw canvas mode */
+@media (min-width: 640px) {
+  .modal-resize-smooth {
+    transition: width 350ms cubic-bezier(.4,0,.2,1),
+                max-width 350ms cubic-bezier(.4,0,.2,1),
+                height 350ms cubic-bezier(.4,0,.2,1),
+                border-radius 250ms ease;
+  }
+}
+
 /* Remove glass-card shadow on modal to avoid edge halos */
 .note-modal-anim.glass-card {
   box-shadow: none !important;
