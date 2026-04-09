@@ -18,13 +18,15 @@ html.dark {
 }
 button, [role="button"] { cursor: pointer; }
 body {
-  background: linear-gradient(135deg, #f0e8ff 0%, #e8f4fd 50%, #fde8f0 100%);
+  background-color: #f0e8ff;
+  background-image: linear-gradient(135deg, #f0e8ff 0%, #e8f4fd 50%, #fde8f0 100%);
   background-attachment: fixed;
   color: var(--text-light);
-  transition: background 0.3s ease, color 0.3s ease;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 html.dark body {
-  background: var(--bg-dark);
+  background-color: #1a1a1a;
+  background-image: none;
   background-attachment: fixed;
 }
 .glass-card {
