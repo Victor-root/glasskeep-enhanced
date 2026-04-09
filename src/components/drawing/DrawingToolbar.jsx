@@ -267,17 +267,14 @@ export default function DrawingToolbar({
             <>
               <button
                 ref={colorBtnRef}
-                onClick={() => { setColorPopOpen(v => !v); setSizePopOpen(false); }}
+                onClick={() => { setColorPopOpen(v => !v); setSizePopOpen(false); setActionsPopOpen(false); }}
                 className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 focus:outline-none border border-gray-200/50 dark:border-gray-600/40 hover:scale-105 transition-transform duration-150"
               >
-                <span
-                  className={`w-5 h-5 rounded-full border ${
-                    color === '#FFFFFF' || color === '#fff'
-                      ? 'border-gray-300 dark:border-gray-500'
-                      : 'border-transparent'
-                  }`}
-                  style={{ backgroundColor: color }}
-                />
+                <svg width="22" height="18" viewBox="0 0 22 18" fill="none">
+                  <circle cx="6" cy="10" r="5" fill="#3B82F6" stroke={darkMode ? '#374151' : '#fff'} strokeWidth="1.2" />
+                  <circle cx="11" cy="6" r="5" fill="#EF4444" stroke={darkMode ? '#374151' : '#fff'} strokeWidth="1.2" />
+                  <circle cx="16" cy="10" r="5" fill={color} stroke={darkMode ? '#374151' : '#fff'} strokeWidth="1.2" />
+                </svg>
               </button>
               <ToolbarPopover anchorRef={colorBtnRef} open={colorPopOpen} onClose={() => setColorPopOpen(false)} darkMode={darkMode}>
                 <div className="flex flex-wrap gap-2.5 justify-center" style={{ width: 200 }}>
