@@ -104,7 +104,7 @@ function TBtn({ active, onClick, disabled, tooltip, variant = 'default', compact
 }
 
 /* ─── Separator (desktop only) ─── */
-const Sep = ({ compact }) => compact ? null : <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-0.5 shrink-0" />;
+const Sep = ({ hide }) => hide ? null : <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-0.5 shrink-0" />;
 
 /* ─── Compact Popover (portal, auto-position, outside click to close) ─── */
 function ToolbarPopover({ anchorRef, open, onClose, darkMode, children }) {
@@ -192,6 +192,15 @@ export default function DrawingToolbar({
   darkMode,
   compact = false,
 }) {
+  // Mobile detection — popovers only on small screens
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   const [showCustomColor, setShowCustomColor] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [colorPopOpen, setColorPopOpen] = useState(false);
@@ -248,12 +257,12 @@ export default function DrawingToolbar({
         </TBtn>
       </div>
 
-      <Sep compact={compact} />
+      <Sep hide={compact && isMobile} />
 
       {/* ─── Color Palette (visible only for pen) ─── */}
       {tool === 'pen' && (
         <>
-          {compact ? (
+          {compact && isMobile ? (
             /* Mobile: single color button → popover */
             <>
               <button
@@ -369,12 +378,12 @@ export default function DrawingToolbar({
             </div>
           )}
 
-          <Sep compact={compact} />
+          <Sep hide={compact && isMobile} />
         </>
       )}
 
       {/* ─── Size Presets ─── */}
-      {compact ? (
+      {compact && isMobile ? (
         /* Mobile: single size button → popover */
         <>
           <button
@@ -451,10 +460,10 @@ export default function DrawingToolbar({
         </div>
       )}
 
-      <Sep compact={compact} />
+      <Sep hide={compact && isMobile} />
 
       {/* ─── Actions: Undo / Redo / Add Page / Clear ─── */}
-      {compact ? (
+      {compact && isMobile ? (
         /* Mobile: toolbox button → popover with all actions */
         <>
           <button
