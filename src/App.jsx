@@ -2554,11 +2554,12 @@ export default function App() {
   const handleDirectDraw = async () => {
     const nowIso = new Date().toISOString();
     const composerTitle = title.trim();
+    const composerText = content.trim();
     const newNote = {
       id: uid(),
       type: "draw",
       title: composerTitle,
-      content: JSON.stringify({ paths: [], dimensions: null, text: "" }),
+      content: JSON.stringify({ paths: [], dimensions: null, text: composerText }),
       items: [],
       tags: composerTagList.length ? composerTagList : [],
       images: [],
@@ -2601,7 +2602,7 @@ export default function App() {
     setMTitle(composerTitle);
     setMDrawingData({ paths: [], dimensions: null });
     prevDrawingRef.current = { paths: [], dimensions: null };
-    setMBody("");
+    setMBody(composerText);
     skipNextDrawingAutosave.current = true;
     skipNextItemsAutosave.current = true;
     setMItems([]);
@@ -2610,7 +2611,7 @@ export default function App() {
     setMImages([]);
     setTagInput("");
     setMColor(localNote.color || "default");
-    const baselineState = { title: composerTitle, content: "", tags: localNote.tags || [], images: [], color: localNote.color || "default" };
+    const baselineState = { title: composerTitle, content: composerText, tags: localNote.tags || [], images: [], color: localNote.color || "default" };
     initialModalStateRef.current = baselineState;
     committedBaselineRef.current = { ...baselineState };
     setInitialDrawMode("draw");
