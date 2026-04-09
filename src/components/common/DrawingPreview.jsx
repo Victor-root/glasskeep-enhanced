@@ -104,7 +104,7 @@ export default function DrawingPreview({ data, width, height, darkMode = false }
   }, [data, width, height, darkMode]);
 
   return (
-    <div className="w-[90%] mx-auto rounded overflow-hidden">
+    <div className="w-[90%] mx-auto rounded">
       <canvas
         ref={canvasRef}
         className="block"

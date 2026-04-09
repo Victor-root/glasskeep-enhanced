@@ -113,6 +113,7 @@ export default function NoteCard({
       style={{
         backgroundColor: bgFor(n.color, dark),
         '--note-color': (!dark && (!n.color || n.color === 'default')) ? '#a78bfa' : solid(bgFor(n.color, dark)),
+        ...(isDraw ? { overflow: 'visible', contain: 'none', contentVisibility: 'visible' } : {}),
       }}
       data-id={n.id}
       data-group={group}
