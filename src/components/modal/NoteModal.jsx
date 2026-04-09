@@ -221,7 +221,6 @@ export default function NoteModal({
             isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen sm:!rounded-none'
             : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl'
           }${drawTransition === 'entering' ? ' draw-expand' : drawTransition === 'leaving' ? ' draw-collapse' : ''} flex flex-col relative overflow-hidden`}
-          onAnimationEnd={() => setDrawTransition(null)}
           style={{ backgroundColor: modalBgFor(mColor, dark), height: windowWidth < 640 ? '100dvh' : undefined }}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
