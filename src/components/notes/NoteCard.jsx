@@ -61,6 +61,7 @@ export default function NoteCard({
   const group = n.pinned ? "pinned" : "others";
   const isOwned = !currentUser || !n.user_id || n.user_id === currentUser.id;
   const canDrag = !multiMode && isOwned;
+  const isTouchDevice = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
   const cardRef = useRef(null);
   useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId: n.id, group, onDragStart, onDrop, onDragEnd });
 
@@ -68,7 +69,7 @@ export default function NoteCard({
     <div
       ref={cardRef}
       data-note-id={n.id}
-      draggable={canDrag}
+      draggable={canDrag && !isTouchDevice}
       onDragStart={(e) => {
         if (canDrag) onDragStart(n.id, e);
       }}
