@@ -3,14 +3,33 @@ import { t } from "../i18n";
 /** ---------- Utils ---------- */
 export const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-/** Force PWA to update status bar color by replacing the meta tag */
+/** Force PWA to update status bar color.
+ *  Tries multiple methods to ensure the browser picks up the change:
+ *  1. setAttribute on existing meta
+ *  2. Remove + re-insert the meta node
+ *  3. After a short delay, re-apply (some PWAs need a frame or two)
+ */
 export function setThemeColor(color) {
-  const old = document.querySelector('meta[name="theme-color"]');
-  if (old) old.remove();
-  const meta = document.createElement("meta");
-  meta.name = "theme-color";
-  meta.setAttribute("content", color);
-  document.head.appendChild(meta);
+  const apply = () => {
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute("content", color);
+      // Force re-parse: remove from DOM and re-insert
+      const parent = meta.parentNode;
+      if (parent) {
+        parent.removeChild(meta);
+        parent.appendChild(meta);
+      }
+    } else {
+      meta = document.createElement("meta");
+      meta.name = "theme-color";
+      meta.setAttribute("content", color);
+      document.head.appendChild(meta);
+    }
+  };
+  apply();
+  // Re-apply after a frame + delay to catch lazy PWA runtimes
+  requestAnimationFrame(() => setTimeout(apply, 50));
 }
 
 export const sanitizeFilename = (name, fallback = "note") =>
