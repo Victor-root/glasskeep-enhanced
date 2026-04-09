@@ -197,7 +197,7 @@ export default function NoteModal({
           <div
             ref={modalScrollRef}
             data-modal-scroll
-            className={`relative flex-1 min-h-0 overflow-x-auto mobile-hide-scrollbar modal-scroll-themed ${mType === 'draw' ? 'flex flex-col overflow-y-hidden' : 'overflow-y-auto'}`}
+            className={`relative flex-1 min-h-0 mobile-hide-scrollbar modal-scroll-themed ${mType === 'draw' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto overflow-x-auto'}`}
             style={(() => {
               const sc = scrollColorsFor(mColor, dark);
               const noteColorBtn = (!dark && (!mColor || mColor === "default"))

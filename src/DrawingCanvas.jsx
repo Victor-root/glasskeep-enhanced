@@ -427,11 +427,16 @@ function DrawingCanvas({
       )}
 
       {/* Canvas with cursor overlay */}
-      <div className={`relative border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden${fillContainer ? ' flex-1 min-h-0 overflow-y-auto' : ''}`}>
+      <div className={`relative border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden${fillContainer ? ' flex-1 min-h-0 flex items-center justify-center' : ''}`}>
         <canvas
           ref={canvasRef}
           className="block"
-          style={{
+          style={fillContainer ? {
+            maxWidth: '100%',
+            maxHeight: '100%',
+            touchAction: mode === 'draw' && !readOnly ? 'none' : 'auto',
+            cursor: mode === 'draw' && !readOnly ? 'none' : 'default',
+          } : {
             width: '100%',
             height: 'auto',
             touchAction: mode === 'draw' && !readOnly ? 'none' : 'auto',
