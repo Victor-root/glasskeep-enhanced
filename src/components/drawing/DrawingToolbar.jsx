@@ -74,20 +74,20 @@ const TrashIcon = () => (
 /* ─── Toolbar Button ─── */
 function TBtn({ active, onClick, disabled, tooltip, variant = 'default', compact = false, children, className = '' }) {
   const base = compact
-    ? 'flex items-center justify-center rounded-lg transition-all duration-200 active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:scale-100 w-8 h-8 p-1.5 [&_svg]:w-[18px] [&_svg]:h-[18px]'
-    : 'flex items-center justify-center rounded-xl transition-all duration-200 active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:scale-100 min-w-[40px] min-h-[40px] p-2';
+    ? 'flex items-center justify-center rounded-lg transition-all duration-200 active:scale-[0.95] disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:scale-100 w-8 h-8 p-1.5 [&_svg]:w-[18px] [&_svg]:h-[18px]'
+    : 'flex items-center justify-center rounded-xl transition-all duration-200 active:scale-[0.95] disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:scale-100 min-w-[40px] min-h-[40px] p-2';
 
   const variants = {
     default: active
-      ? 'bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-md shadow-indigo-300/40 dark:shadow-none scale-105'
-      : 'border border-gray-200/80 dark:border-gray-600/60 bg-white/80 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60 hover:border-gray-300 dark:hover:border-gray-500 hover:scale-105',
+      ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-300/40 dark:shadow-none hover:from-indigo-600 hover:to-violet-700 hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] btn-gradient'
+      : 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-300/40 dark:shadow-none hover:from-indigo-600 hover:to-violet-700 hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] btn-gradient',
     eraser: active
-      ? 'bg-gradient-to-br from-slate-500 to-gray-600 text-white shadow-md shadow-slate-300/40 dark:shadow-none scale-105'
-      : 'border border-gray-200/80 dark:border-gray-600/60 bg-white/80 dark:bg-gray-800/60 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/60 hover:border-gray-300 dark:hover:border-gray-500 hover:scale-105',
-    danger: 'border border-red-200/80 dark:border-red-700/50 bg-white/80 dark:bg-gray-800/60 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 hover:scale-105',
+      ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-300/40 dark:shadow-none hover:from-indigo-600 hover:to-violet-700 hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] btn-gradient'
+      : 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-300/40 dark:shadow-none hover:from-indigo-600 hover:to-violet-700 hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] btn-gradient',
+    danger: 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-md shadow-red-300/40 dark:shadow-none hover:from-red-600 hover:to-rose-700 hover:shadow-lg hover:shadow-red-300/50 dark:hover:shadow-none hover:scale-[1.03] btn-gradient',
     action: disabled
-      ? 'border border-gray-200/60 dark:border-gray-700/40 bg-white/60 dark:bg-gray-800/40 text-gray-300 dark:text-gray-600'
-      : 'border border-gray-200/80 dark:border-gray-600/60 bg-white/80 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60 hover:border-gray-300 dark:hover:border-gray-500 hover:scale-105',
+      ? 'bg-gradient-to-r from-indigo-400/50 to-violet-500/50 text-white/40 shadow-none'
+      : 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-300/40 dark:shadow-none hover:from-indigo-600 hover:to-violet-700 hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] btn-gradient',
   };
 
   return (
@@ -234,18 +234,14 @@ export default function DrawingToolbar({
             key={preset.value}
             onClick={() => setSize(preset.value)}
             data-tooltip={`${preset.label()} (${preset.value}px)`}
-            className={`flex items-center justify-center ${sizeBtn} transition-all duration-200 hover:scale-105 ${
+            className={`flex items-center justify-center ${sizeBtn} transition-all duration-200 hover:scale-[1.03] active:scale-[0.95] btn-gradient ${
               size === preset.value
-                ? 'bg-gray-800 dark:bg-white border-2 border-gray-800 dark:border-white'
-                : 'border border-gray-200/80 dark:border-gray-600/60 bg-white/80 dark:bg-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-700/60 hover:border-gray-300 dark:hover:border-gray-500'
+                ? 'bg-gradient-to-r from-indigo-600 to-violet-700 shadow-lg shadow-indigo-300/50 dark:shadow-none'
+                : 'bg-gradient-to-r from-indigo-500 to-violet-600 shadow-md shadow-indigo-300/40 dark:shadow-none hover:from-indigo-600 hover:to-violet-700 hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none'
             }`}
           >
             <span
-              className={`block rounded-full ${
-                size === preset.value
-                  ? 'bg-white dark:bg-gray-800'
-                  : 'bg-gray-500 dark:bg-gray-400'
-              }`}
+              className="block rounded-full bg-white"
               style={{
                 width: Math.max(3, Math.min(preset.icon, compact ? 16 : 18)),
                 height: Math.max(3, Math.min(preset.icon, compact ? 16 : 18)),
