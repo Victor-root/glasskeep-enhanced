@@ -249,7 +249,7 @@ export default function NoteCard({
           {drawText && (
             <div
               className="text-sm break-words whitespace-pre-wrap overflow-hidden note-content note-content--dense mb-2"
-              style={{ maxHeight: "140px" }}
+              style={{ maxHeight: "280px" }}
               dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(drawText.length > MAX_CHARS ? drawText.slice(0, MAX_CHARS).trimEnd() + "\u2026" : drawText) }}
             />
           )}
