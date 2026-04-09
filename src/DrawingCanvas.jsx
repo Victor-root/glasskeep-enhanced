@@ -655,7 +655,11 @@ function DrawingCanvas({
             >
               <path d="M3 21l1.5-4.5L17.1 3.9a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1L7.5 19.5 3 21z"
                 fill={color} stroke={darkMode ? '#fff' : '#000'} strokeWidth="1.2" strokeLinejoin="round" />
-              <path d="M14.5 6.5l3 3" stroke={color === '#000000' || color === '#000' ? '#fff' : (darkMode ? '#fff' : '#000')} strokeWidth="1" strokeLinecap="round" />
+              <path d="M14.5 6.5l3 3" stroke={
+                darkMode
+                  ? (color === '#FFFFFF' || color === '#fff' || color === '#FFF' ? '#000' : '#fff')
+                  : (color === '#000000' || color === '#000' ? '#fff' : '#000')
+              } strokeWidth="1" strokeLinecap="round" />
             </svg>
           )
         )}
