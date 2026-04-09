@@ -775,6 +775,13 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
 .note-scrim-anim         { animation: scrimFadeIn  200ms ease-out both; }
 .note-scrim-anim.closing { animation: scrimFadeOut 180ms ease-in  both; }
 
+/* Smooth content fade when toggling view/edit mode */
+@keyframes modalContentFade {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.modal-content-fade { animation: modalContentFade 200ms ease-out both; }
+
 /* Remove glass-card shadow on modal to avoid edge halos */
 .note-modal-anim.glass-card {
   box-shadow: none !important;

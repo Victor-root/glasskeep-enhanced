@@ -206,7 +206,6 @@ export default function NoteModal({
         <div
           className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full max-w-none ${
             isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen'
-            : isDrawView ? 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:max-h-[95vh]'
             : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh]'
           } ${isDrawEdit ? '' : 'sm:rounded-xl'} flex flex-col relative overflow-hidden`}
           style={{ backgroundColor: modalBgFor(mColor, dark), height: windowWidth < 640 ? '100dvh' : undefined }}
@@ -267,7 +266,8 @@ export default function NoteModal({
 
             {/* Content area */}
             <div
-              className={isDrawEdit ? "flex-1 min-h-0 flex flex-col" : isDrawView ? "px-6 pt-3 pb-6 max-sm:px-4 max-sm:pt-1 max-sm:pb-4" : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"}
+              key={isDrawEdit ? 'draw' : viewMode ? 'view' : 'edit'}
+              className={`${isDrawEdit ? "flex-1 min-h-0 flex flex-col" : isDrawView ? "px-6 pt-3 pb-6 max-sm:px-4 max-sm:pt-1 max-sm:pb-4" : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"} ${!isDrawEdit ? "modal-content-fade" : ""}`}
               onClick={onModalBodyClick}
             >
 
