@@ -271,11 +271,13 @@ export default function NoteModal({
               onToggleDrawMode={() => setDrawMode((m) => m === "view" ? "draw" : "view")}
             />
 
-            <ModalImagesGrid
-              images={mImages}
-              onOpenViewer={openImageViewer}
-              onRemoveImage={(id) => setMImages((prev) => prev.filter((x) => x.id !== id))}
-            />
+            {!isDrawEdit && (
+              <ModalImagesGrid
+                images={mImages}
+                onOpenViewer={openImageViewer}
+                onRemoveImage={(id) => setMImages((prev) => prev.filter((x) => x.id !== id))}
+              />
+            )}
 
             {/* Content area */}
             <div

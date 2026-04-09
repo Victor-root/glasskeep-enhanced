@@ -151,8 +151,8 @@ export default function ModalFooter({
           onSelect={(name) => setMColor(name)}
         />
 
-        {/* ── Add image (always visible, including view mode) ── */}
-        {(mType === "checklist" || mType === "text" || mType === "draw") && (
+        {/* ── Add image (hidden in view mode for draw notes, hidden in draw canvas) ── */}
+        {(mType === "checklist" || mType === "text" || (mType === "draw" && drawMode !== "draw" && !viewMode)) && (
           <>
             <input
               ref={modalFileRef}
