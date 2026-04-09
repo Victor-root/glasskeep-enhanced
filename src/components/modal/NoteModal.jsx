@@ -257,6 +257,7 @@ export default function NoteModal({
               drawMode={drawMode}
               drawToolbarMount={setDrawToolbarEl}
               onToggleDrawMode={() => setDrawMode((m) => m === "view" ? "draw" : "view")}
+              onExitDrawToView={() => { setDrawMode("view"); setViewMode(true); }}
             />
 
             <ModalImagesGrid
