@@ -79,6 +79,7 @@ function DrawingCanvas({
   initialMode = null,
   externalMode,
   onModeChange,
+  fillContainer = false,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -386,10 +387,10 @@ function DrawingCanvas({
   }, [stopDrawing]);
 
   return (
-    <div className="drawing-canvas-container" ref={containerRef}>
+    <div className={`drawing-canvas-container${fillContainer ? ' flex flex-col h-full' : ''}`} ref={containerRef}>
       {/* View/Draw Mode Toggle */}
       {!readOnly && !hideModeToggle && (
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 shrink-0">
           <button
             onClick={() => setMode(mode === 'view' ? 'draw' : 'view')}
             className={`px-3 py-1.5 rounded-xl border-2 text-sm font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${
@@ -406,25 +407,27 @@ function DrawingCanvas({
 
       {/* Toolbar */}
       {!readOnly && mode === 'draw' && (
-        <DrawingToolbar
-          tool={tool}
-          setTool={setTool}
-          color={color}
-          setColor={setColor}
-          size={size}
-          setSize={setSize}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-          onClear={clearCanvas}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          pathCount={paths.length}
-          darkMode={darkMode}
-        />
+        <div className="shrink-0">
+          <DrawingToolbar
+            tool={tool}
+            setTool={setTool}
+            color={color}
+            setColor={setColor}
+            size={size}
+            setSize={setSize}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onClear={clearCanvas}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            pathCount={paths.length}
+            darkMode={darkMode}
+          />
+        </div>
       )}
 
       {/* Canvas with cursor overlay */}
-      <div className="relative border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
+      <div className={`relative border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden${fillContainer ? ' flex-1 min-h-0 overflow-y-auto' : ''}`}>
         <canvas
           ref={canvasRef}
           className="block"
@@ -464,7 +467,7 @@ function DrawingCanvas({
 
       {/* Add Page Button */}
       {!readOnly && mode === 'draw' && (
-        <div className="mt-3 flex justify-center">
+        <div className="mt-3 flex justify-center shrink-0">
           <button
             data-tooltip={t('addPageTitle')}
             onClick={addPage}
@@ -476,7 +479,7 @@ function DrawingCanvas({
       )}
 
       {/* Info */}
-      <div className="text-xs text-gray-500 dark:text-gray-300 mt-2">
+      <div className="text-xs text-gray-500 dark:text-gray-300 mt-2 shrink-0">
         {paths.length} {paths.length !== 1 ? t("strokeCountPlural") : t("strokeCount")}
         {mode === 'view' && ` (${t('viewMode')})`}
         {readOnly && mode === 'draw' && ` (${t('readOnlyLabel')})`}

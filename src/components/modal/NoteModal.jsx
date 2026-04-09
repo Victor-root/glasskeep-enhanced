@@ -186,7 +186,7 @@ export default function NoteModal({
         }}
       >
         <div
-          className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full max-w-none sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl flex flex-col relative overflow-hidden`}
+          className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full max-w-none ${mType === 'draw' ? 'sm:w-[98vw] sm:max-w-[98vw] sm:h-[98vh]' : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh]'} sm:rounded-xl flex flex-col relative overflow-hidden`}
           style={{ backgroundColor: modalBgFor(mColor, dark), height: windowWidth < 640 ? '100dvh' : undefined }}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
@@ -197,7 +197,7 @@ export default function NoteModal({
           <div
             ref={modalScrollRef}
             data-modal-scroll
-            className="relative flex-1 min-h-0 overflow-y-auto overflow-x-auto mobile-hide-scrollbar modal-scroll-themed"
+            className={`relative flex-1 min-h-0 overflow-x-auto mobile-hide-scrollbar modal-scroll-themed ${mType === 'draw' ? 'flex flex-col overflow-y-hidden' : 'overflow-y-auto'}`}
             style={(() => {
               const sc = scrollColorsFor(mColor, dark);
               const noteColorBtn = (!dark && (!mColor || mColor === "default"))
@@ -241,7 +241,7 @@ export default function NoteModal({
 
             {/* Content area */}
             <div
-              className={mType === "draw" ? "p-2 pb-6" : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"}
+              className={mType === "draw" ? "p-2 flex-1 min-h-0 flex flex-col" : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"}
               onClick={onModalBodyClick}
             >
 
@@ -482,13 +482,14 @@ export default function NoteModal({
                 <DrawingCanvas
                   data={mDrawingData}
                   onChange={setMDrawingData}
-                  width={750}
-                  height={850}
+                  width={1200}
+                  height={800}
                   readOnly={false}
                   darkMode={dark}
                   hideModeToggle
                   externalMode={drawMode}
                   onModeChange={setDrawMode}
+                  fillContainer
                 />
               )}
 
