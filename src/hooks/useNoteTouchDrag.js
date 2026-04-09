@@ -21,6 +21,8 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
     let startY = 0;
     let lastTarget = null;
     let failsafeTimer = null;
+    let noMoveTimer = null;
+    let gotMoveAfterActivation = false;
     let scrollRaf = null;
     let lastTouchY = 0;
 
@@ -34,9 +36,11 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
       if (reason) log("cleanup:", reason);
       clearTimeout(timer);
       clearTimeout(failsafeTimer);
+      clearTimeout(noMoveTimer);
       stopAutoScroll();
       timer = null;
       failsafeTimer = null;
+      noMoveTimer = null;
       if (!active) return;
       log("→ deactivating, removing dragging class");
       active = false;
@@ -71,8 +75,16 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
       timer = setTimeout(() => {
         log("✅ 400ms timer → ACTIVATE", { noteId: p.noteId, classList: [...card.classList] });
         active = true;
+        gotMoveAfterActivation = false;
         card.classList.add("dragging");
         p.onDragStart(p.noteId, { currentTarget: card });
+        // If browser stole the touch, no touchmove will arrive → cancel quickly
+        noMoveTimer = setTimeout(() => {
+          if (active && !gotMoveAfterActivation) {
+            log("⚠ no touchmove after 600ms → browser stole touch, cancelling");
+            cleanup("no-move-abort");
+          }
+        }, 600);
         failsafeTimer = setTimeout(() => cleanup("failsafe 3s"), 3000);
         scrollRaf = requestAnimationFrame(autoScroll);
       }, 400);
@@ -92,6 +104,7 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
       }
       if (!active) return;
       e.preventDefault();
+      gotMoveAfterActivation = true;
       lastTouchY = touch.clientY;
 
       clearTimeout(failsafeTimer);
@@ -138,6 +151,7 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
     return () => {
       clearTimeout(timer);
       clearTimeout(failsafeTimer);
+      clearTimeout(noMoveTimer);
       stopAutoScroll();
       if (active) {
         active = false;
