@@ -135,13 +135,11 @@ export class SyncEngine {
     }
 
     this._processing = true;
-    console.log("[SYNC] processQueue START");
 
     try {
       await collapseQueue(this._userId);
 
       const items = await getPendingQueue(this._userId);
-      console.log("[SYNC] processQueue items:", items.length, items.map(i => i.type + ":" + (i.noteId || "").slice(0, 10)).join(", "));
       if (items.length === 0) {
         this._processing = false;
         await this._emitStatus();
@@ -170,13 +168,11 @@ export class SyncEngine {
           }
         }
 
-        console.log("[SYNC] processing:", item.type, item.noteId?.slice(0, 10), "attempt:", item.attempts);
         await updateQueueItem(item.queueId, { status: "processing" });
         await this._emitStatus();
 
         try {
           const result = await this._executeAction(item);
-          console.log("[SYNC] ✅ done:", item.type, item.noteId?.slice(0, 10));
           await removeQueueItem(item.queueId);
           this._serverReachable = true;
           this._lastSyncAt = Date.now();
@@ -187,7 +183,6 @@ export class SyncEngine {
           // Small delay between items to avoid triggering reverse proxy rate limits
           await new Promise((r) => setTimeout(r, QUEUE_ITEM_DELAY));
         } catch (err) {
-          console.log("[SYNC] ❌ error:", item.type, item.noteId?.slice(0, 10), err.status, err.message);
           const isAuthError = err.status === 401;
           const isForbidden = err.status === 403;
           const isConflict = err.status === 409;

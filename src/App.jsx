@@ -1127,7 +1127,6 @@ export default function App() {
   // ─── Local-first helpers ───
   // Enqueue a sync action and immediately trigger the engine
   const enqueueAndSync = useCallback(async (action) => {
-    console.log("[SYNC] enqueue:", action.type, action.noteId === "__reorder__" ? "(reorder)" : action.noteId);
     await idbEnqueue({ ...action, userId: currentUser?.id, sessionId });
     triggerSync();
   }, [triggerSync, currentUser?.id, sessionId]);
@@ -3339,7 +3338,6 @@ export default function App() {
       const n = byId.get(id);
       return n ? { ...n, position: positionMap.get(id) } : n;
     });
-    console.log("[SYNC] setNotes(reordered) — optimistic reorder", { from: dragged, to: overId, group });
     setNotes(reordered);
 
     // Persist new positions to IndexedDB (local-first)
