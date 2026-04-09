@@ -51,7 +51,9 @@ html.dark body {
 .note-card.dragging {
   opacity: 0.35;
   transform: scale(0.97);
-  cursor: move !important;
+}
+body.note-reordering, body.note-reordering * {
+  cursor: grabbing !important;
 }
 .note-card.drag-over {
   outline: 2.5px dashed #6366f1;

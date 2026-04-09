@@ -3285,7 +3285,14 @@ export default function App() {
     const isPinned = !!notes.find((n) => String(n.id) === String(id))?.pinned;
     dragGroup.current = isPinned ? "pinned" : "others";
     ev.currentTarget.classList.add("dragging");
-    if (ev.dataTransfer) ev.dataTransfer.effectAllowed = "move";
+    if (ev.dataTransfer) {
+      ev.dataTransfer.effectAllowed = "move";
+      // Hide browser's ugly drag ghost
+      const blank = document.createElement("canvas");
+      blank.width = 1; blank.height = 1;
+      ev.dataTransfer.setDragImage(blank, 0, 0);
+    }
+    document.body.classList.add("note-reordering");
   };
   const onDragOver = (overId, group, ev) => {
     ev.preventDefault();
@@ -3363,9 +3370,11 @@ export default function App() {
       // enqueue failed — leases stay active (SSE protection maintained)
     }
     dragGroup.current = null;
+    document.body.classList.remove("note-reordering");
   };
   const onDragEnd = (ev) => {
     ev.currentTarget.classList.remove("dragging");
+    document.body.classList.remove("note-reordering");
   };
 
   // Checklist item drag handlers (for modal reordering)
