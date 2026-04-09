@@ -271,11 +271,13 @@ function DrawingCanvas({
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
 
-    // In fillContainer mode, use actual display dimensions for sharp rendering
-    // even when logical dimensions differ (e.g. stored drawing at 1200px on a 1900px wrapper)
+    // In fillContainer mode, use actual display width for sharp rendering.
+    // For height: if canvas is taller than display (multi-page), scale proportionally
+    // from width so the canvas scrolls instead of squishing.
     const useDisplay = fillContainer && displaySize && displaySize.width > 0;
     const physW = useDisplay ? displaySize.width : canvasWidth;
-    const physH = useDisplay ? displaySize.height : canvasHeight;
+    const scaleFromWidth = useDisplay ? displaySize.width / canvasWidth : 1;
+    const physH = useDisplay ? canvasHeight * scaleFromWidth : canvasHeight;
 
     // Physical pixel buffer matches the display area × devicePixelRatio
     canvas.width = Math.round(physW * dpr);
@@ -487,7 +489,7 @@ function DrawingCanvas({
       {/* Canvas with cursor overlay */}
       <div
         ref={canvasWrapperRef}
-        className={`relative overflow-hidden${fillContainer ? ' flex-1 min-h-0 border-0' : ' border border-gray-300 dark:border-gray-600 rounded-lg'}`}
+        className={`relative${fillContainer ? ' flex-1 min-h-0 border-0 overflow-y-auto overflow-x-hidden' : ' overflow-hidden border border-gray-300 dark:border-gray-600 rounded-lg'}`}
       >
         <canvas
           ref={canvasRef}
