@@ -97,6 +97,13 @@ export const parseRGBA = (str) => {
   if (!m) return { r: 255, g: 255, b: 255, a: 0.85 };
   return { r: +m[1], g: +m[2], b: +m[3], a: m[4] ? +m[4] : 1 };
 };
+/** Convert any rgba(...) or hex string to #rrggbb */
+export const toHex = (str) => {
+  if (!str) return "#ffffff";
+  if (str.startsWith("#")) return str.length <= 7 ? str : str.slice(0, 7);
+  const { r, g, b } = parseRGBA(str);
+  return `#${[r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+};
 export const mixWithWhite = (rgbaStr, whiteRatio = 0.8, outAlpha = 0.92) => {
   const { r, g, b } = parseRGBA(rgbaStr);
   const rr = Math.round(255 * whiteRatio + r * (1 - whiteRatio));

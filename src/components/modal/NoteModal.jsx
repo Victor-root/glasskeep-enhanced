@@ -13,7 +13,7 @@ import useModalHistory from "../../hooks/useModalHistory.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { handleSmartEnter } from "../common/FormatToolbar.jsx";
 import { uid } from "../../utils/helpers.js";
-import { modalBgFor, scrollColorsFor, solid, bgFor } from "../../utils/colors.js";
+import { modalBgFor, scrollColorsFor, solid, bgFor, toHex } from "../../utils/colors.js";
 
 export default function NoteModal({
   // visibility / animation
@@ -141,6 +141,21 @@ export default function NoteModal({
     mTitle, mBody, setMTitle, setMBody,
     open, activeId, mType, viewMode,
   });
+
+  /* Sync PWA system bar color with modal note color */
+  React.useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    const prev = meta.content;
+    if (open) {
+      meta.content = toHex(modalBgFor(mColor, dark));
+      document.body.style.backgroundColor = meta.content;
+    }
+    return () => {
+      meta.content = prev;
+      document.body.style.backgroundColor = "";
+    };
+  }, [open, mColor, dark]);
 
   /* Intercept Ctrl+Z / Ctrl+Y at modal level for chunk-level undo */
   const handleModalKeyDown = React.useCallback(
