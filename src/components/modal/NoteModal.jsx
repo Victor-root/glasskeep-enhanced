@@ -142,18 +142,16 @@ export default function NoteModal({
     open, activeId, mType, viewMode,
   });
 
-  /* Sync PWA system bar color with modal note color */
+  /* Sync PWA status bar color with modal note color */
   React.useEffect(() => {
+    if (!open) return;
     const meta = document.querySelector('meta[name="theme-color"]');
     if (!meta) return;
-    const prev = meta.content;
-    if (open) {
-      meta.content = toHex(modalBgFor(mColor, dark));
-      document.body.style.backgroundColor = meta.content;
-    }
+    const prev = meta.getAttribute("content");
+    const color = toHex(modalBgFor(mColor, dark));
+    meta.setAttribute("content", color);
     return () => {
-      meta.content = prev;
-      document.body.style.backgroundColor = "";
+      meta.setAttribute("content", prev || (dark ? "#1a1a1a" : "#f0e8ff"));
     };
   }, [open, mColor, dark]);
 
