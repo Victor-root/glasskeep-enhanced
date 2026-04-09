@@ -105,9 +105,12 @@ function DrawingCanvas({
   const mode = externalMode !== undefined ? externalMode : internalMode;
   const setMode = onModeChange || setInternalMode;
 
-  // Canvas dimensions
+  // Canvas dimensions (logical coordinate space for paths)
   const [canvasWidth, setCanvasWidth] = useState(width);
   const [canvasHeight, setCanvasHeight] = useState(height);
+
+  // Actual display size in CSS pixels (for sharp HiDPI rendering in fillContainer mode)
+  const [displaySize, setDisplaySize] = useState(null);
 
   // Undo/Redo via hook
   const {
@@ -223,21 +226,28 @@ function DrawingCanvas({
     setCanvasHeight(height);
   }, [width, height, data, fillContainer]);
 
-  // ─── Auto-size canvas to fill container (fillContainer mode, new drawings only) ───
+  // ─── Auto-size canvas to fill container (fillContainer mode) ───
+  // Always tracks display size for sharp HiDPI rendering.
+  // For new drawings (no stored dimensions), also sets logical canvas size.
   useEffect(() => {
     if (!fillContainer) return;
     const wrapper = canvasWrapperRef.current;
     if (!wrapper) return;
 
-    // Only auto-size for new drawings (no stored dimensions)
     const hasStoredDimensions = data && typeof data === 'object' && !Array.isArray(data) && data.dimensions;
-    if (hasStoredDimensions) return;
 
     const updateSize = () => {
       const rect = wrapper.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
-        setCanvasWidth(Math.round(rect.width));
-        setCanvasHeight(Math.round(rect.height));
+        const w = Math.round(rect.width);
+        const h = Math.round(rect.height);
+        // Always update display size for sharp rendering
+        setDisplaySize({ width: w, height: h });
+        // Only update logical dimensions for new drawings
+        if (!hasStoredDimensions) {
+          setCanvasWidth(w);
+          setCanvasHeight(h);
+        }
       }
     };
 
@@ -254,13 +264,21 @@ function DrawingCanvas({
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
 
-    // Set physical pixel dimensions for sharp rendering on HiDPI screens
-    canvas.width = canvasWidth * dpr;
-    canvas.height = canvasHeight * dpr;
+    // In fillContainer mode, use actual display dimensions for sharp rendering
+    // even when logical dimensions differ (e.g. stored drawing at 1200px on a 1900px wrapper)
+    const useDisplay = fillContainer && displaySize && displaySize.width > 0;
+    const physW = useDisplay ? displaySize.width : canvasWidth;
+    const physH = useDisplay ? displaySize.height : canvasHeight;
+
+    // Physical pixel buffer matches the display area × devicePixelRatio
+    canvas.width = Math.round(physW * dpr);
+    canvas.height = Math.round(physH * dpr);
 
     const ctx = canvas.getContext('2d');
-    // Scale context so all drawing uses logical coordinates
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Transform maps logical coordinates → physical pixels
+    const sx = (physW / canvasWidth) * dpr;
+    const sy = (physH / canvasHeight) * dpr;
+    ctx.setTransform(sx, 0, 0, sy, 0, 0);
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
     renderPaths(ctx, paths);
@@ -275,7 +293,7 @@ function DrawingCanvas({
       drawSmoothPath(ctx, currentPath.points);
       ctx.globalCompositeOperation = 'source-over';
     }
-  }, [paths, currentPath, canvasWidth, canvasHeight]);
+  }, [paths, currentPath, canvasWidth, canvasHeight, fillContainer, displaySize]);
 
   // ─── Coordinate helper (maps CSS pixels → logical canvas coordinates) ───
   const getCanvasCoordinates = useCallback((e) => {
@@ -395,15 +413,15 @@ function DrawingCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const cssSize = size / scaleX;
+    // Map logical brush size to CSS pixels
+    const cssSize = size * (rect.width / canvasWidth);
     setCursorPos({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
       cssSize,
     });
     draw(e);
-  }, [mode, readOnly, size, draw]);
+  }, [mode, readOnly, size, canvasWidth, draw]);
 
   const handleMouseEnter = useCallback(() => {
     if (mode === 'draw' && !readOnly) setShowCursor(true);
