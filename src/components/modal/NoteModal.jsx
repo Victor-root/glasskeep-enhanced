@@ -143,15 +143,11 @@ export default function NoteModal({
     open, activeId, mType, viewMode,
   });
 
-  /* Sync PWA status bar color with modal note color */
+  /* Sync PWA status bar color with note color */
   React.useEffect(() => {
     if (!open) return;
     const pageColor = dark ? "#1a1a1a" : "#f0e8ff";
-    // Use the raw note color (not the washed-out modalBgFor) so the
-    // status bar change is clearly visible. Default keeps page color.
-    const color = (!mColor || mColor === "default")
-      ? pageColor
-      : toHex(solid(bgFor(mColor, dark)));
+    const color = (!mColor || mColor === "default") ? pageColor : toHex(solid(bgFor(mColor, dark)));
     setThemeColor(color);
     return () => setThemeColor(pageColor);
   }, [open, mColor, dark]);
