@@ -2,11 +2,10 @@ import { useRef, useEffect } from "react";
 
 /**
  * Touch-based long-press drag for note cards (mobile).
- * After 400ms hold, enters drag mode. Moving finger highlights
- * the target card (via .drag-over). On release, calls onDrop.
- *
- * Sets data-touch-dragging="1" on the card while active so
- * click handlers can ignore the synthetic click after release.
+ * After 400ms hold, enters drag mode with scroll locked.
+ * Moving finger highlights the target card (via .drag-over).
+ * Dragging near top/bottom edge auto-scrolls the page.
+ * On release, calls onDrop.
  */
 export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, group, onDragStart, onDrop, onDragEnd }) {
   const propsRef = useRef({ canDrag, multiMode, noteId, group, onDragStart, onDrop, onDragEnd });
@@ -22,39 +21,73 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
     let startY = 0;
     let lastTarget = null;
     let failsafeTimer = null;
-    let moveCount = 0;
+    let scrollRaf = null;
+    let lastTouchY = 0;
+    let prevOverflow = "";
+
+    const lockScroll = () => {
+      prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    };
+
+    const unlockScroll = () => {
+      document.body.style.overflow = prevOverflow;
+    };
+
+    const stopAutoScroll = () => {
+      if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = null; }
+    };
 
     const cleanup = () => {
       clearTimeout(timer);
       clearTimeout(failsafeTimer);
+      stopAutoScroll();
       timer = null;
       failsafeTimer = null;
-      moveCount = 0;
       if (!active) return;
       active = false;
+      unlockScroll();
       card.classList.remove("dragging");
       if (lastTarget) { lastTarget.classList.remove("drag-over"); lastTarget = null; }
       card.dataset.touchDragging = "1";
       setTimeout(() => { delete card.dataset.touchDragging; }, 300);
     };
 
-    const onTouchStart = (e) => {
-      // If a previous drag is stuck, clean it up first
-      if (active) cleanup();
+    // Auto-scroll when finger is near top/bottom edge
+    const autoScroll = () => {
+      if (!active) return;
+      const edgeZone = 80;
+      const vh = window.innerHeight;
+      let speed = 0;
+      if (lastTouchY > vh - edgeZone) {
+        speed = Math.min(15, ((lastTouchY - (vh - edgeZone)) / edgeZone) * 15);
+      } else if (lastTouchY < edgeZone) {
+        speed = -Math.min(15, ((edgeZone - lastTouchY) / edgeZone) * 15);
+      }
+      if (speed !== 0) {
+        // Temporarily unlock scroll to programmatically scroll
+        document.body.style.overflow = prevOverflow;
+        window.scrollBy(0, speed);
+        document.body.style.overflow = "hidden";
+      }
+      scrollRaf = requestAnimationFrame(autoScroll);
+    };
 
+    const onTouchStart = (e) => {
+      if (active) cleanup();
       const p = propsRef.current;
       if (!p.canDrag || p.multiMode) return;
       const touch = e.touches[0];
       startX = touch.clientX;
       startY = touch.clientY;
-      moveCount = 0;
       timer = setTimeout(() => {
         active = true;
+        lockScroll();
         try { navigator.vibrate?.(30); } catch (_) {}
         card.classList.add("dragging");
         p.onDragStart(p.noteId, { currentTarget: card });
-        // Failsafe: if no touch events come for 6s, force cleanup
-        failsafeTimer = setTimeout(cleanup, 6000);
+        failsafeTimer = setTimeout(cleanup, 8000);
+        scrollRaf = requestAnimationFrame(autoScroll);
       }, 400);
     };
 
@@ -69,11 +102,11 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
       }
       if (!active) return;
       e.preventDefault();
+      lastTouchY = touch.clientY;
 
-      // Reset failsafe on each move (user is still interacting)
-      moveCount++;
+      // Reset failsafe
       clearTimeout(failsafeTimer);
-      failsafeTimer = setTimeout(cleanup, 6000);
+      failsafeTimer = setTimeout(cleanup, 8000);
 
       if (lastTarget) lastTarget.classList.remove("drag-over");
       const el = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -100,7 +133,6 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
       }
     };
 
-    // Fallback listeners on document for missed events
     const onDocTouchEnd = () => { if (active) cleanup(); };
     const onDocTouchCancel = () => { if (active) cleanup(); };
 
@@ -114,8 +146,10 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
     return () => {
       clearTimeout(timer);
       clearTimeout(failsafeTimer);
+      stopAutoScroll();
       if (active) {
         active = false;
+        unlockScroll();
         card.classList.remove("dragging");
         if (lastTarget) { lastTarget.classList.remove("drag-over"); lastTarget = null; }
       }
