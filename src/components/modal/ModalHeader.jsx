@@ -44,7 +44,6 @@ export default function ModalHeader({
   drawMode,
   drawToolbarMount,
   onToggleDrawMode,
-  onExitDrawToView,
 }) {
   const mobileTitleRef = useRef(null);
   const isDesktop = windowWidth >= 768;
@@ -78,32 +77,18 @@ export default function ModalHeader({
             : (isDesktop ? "flex-wrap gap-2 px-4 sm:px-6 pt-4 pb-3" : "px-2 py-1.5")
         }`}>
 
-          {/* Mobile: back arrow / "reading mode" button in draw mode */}
+          {/* Mobile: back arrow on the left */}
           {!isDesktop && (
-            isDrawEdit ? (
-              <button
-                className="modal-icon-btn focus:outline-none shrink-0 flex items-center gap-1 text-xs font-medium opacity-80 hover:opacity-100"
-                onClick={onExitDrawToView}
-                aria-label={t("readingMode")}
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M19 12H5" />
-                  <path d="M12 19l-7-7 7-7" />
-                </svg>
-                <span>{t("readingMode")}</span>
-              </button>
-            ) : (
-              <button
-                className="modal-icon-btn focus:outline-none shrink-0"
-                onClick={onClose}
-                aria-label={t("close")}
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M19 12H5" />
-                  <path d="M12 19l-7-7 7-7" />
-                </svg>
-              </button>
-            )
+            <button
+              className="modal-icon-btn focus:outline-none shrink-0"
+              onClick={onClose}
+              aria-label={t("close")}
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5" />
+                <path d="M12 19l-7-7 7-7" />
+              </svg>
+            </button>
           )}
 
           {/* Draw edit: portal target for drawing toolbar (fills the space where title was) */}
@@ -154,27 +139,13 @@ export default function ModalHeader({
 
               {/* Close (desktop only — mobile uses back arrow above) */}
               {isDesktop && (
-                isDrawEdit ? (
-                  <button
-                    className="modal-icon-btn focus:outline-none flex items-center gap-1 text-xs font-medium opacity-80 hover:opacity-100"
-                    data-tooltip={t("readingMode")}
-                    onClick={onExitDrawToView}
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M19 12H5" />
-                      <path d="M12 19l-7-7 7-7" />
-                    </svg>
-                    <span>{t("readingMode")}</span>
-                  </button>
-                ) : (
-                  <button
-                    className="modal-icon-btn modal-icon-btn--close focus:outline-none"
-                    data-tooltip={t("close")}
-                    onClick={onClose}
-                  >
-                    <CloseIcon />
-                  </button>
-                )
+                <button
+                  className="modal-icon-btn modal-icon-btn--close focus:outline-none"
+                  data-tooltip={t("close")}
+                  onClick={onClose}
+                >
+                  <CloseIcon />
+                </button>
               )}
             </div>
           </div>
