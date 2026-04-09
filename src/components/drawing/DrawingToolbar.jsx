@@ -111,6 +111,7 @@ export default function DrawingToolbar({
   canRedo,
   pathCount,
   darkMode,
+  compact = false,
 }) {
   const [showCustomColor, setShowCustomColor] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -143,7 +144,10 @@ export default function DrawingToolbar({
   const isCustomColor = !QUICK_COLORS.includes(color);
 
   return (
-    <div className="flex items-center flex-wrap gap-1.5 mb-1 p-1.5 bg-gray-100/80 dark:bg-gray-800/60 rounded-2xl border border-gray-200/60 dark:border-gray-700/40">
+    <div className={compact
+      ? "flex items-center flex-wrap gap-1"
+      : "flex items-center flex-wrap gap-1.5 mb-1 p-1.5 bg-gray-100/80 dark:bg-gray-800/60 rounded-2xl border border-gray-200/60 dark:border-gray-700/40"
+    }>
 
       {/* ─── Tool Group: Pen / Eraser ─── */}
       <div className="flex items-center gap-1">

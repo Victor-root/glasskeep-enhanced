@@ -135,6 +135,8 @@ export default function NoteModal({
 }) {
   const [autoEditId, setAutoEditId] = React.useState(null);
   const [drawMode, setDrawMode] = React.useState("view");
+  const [drawToolbarEl, setDrawToolbarEl] = React.useState(null);
+  const isDrawEdit = mType === 'draw' && drawMode === 'draw';
   const { handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } =
     useChecklistDrag(mItems, setMItems, syncChecklistItems);
 
@@ -186,7 +188,11 @@ export default function NoteModal({
         }}
       >
         <div
-          className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full max-w-none ${mType === 'draw' ? 'sm:w-[98vw] sm:max-w-[98vw] sm:h-[98vh]' : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh]'} sm:rounded-xl flex flex-col relative overflow-hidden`}
+          className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full max-w-none ${
+            isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen'
+            : mType === 'draw' ? 'sm:w-[98vw] sm:max-w-[98vw] sm:h-[98vh]'
+            : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh]'
+          } ${isDrawEdit ? '' : 'sm:rounded-xl'} flex flex-col relative overflow-hidden`}
           style={{ backgroundColor: modalBgFor(mColor, dark), height: windowWidth < 640 ? '100dvh' : undefined }}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
@@ -233,6 +239,8 @@ export default function NoteModal({
               onSave={saveModal}
               // drawing
               drawMode={drawMode}
+              drawToolbarMount={setDrawToolbarEl}
+              onToggleDrawMode={() => setDrawMode((m) => m === "view" ? "draw" : "view")}
             />
 
             <ModalImagesGrid
@@ -243,7 +251,7 @@ export default function NoteModal({
 
             {/* Content area */}
             <div
-              className={mType === "draw" ? (drawMode === "draw" ? "p-1 flex-1 min-h-0 flex flex-col" : "p-2 flex-1 min-h-0 flex flex-col") : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"}
+              className={isDrawEdit ? "flex-1 min-h-0 flex flex-col" : mType === "draw" ? "p-2 flex-1 min-h-0 flex flex-col" : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"}
               onClick={onModalBodyClick}
             >
 
@@ -492,6 +500,7 @@ export default function NoteModal({
                   externalMode={drawMode}
                   onModeChange={setDrawMode}
                   fillContainer
+                  toolbarPortalTarget={drawToolbarEl}
                 />
               )}
 
@@ -523,7 +532,7 @@ export default function NoteModal({
             )}
           </div>
 
-          <ModalFooter
+          {!isDrawEdit && <ModalFooter
             dark={dark}
             windowWidth={windowWidth}
             // tags
@@ -588,7 +597,7 @@ export default function NoteModal({
             redo={redo}
             canUndo={canUndo}
             canRedo={canRedo}
-          />
+          />}
 
           <ConfirmDeleteDialog
             open={confirmDeleteOpen}

@@ -1,5 +1,6 @@
 import { t } from "./i18n";
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import useDrawingHistory from './hooks/useDrawingHistory';
 import DrawingToolbar from './components/drawing/DrawingToolbar';
 
@@ -80,6 +81,7 @@ function DrawingCanvas({
   externalMode,
   onModeChange,
   fillContainer = false,
+  toolbarPortalTarget = null,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -451,9 +453,9 @@ function DrawingCanvas({
         </div>
       )}
 
-      {/* Toolbar */}
-      {!readOnly && mode === 'draw' && (
-        <div className="shrink-0">
+      {/* Toolbar — portaled into header when toolbarPortalTarget is available */}
+      {!readOnly && mode === 'draw' && (() => {
+        const toolbar = (
           <DrawingToolbar
             tool={tool}
             setTool={setTool}
@@ -469,9 +471,13 @@ function DrawingCanvas({
             canRedo={canRedo}
             pathCount={paths.length}
             darkMode={darkMode}
+            compact={!!toolbarPortalTarget}
           />
-        </div>
-      )}
+        );
+        return toolbarPortalTarget
+          ? createPortal(toolbar, toolbarPortalTarget)
+          : <div className="shrink-0">{toolbar}</div>;
+      })()}
 
       {/* Canvas with cursor overlay */}
       <div

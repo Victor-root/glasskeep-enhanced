@@ -42,11 +42,14 @@ export default function ModalHeader({
   onSave,
   // drawing
   drawMode,
+  drawToolbarMount,
+  onToggleDrawMode,
 }) {
   const mobileTitleRef = useRef(null);
   const isDesktop = windowWidth >= 768;
   const isPinned = !!notes.find((n) => String(n.id) === String(activeId))?.pinned;
   const showPinBtn = tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED";
+  const isDrawEdit = mType === 'draw' && drawMode === 'draw';
 
   /* ── auto-resize mobile title textarea on mount & content change ── */
   const autoResizeTitle = useCallback((el) => {
@@ -65,15 +68,19 @@ export default function ModalHeader({
     <>
       {/* ── Sticky toolbar ── */}
       <div
-        className="sticky top-0 z-20 rounded-t-none sm:rounded-t-xl"
+        className={`sticky top-0 z-20 rounded-t-none ${isDrawEdit ? '' : 'sm:rounded-t-xl'}`}
         style={{ backgroundColor: modalBgFor(mColor, dark) }}
       >
-        <div className={`flex items-center ${isDesktop ? (mType === 'draw' && drawMode === 'draw' ? "gap-2 px-4 sm:px-6 pt-2 pb-1" : "flex-wrap gap-2 px-4 sm:px-6 pt-4 pb-3") : "px-2 py-1.5"}`}>
+        <div className={`flex items-center ${
+          isDrawEdit
+            ? (isDesktop ? "gap-1 px-2 py-1" : "px-1 py-1")
+            : (isDesktop ? "flex-wrap gap-2 px-4 sm:px-6 pt-4 pb-3" : "px-2 py-1.5")
+        }`}>
 
           {/* Mobile: back arrow on the left */}
           {!isDesktop && (
             <button
-              className="modal-icon-btn focus:outline-none"
+              className="modal-icon-btn focus:outline-none shrink-0"
               onClick={onClose}
               aria-label={t("close")}
             >
@@ -84,8 +91,13 @@ export default function ModalHeader({
             </button>
           )}
 
-          {/* Desktop: title inline (hidden in draw edit mode to maximize canvas) */}
-          {isDesktop && !(mType === 'draw' && drawMode === 'draw') && (
+          {/* Draw edit: portal target for drawing toolbar (fills the space where title was) */}
+          {isDrawEdit && (
+            <div ref={drawToolbarMount} className="flex-1 min-w-0 overflow-x-auto" />
+          )}
+
+          {/* Desktop: title inline (hidden in draw edit mode) */}
+          {isDesktop && !isDrawEdit && (
             <textarea
               ref={mobileTitleRef}
               className="flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 pr-2 order-first bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden"
@@ -96,10 +108,10 @@ export default function ModalHeader({
             />
           )}
 
-          {/* Spacer pushes right-side buttons on mobile */}
-          {!isDesktop && <div className="flex-1" />}
+          {/* Spacer pushes right-side buttons on mobile (only when no toolbar filling the space) */}
+          {!isDesktop && !isDrawEdit && <div className="flex-1" />}
 
-          <div className={`flex items-center flex-none ${isDesktop ? "ml-auto" : ""}`}>
+          <div className={`flex items-center flex-none shrink-0 ${isDesktop && !isDrawEdit ? "ml-auto" : ""}`}>
             <div className={isDesktop ? "modal-icon-group" : "flex items-center gap-0.5"}>
               {/* Pin */}
               {showPinBtn && (
@@ -124,6 +136,20 @@ export default function ModalHeader({
                   <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
+
+              {/* Draw/View toggle (in header for draw edit mode, since footer is hidden) */}
+              {isDrawEdit && onToggleDrawMode && (
+                <button
+                  className="modal-icon-btn focus:outline-none"
+                  data-tooltip={t("switchToViewMode")}
+                  onClick={onToggleDrawMode}
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />
+                    <circle cx="12" cy="12" r="3.2" fill="currentColor" />
+                  </svg>
+                </button>
+              )}
 
               {/* Close (desktop only — mobile uses back arrow above) */}
               {isDesktop && (
