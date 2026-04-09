@@ -214,12 +214,13 @@ function DrawingCanvas({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [readOnly, mode, historyUndo, historyRedo, notifyChange]);
 
-  // ─── Update canvas size from props (only if data has no dimensions) ───
+  // ─── Update canvas size from props (only if data has no dimensions and no fillContainer) ───
   useEffect(() => {
+    if (fillContainer) return; // ResizeObserver handles sizing in fillContainer mode
     if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions) return;
     setCanvasWidth(width);
     setCanvasHeight(height);
-  }, [width, height, data]);
+  }, [width, height, data, fillContainer]);
 
   // ─── Auto-size canvas to fill container (fillContainer mode, new drawings only) ───
   useEffect(() => {
