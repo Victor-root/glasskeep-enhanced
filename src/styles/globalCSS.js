@@ -756,8 +756,8 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
 
 /* Note modal enter / exit animations — only transform+opacity (GPU composited, no layout) */
 @keyframes noteModalIn {
-  from { opacity: 0; transform: scale(0.97) translateY(6px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0);   }
+  from { opacity: 0; transform: scale(0.92) translateY(10px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);    }
 }
 @keyframes noteModalOut {
   from { opacity: 1; transform: scale(1)    translateY(0);   }
