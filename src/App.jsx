@@ -3285,9 +3285,11 @@ export default function App() {
     const isPinned = !!notes.find((n) => String(n.id) === String(id))?.pinned;
     dragGroup.current = isPinned ? "pinned" : "others";
     ev.currentTarget.classList.add("dragging");
+    if (ev.dataTransfer) ev.dataTransfer.effectAllowed = "move";
   };
   const onDragOver = (overId, group, ev) => {
     ev.preventDefault();
+    if (ev.dataTransfer) ev.dataTransfer.dropEffect = "move";
     if (!dragId.current) return;
     if (dragGroup.current !== group) return;
     ev.currentTarget.classList.add("drag-over");
