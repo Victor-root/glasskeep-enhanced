@@ -619,19 +619,27 @@ function DrawingCanvas({
         {/* Dynamic cursor (desktop) — fixed position so it renders above header */}
         {showCursor && cursorPos && mode === 'draw' && !readOnly && (
           tool === 'eraser' ? (
-            /* Eraser: circle cursor showing erase radius */
-            <div
-              className="pointer-events-none fixed rounded-full border z-50"
+            /* Eraser: eraser icon cursor */
+            <svg
+              className="pointer-events-none fixed z-50"
               style={{
-                width: Math.max(8, cursorPos.cssSize),
-                height: Math.max(8, cursorPos.cssSize),
-                left: cursorPos.clientX - Math.max(8, cursorPos.cssSize) / 2,
-                top: cursorPos.clientY - Math.max(8, cursorPos.cssSize) / 2,
-                borderColor: 'rgba(100,100,100,0.6)',
-                backgroundColor: 'rgba(200,200,200,0.15)',
-                transition: 'width 0.1s, height 0.1s',
+                left: cursorPos.clientX - 4,
+                top: cursorPos.clientY - 22,
+                filter: darkMode
+                  ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))'
+                  : 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
               }}
-            />
+              width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+            >
+              {/* Eraser body */}
+              <path d="M6 19l-3.3-3.3a1.5 1.5 0 0 1 0-2.1L13.4 2.9a1.5 1.5 0 0 1 2.1 0l5.6 5.6a1.5 1.5 0 0 1 0 2.1L12 19H6z"
+                fill={darkMode ? '#555' : '#e5e7eb'} stroke={darkMode ? '#fff' : '#374151'} strokeWidth="1.2" strokeLinejoin="round" />
+              {/* Eraser tip (pink/red) */}
+              <path d="M6 19l-3.3-3.3a1.5 1.5 0 0 1 0-2.1L8 8.3 15.7 16 12 19H6z"
+                fill={darkMode ? '#f87171' : '#fca5a5'} stroke={darkMode ? '#fff' : '#374151'} strokeWidth="1.2" strokeLinejoin="round" />
+              {/* Base line */}
+              <line x1="5" y1="21" x2="21" y2="21" stroke={darkMode ? '#fff' : '#374151'} strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
           ) : (
             /* Pen: pencil icon cursor */
             <svg
