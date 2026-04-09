@@ -205,7 +205,7 @@ export default function NoteCard({
 
       {imgs.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3">
-          {imgs.map((im) => (
+          {imgs.slice(0, 6).map((im) => (
             <div
               key={im.id}
               className="overflow-hidden rounded-lg"
@@ -219,6 +219,11 @@ export default function NoteCard({
               />
             </div>
           ))}
+          {imgs.length > 6 && (
+            <div className="w-full text-center text-xs text-gray-500 dark:text-gray-400 py-1">
+              +{imgs.length - 6} {t("image")}{imgs.length - 6 > 1 ? "s" : ""}
+            </div>
+          )}
         </div>
       )}
 
