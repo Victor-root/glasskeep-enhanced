@@ -93,7 +93,7 @@ export default function ModalHeader({
 
           {/* Draw edit: portal target for drawing toolbar (fills the space where title was) */}
           {isDrawEdit && (
-            <div ref={drawToolbarMount} className="flex-1 min-w-0 overflow-x-auto" />
+            <div ref={drawToolbarMount} className="flex-1 min-w-0 overflow-hidden" />
           )}
 
           {/* Desktop: title inline (hidden in draw edit mode) */}
@@ -136,20 +136,6 @@ export default function ModalHeader({
                   <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-
-              {/* Draw/View toggle (in header for draw edit mode, since footer is hidden) */}
-              {isDrawEdit && onToggleDrawMode && (
-                <button
-                  className="modal-icon-btn focus:outline-none"
-                  data-tooltip={t("switchToViewMode")}
-                  onClick={onToggleDrawMode}
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />
-                    <circle cx="12" cy="12" r="3.2" fill="currentColor" />
-                  </svg>
-                </button>
-              )}
 
               {/* Close (desktop only — mobile uses back arrow above) */}
               {isDesktop && (

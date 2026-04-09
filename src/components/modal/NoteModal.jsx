@@ -532,7 +532,7 @@ export default function NoteModal({
             )}
           </div>
 
-          {!isDrawEdit && <ModalFooter
+          <ModalFooter
             dark={dark}
             windowWidth={windowWidth}
             // tags
@@ -597,7 +597,7 @@ export default function NoteModal({
             redo={redo}
             canUndo={canUndo}
             canRedo={canRedo}
-          />}
+          />
 
           <ConfirmDeleteDialog
             open={confirmDeleteOpen}

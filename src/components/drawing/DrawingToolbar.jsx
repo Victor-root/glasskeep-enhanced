@@ -64,8 +64,10 @@ const TrashIcon = () => (
 );
 
 /* ─── Toolbar Button ─── */
-function TBtn({ active, onClick, disabled, tooltip, variant = 'default', children, className = '' }) {
-  const base = 'flex items-center justify-center rounded-xl transition-all duration-200 active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:scale-100 min-w-[40px] min-h-[40px] p-2';
+function TBtn({ active, onClick, disabled, tooltip, variant = 'default', compact = false, children, className = '' }) {
+  const base = compact
+    ? 'flex items-center justify-center rounded-lg transition-all duration-200 active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:scale-100 min-w-[28px] min-h-[28px] p-1 [&_svg]:w-4 [&_svg]:h-4'
+    : 'flex items-center justify-center rounded-xl transition-all duration-200 active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:scale-100 min-w-[40px] min-h-[40px] p-2';
 
   const variants = {
     default: active
@@ -143,18 +145,22 @@ export default function DrawingToolbar({
 
   const isCustomColor = !QUICK_COLORS.includes(color);
 
+  const colorSize = compact ? 'w-5 h-5' : 'w-7 h-7';
+  const sizeBtn = compact ? 'w-6 h-6 rounded-lg' : 'w-9 h-9 rounded-xl';
+  const iconCls = compact ? 'w-4 h-4' : 'w-5 h-5';
+
   return (
     <div className={compact
-      ? "flex items-center flex-wrap gap-1"
+      ? "flex items-center gap-0.5 flex-nowrap"
       : "flex items-center flex-wrap gap-1.5 mb-1 p-1.5 bg-gray-100/80 dark:bg-gray-800/60 rounded-2xl border border-gray-200/60 dark:border-gray-700/40"
     }>
 
       {/* ─── Tool Group: Pen / Eraser ─── */}
-      <div className="flex items-center gap-1">
-        <TBtn active={tool === 'pen'} onClick={() => setTool('pen')} tooltip={t('pen')}>
+      <div className="flex items-center gap-0.5 shrink-0">
+        <TBtn compact={compact} active={tool === 'pen'} onClick={() => setTool('pen')} tooltip={t('pen')}>
           <PenIcon />
         </TBtn>
-        <TBtn active={tool === 'eraser'} onClick={() => setTool('eraser')} variant="eraser" tooltip={t('eraser')}>
+        <TBtn compact={compact} active={tool === 'eraser'} onClick={() => setTool('eraser')} variant="eraser" tooltip={t('eraser')}>
           <EraserIcon />
         </TBtn>
       </div>
@@ -164,12 +170,12 @@ export default function DrawingToolbar({
       {/* ─── Color Palette (visible only for pen) ─── */}
       {tool === 'pen' && (
         <>
-          <div className="flex items-center gap-1 flex-wrap">
+          <div className={`flex items-center ${compact ? 'gap-0.5' : 'gap-1 flex-wrap'}`}>
             {QUICK_COLORS.map(c => (
               <button
                 key={c}
                 onClick={() => setColor(c)}
-                className={`w-7 h-7 rounded-full border-2 transition-all duration-150 hover:scale-110 shrink-0 ${
+                className={`${colorSize} rounded-full border-2 transition-all duration-150 hover:scale-110 shrink-0 ${
                   color === c
                     ? 'ring-2 ring-offset-1 ring-indigo-400 dark:ring-indigo-500 dark:ring-offset-gray-800 scale-110 border-gray-400 dark:border-gray-300'
                     : 'border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-400'
@@ -182,7 +188,7 @@ export default function DrawingToolbar({
             <div className="relative">
               <button
                 onClick={() => customColorRef.current?.click()}
-                className={`w-7 h-7 rounded-full border-2 border-dashed transition-all duration-150 hover:scale-110 shrink-0 flex items-center justify-center text-xs ${
+                className={`${colorSize} rounded-full border-2 border-dashed transition-all duration-150 hover:scale-110 shrink-0 flex items-center justify-center text-xs ${
                   isCustomColor
                     ? 'ring-2 ring-offset-1 ring-indigo-400 dark:ring-indigo-500 dark:ring-offset-gray-800 scale-110 border-gray-400'
                     : 'border-gray-300 dark:border-gray-500 text-gray-400 dark:text-gray-500'
@@ -191,7 +197,7 @@ export default function DrawingToolbar({
                 data-tooltip={t('customColor')}
               >
                 {!isCustomColor && (
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                  <svg className={compact ? "w-2.5 h-2.5" : "w-3.5 h-3.5"} viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10c1.38 0 2.5-1.12 2.5-2.5 0-.61-.23-1.2-.64-1.67-.08-.1-.13-.21-.13-.33 0-.28.22-.5.5-.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 8 6.5 8 8 8.67 8 9.5 7.33 11 6.5 11zm3-4C8.67 7 8 6.33 8 5.5S8.67 4 9.5 4s1.5.67 1.5 1.5S10.33 7 9.5 7zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 4 14.5 4s1.5.67 1.5 1.5S15.33 7 14.5 7zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 8 17.5 8s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
                   </svg>
                 )}
@@ -211,14 +217,14 @@ export default function DrawingToolbar({
         </>
       )}
 
-      {/* ─── Size Presets (always visible — pen and eraser both need size) ─── */}
-      <div className="flex items-center gap-1">
+      {/* ─── Size Presets ─── */}
+      <div className="flex items-center gap-0.5 shrink-0">
         {SIZE_PRESETS.map(preset => (
           <button
             key={preset.value}
             onClick={() => setSize(preset.value)}
             data-tooltip={`${preset.label()} (${preset.value}px)`}
-            className={`flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200 hover:scale-105 ${
+            className={`flex items-center justify-center ${sizeBtn} transition-all duration-200 hover:scale-105 ${
               size === preset.value
                 ? 'bg-gray-800 dark:bg-white border-2 border-gray-800 dark:border-white'
                 : 'border border-gray-200/80 dark:border-gray-600/60 bg-white/80 dark:bg-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-700/60 hover:border-gray-300 dark:hover:border-gray-500'
@@ -231,8 +237,8 @@ export default function DrawingToolbar({
                   : 'bg-gray-500 dark:bg-gray-400'
               }`}
               style={{
-                width: Math.max(4, Math.min(preset.icon, 18)),
-                height: Math.max(4, Math.min(preset.icon, 18)),
+                width: Math.max(3, Math.min(preset.icon, compact ? 14 : 18)),
+                height: Math.max(3, Math.min(preset.icon, compact ? 14 : 18)),
               }}
             />
           </button>
@@ -242,19 +248,20 @@ export default function DrawingToolbar({
       <Sep />
 
       {/* ─── Actions: Undo / Redo / Add Page / Clear ─── */}
-      <div className="flex items-center gap-1 ml-auto">
-        <TBtn variant="action" onClick={onUndo} disabled={!canUndo} tooltip={`${t('undo')} (Ctrl+Z)`}>
+      <div className={`flex items-center gap-0.5 shrink-0 ${compact ? '' : 'ml-auto'}`}>
+        <TBtn compact={compact} variant="action" onClick={onUndo} disabled={!canUndo} tooltip={`${t('undo')} (Ctrl+Z)`}>
           <UndoIcon />
         </TBtn>
-        <TBtn variant="action" onClick={onRedo} disabled={!canRedo} tooltip={`${t('redo')} (Ctrl+Shift+Z)`}>
+        <TBtn compact={compact} variant="action" onClick={onRedo} disabled={!canRedo} tooltip={`${t('redo')} (Ctrl+Shift+Z)`}>
           <RedoIcon />
         </TBtn>
         {onAddPage && (
-          <TBtn variant="action" onClick={onAddPage} tooltip={t('addPage')}>
+          <TBtn compact={compact} variant="action" onClick={onAddPage} tooltip={t('addPage')}>
             <AddPageIcon />
           </TBtn>
         )}
         <TBtn
+          compact={compact}
           variant="danger"
           onClick={handleClear}
           disabled={pathCount === 0}
