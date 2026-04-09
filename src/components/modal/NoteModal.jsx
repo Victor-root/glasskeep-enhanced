@@ -146,11 +146,9 @@ export default function NoteModal({
   /* Sync PWA status bar color with modal note color */
   React.useEffect(() => {
     if (!open) return;
-    // DEBUG: use bright red to confirm dynamic theme-color works in PWA
-    const color = "#ff0000"; // toHex(modalBgFor(mColor, dark));
-    const prev = document.querySelector('meta[name="theme-color"]')?.getAttribute("content");
+    const color = toHex(modalBgFor(mColor, dark));
     setThemeColor(color);
-    return () => setThemeColor(prev || (dark ? "#1a1a1a" : "#f0e8ff"));
+    return () => setThemeColor(dark ? "#1a1a1a" : "#f0e8ff");
   }, [open, mColor, dark]);
 
   /* Intercept Ctrl+Z / Ctrl+Y at modal level for chunk-level undo */
