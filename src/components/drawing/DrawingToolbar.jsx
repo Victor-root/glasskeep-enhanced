@@ -185,10 +185,10 @@ export default function DrawingToolbar({
               <button
                 key={c}
                 onClick={() => setColor(c)}
-                className={`${colorSize} rounded-full border-2 shrink-0 ${
+                className={`${colorSize} rounded-full shrink-0 focus:outline-none ${
                   color === c
-                    ? 'border-indigo-500 dark:border-indigo-400 outline outline-2 outline-offset-1 outline-indigo-400 dark:outline-indigo-500'
-                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-400 hover:scale-110 transition-transform duration-150'
+                    ? 'border-[3px] border-indigo-500 dark:border-indigo-400 shadow-[0_0_0_2px_rgba(99,102,241,0.5)]'
+                    : 'border-2 border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-400 hover:scale-110 transition-transform duration-150'
                 }`}
                 style={{ backgroundColor: c }}
                 data-tooltip={c}
@@ -198,10 +198,10 @@ export default function DrawingToolbar({
             <div className="relative">
               <button
                 onClick={() => customColorRef.current?.click()}
-                className={`${colorSize} rounded-full border-2 border-dashed shrink-0 flex items-center justify-center text-xs ${
+                className={`${colorSize} rounded-full border-dashed shrink-0 flex items-center justify-center text-xs focus:outline-none ${
                   isCustomColor
-                    ? 'border-indigo-500 dark:border-indigo-400 outline outline-2 outline-offset-1 outline-indigo-400 dark:outline-indigo-500'
-                    : 'border-gray-300 dark:border-gray-500 text-gray-400 dark:text-gray-500 hover:scale-110 transition-transform duration-150'
+                    ? 'border-[3px] border-indigo-500 dark:border-indigo-400 shadow-[0_0_0_2px_rgba(99,102,241,0.5)]'
+                    : 'border-2 border-gray-300 dark:border-gray-500 text-gray-400 dark:text-gray-500 hover:scale-110 transition-transform duration-150'
                 }`}
                 style={isCustomColor ? { backgroundColor: color } : {}}
                 data-tooltip={t('customColor')}
