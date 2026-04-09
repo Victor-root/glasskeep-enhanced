@@ -192,10 +192,22 @@ export class SyncEngine {
           const isMissingTimestamp = err.status === 400 && /client_(updated|reordered)_at is required/i.test(err.message);
           const isNetworkError = !isTimeout && !isRateLimited && !isForbidden && (err.isNetworkError || err.status === 0 || !err.status);
 
+          const isBadRequest400 = err.status === 400 && !isMissingTimestamp;
+
           if (isMissingTimestamp) {
             // Legacy queue item without required LWW timestamp — permanently invalid.
             // Drop immediately: retrying will never help.
             console.warn(`[SyncEngine] ${item.type} 400: missing LWW timestamp, dropping queue item (noteId=${item.noteId})`);
+            this._serverReachable = true;
+            await removeQueueItem(item.queueId);
+            try { await this.onSyncComplete(item, { dropped: true }); } catch (e) {
+              console.error("[SyncEngine] onSyncComplete (dropped) error:", e);
+            }
+            continue;
+          } else if (isBadRequest400) {
+            // Server rejected with 400 (e.g. "Note must be in trash to permanently delete").
+            // These are logic errors that retrying will never fix — drop immediately.
+            console.warn(`[SyncEngine] ${item.type} 400: ${err.message}, dropping queue item (noteId=${item.noteId})`);
             this._serverReachable = true;
             await removeQueueItem(item.queueId);
             try { await this.onSyncComplete(item, { dropped: true }); } catch (e) {
