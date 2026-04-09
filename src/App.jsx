@@ -843,12 +843,17 @@ export default function App() {
         window.matchMedia?.("(prefers-color-scheme: dark)").matches);
     setDark(savedDark);
     document.documentElement.classList.toggle("dark", savedDark);
+    // Update PWA status/nav bar color to match background
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = savedDark ? "#1a1a1a" : "#f0e8ff";
   }, []);
   const toggleDark = () => {
     const next = !dark;
     setDark(next);
     document.documentElement.classList.toggle("dark", next);
     localStorage.setItem("glass-keep-dark-mode", String(next));
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = next ? "#1a1a1a" : "#f0e8ff";
   };
 
   // Close sidebar with Escape

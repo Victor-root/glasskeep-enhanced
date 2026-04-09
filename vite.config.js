@@ -24,7 +24,7 @@ export default defineConfig({
         name: "Glass Keep",
         short_name: "GlassKeep",
         description: "A lightweight notes app with Markdown, images, and offline support.",
-        theme_color: "#4f46e5",
+        theme_color: "#f0e8ff",
         background_color: "#ffffff",
         display: "standalone",
         display_override: ["standalone"],
