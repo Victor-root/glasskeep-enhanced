@@ -146,9 +146,14 @@ export default function NoteModal({
   /* Sync PWA status bar color with modal note color */
   React.useEffect(() => {
     if (!open) return;
-    const color = toHex(modalBgFor(mColor, dark));
+    const pageColor = dark ? "#1a1a1a" : "#f0e8ff";
+    // Use the raw note color (not the washed-out modalBgFor) so the
+    // status bar change is clearly visible. Default keeps page color.
+    const color = (!mColor || mColor === "default")
+      ? pageColor
+      : toHex(solid(bgFor(mColor, dark)));
     setThemeColor(color);
-    return () => setThemeColor(dark ? "#1a1a1a" : "#f0e8ff");
+    return () => setThemeColor(pageColor);
   }, [open, mColor, dark]);
 
   /* Intercept Ctrl+Z / Ctrl+Y at modal level for chunk-level undo */
