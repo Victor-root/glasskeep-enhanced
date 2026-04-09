@@ -784,12 +784,16 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
 
 /* Smooth expand/collapse when entering/leaving draw canvas mode */
 @media (min-width: 640px) {
-  .modal-resize-smooth {
-    transition: width 350ms cubic-bezier(.4,0,.2,1),
-                max-width 350ms cubic-bezier(.4,0,.2,1),
-                height 350ms cubic-bezier(.4,0,.2,1),
-                border-radius 250ms ease;
+  @keyframes drawExpand {
+    from { transform: scale(0.72); border-radius: 12px; opacity: 0.8; }
+    to   { transform: scale(1);    border-radius: 0;    opacity: 1; }
   }
+  @keyframes drawCollapse {
+    from { transform: scale(1.15); opacity: 0.7; }
+    to   { transform: scale(1);    opacity: 1; }
+  }
+  .draw-expand   { animation: drawExpand   400ms cubic-bezier(.16,1,.3,1) both; }
+  .draw-collapse { animation: drawCollapse 350ms cubic-bezier(.16,1,.3,1) both; }
 }
 
 /* Remove glass-card shadow on modal to avoid edge halos */

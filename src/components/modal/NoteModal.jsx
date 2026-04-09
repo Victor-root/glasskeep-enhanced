@@ -139,8 +139,21 @@ export default function NoteModal({
   const [autoEditId, setAutoEditId] = React.useState(null);
   const [drawMode, setDrawMode] = React.useState("view");
   const [drawToolbarEl, setDrawToolbarEl] = React.useState(null);
+  const [drawTransition, setDrawTransition] = React.useState(null); // 'entering' | 'leaving' | null
   const isDrawEdit = mType === 'draw' && drawMode === 'draw';
   const isDrawView = mType === 'draw' && drawMode !== 'draw';
+
+  // Track draw mode transitions for animation
+  const prevDrawEditRef = React.useRef(false);
+  React.useEffect(() => {
+    const wasDrawEdit = prevDrawEditRef.current;
+    prevDrawEditRef.current = isDrawEdit;
+    if (isDrawEdit && !wasDrawEdit) {
+      setDrawTransition('entering');
+    } else if (!isDrawEdit && wasDrawEdit) {
+      setDrawTransition('leaving');
+    }
+  }, [isDrawEdit]);
   const { handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } =
     useChecklistDrag(mItems, setMItems, syncChecklistItems);
 
@@ -204,10 +217,11 @@ export default function NoteModal({
         }}
       >
         <div
-          className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full max-w-none modal-resize-smooth ${
+          className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full max-w-none ${
             isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen sm:!rounded-none'
             : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl'
-          } flex flex-col relative overflow-hidden`}
+          }${drawTransition === 'entering' ? ' draw-expand' : drawTransition === 'leaving' ? ' draw-collapse' : ''} flex flex-col relative overflow-hidden`}
+          onAnimationEnd={() => setDrawTransition(null)}
           style={{ backgroundColor: modalBgFor(mColor, dark), height: windowWidth < 640 ? '100dvh' : undefined }}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
