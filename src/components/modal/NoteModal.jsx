@@ -505,7 +505,7 @@ export default function NoteModal({
 
                 </div>
               ) : drawMode === 'draw' ? (
-                /* Fullscreen drawing canvas (draw mode) */
+                /* Draw mode: fullscreen interactive canvas */
                 <DrawingCanvas
                   data={mDrawingData}
                   onChange={setMDrawingData}
@@ -519,8 +519,32 @@ export default function NoteModal({
                   fillContainer
                   toolbarPortalTarget={drawToolbarEl}
                 />
+              ) : viewMode ? (
+                /* View mode: rendered text + read-only drawing preview */
+                <>
+                  {mBody ? (
+                    <div
+                      className="note-content note-content--dense whitespace-pre-wrap"
+                      dangerouslySetInnerHTML={{
+                        __html: renderSafeMarkdown(mBody),
+                      }}
+                    />
+                  ) : (
+                    <p className="text-sm text-gray-400 dark:text-gray-500 italic">{t("noTextContent")}</p>
+                  )}
+                  <div className="mt-4">
+                    <DrawingCanvas
+                      data={mDrawingData}
+                      width={1200}
+                      height={800}
+                      readOnly
+                      darkMode={dark}
+                      hideModeToggle
+                    />
+                  </div>
+                </>
               ) : (
-                /* Edit mode: text body + drawing preview */
+                /* Edit mode: text body textarea + drawing preview */
                 <>
                   <textarea
                     ref={mBodyRef}
@@ -534,15 +558,11 @@ export default function NoteModal({
                   />
                   <DrawingCanvas
                     data={mDrawingData}
-                    onChange={setMDrawingData}
                     width={1200}
                     height={800}
-                    readOnly={false}
+                    readOnly
                     darkMode={dark}
                     hideModeToggle
-                    externalMode="view"
-                    onModeChange={setDrawMode}
-                    fillContainer={false}
                   />
                 </>
               )}

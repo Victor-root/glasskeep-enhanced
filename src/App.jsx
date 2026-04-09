@@ -2614,7 +2614,7 @@ export default function App() {
     initialModalStateRef.current = baselineState;
     committedBaselineRef.current = { ...baselineState };
     setInitialDrawMode("draw");
-    setViewMode(true);
+    setViewMode(false); // New draw notes land in edit mode when exiting draw canvas
     setModalMenuOpen(false);
     setOpen(true);
     window.history.pushState({ noteModal: true }, "");

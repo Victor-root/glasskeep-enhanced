@@ -563,8 +563,8 @@ export default function ModalFooter({
           </div>
         </Popover>
 
-        {/* ── Edit/View toggle — text notes ── */}
-        {mType === "text" && (
+        {/* ── Edit/View toggle — text notes & draw notes (hidden in draw canvas mode) ── */}
+        {(mType === "text" || (mType === "draw" && drawMode !== "draw")) && (
           <button
             className={`${isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn"} modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]`}
             onClick={handleToggleViewMode}
@@ -586,27 +586,27 @@ export default function ModalFooter({
           </button>
         )}
 
-        {/* ── Draw/Edit toggle — drawing notes ── */}
+        {/* ── Draw mode button — drawing notes only ── */}
         {mType === "draw" && (
           <button
             className={`${isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn"} modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]`}
             onClick={onToggleDrawMode}
-            data-tooltip={!isDesktop ? (drawMode === "view" ? t("switchToDrawMode") : t("switchToEditMode")) : undefined}
-            aria-label={drawMode === "view" ? t("drawMode") : t("editMode")}
+            data-tooltip={!isDesktop ? (drawMode === "draw" ? t("switchToEditMode") : t("switchToDrawMode")) : undefined}
+            aria-label={drawMode === "draw" ? t("editMode") : t("drawMode")}
           >
-            {drawMode === "view" ? (
-              /* In edit mode → button to switch to draw */
+            {drawMode === "draw" ? (
+              /* In draw mode → button to exit back to edit/view */
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M19 12H5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M12 19l-7-7 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              /* Not in draw mode → button to enter draw mode (brush icon) */
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M3 17.25V21h3.75l11-11-3.75-3.75-11 11zM20.71 7.04a1.003 1.003 0 000-1.42L18.37 3.29a1.003 1.003 0 00-1.42 0L15.13 5.11l3.75 3.75 1.83-1.82z" />
               </svg>
-            ) : (
-              /* In draw mode → button to switch to edit */
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25Z" fill="currentColor" />
-                <path d="m14.06 4.94 3.75 3.75 1.41-1.41a1.5 1.5 0 0 0 0-2.12l-1.63-1.63a1.5 1.5 0 0 0-2.12 0l-1.41 1.41Z" fill="currentColor" />
-              </svg>
             )}
-            {isDesktop && <span>{drawMode === "view" ? t("drawMode") : t("editMode")}</span>}
+            {isDesktop && <span>{drawMode === "draw" ? t("exitDrawMode") : t("drawMode")}</span>}
           </button>
         )}
       </div>
