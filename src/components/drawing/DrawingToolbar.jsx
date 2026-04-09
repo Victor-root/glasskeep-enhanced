@@ -273,7 +273,7 @@ export default function DrawingToolbar({
                 {/* 4 overlapping filled circles */}
                 <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
                   <circle cx="8" cy="7" r="6" fill="#EF4444" />
-                  <circle cx="15" cy="9" r="5.5" fill="#22C55E" />
+                  <circle cx="15" cy="9" r="5.5" fill="#FACC15" />
                   <circle cx="7" cy="13" r="5.5" fill="#3B82F6" />
                   <circle cx="13" cy="15" r="6" fill={color} />
                 </svg>
