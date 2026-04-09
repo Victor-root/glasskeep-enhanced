@@ -13,7 +13,7 @@ import useModalHistory from "../../hooks/useModalHistory.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { handleSmartEnter } from "../common/FormatToolbar.jsx";
 import { uid } from "../../utils/helpers.js";
-import { modalBgFor, scrollColorsFor, solid, bgFor, toHex, parseRGBA } from "../../utils/colors.js";
+import { modalBgFor, scrollColorsFor, solid, bgFor, toHex } from "../../utils/colors.js";
 import { setThemeColor } from "../../utils/helpers.js";
 
 export default function NoteModal({
@@ -149,19 +149,9 @@ export default function NoteModal({
     const pageColor = dark ? "#1a1a1a" : "#f0e8ff";
     // Use the raw note color (not the washed-out modalBgFor) so the
     // status bar change is clearly visible. Default keeps page color.
-    // Use a mix between the card color and white (40% white) —
-    // saturated enough to be visible in the status bar, light enough
-    // to feel like the modal background
     const color = (!mColor || mColor === "default")
       ? pageColor
-      : (() => {
-          const { r, g, b } = parseRGBA(solid(bgFor(mColor, dark)));
-          const mix = dark ? 0 : 0.4;
-          const mr = Math.round(255 * mix + r * (1 - mix));
-          const mg = Math.round(255 * mix + g * (1 - mix));
-          const mb = Math.round(255 * mix + b * (1 - mix));
-          return `#${[mr, mg, mb].map((c) => c.toString(16).padStart(2, "0")).join("")}`;
-        })();
+      : toHex(solid(bgFor(mColor, dark)));
     setThemeColor(color);
     return () => setThemeColor(pageColor);
   }, [open, mColor, dark]);
