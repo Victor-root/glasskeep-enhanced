@@ -270,10 +270,14 @@ export default function DrawingToolbar({
                 onClick={() => { setColorPopOpen(v => !v); setSizePopOpen(false); setActionsPopOpen(false); }}
                 className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 focus:outline-none border border-gray-200/50 dark:border-gray-600/40 hover:scale-105 transition-transform duration-150"
               >
-                <svg width="22" height="18" viewBox="0 0 22 18" fill="none">
-                  <circle cx="6" cy="10" r="5" fill="#3B82F6" stroke={darkMode ? '#374151' : '#fff'} strokeWidth="1.2" />
-                  <circle cx="11" cy="6" r="5" fill="#EF4444" stroke={darkMode ? '#374151' : '#fff'} strokeWidth="1.2" />
-                  <circle cx="16" cy="10" r="5" fill={color} stroke={darkMode ? '#374151' : '#fff'} strokeWidth="1.2" />
+                {/* 4-segment color wheel */}
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M10 1 A9 9 0 0 1 19 10 L10 10 Z" fill="#EF4444" />
+                  <path d="M19 10 A9 9 0 0 1 10 19 L10 10 Z" fill="#3B82F6" />
+                  <path d="M10 19 A9 9 0 0 1 1 10 L10 10 Z" fill="#22C55E" />
+                  <path d="M1 10 A9 9 0 0 1 10 1 L10 10 Z" fill={color} />
+                  <circle cx="10" cy="10" r="3" fill={darkMode ? '#1f2937' : '#fff'} />
+                  <circle cx="10" cy="10" r="9" fill="none" stroke={darkMode ? '#4b5563' : '#d1d5db'} strokeWidth="0.8" />
                 </svg>
               </button>
               <ToolbarPopover anchorRef={colorBtnRef} open={colorPopOpen} onClose={() => setColorPopOpen(false)} darkMode={darkMode}>
@@ -385,16 +389,15 @@ export default function DrawingToolbar({
         <>
           <button
             ref={sizeBtnRef}
-            onClick={() => { setSizePopOpen(v => !v); setColorPopOpen(false); }}
+            onClick={() => { setSizePopOpen(v => !v); setColorPopOpen(false); setActionsPopOpen(false); }}
             className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 focus:outline-none border border-gray-200/50 dark:border-gray-600/40 hover:scale-105 transition-transform duration-150"
           >
-            <span
-              className="block rounded-full bg-gray-700 dark:bg-gray-200"
-              style={{
-                width: Math.max(4, Math.min(size, 16)),
-                height: Math.max(4, Math.min(size, 16)),
-              }}
-            />
+            {/* Stacked lines showing stroke widths */}
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <line x1="3" y1="3.5" x2="15" y2="3.5" stroke={darkMode ? '#d1d5db' : '#374151'} strokeWidth="1" strokeLinecap="round" />
+              <line x1="3" y1="7.5" x2="15" y2="7.5" stroke={darkMode ? '#d1d5db' : '#374151'} strokeWidth="2.5" strokeLinecap="round" />
+              <line x1="3" y1="12.5" x2="15" y2="12.5" stroke={darkMode ? '#d1d5db' : '#374151'} strokeWidth="4.5" strokeLinecap="round" />
+            </svg>
           </button>
           <ToolbarPopover anchorRef={sizeBtnRef} open={sizePopOpen} onClose={() => setSizePopOpen(false)} darkMode={darkMode}>
             <div className="flex items-center gap-3 px-1">
