@@ -3026,14 +3026,20 @@ export default function App() {
       const drawPaths = mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []);
       const note = notes.find((n) => String(n.id) === String(activeId));
       if (drawPaths.length === 0 && note && !note.title?.trim()) {
-        // Empty draw note — delete it silently
+        // Empty draw note — trash it (server requires trash before permanent delete)
         const nid = String(activeId);
+        const nowIso = new Date().toISOString();
         const leaseId = acquireLocalLease(nid);
         addDeleteTombstone(nid);
-        idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
+        (async () => {
+          try {
+            const existing = await idbGetNote(nid, currentUser?.id, sessionId);
+            if (existing) await idbPutNote({ ...existing, trashed: true, client_updated_at: nowIso }, currentUser?.id, sessionId);
+          } catch (e) {}
+        })();
         invalidateNotesCache();
         setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-        enqueueWithLease(nid, { type: "permanentDelete", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
+        enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
         showToast(t("emptyDrawNoteDeleted"), "info");
 
         // Run the close animation
