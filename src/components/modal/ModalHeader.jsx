@@ -93,7 +93,7 @@ export default function ModalHeader({
 
           {/* Draw edit: portal target for drawing toolbar (fills the space where title was) */}
           {isDrawEdit && (
-            <div ref={drawToolbarMount} className="flex-1 min-w-0 overflow-visible py-1" />
+            <div ref={drawToolbarMount} className="flex-1 min-w-0 overflow-visible py-1 flex justify-center" />
           )}
 
           {/* Desktop: title inline (hidden in draw edit mode) */}

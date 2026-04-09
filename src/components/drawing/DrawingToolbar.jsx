@@ -161,7 +161,7 @@ export default function DrawingToolbar({
 
   return (
     <div className={compact
-      ? "flex items-center gap-0.5 flex-nowrap"
+      ? "flex items-center justify-center gap-0.5 flex-nowrap px-2.5 py-1 rounded-xl bg-white/60 dark:bg-gray-800/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/40 shadow-sm"
       : "flex items-center flex-wrap gap-1.5 mb-1 p-1.5 bg-gray-100/80 dark:bg-gray-800/60 rounded-2xl border border-gray-200/60 dark:border-gray-700/40"
     }>
 
