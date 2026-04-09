@@ -46,6 +46,7 @@ html.dark body {
   animation: noteAppear 0.15s ease-out;
   -webkit-user-select: none;
   user-select: none;
+  touch-action: none;
 }
 /* Drag & drop reorder styles */
 .note-card.dragging {

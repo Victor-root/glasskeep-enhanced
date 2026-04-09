@@ -65,7 +65,6 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
       startY = touch.clientY;
       timer = setTimeout(() => {
         active = true;
-        try { navigator.vibrate?.(30); } catch (_) {}
         card.classList.add("dragging");
         p.onDragStart(p.noteId, { currentTarget: card });
         failsafeTimer = setTimeout(cleanup, 3000);
