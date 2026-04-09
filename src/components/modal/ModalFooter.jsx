@@ -54,6 +54,7 @@ export default function ModalFooter({
   // drawing mode toggle
   drawMode,
   onToggleDrawMode,
+  onExitDrawToView,
   modalScrollRef,
   savedModalScrollRatioRef,
   // actions
@@ -611,27 +612,34 @@ export default function ModalFooter({
                 {isDesktop && <span>{viewMode ? t("editMode") : t("viewMode")}</span>}
               </button>
             )}
-            {/* Draw mode toggle */}
-            <button
-              className={`${isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn"} modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]`}
-              onClick={onToggleDrawMode}
-              data-tooltip={!isDesktop ? (drawMode === "draw" ? t("switchToEditMode") : t("switchToDrawMode")) : undefined}
-              aria-label={drawMode === "draw" ? t("editMode") : t("drawMode")}
-            >
-              {drawMode === "draw" ? (
+            {/* Draw mode toggle / reading mode */}
+            {drawMode === "draw" ? (
+              <button
+                className={`${isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn"} modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]`}
+                onClick={onExitDrawToView}
+                data-tooltip={!isDesktop ? t("readingMode") : undefined}
+                aria-label={t("readingMode")}
+              >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M19 12H5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M12 19l-7-7 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />
+                  <circle cx="12" cy="12" r="3.2" fill="currentColor" />
                 </svg>
-              ) : (
-                /* Scribble / wave icon to represent drawing */
+                {isDesktop && <span>{t("readingMode")}</span>}
+              </button>
+            ) : (
+              <button
+                className={`${isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn"} modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]`}
+                onClick={onToggleDrawMode}
+                data-tooltip={!isDesktop ? t("switchToDrawMode") : undefined}
+                aria-label={t("drawMode")}
+              >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M3 17c2-3 4-6 6-3s4 3 6 0 4-3 6 0" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                   <path d="M3 10c2-3 4-6 6-3s4 3 6 0 4-3 6 0" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-              )}
-              {isDesktop && <span>{drawMode === "draw" ? t("exitDrawMode") : t("drawMode")}</span>}
-            </button>
+                {isDesktop && <span>{t("drawMode")}</span>}
+              </button>
+            )}
           </div>
         )}
       </div>

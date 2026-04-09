@@ -644,6 +644,7 @@ export default function NoteModal({
             // drawing mode toggle
             drawMode={drawMode}
             onToggleDrawMode={() => setDrawMode((m) => m === "view" ? "draw" : "view")}
+            onExitDrawToView={() => { setDrawMode("view"); setViewMode(true); }}
             modalScrollRef={modalScrollRef}
             savedModalScrollRatioRef={savedModalScrollRatioRef}
             // actions
