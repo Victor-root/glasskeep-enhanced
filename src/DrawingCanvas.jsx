@@ -422,7 +422,7 @@ function DrawingCanvas({
           height={canvasHeight}
           className="block"
           style={{
-            maxWidth: '100%',
+            width: '100%',
             height: 'auto',
             touchAction: mode === 'draw' && !readOnly ? 'none' : 'auto',
             cursor: mode === 'draw' && !readOnly ? 'none' : 'default',
