@@ -527,13 +527,15 @@ function DrawingCanvas({
     const rect = canvas.getBoundingClientRect();
     // Map logical brush size to CSS pixels
     const cssSize = size * (rect.width / canvasWidth);
+    // Ensure cursor is visible (covers case where mouse is already over canvas on mount)
+    if (!showCursor) setShowCursor(true);
     setCursorPos({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
       cssSize,
     });
     draw(e);
-  }, [mode, readOnly, size, canvasWidth, draw]);
+  }, [mode, readOnly, size, canvasWidth, draw, showCursor]);
 
   const handleMouseEnter = useCallback(() => {
     if (mode === 'draw' && !readOnly) setShowCursor(true);
