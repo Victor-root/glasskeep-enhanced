@@ -127,8 +127,9 @@ function DrawingCanvas({
   } = useDrawingHistory([]);
 
   // Flag to distinguish our own onChange calls from external data changes.
-  // Prevents the data-loading effect from resetting history on our own updates.
+  // Kept active for 2s via timer to survive autosave echo round-trips.
   const isInternalChange = useRef(false);
+  const internalChangeTimer = useRef(null);
 
   // ─── Load data from props ───
   useEffect(() => {
@@ -156,8 +157,7 @@ function DrawingCanvas({
     const converted = convertThemeStrokes(pathsData, darkMode);
 
     if (isInternalChange.current) {
-      // Data came back from our own onChange — don't touch history, just sync display
-      isInternalChange.current = false;
+      // Data came back from our own onChange (or autosave echo) — don't touch history
       setPaths(converted);
     } else {
       // External data change (opened different drawing, remote sync, etc.) — full reset
@@ -173,7 +173,12 @@ function DrawingCanvas({
   // ─── Notify parent (marks as internal so data-loading effect won't reset) ───
   const notifyChange = useCallback((newPaths) => {
     if (!onChange) return;
+    // Keep flag active for 2s to survive autosave debounce + network echo
     isInternalChange.current = true;
+    clearTimeout(internalChangeTimer.current);
+    internalChangeTimer.current = setTimeout(() => {
+      isInternalChange.current = false;
+    }, 2000);
     let originalHeight = height;
     if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions) {
       originalHeight = data.dimensions.originalHeight || height;
