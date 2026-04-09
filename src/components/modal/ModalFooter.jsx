@@ -152,7 +152,7 @@ export default function ModalFooter({
         />
 
         {/* ── Add image (always visible, including view mode) ── */}
-        {(mType === "checklist" || mType === "text") && (
+        {(mType === "checklist" || mType === "text" || mType === "draw") && (
           <>
             <input
               ref={modalFileRef}
