@@ -6,7 +6,6 @@ import DrawingToolbar from './components/drawing/DrawingToolbar';
 /* ─── Smooth path rendering (quadratic Bezier interpolation) ─── */
 function drawSmoothPath(ctx, points) {
   if (points.length < 2) {
-    // Single dot
     if (points.length === 1) {
       ctx.beginPath();
       ctx.arc(points[0].x, points[0].y, ctx.lineWidth / 2, 0, Math.PI * 2);
@@ -21,15 +20,12 @@ function drawSmoothPath(ctx, points) {
   if (points.length === 2) {
     ctx.lineTo(points[1].x, points[1].y);
   } else {
-    // Use quadratic curves through midpoints for smooth interpolation
     for (let i = 0; i < points.length - 1; i++) {
       const p0 = points[i];
       const p1 = points[i + 1];
       if (i === points.length - 2) {
-        // Last segment: draw directly to last point
         ctx.lineTo(p1.x, p1.y);
       } else {
-        // Midpoint as end, next point as control
         const mx = (p0.x + p1.x) / 2;
         const my = (p0.y + p1.y) / 2;
         ctx.quadraticCurveTo(p0.x, p0.y, mx, my);
@@ -123,10 +119,11 @@ function DrawingCanvas({
     resetHistory,
   } = useDrawingHistory([]);
 
-  // Track previous data identity to detect drawing switch
-  const prevDataRef = useRef(data);
+  // Flag to distinguish our own onChange calls from external data changes.
+  // Prevents the data-loading effect from resetting history on our own updates.
+  const isInternalChange = useRef(false);
 
-  // ─── Load data ───
+  // ─── Load data from props ───
   useEffect(() => {
     let pathsData = [];
     let dimensions = null;
@@ -150,14 +147,14 @@ function DrawingCanvas({
 
     const converted = convertThemeStrokes(pathsData, darkMode);
 
-    // If this is a different drawing (data reference changed from outside),
-    // reset history; otherwise just sync paths silently
-    if (data !== prevDataRef.current) {
-      resetHistory(converted);
-    } else {
+    if (isInternalChange.current) {
+      // Data came back from our own onChange — don't touch history, just sync display
+      isInternalChange.current = false;
       setPaths(converted);
+    } else {
+      // External data change (opened different drawing, remote sync, etc.) — full reset
+      resetHistory(converted);
     }
-    prevDataRef.current = data;
   }, [data, darkMode]);
 
   // Default color on theme change
@@ -165,9 +162,10 @@ function DrawingCanvas({
     setColor(darkMode ? '#FFFFFF' : '#000000');
   }, [darkMode]);
 
-  // ─── Notify parent ───
+  // ─── Notify parent (marks as internal so data-loading effect won't reset) ───
   const notifyChange = useCallback((newPaths) => {
     if (!onChange) return;
+    isInternalChange.current = true;
     let originalHeight = height;
     if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions) {
       originalHeight = data.dimensions.originalHeight || height;
@@ -178,56 +176,45 @@ function DrawingCanvas({
     });
   }, [onChange, canvasWidth, canvasHeight, data, height]);
 
-  // ─── Undo / Redo with notification ───
+  // ─── Undo / Redo — explicit notify ───
   const handleUndo = useCallback(() => {
     if (readOnly || mode !== 'draw') return;
-    // Get the paths that undo will restore to
-    historyUndo();
-    // We need to notify after state updates — use a microtask
-    setTimeout(() => {
-      // Read current paths from the history after undo
-    }, 0);
-  }, [readOnly, mode, historyUndo]);
+    const result = historyUndo();
+    if (result !== null) notifyChange(result);
+  }, [readOnly, mode, historyUndo, notifyChange]);
 
   const handleRedo = useCallback(() => {
     if (readOnly || mode !== 'draw') return;
-    historyRedo();
-  }, [readOnly, mode, historyRedo]);
-
-  // Notify parent whenever paths change (from undo/redo/draw)
-  const prevPathsRef = useRef(paths);
-  useEffect(() => {
-    if (paths !== prevPathsRef.current) {
-      prevPathsRef.current = paths;
-      notifyChange(paths);
-    }
-  }, [paths, notifyChange]);
+    const result = historyRedo();
+    if (result !== null) notifyChange(result);
+  }, [readOnly, mode, historyRedo, notifyChange]);
 
   // ─── Keyboard shortcuts ───
   useEffect(() => {
     if (readOnly || mode !== 'draw') return;
 
     const handleKeyDown = (e) => {
-      // Only handle if canvas container or body is focused (not text inputs)
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
       if (e.target.isContentEditable) return;
 
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
-        historyRedo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        const result = historyRedo();
+        if (result !== null) notifyChange(result);
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
-        historyUndo();
+        const result = historyUndo();
+        if (result !== null) notifyChange(result);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [readOnly, mode, historyUndo, historyRedo]);
+  }, [readOnly, mode, historyUndo, historyRedo, notifyChange]);
 
-  // ─── Close color picker on outside click (propagate) ───
+  // ─── Update canvas size from props (only if data has no dimensions) ───
   useEffect(() => {
-    if (!data || (typeof data === 'object' && !Array.isArray(data) && data.dimensions)) return;
+    if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions) return;
     setCanvasWidth(width);
     setCanvasHeight(height);
   }, [width, height, data]);
@@ -241,7 +228,6 @@ function DrawingCanvas({
 
     renderPaths(ctx, paths);
 
-    // Current path being drawn
     if (currentPath && currentPath.points && currentPath.points.length > 0) {
       ctx.strokeStyle = currentPath.color;
       ctx.fillStyle = currentPath.color;
@@ -285,7 +271,7 @@ function DrawingCanvas({
   const draw = useCallback((e) => {
     if (!isDrawing || readOnly || mode !== 'draw') return;
     const now = Date.now();
-    if (now - lastDrawTime.current < 16) return; // ~60fps
+    if (now - lastDrawTime.current < 16) return;
     lastDrawTime.current = now;
     const point = getCanvasCoordinates(e);
     setCurrentPath(prev => ({
@@ -299,16 +285,18 @@ function DrawingCanvas({
     if (currentPath && currentPath.points.length > 0) {
       const newPaths = [...paths, currentPath];
       pushPaths(newPaths);
+      notifyChange(newPaths);
     }
     setCurrentPath(null);
     setIsDrawing(false);
-  }, [isDrawing, readOnly, mode, currentPath, paths, pushPaths]);
+  }, [isDrawing, readOnly, mode, currentPath, paths, pushPaths, notifyChange]);
 
   // ─── Clear ───
   const clearCanvas = useCallback(() => {
     if (readOnly || mode !== 'draw') return;
     pushPaths([]);
-  }, [readOnly, mode, pushPaths]);
+    notifyChange([]);
+  }, [readOnly, mode, pushPaths, notifyChange]);
 
   // ─── Add Page ───
   const addPage = useCallback(() => {
@@ -316,6 +304,7 @@ function DrawingCanvas({
     const newHeight = canvasHeight * 2;
     setCanvasHeight(newHeight);
     if (onChange) {
+      isInternalChange.current = true;
       let originalHeight = height;
       if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions) {
         originalHeight = data.dimensions.originalHeight || height;
@@ -369,14 +358,12 @@ function DrawingCanvas({
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
-    // Cursor size in CSS pixels
     const cssSize = size / scaleX;
     setCursorPos({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
       cssSize,
     });
-    // Also forward to draw handler
     draw(e);
   }, [mode, readOnly, size, draw]);
 
@@ -384,7 +371,7 @@ function DrawingCanvas({
     if (mode === 'draw' && !readOnly) setShowCursor(true);
   }, [mode, readOnly]);
 
-  const handleMouseLeave = useCallback((e) => {
+  const handleMouseLeave = useCallback(() => {
     setShowCursor(false);
     stopDrawing();
   }, [stopDrawing]);

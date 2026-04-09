@@ -5,19 +5,14 @@ const MAX_HISTORY = 80;
 /**
  * Manages undo/redo for an array of drawing paths.
  *
- * API:
- *   paths          – current paths array (source of truth for rendering)
- *   pushPaths(p)   – record a new snapshot (after stroke, clear, etc.)
- *   undo()         – step back
- *   redo()         – step forward
- *   canUndo / canRedo
- *   resetHistory(initial) – reset stacks (when switching drawings)
+ * - pushPaths(p)   → record new snapshot, returns p
+ * - undo()         → step back, returns previous paths or null
+ * - redo()         → step forward, returns next paths or null
+ * - resetHistory() → clear stacks (on drawing switch)
  */
 export default function useDrawingHistory(initialPaths = []) {
-  // Current paths state
   const [paths, setPaths] = useState(initialPaths);
 
-  // Stacks stored as refs to avoid re-render on every push
   const undoStack = useRef([]);
   const redoStack = useRef([]);
 
@@ -27,16 +22,15 @@ export default function useDrawingHistory(initialPaths = []) {
 
   const pushPaths = useCallback((newPaths) => {
     setPaths(prev => {
-      // Push previous state onto undo stack
       undoStack.current.push(prev);
       if (undoStack.current.length > MAX_HISTORY) {
         undoStack.current.shift();
       }
-      // Clear redo on new action
       redoStack.current = [];
       tick();
       return newPaths;
     });
+    return newPaths;
   }, []);
 
   const undo = useCallback(() => {
@@ -47,7 +41,7 @@ export default function useDrawingHistory(initialPaths = []) {
       tick();
       return previous;
     });
-    return true; // signal that undo happened
+    return previous;
   }, []);
 
   const redo = useCallback(() => {
@@ -58,7 +52,7 @@ export default function useDrawingHistory(initialPaths = []) {
       tick();
       return next;
     });
-    return true;
+    return next;
   }, []);
 
   const resetHistory = useCallback((initial = []) => {
@@ -70,7 +64,7 @@ export default function useDrawingHistory(initialPaths = []) {
 
   return {
     paths,
-    setPaths, // direct set without history (for loading data)
+    setPaths,
     pushPaths,
     undo,
     redo,
