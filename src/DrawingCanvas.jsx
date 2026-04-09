@@ -616,22 +616,38 @@ function DrawingCanvas({
 
         {/* Dynamic cursor (desktop) */}
         {showCursor && cursorPos && mode === 'draw' && !readOnly && (
-          <div
-            className="pointer-events-none absolute rounded-full border"
-            style={{
-              width: Math.max(8, cursorPos.cssSize),
-              height: Math.max(8, cursorPos.cssSize),
-              left: cursorPos.x - Math.max(8, cursorPos.cssSize) / 2,
-              top: cursorPos.y - Math.max(8, cursorPos.cssSize) / 2,
-              borderColor: tool === 'eraser'
-                ? 'rgba(100,100,100,0.6)'
-                : (darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)'),
-              backgroundColor: tool === 'eraser'
-                ? 'rgba(200,200,200,0.15)'
-                : 'transparent',
-              transition: 'width 0.1s, height 0.1s',
-            }}
-          />
+          tool === 'eraser' ? (
+            /* Eraser: circle cursor showing erase radius */
+            <div
+              className="pointer-events-none absolute rounded-full border"
+              style={{
+                width: Math.max(8, cursorPos.cssSize),
+                height: Math.max(8, cursorPos.cssSize),
+                left: cursorPos.x - Math.max(8, cursorPos.cssSize) / 2,
+                top: cursorPos.y - Math.max(8, cursorPos.cssSize) / 2,
+                borderColor: 'rgba(100,100,100,0.6)',
+                backgroundColor: 'rgba(200,200,200,0.15)',
+                transition: 'width 0.1s, height 0.1s',
+              }}
+            />
+          ) : (
+            /* Pen: pencil icon cursor */
+            <svg
+              className="pointer-events-none absolute"
+              style={{
+                left: cursorPos.x - 2,
+                top: cursorPos.y - 24,
+                filter: darkMode
+                  ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))'
+                  : 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
+              }}
+              width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M3 21l1.5-4.5L17.1 3.9a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1L7.5 19.5 3 21z"
+                fill={color} stroke={darkMode ? '#fff' : '#000'} strokeWidth="1.2" strokeLinejoin="round" />
+              <path d="M14.5 6.5l3 3" stroke={darkMode ? '#fff' : '#000'} strokeWidth="1" strokeLinecap="round" />
+            </svg>
+          )
         )}
       </div>
 

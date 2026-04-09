@@ -3021,6 +3021,41 @@ export default function App() {
     // Prevent double-triggering while exit animation is running
     if (modalClosingTimerRef.current) return;
 
+    // Auto-delete empty draw notes (created via direct draw but never drawn on)
+    if (activeId && mType === "draw") {
+      const drawPaths = mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []);
+      const note = notes.find((n) => String(n.id) === String(activeId));
+      if (drawPaths.length === 0 && note && !note.title?.trim()) {
+        // Empty draw note — delete it silently
+        const nid = String(activeId);
+        const leaseId = acquireLocalLease(nid);
+        addDeleteTombstone(nid);
+        idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
+        invalidateNotesCache();
+        setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+        enqueueWithLease(nid, { type: "permanentDelete", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
+        showToast(t("emptyDrawNoteDeleted"), "info");
+
+        // Run the close animation
+        setIsModalClosing(true);
+        modalClosingTimerRef.current = setTimeout(() => {
+          modalClosingTimerRef.current = null;
+          if (modalHistoryRef.current) {
+            modalHistoryRef.current = false;
+            window.history.back();
+          }
+          setOpen(false);
+          setActiveId(null);
+          setViewMode(true);
+          setModalMenuOpen(false);
+          setConfirmDeleteOpen(false);
+          setShowModalFmt(false);
+          setIsModalClosing(false);
+        }, 180);
+        return;
+      }
+    }
+
     // Flush any pending drawing debounce before closing.
     // flushPendingDrawingSave restores pendingDrawingSaveRef on failure,
     // so a second close attempt can retry.
