@@ -137,6 +137,7 @@ export default function NoteModal({
   const [drawMode, setDrawMode] = React.useState("view");
   const [drawToolbarEl, setDrawToolbarEl] = React.useState(null);
   const isDrawEdit = mType === 'draw' && drawMode === 'draw';
+  const isDrawView = mType === 'draw' && drawMode !== 'draw';
   const { handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } =
     useChecklistDrag(mItems, setMItems, syncChecklistItems);
 
@@ -190,6 +191,7 @@ export default function NoteModal({
         <div
           className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full max-w-none ${
             isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen'
+            : isDrawView ? 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:max-h-[95vh]'
             : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh]'
           } ${isDrawEdit ? '' : 'sm:rounded-xl'} flex flex-col relative overflow-hidden`}
           style={{ backgroundColor: modalBgFor(mColor, dark), height: windowWidth < 640 ? '100dvh' : undefined }}
@@ -202,7 +204,7 @@ export default function NoteModal({
           <div
             ref={modalScrollRef}
             data-modal-scroll
-            className={`relative flex-1 min-h-0 mobile-hide-scrollbar modal-scroll-themed ${mType === 'draw' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto overflow-x-auto'}`}
+            className={`relative flex-1 min-h-0 mobile-hide-scrollbar modal-scroll-themed ${isDrawEdit ? 'flex flex-col overflow-hidden' : 'overflow-y-auto overflow-x-auto'}`}
             style={(() => {
               const sc = scrollColorsFor(mColor, dark);
               const noteColorBtn = (!dark && (!mColor || mColor === "default"))
@@ -250,7 +252,7 @@ export default function NoteModal({
 
             {/* Content area */}
             <div
-              className={isDrawEdit ? "flex-1 min-h-0 flex flex-col" : mType === "draw" ? "p-2 flex-1 min-h-0 flex flex-col" : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"}
+              className={isDrawEdit ? "flex-1 min-h-0 flex flex-col" : isDrawView ? "p-4" : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"}
               onClick={onModalBodyClick}
             >
 
