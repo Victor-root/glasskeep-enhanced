@@ -268,6 +268,9 @@ export default function App() {
   const pendingDrawingSaveRef = useRef(null);
   const drawingDebounceTimerRef = useRef(null);
 
+  // Initial draw mode for the modal (null = default "view", "draw" = open in edit mode)
+  const [initialDrawMode, setInitialDrawMode] = useState(null);
+
   // Clear data when switching composer types
   useEffect(() => {
     if (composerType === "text") {
@@ -2538,6 +2541,76 @@ export default function App() {
     if (contentRef.current) contentRef.current.style.height = "auto";
   };
 
+  /** -------- Direct draw: create blank draw note and open fullscreen -------- */
+  const handleDirectDraw = async () => {
+    const nowIso = new Date().toISOString();
+    const newNote = {
+      id: uid(),
+      type: "draw",
+      title: "",
+      content: JSON.stringify({ paths: [], dimensions: null }),
+      items: [],
+      tags: composerTagList.length ? composerTagList : [],
+      images: [],
+      color: composerColor !== "default" ? composerColor : "default",
+      pinned: false,
+      position: Date.now(),
+      timestamp: nowIso,
+      updated_at: nowIso,
+      client_updated_at: nowIso,
+    };
+    const localNote = {
+      ...newNote,
+      user_id: currentUser?.id,
+      archived: false,
+      trashed: false,
+    };
+    const leaseId = acquireLocalLease(String(newNote.id));
+    try { await idbPutNote(localNote, currentUser?.id, sessionId); } catch (e) { console.error("IndexedDB put failed:", e); }
+    setNotes((prev) => sortNotesByRecency([localNote, ...(Array.isArray(prev) ? prev : [])]));
+    invalidateNotesCache();
+    enqueueWithLease(String(newNote.id), { type: "create", noteId: newNote.id, payload: newNote }, leaseId);
+
+    // Reset composer
+    setTitle("");
+    setContent("");
+    setComposerTagList([]);
+    setComposerTagInput("");
+    setComposerTagFocused(false);
+    setComposerImages([]);
+    setComposerColor("default");
+    setComposerDrawingData({ paths: [], dimensions: null });
+    setComposerType("text");
+    setComposerCollapsed(true);
+
+    // Open the modal directly in draw edit mode (can't use openModal because
+    // the notes state won't have the new note yet in this render cycle)
+    setSidebarOpen(false);
+    setActiveId(String(newNote.id));
+    setMType("draw");
+    setMTitle("");
+    setMDrawingData({ paths: [], dimensions: null });
+    prevDrawingRef.current = { paths: [], dimensions: null };
+    setMBody("");
+    skipNextDrawingAutosave.current = true;
+    skipNextItemsAutosave.current = true;
+    setMItems([]);
+    prevItemsRef.current = [];
+    setMTagList(localNote.tags || []);
+    setMImages([]);
+    setTagInput("");
+    setMColor(localNote.color || "default");
+    const baselineState = { title: "", content: "", tags: localNote.tags || [], images: [], color: localNote.color || "default" };
+    initialModalStateRef.current = baselineState;
+    committedBaselineRef.current = { ...baselineState };
+    setInitialDrawMode("draw");
+    setViewMode(true);
+    setModalMenuOpen(false);
+    setOpen(true);
+    window.history.pushState({ noteModal: true }, "");
+    modalHistoryRef.current = true;
+  };
+
   /** -------- Download single note .md -------- */
   const handleDownloadNote = (note) => {
     const md = mdForDownload(note);
@@ -3633,7 +3706,8 @@ export default function App() {
       resizeModalTextarea={resizeModalTextarea}
       syncChecklistItems={syncChecklistItems}
       checklistInsertPosition={checklistInsertPosition}
-
+      initialDrawMode={initialDrawMode}
+      onConsumeInitialDrawMode={() => setInitialDrawMode(null)}
     />
   );
 
@@ -3854,6 +3928,7 @@ export default function App() {
         composerColor={composerColor}
         setComposerColor={setComposerColor}
         addNote={addNote}
+        onDirectDraw={handleDirectDraw}
         pinned={pinned}
         others={others}
         openModal={openModal}

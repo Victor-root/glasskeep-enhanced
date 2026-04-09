@@ -42,6 +42,7 @@ export default function NotesComposer({
   composerColor,
   setComposerColor,
   addNote,
+  onDirectDraw,
   addImagesToState,
   formatComposer,
   showComposerFmt,
@@ -435,7 +436,7 @@ export default function NotesComposer({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setComposerType("draw")}
+                          onClick={() => onDirectDraw ? onDirectDraw() : setComposerType("draw")}
                           className={`p-1.5 rounded-xl border-2 text-sm transition-all duration-200 ${
                             composerType === "draw"
                               ? "bg-gradient-to-br from-orange-400 to-amber-500 text-white border-transparent shadow-md shadow-orange-300/50 dark:shadow-none scale-105"

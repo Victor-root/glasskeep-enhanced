@@ -37,25 +37,51 @@ function drawSmoothPath(ctx, points) {
   ctx.stroke();
 }
 
+/* ─── Hit-test: is a point within radius of any point on a path? ─── */
+function isPointNearPath(px, py, path, radius) {
+  if (!path.points || path.points.length === 0) return false;
+  const r2 = radius * radius;
+  for (let i = 0; i < path.points.length; i++) {
+    const dx = px - path.points[i].x;
+    const dy = py - path.points[i].y;
+    if (dx * dx + dy * dy <= r2) return true;
+    // Also check segments between points for better hit detection
+    if (i > 0) {
+      const p0 = path.points[i - 1];
+      const p1 = path.points[i];
+      const len2 = (p1.x - p0.x) ** 2 + (p1.y - p0.y) ** 2;
+      if (len2 > 0) {
+        let t = ((px - p0.x) * (p1.x - p0.x) + (py - p0.y) * (p1.y - p0.y)) / len2;
+        t = Math.max(0, Math.min(1, t));
+        const cx = p0.x + t * (p1.x - p0.x);
+        const cy = p0.y + t * (p1.y - p0.y);
+        const d2 = (px - cx) ** 2 + (py - cy) ** 2;
+        if (d2 <= r2) return true;
+      }
+    }
+  }
+  return false;
+}
+
 /* ─── Render all paths on a canvas context (shared by DrawingCanvas + DrawingPreview) ─── */
 export function renderPaths(ctx, paths, scale = 1) {
   paths.forEach(path => {
     if (!path.points || path.points.length === 0) return;
+    // Skip legacy eraser strokes (stroke-based eraser doesn't render anything)
+    if (path.tool === 'eraser') return;
 
     ctx.strokeStyle = path.color;
     ctx.fillStyle = path.color;
     ctx.lineWidth = Math.max(1, path.size * scale);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-
-    ctx.globalCompositeOperation = path.tool === 'eraser' ? 'destination-out' : 'source-over';
+    ctx.globalCompositeOperation = 'source-over';
 
     const scaledPoints = scale !== 1
       ? path.points.map(p => ({ x: p.x * scale, y: p.y * scale }))
       : path.points;
 
     drawSmoothPath(ctx, scaledPoints);
-    ctx.globalCompositeOperation = 'source-over';
   });
 }
 
@@ -292,15 +318,14 @@ function DrawingCanvas({
 
     renderPaths(ctx, paths);
 
-    if (currentPath && currentPath.points && currentPath.points.length > 0) {
+    if (currentPath && currentPath.points && currentPath.points.length > 0 && currentPath.tool !== 'eraser') {
       ctx.strokeStyle = currentPath.color;
       ctx.fillStyle = currentPath.color;
       ctx.lineWidth = currentPath.size;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.globalCompositeOperation = currentPath.tool === 'eraser' ? 'destination-out' : 'source-over';
-      drawSmoothPath(ctx, currentPath.points);
       ctx.globalCompositeOperation = 'source-over';
+      drawSmoothPath(ctx, currentPath.points);
     }
   }, [paths, currentPath, canvasWidth, canvasHeight, fillContainer, displaySize]);
 
@@ -320,17 +345,37 @@ function DrawingCanvas({
   }, [canvasWidth, canvasHeight]);
 
   // ─── Drawing handlers ───
+  // Refs to track stroke-based eraser state across a single gesture
+  const eraserStartPaths = useRef(null);
+  const eraserResultPaths = useRef(null);
+  const eraserDidErase = useRef(false);
+
   const startDrawing = useCallback((e) => {
     if (readOnly || mode !== 'draw') return;
     const point = getCanvasCoordinates(e);
-    setCurrentPath({
-      tool,
-      color: tool === 'eraser' ? '#FFFFFF' : color,
-      size,
-      points: [point],
-    });
+    if (tool === 'eraser') {
+      // Stroke-based eraser: save initial state for undo
+      eraserStartPaths.current = paths;
+      eraserResultPaths.current = paths;
+      eraserDidErase.current = false;
+      const eraserRadius = Math.max(size, 8);
+      const hitIdx = paths.findIndex(p => p.tool !== 'eraser' && isPointNearPath(point.x, point.y, p, eraserRadius));
+      if (hitIdx !== -1) {
+        const filtered = paths.filter((_, i) => i !== hitIdx);
+        setPaths(filtered);
+        eraserResultPaths.current = filtered;
+        eraserDidErase.current = true;
+      }
+    } else {
+      setCurrentPath({
+        tool,
+        color,
+        size,
+        points: [point],
+      });
+    }
     setIsDrawing(true);
-  }, [readOnly, mode, tool, color, size, getCanvasCoordinates]);
+  }, [readOnly, mode, tool, color, size, getCanvasCoordinates, paths, setPaths]);
 
   const lastDrawTime = useRef(0);
   const draw = useCallback((e) => {
@@ -339,22 +384,48 @@ function DrawingCanvas({
     if (now - lastDrawTime.current < 16) return;
     lastDrawTime.current = now;
     const point = getCanvasCoordinates(e);
-    setCurrentPath(prev => ({
-      ...prev,
-      points: [...prev.points, point],
-    }));
-  }, [isDrawing, readOnly, mode, getCanvasCoordinates]);
+    if (tool === 'eraser') {
+      const eraserRadius = Math.max(size, 8);
+      const current = eraserResultPaths.current;
+      const hitIdx = current.findIndex(p => p.tool !== 'eraser' && isPointNearPath(point.x, point.y, p, eraserRadius));
+      if (hitIdx !== -1) {
+        const filtered = current.filter((_, i) => i !== hitIdx);
+        setPaths(filtered);
+        eraserResultPaths.current = filtered;
+        eraserDidErase.current = true;
+      }
+    } else {
+      setCurrentPath(prev => ({
+        ...prev,
+        points: [...prev.points, point],
+      }));
+    }
+  }, [isDrawing, readOnly, mode, tool, size, getCanvasCoordinates, setPaths]);
 
   const stopDrawing = useCallback(() => {
     if (!isDrawing || readOnly || mode !== 'draw') return;
-    if (currentPath && currentPath.points.length > 0) {
-      const newPaths = [...paths, currentPath];
-      pushPaths(newPaths);
-      notifyChange(newPaths);
+    if (tool === 'eraser') {
+      if (eraserDidErase.current && eraserStartPaths.current) {
+        const result = eraserResultPaths.current;
+        // Restore to before-state so pushPaths records it in undo stack
+        setPaths(eraserStartPaths.current);
+        // Now push the erased result (records before in undo, sets to result)
+        pushPaths(result);
+        notifyChange(result);
+      }
+      eraserStartPaths.current = null;
+      eraserResultPaths.current = null;
+      eraserDidErase.current = false;
+    } else {
+      if (currentPath && currentPath.points.length > 0) {
+        const newPaths = [...paths, currentPath];
+        pushPaths(newPaths);
+        notifyChange(newPaths);
+      }
+      setCurrentPath(null);
     }
-    setCurrentPath(null);
     setIsDrawing(false);
-  }, [isDrawing, readOnly, mode, currentPath, paths, pushPaths, notifyChange]);
+  }, [isDrawing, readOnly, mode, tool, currentPath, paths, pushPaths, notifyChange, setPaths]);
 
   // ─── Clear ───
   const clearCanvas = useCallback(() => {
@@ -370,6 +441,8 @@ function DrawingCanvas({
     setCanvasHeight(newHeight);
     if (onChange) {
       isInternalChange.current = true;
+      clearTimeout(internalChangeTimer.current);
+      internalChangeTimer.current = setTimeout(() => { isInternalChange.current = false; }, 2000);
       let originalHeight = height;
       if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions) {
         originalHeight = data.dimensions.originalHeight || height;
@@ -380,6 +453,36 @@ function DrawingCanvas({
       });
     }
   }, [readOnly, mode, paths, canvasWidth, canvasHeight, onChange, data, height]);
+
+  // ─── Remove Last Page ───
+  const originalHeight = React.useMemo(() => {
+    if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions) {
+      return data.dimensions.originalHeight || height;
+    }
+    return height;
+  }, [data, height]);
+
+  const canRemovePage = canvasHeight > originalHeight;
+
+  const removePage = useCallback(() => {
+    if (readOnly || mode !== 'draw' || !canRemovePage) return;
+    const newHeight = canvasHeight / 2;
+    // Remove paths whose points are entirely below the new boundary
+    const filteredPaths = paths.filter(p =>
+      p.points && p.points.some(pt => pt.y <= newHeight)
+    );
+    setCanvasHeight(newHeight);
+    pushPaths(filteredPaths);
+    if (onChange) {
+      isInternalChange.current = true;
+      clearTimeout(internalChangeTimer.current);
+      internalChangeTimer.current = setTimeout(() => { isInternalChange.current = false; }, 2000);
+      onChange({
+        paths: filteredPaths,
+        dimensions: { width: canvasWidth, height: newHeight, originalHeight },
+      });
+    }
+  }, [readOnly, mode, canRemovePage, canvasHeight, paths, canvasWidth, originalHeight, pushPaths, onChange]);
 
   // ─── Touch events (passive: false for preventDefault) ───
   useEffect(() => {
@@ -474,6 +577,8 @@ function DrawingCanvas({
             onRedo={handleRedo}
             onClear={clearCanvas}
             onAddPage={addPage}
+            onRemovePage={removePage}
+            canRemovePage={canRemovePage}
             canUndo={canUndo}
             canRedo={canRedo}
             pathCount={paths.length}

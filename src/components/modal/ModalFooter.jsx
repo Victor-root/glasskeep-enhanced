@@ -382,7 +382,8 @@ export default function ModalFooter({
           })()}
         </div>
 
-        {/* ── Undo ── */}
+        {/* ── Undo (hidden in draw edit mode — canvas has its own undo) ── */}
+        {!(mType === 'draw' && drawMode === 'draw') && (
         <button
           className={`${btnClass} focus:outline-none ${!canUndo ? "opacity-50 cursor-default" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
@@ -396,8 +397,10 @@ export default function ModalFooter({
           </svg>
           {isDesktop && <span>{t("undo")}</span>}
         </button>
+        )}
 
-        {/* ── Redo ── */}
+        {/* ── Redo (hidden in draw edit mode — canvas has its own redo) ── */}
+        {!(mType === 'draw' && drawMode === 'draw') && (
         <button
           className={`${btnClass} focus:outline-none ${!canRedo ? "opacity-50 cursor-default" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
@@ -411,6 +414,7 @@ export default function ModalFooter({
           </svg>
           {isDesktop && <span>{t("redo")}</span>}
         </button>
+        )}
 
         {/* Spacer */}
         <div className="flex-1 modal-footer-spacer" />

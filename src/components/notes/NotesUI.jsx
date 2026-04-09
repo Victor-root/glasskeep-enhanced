@@ -43,6 +43,7 @@ function NotesUI({
   composerColor,
   setComposerColor,
   addNote,
+  onDirectDraw,
   pinned,
   others,
   openModal,
@@ -286,6 +287,7 @@ function NotesUI({
         composerColor={composerColor}
         setComposerColor={setComposerColor}
         addNote={addNote}
+        onDirectDraw={onDirectDraw}
         formatComposer={formatComposer}
         showComposerFmt={showComposerFmt}
         setShowComposerFmt={setShowComposerFmt}

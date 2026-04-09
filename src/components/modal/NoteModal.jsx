@@ -132,6 +132,9 @@ export default function NoteModal({
   // checklist handlers
   syncChecklistItems,
   checklistInsertPosition,
+  // direct draw mode
+  initialDrawMode,
+  onConsumeInitialDrawMode,
 }) {
   const [autoEditId, setAutoEditId] = React.useState(null);
   const [drawMode, setDrawMode] = React.useState("view");
@@ -145,6 +148,18 @@ export default function NoteModal({
     mTitle, mBody, setMTitle, setMBody,
     open, activeId, mType, viewMode,
   });
+
+  /* Set draw mode when modal opens (reset to view, or honour initialDrawMode) */
+  React.useEffect(() => {
+    if (open) {
+      if (initialDrawMode) {
+        setDrawMode(initialDrawMode);
+        if (onConsumeInitialDrawMode) onConsumeInitialDrawMode();
+      } else {
+        setDrawMode("view");
+      }
+    }
+  }, [open, activeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Sync PWA status bar color with note color */
   React.useEffect(() => {
