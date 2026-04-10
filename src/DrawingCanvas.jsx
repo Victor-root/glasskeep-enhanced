@@ -299,15 +299,24 @@ function DrawingCanvas({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
+    let dpr = window.devicePixelRatio || 1;
 
     // In fillContainer mode, use actual display width for sharp rendering.
     // For height: if canvas is taller than display (multi-page), scale proportionally
     // from width so the canvas scrolls instead of squishing.
     const useDisplay = fillContainer && displaySize && displaySize.width > 0;
-    const physW = useDisplay ? displaySize.width : canvasWidth;
+    let physW = useDisplay ? displaySize.width : canvasWidth;
     const scaleFromWidth = useDisplay ? displaySize.width / canvasWidth : 1;
-    const physH = useDisplay ? canvasHeight * scaleFromWidth : canvasHeight;
+    let physH = useDisplay ? canvasHeight * scaleFromWidth : canvasHeight;
+
+    // Cap physical canvas size to stay within mobile browser limits (~16M pixels).
+    // Exceeding the limit causes silent canvas failure (blank rendering).
+    const MAX_PIXELS = 12_000_000;
+    let totalPixels = Math.round(physW * dpr) * Math.round(physH * dpr);
+    if (totalPixels > MAX_PIXELS) {
+      const scale = Math.sqrt(MAX_PIXELS / totalPixels);
+      dpr = Math.max(1, dpr * scale);
+    }
 
     // Physical pixel buffer matches the display area × devicePixelRatio
     canvas.width = Math.round(physW * dpr);
