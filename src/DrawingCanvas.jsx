@@ -114,7 +114,8 @@ function DrawingCanvas({
   const canvasWrapperRef = useRef(null);
   const isScrollingRef = useRef(false);
   const isDrawingRef = useRef(false);
-  const pendingTouchRef = useRef(null); // deferred first-touch for draw vs scroll detection
+  const pendingTouchRef = useRef(null);
+  const scrollStateRef = useRef({ lastY: 0, velocity: 0, momentumId: null });
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState('pen');
   const [color, setColor] = useState(darkMode ? '#FFFFFF' : '#000000');
@@ -508,9 +509,7 @@ function DrawingCanvas({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    let lastY = 0;
-    let velocity = 0;
-    let momentumId = null;
+    const ss = scrollStateRef; // ref persists across effect re-runs
 
     const avgY = (touches) => {
       let s = 0;
@@ -519,22 +518,25 @@ function DrawingCanvas({
     };
 
     const stopMomentum = () => {
-      if (momentumId) { cancelAnimationFrame(momentumId); momentumId = null; }
+      if (ss.current.momentumId) {
+        cancelAnimationFrame(ss.current.momentumId);
+        ss.current.momentumId = null;
+      }
     };
 
     const startMomentum = () => {
       const wrapper = canvasWrapperRef.current;
-      if (!wrapper || Math.abs(velocity) < 0.5) return;
+      if (!wrapper || Math.abs(ss.current.velocity) < 0.5) return;
       const step = () => {
-        velocity *= 0.92;
-        wrapper.scrollTop -= velocity;
-        if (Math.abs(velocity) > 0.5) {
-          momentumId = requestAnimationFrame(step);
+        ss.current.velocity *= 0.92;
+        wrapper.scrollTop -= ss.current.velocity;
+        if (Math.abs(ss.current.velocity) > 0.5) {
+          ss.current.momentumId = requestAnimationFrame(step);
         } else {
-          momentumId = null;
+          ss.current.momentumId = null;
         }
       };
-      momentumId = requestAnimationFrame(step);
+      ss.current.momentumId = requestAnimationFrame(step);
     };
 
     const handleTouchStart = (e) => {
@@ -543,17 +545,14 @@ function DrawingCanvas({
       stopMomentum();
 
       if (e.touches.length >= 2) {
-        // Two fingers: scroll mode — no state changes, no re-render
         pendingTouchRef.current = null;
         if (isDrawingRef.current) cancelCurrentStroke();
         isScrollingRef.current = true;
-        lastY = avgY(e.touches);
-        velocity = 0;
+        ss.current.lastY = avgY(e.touches);
+        ss.current.velocity = 0;
         return;
       }
 
-      // Single finger: DON'T start drawing yet — defer to touchmove
-      // This avoids state changes that would reset scrollTop if 2nd finger arrives
       if (!isScrollingRef.current) {
         const t = e.touches[0];
         pendingTouchRef.current = { clientX: t.clientX, clientY: t.clientY };
@@ -569,15 +568,14 @@ function DrawingCanvas({
         if (isDrawingRef.current) cancelCurrentStroke();
         isScrollingRef.current = true;
         const currentY = avgY(e.touches);
-        const delta = currentY - lastY;
-        velocity = delta;
+        const delta = currentY - ss.current.lastY;
+        ss.current.velocity = delta;
         const wrapper = canvasWrapperRef.current;
         if (wrapper) wrapper.scrollTop -= delta;
-        lastY = currentY;
+        ss.current.lastY = currentY;
         return;
       }
 
-      // Single finger: start drawing on first move if pending
       if (pendingTouchRef.current) {
         startDrawing(pendingTouchRef.current);
         pendingTouchRef.current = null;
@@ -590,11 +588,9 @@ function DrawingCanvas({
       e.preventDefault();
 
       if (e.touches.length === 0) {
-        // Single tap without move — start + stop to record a dot
         if (pendingTouchRef.current) {
           startDrawing(pendingTouchRef.current);
           pendingTouchRef.current = null;
-          // Let stopDrawing run below to finalize the dot
         }
         if (isScrollingRef.current) {
           isScrollingRef.current = false;
