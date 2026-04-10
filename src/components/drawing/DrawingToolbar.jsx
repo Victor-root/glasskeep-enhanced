@@ -581,7 +581,7 @@ export default function DrawingToolbar({
             tooltip={confirmClear ? t('confirmClear') : t('clearAll')}
           >
             {confirmClear ? (
-              <span className="text-xs font-bold px-0.5 text-red-600 dark:text-red-400 animate-pulse">{t('confirmQuestion')}</span>
+              <span className="text-xs font-bold px-0.5 text-white animate-pulse">{t('confirmQuestion')}</span>
             ) : (
               <TrashIcon />
             )}
