@@ -112,6 +112,7 @@ function DrawingCanvas({
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const canvasWrapperRef = useRef(null);
+  const touchScrollRef = useRef({ active: false, lastY: 0 });
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState('pen');
   const [color, setColor] = useState(darkMode ? '#FFFFFF' : '#000000');
@@ -485,27 +486,77 @@ function DrawingCanvas({
   }, [readOnly, mode, canRemovePage, canvasHeight, paths, canvasWidth, originalHeight, pushPaths, onChange]);
 
   // ─── Touch events (passive: false for preventDefault) ───
+  // 1 finger = draw, 2 fingers = scroll (multi-page navigation on touch devices)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const ts = touchScrollRef;
+
+    const avgTouchY = (touches) => {
+      let sum = 0;
+      for (let i = 0; i < touches.length; i++) sum += touches[i].clientY;
+      return sum / touches.length;
+    };
 
     const handleTouchStart = (e) => {
-      if (mode === 'draw' && !readOnly) {
-        e.preventDefault();
+      if (mode !== 'draw' || readOnly) return;
+      e.preventDefault();
+
+      if (e.touches.length >= 2) {
+        // Two-finger: enter scroll mode, cancel any in-progress stroke
+        if (isDrawing) {
+          setCurrentPath(null);
+          setIsDrawing(false);
+        }
+        ts.current = { active: true, lastY: avgTouchY(e.touches) };
+        return;
+      }
+
+      // Single finger: only draw if not in scroll mode
+      if (!ts.current.active) {
         startDrawing(e);
       }
     };
+
     const handleTouchMove = (e) => {
-      if (mode === 'draw' && !readOnly) {
-        e.preventDefault();
-        draw(e);
+      if (mode !== 'draw' || readOnly) return;
+      e.preventDefault();
+
+      if (ts.current.active || e.touches.length >= 2) {
+        // Scroll mode: programmatically scroll the canvas wrapper
+        if (!ts.current.active) {
+          // Just became 2-finger mid-stroke — cancel stroke
+          if (isDrawing) {
+            setCurrentPath(null);
+            setIsDrawing(false);
+          }
+          ts.current = { active: true, lastY: avgTouchY(e.touches) };
+        }
+        const currentY = avgTouchY(e.touches);
+        const delta = currentY - ts.current.lastY;
+        const wrapper = canvasWrapperRef.current;
+        if (wrapper) wrapper.scrollTop -= delta;
+        ts.current.lastY = currentY;
+        return;
       }
+
+      // Single finger drawing
+      draw(e);
     };
+
     const handleTouchEnd = (e) => {
-      if (mode === 'draw' && !readOnly) {
-        e.preventDefault();
+      if (mode !== 'draw' || readOnly) return;
+      e.preventDefault();
+
+      if (e.touches.length === 0) {
+        // All fingers lifted — reset scroll mode
+        if (ts.current.active) {
+          ts.current = { active: false, lastY: 0 };
+          return;
+        }
         stopDrawing();
       }
+      // If touches remain and we're in scroll mode, stay in scroll mode
     };
 
     canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
@@ -517,7 +568,7 @@ function DrawingCanvas({
       canvas.removeEventListener('touchmove', handleTouchMove);
       canvas.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [mode, readOnly, startDrawing, draw, stopDrawing]);
+  }, [mode, readOnly, startDrawing, draw, stopDrawing, isDrawing, setCurrentPath, setIsDrawing]);
 
   // ─── Desktop cursor tracking ───
   const handleMouseMove = useCallback((e) => {
