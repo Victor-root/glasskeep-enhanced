@@ -75,7 +75,7 @@ const TrashIcon = () => (
 /* ─── Toolbar Button ─── */
 function TBtn({ active, onClick, disabled, tooltip, variant = 'default', compact = false, children, className = '' }) {
   const base = compact
-    ? 'flex items-center justify-center rounded-lg transition-all duration-200 active:scale-[0.95] disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:scale-100 w-8 h-8 p-1.5 [&_svg]:w-[18px] [&_svg]:h-[18px]'
+    ? 'flex items-center justify-center rounded-lg transition-all duration-200 active:scale-[0.95] disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:scale-100 w-9 h-9 p-1.5 [&_svg]:w-5 [&_svg]:h-5'
     : 'flex items-center justify-center rounded-xl transition-all duration-200 active:scale-[0.95] disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:scale-100 min-w-[40px] min-h-[40px] p-2';
 
   const variants = {
@@ -104,7 +104,7 @@ function TBtn({ active, onClick, disabled, tooltip, variant = 'default', compact
 }
 
 /* ─── Separator (desktop only) ─── */
-const Sep = ({ hide }) => hide ? null : <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-0.5 shrink-0" />;
+const Sep = ({ hide }) => hide ? null : <div className="w-px h-7 bg-gray-200 dark:bg-gray-700 mx-0.5 shrink-0" />;
 
 /* ─── Compact Popover (portal, auto-position, outside click to close) ─── */
 function ToolbarPopover({ anchorRef, open, onClose, darkMode, children }) {
@@ -238,13 +238,13 @@ export default function DrawingToolbar({
 
   const isCustomColor = !QUICK_COLORS.includes(color);
 
-  const colorSize = compact ? 'w-6 h-6' : 'w-7 h-7';
-  const sizeBtn = compact ? 'w-7 h-7 rounded-lg' : 'w-9 h-9 rounded-xl';
-  const iconCls = compact ? 'w-4 h-4' : 'w-5 h-5';
+  const colorSize = compact ? 'w-7 h-7' : 'w-7 h-7';
+  const sizeBtn = compact ? 'w-8 h-8 rounded-lg' : 'w-9 h-9 rounded-xl';
+  const iconCls = compact ? 'w-5 h-5' : 'w-5 h-5';
 
   return (
     <div className={compact
-      ? "flex items-center justify-center gap-0.5 flex-nowrap px-2.5 py-1 rounded-xl bg-white/60 dark:bg-gray-800/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/40 shadow-sm"
+      ? "flex items-center justify-center gap-1 flex-nowrap px-3 py-1.5 rounded-xl bg-white/60 dark:bg-gray-800/70 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/40 shadow-sm"
       : "flex items-center flex-wrap gap-1.5 mb-1 p-1.5 bg-gray-100/80 dark:bg-gray-800/60 rounded-2xl border border-gray-200/60 dark:border-gray-700/40"
     }>
 
