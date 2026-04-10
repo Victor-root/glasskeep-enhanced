@@ -734,6 +734,7 @@ function DrawingCanvas({
           // Convert logical originalHeight to CSS pixels
           const scale = displaySize.width / canvasWidth;
           const pageCssH = originalHeight * scale;
+          const isMobile = displaySize.width < 768;
           const lines = [];
           for (let y = originalHeight; y <= canvasHeight; y += originalHeight) {
             lines.push(
@@ -742,7 +743,9 @@ function DrawingCanvas({
                 className="absolute left-0 right-0 pointer-events-none"
                 style={{
                   top: `${y * scale}px`,
-                  borderTop: `1px dashed ${darkMode ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.15)'}`,
+                  borderTop: `1px dashed ${darkMode
+                    ? (isMobile ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.18)')
+                    : (isMobile ? 'rgba(0,0,0,0.07)' : 'rgba(0,0,0,0.15)')}`,
                 }}
               />
             );
