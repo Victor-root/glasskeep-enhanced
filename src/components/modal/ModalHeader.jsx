@@ -73,7 +73,7 @@ export default function ModalHeader({
       >
         <div className={`flex items-center ${
           isDrawEdit
-            ? (isDesktop ? "gap-1 px-2 py-2" : "px-1 py-1")
+            ? (isDesktop ? "gap-1 px-2 py-1" : "px-1 py-1")
             : (isDesktop ? "flex-wrap gap-2 px-4 sm:px-6 pt-4 pb-3" : "px-2 py-1.5")
         }`}>
 
