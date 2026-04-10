@@ -345,20 +345,18 @@ function DrawingCanvas({
       drawSmoothPath(ctx, currentPath.points);
     }
 
-    // Draw page boundary lines (draw mode only, multi-page)
+    // Draw page boundary lines (draw mode only)
     if (mode === 'draw') {
       // In fillContainer mode, one page = the wrapper's visible height in logical coords.
-      // This is more reliable than originalHeight (which was incorrectly stored as the
-      // height prop instead of the actual viewport height for older drawings).
       const firstPageH = useDisplay
         ? displaySize.height / scaleFromWidth
         : height;
-      if (canvasHeight > firstPageH * 1.1 && firstPageH > 0) {
+      if (firstPageH > 0) {
         ctx.save();
         ctx.strokeStyle = darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)';
         ctx.lineWidth = 1;
         ctx.setLineDash([8, 6]);
-        for (let y = firstPageH; y < canvasHeight; y += firstPageH) {
+        for (let y = firstPageH; y <= canvasHeight; y += firstPageH) {
           ctx.beginPath();
           ctx.moveTo(0, y);
           ctx.lineTo(canvasWidth, y);
