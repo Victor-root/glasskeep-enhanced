@@ -730,17 +730,18 @@ function DrawingCanvas({
         />
 
         {/* Page boundary lines (draw mode only) — DOM-based for cross-browser reliability */}
-        {mode === 'draw' && !readOnly && displaySize && displaySize.height > 0 && (() => {
-          const pageH = displaySize.height;
-          const totalPages = Math.max(1, Math.round(canvasHeight / (displaySize.height / (displaySize.width / canvasWidth || 1))));
+        {mode === 'draw' && !readOnly && displaySize && displaySize.width > 0 && originalHeight > 0 && (() => {
+          // Convert logical originalHeight to CSS pixels
+          const scale = displaySize.width / canvasWidth;
+          const pageCssH = originalHeight * scale;
           const lines = [];
-          for (let i = 1; i <= totalPages; i++) {
+          for (let y = originalHeight; y <= canvasHeight; y += originalHeight) {
             lines.push(
               <div
-                key={i}
+                key={y}
                 className="absolute left-0 right-0 pointer-events-none"
                 style={{
-                  top: `${pageH * i}px`,
+                  top: `${y * scale}px`,
                   borderTop: `1px dashed ${darkMode ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.15)'}`,
                 }}
               />
