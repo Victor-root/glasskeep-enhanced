@@ -147,6 +147,7 @@ function ToolbarPopover({ anchorRef, open, onClose, darkMode, children }) {
     const onDown = (e) => {
       if (panelRef.current?.contains(e.target)) return;
       if (anchorRef?.current?.contains(e.target)) return;
+      e.stopPropagation();
       onClose?.();
     };
     document.addEventListener("mousedown", onDown, true);
