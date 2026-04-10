@@ -713,9 +713,32 @@ function DrawingCanvas({
         ref={canvasWrapperRef}
         className={`relative${fillContainer ? ' flex-1 min-h-0 border-0 overflow-y-auto overflow-x-hidden' : ' overflow-hidden border border-gray-300 dark:border-gray-600 rounded-lg'}`}
       >
+        {/* Page boundary lines (draw mode only) — behind canvas so strokes render on top */}
+        {mode === 'draw' && !readOnly && displaySize && displaySize.width > 0 && originalHeight > 0 && (() => {
+          // Convert logical originalHeight to CSS pixels
+          const scale = displaySize.width / canvasWidth;
+          const isMobile = displaySize.width < 768;
+          const lines = [];
+          for (let y = originalHeight; y <= canvasHeight; y += originalHeight) {
+            lines.push(
+              <div
+                key={y}
+                className="absolute left-0 right-0 pointer-events-none z-0"
+                style={{
+                  top: `${y * scale}px`,
+                  borderTop: `1px dashed ${darkMode
+                    ? (isMobile ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.18)')
+                    : (isMobile ? 'rgba(0,0,0,0.07)' : 'rgba(0,0,0,0.15)')}`,
+                }}
+              />
+            );
+          }
+          return lines;
+        })()}
+
         <canvas
           ref={canvasRef}
-          className="block"
+          className="block relative z-[1]"
           style={{
             width: '100%',
             height: 'auto',
@@ -728,30 +751,6 @@ function DrawingCanvas({
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         />
-
-        {/* Page boundary lines (draw mode only) — DOM-based for cross-browser reliability */}
-        {mode === 'draw' && !readOnly && displaySize && displaySize.width > 0 && originalHeight > 0 && (() => {
-          // Convert logical originalHeight to CSS pixels
-          const scale = displaySize.width / canvasWidth;
-          const pageCssH = originalHeight * scale;
-          const isMobile = displaySize.width < 768;
-          const lines = [];
-          for (let y = originalHeight; y <= canvasHeight; y += originalHeight) {
-            lines.push(
-              <div
-                key={y}
-                className="absolute left-0 right-0 pointer-events-none"
-                style={{
-                  top: `${y * scale}px`,
-                  borderTop: `1px dashed ${darkMode
-                    ? (isMobile ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.18)')
-                    : (isMobile ? 'rgba(0,0,0,0.07)' : 'rgba(0,0,0,0.15)')}`,
-                }}
-              />
-            );
-          }
-          return lines;
-        })()}
 
         {/* Dynamic cursor (desktop) — fixed position so it renders above header */}
         {showCursor && cursorPos && mode === 'draw' && !readOnly && (
