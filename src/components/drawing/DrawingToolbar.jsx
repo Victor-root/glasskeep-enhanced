@@ -505,7 +505,7 @@ export default function DrawingToolbar({
               </button>
               {/* Clear */}
               <button
-                onClick={() => { handleClear(); if (confirmClear) return; setActionsPopOpen(false); }}
+                onClick={() => { if (!confirmClear) { handleClear(); return; } handleClear(); setActionsPopOpen(false); }}
                 className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-150 active:scale-95 ${
                   pathCount === 0 ? 'opacity-35 cursor-not-allowed' : 'hover:bg-red-50 dark:hover:bg-red-900/20'
                 }`}
