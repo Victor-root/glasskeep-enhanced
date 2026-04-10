@@ -794,8 +794,6 @@ function DrawingCanvas({
       {!(fillContainer && mode === 'draw') && (
         <div className="text-xs text-gray-500 dark:text-gray-300 mt-2 shrink-0">
           {paths.length} {paths.length !== 1 ? t("strokeCountPlural") : t("strokeCount")}
-          {mode === 'view' && ` (${t('viewMode')})`}
-          {readOnly && mode === 'draw' && ` (${t('readOnlyLabel')})`}
         </div>
       )}
     </div>
