@@ -589,7 +589,7 @@ export default function ModalFooter({
 
         {/* ── Mode buttons for drawing notes (grouped) ── */}
         {mType === "draw" && (
-          <div className={`flex items-center ${isDesktop ? "gap-1" : "gap-0.5"}`}>
+          <div className={`flex items-center ${isDesktop ? "gap-1" : "gap-2"}`}>
             {/* Edit/View toggle (hidden in draw canvas mode) */}
             {drawMode !== "draw" && (
               <button
