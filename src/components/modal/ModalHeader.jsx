@@ -91,6 +91,13 @@ export default function ModalHeader({
             </button>
           )}
 
+          {/* Draw edit: note title on the left (desktop only) */}
+          {isDrawEdit && isDesktop && mTitle && (
+            <span className="text-sm font-semibold truncate max-w-[200px] opacity-70 shrink-0 pl-2">
+              {mTitle}
+            </span>
+          )}
+
           {/* Draw edit: portal target for drawing toolbar (fills the space where title was) */}
           {isDrawEdit && (
             <div ref={drawToolbarMount} className="flex-1 min-w-0 overflow-visible py-1 flex justify-center" />
