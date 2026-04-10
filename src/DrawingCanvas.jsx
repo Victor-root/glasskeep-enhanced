@@ -114,6 +114,7 @@ function DrawingCanvas({
   const canvasWrapperRef = useRef(null);
   const isScrollingRef = useRef(false);
   const isDrawingRef = useRef(false);
+  const pendingTouchRef = useRef(null); // deferred first-touch for draw vs scroll detection
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState('pen');
   const [color, setColor] = useState(darkMode ? '#FFFFFF' : '#000000');
@@ -542,6 +543,8 @@ function DrawingCanvas({
       stopMomentum();
 
       if (e.touches.length >= 2) {
+        // Two fingers: scroll mode — no state changes, no re-render
+        pendingTouchRef.current = null;
         if (isDrawingRef.current) cancelCurrentStroke();
         isScrollingRef.current = true;
         lastY = avgY(e.touches);
@@ -549,8 +552,11 @@ function DrawingCanvas({
         return;
       }
 
+      // Single finger: DON'T start drawing yet — defer to touchmove
+      // This avoids state changes that would reset scrollTop if 2nd finger arrives
       if (!isScrollingRef.current) {
-        startDrawing(e);
+        const t = e.touches[0];
+        pendingTouchRef.current = { clientX: t.clientX, clientY: t.clientY };
       }
     };
 
@@ -559,6 +565,7 @@ function DrawingCanvas({
       e.preventDefault();
 
       if (e.touches.length >= 2 || isScrollingRef.current) {
+        pendingTouchRef.current = null;
         if (isDrawingRef.current) cancelCurrentStroke();
         isScrollingRef.current = true;
         const currentY = avgY(e.touches);
@@ -570,6 +577,11 @@ function DrawingCanvas({
         return;
       }
 
+      // Single finger: start drawing on first move if pending
+      if (pendingTouchRef.current) {
+        startDrawing(pendingTouchRef.current);
+        pendingTouchRef.current = null;
+      }
       draw(e);
     };
 
@@ -578,6 +590,12 @@ function DrawingCanvas({
       e.preventDefault();
 
       if (e.touches.length === 0) {
+        // Single tap without move — start + stop to record a dot
+        if (pendingTouchRef.current) {
+          startDrawing(pendingTouchRef.current);
+          pendingTouchRef.current = null;
+          // Let stopDrawing run below to finalize the dot
+        }
         if (isScrollingRef.current) {
           isScrollingRef.current = false;
           startMomentum();
@@ -588,6 +606,7 @@ function DrawingCanvas({
     };
 
     const handleTouchCancel = () => {
+      pendingTouchRef.current = null;
       isScrollingRef.current = false;
       stopMomentum();
       if (isDrawingRef.current) cancelCurrentStroke();
