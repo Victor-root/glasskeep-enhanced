@@ -344,27 +344,6 @@ function DrawingCanvas({
       ctx.globalCompositeOperation = 'source-over';
       drawSmoothPath(ctx, currentPath.points);
     }
-
-    // Draw page boundary lines (draw mode only)
-    if (mode === 'draw') {
-      // In fillContainer mode, one page = the wrapper's visible height in logical coords.
-      const firstPageH = useDisplay
-        ? displaySize.height / scaleFromWidth
-        : height;
-      if (firstPageH > 0) {
-        ctx.save();
-        ctx.strokeStyle = darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([8, 6]);
-        for (let y = firstPageH; y <= canvasHeight; y += firstPageH) {
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(canvasWidth, y);
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
-    }
   }, [paths, currentPath, canvasWidth, canvasHeight, fillContainer, displaySize, mode, darkMode]);
 
   // ─── Coordinate helper (maps CSS pixels → logical canvas coordinates) ───
@@ -749,6 +728,26 @@ function DrawingCanvas({
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         />
+
+        {/* Page boundary lines (draw mode only) — DOM-based for cross-browser reliability */}
+        {mode === 'draw' && !readOnly && displaySize && displaySize.height > 0 && (() => {
+          const pageH = displaySize.height;
+          const totalPages = Math.max(1, Math.round(canvasHeight / (displaySize.height / (displaySize.width / canvasWidth || 1))));
+          const lines = [];
+          for (let i = 1; i <= totalPages; i++) {
+            lines.push(
+              <div
+                key={i}
+                className="absolute left-0 right-0 pointer-events-none"
+                style={{
+                  top: `${pageH * i}px`,
+                  borderTop: `1px dashed ${darkMode ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.15)'}`,
+                }}
+              />
+            );
+          }
+          return lines;
+        })()}
 
         {/* Dynamic cursor (desktop) — fixed position so it renders above header */}
         {showCursor && cursorPos && mode === 'draw' && !readOnly && (
