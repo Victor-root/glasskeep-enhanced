@@ -68,7 +68,7 @@ export default function ModalHeader({
     <>
       {/* ── Sticky toolbar ── */}
       <div
-        className={`sticky top-0 z-20 rounded-t-none ${isDrawEdit ? '' : 'sm:rounded-t-xl'}`}
+        className={`sticky top-0 z-20 rounded-t-none ${isDrawEdit ? '' : 'sm:rounded-t-xl'} ${isDrawEdit ? (dark ? 'border-b border-white/15' : 'border-b border-black/10') : ''}`}
         style={{ backgroundColor: modalBgFor(mColor, dark) }}
       >
         <div className={`flex items-center ${
@@ -93,7 +93,7 @@ export default function ModalHeader({
 
           {/* Draw edit: note title on the left (desktop only) */}
           {isDrawEdit && isDesktop && mTitle && (
-            <span className="text-sm font-semibold truncate max-w-[200px] opacity-70 shrink-0 pl-2">
+            <span className="text-sm font-semibold truncate max-w-[200px] shrink-0 pl-2">
               {mTitle}
             </span>
           )}
