@@ -503,61 +503,93 @@ function DrawingCanvas({
   }, [readOnly, mode, canRemovePage, canvasHeight, paths, canvasWidth, originalHeight, pushPaths, onChange]);
 
   // ─── Touch events (passive: false for preventDefault) ───
-  // 1 finger = draw, 2 fingers = native browser scroll (multi-page navigation)
+  // 1 finger = draw, 2 fingers = programmatic scroll with momentum
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    let lastY = 0;
+    let velocity = 0;
+    let momentumId = null;
+
+    const avgY = (touches) => {
+      let s = 0;
+      for (let i = 0; i < touches.length; i++) s += touches[i].clientY;
+      return s / touches.length;
+    };
+
+    const stopMomentum = () => {
+      if (momentumId) { cancelAnimationFrame(momentumId); momentumId = null; }
+    };
+
+    const startMomentum = () => {
+      const wrapper = canvasWrapperRef.current;
+      if (!wrapper || Math.abs(velocity) < 0.5) return;
+      const step = () => {
+        velocity *= 0.92;
+        wrapper.scrollTop -= velocity;
+        if (Math.abs(velocity) > 0.5) {
+          momentumId = requestAnimationFrame(step);
+        } else {
+          momentumId = null;
+        }
+      };
+      momentumId = requestAnimationFrame(step);
+    };
 
     const handleTouchStart = (e) => {
       if (mode !== 'draw' || readOnly) return;
+      e.preventDefault();
+      stopMomentum();
 
       if (e.touches.length >= 2) {
-        // Two-finger: enter scroll mode, cancel any in-progress stroke
         if (isDrawingRef.current) cancelCurrentStroke();
         isScrollingRef.current = true;
-        // Don't preventDefault — let browser handle scroll natively
+        lastY = avgY(e.touches);
+        velocity = 0;
         return;
       }
 
-      // Single finger: only draw if not already in scroll mode
       if (!isScrollingRef.current) {
-        e.preventDefault();
         startDrawing(e);
       }
     };
 
     const handleTouchMove = (e) => {
       if (mode !== 'draw' || readOnly) return;
+      e.preventDefault();
 
       if (e.touches.length >= 2 || isScrollingRef.current) {
-        // Multi-touch or already scrolling — let browser scroll natively
         if (isDrawingRef.current) cancelCurrentStroke();
         isScrollingRef.current = true;
+        const currentY = avgY(e.touches);
+        const delta = currentY - lastY;
+        velocity = delta;
+        const wrapper = canvasWrapperRef.current;
+        if (wrapper) wrapper.scrollTop -= delta;
+        lastY = currentY;
         return;
       }
 
-      // Single finger drawing
-      e.preventDefault();
       draw(e);
     };
 
     const handleTouchEnd = (e) => {
       if (mode !== 'draw' || readOnly) return;
+      e.preventDefault();
 
       if (e.touches.length === 0) {
-        // All fingers lifted — reset scroll mode or finish stroke
         if (isScrollingRef.current) {
           isScrollingRef.current = false;
+          startMomentum();
           return;
         }
-        e.preventDefault();
         stopDrawing();
       }
-      // If touches remain and scrolling, stay in scroll mode
     };
 
     const handleTouchCancel = () => {
       isScrollingRef.current = false;
+      stopMomentum();
       if (isDrawingRef.current) cancelCurrentStroke();
     };
 
@@ -571,6 +603,7 @@ function DrawingCanvas({
       canvas.removeEventListener('touchmove', handleTouchMove);
       canvas.removeEventListener('touchend', handleTouchEnd);
       canvas.removeEventListener('touchcancel', handleTouchCancel);
+      stopMomentum();
     };
   }, [mode, readOnly, startDrawing, draw, stopDrawing, cancelCurrentStroke]);
 
@@ -661,7 +694,7 @@ function DrawingCanvas({
           style={{
             width: '100%',
             height: 'auto',
-            touchAction: mode === 'draw' && !readOnly ? 'pan-y' : 'auto',
+            touchAction: mode === 'draw' && !readOnly ? 'none' : 'auto',
             cursor: mode === 'draw' && !readOnly ? 'none' : 'default',
           }}
           onMouseDown={startDrawing}
