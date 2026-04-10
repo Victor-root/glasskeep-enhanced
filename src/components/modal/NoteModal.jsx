@@ -537,15 +537,13 @@ export default function NoteModal({
               ) : viewMode ? (
                 /* View mode: rendered text + read-only drawing preview */
                 <>
-                  {mBody ? (
+                  {mBody && (
                     <div
                       className="note-content note-content--dense whitespace-pre-wrap"
                       dangerouslySetInnerHTML={{
                         __html: renderSafeMarkdown(mBody),
                       }}
                     />
-                  ) : (
-                    <p className="text-sm text-gray-400 dark:text-gray-500 italic">{t("noTextContent")}</p>
                   )}
                   <div className="mt-4">
                     <DrawingCanvas
