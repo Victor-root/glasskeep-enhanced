@@ -490,29 +490,7 @@ function DrawingCanvas({
     notifyChange([]);
   }, [readOnly, mode, pushPaths, notifyChange]);
 
-  // ─── Add Page ───
-  const addPage = useCallback(() => {
-    if (readOnly || mode !== 'draw') return;
-    const newHeight = canvasHeight * 2;
-    setCanvasHeight(newHeight);
-    if (onChange) {
-      isInternalChange.current = true;
-      clearTimeout(internalChangeTimer.current);
-      internalChangeTimer.current = setTimeout(() => { isInternalChange.current = false; }, 2000);
-      let origH;
-      if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions && data.dimensions.originalHeight) {
-        origH = data.dimensions.originalHeight;
-      } else {
-        origH = fillContainer ? canvasHeight : height;
-      }
-      onChange({
-        paths,
-        dimensions: { width: canvasWidth, height: newHeight, originalHeight: origH },
-      });
-    }
-  }, [readOnly, mode, paths, canvasWidth, canvasHeight, onChange, data, height, fillContainer]);
-
-  // ─── Remove Last Page ───
+  // ─── Page height (one page = originalHeight from stored data, or viewport height) ───
   const originalHeight = React.useMemo(() => {
     if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions) {
       return data.dimensions.originalHeight || height;
@@ -520,11 +498,28 @@ function DrawingCanvas({
     return height;
   }, [data, height]);
 
+  // ─── Add Page ───
+  const addPage = useCallback(() => {
+    if (readOnly || mode !== 'draw') return;
+    const newHeight = canvasHeight + originalHeight;
+    setCanvasHeight(newHeight);
+    if (onChange) {
+      isInternalChange.current = true;
+      clearTimeout(internalChangeTimer.current);
+      internalChangeTimer.current = setTimeout(() => { isInternalChange.current = false; }, 2000);
+      onChange({
+        paths,
+        dimensions: { width: canvasWidth, height: newHeight, originalHeight },
+      });
+    }
+  }, [readOnly, mode, paths, canvasWidth, canvasHeight, originalHeight, onChange]);
+
+  // ─── Remove Last Page ───
   const canRemovePage = canvasHeight > originalHeight;
 
   const removePage = useCallback(() => {
     if (readOnly || mode !== 'draw' || !canRemovePage) return;
-    const newHeight = canvasHeight / 2;
+    const newHeight = canvasHeight - originalHeight;
     // Remove paths whose points are entirely below the new boundary
     const filteredPaths = paths.filter(p =>
       p.points && p.points.some(pt => pt.y <= newHeight)
