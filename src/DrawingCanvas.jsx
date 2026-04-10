@@ -209,15 +209,19 @@ function DrawingCanvas({
     internalChangeTimer.current = setTimeout(() => {
       isInternalChange.current = false;
     }, 2000);
-    let originalHeight = height;
-    if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions) {
-      originalHeight = data.dimensions.originalHeight || height;
+    let originalHeight;
+    if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions && data.dimensions.originalHeight) {
+      originalHeight = data.dimensions.originalHeight;
+    } else {
+      // For new drawings in fillContainer mode, use actual canvas height (from viewport)
+      // instead of the height prop, which is a default that doesn't match the viewport.
+      originalHeight = fillContainer ? canvasHeight : height;
     }
     onChange({
       paths: newPaths,
       dimensions: { width: canvasWidth, height: canvasHeight, originalHeight },
     });
-  }, [onChange, canvasWidth, canvasHeight, data, height]);
+  }, [onChange, canvasWidth, canvasHeight, data, height, fillContainer]);
 
   // ─── Undo / Redo — explicit notify ───
   const handleUndo = useCallback(() => {
@@ -343,10 +347,13 @@ function DrawingCanvas({
 
     // Draw page boundary lines (draw mode only, multi-page)
     if (mode === 'draw') {
-      const firstPageH = (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions)
-        ? (data.dimensions.originalHeight || height)
+      // In fillContainer mode, one page = the wrapper's visible height in logical coords.
+      // This is more reliable than originalHeight (which was incorrectly stored as the
+      // height prop instead of the actual viewport height for older drawings).
+      const firstPageH = useDisplay
+        ? displaySize.height / scaleFromWidth
         : height;
-      if (canvasHeight > firstPageH && firstPageH > 0) {
+      if (canvasHeight > firstPageH * 1.1 && firstPageH > 0) {
         ctx.save();
         ctx.strokeStyle = darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)';
         ctx.lineWidth = 1;
@@ -360,7 +367,7 @@ function DrawingCanvas({
         ctx.restore();
       }
     }
-  }, [paths, currentPath, canvasWidth, canvasHeight, fillContainer, displaySize, mode, data, height, darkMode]);
+  }, [paths, currentPath, canvasWidth, canvasHeight, fillContainer, displaySize, mode, darkMode]);
 
   // ─── Coordinate helper (maps CSS pixels → logical canvas coordinates) ───
   const getCanvasCoordinates = useCallback((e) => {
@@ -492,16 +499,18 @@ function DrawingCanvas({
       isInternalChange.current = true;
       clearTimeout(internalChangeTimer.current);
       internalChangeTimer.current = setTimeout(() => { isInternalChange.current = false; }, 2000);
-      let originalHeight = height;
-      if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions) {
-        originalHeight = data.dimensions.originalHeight || height;
+      let origH;
+      if (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions && data.dimensions.originalHeight) {
+        origH = data.dimensions.originalHeight;
+      } else {
+        origH = fillContainer ? canvasHeight : height;
       }
       onChange({
         paths,
-        dimensions: { width: canvasWidth, height: newHeight, originalHeight },
+        dimensions: { width: canvasWidth, height: newHeight, originalHeight: origH },
       });
     }
-  }, [readOnly, mode, paths, canvasWidth, canvasHeight, onChange, data, height]);
+  }, [readOnly, mode, paths, canvasWidth, canvasHeight, onChange, data, height, fillContainer]);
 
   // ─── Remove Last Page ───
   const originalHeight = React.useMemo(() => {
