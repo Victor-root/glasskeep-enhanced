@@ -266,21 +266,21 @@ function DrawingCanvas({
   // ─── Auto-size canvas to fill container (fillContainer mode) ───
   // Always tracks display size for sharp HiDPI rendering.
   // For new drawings (no stored dimensions), also sets logical canvas size.
-  // Debounced to avoid excessive re-renders during transition animations.
   useEffect(() => {
     if (!fillContainer) return;
     const wrapper = canvasWrapperRef.current;
     if (!wrapper) return;
 
     const hasStoredDimensions = data && typeof data === 'object' && !Array.isArray(data) && data.dimensions;
-    let debounceId = null;
 
     const updateSize = () => {
       const rect = wrapper.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
         const w = Math.round(rect.width);
         const h = Math.round(rect.height);
+        // Always update display size for sharp rendering
         setDisplaySize({ width: w, height: h });
+        // Only update logical dimensions for new drawings
         if (!hasStoredDimensions) {
           setCanvasWidth(w);
           setCanvasHeight(h);
@@ -288,82 +288,49 @@ function DrawingCanvas({
       }
     };
 
-    const debouncedUpdate = () => {
-      if (debounceId) cancelAnimationFrame(debounceId);
-      debounceId = requestAnimationFrame(updateSize);
-    };
-
-    // Initial size after layout settles
+    // Wait one frame for layout to settle
     const raf = requestAnimationFrame(updateSize);
-    const ro = new ResizeObserver(debouncedUpdate);
+    const ro = new ResizeObserver(updateSize);
     ro.observe(wrapper);
-    return () => { cancelAnimationFrame(raf); if (debounceId) cancelAnimationFrame(debounceId); ro.disconnect(); };
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, [fillContainer, data]);
 
   // ─── Canvas rendering (HiDPI-aware) ───
-  // Active stroke renders immediately; full path re-render is deferred via rAF
-  // to avoid blocking the UI thread during transitions.
-  const renderIdRef = useRef(null);
-  const lastRenderedRef = useRef(null);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const dpr = window.devicePixelRatio || 1;
+
+    // In fillContainer mode, use actual display width for sharp rendering.
+    // For height: if canvas is taller than display (multi-page), scale proportionally
+    // from width so the canvas scrolls instead of squishing.
     const useDisplay = fillContainer && displaySize && displaySize.width > 0;
     const physW = useDisplay ? displaySize.width : canvasWidth;
     const scaleFromWidth = useDisplay ? displaySize.width / canvasWidth : 1;
     const physH = useDisplay ? canvasHeight * scaleFromWidth : canvasHeight;
 
-    const newW = Math.round(physW * dpr);
-    const newH = Math.round(physH * dpr);
-
-    // Only resize the canvas buffer when dimensions actually change
-    if (canvas.width !== newW || canvas.height !== newH) {
-      canvas.width = newW;
-      canvas.height = newH;
-      lastRenderedRef.current = null; // force full re-render after resize
-    }
+    // Physical pixel buffer matches the display area × devicePixelRatio
+    canvas.width = Math.round(physW * dpr);
+    canvas.height = Math.round(physH * dpr);
 
     const ctx = canvas.getContext('2d');
+    // Transform maps logical coordinates → physical pixels
     const sx = (physW / canvasWidth) * dpr;
     const sy = (physH / canvasHeight) * dpr;
+    ctx.setTransform(sx, 0, 0, sy, 0, 0);
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    const doRender = () => {
-      ctx.setTransform(sx, 0, 0, sy, 0, 0);
-      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-      renderPaths(ctx, paths);
-      if (currentPath && currentPath.points && currentPath.points.length > 0 && currentPath.tool !== 'eraser') {
-        ctx.strokeStyle = currentPath.color;
-        ctx.fillStyle = currentPath.color;
-        ctx.lineWidth = currentPath.size;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.globalCompositeOperation = 'source-over';
-        drawSmoothPath(ctx, currentPath.points);
-      }
-      lastRenderedRef.current = paths;
-    };
+    renderPaths(ctx, paths);
 
-    // During active drawing (currentPath changing rapidly), render immediately
-    if (currentPath) {
-      if (renderIdRef.current) { cancelAnimationFrame(renderIdRef.current); renderIdRef.current = null; }
-      doRender();
-      return;
+    if (currentPath && currentPath.points && currentPath.points.length > 0 && currentPath.tool !== 'eraser') {
+      ctx.strokeStyle = currentPath.color;
+      ctx.fillStyle = currentPath.color;
+      ctx.lineWidth = currentPath.size;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.globalCompositeOperation = 'source-over';
+      drawSmoothPath(ctx, currentPath.points);
     }
-
-    // For non-drawing updates (mode transition, resize), defer to next frame
-    // so we don't block the CSS animation
-    if (renderIdRef.current) cancelAnimationFrame(renderIdRef.current);
-    renderIdRef.current = requestAnimationFrame(() => {
-      renderIdRef.current = null;
-      doRender();
-    });
-
-    return () => {
-      if (renderIdRef.current) { cancelAnimationFrame(renderIdRef.current); renderIdRef.current = null; }
-    };
   }, [paths, currentPath, canvasWidth, canvasHeight, fillContainer, displaySize]);
 
   // ─── Coordinate helper (maps CSS pixels → logical canvas coordinates) ───
