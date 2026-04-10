@@ -340,7 +340,27 @@ function DrawingCanvas({
       ctx.globalCompositeOperation = 'source-over';
       drawSmoothPath(ctx, currentPath.points);
     }
-  }, [paths, currentPath, canvasWidth, canvasHeight, fillContainer, displaySize]);
+
+    // Draw page boundary lines (draw mode only, multi-page)
+    if (mode === 'draw') {
+      const firstPageH = (data && typeof data === 'object' && !Array.isArray(data) && data.dimensions)
+        ? (data.dimensions.originalHeight || height)
+        : height;
+      if (canvasHeight > firstPageH && firstPageH > 0) {
+        ctx.save();
+        ctx.strokeStyle = darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([8, 6]);
+        for (let y = firstPageH; y < canvasHeight; y += firstPageH) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvasWidth, y);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+  }, [paths, currentPath, canvasWidth, canvasHeight, fillContainer, displaySize, mode, data, height, darkMode]);
 
   // ─── Coordinate helper (maps CSS pixels → logical canvas coordinates) ───
   const getCanvasCoordinates = useCallback((e) => {
