@@ -3,7 +3,6 @@ package com.glasskeep.app
 import android.Manifest
 import android.app.Activity
 import android.app.DownloadManager
-import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -221,18 +220,145 @@ class WebViewActivity : AppCompatActivity() {
     }
 
     private fun showChangeServerDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Changer de serveur")
-            .setMessage("Revenir a l'ecran de configuration ?")
-            .setPositiveButton("Oui") { _, _ ->
+        val dialog = android.app.Dialog(this)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        val dp = resources.displayMetrics.density
+        val pad = (24 * dp).toInt()
+        val padSmall = (16 * dp).toInt()
+        val indigo = Color.parseColor("#6366f1")
+        val violet = Color.parseColor("#7c3aed")
+
+        // Card container
+        val card = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(pad, pad, pad, pad)
+            val bg = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = 20 * dp
+            }
+            background = bg
+            elevation = 16 * dp
+        }
+
+        // Icon circle
+        val iconBg = android.widget.FrameLayout(this).apply {
+            val size = (48 * dp).toInt()
+            layoutParams = android.widget.LinearLayout.LayoutParams(size, size).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                bottomMargin = padSmall
+            }
+            val circle = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(Color.parseColor("#f0e8ff"))
+            }
+            background = circle
+        }
+        val iconText = android.widget.TextView(this).apply {
+            text = "\u21A9"
+            textSize = 22f
+            setTextColor(indigo)
+            gravity = android.view.Gravity.CENTER
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        iconBg.addView(iconText)
+        card.addView(iconBg)
+
+        // Title
+        val title = android.widget.TextView(this).apply {
+            text = "Changer de serveur"
+            textSize = 18f
+            setTextColor(Color.parseColor("#1f2937"))
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (8 * dp).toInt() }
+        }
+        card.addView(title)
+
+        // Message
+        val msg = android.widget.TextView(this).apply {
+            text = "Revenir a l'ecran de configuration ?"
+            textSize = 14f
+            setTextColor(Color.parseColor("#6b7280"))
+            gravity = android.view.Gravity.CENTER
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = pad }
+        }
+        card.addView(msg)
+
+        // Buttons row
+        val row = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        // Cancel button
+        val btnCancel = android.widget.TextView(this).apply {
+            text = "Non"
+            textSize = 15f
+            setTextColor(Color.parseColor("#6b7280"))
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, (12 * dp).toInt(), 0, (12 * dp).toInt())
+            val bg = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.parseColor("#f3f4f6"))
+                cornerRadius = 12 * dp
+            }
+            background = bg
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+            ).apply { marginEnd = (6 * dp).toInt() }
+            setOnClickListener { dialog.dismiss() }
+        }
+        row.addView(btnCancel)
+
+        // Confirm button with gradient
+        val btnConfirm = android.widget.TextView(this).apply {
+            text = "Oui, changer"
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, (12 * dp).toInt(), 0, (12 * dp).toInt())
+            val bg = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(indigo, violet)
+            ).apply { cornerRadius = 12 * dp }
+            background = bg
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+            ).apply { marginStart = (6 * dp).toInt() }
+            setOnClickListener {
+                dialog.dismiss()
                 getSharedPreferences("glasskeep", MODE_PRIVATE)
                     .edit().remove("server_url").apply()
-                val intent = Intent(this, MainActivity::class.java)
+                val intent = Intent(this@WebViewActivity, MainActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 startActivity(intent)
                 finish()
             }
-            .setNegativeButton("Non", null)
-            .show()
+        }
+        row.addView(btnConfirm)
+
+        card.addView(row)
+
+        dialog.setContentView(card)
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.85).toInt(),
+            android.view.WindowManager.LayoutParams.WRAP_CONTENT
+        )
+        dialog.show()
     }
 }
