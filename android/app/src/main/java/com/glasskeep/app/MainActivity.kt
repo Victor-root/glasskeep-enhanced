@@ -1,12 +1,14 @@
 package com.glasskeep.app
 
+import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowInsetsControllerCompat
 import com.glasskeep.app.ui.SetupScreen
 import com.glasskeep.app.ui.theme.GlassKeepTheme
 
@@ -26,14 +28,18 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        // Force light appearance (dark icons) on status/nav bar for setup screen
-        val bgColor = Color.parseColor("#f0e8ff")
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.light(bgColor, bgColor),
-            navigationBarStyle = SystemBarStyle.light(bgColor, bgColor)
-        )
-
         setContent {
+            val view = LocalView.current
+            SideEffect {
+                val w = (view.context as Activity).window
+                val bgColor = Color.parseColor("#f0e8ff")
+                w.statusBarColor = bgColor
+                w.navigationBarColor = bgColor
+                WindowInsetsControllerCompat(w, view).apply {
+                    isAppearanceLightStatusBars = true
+                    isAppearanceLightNavigationBars = true
+                }
+            }
             GlassKeepTheme {
                 SetupScreen(onConnect = { url ->
                     prefs.edit().putString("server_url", url).apply()
