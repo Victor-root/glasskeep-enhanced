@@ -82,6 +82,7 @@ fun WebViewScreen(url: String, onReset: () -> Unit) {
                     mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                     useWideViewPort = true
                     loadWithOverviewMode = true
+                    textZoom = 100
 
                     // PWA support
                     javaScriptCanOpenWindowsAutomatically = true
