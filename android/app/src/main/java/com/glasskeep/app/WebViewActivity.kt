@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.ServiceWorkerClient
 import android.webkit.ServiceWorkerController
 import android.webkit.URLUtil
@@ -24,7 +25,6 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
 class WebViewActivity : AppCompatActivity() {
@@ -49,6 +49,14 @@ class WebViewActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { /* handled */ }
 
+    /** Called from JavaScript when <meta name="theme-color"> changes */
+    inner class ThemeBridge {
+        @JavascriptInterface
+        fun onThemeColor(hexColor: String) {
+            runOnUiThread { applySystemBarColor(hexColor) }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_webview)
@@ -70,6 +78,8 @@ class WebViewActivity : AppCompatActivity() {
         } catch (_: Exception) { }
 
         webView.apply {
+            addJavascriptInterface(ThemeBridge(), "AndroidTheme")
+
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
@@ -106,7 +116,7 @@ class WebViewActivity : AppCompatActivity() {
 
                 override fun onPageFinished(view: WebView, pageUrl: String?) {
                     super.onPageFinished(view, pageUrl)
-                    readThemeColor(view)
+                    injectThemeColorObserver(view)
                 }
             }
 
@@ -152,71 +162,26 @@ class WebViewActivity : AppCompatActivity() {
 
             loadUrl(url)
         }
-
-        // Watch for theme-color changes (dark mode toggle)
-        setupThemeColorObserver()
     }
 
-    private fun readThemeColor(view: WebView) {
-        view.evaluateJavascript(
-            "(function(){var m=document.querySelector('meta[name=theme-color]');return m?m.content:''})()"
-        ) { result ->
-            val color = result.trim('"')
-            if (color.startsWith("#")) {
-                applySystemBarColor(color)
-            }
-        }
-    }
-
-    private fun setupThemeColorObserver() {
-        // MutationObserver on <head> to catch theme-color meta being removed/re-added
-        val js = """javascript:void((function(){
-            if(window.__themeObs)return;
-            window.__themeObs=new MutationObserver(function(){
-                var m=document.querySelector('meta[name=theme-color]');
-                if(m&&m.content){
-                    document.title='__themecolor__'+m.content;
-                    setTimeout(function(){
-                        var t=document.title;
-                        if(t.indexOf('__themecolor__')===0)document.title=t.substring(t.indexOf('__'+'tc__end__'));
-                    },100);
-                }
-            });
-            window.__themeObs.observe(document.head,{childList:true,subtree:true,attributes:true,attributeFilter:['content']});
-        })())"""
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onReceivedTitle(view: WebView, title: String?) {
-                super.onReceivedTitle(view, title)
-                if (title != null && title.startsWith("__themecolor__")) {
-                    val color = title.removePrefix("__themecolor__")
-                    if (color.startsWith("#")) {
-                        applySystemBarColor(color)
-                    }
-                }
-            }
-
-            override fun onShowFileChooser(
-                webView: WebView,
-                callback: ValueCallback<Array<Uri>>,
-                params: FileChooserParams
-            ): Boolean {
-                fileUploadCallback?.onReceiveValue(null)
-                fileUploadCallback = callback
-
-                if (ContextCompat.checkSelfPermission(
-                        this@WebViewActivity, Manifest.permission.CAMERA
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                }
-
-                fileChooserLauncher.launch(params.createIntent())
-                return true
-            }
-        }
-
-        // Inject the observer after a short delay to ensure page is ready
-        webView.postDelayed({ webView.loadUrl(js) }, 1500)
+    private fun injectThemeColorObserver(view: WebView) {
+        // Read current color + set up observer for changes (dark mode toggle)
+        val js = "(function(){" +
+            "function send(){var m=document.querySelector('meta[name=\"theme-color\"]');if(m&&m.content)AndroidTheme.onThemeColor(m.content);}" +
+            "send();" +
+            "if(!window.__tcObs){" +
+            "window.__tcObs=new MutationObserver(function(muts){" +
+            "for(var i=0;i<muts.length;i++){" +
+            "var added=muts[i].addedNodes;" +
+            "for(var j=0;j<added.length;j++){" +
+            "if(added[j].nodeName==='META'&&added[j].name==='theme-color'){send();return;}" +
+            "}" +
+            "}" +
+            "});" +
+            "window.__tcObs.observe(document.head,{childList:true});" +
+            "}" +
+            "})()"
+        view.evaluateJavascript(js, null)
     }
 
     private fun applySystemBarColor(hexColor: String) {
@@ -225,7 +190,6 @@ class WebViewActivity : AppCompatActivity() {
             window.statusBarColor = color
             window.navigationBarColor = color
 
-            // Dark icons on light backgrounds, light icons on dark backgrounds
             val luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
             val isLight = luminance > 0.5
 
