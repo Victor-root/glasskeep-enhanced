@@ -130,7 +130,10 @@ fun SetupScreen(onConnect: (String) -> Unit) {
                         onGo = { validateAndConnect(url.trim(), onConnect) { error = it } }
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color(0xFF1f2937),
+                        unfocusedTextColor = Color(0xFF1f2937),
                         focusedBorderColor = Indigo,
+                        unfocusedBorderColor = BorderColor,
                         focusedLabelColor = Indigo,
                         cursorColor = Indigo
                     ),
