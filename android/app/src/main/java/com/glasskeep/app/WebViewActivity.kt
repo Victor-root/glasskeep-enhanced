@@ -3,12 +3,15 @@ package com.glasskeep.app
 import android.Manifest
 import android.app.Activity
 import android.app.DownloadManager
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.ServiceWorkerClient
@@ -199,13 +202,40 @@ class WebViewActivity : AppCompatActivity() {
         } catch (_: Exception) { }
     }
 
+    private var backPressCount = 0
+    private val backResetHandler = Handler(Looper.getMainLooper())
+
     @Deprecated("Use OnBackPressedCallback")
     override fun onBackPressed() {
         if (webView.canGoBack()) {
             webView.goBack()
-        } else {
-            @Suppress("DEPRECATION")
-            super.onBackPressed()
+            return
         }
+
+        backPressCount++
+        if (backPressCount == 1) {
+            Toast.makeText(this, "Appuyez encore pour changer de serveur", Toast.LENGTH_SHORT).show()
+            backResetHandler.postDelayed({ backPressCount = 0 }, 2000)
+        } else {
+            backResetHandler.removeCallbacksAndMessages(null)
+            backPressCount = 0
+            showChangeServerDialog()
+        }
+    }
+
+    private fun showChangeServerDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Changer de serveur")
+            .setMessage("Revenir a l'ecran de configuration ?")
+            .setPositiveButton("Oui") { _, _ ->
+                getSharedPreferences("glasskeep", MODE_PRIVATE)
+                    .edit().remove("server_url").apply()
+                val intent = Intent(this, MainActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+                finish()
+            }
+            .setNegativeButton("Non", null)
+            .show()
     }
 }
