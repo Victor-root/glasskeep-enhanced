@@ -25,6 +25,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -164,6 +165,13 @@ class WebViewActivity : AppCompatActivity() {
 
             loadUrl(url)
         }
+
+        // Handle gesture back navigation (swipe back)
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                webView.evaluateJavascript("window.history.back()", null)
+            }
+        })
     }
 
     private fun injectThemeColorObserver(view: WebView) {
@@ -196,14 +204,19 @@ class WebViewActivity : AppCompatActivity() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var backHeld = false
-    private val longBackRunnable = Runnable { showChangeServerDialog() }
+    private var dialogShown = false
+    private val longBackRunnable = Runnable {
+        dialogShown = true
+        showChangeServerDialog()
+    }
 
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
-        if (keyCode == android.view.KeyEvent.KEYCODE_BACK && !backHeld) {
-            backHeld = true
-            if (!webView.canGoBack()) {
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+            if (!backHeld) {
+                backHeld = true
                 handler.postDelayed(longBackRunnable, 3000)
             }
+            return true
         }
         return super.onKeyDown(keyCode, event)
     }
@@ -212,9 +225,11 @@ class WebViewActivity : AppCompatActivity() {
         if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
             handler.removeCallbacks(longBackRunnable)
             backHeld = false
-            if (webView.canGoBack()) {
-                webView.goBack()
+            if (!dialogShown) {
+                webView.evaluateJavascript("window.history.back()", null)
             }
+            dialogShown = false
+            return true
         }
         return super.onKeyUp(keyCode, event)
     }
