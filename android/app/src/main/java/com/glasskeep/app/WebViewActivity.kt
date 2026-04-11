@@ -202,25 +202,29 @@ class WebViewActivity : AppCompatActivity() {
         } catch (_: Exception) { }
     }
 
-    private var backPressCount = 0
-    private val backResetHandler = Handler(Looper.getMainLooper())
+    private val handler = Handler(Looper.getMainLooper())
+    private var backHeld = false
+    private val longBackRunnable = Runnable { showChangeServerDialog() }
 
-    @Deprecated("Use OnBackPressedCallback")
-    override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-            return
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK && !backHeld) {
+            backHeld = true
+            if (!webView.canGoBack()) {
+                handler.postDelayed(longBackRunnable, 3000)
+            }
         }
+        return super.onKeyDown(keyCode, event)
+    }
 
-        backPressCount++
-        if (backPressCount == 1) {
-            Toast.makeText(this, "Appuyez encore pour changer de serveur", Toast.LENGTH_SHORT).show()
-            backResetHandler.postDelayed({ backPressCount = 0 }, 2000)
-        } else {
-            backResetHandler.removeCallbacksAndMessages(null)
-            backPressCount = 0
-            showChangeServerDialog()
+    override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+            handler.removeCallbacks(longBackRunnable)
+            backHeld = false
+            if (webView.canGoBack()) {
+                webView.goBack()
+            }
         }
+        return super.onKeyUp(keyCode, event)
     }
 
     private fun showChangeServerDialog() {
