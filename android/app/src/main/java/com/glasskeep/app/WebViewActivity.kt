@@ -169,14 +169,20 @@ class WebViewActivity : AppCompatActivity() {
     }
 
     private fun setupThemeColorObserver() {
-        // MutationObserver watches <meta name="theme-color"> for dark mode changes
+        // MutationObserver on <head> to catch theme-color meta being removed/re-added
         val js = """javascript:void((function(){
-            var meta=document.querySelector('meta[name=theme-color]');
-            if(!meta)return;
-            new MutationObserver(function(){
-                document.title='__themecolor__'+meta.content;
-                setTimeout(function(){document.title=document.title.replace('__themecolor__'+meta.content,'');},50);
-            }).observe(meta,{attributes:true,attributeFilter:['content']});
+            if(window.__themeObs)return;
+            window.__themeObs=new MutationObserver(function(){
+                var m=document.querySelector('meta[name=theme-color]');
+                if(m&&m.content){
+                    document.title='__themecolor__'+m.content;
+                    setTimeout(function(){
+                        var t=document.title;
+                        if(t.indexOf('__themecolor__')===0)document.title=t.substring(t.indexOf('__'+'tc__end__'));
+                    },100);
+                }
+            });
+            window.__themeObs.observe(document.head,{childList:true,subtree:true,attributes:true,attributeFilter:['content']});
         })())"""
         webView.webChromeClient = object : WebChromeClient() {
             override fun onReceivedTitle(view: WebView, title: String?) {
