@@ -163,6 +163,14 @@ export default function SettingsPanel({
                     >{t("removePhoto")}</button>
                   )}
                 </div>
+                {window.AndroidTheme && (
+                  <div className="mt-1">
+                    <button
+                      className="text-xs text-gray-500 dark:text-gray-400 underline"
+                      onClick={() => window.AndroidTheme.changeServer()}
+                    >{t("changeServer")}</button>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex items-center justify-between">

@@ -52,11 +52,16 @@ class WebViewActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { /* handled */ }
 
-    /** Called from JavaScript when <meta name="theme-color"> changes */
+    /** Called from JavaScript for theme-color sync and server change */
     inner class ThemeBridge {
         @JavascriptInterface
         fun onThemeColor(hexColor: String) {
             runOnUiThread { applySystemBarColor(hexColor) }
+        }
+
+        @JavascriptInterface
+        fun changeServer() {
+            runOnUiThread { showChangeServerDialog() }
         }
     }
 
