@@ -97,10 +97,9 @@ fun WebViewScreen(url: String, onReset: () -> Unit) {
                         }
 
                         // Enable cookies for auth
-                        CookieManager.getInstance().apply {
-                            setAcceptCookie(true)
-                            setAcceptThirdPartyCookies(this@apply, true)
-                        }
+                        val cookieManager = CookieManager.getInstance()
+                        cookieManager.setAcceptCookie(true)
+                        cookieManager.setAcceptThirdPartyCookies(this, true)
 
                         webViewClient = object : WebViewClient() {
                             override fun shouldOverrideUrlLoading(
