@@ -173,14 +173,7 @@ class WebViewActivity : AppCompatActivity() {
             "function send(){var m=document.querySelector('meta[name=\"theme-color\"]');if(m&&m.content)AndroidTheme.onThemeColor(m.content);}" +
             "send();" +
             "if(!window.__tcObs){" +
-            "window.__tcObs=new MutationObserver(function(muts){" +
-            "for(var i=0;i<muts.length;i++){" +
-            "var added=muts[i].addedNodes;" +
-            "for(var j=0;j<added.length;j++){" +
-            "if(added[j].nodeName==='META'&&added[j].name==='theme-color'){send();return;}" +
-            "}" +
-            "}" +
-            "});" +
+            "window.__tcObs=new MutationObserver(function(){setTimeout(send,0);});" +
             "window.__tcObs.observe(document.head,{childList:true});" +
             "}" +
             "})()"
