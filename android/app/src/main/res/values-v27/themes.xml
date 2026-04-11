@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="Theme.GlassKeep" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="android:statusBarColor">#f0e8ff</item>
-        <item name="android:navigationBarColor">#f0e8ff</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
-    </style>
-</resources>
