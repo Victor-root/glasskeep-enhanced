@@ -92,11 +92,19 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
             </span>
           </div>
         )}
+        {window.AndroidTheme && (
+          <div className="mt-4 text-center">
+            <button
+              className="text-xs text-indigo-600 hover:underline"
+              onClick={() => window.AndroidTheme.changeServer()}
+            >{t("changeServer")}</button>
+          </div>
+        )}
       </div>
     <p className="absolute bottom-4 left-0 right-0 text-center text-xs text-gray-400 dark:text-gray-600 z-10 select-none">
       Open source project &mdash; original by{" "}
       <a href="https://github.com/nikunjsingh93" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">nikunjsingh93</a>
-      {" · "}forked &amp; maintained by{" "}
+      {" · "}forked by{" "}
       <a href="https://github.com/Victor-root/glasskeep-enhanced" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">Victor-root</a>
     </p>
   </div>
