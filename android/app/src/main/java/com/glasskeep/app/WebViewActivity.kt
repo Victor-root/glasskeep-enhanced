@@ -5,6 +5,7 @@ import android.app.Activity
 import android.app.DownloadManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -177,6 +178,15 @@ class WebViewActivity : AppCompatActivity() {
                 webView.evaluateJavascript("window.history.back()", null)
             }
         })
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val isDark = (newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+        webView.evaluateJavascript(
+            "if(window.__setDarkMode)window.__setDarkMode($isDark)", null
+        )
     }
 
     private fun injectThemeColorObserver(view: WebView) {

@@ -851,15 +851,23 @@ export default function App() {
     setThemeColor(savedDark ? "#1a1a1a" : "#f0e8ff");
 
     // Listen for system dark mode changes (always follow system)
-    if (!mq) return;
-    const onChange = (e) => {
-      setDark(e.matches);
-      document.documentElement.classList.toggle("dark", e.matches);
-      localStorage.setItem("glass-keep-dark-mode", String(e.matches));
-      setThemeColor(e.matches ? "#1a1a1a" : "#f0e8ff");
+    const applyDark = (isDark) => {
+      setDark(isDark);
+      document.documentElement.classList.toggle("dark", isDark);
+      localStorage.setItem("glass-keep-dark-mode", String(isDark));
+      setThemeColor(isDark ? "#1a1a1a" : "#f0e8ff");
     };
+
+    // Expose for Android WebView bridge (prefers-color-scheme doesn't update in WebView)
+    window.__setDarkMode = applyDark;
+
+    if (!mq) return () => { delete window.__setDarkMode; };
+    const onChange = (e) => applyDark(e.matches);
     mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+    return () => {
+      mq.removeEventListener("change", onChange);
+      delete window.__setDarkMode;
+    };
   }, []);
   const toggleDark = () => {
     const next = !dark;
