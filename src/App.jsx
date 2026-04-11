@@ -842,14 +842,24 @@ export default function App() {
 
   // Theme init/toggle
   useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
     const savedDark =
       localStorage.getItem("glass-keep-dark-mode") === "true" ||
-      (!("glass-keep-dark-mode" in localStorage) &&
-        window.matchMedia?.("(prefers-color-scheme: dark)").matches);
+      (!("glass-keep-dark-mode" in localStorage) && mq?.matches);
     setDark(savedDark);
     document.documentElement.classList.toggle("dark", savedDark);
-    // Update PWA status/nav bar color to match background
     setThemeColor(savedDark ? "#1a1a1a" : "#f0e8ff");
+
+    // Listen for system dark mode changes (always follow system)
+    if (!mq) return;
+    const onChange = (e) => {
+      setDark(e.matches);
+      document.documentElement.classList.toggle("dark", e.matches);
+      localStorage.setItem("glass-keep-dark-mode", String(e.matches));
+      setThemeColor(e.matches ? "#1a1a1a" : "#f0e8ff");
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
   const toggleDark = () => {
     const next = !dark;
