@@ -5,6 +5,7 @@ import android.app.Activity
 import android.app.DownloadManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -23,6 +24,8 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 class WebViewActivity : AppCompatActivity() {
 
@@ -100,6 +103,11 @@ class WebViewActivity : AppCompatActivity() {
                         true
                     }
                 }
+
+                override fun onPageFinished(view: WebView, pageUrl: String?) {
+                    super.onPageFinished(view, pageUrl)
+                    readThemeColor(view)
+                }
             }
 
             webChromeClient = object : WebChromeClient() {
@@ -144,6 +152,81 @@ class WebViewActivity : AppCompatActivity() {
 
             loadUrl(url)
         }
+
+        // Watch for theme-color changes (dark mode toggle)
+        setupThemeColorObserver()
+    }
+
+    private fun readThemeColor(view: WebView) {
+        view.evaluateJavascript(
+            "(function(){var m=document.querySelector('meta[name=theme-color]');return m?m.content:''})()"
+        ) { result ->
+            val color = result.trim('"')
+            if (color.startsWith("#")) {
+                applySystemBarColor(color)
+            }
+        }
+    }
+
+    private fun setupThemeColorObserver() {
+        // MutationObserver watches <meta name="theme-color"> for dark mode changes
+        val js = """javascript:void((function(){
+            var meta=document.querySelector('meta[name=theme-color]');
+            if(!meta)return;
+            new MutationObserver(function(){
+                document.title='__themecolor__'+meta.content;
+                setTimeout(function(){document.title=document.title.replace('__themecolor__'+meta.content,'');},50);
+            }).observe(meta,{attributes:true,attributeFilter:['content']});
+        })())"""
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onReceivedTitle(view: WebView, title: String?) {
+                super.onReceivedTitle(view, title)
+                if (title != null && title.startsWith("__themecolor__")) {
+                    val color = title.removePrefix("__themecolor__")
+                    if (color.startsWith("#")) {
+                        applySystemBarColor(color)
+                    }
+                }
+            }
+
+            override fun onShowFileChooser(
+                webView: WebView,
+                callback: ValueCallback<Array<Uri>>,
+                params: FileChooserParams
+            ): Boolean {
+                fileUploadCallback?.onReceiveValue(null)
+                fileUploadCallback = callback
+
+                if (ContextCompat.checkSelfPermission(
+                        this@WebViewActivity, Manifest.permission.CAMERA
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                }
+
+                fileChooserLauncher.launch(params.createIntent())
+                return true
+            }
+        }
+
+        // Inject the observer after a short delay to ensure page is ready
+        webView.postDelayed({ webView.loadUrl(js) }, 1500)
+    }
+
+    private fun applySystemBarColor(hexColor: String) {
+        try {
+            val color = Color.parseColor(hexColor)
+            window.statusBarColor = color
+            window.navigationBarColor = color
+
+            // Dark icons on light backgrounds, light icons on dark backgrounds
+            val luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
+            val isLight = luminance > 0.5
+
+            val controller = WindowInsetsControllerCompat(window, window.decorView)
+            controller.isAppearanceLightStatusBars = isLight
+            controller.isAppearanceLightNavigationBars = isLight
+        } catch (_: Exception) { }
     }
 
     @Deprecated("Use OnBackPressedCallback")
