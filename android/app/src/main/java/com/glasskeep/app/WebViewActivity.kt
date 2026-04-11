@@ -1,0 +1,158 @@
+package com.glasskeep.app
+
+import android.Manifest
+import android.app.Activity
+import android.app.DownloadManager
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Bundle
+import android.os.Environment
+import android.webkit.CookieManager
+import android.webkit.ServiceWorkerClient
+import android.webkit.ServiceWorkerController
+import android.webkit.URLUtil
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+
+class WebViewActivity : AppCompatActivity() {
+
+    private lateinit var webView: WebView
+    private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
+
+    private val fileChooserLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val data = if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.let { intent ->
+                intent.data?.let { arrayOf(it) }
+                    ?: WebChromeClient.FileChooserParams.parseResult(result.resultCode, intent)
+            }
+        } else null
+        fileUploadCallback?.onReceiveValue(data)
+        fileUploadCallback = null
+    }
+
+    private val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* handled */ }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_webview)
+
+        val url = intent.getStringExtra("url")
+            ?: getSharedPreferences("glasskeep", MODE_PRIVATE).getString("server_url", null)
+            ?: run { finish(); return }
+
+        webView = findViewById(R.id.webview)
+
+        // Service Worker support
+        try {
+            val swController = ServiceWorkerController.getInstance()
+            swController.setServiceWorkerClient(object : ServiceWorkerClient() {
+                override fun shouldInterceptRequest(
+                    request: WebResourceRequest
+                ): WebResourceResponse? = null
+            })
+        } catch (_: Exception) { }
+
+        webView.apply {
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                databaseEnabled = true
+                cacheMode = WebSettings.LOAD_DEFAULT
+                allowFileAccess = true
+                allowContentAccess = true
+                mediaPlaybackRequiresUserGesture = false
+                mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+
+                javaScriptCanOpenWindowsAutomatically = true
+                setSupportMultipleWindows(false)
+            }
+
+            // Cookies
+            CookieManager.getInstance().apply {
+                setAcceptCookie(true)
+                setAcceptThirdPartyCookies(webView, true)
+            }
+
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(
+                    view: WebView,
+                    request: WebResourceRequest
+                ): Boolean {
+                    val requestUrl = request.url.toString()
+                    return if (requestUrl.startsWith(url)) {
+                        false
+                    } else {
+                        startActivity(Intent(Intent.ACTION_VIEW, request.url))
+                        true
+                    }
+                }
+            }
+
+            webChromeClient = object : WebChromeClient() {
+                override fun onShowFileChooser(
+                    webView: WebView,
+                    callback: ValueCallback<Array<Uri>>,
+                    params: FileChooserParams
+                ): Boolean {
+                    fileUploadCallback?.onReceiveValue(null)
+                    fileUploadCallback = callback
+
+                    if (ContextCompat.checkSelfPermission(
+                            this@WebViewActivity, Manifest.permission.CAMERA
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+
+                    fileChooserLauncher.launch(params.createIntent())
+                    return true
+                }
+            }
+
+            // Downloads
+            setDownloadListener { downloadUrl, userAgent, contentDisposition, mimeType, _ ->
+                try {
+                    val req = DownloadManager.Request(Uri.parse(downloadUrl)).apply {
+                        setMimeType(mimeType)
+                        addRequestHeader("Cookie", CookieManager.getInstance().getCookie(downloadUrl))
+                        addRequestHeader("User-Agent", userAgent)
+                        val filename = URLUtil.guessFileName(downloadUrl, contentDisposition, mimeType)
+                        setTitle(filename)
+                        setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                        setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
+                    }
+                    getSystemService(DownloadManager::class.java).enqueue(req)
+                    Toast.makeText(this@WebViewActivity, "Telechargement lance...", Toast.LENGTH_SHORT).show()
+                } catch (_: Exception) {
+                    Toast.makeText(this@WebViewActivity, "Erreur de telechargement", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            loadUrl(url)
+        }
+    }
+
+    @Deprecated("Use OnBackPressedCallback")
+    override fun onBackPressed() {
+        if (webView.canGoBack()) {
+            webView.goBack()
+        } else {
+            @Suppress("DEPRECATION")
+            super.onBackPressed()
+        }
+    }
+}
