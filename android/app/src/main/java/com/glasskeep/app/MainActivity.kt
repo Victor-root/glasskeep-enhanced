@@ -4,11 +4,9 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.core.view.WindowInsetsControllerCompat
+import androidx.activity.enableEdgeToEdge
 import com.glasskeep.app.ui.SetupScreen
 import com.glasskeep.app.ui.theme.GlassKeepTheme
 
@@ -28,13 +26,12 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        // Force light status/nav bar icons on the setup screen (always light bg)
+        // Force light appearance (dark icons) on status/nav bar for setup screen
         val bgColor = Color.parseColor("#f0e8ff")
-        window.statusBarColor = bgColor
-        window.navigationBarColor = bgColor
-        val controller = WindowInsetsControllerCompat(window, window.decorView)
-        controller.isAppearanceLightStatusBars = true
-        controller.isAppearanceLightNavigationBars = true
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(bgColor, bgColor),
+            navigationBarStyle = SystemBarStyle.light(bgColor, bgColor)
+        )
 
         setContent {
             GlassKeepTheme {
