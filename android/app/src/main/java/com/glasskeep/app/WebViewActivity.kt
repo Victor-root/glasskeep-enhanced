@@ -255,17 +255,16 @@ class WebViewActivity : AppCompatActivity() {
             }
             background = circle
         }
-        val iconText = android.widget.TextView(this).apply {
-            text = "\u21A9"
-            textSize = 22f
-            setTextColor(indigo)
-            gravity = android.view.Gravity.CENTER
+        val iconView = android.widget.ImageView(this).apply {
+            setImageResource(R.drawable.ic_swap_server)
+            val iconPad = (12 * dp).toInt()
+            setPadding(iconPad, iconPad, iconPad, iconPad)
             layoutParams = android.widget.FrameLayout.LayoutParams(
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT
             )
         }
-        iconBg.addView(iconText)
+        iconBg.addView(iconView)
         card.addView(iconBg)
 
         // Title
