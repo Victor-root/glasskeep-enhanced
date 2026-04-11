@@ -23,13 +23,9 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -62,115 +58,109 @@ fun WebViewScreen(url: String, onReset: () -> Unit) {
         webView?.goBack()
     }
 
-    Scaffold { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            AndroidView(
-                factory = { ctx ->
-                    // Enable Service Worker support
-                    try {
-                        val swController = ServiceWorkerController.getInstance()
-                        swController.setServiceWorkerClient(object : ServiceWorkerClient() {
-                            override fun shouldInterceptRequest(
-                                request: WebResourceRequest
-                            ): WebResourceResponse? = null
-                        })
-                    } catch (_: Exception) { }
+    AndroidView(
+        factory = { ctx ->
+            // Enable Service Worker support
+            try {
+                val swController = ServiceWorkerController.getInstance()
+                swController.setServiceWorkerClient(object : ServiceWorkerClient() {
+                    override fun shouldInterceptRequest(
+                        request: WebResourceRequest
+                    ): WebResourceResponse? = null
+                })
+            } catch (_: Exception) { }
 
-                    WebView(ctx).apply {
-                        settings.apply {
-                            javaScriptEnabled = true
-                            domStorageEnabled = true
-                            databaseEnabled = true
-                            cacheMode = WebSettings.LOAD_DEFAULT
-                            allowFileAccess = true
-                            allowContentAccess = true
-                            mediaPlaybackRequiresUserGesture = false
-                            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            WebView(ctx).apply {
+                settings.apply {
+                    javaScriptEnabled = true
+                    domStorageEnabled = true
+                    databaseEnabled = true
+                    cacheMode = WebSettings.LOAD_DEFAULT
+                    allowFileAccess = true
+                    allowContentAccess = true
+                    mediaPlaybackRequiresUserGesture = false
+                    mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                    useWideViewPort = true
+                    loadWithOverviewMode = true
 
-                            // PWA support
-                            javaScriptCanOpenWindowsAutomatically = true
-                            setSupportMultipleWindows(false)
+                    // PWA support
+                    javaScriptCanOpenWindowsAutomatically = true
+                    setSupportMultipleWindows(false)
+                }
+
+                // Enable cookies for auth
+                val cookieManager = CookieManager.getInstance()
+                cookieManager.setAcceptCookie(true)
+                cookieManager.setAcceptThirdPartyCookies(this, true)
+
+                webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(
+                        view: WebView,
+                        request: WebResourceRequest
+                    ): Boolean {
+                        val requestUrl = request.url.toString()
+                        // Keep navigation within the app's server
+                        return if (requestUrl.startsWith(url)) {
+                            false
+                        } else {
+                            // External links open in browser
+                            ctx.startActivity(
+                                Intent(Intent.ACTION_VIEW, request.url)
+                            )
+                            true
                         }
-
-                        // Enable cookies for auth
-                        val cookieManager = CookieManager.getInstance()
-                        cookieManager.setAcceptCookie(true)
-                        cookieManager.setAcceptThirdPartyCookies(this, true)
-
-                        webViewClient = object : WebViewClient() {
-                            override fun shouldOverrideUrlLoading(
-                                view: WebView,
-                                request: WebResourceRequest
-                            ): Boolean {
-                                val requestUrl = request.url.toString()
-                                // Keep navigation within the app's server
-                                return if (requestUrl.startsWith(url)) {
-                                    false
-                                } else {
-                                    // External links open in browser
-                                    ctx.startActivity(
-                                        Intent(Intent.ACTION_VIEW, request.url)
-                                    )
-                                    true
-                                }
-                            }
-                        }
-
-                        webChromeClient = object : WebChromeClient() {
-                            override fun onShowFileChooser(
-                                webView: WebView,
-                                callback: ValueCallback<Array<Uri>>,
-                                params: FileChooserParams
-                            ): Boolean {
-                                fileUploadCallback?.onReceiveValue(null)
-                                fileUploadCallback = callback
-
-                                // Request camera permission if needed
-                                if (ContextCompat.checkSelfPermission(
-                                        ctx, Manifest.permission.CAMERA
-                                    ) != PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                                }
-
-                                val intent = params.createIntent()
-                                fileChooserLauncher.launch(intent)
-                                return true
-                            }
-                        }
-
-                        // Download support
-                        setDownloadListener(DownloadListener { downloadUrl, userAgent, contentDisposition, mimeType, _ ->
-                            try {
-                                val request = DownloadManager.Request(Uri.parse(downloadUrl)).apply {
-                                    setMimeType(mimeType)
-                                    addRequestHeader("Cookie", CookieManager.getInstance().getCookie(downloadUrl))
-                                    addRequestHeader("User-Agent", userAgent)
-                                    setTitle(URLUtil.guessFileName(downloadUrl, contentDisposition, mimeType))
-                                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                                    setDestinationInExternalPublicDir(
-                                        Environment.DIRECTORY_DOWNLOADS,
-                                        URLUtil.guessFileName(downloadUrl, contentDisposition, mimeType)
-                                    )
-                                }
-                                val dm = ctx.getSystemService(DownloadManager::class.java)
-                                dm.enqueue(request)
-                                Toast.makeText(ctx, "Telechargement lance...", Toast.LENGTH_SHORT).show()
-                            } catch (e: Exception) {
-                                Toast.makeText(ctx, "Erreur de telechargement", Toast.LENGTH_SHORT).show()
-                            }
-                        })
-
-                        webView = this
-                        loadUrl(url)
                     }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-    }
+                }
+
+                webChromeClient = object : WebChromeClient() {
+                    override fun onShowFileChooser(
+                        webView: WebView,
+                        callback: ValueCallback<Array<Uri>>,
+                        params: FileChooserParams
+                    ): Boolean {
+                        fileUploadCallback?.onReceiveValue(null)
+                        fileUploadCallback = callback
+
+                        // Request camera permission if needed
+                        if (ContextCompat.checkSelfPermission(
+                                ctx, Manifest.permission.CAMERA
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+
+                        val intent = params.createIntent()
+                        fileChooserLauncher.launch(intent)
+                        return true
+                    }
+                }
+
+                // Download support
+                setDownloadListener(DownloadListener { downloadUrl, userAgent, contentDisposition, mimeType, _ ->
+                    try {
+                        val request = DownloadManager.Request(Uri.parse(downloadUrl)).apply {
+                            setMimeType(mimeType)
+                            addRequestHeader("Cookie", CookieManager.getInstance().getCookie(downloadUrl))
+                            addRequestHeader("User-Agent", userAgent)
+                            setTitle(URLUtil.guessFileName(downloadUrl, contentDisposition, mimeType))
+                            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                            setDestinationInExternalPublicDir(
+                                Environment.DIRECTORY_DOWNLOADS,
+                                URLUtil.guessFileName(downloadUrl, contentDisposition, mimeType)
+                            )
+                        }
+                        val dm = ctx.getSystemService(DownloadManager::class.java)
+                        dm.enqueue(request)
+                        Toast.makeText(ctx, "Telechargement lance...", Toast.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        Toast.makeText(ctx, "Erreur de telechargement", Toast.LENGTH_SHORT).show()
+                    }
+                })
+
+                webView = this
+                loadUrl(url)
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    )
 }
