@@ -10,6 +10,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -49,43 +50,45 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
 
-private val BgGradient = Brush.linearGradient(
-    colors = listOf(
-        Color(0xFFf0e8ff),
-        Color(0xFFe8f4fd),
-        Color(0xFFfde8f0)
-    ),
+// Light theme
+private val LightBgGradient = Brush.linearGradient(
+    colors = listOf(Color(0xFFf0e8ff), Color(0xFFe8f4fd), Color(0xFFfde8f0)),
     start = Offset(0f, 0f),
     end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
 )
+private val LightCardBg = Color(0xFFFFFFFF).copy(alpha = 0.7f)
+private val LightFloatingCardBg = Color.White.copy(alpha = 0.35f)
+private val LightTitleColor = Color(0xFF1f2937)
+private val LightSubtextColor = Color(0xFF6b7280)
+private val LightBorderColor = Color(0xFFd1d5db).copy(alpha = 0.3f)
+private val LightLineColor = Color(0xFF9ca3af).copy(alpha = 0.15f)
+
+// Dark theme
+private val DarkBgColor = Color(0xFF1a1a1a)
+private val DarkCardBg = Color(0xFF282828).copy(alpha = 0.6f)
+private val DarkFloatingCardBg = Color(0xFF1e1e28).copy(alpha = 0.65f)
+private val DarkTitleColor = Color(0xFFe5e7eb)
+private val DarkSubtextColor = Color(0xFF9ca3af)
+private val DarkBorderColor = Color(0xFF4b5563).copy(alpha = 0.3f)
+private val DarkLineColor = Color(0xFF9ca3af).copy(alpha = 0.10f)
 
 private val ButtonGradient = Brush.horizontalGradient(
     colors = listOf(Color(0xFF6366f1), Color(0xFF7c3aed))
 )
-
-private val CardBg = Color(0xFFFFFFFF).copy(alpha = 0.7f)
-private val BorderColor = Color(0xFFd1d5db).copy(alpha = 0.3f)
 private val Indigo = Color(0xFF6366f1)
-private val SubtextColor = Color(0xFF6b7280)
 
-// Floating card colors matching the web app
+// Floating card accent colors
 private val FloatingCardColors = listOf(
-    Color(0xFF6366f1), // Indigo
-    Color(0xFFa855f7), // Purple
-    Color(0xFF10b981), // Teal
-    Color(0xFFf59e0b), // Amber
-    Color(0xFFf97316), // Orange
-    Color(0xFF0ea5e9), // Sky Blue
-    Color(0xFF84cc16), // Lime
-    Color(0xFFec4899), // Pink
-    Color(0xFF14b8a6), // Cyan
-    Color(0xFFf43f5e), // Rose
+    Color(0xFF6366f1), Color(0xFFa855f7), Color(0xFF10b981),
+    Color(0xFFf59e0b), Color(0xFFf97316), Color(0xFF0ea5e9),
+    Color(0xFF84cc16), Color(0xFFec4899), Color(0xFF14b8a6),
+    Color(0xFFf43f5e),
 )
 
 private data class FloatingCard(
-    val xFraction: Float,   // 0..1 horizontal position
-    val yFraction: Float,   // 0..1 vertical position
-    val rotation: Float,    // degrees
+    val xFraction: Float,
+    val yFraction: Float,
+    val rotation: Float,
     val colorIndex: Int,
     val durationMs: Int,
     val delayMs: Int,
@@ -106,8 +109,10 @@ private val floatingCards = listOf(
 )
 
 @Composable
-private fun FloatingCardsBackground() {
+private fun FloatingCardsBackground(dark: Boolean) {
     val transition = rememberInfiniteTransition(label = "float")
+    val cardBg = if (dark) DarkFloatingCardBg else LightFloatingCardBg
+    val lineColor = if (dark) DarkLineColor else LightLineColor
 
     Box(modifier = Modifier.fillMaxSize()) {
         floatingCards.forEach { card ->
@@ -127,10 +132,7 @@ private fun FloatingCardsBackground() {
 
             val accentColor = FloatingCardColors[card.colorIndex]
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-            ) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 Column(
                     modifier = Modifier
                         .offset(x = (card.xFraction * 300).dp, y = (card.yFraction * 700).dp)
@@ -138,9 +140,8 @@ private fun FloatingCardsBackground() {
                         .rotate(card.rotation)
                         .width(card.widthDp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White.copy(alpha = 0.35f))
+                        .background(cardBg)
                 ) {
-                    // Top colored border
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -148,7 +149,6 @@ private fun FloatingCardsBackground() {
                             .background(accentColor.copy(alpha = 0.7f))
                     )
                     Column(modifier = Modifier.padding(10.dp)) {
-                        // Title line
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(0.7f)
@@ -157,13 +157,12 @@ private fun FloatingCardsBackground() {
                                 .background(accentColor.copy(alpha = 0.2f))
                         )
                         Spacer(modifier = Modifier.height(6.dp))
-                        // Content lines
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
                                 .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(Color(0xFF9ca3af).copy(alpha = 0.15f))
+                                .background(lineColor)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Box(
@@ -171,7 +170,7 @@ private fun FloatingCardsBackground() {
                                 .fillMaxWidth(0.6f)
                                 .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(Color(0xFF9ca3af).copy(alpha = 0.15f))
+                                .background(lineColor)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Box(
@@ -179,7 +178,7 @@ private fun FloatingCardsBackground() {
                                 .fillMaxWidth(0.75f)
                                 .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(Color(0xFF9ca3af).copy(alpha = 0.15f))
+                                .background(lineColor)
                         )
                     }
                 }
@@ -190,23 +189,33 @@ private fun FloatingCardsBackground() {
 
 @Composable
 fun SetupScreen(onConnect: (String) -> Unit) {
+    val dark = isSystemInDarkTheme()
     var url by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+
+    val bgModifier = if (dark) {
+        Modifier.background(DarkBgColor)
+    } else {
+        Modifier.background(LightBgGradient)
+    }
+    val titleColor = if (dark) DarkTitleColor else LightTitleColor
+    val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
+    val cardBg = if (dark) DarkCardBg else LightCardBg
+    val borderColor = if (dark) DarkBorderColor else LightBorderColor
+    val textColor = if (dark) DarkTitleColor else LightTitleColor
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgGradient),
+            .then(bgModifier),
         contentAlignment = Alignment.Center
     ) {
-        // Floating cards behind everything
-        FloatingCardsBackground()
+        FloatingCardsBackground(dark)
 
         Column(
             modifier = Modifier.padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Logo
             Image(
                 painter = painterResource(id = R.drawable.glasskeep_logo),
                 contentDescription = "GlassKeep",
@@ -218,29 +227,26 @@ fun SetupScreen(onConnect: (String) -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Title
             Text(
                 text = "Glass Keep",
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1f2937)
+                color = titleColor
             )
 
-            // Subtitle
             Text(
                 text = "Connectez-vous a votre serveur",
                 fontSize = 14.sp,
-                color = SubtextColor
+                color = subtextColor
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Glass card
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(CardBg)
+                    .background(cardBg)
                     .padding(24.dp)
             ) {
                 OutlinedTextField(
@@ -262,11 +268,14 @@ fun SetupScreen(onConnect: (String) -> Unit) {
                         onGo = { validateAndConnect(url.trim(), onConnect) { error = it } }
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color(0xFF1f2937),
-                        unfocusedTextColor = Color(0xFF1f2937),
+                        focusedTextColor = textColor,
+                        unfocusedTextColor = textColor,
                         focusedBorderColor = Indigo,
-                        unfocusedBorderColor = BorderColor,
+                        unfocusedBorderColor = borderColor,
                         focusedLabelColor = Indigo,
+                        unfocusedLabelColor = subtextColor,
+                        focusedPlaceholderColor = subtextColor,
+                        unfocusedPlaceholderColor = subtextColor,
                         cursorColor = Indigo
                     ),
                     modifier = Modifier.fillMaxWidth()

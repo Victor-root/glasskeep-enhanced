@@ -1,12 +1,16 @@
 package com.glasskeep.app
 
+import android.app.Activity
 import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowInsetsControllerCompat
 import com.glasskeep.app.ui.SetupScreen
 import com.glasskeep.app.ui.theme.GlassKeepTheme
 
@@ -27,6 +31,28 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
+            val dark = isSystemInDarkTheme()
+            val view = LocalView.current
+            SideEffect {
+                val w = (view.context as Activity).window
+                if (dark) {
+                    val bgColor = Color.parseColor("#1a1a1a")
+                    w.statusBarColor = bgColor
+                    w.navigationBarColor = bgColor
+                    WindowInsetsControllerCompat(w, view).apply {
+                        isAppearanceLightStatusBars = false
+                        isAppearanceLightNavigationBars = false
+                    }
+                } else {
+                    val bgColor = Color.parseColor("#f0e8ff")
+                    w.statusBarColor = bgColor
+                    w.navigationBarColor = bgColor
+                    WindowInsetsControllerCompat(w, view).apply {
+                        isAppearanceLightStatusBars = true
+                        isAppearanceLightNavigationBars = true
+                    }
+                }
+            }
             GlassKeepTheme {
                 SetupScreen(onConnect = { url ->
                     prefs.edit().putString("server_url", url).apply()

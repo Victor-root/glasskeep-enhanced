@@ -219,7 +219,14 @@ class WebViewActivity : AppCompatActivity() {
         return super.onKeyUp(keyCode, event)
     }
 
+    private fun isDarkMode(): Boolean {
+        return (resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+    }
+
     private fun showChangeServerDialog() {
+        val dark = isDarkMode()
         val dialog = android.app.Dialog(this)
         dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
@@ -230,12 +237,19 @@ class WebViewActivity : AppCompatActivity() {
         val indigo = Color.parseColor("#6366f1")
         val violet = Color.parseColor("#7c3aed")
 
+        val cardColor = if (dark) Color.parseColor("#282828") else Color.WHITE
+        val titleColor = if (dark) Color.parseColor("#e5e7eb") else Color.parseColor("#1f2937")
+        val msgColor = if (dark) Color.parseColor("#9ca3af") else Color.parseColor("#6b7280")
+        val iconCircleColor = if (dark) Color.parseColor("#2d2644") else Color.parseColor("#f0e8ff")
+        val cancelBgColor = if (dark) Color.parseColor("#363636") else Color.parseColor("#f3f4f6")
+        val cancelTextColor = if (dark) Color.parseColor("#9ca3af") else Color.parseColor("#6b7280")
+
         // Card container
         val card = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             setPadding(pad, pad, pad, pad)
             val bg = android.graphics.drawable.GradientDrawable().apply {
-                setColor(Color.WHITE)
+                setColor(cardColor)
                 cornerRadius = 20 * dp
             }
             background = bg
@@ -251,7 +265,7 @@ class WebViewActivity : AppCompatActivity() {
             }
             val circle = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(Color.parseColor("#f0e8ff"))
+                setColor(iconCircleColor)
             }
             background = circle
         }
@@ -271,7 +285,7 @@ class WebViewActivity : AppCompatActivity() {
         val title = android.widget.TextView(this).apply {
             text = "Changer de serveur"
             textSize = 18f
-            setTextColor(Color.parseColor("#1f2937"))
+            setTextColor(titleColor)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = android.view.Gravity.CENTER
             layoutParams = android.widget.LinearLayout.LayoutParams(
@@ -285,7 +299,7 @@ class WebViewActivity : AppCompatActivity() {
         val msg = android.widget.TextView(this).apply {
             text = "Revenir a l'ecran de configuration ?"
             textSize = 14f
-            setTextColor(Color.parseColor("#6b7280"))
+            setTextColor(msgColor)
             gravity = android.view.Gravity.CENTER
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
@@ -307,12 +321,12 @@ class WebViewActivity : AppCompatActivity() {
         val btnCancel = android.widget.TextView(this).apply {
             text = "Non"
             textSize = 15f
-            setTextColor(Color.parseColor("#6b7280"))
+            setTextColor(cancelTextColor)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = android.view.Gravity.CENTER
             setPadding(0, (12 * dp).toInt(), 0, (12 * dp).toInt())
             val bg = android.graphics.drawable.GradientDrawable().apply {
-                setColor(Color.parseColor("#f3f4f6"))
+                setColor(cancelBgColor)
                 cornerRadius = 12 * dp
             }
             background = bg
