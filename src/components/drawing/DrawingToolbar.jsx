@@ -173,6 +173,14 @@ function ToolbarPopover({ anchorRef, open, onClose, darkMode, children }) {
   );
 }
 
+const PageLinesIcon = ({ active }) => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <line x1="4" y1="8" x2="20" y2="8" strokeDasharray={active ? "none" : "3 3"} />
+    <line x1="4" y1="16" x2="20" y2="16" strokeDasharray={active ? "none" : "3 3"} />
+    <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="none" />
+  </svg>
+);
+
 /* ─── Main Component ─── */
 export default function DrawingToolbar({
   tool,
@@ -192,6 +200,8 @@ export default function DrawingToolbar({
   pathCount,
   darkMode,
   compact = false,
+  showPageLines = true,
+  onTogglePageLines,
 }) {
   // Mobile detection — popovers only on small screens
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
@@ -551,6 +561,24 @@ export default function DrawingToolbar({
                   <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">{t('removePage')}</span>
                 </button>
               )}
+              {/* Toggle Page Lines */}
+              {onTogglePageLines && (
+                <button
+                  onClick={() => { onTogglePageLines(); }}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-150 active:scale-95 ${
+                    showPageLines ? 'bg-indigo-50 dark:bg-indigo-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <span className={`w-8 h-8 flex items-center justify-center rounded-lg text-white shadow-sm ${
+                    showPageLines ? 'bg-gradient-to-r from-indigo-500 to-violet-600' : 'bg-gray-400 dark:bg-gray-600'
+                  }`}>
+                    <PageLinesIcon active={showPageLines} />
+                  </span>
+                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                    {showPageLines ? t('hidePageLines') : t('showPageLines')}
+                  </span>
+                </button>
+              )}
             </div>
           </ToolbarPopover>
         </>
@@ -571,6 +599,11 @@ export default function DrawingToolbar({
           {onRemovePage && (
             <TBtn compact={compact} variant="action" onClick={onRemovePage} disabled={!canRemovePage} tooltip={t('removePage')}>
               <RemovePageIcon />
+            </TBtn>
+          )}
+          {onTogglePageLines && (
+            <TBtn compact={compact} active={showPageLines} onClick={onTogglePageLines} tooltip={showPageLines ? t('hidePageLines') : t('showPageLines')}>
+              <PageLinesIcon active={showPageLines} />
             </TBtn>
           )}
           <TBtn

@@ -120,6 +120,7 @@ function DrawingCanvas({
   const [tool, setTool] = useState('pen');
   const [color, setColor] = useState(darkMode ? '#FFFFFF' : '#000000');
   const [size, setSize] = useState(5);
+  const [showPageLines, setShowPageLines] = useState(true);
   const [currentPath, setCurrentPath] = useState(null);
 
   // Cursor state (desktop only)
@@ -701,6 +702,8 @@ function DrawingCanvas({
             pathCount={paths.length}
             darkMode={darkMode}
             compact={!!toolbarPortalTarget}
+            showPageLines={showPageLines}
+            onTogglePageLines={() => setShowPageLines(v => !v)}
           />
         );
         return toolbarPortalTarget
@@ -714,7 +717,7 @@ function DrawingCanvas({
         className={`relative${fillContainer ? ' flex-1 min-h-0 border-0 overflow-y-auto overflow-x-hidden' : ' overflow-hidden border border-gray-300 dark:border-gray-600 rounded-lg'}`}
       >
         {/* Page boundary lines (draw mode only) — behind canvas so strokes render on top */}
-        {mode === 'draw' && !readOnly && displaySize && displaySize.width > 0 && originalHeight > 0 && (() => {
+        {mode === 'draw' && !readOnly && showPageLines && displaySize && displaySize.width > 0 && originalHeight > 0 && (() => {
           // Convert logical originalHeight to CSS pixels
           const scale = displaySize.width / canvasWidth;
           const isMobile = displaySize.width < 768;
