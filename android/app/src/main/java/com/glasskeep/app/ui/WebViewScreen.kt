@@ -71,6 +71,8 @@ fun WebViewScreen(url: String, onReset: () -> Unit) {
             } catch (_: Exception) { }
 
             WebView(ctx).apply {
+                setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+
                 settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
@@ -81,8 +83,16 @@ fun WebViewScreen(url: String, onReset: () -> Unit) {
                     mediaPlaybackRequiresUserGesture = false
                     mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                     useWideViewPort = true
-                    loadWithOverviewMode = true
+                    loadWithOverviewMode = false
                     textZoom = 100
+                    builtInZoomControls = false
+                    displayZoomControls = false
+
+                    // Use Chrome user agent instead of WebView UA
+                    val chromeUa = userAgentString
+                        .replace("; wv", "")
+                        .replace("Version/\\d+\\.\\d+\\s*".toRegex(), "")
+                    userAgentString = chromeUa
 
                     // PWA support
                     javaScriptCanOpenWindowsAutomatically = true
