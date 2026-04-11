@@ -175,9 +175,9 @@ function ToolbarPopover({ anchorRef, open, onClose, darkMode, children }) {
 
 const PageLinesIcon = ({ active }) => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <line x1="4" y1="6" x2="20" y2="6" strokeDasharray={active ? "none" : "3 3"} />
-    <line x1="4" y1="12" x2="20" y2="12" strokeDasharray={active ? "none" : "3 3"} />
-    <line x1="4" y1="18" x2="20" y2="18" strokeDasharray={active ? "none" : "3 3"} />
+    <line x1="4" y1="8" x2="20" y2="8" strokeDasharray={active ? "none" : "3 3"} />
+    <line x1="4" y1="16" x2="20" y2="16" strokeDasharray={active ? "none" : "3 3"} />
+    <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="none" />
   </svg>
 );
 
@@ -602,9 +602,18 @@ export default function DrawingToolbar({
             </TBtn>
           )}
           {onTogglePageLines && (
-            <TBtn compact={compact} active={showPageLines} onClick={onTogglePageLines} tooltip={showPageLines ? t('hidePageLines') : t('showPageLines')}>
+            <button
+              onClick={onTogglePageLines}
+              data-tooltip={showPageLines ? t('hidePageLines') : t('showPageLines')}
+              className={`flex items-center justify-center rounded-lg transition-all duration-200 active:scale-[0.95] hover:scale-[1.03] ${
+                compact ? 'w-9 h-9 p-1.5 [&_svg]:w-5 [&_svg]:h-5' : 'min-w-[40px] min-h-[40px] p-2'
+              } ${showPageLines
+                ? 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-300/40 dark:shadow-none btn-gradient'
+                : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+              }`}
+            >
               <PageLinesIcon active={showPageLines} />
-            </TBtn>
+            </button>
           )}
           <TBtn
             compact={compact}
