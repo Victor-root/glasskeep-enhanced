@@ -166,7 +166,7 @@ export default function SettingsPanel({
                 {window.AndroidTheme && (
                   <div className="mt-1">
                     <button
-                      className="text-xs text-gray-500 dark:text-gray-400 underline"
+                      className="text-xs text-indigo-600 hover:underline"
                       onClick={() => window.AndroidTheme.changeServer()}
                     >{t("changeServer")}</button>
                   </div>
