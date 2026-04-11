@@ -178,7 +178,7 @@ export default function NoteModal({
   React.useEffect(() => {
     if (!open) return;
     const pageColor = dark ? "#1a1a1a" : "#f0e8ff";
-    const color = (!mColor || mColor === "default") ? pageColor : toHex(solid(bgFor(mColor, dark)));
+    const color = (!mColor || mColor === "default") ? pageColor : toHex(modalBgFor(mColor, dark));
     setThemeColor(color);
     return () => setThemeColor(pageColor);
   }, [open, mColor, dark]);
