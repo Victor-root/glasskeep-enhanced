@@ -126,6 +126,11 @@ class WebViewActivity : AppCompatActivity() {
                 override fun onPageFinished(view: WebView, pageUrl: String?) {
                     super.onPageFinished(view, pageUrl)
                     injectThemeColorObserver(view)
+                    // Push current system dark mode state to web app on load
+                    val isDark = isDarkMode()
+                    view.evaluateJavascript(
+                        "if(window.__setDarkMode)window.__setDarkMode($isDark)", null
+                    )
                 }
             }
 
