@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Environment
+import android.util.Base64
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.ServiceWorkerClient
@@ -31,54 +32,34 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 
-private const val WEBVIEW_CSS_FIXES = """
-    /* Force disable backdrop-filter (not supported in WebView, causes white overlays) */
-    *, *::before, *::after {
-        -webkit-backdrop-filter: none !important;
-        backdrop-filter: none !important;
-    }
+private fun buildCssFixesJs(): String {
+    // CSS fixes for WebView compatibility issues
+    val css = """
+        *,*::before,*::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+        .glass-card{background:rgba(255,255,255,0.92)!important}
+        html.dark .glass-card{background:rgba(40,40,40,0.92)!important}
+        .modal-scrim{background:rgba(0,0,0,0.5)!important}
+        .modal-header-blur{background:rgba(255,255,255,0.95)!important}
+        html.dark .modal-header-blur{background:rgba(40,40,40,0.95)!important}
+        .login-deco-card{background:rgba(255,255,255,0.55)!important}
+        html.dark .login-deco-card{background:rgba(30,30,40,0.65)!important}
+        .fmt-pop{background:rgba(255,255,255,0.97)!important}
+        html.dark .fmt-pop{background:rgba(40,40,40,0.97)!important}
+        .note-card{content-visibility:visible!important;contain:none!important}
+        .note-modal-anim{height:100vh!important;max-height:100vh!important}
+    """.trimIndent()
 
-    /* Fix glass cards: use solid semi-transparent bg instead of blur */
-    .glass-card {
-        background: rgba(255, 255, 255, 0.92) !important;
-    }
-    @media (prefers-color-scheme: dark) {
-        .glass-card {
-            background: rgba(30, 30, 30, 0.95) !important;
-        }
-    }
+    // Base64-encode CSS to avoid all JS string escaping issues
+    val encoded = Base64.encodeToString(css.toByteArray(), Base64.NO_WRAP)
 
-    /* Fix modal scrim */
-    .modal-scrim {
-        background: rgba(0, 0, 0, 0.5) !important;
-    }
-
-    /* Fix modal header blur */
-    .modal-header-blur {
-        background: rgba(255, 255, 255, 0.95) !important;
-    }
-
-    /* Fix login decorative cards */
-    .login-deco-card {
-        background: rgba(255, 255, 255, 0.7) !important;
-    }
-
-    /* Fix format popover */
-    .fmt-pop {
-        background: rgba(255, 255, 255, 0.97) !important;
-    }
-
-    /* Fix content-visibility (causes notes to vanish in WebView) */
-    .note-card {
-        content-visibility: visible !important;
-        contain: none !important;
-    }
-
-    /* Fix 100dvh (not reliable in WebView) */
-    .note-modal-anim {
-        height: 100vh !important;
-    }
-"""
+    return "javascript:void((function(){" +
+        "if(document.getElementById('wv-fix'))return;" +
+        "var s=document.createElement('style');" +
+        "s.id='wv-fix';" +
+        "s.textContent=atob('$encoded');" +
+        "document.head.appendChild(s);" +
+        "})())"
+}
 
 @Composable
 fun WebViewScreen(url: String, onReset: () -> Unit) {
@@ -106,6 +87,8 @@ fun WebViewScreen(url: String, onReset: () -> Unit) {
     BackHandler(enabled = webView?.canGoBack() == true) {
         webView?.goBack()
     }
+
+    val cssFixesJs = remember { buildCssFixesJs() }
 
     AndroidView(
         factory = { ctx ->
@@ -171,17 +154,8 @@ fun WebViewScreen(url: String, onReset: () -> Unit) {
 
                     override fun onPageFinished(view: WebView, pageUrl: String?) {
                         super.onPageFinished(view, pageUrl)
-                        // Inject CSS fixes for WebView compatibility
-                        val js = """
-                            (function() {
-                                if (document.getElementById('webview-fixes')) return;
-                                var style = document.createElement('style');
-                                style.id = 'webview-fixes';
-                                style.textContent = `$WEBVIEW_CSS_FIXES`;
-                                document.head.appendChild(style);
-                            })();
-                        """.trimIndent()
-                        view.evaluateJavascript(js, null)
+                        // Inject CSS fixes via Base64 (avoids JS escaping issues)
+                        view.loadUrl(cssFixesJs)
                     }
                 }
 
@@ -194,7 +168,6 @@ fun WebViewScreen(url: String, onReset: () -> Unit) {
                         fileUploadCallback?.onReceiveValue(null)
                         fileUploadCallback = callback
 
-                        // Request camera permission if needed
                         if (ContextCompat.checkSelfPermission(
                                 ctx, Manifest.permission.CAMERA
                             ) != PackageManager.PERMISSION_GRANTED
