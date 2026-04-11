@@ -31,6 +31,55 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 
+private const val WEBVIEW_CSS_FIXES = """
+    /* Force disable backdrop-filter (not supported in WebView, causes white overlays) */
+    *, *::before, *::after {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+    }
+
+    /* Fix glass cards: use solid semi-transparent bg instead of blur */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.92) !important;
+    }
+    @media (prefers-color-scheme: dark) {
+        .glass-card {
+            background: rgba(30, 30, 30, 0.95) !important;
+        }
+    }
+
+    /* Fix modal scrim */
+    .modal-scrim {
+        background: rgba(0, 0, 0, 0.5) !important;
+    }
+
+    /* Fix modal header blur */
+    .modal-header-blur {
+        background: rgba(255, 255, 255, 0.95) !important;
+    }
+
+    /* Fix login decorative cards */
+    .login-deco-card {
+        background: rgba(255, 255, 255, 0.7) !important;
+    }
+
+    /* Fix format popover */
+    .fmt-pop {
+        background: rgba(255, 255, 255, 0.97) !important;
+    }
+
+    /* Fix content-visibility (causes notes to vanish in WebView) */
+    .note-card {
+        content-visibility: visible !important;
+        contain: none !important;
+    }
+
+    /* Fix 100dvh (not reliable in WebView) */
+    .note-modal-anim {
+        height: 100vh !important;
+    }
+"""
+
 @Composable
 fun WebViewScreen(url: String, onReset: () -> Unit) {
     val context = LocalContext.current
@@ -110,16 +159,29 @@ fun WebViewScreen(url: String, onReset: () -> Unit) {
                         request: WebResourceRequest
                     ): Boolean {
                         val requestUrl = request.url.toString()
-                        // Keep navigation within the app's server
                         return if (requestUrl.startsWith(url)) {
                             false
                         } else {
-                            // External links open in browser
                             ctx.startActivity(
                                 Intent(Intent.ACTION_VIEW, request.url)
                             )
                             true
                         }
+                    }
+
+                    override fun onPageFinished(view: WebView, pageUrl: String?) {
+                        super.onPageFinished(view, pageUrl)
+                        // Inject CSS fixes for WebView compatibility
+                        val js = """
+                            (function() {
+                                if (document.getElementById('webview-fixes')) return;
+                                var style = document.createElement('style');
+                                style.id = 'webview-fixes';
+                                style.textContent = `$WEBVIEW_CSS_FIXES`;
+                                document.head.appendChild(style);
+                            })();
+                        """.trimIndent()
+                        view.evaluateJavascript(js, null)
                     }
                 }
 
