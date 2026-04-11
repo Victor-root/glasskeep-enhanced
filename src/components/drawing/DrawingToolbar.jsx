@@ -565,9 +565,7 @@ export default function DrawingToolbar({
               {onTogglePageLines && (
                 <button
                   onClick={() => { onTogglePageLines(); }}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-150 active:scale-95 ${
-                    showPageLines ? 'bg-indigo-50 dark:bg-indigo-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-                  }`}
+                  className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-150 active:scale-95 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
                   <span className={`w-8 h-8 flex items-center justify-center rounded-lg text-white shadow-sm ${
                     showPageLines ? 'bg-gradient-to-r from-indigo-500 to-violet-600' : 'bg-gray-400 dark:bg-gray-600'
