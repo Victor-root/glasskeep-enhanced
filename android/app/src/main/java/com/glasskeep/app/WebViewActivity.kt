@@ -41,7 +41,12 @@ class WebViewActivity : AppCompatActivity() {
     ) { result ->
         val data = if (result.resultCode == Activity.RESULT_OK) {
             result.data?.let { intent ->
+                // Single URI (file manager)
                 intent.data?.let { arrayOf(it) }
+                    // clipData (Android 13+ photo picker)
+                    ?: intent.clipData?.let { clip ->
+                        Array(clip.itemCount) { i -> clip.getItemAt(i).uri }
+                    }
                     ?: WebChromeClient.FileChooserParams.parseResult(result.resultCode, intent)
             }
         } else null
