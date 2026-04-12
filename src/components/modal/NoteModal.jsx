@@ -233,7 +233,12 @@ export default function NoteModal({
             : isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen sm:!rounded-none'
             : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl'
           }${drawTransition === 'entering' ? ' draw-expand' : drawTransition === 'leaving' ? ' draw-collapse' : ''} flex flex-col relative overflow-hidden`}
-          style={{ backgroundColor: modalBgFor(mColor, dark), height: (windowWidth < 640 || isLandscapeMobile) ? '100dvh' : undefined }}
+          style={{
+            backgroundColor: modalBgFor(mColor, dark),
+            height: (windowWidth < 640 || isLandscapeMobile) ? '100dvh' : undefined,
+            paddingTop: (windowWidth < 640 || isLandscapeMobile) ? 'env(safe-area-inset-top)' : undefined,
+            paddingBottom: (windowWidth < 640 || isLandscapeMobile) ? 'env(safe-area-inset-bottom)' : undefined,
+          }}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
