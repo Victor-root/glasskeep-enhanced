@@ -213,16 +213,22 @@ fun SetupScreen(onConnect: (String) -> Unit) {
         when {
             trimmed.isBlank() -> error = errorEmpty
             !trimmed.startsWith("http://") && !trimmed.startsWith("https://") -> error = errorInvalid
+            loading -> {} // already checking
             else -> {
                 loading = true
                 error = null
                 scope.launch {
-                    val result = checkGlassKeepServer(trimmed)
-                    loading = false
-                    when (result) {
-                        ServerCheck.OK -> onConnect(trimmed)
-                        ServerCheck.NOT_GLASSKEEP -> error = errorNotGlasskeep
-                        ServerCheck.UNREACHABLE -> error = errorUnreachable
+                    try {
+                        val result = checkGlassKeepServer(trimmed)
+                        when (result) {
+                            ServerCheck.OK -> onConnect(trimmed)
+                            ServerCheck.NOT_GLASSKEEP -> error = errorNotGlasskeep
+                            ServerCheck.UNREACHABLE -> error = errorUnreachable
+                        }
+                    } catch (_: Throwable) {
+                        error = errorUnreachable
+                    } finally {
+                        loading = false
                     }
                 }
             }
@@ -361,14 +367,18 @@ private suspend fun checkGlassKeepServer(baseUrl: String): ServerCheck =
             conn.connectTimeout = 5000
             conn.readTimeout = 5000
             conn.requestMethod = "GET"
+            conn.instanceFollowRedirects = true
             val code = conn.responseCode
-            if (code != 200) return@withContext ServerCheck.UNREACHABLE
-            val body = conn.inputStream.bufferedReader().readText()
+            if (code != 200) {
+                conn.disconnect()
+                return@withContext ServerCheck.UNREACHABLE
+            }
+            val body = conn.inputStream.bufferedReader().use { it.readText() }
             conn.disconnect()
             val json = JSONObject(body)
             if (json.optString("service") == "glasskeep") ServerCheck.OK
             else ServerCheck.NOT_GLASSKEEP
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             ServerCheck.UNREACHABLE
         }
     }
