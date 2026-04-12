@@ -74,23 +74,28 @@ class WebViewActivity : AppCompatActivity() {
         fun saveBlobFile(base64Data: String, filename: String, mimeType: String) {
             try {
                 val bytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
-                // Write to cache/shared/ so FileProvider can serve it
-                val sharedDir = java.io.File(cacheDir, "shared")
-                sharedDir.mkdirs()
-                val file = java.io.File(sharedDir, filename)
-                file.writeBytes(bytes)
-                val uri = androidx.core.content.FileProvider.getUriForFile(
-                    this@WebViewActivity,
-                    "${packageName}.fileprovider",
-                    file
-                )
-                val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                    type = mimeType
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                val contentValues = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, filename)
+                    put(android.provider.MediaStore.Downloads.MIME_TYPE, mimeType)
+                    put(android.provider.MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                    put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
                 }
+                val uri = contentResolver.insert(
+                    android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues
+                )
+                if (uri == null) {
+                    runOnUiThread {
+                        Toast.makeText(this@WebViewActivity, getString(R.string.download_error), Toast.LENGTH_SHORT).show()
+                    }
+                    return
+                }
+                contentResolver.openOutputStream(uri)?.use { out -> out.write(bytes) }
+                val updateValues = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+                }
+                contentResolver.update(uri, updateValues, null, null)
                 runOnUiThread {
-                    startActivity(Intent.createChooser(sendIntent, filename))
+                    Toast.makeText(this@WebViewActivity, getString(R.string.download_complete, filename), Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
                 android.util.Log.e("GlassKeep", "saveBlobFile failed", e)
