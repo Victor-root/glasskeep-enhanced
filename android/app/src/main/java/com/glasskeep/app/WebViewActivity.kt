@@ -69,6 +69,32 @@ class WebViewActivity : AppCompatActivity() {
         fun changeServer() {
             runOnUiThread { showChangeServerDialog() }
         }
+
+        @JavascriptInterface
+        fun saveBlobFile(base64Data: String, filename: String, mimeType: String) {
+            try {
+                val bytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+                val contentValues = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, filename)
+                    put(android.provider.MediaStore.Downloads.MIME_TYPE, mimeType)
+                    put(android.provider.MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                }
+                val uri = contentResolver.insert(
+                    android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues
+                )
+                uri?.let {
+                    contentResolver.openOutputStream(it)?.use { out -> out.write(bytes) }
+                    runOnUiThread {
+                        Toast.makeText(this@WebViewActivity, getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this@WebViewActivity, getString(R.string.download_error), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -176,20 +202,40 @@ class WebViewActivity : AppCompatActivity() {
 
             // Downloads
             setDownloadListener { downloadUrl, userAgent, contentDisposition, mimeType, _ ->
-                try {
-                    val req = DownloadManager.Request(Uri.parse(downloadUrl)).apply {
-                        setMimeType(mimeType)
-                        addRequestHeader("Cookie", CookieManager.getInstance().getCookie(downloadUrl))
-                        addRequestHeader("User-Agent", userAgent)
-                        val filename = URLUtil.guessFileName(downloadUrl, contentDisposition, mimeType)
-                        setTitle(filename)
-                        setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                        setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
+                if (downloadUrl.startsWith("blob:")) {
+                    // blob: URLs can't be downloaded by DownloadManager —
+                    // fetch in JS, convert to base64, pass to native bridge
+                    val filename = URLUtil.guessFileName(downloadUrl, contentDisposition, mimeType)
+                    webView.evaluateJavascript("""
+                        (async function(){
+                          try {
+                            var r = await fetch('$downloadUrl');
+                            var b = await r.blob();
+                            var reader = new FileReader();
+                            reader.onloadend = function(){
+                              var base64 = reader.result.split(',')[1] || '';
+                              window.AndroidTheme.saveBlobFile(base64, '$filename', b.type || '$mimeType');
+                            };
+                            reader.readAsDataURL(b);
+                          } catch(e){ console.error('blob download failed', e); }
+                        })()
+                    """.trimIndent(), null)
+                } else {
+                    try {
+                        val req = DownloadManager.Request(Uri.parse(downloadUrl)).apply {
+                            setMimeType(mimeType)
+                            addRequestHeader("Cookie", CookieManager.getInstance().getCookie(downloadUrl))
+                            addRequestHeader("User-Agent", userAgent)
+                            val filename = URLUtil.guessFileName(downloadUrl, contentDisposition, mimeType)
+                            setTitle(filename)
+                            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                            setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
+                        }
+                        getSystemService(DownloadManager::class.java).enqueue(req)
+                        Toast.makeText(this@WebViewActivity, getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+                    } catch (_: Exception) {
+                        Toast.makeText(this@WebViewActivity, getString(R.string.download_error), Toast.LENGTH_SHORT).show()
                     }
-                    getSystemService(DownloadManager::class.java).enqueue(req)
-                    Toast.makeText(this@WebViewActivity, getString(R.string.download_started), Toast.LENGTH_SHORT).show()
-                } catch (_: Exception) {
-                    Toast.makeText(this@WebViewActivity, getString(R.string.download_error), Toast.LENGTH_SHORT).show()
                 }
             }
 
