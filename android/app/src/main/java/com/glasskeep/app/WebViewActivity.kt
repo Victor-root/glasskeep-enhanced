@@ -93,7 +93,7 @@ class WebViewActivity : AppCompatActivity() {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true
-                cacheMode = WebSettings.LOAD_DEFAULT
+                cacheMode = WebSettings.LOAD_NO_CACHE
                 allowFileAccess = true
                 allowContentAccess = true
                 mediaPlaybackRequiresUserGesture = false
