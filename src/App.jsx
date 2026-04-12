@@ -776,7 +776,7 @@ export default function App() {
       });
       const blob = await zip.generateAsync({ type: "blob" });
       const ts = new Date().toISOString().replace(/[:.]/g, "-");
-      triggerBlobDownload(`glass-keep-selected-${ts}.zip`, blob);
+      await triggerBlobDownload(`glass-keep-selected-${ts}.zip`, blob);
     } catch (e) {
       alert(e.message || t("zipDownloadFailed"));
     }

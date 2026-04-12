@@ -23,6 +23,12 @@ export const sanitizeFilename = (name, fallback = "note") =>
     .slice(0, 64);
 
 export const downloadText = (filename, content) => {
+  // Android WebView: pass directly to native bridge (blob: URLs get revoked before the download listener can fetch them)
+  if (window.AndroidTheme?.saveBlobFile) {
+    const base64 = btoa(unescape(encodeURIComponent(content)));
+    window.AndroidTheme.saveBlobFile(base64, filename, "text/plain");
+    return;
+  }
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -35,6 +41,13 @@ export const downloadText = (filename, content) => {
 };
 
 export const downloadDataUrl = async (filename, dataUrl) => {
+  // Android WebView: extract base64 from data URL and pass to native bridge
+  if (window.AndroidTheme?.saveBlobFile && dataUrl.startsWith("data:")) {
+    const [header, b64] = dataUrl.split(",");
+    const mime = (header.match(/data:([^;]+)/)?.[1]) || "application/octet-stream";
+    window.AndroidTheme.saveBlobFile(b64, filename, mime);
+    return;
+  }
   const res = await fetch(dataUrl);
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -48,7 +61,17 @@ export const downloadDataUrl = async (filename, dataUrl) => {
 };
 
 // Download arbitrary blob
-export const triggerBlobDownload = (filename, blob) => {
+export const triggerBlobDownload = async (filename, blob) => {
+  // Android WebView: convert blob to base64 and pass to native bridge
+  if (window.AndroidTheme?.saveBlobFile) {
+    const buf = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    const base64 = btoa(binary);
+    window.AndroidTheme.saveBlobFile(base64, filename, blob.type || "application/octet-stream");
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
