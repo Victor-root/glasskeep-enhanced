@@ -53,11 +53,22 @@ class WebViewActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { /* handled */ }
 
+    /** Debounce rapid theme-color updates so only the last value in a burst
+     *  (e.g. React cleanup → effect) wins. */
+    private var pendingThemeColor: String? = null
+    private val applyThemeRunnable = Runnable {
+        pendingThemeColor?.let { applySystemBarColor(it) }
+    }
+
     /** Called from JavaScript for theme-color sync and server change */
     inner class ThemeBridge {
         @JavascriptInterface
         fun onThemeColor(hexColor: String) {
-            runOnUiThread { applySystemBarColor(hexColor) }
+            handler.post {
+                pendingThemeColor = hexColor
+                handler.removeCallbacks(applyThemeRunnable)
+                handler.postDelayed(applyThemeRunnable, 60)
+            }
         }
 
         @JavascriptInterface
