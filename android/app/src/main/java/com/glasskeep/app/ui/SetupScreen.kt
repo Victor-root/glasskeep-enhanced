@@ -205,26 +205,51 @@ fun SetupScreen(onConnect: (String) -> Unit) {
     val errorUnreachable = stringResource(R.string.error_unreachable)
 
     val doConnect: () -> Unit = {
-        val trimmed = url.trim().trimEnd('/')
-        when {
-            trimmed.isBlank() -> error = errorEmpty
-            !trimmed.startsWith("http://") && !trimmed.startsWith("https://") -> error = errorInvalid
-            loading -> {}
-            else -> {
-                loading = true
-                error = null
-                Thread {
-                    val result = checkGlassKeepServer(trimmed)
-                    handler.post {
-                        loading = false
-                        when (result) {
-                            ServerCheck.OK -> onConnect(trimmed)
-                            ServerCheck.NOT_GLASSKEEP -> error = errorNotGlasskeep
-                            ServerCheck.UNREACHABLE -> error = errorUnreachable
+        try {
+            val trimmed = url.trim().trimEnd('/')
+            when {
+                trimmed.isBlank() -> error = errorEmpty
+                !trimmed.startsWith("http://") && !trimmed.startsWith("https://") -> error = errorInvalid
+                loading -> {}
+                else -> {
+                    loading = true
+                    error = null
+                    val t = Thread {
+                        try {
+                            val result = checkGlassKeepServer(trimmed)
+                            handler.post {
+                                try {
+                                    loading = false
+                                    when (result) {
+                                        ServerCheck.OK -> onConnect(trimmed)
+                                        ServerCheck.NOT_GLASSKEEP -> error = errorNotGlasskeep
+                                        ServerCheck.UNREACHABLE -> error = errorUnreachable
+                                    }
+                                } catch (e: Throwable) {
+                                    loading = false
+                                    error = "UI: ${e.javaClass.simpleName}: ${e.message}"
+                                }
+                            }
+                        } catch (e: Throwable) {
+                            handler.post {
+                                loading = false
+                                error = "BG: ${e.javaClass.simpleName}: ${e.message}"
+                            }
                         }
                     }
-                }.start()
+                    t.uncaughtExceptionHandler =
+                        Thread.UncaughtExceptionHandler { _, e ->
+                            handler.post {
+                                loading = false
+                                error = "UCE: ${e.javaClass.simpleName}: ${e.message}"
+                            }
+                        }
+                    t.start()
+                }
             }
+        } catch (e: Throwable) {
+            loading = false
+            error = "Click: ${e.javaClass.simpleName}: ${e.message}"
         }
     }
 
