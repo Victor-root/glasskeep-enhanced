@@ -11,6 +11,8 @@ export function setThemeColor(color) {
   meta.name = "theme-color";
   meta.setAttribute("content", color);
   document.head.appendChild(meta);
+  // Direct call to Android WebView bridge (bypasses MutationObserver)
+  try { window.AndroidTheme?.onThemeColor(color); } catch (_) {}
 }
 
 export const sanitizeFilename = (name, fallback = "note") =>
