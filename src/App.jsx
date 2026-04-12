@@ -855,7 +855,8 @@ export default function App() {
       setDark(isDark);
       document.documentElement.classList.toggle("dark", isDark);
       localStorage.setItem("glass-keep-dark-mode", String(isDark));
-      setThemeColor(isDark ? "#1a1a1a" : "#f0e8ff");
+      // Skip if note modal is open — NoteModal effect handles its own color
+      if (!window.__noteModalOpen) setThemeColor(isDark ? "#1a1a1a" : "#f0e8ff");
     };
 
     // Expose for Android WebView bridge (prefers-color-scheme doesn't update in WebView)
@@ -874,7 +875,8 @@ export default function App() {
     setDark(next);
     document.documentElement.classList.toggle("dark", next);
     localStorage.setItem("glass-keep-dark-mode", String(next));
-    setThemeColor(next ? "#1a1a1a" : "#f0e8ff");
+    // Skip if note modal is open — NoteModal effect handles its own color
+    if (!window.__noteModalOpen) setThemeColor(next ? "#1a1a1a" : "#f0e8ff");
   };
 
   // Close sidebar with Escape

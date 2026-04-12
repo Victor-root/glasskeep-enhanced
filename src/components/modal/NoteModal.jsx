@@ -174,13 +174,20 @@ export default function NoteModal({
     }
   }, [open, activeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* Sync PWA status bar color with note color */
+  /* Sync PWA / Android status bar color with note color.
+     No cleanup function — avoids the cleanup→default→effect→noteColor race
+     that caused a flash on Android WebView. The default is set explicitly
+     when `open` becomes false. */
   React.useEffect(() => {
-    if (!open) return;
     const pageColor = dark ? "#1a1a1a" : "#f0e8ff";
+    if (!open) {
+      window.__noteModalOpen = false;
+      setThemeColor(pageColor);
+      return;
+    }
+    window.__noteModalOpen = true;
     const color = (!mColor || mColor === "default") ? pageColor : toHex(solid(bgFor(mColor, dark)));
     setThemeColor(color);
-    return () => setThemeColor(pageColor);
   }, [open, mColor, dark]);
 
   /* Intercept Ctrl+Z / Ctrl+Y at modal level for chunk-level undo */
