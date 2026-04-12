@@ -809,6 +809,9 @@ export default function App() {
   // Sync dropdown state (lifted for back button support)
   const [syncDropdownOpen, setSyncDropdownOpen] = useState(false);
 
+  // Mobile search expand (lifted for back button support)
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+
 
   useEffect(() => {
     // Only close header kebab on outside click (modal kebab is handled by Popover)
@@ -2747,7 +2750,7 @@ export default function App() {
   const overlayOpenCount = [
     imgViewOpen, confirmDeleteOpen, genericConfirmOpen,
     collaborationModalOpen, showModalColorPop, showModalFmt, modalMenuOpen,
-    modalKebabOpen, modalTagFocused, syncDropdownOpen,
+    modalKebabOpen, modalTagFocused, syncDropdownOpen, mobileSearchOpen,
     showColorPop, showComposerFmt, headerMenuOpen, multiMode,
     settingsPanelOpen, adminPanelOpen, sidebarOpen, open,
   ].filter(Boolean).length;
@@ -2792,6 +2795,7 @@ export default function App() {
       if (modalKebabOpen) { setModalKebabOpen(false); return; }
       if (modalTagFocused) { setModalTagFocused(false); return; }
       if (syncDropdownOpen) { setSyncDropdownOpen(false); return; }
+      if (mobileSearchOpen) { setMobileSearchOpen(false); return; }
       if (showColorPop) { setShowColorPop(false); return; }
       if (showComposerFmt) { setShowComposerFmt(false); return; }
       if (headerMenuOpen) { setHeaderMenuOpen(false); return; }
@@ -2805,8 +2809,8 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPopState);
   }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
       showModalColorPop, showModalFmt, modalMenuOpen, modalKebabOpen, modalTagFocused,
-      syncDropdownOpen, showColorPop, showComposerFmt, headerMenuOpen, multiMode,
-      settingsPanelOpen, adminPanelOpen, sidebarOpen, open]);
+      syncDropdownOpen, mobileSearchOpen, showColorPop, showComposerFmt,
+      headerMenuOpen, multiMode, settingsPanelOpen, adminPanelOpen, sidebarOpen, open]);
 
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
@@ -4226,6 +4230,8 @@ export default function App() {
         handleSyncNow={handleSyncNow}
         syncDropdownOpen={syncDropdownOpen}
         setSyncDropdownOpen={setSyncDropdownOpen}
+        mobileSearchOpen={mobileSearchOpen}
+        setMobileSearchOpen={setMobileSearchOpen}
         // checklist update
         onUpdateChecklistItem={onUpdateChecklistItem}
         // Admin panel

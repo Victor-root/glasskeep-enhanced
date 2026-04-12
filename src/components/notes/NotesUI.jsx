@@ -137,9 +137,9 @@ function NotesUI({
   handleSyncNow,
   syncDropdownOpen,
   setSyncDropdownOpen,
+  mobileSearchOpen,
+  setMobileSearchOpen,
 }) {
-  // Mobile search expand
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const mobileSearchRef = useRef(null);
 
   // Header auto-hide on scroll (mobile only)
