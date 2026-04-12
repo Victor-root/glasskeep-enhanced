@@ -489,7 +489,7 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
     mDrawingData, setMDrawingData,
     showModalFmt, setShowModalFmt,
     showModalColorPop, setShowModalColorPop,
-    imgViewOpen, imgViewIndex,
+    imgViewOpen, setImgViewOpen, imgViewIndex,
     mobileNavVisible,
     modalScrollable,
     // Refs

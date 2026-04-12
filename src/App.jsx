@@ -214,7 +214,7 @@ export default function App() {
     mDrawingData, setMDrawingData,
     showModalFmt, setShowModalFmt,
     showModalColorPop, setShowModalColorPop,
-    imgViewOpen, imgViewIndex,
+    imgViewOpen, setImgViewOpen, imgViewIndex,
     mobileNavVisible,
     modalScrollable,
     // Refs
