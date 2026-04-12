@@ -147,7 +147,7 @@ function NotesUI({
   const [headerVisible, setHeaderVisible] = useState(true);
   const lastScrollYRef = useRef(0);
   useEffect(() => {
-    if (windowWidth >= 700) {
+    if (windowWidth >= 700 && !isLandscapeMobile) {
       setHeaderVisible(true);
       return;
     }
@@ -204,7 +204,7 @@ function NotesUI({
 
   return (
     <div
-      className="min-h-screen overflow-x-hidden"
+      className="min-h-screen overflow-x-clip"
       style={{ marginLeft: sidebarPermanent ? `${sidebarWidth}px` : "0px", position:"relative", zIndex:2 }}
     >
       <MultiSelectToolbar
@@ -219,6 +219,7 @@ function NotesUI({
         onBulkPin={onBulkPin}
         onBulkArchive={onBulkArchive}
         onExitMulti={onExitMulti}
+        headerVisible={headerVisible}
       />
 
       <NotesHeader

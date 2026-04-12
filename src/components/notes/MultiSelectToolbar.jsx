@@ -16,6 +16,7 @@ export default function MultiSelectToolbar({
   onBulkPin,
   onBulkArchive,
   onExitMulti,
+  headerVisible,
 }) {
   const multiColorBtnRef = useRef(null);
   const [showMultiColorPop, setShowMultiColorPop] = useState(false);
@@ -25,7 +26,11 @@ export default function MultiSelectToolbar({
   return (
         <div
           className="p-3 sm:p-4 flex items-center justify-between sticky top-0 z-[25] glass-card mb-2"
-          style={{ position: "sticky" }}
+          style={{
+            position: "sticky",
+            transform: headerVisible === false ? "translateY(-100%)" : "translateY(0)",
+            transition: "transform 0.3s ease",
+          }}
         >
           <div className="flex items-center gap-2 flex-wrap">
             <button
