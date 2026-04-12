@@ -32,7 +32,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,9 +51,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -202,7 +198,7 @@ fun SetupScreen(onConnect: (String) -> Unit) {
     var url by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    val handler = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
     val errorEmpty = stringResource(R.string.error_empty_url)
     val errorInvalid = stringResource(R.string.error_invalid_url)
     val errorNotGlasskeep = stringResource(R.string.error_not_glasskeep)
@@ -213,24 +209,21 @@ fun SetupScreen(onConnect: (String) -> Unit) {
         when {
             trimmed.isBlank() -> error = errorEmpty
             !trimmed.startsWith("http://") && !trimmed.startsWith("https://") -> error = errorInvalid
-            loading -> {} // already checking
+            loading -> {}
             else -> {
                 loading = true
                 error = null
-                scope.launch {
-                    try {
-                        val result = checkGlassKeepServer(trimmed)
+                Thread {
+                    val result = checkGlassKeepServer(trimmed)
+                    handler.post {
+                        loading = false
                         when (result) {
                             ServerCheck.OK -> onConnect(trimmed)
                             ServerCheck.NOT_GLASSKEEP -> error = errorNotGlasskeep
                             ServerCheck.UNREACHABLE -> error = errorUnreachable
                         }
-                    } catch (_: Throwable) {
-                        error = errorUnreachable
-                    } finally {
-                        loading = false
                     }
-                }
+                }.start()
             }
         }
     }
@@ -360,25 +353,24 @@ fun SetupScreen(onConnect: (String) -> Unit) {
 
 private enum class ServerCheck { OK, NOT_GLASSKEEP, UNREACHABLE }
 
-private suspend fun checkGlassKeepServer(baseUrl: String): ServerCheck =
-    withContext(Dispatchers.IO) {
-        try {
-            val conn = URL("$baseUrl/api/health").openConnection() as HttpURLConnection
-            conn.connectTimeout = 5000
-            conn.readTimeout = 5000
-            conn.requestMethod = "GET"
-            conn.instanceFollowRedirects = true
-            val code = conn.responseCode
-            if (code != 200) {
-                conn.disconnect()
-                return@withContext ServerCheck.UNREACHABLE
-            }
+private fun checkGlassKeepServer(baseUrl: String): ServerCheck =
+    try {
+        val conn = URL("$baseUrl/api/health").openConnection() as HttpURLConnection
+        conn.connectTimeout = 5000
+        conn.readTimeout = 5000
+        conn.requestMethod = "GET"
+        conn.instanceFollowRedirects = true
+        val code = conn.responseCode
+        if (code != 200) {
+            conn.disconnect()
+            ServerCheck.UNREACHABLE
+        } else {
             val body = conn.inputStream.bufferedReader().use { it.readText() }
             conn.disconnect()
             val json = JSONObject(body)
             if (json.optString("service") == "glasskeep") ServerCheck.OK
             else ServerCheck.NOT_GLASSKEEP
-        } catch (_: Throwable) {
-            ServerCheck.UNREACHABLE
         }
+    } catch (_: Throwable) {
+        ServerCheck.UNREACHABLE
     }
