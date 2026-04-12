@@ -73,6 +73,10 @@ class WebViewActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_webview)
 
+        // DEBUG: force bright red bars to test if programmatic colors work
+        window.statusBarColor = Color.parseColor("#FF0000")
+        window.navigationBarColor = Color.parseColor("#FF0000")
+
         val url = intent.getStringExtra("url")
             ?: getSharedPreferences("glasskeep", MODE_PRIVATE).getString("server_url", null)
             ?: run { finish(); return }
