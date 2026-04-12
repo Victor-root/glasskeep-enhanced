@@ -66,6 +66,9 @@ export default function TagSidebar({
           width: permanent ? `${width}px` : "288px",
           backgroundColor: dark ? "#222222" : "rgba(240,232,255,0.97)",
           borderRight: "1px solid var(--border-light)",
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+          paddingLeft: "env(safe-area-inset-left)",
         }}
         aria-hidden={!(permanent || open)}
       >
