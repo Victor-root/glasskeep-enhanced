@@ -57,10 +57,7 @@ class WebViewActivity : AppCompatActivity() {
     inner class ThemeBridge {
         @JavascriptInterface
         fun onThemeColor(hexColor: String) {
-            runOnUiThread {
-                Toast.makeText(this@WebViewActivity, "Theme: $hexColor", Toast.LENGTH_SHORT).show()
-                applySystemBarColor(hexColor)
-            }
+            runOnUiThread { applySystemBarColor(hexColor) }
         }
 
         @JavascriptInterface
@@ -72,10 +69,6 @@ class WebViewActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_webview)
-
-        // DEBUG: force bright red bars to test if programmatic colors work
-        window.statusBarColor = Color.parseColor("#FF0000")
-        window.navigationBarColor = Color.parseColor("#FF0000")
 
         val url = intent.getStringExtra("url")
             ?: getSharedPreferences("glasskeep", MODE_PRIVATE).getString("server_url", null)
@@ -100,7 +93,7 @@ class WebViewActivity : AppCompatActivity() {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true
-                cacheMode = WebSettings.LOAD_NO_CACHE
+                cacheMode = WebSettings.LOAD_DEFAULT
                 allowFileAccess = true
                 allowContentAccess = true
                 mediaPlaybackRequiresUserGesture = false
@@ -132,7 +125,6 @@ class WebViewActivity : AppCompatActivity() {
 
                 override fun onPageFinished(view: WebView, pageUrl: String?) {
                     super.onPageFinished(view, pageUrl)
-                    injectThemeColorObserver(view)
                     // Push current system dark mode state to web app on load
                     val isDark = isDarkMode()
                     view.evaluateJavascript(
@@ -201,25 +193,9 @@ class WebViewActivity : AppCompatActivity() {
         )
     }
 
-    private fun injectThemeColorObserver(view: WebView) {
-        // Read current color + set up observer for changes (dark mode toggle)
-        val js = "(function(){" +
-            "function send(){var m=document.querySelector('meta[name=\"theme-color\"]');if(m&&m.content)AndroidTheme.onThemeColor(m.content);}" +
-            "send();" +
-            "if(!window.__tcObs){" +
-            "window.__tcObs=new MutationObserver(function(){setTimeout(send,0);});" +
-            "window.__tcObs.observe(document.head,{childList:true});" +
-            "}" +
-            "})()"
-        view.evaluateJavascript(js, null)
-    }
-
     private fun applySystemBarColor(hexColor: String) {
         try {
             val color = Color.parseColor(hexColor)
-            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)
-            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
             window.statusBarColor = color
             window.navigationBarColor = color
 
@@ -229,9 +205,7 @@ class WebViewActivity : AppCompatActivity() {
             val controller = WindowInsetsControllerCompat(window, window.decorView)
             controller.isAppearanceLightStatusBars = isLight
             controller.isAppearanceLightNavigationBars = isLight
-        } catch (e: Exception) {
-            Toast.makeText(this, "BarErr: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
+        } catch (_: Exception) { }
     }
 
     private val handler = Handler(Looper.getMainLooper())
