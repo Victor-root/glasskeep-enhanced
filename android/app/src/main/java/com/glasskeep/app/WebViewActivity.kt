@@ -57,7 +57,10 @@ class WebViewActivity : AppCompatActivity() {
     inner class ThemeBridge {
         @JavascriptInterface
         fun onThemeColor(hexColor: String) {
-            runOnUiThread { applySystemBarColor(hexColor) }
+            runOnUiThread {
+                Toast.makeText(this@WebViewActivity, "Theme: $hexColor", Toast.LENGTH_SHORT).show()
+                applySystemBarColor(hexColor)
+            }
         }
 
         @JavascriptInterface
