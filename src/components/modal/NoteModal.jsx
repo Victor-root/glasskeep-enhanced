@@ -238,7 +238,6 @@ export default function NoteModal({
             height: (windowWidth < 640 || isLandscapeMobile) ? '100dvh' : undefined,
             paddingTop: (windowWidth < 640 || isLandscapeMobile) ? 'env(safe-area-inset-top)' : undefined,
             paddingBottom: (windowWidth < 640 || isLandscapeMobile) ? 'env(safe-area-inset-bottom)' : undefined,
-            paddingLeft: (windowWidth < 640 || isLandscapeMobile) ? 'env(safe-area-inset-left)' : undefined,
             paddingRight: (windowWidth < 640 || isLandscapeMobile) ? 'env(safe-area-inset-right)' : undefined,
           }}
           onMouseDown={(e) => e.stopPropagation()}
