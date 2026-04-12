@@ -128,6 +128,9 @@ export default function AdminPanel({
             ? "rgba(40,40,40,0.95)"
             : "rgba(255,255,255,0.95)",
           borderLeft: "1px solid var(--border-light)",
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+          paddingRight: "env(safe-area-inset-right)",
         }}
         aria-hidden={!open}
       >
