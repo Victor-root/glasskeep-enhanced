@@ -17,6 +17,19 @@ export default function ChecklistRow({
   const isMobile = typeof window !== "undefined" && window.innerWidth < 700;
   const [editing, setEditing] = React.useState(initialEditing);
   const clickOffsetRef = React.useRef(null);
+  const textareaRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (editing && textareaRef.current) {
+      const el = textareaRef.current;
+      el.style.height = "auto";
+      el.style.height = el.scrollHeight + "px";
+      el.focus();
+      const pos = clickOffsetRef.current ?? el.value.length;
+      el.setSelectionRange(pos, pos);
+      clickOffsetRef.current = null;
+    }
+  }, [editing]);
 
   const boxSize =
     size === "lg"
@@ -77,16 +90,7 @@ export default function ChecklistRow({
             setEditing(false);
             if (!item.text.trim()) onRemove?.();
           }}
-          ref={(el) => {
-            if (el) {
-              el.style.height = "auto";
-              el.style.height = el.scrollHeight + "px";
-              el.focus();
-              const pos = clickOffsetRef.current ?? el.value.length;
-              el.setSelectionRange(pos, pos);
-              clickOffsetRef.current = null;
-            }
-          }}
+          ref={textareaRef}
           placeholder={t("listItem")}
         />
       )}
