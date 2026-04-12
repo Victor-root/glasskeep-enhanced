@@ -1,8 +1,6 @@
 package com.glasskeep.app
 
 import android.Manifest
-import android.animation.AnimatorSet
-import android.animation.ObjectAnimator
 import android.app.Activity
 import android.app.DownloadManager
 import android.content.Intent
@@ -27,20 +25,16 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
-import android.view.View
-import android.view.animation.AccelerateDecelerateInterpolator
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowInsetsControllerCompat
 
 class WebViewActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
-    private var splashReady = false
 
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -73,34 +67,8 @@ class WebViewActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_webview)
-
-        // Keep splash visible until page loads (max 4s fallback)
-        splashScreen.setKeepOnScreenCondition { !splashReady }
-        handler.postDelayed({ splashReady = true }, 4000)
-
-        // Animated exit: icon scales up + fades, background fades out
-        splashScreen.setOnExitAnimationListener { splashScreenView ->
-            val icon = splashScreenView.iconView
-            AnimatorSet().apply {
-                playTogether(
-                    ObjectAnimator.ofFloat(icon, View.SCALE_X, 1f, 1.4f),
-                    ObjectAnimator.ofFloat(icon, View.SCALE_Y, 1f, 1.4f),
-                    ObjectAnimator.ofFloat(icon, View.ALPHA, 1f, 0f),
-                    ObjectAnimator.ofFloat(splashScreenView.view, View.ALPHA, 1f, 0f)
-                )
-                duration = 500L
-                interpolator = AccelerateDecelerateInterpolator()
-                addListener(object : android.animation.AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: android.animation.Animator) {
-                        splashScreenView.remove()
-                    }
-                })
-                start()
-            }
-        }
 
         val url = intent.getStringExtra("url")
             ?: getSharedPreferences("glasskeep", MODE_PRIVATE).getString("server_url", null)
@@ -157,8 +125,6 @@ class WebViewActivity : AppCompatActivity() {
 
                 override fun onPageFinished(view: WebView, pageUrl: String?) {
                     super.onPageFinished(view, pageUrl)
-                    // Dismiss splash screen now that the page is ready
-                    splashReady = true
                     // Push current system dark mode state to web app on load
                     val isDark = isDarkMode()
                     view.evaluateJavascript(
