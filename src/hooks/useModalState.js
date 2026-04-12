@@ -49,6 +49,9 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
   const modalColorBtnRef = useRef(null);
   const [showModalColorPop, setShowModalColorPop] = useState(false);
 
+  // Modal footer kebab menu
+  const [modalKebabOpen, setModalKebabOpen] = useState(false);
+
   // Image Viewer state (fullscreen)
   const [imgViewOpen, setImgViewOpen] = useState(false);
   const [imgViewIndex, setImgViewIndex] = useState(0);
@@ -489,6 +492,7 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
     mDrawingData, setMDrawingData,
     showModalFmt, setShowModalFmt,
     showModalColorPop, setShowModalColorPop,
+    modalKebabOpen, setModalKebabOpen,
     imgViewOpen, setImgViewOpen, imgViewIndex,
     mobileNavVisible,
     modalScrollable,

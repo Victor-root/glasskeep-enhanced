@@ -67,6 +67,9 @@ export default function ModalFooter({
   onRestoreFromTrash,
   onArchiveNote,
   onOpenConfirmDelete,
+  // kebab menu (state lifted to App)
+  modalKebabOpen,
+  setModalKebabOpen,
   // undo / redo
   undo,
   redo,
@@ -110,7 +113,6 @@ export default function ModalFooter({
 
   /* Kebab menu (download + collaborate) */
   const kebabRef = useRef(null);
-  const [kebabOpen, setKebabOpen] = useState(false);
 
   /* Close tag dropdown on outside click */
   const tagDropdownRef = useRef(null);
@@ -497,15 +499,15 @@ export default function ModalFooter({
         <button
           ref={kebabRef}
           className="modal-footer-btn modal-footer-btn--kebab focus:outline-none"
-          onClick={(e) => { e.stopPropagation(); setKebabOpen((v) => !v); }}
+          onClick={(e) => { e.stopPropagation(); setModalKebabOpen((v) => !v); }}
           data-tooltip={t("moreOptions")}
         >
           <Kebab />
         </button>
         <Popover
           anchorRef={kebabRef}
-          open={kebabOpen}
-          onClose={() => setKebabOpen(false)}
+          open={modalKebabOpen}
+          onClose={() => setModalKebabOpen(false)}
           showArrow
         >
           <div
@@ -518,7 +520,7 @@ export default function ModalFooter({
               <button
                 className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                 style={{ color: dark ? "#fbbf24" : "#a16207" }}
-                onClick={() => { onRestoreFromTrash(activeId); setKebabOpen(false); }}
+                onClick={() => { onRestoreFromTrash(activeId); setModalKebabOpen(false); }}
               >
                 <ArchiveIcon />{t("restoreFromTrash")}
               </button>
@@ -526,7 +528,7 @@ export default function ModalFooter({
               <button
                 className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                 style={{ color: dark ? "#fbbf24" : "#a16207" }}
-                onClick={() => { handleArchiveToggle(); setKebabOpen(false); }}
+                onClick={() => { handleArchiveToggle(); setModalKebabOpen(false); }}
               >
                 <ArchiveIcon />{activeNoteObj?.archived ? t("unarchive") : t("archive")}
               </button>
@@ -535,7 +537,7 @@ export default function ModalFooter({
             <button
               className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
               style={{ color: dark ? "#4ade80" : "#16a34a" }}
-              onClick={() => { handleDownload(); setKebabOpen(false); }}
+              onClick={() => { handleDownload(); setModalKebabOpen(false); }}
             >
               <DownloadIcon />{t("downloadMd")}
             </button>
@@ -544,7 +546,7 @@ export default function ModalFooter({
               <button
                 className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                 style={{ color: dark ? "#93c5fd" : "#2563eb" }}
-                onClick={() => { onOpenCollaboration(); setKebabOpen(false); }}
+                onClick={() => { onOpenCollaboration(); setModalKebabOpen(false); }}
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" /></svg>
                 {t("collaborate")}
@@ -555,7 +557,7 @@ export default function ModalFooter({
               <button
                 className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                 style={{ color: dark ? "#f87171" : "#dc2626" }}
-                onClick={() => { onOpenConfirmDelete(); setKebabOpen(false); }}
+                onClick={() => { onOpenConfirmDelete(); setModalKebabOpen(false); }}
               >
                 <Trash />
                 {isTrashed ? t("permanentlyDelete") : t("trash")}

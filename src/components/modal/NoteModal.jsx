@@ -81,6 +81,9 @@ export default function NoteModal({
   // color popover
   showModalColorPop,
   setShowModalColorPop,
+  // kebab menu
+  modalKebabOpen,
+  setModalKebabOpen,
   // confirm delete
   confirmDeleteOpen,
   setConfirmDeleteOpen,
@@ -677,6 +680,8 @@ export default function NoteModal({
             onRestoreFromTrash={restoreFromTrash}
             onArchiveNote={handleArchiveNote}
             onOpenConfirmDelete={() => setConfirmDeleteOpen(true)}
+            modalKebabOpen={modalKebabOpen}
+            setModalKebabOpen={setModalKebabOpen}
             undo={undo}
             redo={redo}
             canUndo={canUndo}

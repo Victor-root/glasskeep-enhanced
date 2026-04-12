@@ -214,6 +214,7 @@ export default function App() {
     mDrawingData, setMDrawingData,
     showModalFmt, setShowModalFmt,
     showModalColorPop, setShowModalColorPop,
+    modalKebabOpen, setModalKebabOpen,
     imgViewOpen, setImgViewOpen, imgViewIndex,
     mobileNavVisible,
     modalScrollable,
@@ -2743,6 +2744,7 @@ export default function App() {
   const overlayOpenCount = [
     imgViewOpen, confirmDeleteOpen, genericConfirmOpen,
     collaborationModalOpen, showModalColorPop, showModalFmt, modalMenuOpen,
+    modalKebabOpen, modalTagFocused,
     showColorPop, showComposerFmt, headerMenuOpen, multiMode,
     settingsPanelOpen, adminPanelOpen, sidebarOpen, open,
   ].filter(Boolean).length;
@@ -2784,6 +2786,8 @@ export default function App() {
       if (showModalColorPop) { setShowModalColorPop(false); return; }
       if (showModalFmt) { setShowModalFmt(false); return; }
       if (modalMenuOpen) { setModalMenuOpen(false); return; }
+      if (modalKebabOpen) { setModalKebabOpen(false); return; }
+      if (modalTagFocused) { setModalTagFocused(false); return; }
       if (showColorPop) { setShowColorPop(false); return; }
       if (showComposerFmt) { setShowComposerFmt(false); return; }
       if (headerMenuOpen) { setHeaderMenuOpen(false); return; }
@@ -2796,8 +2800,9 @@ export default function App() {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
-      showModalColorPop, showModalFmt, modalMenuOpen, showColorPop, showComposerFmt,
-      headerMenuOpen, multiMode, settingsPanelOpen, adminPanelOpen, sidebarOpen, open]);
+      showModalColorPop, showModalFmt, modalMenuOpen, modalKebabOpen, modalTagFocused,
+      showColorPop, showComposerFmt, headerMenuOpen, multiMode, settingsPanelOpen,
+      adminPanelOpen, sidebarOpen, open]);
 
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
@@ -3862,6 +3867,8 @@ export default function App() {
       formatModal={formatModal}
       showModalColorPop={showModalColorPop}
       setShowModalColorPop={setShowModalColorPop}
+      modalKebabOpen={modalKebabOpen}
+      setModalKebabOpen={setModalKebabOpen}
       confirmDeleteOpen={confirmDeleteOpen}
       setConfirmDeleteOpen={setConfirmDeleteOpen}
       savingModal={savingModal}
