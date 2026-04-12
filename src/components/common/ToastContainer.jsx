@@ -4,7 +4,7 @@ export default function ToastContainer({ toasts }) {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] space-y-2 flex flex-col items-center">
+    <div className="fixed left-1/2 -translate-x-1/2 z-[60] space-y-2 flex flex-col items-center" style={{ top: "calc(env(safe-area-inset-top) + 1rem)" }}>
       {toasts.map((toast) => (
         <div
           key={toast.id}
