@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="setup_subtitle">Connectez-vous à votre instance auto-hébergée</string>
+    <string name="setup_subtitle">Connectez-vous à votre serveur</string>
     <string name="setup_label">Adresse du serveur</string>
     <string name="setup_placeholder">https://votre-serveur.com</string>
-    <string name="setup_hint">Précisez le port si nécessaire, ex : https://192.168.1.10:8080</string>
+    <string name="setup_hint">ex : https://domaine:port ou https://ip:port</string>
     <string name="setup_connect">Se connecter</string>
     <string name="error_empty_url">Veuillez entrer une URL</string>
     <string name="error_invalid_url">L\'URL doit commencer par http:// ou https://</string>
