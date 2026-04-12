@@ -2776,6 +2776,11 @@ export default function App() {
     }
   }, [overlayOpenCount]);
 
+  // Disable pull-to-refresh on Android when any overlay is open
+  useEffect(() => {
+    try { window.AndroidTheme?.setRefreshEnabled(overlayOpenCount === 0); } catch (_) {}
+  }, [overlayOpenCount]);
+
   useEffect(() => {
     const onPopState = () => {
       // Skip popstate events triggered by our own history.go() cleanup

@@ -34,6 +34,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 class WebViewActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
+    private lateinit var swipeRefresh: androidx.swiperefreshlayout.widget.SwipeRefreshLayout
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
 
     private val fileChooserLauncher = registerForActivityResult(
@@ -63,6 +64,11 @@ class WebViewActivity : AppCompatActivity() {
         @JavascriptInterface
         fun onThemeColor(hexColor: String) {
             runOnUiThread { applySystemBarColor(hexColor) }
+        }
+
+        @JavascriptInterface
+        fun setRefreshEnabled(enabled: Boolean) {
+            runOnUiThread { swipeRefresh.isEnabled = enabled }
         }
 
         @JavascriptInterface
@@ -117,7 +123,7 @@ class WebViewActivity : AppCompatActivity() {
         webView = findViewById(R.id.webview)
 
         // Pull-to-refresh
-        val swipeRefresh = findViewById<androidx.swiperefreshlayout.widget.SwipeRefreshLayout>(R.id.swipe_refresh)
+        swipeRefresh = findViewById(R.id.swipe_refresh)
         swipeRefresh.setOnRefreshListener {
             webView.reload()
         }
