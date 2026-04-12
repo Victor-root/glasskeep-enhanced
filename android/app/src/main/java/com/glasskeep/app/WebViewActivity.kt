@@ -115,6 +115,9 @@ class WebViewActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Draw edge-to-edge: let the app handle system bar insets via CSS
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+
         // Allow content to render under the display cutout (status bar area in landscape)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
             window.attributes.layoutInDisplayCutoutMode =
