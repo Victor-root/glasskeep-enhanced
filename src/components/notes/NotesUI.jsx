@@ -129,6 +129,7 @@ function NotesUI({
   onAiSearch,
   // header auto-hide (mobile)
   windowWidth,
+  isLandscapeMobile,
   // floating cards toggle
   floatingCardsEnabled,
   onToggleFloatingCards,
@@ -224,6 +225,7 @@ function NotesUI({
         dark={dark}
         headerVisible={headerVisible}
         windowWidth={windowWidth}
+        isLandscapeMobile={isLandscapeMobile}
         sidebarPermanent={sidebarPermanent}
         mobileSearchOpen={mobileSearchOpen}
         setMobileSearchOpen={setMobileSearchOpen}

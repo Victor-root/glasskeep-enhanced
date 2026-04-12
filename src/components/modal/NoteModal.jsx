@@ -23,6 +23,7 @@ export default function NoteModal({
   // theme & layout
   dark,
   windowWidth,
+  isLandscapeMobile,
   // modal state
   activeId,
   mType,
@@ -215,7 +216,7 @@ export default function NoteModal({
   return (
     <>
       <div
-        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 bg-black/40 max-sm:bg-black z-40 flex items-center justify-center overscroll-contain`}
+        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 ${isLandscapeMobile ? 'bg-black' : 'bg-black/40 max-sm:bg-black'} z-40 flex items-center justify-center overscroll-contain`}
         onMouseDown={(e) => {
           scrimClickStartRef.current = e.target === e.currentTarget;
         }}
@@ -228,10 +229,11 @@ export default function NoteModal({
       >
         <div
           className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full max-w-none ${
-            isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen sm:!rounded-none'
+            isLandscapeMobile ? ''
+            : isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen sm:!rounded-none'
             : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl'
           }${drawTransition === 'entering' ? ' draw-expand' : drawTransition === 'leaving' ? ' draw-collapse' : ''} flex flex-col relative overflow-hidden`}
-          style={{ backgroundColor: modalBgFor(mColor, dark), height: windowWidth < 640 ? '100dvh' : undefined }}
+          style={{ backgroundColor: modalBgFor(mColor, dark), height: (windowWidth < 640 || isLandscapeMobile) ? '100dvh' : undefined }}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}

@@ -44,7 +44,14 @@ export default function NotesHeader({
   SectionIcon,
   openSidebar,
   activeTagFilter,
+  isLandscapeMobile,
 }) {
+  // In landscape mobile, force mobile layout regardless of sm: breakpoint
+  const mobileOnly = isLandscapeMobile ? "" : "sm:hidden";
+  const desktopOnly = isLandscapeMobile ? "hidden" : "hidden sm:flex";
+  const desktopOnlyBlock = isLandscapeMobile ? "hidden" : "hidden sm:block";
+  const desktopOnlyInline = isLandscapeMobile ? "hidden" : "hidden sm:inline-block";
+  const desktopOnlyInlineText = isLandscapeMobile ? "hidden" : "hidden sm:inline";
   return (
       <header
         className={`p-4 sm:p-6 flex justify-between items-center sticky top-0 ${mobileSearchOpen ? "z-[1000]" : "z-20"} glass-card mb-6 relative${!isOnline && windowWidth < 640 ? " pb-7" : ""}`}
@@ -76,7 +83,7 @@ export default function NotesHeader({
           />
 
           {/* Mobile: stacked name + badge */}
-          <div className="flex flex-col sm:hidden leading-tight relative">
+          <div className={`flex flex-col ${mobileOnly} leading-tight relative`}>
             <h1 className="text-lg font-bold">Glass Keep</h1>
             <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1 max-w-[160px]">
               <span className="shrink-0 w-3 h-3 [&>svg]:w-3 [&>svg]:h-3"><SectionIcon /></span>
@@ -88,23 +95,23 @@ export default function NotesHeader({
           </div>
 
           {/* Desktop: inline name + separator + badge */}
-          <h1 className="hidden sm:block text-2xl sm:text-3xl font-bold">
+          <h1 className={`${desktopOnlyBlock} text-2xl sm:text-3xl font-bold`}>
             Glass Keep
           </h1>
-          <span className="hidden sm:inline-block h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
-          <span className="hidden sm:flex text-base font-medium px-3 py-1 rounded-lg bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20 items-center gap-1.5 max-w-[200px]">
+          <span className={`${desktopOnlyInline} h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1`} />
+          <span className={`${desktopOnly} text-base font-medium px-3 py-1 rounded-lg bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border border-indigo-600/20 items-center gap-1.5 max-w-[200px]`}>
             <span className="shrink-0 w-4 h-4 [&>svg]:w-4 [&>svg]:h-4"><SectionIcon /></span>
             <span className="truncate">{sectionLabel}</span>
           </span>
 
           {/* Offline indicator - desktop only (mobile is inside stacked block above) */}
           {!isOnline && (
-            <span className="hidden sm:inline ml-2 text-xs px-2 py-0.5 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20">{t("offline")}</span>
+            <span className={`${desktopOnlyInlineText} ml-2 text-xs px-2 py-0.5 rounded-full bg-orange-600/10 text-orange-700 dark:text-orange-300 border border-orange-600/20`}>{t("offline")}</span>
           )}
         </div>
 
         {/* Desktop: full search bar */}
-        <div className="hidden sm:flex flex-grow min-w-0 justify-center px-2 sm:px-8">
+        <div className={`${desktopOnly} flex-grow min-w-0 justify-center px-2 sm:px-8`}>
           <div className="relative w-full max-w-lg">
             <input
               type="text"
@@ -148,7 +155,7 @@ export default function NotesHeader({
         </div>
 
         {/* Mobile: search icon that expands into a full search bar */}
-        <div className="sm:hidden flex items-center ml-auto mr-1">
+        <div className={`${mobileOnly} flex items-center ml-auto mr-1`}>
           {!mobileSearchOpen && (
             <button
               type="button"
@@ -166,13 +173,13 @@ export default function NotesHeader({
         {/* Mobile expanded search overlay - covers the header content */}
         {mobileSearchOpen && createPortal(
           <div
-            className="sm:hidden fixed inset-0 z-[999]"
+            className={`${mobileOnly} fixed inset-0 z-[999]`}
             onClick={() => setMobileSearchOpen(false)}
           />,
           document.body
         )}
         {mobileSearchOpen && (
-          <div className="sm:hidden absolute inset-0 z-30 flex items-center px-3 gap-2 bg-[var(--bg-card,_var(--bg-primary))] backdrop-blur-xl">
+          <div className={`${mobileOnly} absolute inset-0 z-30 flex items-center px-3 gap-2 bg-[var(--bg-card,_var(--bg-primary))] backdrop-blur-xl`}>
             <div className="relative flex-1 min-w-0">
               <input
                 ref={mobileSearchRef}
@@ -221,7 +228,7 @@ export default function NotesHeader({
 
         <div className="relative flex items-center gap-3 shrink-0">
           {/* Desktop: icon buttons directly in header bar */}
-          <div className="hidden sm:flex items-center gap-1">
+          <div className={`${desktopOnly} items-center gap-1`}>
             <button
               onClick={() => onToggleViewMode?.()}
               className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-blue-400 hover:text-blue-300 hover:bg-blue-500/15 focus:ring-blue-500" : "text-blue-600 hover:text-blue-700 hover:bg-blue-100 focus:ring-blue-400"}`}
@@ -290,7 +297,7 @@ export default function NotesHeader({
           </div>
 
           {/* Mobile: sync icon + 3-dot menu */}
-          <div className="sm:hidden flex items-center gap-1">
+          <div className={`${mobileOnly} flex items-center gap-1`}>
             <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} syncDropdownOpen={syncDropdownOpen} setSyncDropdownOpen={setSyncDropdownOpen} />
             <button
               ref={headerBtnRef}

@@ -69,7 +69,9 @@ export default function App() {
 
   // Screen width for responsive behavior
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  const isMobileDevice = Math.min(window.screen.width, window.screen.height) < 700;
+  const [windowHeight, setWindowHeight] = useState(window.innerHeight);
+  const isMobileDevice = Math.min(windowWidth, windowHeight) < 500;
+  const isLandscapeMobile = windowWidth > windowHeight && windowHeight < 500;
 
   // Notes & search
   const [notes, setNotes] = useState([]);
@@ -540,7 +542,10 @@ export default function App() {
 
   // Window resize listener for responsive sidebar behavior
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+      setWindowHeight(window.innerHeight);
+    };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -3829,6 +3834,7 @@ export default function App() {
       isModalClosing={isModalClosing}
       dark={dark}
       windowWidth={windowWidth}
+      isLandscapeMobile={isLandscapeMobile}
       activeId={activeId}
       mType={mType}
       mTitle={mTitle}
@@ -4246,6 +4252,7 @@ export default function App() {
         openSettingsPanel={openSettingsPanel}
         // header auto-hide (mobile)
         windowWidth={windowWidth}
+        isLandscapeMobile={isLandscapeMobile}
         // floating cards toggle
         floatingCardsEnabled={floatingCardsEnabled}
         onToggleFloatingCards={toggleFloatingCards}
