@@ -116,6 +116,13 @@ class WebViewActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.webview)
 
+        // Pull-to-refresh
+        val swipeRefresh = findViewById<androidx.swiperefreshlayout.widget.SwipeRefreshLayout>(R.id.swipe_refresh)
+        swipeRefresh.setOnRefreshListener {
+            webView.reload()
+        }
+        // Hide spinner once page finishes loading (set in webViewClient below)
+
         // Service Worker support
         try {
             val swController = ServiceWorkerController.getInstance()
@@ -165,6 +172,7 @@ class WebViewActivity : AppCompatActivity() {
 
                 override fun onPageFinished(view: WebView, pageUrl: String?) {
                     super.onPageFinished(view, pageUrl)
+                    swipeRefresh.isRefreshing = false
                     // Push current system dark mode state to web app on load
                     val isDark = isDarkMode()
                     view.evaluateJavascript(
