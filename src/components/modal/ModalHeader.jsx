@@ -24,6 +24,7 @@ export default function ModalHeader({
   mType,
   viewMode,
   windowWidth,
+  isLandscapeMobile,
   // formatting (mobile popover)
   modalFmtBtnRef,
   showModalFmt,
@@ -46,7 +47,7 @@ export default function ModalHeader({
   onToggleDrawMode,
 }) {
   const mobileTitleRef = useRef(null);
-  const isDesktop = windowWidth >= 768;
+  const isDesktop = windowWidth >= 768 && !isLandscapeMobile;
   const isPinned = !!notes.find((n) => String(n.id) === String(activeId))?.pinned;
   const showPinBtn = tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED";
   const isDrawEdit = mType === 'draw' && drawMode === 'draw';

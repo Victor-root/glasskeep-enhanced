@@ -16,6 +16,7 @@ import { t } from "../../i18n";
 export default function ModalFooter({
   dark,
   windowWidth,
+  isLandscapeMobile,
   // tags
   mTagList,
   setMTagList,
@@ -76,7 +77,7 @@ export default function ModalFooter({
   canUndo,
   canRedo,
 }) {
-  const isDesktop = windowWidth >= 768;
+  const isDesktop = windowWidth >= 768 && !isLandscapeMobile;
   const isTrashed = tagFilter === "TRASHED";
 
   const handleDownload = () => {

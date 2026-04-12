@@ -261,6 +261,7 @@ export default function NoteModal({
               mType={mType}
               viewMode={viewMode}
               windowWidth={windowWidth}
+              isLandscapeMobile={isLandscapeMobile}
               // formatting
               modalFmtBtnRef={modalFmtBtnRef}
               showModalFmt={showModalFmt}
@@ -623,6 +624,7 @@ export default function NoteModal({
           <ModalFooter
             dark={dark}
             windowWidth={windowWidth}
+            isLandscapeMobile={isLandscapeMobile}
             // tags
             mTagList={mTagList}
             setMTagList={setMTagList}
