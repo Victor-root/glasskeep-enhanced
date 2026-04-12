@@ -213,6 +213,9 @@ class WebViewActivity : AppCompatActivity() {
     private fun applySystemBarColor(hexColor: String) {
         try {
             val color = Color.parseColor(hexColor)
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
             window.statusBarColor = color
             window.navigationBarColor = color
 
@@ -222,7 +225,9 @@ class WebViewActivity : AppCompatActivity() {
             val controller = WindowInsetsControllerCompat(window, window.decorView)
             controller.isAppearanceLightStatusBars = isLight
             controller.isAppearanceLightNavigationBars = isLight
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            Toast.makeText(this, "BarErr: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private val handler = Handler(Looper.getMainLooper())
