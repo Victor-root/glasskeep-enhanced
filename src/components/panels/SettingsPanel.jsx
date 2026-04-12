@@ -22,6 +22,8 @@ export default function SettingsPanel({
   setFloatingCardsEnabled,
   checklistInsertPosition,
   setChecklistInsertPosition,
+  edgeToEdgeLandscape,
+  setEdgeToEdgeLandscape,
   showGenericConfirm,
   showToast,
   onResetNoteOrder,
@@ -353,6 +355,27 @@ export default function SettingsPanel({
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                       floatingCardsEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="font-medium">{t("edgeToEdgeLandscape")}</div>
+                  <div className="text-sm text-gray-500">{t("edgeToEdgeLandscapeDesc")}</div>
+                </div>
+                <button
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
+                    edgeToEdgeLandscape
+                      ? "bg-indigo-600"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                  onClick={() => setEdgeToEdgeLandscape(!edgeToEdgeLandscape)}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      edgeToEdgeLandscape ? "translate-x-6" : "translate-x-1"
                     }`}
                   />
                 </button>

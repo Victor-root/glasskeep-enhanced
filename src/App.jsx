@@ -155,6 +155,15 @@ export default function App() {
       return "top";
     }
   });
+  // Edge-to-edge landscape: extend content under status bar on the left
+  const [edgeToEdgeLandscape, setEdgeToEdgeLandscape] = useState(() => {
+    try {
+      const stored = localStorage.getItem("edgeToEdgeLandscape");
+      return stored === null ? true : stored === "true";
+    } catch (e) {
+      return true;
+    }
+  });
   const [aiResponse, setAiResponse] = useState(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiLoadingProgress, setAiLoadingProgress] = useState(null);
@@ -472,6 +481,10 @@ export default function App() {
           setChecklistInsertPosition(settings.checklistInsertPosition);
           localStorage.setItem("checklistInsertPosition", settings.checklistInsertPosition);
         }
+        if (typeof settings?.edgeToEdgeLandscape === "boolean") {
+          setEdgeToEdgeLandscape(settings.edgeToEdgeLandscape);
+          localStorage.setItem("edgeToEdgeLandscape", String(settings.edgeToEdgeLandscape));
+        }
       } catch (e) {
         // Network error — default to true
         setAlwaysShowSidebarOnWide((prev) => prev === null ? true : prev);
@@ -539,6 +552,20 @@ export default function App() {
       }).catch(() => {});
     }
   }, [checklistInsertPosition]);
+
+  // Edge-to-edge landscape: save + dynamically toggle body padding-left
+  useEffect(() => {
+    try { localStorage.setItem("edgeToEdgeLandscape", String(edgeToEdgeLandscape)); } catch (e) {}
+    document.body.style.paddingLeft = edgeToEdgeLandscape ? "" : "env(safe-area-inset-left)";
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { edgeToEdgeLandscape },
+      }).catch(() => {});
+    }
+  }, [edgeToEdgeLandscape]);
 
   // Window resize listener for responsive sidebar behavior
   useEffect(() => {
@@ -3835,6 +3862,7 @@ export default function App() {
       dark={dark}
       windowWidth={windowWidth}
       isLandscapeMobile={isLandscapeMobile}
+      edgeToEdgeLandscape={edgeToEdgeLandscape}
       activeId={activeId}
       mType={mType}
       mTitle={mTitle}
@@ -4089,6 +4117,8 @@ export default function App() {
         setFloatingCardsEnabled={setFloatingCardsEnabled}
         checklistInsertPosition={checklistInsertPosition}
         setChecklistInsertPosition={setChecklistInsertPosition}
+        edgeToEdgeLandscape={edgeToEdgeLandscape}
+        setEdgeToEdgeLandscape={setEdgeToEdgeLandscape}
         showGenericConfirm={showGenericConfirm}
         showToast={showToast}
         onResetNoteOrder={resetNoteOrder}
