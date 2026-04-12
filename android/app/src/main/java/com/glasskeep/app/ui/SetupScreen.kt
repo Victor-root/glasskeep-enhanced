@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -31,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +52,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
 // Light theme
 private val LightBgGradient = Brush.linearGradient(
@@ -193,8 +201,33 @@ fun SetupScreen(onConnect: (String) -> Unit) {
     val dark = isSystemInDarkTheme()
     var url by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var loading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val errorEmpty = stringResource(R.string.error_empty_url)
     val errorInvalid = stringResource(R.string.error_invalid_url)
+    val errorNotGlasskeep = stringResource(R.string.error_not_glasskeep)
+    val errorUnreachable = stringResource(R.string.error_unreachable)
+
+    val doConnect: () -> Unit = {
+        val trimmed = url.trim().trimEnd('/')
+        when {
+            trimmed.isBlank() -> error = errorEmpty
+            !trimmed.startsWith("http://") && !trimmed.startsWith("https://") -> error = errorInvalid
+            else -> {
+                loading = true
+                error = null
+                scope.launch {
+                    val result = checkGlassKeepServer(trimmed)
+                    loading = false
+                    when (result) {
+                        ServerCheck.OK -> onConnect(trimmed)
+                        ServerCheck.NOT_GLASSKEEP -> error = errorNotGlasskeep
+                        ServerCheck.UNREACHABLE -> error = errorUnreachable
+                    }
+                }
+            }
+        }
+    }
 
     val bgModifier = if (dark) {
         Modifier.background(DarkBgColor)
@@ -268,7 +301,7 @@ fun SetupScreen(onConnect: (String) -> Unit) {
                         imeAction = ImeAction.Go
                     ),
                     keyboardActions = KeyboardActions(
-                        onGo = { validateAndConnect(url.trim(), errorEmpty, errorInvalid, onConnect) { error = it } }
+                        onGo = { doConnect() }
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = textColor,
@@ -296,31 +329,46 @@ fun SetupScreen(onConnect: (String) -> Unit) {
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             role = Role.Button
-                        ) { validateAndConnect(url.trim(), errorEmpty, errorInvalid, onConnect) { error = it } },
+                        ) { doConnect() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        stringResource(R.string.setup_connect),
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        fontSize = 16.sp
-                    )
+                    if (loading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            stringResource(R.string.setup_connect),
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                            fontSize = 16.sp
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-private fun validateAndConnect(
-    url: String,
-    errorEmpty: String,
-    errorInvalid: String,
-    onConnect: (String) -> Unit,
-    onError: (String) -> Unit
-) {
-    when {
-        url.isBlank() -> onError(errorEmpty)
-        !url.startsWith("http://") && !url.startsWith("https://") -> onError(errorInvalid)
-        else -> onConnect(url.trimEnd('/'))
+private enum class ServerCheck { OK, NOT_GLASSKEEP, UNREACHABLE }
+
+private suspend fun checkGlassKeepServer(baseUrl: String): ServerCheck =
+    withContext(Dispatchers.IO) {
+        try {
+            val conn = URL("$baseUrl/api/health").openConnection() as HttpURLConnection
+            conn.connectTimeout = 5000
+            conn.readTimeout = 5000
+            conn.requestMethod = "GET"
+            val code = conn.responseCode
+            if (code != 200) return@withContext ServerCheck.UNREACHABLE
+            val body = conn.inputStream.bufferedReader().readText()
+            conn.disconnect()
+            val json = JSONObject(body)
+            if (json.optString("service") == "glasskeep") ServerCheck.OK
+            else ServerCheck.NOT_GLASSKEEP
+        } catch (_: Exception) {
+            ServerCheck.UNREACHABLE
+        }
     }
-}

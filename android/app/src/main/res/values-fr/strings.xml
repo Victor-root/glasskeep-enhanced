@@ -6,6 +6,9 @@
     <string name="setup_connect">Se connecter</string>
     <string name="error_empty_url">Veuillez entrer une URL</string>
     <string name="error_invalid_url">L\'URL doit commencer par http:// ou https://</string>
+    <string name="error_not_glasskeep">Ce serveur n\'est pas une instance GlassKeep</string>
+    <string name="error_unreachable">Serveur injoignable</string>
+    <string name="connecting">Connexion…</string>
     <string name="dialog_change_server">Changer de serveur</string>
     <string name="dialog_change_message">Revenir à l\'écran de configuration ?</string>
     <string name="dialog_yes">Oui, changer</string>
