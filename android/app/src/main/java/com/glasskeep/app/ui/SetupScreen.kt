@@ -293,7 +293,17 @@ fun SetupScreen(onConnect: (String) -> Unit) {
                     placeholder = { Text(stringResource(R.string.setup_placeholder)) },
                     singleLine = true,
                     isError = error != null,
-                    supportingText = error?.let { msg -> { Text(msg, color = Color(0xFFdc2626)) } },
+                    supportingText = {
+                        if (error != null) {
+                            Text(error!!, color = Color(0xFFdc2626))
+                        } else {
+                            Text(
+                                stringResource(R.string.setup_hint),
+                                color = subtextColor,
+                                fontSize = 12.sp
+                            )
+                        }
+                    },
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Uri,
                         imeAction = ImeAction.Go
