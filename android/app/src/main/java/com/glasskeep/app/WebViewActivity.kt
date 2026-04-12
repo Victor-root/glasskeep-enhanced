@@ -107,7 +107,8 @@ class WebViewActivity : AppCompatActivity() {
                     type = mimeType
                     putExtra(Intent.EXTRA_TITLE, filename)
                 }
-                runOnUiThread { saveFileLauncher.launch(intent) }
+                val chooser = Intent.createChooser(intent, filename)
+                runOnUiThread { saveFileLauncher.launch(chooser) }
             } catch (e: Exception) {
                 android.util.Log.e("GlassKeep", "saveBlobFile failed", e)
                 pendingSaveBytes = null
