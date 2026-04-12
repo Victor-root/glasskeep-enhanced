@@ -2720,6 +2720,8 @@ export default function App() {
       closeModal();
     }
 
+    showToast(t(archived ? "noteArchived" : "noteUnarchived"), "success");
+
     await enqueueWithLease(nid, { type: "archive", noteId: nid, payload: { archived: !!archived, client_updated_at: nowIso } }, leaseId);
   };
 
