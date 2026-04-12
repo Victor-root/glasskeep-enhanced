@@ -94,7 +94,6 @@ class WebViewActivity : AppCompatActivity() {
                 }
             }
         }
-        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
