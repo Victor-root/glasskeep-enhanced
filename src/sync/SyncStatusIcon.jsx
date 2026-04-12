@@ -154,8 +154,9 @@ function formatTimeAgo(ts) {
 
 // ─── Component ───
 
-export default function SyncStatusIcon({ dark, syncStatus, onSyncNow }) {
-  const [open, setOpen] = useState(false);
+export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdownOpen, setSyncDropdownOpen }) {
+  const open = syncDropdownOpen;
+  const setOpen = setSyncDropdownOpen;
   const [forceSyncing, setForceSyncing] = useState(false);
   const menuRef = useRef(null);
   const btnRef = useRef(null);

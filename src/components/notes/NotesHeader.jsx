@@ -23,6 +23,8 @@ export default function NotesHeader({
   toggleDark,
   syncStatus,
   handleSyncNow,
+  syncDropdownOpen,
+  setSyncDropdownOpen,
   onStartMulti,
   openSettingsPanel,
   openAdminPanel,
@@ -236,7 +238,7 @@ export default function NotesHeader({
             >
               {dark ? <SunIcon /> : <MoonIcon />}
             </button>
-            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
+            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} syncDropdownOpen={syncDropdownOpen} setSyncDropdownOpen={setSyncDropdownOpen} />
             <button
               onClick={() => onStartMulti?.()}
               className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-violet-400 hover:text-violet-300 hover:bg-violet-500/15 focus:ring-violet-500" : "text-violet-600 hover:text-violet-700 hover:bg-violet-100 focus:ring-violet-400"}`}
@@ -289,7 +291,7 @@ export default function NotesHeader({
 
           {/* Mobile: sync icon + 3-dot menu */}
           <div className="sm:hidden flex items-center gap-1">
-            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} />
+            <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} syncDropdownOpen={syncDropdownOpen} setSyncDropdownOpen={setSyncDropdownOpen} />
             <button
               ref={headerBtnRef}
               onClick={() => setHeaderMenuOpen((v) => !v)}

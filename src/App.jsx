@@ -806,6 +806,9 @@ export default function App() {
   // Settings panel state
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
 
+  // Sync dropdown state (lifted for back button support)
+  const [syncDropdownOpen, setSyncDropdownOpen] = useState(false);
+
 
   useEffect(() => {
     // Only close header kebab on outside click (modal kebab is handled by Popover)
@@ -2744,7 +2747,7 @@ export default function App() {
   const overlayOpenCount = [
     imgViewOpen, confirmDeleteOpen, genericConfirmOpen,
     collaborationModalOpen, showModalColorPop, showModalFmt, modalMenuOpen,
-    modalKebabOpen, modalTagFocused,
+    modalKebabOpen, modalTagFocused, syncDropdownOpen,
     showColorPop, showComposerFmt, headerMenuOpen, multiMode,
     settingsPanelOpen, adminPanelOpen, sidebarOpen, open,
   ].filter(Boolean).length;
@@ -2788,6 +2791,7 @@ export default function App() {
       if (modalMenuOpen) { setModalMenuOpen(false); return; }
       if (modalKebabOpen) { setModalKebabOpen(false); return; }
       if (modalTagFocused) { setModalTagFocused(false); return; }
+      if (syncDropdownOpen) { setSyncDropdownOpen(false); return; }
       if (showColorPop) { setShowColorPop(false); return; }
       if (showComposerFmt) { setShowComposerFmt(false); return; }
       if (headerMenuOpen) { setHeaderMenuOpen(false); return; }
@@ -2801,8 +2805,8 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPopState);
   }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
       showModalColorPop, showModalFmt, modalMenuOpen, modalKebabOpen, modalTagFocused,
-      showColorPop, showComposerFmt, headerMenuOpen, multiMode, settingsPanelOpen,
-      adminPanelOpen, sidebarOpen, open]);
+      syncDropdownOpen, showColorPop, showComposerFmt, headerMenuOpen, multiMode,
+      settingsPanelOpen, adminPanelOpen, sidebarOpen, open]);
 
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
@@ -4220,6 +4224,8 @@ export default function App() {
         // sync
         syncStatus={syncStatus}
         handleSyncNow={handleSyncNow}
+        syncDropdownOpen={syncDropdownOpen}
+        setSyncDropdownOpen={setSyncDropdownOpen}
         // checklist update
         onUpdateChecklistItem={onUpdateChecklistItem}
         // Admin panel
