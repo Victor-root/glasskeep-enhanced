@@ -2734,30 +2734,45 @@ export default function App() {
     collaboratorInputRef,
   });
 
-  // Android back button: maintain exactly ONE history entry when any overlay
-  // is open. On back press, close the topmost overlay. If overlays remain,
-  // a new entry is pushed automatically on the next render.
-  const overlayHistoryRef = useRef(false);
+  // Android back button: push a history entry each time an overlay opens,
+  // pop entries when overlays close. Uses history.go(-n) for batch cleanup
+  // instead of looping history.back() which can navigate out of the SPA.
+  const overlayDepthRef = useRef(0);
+  const popInProgressRef = useRef(false);
 
-  const anyOverlayOpen = imgViewOpen || confirmDeleteOpen || genericConfirmOpen ||
-    collaborationModalOpen || showModalColorPop || showModalFmt || modalMenuOpen ||
-    showColorPop || showComposerFmt || headerMenuOpen || multiMode ||
-    settingsPanelOpen || adminPanelOpen || sidebarOpen || open;
+  const overlayOpenCount = [
+    imgViewOpen, confirmDeleteOpen, genericConfirmOpen,
+    collaborationModalOpen, showModalColorPop, showModalFmt, modalMenuOpen,
+    showColorPop, showComposerFmt, headerMenuOpen, multiMode,
+    settingsPanelOpen, adminPanelOpen, sidebarOpen, open,
+  ].filter(Boolean).length;
+  const prevOverlayCountRef = useRef(0);
 
   useEffect(() => {
-    if (anyOverlayOpen && !overlayHistoryRef.current) {
-      window.history.pushState({ overlay: true }, "");
-      overlayHistoryRef.current = true;
-    } else if (!anyOverlayOpen && overlayHistoryRef.current) {
-      overlayHistoryRef.current = false;
-      window.history.back();
+    const prev = prevOverlayCountRef.current;
+    prevOverlayCountRef.current = overlayOpenCount;
+    // Skip if this render was caused by our own popstate handler
+    if (popInProgressRef.current) { popInProgressRef.current = false; return; }
+    if (overlayOpenCount > prev) {
+      const delta = overlayOpenCount - prev;
+      for (let i = 0; i < delta; i++) window.history.pushState({ overlay: true }, "");
+      overlayDepthRef.current += delta;
+    } else if (overlayOpenCount < prev) {
+      // Overlays closed via UI — clean up history entries in one go
+      const delta = Math.min(prev - overlayOpenCount, overlayDepthRef.current);
+      if (delta > 0) {
+        overlayDepthRef.current -= delta;
+        popInProgressRef.current = true;
+        window.history.go(-delta);
+      }
     }
-  }, [anyOverlayOpen]);
+  }, [overlayOpenCount]);
 
   useEffect(() => {
     const onPopState = () => {
-      if (!overlayHistoryRef.current) return;
-      overlayHistoryRef.current = false;
+      if (overlayDepthRef.current <= 0) return;
+      overlayDepthRef.current--;
+      popInProgressRef.current = true;
       // Close topmost overlay (highest z-index first)
       if (imgViewOpen) { setImgViewOpen(false); return; }
       if (confirmDeleteOpen) { setConfirmDeleteOpen(false); return; }
