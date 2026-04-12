@@ -186,7 +186,7 @@ export default function NoteModal({
       return;
     }
     window.__noteModalOpen = true;
-    const color = (!mColor || mColor === "default") ? pageColor : toHex(solid(bgFor(mColor, dark)));
+    const color = (!mColor || mColor === "default") ? pageColor : toHex(modalBgFor(mColor, dark));
     setThemeColor(color);
   }, [open, mColor, dark]);
 
