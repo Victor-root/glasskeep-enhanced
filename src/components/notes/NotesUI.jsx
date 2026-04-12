@@ -135,6 +135,8 @@ function NotesUI({
   // sync
   syncStatus,
   handleSyncNow,
+  syncDropdownOpen,
+  setSyncDropdownOpen,
 }) {
   // Mobile search expand
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -236,6 +238,8 @@ function NotesUI({
         toggleDark={toggleDark}
         syncStatus={syncStatus}
         handleSyncNow={handleSyncNow}
+        syncDropdownOpen={syncDropdownOpen}
+        setSyncDropdownOpen={setSyncDropdownOpen}
         onStartMulti={onStartMulti}
         openSettingsPanel={openSettingsPanel}
         openAdminPanel={openAdminPanel}
