@@ -45,3 +45,8 @@ server/*.sqlite-journal
 data/notes.db
 data/notes.db-shm
 data/notes.db-wal
+
+# Android signing
+*.jks
+*.keystore
+keystore.properties
