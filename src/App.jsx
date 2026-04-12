@@ -821,53 +821,6 @@ export default function App() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [headerMenuOpen]);
 
-  // Android back button: maintain exactly ONE history entry when any overlay
-  // is open. On back press, close the topmost overlay. If overlays remain,
-  // a new entry is pushed automatically on the next render.
-  const overlayHistoryRef = useRef(false);
-
-  const anyOverlayOpen = imgViewOpen || confirmDeleteOpen || genericConfirmOpen ||
-    collaborationModalOpen || showModalColorPop || showModalFmt || modalMenuOpen ||
-    showColorPop || showComposerFmt || headerMenuOpen || multiMode ||
-    settingsPanelOpen || adminPanelOpen || sidebarOpen || open;
-
-  useEffect(() => {
-    if (anyOverlayOpen && !overlayHistoryRef.current) {
-      window.history.pushState({ overlay: true }, "");
-      overlayHistoryRef.current = true;
-    } else if (!anyOverlayOpen && overlayHistoryRef.current) {
-      overlayHistoryRef.current = false;
-      window.history.back();
-    }
-  }, [anyOverlayOpen]);
-
-  useEffect(() => {
-    const onPopState = () => {
-      if (!overlayHistoryRef.current) return;
-      overlayHistoryRef.current = false;
-      // Close topmost overlay (highest z-index first)
-      if (imgViewOpen) { setImgViewOpen(false); return; }
-      if (confirmDeleteOpen) { setConfirmDeleteOpen(false); return; }
-      if (genericConfirmOpen) { setGenericConfirmOpen(false); return; }
-      if (collaborationModalOpen) { setCollaborationModalOpen(false); return; }
-      if (showModalColorPop) { setShowModalColorPop(false); return; }
-      if (showModalFmt) { setShowModalFmt(false); return; }
-      if (modalMenuOpen) { setModalMenuOpen(false); return; }
-      if (showColorPop) { setShowColorPop(false); return; }
-      if (showComposerFmt) { setShowComposerFmt(false); return; }
-      if (headerMenuOpen) { setHeaderMenuOpen(false); return; }
-      if (multiMode) { setMultiMode(false); return; }
-      if (settingsPanelOpen) { setSettingsPanelOpen(false); return; }
-      if (adminPanelOpen) { setAdminPanelOpen(false); return; }
-      if (sidebarOpen) { setSidebarOpen(false); return; }
-      if (open) { closeModalRef.current?.(); return; }
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
-      showModalColorPop, showModalFmt, modalMenuOpen, showColorPop, showComposerFmt,
-      headerMenuOpen, multiMode, settingsPanelOpen, adminPanelOpen, sidebarOpen, open]);
-
   // CSS inject
   useEffect(() => {
     const style = document.createElement("style");
@@ -2780,6 +2733,53 @@ export default function App() {
     showToast, invalidateNotesCache, setNotes,
     collaboratorInputRef,
   });
+
+  // Android back button: maintain exactly ONE history entry when any overlay
+  // is open. On back press, close the topmost overlay. If overlays remain,
+  // a new entry is pushed automatically on the next render.
+  const overlayHistoryRef = useRef(false);
+
+  const anyOverlayOpen = imgViewOpen || confirmDeleteOpen || genericConfirmOpen ||
+    collaborationModalOpen || showModalColorPop || showModalFmt || modalMenuOpen ||
+    showColorPop || showComposerFmt || headerMenuOpen || multiMode ||
+    settingsPanelOpen || adminPanelOpen || sidebarOpen || open;
+
+  useEffect(() => {
+    if (anyOverlayOpen && !overlayHistoryRef.current) {
+      window.history.pushState({ overlay: true }, "");
+      overlayHistoryRef.current = true;
+    } else if (!anyOverlayOpen && overlayHistoryRef.current) {
+      overlayHistoryRef.current = false;
+      window.history.back();
+    }
+  }, [anyOverlayOpen]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (!overlayHistoryRef.current) return;
+      overlayHistoryRef.current = false;
+      // Close topmost overlay (highest z-index first)
+      if (imgViewOpen) { setImgViewOpen(false); return; }
+      if (confirmDeleteOpen) { setConfirmDeleteOpen(false); return; }
+      if (genericConfirmOpen) { setGenericConfirmOpen(false); return; }
+      if (collaborationModalOpen) { setCollaborationModalOpen(false); return; }
+      if (showModalColorPop) { setShowModalColorPop(false); return; }
+      if (showModalFmt) { setShowModalFmt(false); return; }
+      if (modalMenuOpen) { setModalMenuOpen(false); return; }
+      if (showColorPop) { setShowColorPop(false); return; }
+      if (showComposerFmt) { setShowComposerFmt(false); return; }
+      if (headerMenuOpen) { setHeaderMenuOpen(false); return; }
+      if (multiMode) { setMultiMode(false); return; }
+      if (settingsPanelOpen) { setSettingsPanelOpen(false); return; }
+      if (adminPanelOpen) { setAdminPanelOpen(false); return; }
+      if (sidebarOpen) { setSidebarOpen(false); return; }
+      if (open) { closeModalRef.current?.(); return; }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
+      showModalColorPop, showModalFmt, modalMenuOpen, showColorPop, showComposerFmt,
+      headerMenuOpen, multiMode, settingsPanelOpen, adminPanelOpen, sidebarOpen, open]);
 
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
