@@ -69,6 +69,7 @@ export default function App() {
 
   // Screen width for responsive behavior
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const isMobileDevice = Math.min(window.screen.width, window.screen.height) < 700;
 
   // Notes & search
   const [notes, setNotes] = useState([]);
@@ -4027,7 +4028,7 @@ export default function App() {
       <TagSidebar
         open={sidebarOpen}
         onClose={() => {
-          if (alwaysShowSidebarOnWide && windowWidth >= 700) {
+          if (alwaysShowSidebarOnWide && windowWidth >= 700 && !isMobileDevice) {
             setDesktopSidebarHidden(true);
           } else {
             setSidebarOpen(false);
@@ -4059,7 +4060,7 @@ export default function App() {
           }
         }}
         dark={dark}
-        permanent={alwaysShowSidebarOnWide && windowWidth >= 700 && !desktopSidebarHidden}
+        permanent={alwaysShowSidebarOnWide && windowWidth >= 700 && !isMobileDevice && !desktopSidebarHidden}
         width={sidebarWidth}
         onResize={setSidebarWidth}
       />
@@ -4174,7 +4175,7 @@ export default function App() {
         headerMenuRef={headerMenuRef}
         headerBtnRef={headerBtnRef}
         openSidebar={() => {
-          if (alwaysShowSidebarOnWide && windowWidth >= 700) {
+          if (alwaysShowSidebarOnWide && windowWidth >= 700 && !isMobileDevice) {
             setDesktopSidebarHidden(h => !h);
           } else {
             setSidebarOpen(true);
@@ -4182,7 +4183,7 @@ export default function App() {
         }}
         activeTagFilter={tagFilter}
         activeTagFilters={activeTagFilters}
-        sidebarPermanent={alwaysShowSidebarOnWide && windowWidth >= 700 && !desktopSidebarHidden}
+        sidebarPermanent={alwaysShowSidebarOnWide && windowWidth >= 700 && !isMobileDevice && !desktopSidebarHidden}
         sidebarWidth={sidebarWidth}
         // AI props
         localAiEnabled={localAiEnabled}
