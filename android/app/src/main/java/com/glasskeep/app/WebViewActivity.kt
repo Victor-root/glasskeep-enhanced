@@ -36,33 +36,6 @@ class WebViewActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
 
-    // "Save As" file picker state
-    private var pendingSaveBytes: ByteArray? = null
-    private var pendingSaveFilename: String? = null
-
-    private val saveFileLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val uri = if (result.resultCode == Activity.RESULT_OK) result.data?.data else null
-        val bytes = pendingSaveBytes
-        pendingSaveBytes = null
-        val fname = pendingSaveFilename
-        pendingSaveFilename = null
-        if (uri != null && bytes != null) {
-            try {
-                contentResolver.openOutputStream(uri)?.use { out -> out.write(bytes) }
-                runOnUiThread {
-                    Toast.makeText(this, getString(R.string.download_complete, fname ?: ""), Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("GlassKeep", "saveFileLauncher write failed", e)
-                runOnUiThread {
-                    Toast.makeText(this, getString(R.string.download_error), Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -100,19 +73,27 @@ class WebViewActivity : AppCompatActivity() {
         @JavascriptInterface
         fun saveBlobFile(base64Data: String, filename: String, mimeType: String) {
             try {
-                pendingSaveBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
-                pendingSaveFilename = filename
-                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
+                val bytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+                // Write to cache/shared/ so FileProvider can serve it
+                val sharedDir = java.io.File(cacheDir, "shared")
+                sharedDir.mkdirs()
+                val file = java.io.File(sharedDir, filename)
+                file.writeBytes(bytes)
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    this@WebViewActivity,
+                    "${packageName}.fileprovider",
+                    file
+                )
+                val sendIntent = Intent(Intent.ACTION_SEND).apply {
                     type = mimeType
-                    putExtra(Intent.EXTRA_TITLE, filename)
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                val chooser = Intent.createChooser(intent, filename)
-                runOnUiThread { saveFileLauncher.launch(chooser) }
+                runOnUiThread {
+                    startActivity(Intent.createChooser(sendIntent, filename))
+                }
             } catch (e: Exception) {
                 android.util.Log.e("GlassKeep", "saveBlobFile failed", e)
-                pendingSaveBytes = null
-                pendingSaveFilename = null
                 runOnUiThread {
                     Toast.makeText(this@WebViewActivity, getString(R.string.download_error), Toast.LENGTH_SHORT).show()
                 }
