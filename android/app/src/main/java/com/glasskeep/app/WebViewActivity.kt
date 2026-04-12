@@ -168,9 +168,9 @@ class WebViewActivity : AppCompatActivity() {
                         setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
                     }
                     getSystemService(DownloadManager::class.java).enqueue(req)
-                    Toast.makeText(this@WebViewActivity, "Telechargement lance...", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@WebViewActivity, getString(R.string.download_started), Toast.LENGTH_SHORT).show()
                 } catch (_: Exception) {
-                    Toast.makeText(this@WebViewActivity, "Erreur de telechargement", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@WebViewActivity, getString(R.string.download_error), Toast.LENGTH_SHORT).show()
                 }
             }
 
@@ -318,7 +318,7 @@ class WebViewActivity : AppCompatActivity() {
 
         // Title
         val title = android.widget.TextView(this).apply {
-            text = "Changer de serveur"
+            text = getString(R.string.dialog_change_server)
             textSize = 18f
             setTextColor(titleColor)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
@@ -332,7 +332,7 @@ class WebViewActivity : AppCompatActivity() {
 
         // Message
         val msg = android.widget.TextView(this).apply {
-            text = "Revenir a l'ecran de configuration ?"
+            text = getString(R.string.dialog_change_message)
             textSize = 14f
             setTextColor(msgColor)
             gravity = android.view.Gravity.CENTER
@@ -354,7 +354,7 @@ class WebViewActivity : AppCompatActivity() {
 
         // Cancel button
         val btnCancel = android.widget.TextView(this).apply {
-            text = "Non"
+            text = getString(R.string.dialog_no)
             textSize = 15f
             setTextColor(cancelTextColor)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
@@ -374,7 +374,7 @@ class WebViewActivity : AppCompatActivity() {
 
         // Confirm button with gradient
         val btnConfirm = android.widget.TextView(this).apply {
-            text = "Oui, changer"
+            text = getString(R.string.dialog_yes)
             textSize = 15f
             setTextColor(Color.WHITE)
             typeface = android.graphics.Typeface.DEFAULT_BOLD

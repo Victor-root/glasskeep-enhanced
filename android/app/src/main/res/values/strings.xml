@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">GlassKeep</string>
+    <string name="setup_subtitle">Connect to your server</string>
+    <string name="setup_label">Server address</string>
+    <string name="setup_placeholder">https://your-server.com</string>
+    <string name="setup_connect">Connect</string>
+    <string name="error_empty_url">Please enter a URL</string>
+    <string name="error_invalid_url">URL must start with http:// or https://</string>
+    <string name="dialog_change_server">Change server</string>
+    <string name="dialog_change_message">Go back to setup screen?</string>
+    <string name="dialog_yes">Yes, change</string>
+    <string name="dialog_no">No</string>
+    <string name="download_started">Download started…</string>
+    <string name="download_error">Download error</string>
 </resources>

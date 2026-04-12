@@ -41,6 +41,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -192,6 +193,8 @@ fun SetupScreen(onConnect: (String) -> Unit) {
     val dark = isSystemInDarkTheme()
     var url by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    val errorEmpty = stringResource(R.string.error_empty_url)
+    val errorInvalid = stringResource(R.string.error_invalid_url)
 
     val bgModifier = if (dark) {
         Modifier.background(DarkBgColor)
@@ -235,7 +238,7 @@ fun SetupScreen(onConnect: (String) -> Unit) {
             )
 
             Text(
-                text = "Connectez-vous a votre serveur",
+                text = stringResource(R.string.setup_subtitle),
                 fontSize = 14.sp,
                 color = subtextColor
             )
@@ -255,8 +258,8 @@ fun SetupScreen(onConnect: (String) -> Unit) {
                         url = it
                         error = null
                     },
-                    label = { Text("Adresse du serveur") },
-                    placeholder = { Text("https://votre-serveur.com") },
+                    label = { Text(stringResource(R.string.setup_label)) },
+                    placeholder = { Text(stringResource(R.string.setup_placeholder)) },
                     singleLine = true,
                     isError = error != null,
                     supportingText = error?.let { msg -> { Text(msg, color = Color(0xFFdc2626)) } },
@@ -265,7 +268,7 @@ fun SetupScreen(onConnect: (String) -> Unit) {
                         imeAction = ImeAction.Go
                     ),
                     keyboardActions = KeyboardActions(
-                        onGo = { validateAndConnect(url.trim(), onConnect) { error = it } }
+                        onGo = { validateAndConnect(url.trim(), errorEmpty, errorInvalid, onConnect) { error = it } }
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = textColor,
@@ -293,11 +296,11 @@ fun SetupScreen(onConnect: (String) -> Unit) {
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             role = Role.Button
-                        ) { validateAndConnect(url.trim(), onConnect) { error = it } },
+                        ) { validateAndConnect(url.trim(), errorEmpty, errorInvalid, onConnect) { error = it } },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "Se connecter",
+                        stringResource(R.string.setup_connect),
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White,
                         fontSize = 16.sp
@@ -310,13 +313,14 @@ fun SetupScreen(onConnect: (String) -> Unit) {
 
 private fun validateAndConnect(
     url: String,
+    errorEmpty: String,
+    errorInvalid: String,
     onConnect: (String) -> Unit,
     onError: (String) -> Unit
 ) {
     when {
-        url.isBlank() -> onError("Veuillez entrer une URL")
-        !url.startsWith("http://") && !url.startsWith("https://") ->
-            onError("L'URL doit commencer par http:// ou https://")
+        url.isBlank() -> onError(errorEmpty)
+        !url.startsWith("http://") && !url.startsWith("https://") -> onError(errorInvalid)
         else -> onConnect(url.trimEnd('/'))
     }
 }
