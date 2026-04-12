@@ -56,6 +56,7 @@ export default function NotesHeader({
       <header
         className={`p-4 sm:p-6 flex justify-between items-center sticky top-0 ${mobileSearchOpen ? "z-[1000]" : "z-20"} glass-card mb-6 relative${!isOnline && windowWidth < 640 ? " pb-7" : ""}`}
         style={{
+          top: "env(safe-area-inset-top)",
           transform: !headerVisible && (windowWidth < 700 || isLandscapeMobile) ? "translateY(-100%)" : "translateY(0)",
           transition: "transform 0.3s ease",
         }}

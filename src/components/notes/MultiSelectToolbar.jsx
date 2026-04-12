@@ -28,6 +28,7 @@ export default function MultiSelectToolbar({
           className="p-3 sm:p-4 flex items-center justify-between sticky top-0 z-[25] glass-card mb-2"
           style={{
             position: "sticky",
+            top: "env(safe-area-inset-top)",
             transform: headerVisible === false ? "translateY(-100%)" : "translateY(0)",
             transition: "transform 0.3s ease",
           }}
