@@ -821,6 +821,40 @@ export default function App() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [headerMenuOpen]);
 
+  // Android back button: close overlays (sidebar, settings, admin, header kebab)
+  const overlayHistoryRef = useRef(false);
+  useEffect(() => {
+    if (sidebarOpen || settingsPanelOpen || adminPanelOpen || headerMenuOpen) {
+      if (!overlayHistoryRef.current) {
+        window.history.pushState({ overlay: true }, "");
+        overlayHistoryRef.current = true;
+      }
+    }
+  }, [sidebarOpen, settingsPanelOpen, adminPanelOpen, headerMenuOpen]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (!overlayHistoryRef.current) return;
+      overlayHistoryRef.current = false;
+      if (settingsPanelOpen) { setSettingsPanelOpen(false); return; }
+      if (adminPanelOpen) { setAdminPanelOpen(false); return; }
+      if (sidebarOpen) { setSidebarOpen(false); return; }
+      if (headerMenuOpen) { setHeaderMenuOpen(false); return; }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [sidebarOpen, settingsPanelOpen, adminPanelOpen, headerMenuOpen]);
+
+  // Clean up history entry when overlay closes without back button
+  useEffect(() => {
+    if (!sidebarOpen && !settingsPanelOpen && !adminPanelOpen && !headerMenuOpen) {
+      if (overlayHistoryRef.current) {
+        overlayHistoryRef.current = false;
+        window.history.back();
+      }
+    }
+  }, [sidebarOpen, settingsPanelOpen, adminPanelOpen, headerMenuOpen]);
+
   // CSS inject
   useEffect(() => {
     const style = document.createElement("style");
