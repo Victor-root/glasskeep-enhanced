@@ -2770,8 +2770,11 @@ export default function App() {
 
   useEffect(() => {
     const onPopState = () => {
+      // Skip popstate events triggered by our own history.go() cleanup
+      if (popInProgressRef.current) { popInProgressRef.current = false; return; }
       if (overlayDepthRef.current <= 0) return;
       overlayDepthRef.current--;
+      // Tell the count effect to skip (back button already popped the entry)
       popInProgressRef.current = true;
       // Close topmost overlay (highest z-index first)
       if (imgViewOpen) { setImgViewOpen(false); return; }
