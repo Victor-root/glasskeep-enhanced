@@ -117,13 +117,6 @@ export const modalBgFor = (colorKey, dark) => {
   return mixWithWhite(solid(base), 0.8, 1);
 };
 
-/** Status-bar color: more saturated than the modal so it's visible */
-export const statusBarFor = (colorKey, dark) => {
-  const base = bgFor(colorKey, dark);
-  if (dark) return base.replace(/,\s*[\d.]+\)$/, ', 1)');
-  return mixWithWhite(solid(base), 0.4, 1);
-};
-
 export const scrollColorsFor = (colorKey, dark) => {
   if (!colorKey || colorKey === "default")
     return dark ? { thumb: "#7c3aed", track: "#3b0764" } : { thumb: "#a78bfa", track: "#e3d0ff" };

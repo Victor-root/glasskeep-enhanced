@@ -13,7 +13,7 @@ import useModalHistory from "../../hooks/useModalHistory.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { handleSmartEnter } from "../common/FormatToolbar.jsx";
 import { uid } from "../../utils/helpers.js";
-import { modalBgFor, statusBarFor, scrollColorsFor, solid, bgFor, toHex } from "../../utils/colors.js";
+import { modalBgFor, scrollColorsFor, solid, bgFor, toHex } from "../../utils/colors.js";
 import { setThemeColor } from "../../utils/helpers.js";
 
 export default function NoteModal({
@@ -178,7 +178,7 @@ export default function NoteModal({
   React.useEffect(() => {
     if (!open) return;
     const pageColor = dark ? "#1a1a1a" : "#f0e8ff";
-    const color = (!mColor || mColor === "default") ? pageColor : toHex(statusBarFor(mColor, dark));
+    const color = (!mColor || mColor === "default") ? pageColor : toHex(modalBgFor(mColor, dark));
     setThemeColor(color);
     return () => setThemeColor(pageColor);
   }, [open, mColor, dark]);
