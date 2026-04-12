@@ -1,6 +1,25 @@
 # Glass Keep — Enhanced Fork
 
-> **Fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with local-first sync (offline support), real-time multi-device sync, multi-language i18n support, and UI improvements.
+> **Fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with local-first sync (offline support), real-time multi-device sync, multi-language i18n support, UI improvements, and a **native Android app**.
+
+## 📱 Android App
+
+A native Android wrapper is available for GlassKeep, turning your self-hosted instance into a full mobile app.
+
+**Download the latest APK from the [Releases](https://github.com/Victor-root/glasskeep-enhanced/releases) page.**
+
+### Features
+- **Connect to your server** — enter your GlassKeep URL on first launch, the app remembers it
+- **Pull-to-refresh** — swipe down on the home screen to reload
+- **Android back button** — closes overlays (sidebar, settings, modals, image viewer, menus, etc.) instead of leaving the app
+- **Native file downloads** — download notes as .md, images, or ZIP exports directly to your Downloads folder
+- **Photo picker support** — add images from your gallery (Android 13+ photo picker compatible)
+- **Dark/light theme sync** — status bar and navigation bar colors follow the app theme automatically
+- **Long-press back button** — hold the back button for 3 seconds to switch server
+
+> The Android source code is in the `android/` directory. Build it with Android Studio.
+
+---
 
 ## 🆕 What this fork adds
 
