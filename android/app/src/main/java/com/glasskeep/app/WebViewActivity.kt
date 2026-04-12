@@ -130,6 +130,21 @@ class WebViewActivity : AppCompatActivity() {
                     view.evaluateJavascript(
                         "if(window.__setDarkMode)window.__setDarkMode($isDark)", null
                     )
+                    // Watch <meta name="theme-color"> for status/nav bar sync
+                    view.evaluateJavascript("""
+                        (function(){
+                          if(window.__themeColorSync) return;
+                          window.__themeColorSync=true;
+                          var last='';
+                          function sync(){
+                            var m=document.querySelector('meta[name="theme-color"]');
+                            var c=m?m.getAttribute('content'):'';
+                            if(c&&c!==last){last=c;try{window.AndroidTheme.onThemeColor(c)}catch(e){}}
+                          }
+                          new MutationObserver(sync).observe(document.head,{childList:true,subtree:true,attributes:true,attributeFilter:['content']});
+                          sync();
+                        })()
+                    """.trimIndent(), null)
                 }
             }
 
