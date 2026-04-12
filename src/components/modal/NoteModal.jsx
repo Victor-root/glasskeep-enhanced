@@ -370,7 +370,7 @@ export default function NoteModal({
                   </div>
                 )
               ) : mType === "checklist" ? (
-                <div className="space-y-4 md:space-y-2">
+                <div className="space-y-4 md:space-y-2 max-sm:-mx-2">
                   {/* Add new item row — top position */}
                   {checklistInsertPosition === "top" && (
                     <div
