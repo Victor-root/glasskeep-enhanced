@@ -312,22 +312,7 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
     return () => document.removeEventListener("keydown", onKey);
   }, [activeId, imgViewOpen]);
 
-  // Close note modal with Android back button (popstate)
-  useEffect(() => {
-    const onPopState = () => {
-      if (modalHistoryRef.current) {
-        modalHistoryRef.current = false;
-        setOpen(false);
-        setActiveId(null);
-        setViewMode(true);
-        setModalMenuOpen(false);
-        setConfirmDeleteOpen(false);
-        setShowModalFmt(false);
-      }
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+  // Note: Android back button (popstate) for the modal is handled centrally in App.jsx
 
   // Auto-resize modal textarea effect
   useEffect(() => {

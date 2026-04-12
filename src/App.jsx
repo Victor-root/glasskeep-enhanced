@@ -821,39 +821,89 @@ export default function App() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [headerMenuOpen]);
 
-  // Android back button: close overlays (sidebar, settings, admin, header kebab)
-  const overlayHistoryRef = useRef(false);
+  // Android back button: close any open overlay/modal/menu on popstate.
+  // Tracks how many history entries we've pushed so we can clean up when
+  // overlays close via normal UI interaction (not back button).
+  const overlayDepthRef = useRef(0);
+  const backButtonFiringRef = useRef(false);
+
+  // All overlay states in one snapshot (order = close priority, highest first)
+  const overlayStates = [
+    imgViewOpen,
+    confirmDeleteOpen,
+    genericConfirmOpen,
+    collaborationModalOpen,
+    showModalColorPop,
+    showModalFmt,
+    modalMenuOpen,
+    showColorPop,
+    showComposerFmt,
+    headerMenuOpen,
+    multiMode,
+    settingsPanelOpen,
+    adminPanelOpen,
+    sidebarOpen,
+    open, // note modal
+  ];
+  const openCount = overlayStates.filter(Boolean).length;
+  const prevOpenCountRef = useRef(0);
+
   useEffect(() => {
-    if (sidebarOpen || settingsPanelOpen || adminPanelOpen || headerMenuOpen) {
-      if (!overlayHistoryRef.current) {
+    const prev = prevOpenCountRef.current;
+    prevOpenCountRef.current = openCount;
+    if (backButtonFiringRef.current) { backButtonFiringRef.current = false; return; }
+    if (openCount > prev) {
+      // New overlay(s) opened — push history entries for each new one
+      const delta = openCount - prev;
+      for (let i = 0; i < delta; i++) {
         window.history.pushState({ overlay: true }, "");
-        overlayHistoryRef.current = true;
+        overlayDepthRef.current++;
+      }
+    } else if (openCount < prev) {
+      // Overlay(s) closed via UI — pop matching history entries
+      const delta = prev - openCount;
+      for (let i = 0; i < delta; i++) {
+        if (overlayDepthRef.current > 0) {
+          overlayDepthRef.current--;
+          backButtonFiringRef.current = true;
+          window.history.back();
+        }
       }
     }
-  }, [sidebarOpen, settingsPanelOpen, adminPanelOpen, headerMenuOpen]);
+  }, [openCount]);
 
   useEffect(() => {
     const onPopState = () => {
-      if (!overlayHistoryRef.current) return;
-      overlayHistoryRef.current = false;
+      if (overlayDepthRef.current <= 0) return;
+      overlayDepthRef.current--;
+      backButtonFiringRef.current = true;
+      // Close topmost overlay (order matches overlayStates priority)
+      if (imgViewOpen) { setImgViewOpen(false); return; }
+      if (confirmDeleteOpen) { setConfirmDeleteOpen(false); return; }
+      if (genericConfirmOpen) { setGenericConfirmOpen(false); return; }
+      if (collaborationModalOpen) { setCollaborationModalOpen(false); return; }
+      if (showModalColorPop) { setShowModalColorPop(false); return; }
+      if (showModalFmt) { setShowModalFmt(false); return; }
+      if (modalMenuOpen) { setModalMenuOpen(false); return; }
+      if (showColorPop) { setShowColorPop(false); return; }
+      if (showComposerFmt) { setShowComposerFmt(false); return; }
+      if (headerMenuOpen) { setHeaderMenuOpen(false); return; }
+      if (multiMode) { setMultiMode(false); return; }
       if (settingsPanelOpen) { setSettingsPanelOpen(false); return; }
       if (adminPanelOpen) { setAdminPanelOpen(false); return; }
       if (sidebarOpen) { setSidebarOpen(false); return; }
-      if (headerMenuOpen) { setHeaderMenuOpen(false); return; }
+      if (open) {
+        // Close note modal — reuse the same logic as the old popstate handler
+        modalHistoryRef.current = false;
+        closeModalRef.current?.();
+        return;
+      }
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [sidebarOpen, settingsPanelOpen, adminPanelOpen, headerMenuOpen]);
-
-  // Clean up history entry when overlay closes without back button
-  useEffect(() => {
-    if (!sidebarOpen && !settingsPanelOpen && !adminPanelOpen && !headerMenuOpen) {
-      if (overlayHistoryRef.current) {
-        overlayHistoryRef.current = false;
-        window.history.back();
-      }
-    }
-  }, [sidebarOpen, settingsPanelOpen, adminPanelOpen, headerMenuOpen]);
+  }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
+      showModalColorPop, showModalFmt, modalMenuOpen, showColorPop, showComposerFmt,
+      headerMenuOpen, multiMode, settingsPanelOpen, adminPanelOpen, sidebarOpen, open]);
 
   // CSS inject
   useEffect(() => {
@@ -2672,8 +2722,6 @@ export default function App() {
     setViewMode(false); // New draw notes land in edit mode when exiting draw canvas
     setModalMenuOpen(false);
     setOpen(true);
-    window.history.pushState({ noteModal: true }, "");
-    modalHistoryRef.current = true;
   };
 
   /** -------- Download single note .md -------- */
@@ -2848,8 +2896,6 @@ export default function App() {
     setViewMode(true);
     setModalMenuOpen(false);
     setOpen(true);
-    window.history.pushState({ noteModal: true }, "");
-    modalHistoryRef.current = true;
   };
 
   // Check if the note has been modified from initial state
@@ -3123,13 +3169,8 @@ export default function App() {
       modalClosingTimerRef.current = null;
     }
 
-    // Clean up history state without going through closeModal
-    if (modalHistoryRef.current) {
-      modalHistoryRef.current = false;
-      window.history.back();
-    }
-
     // Reset all modal state immediately — no animation, no save
+    // (history cleanup is handled by the centralized overlay back-button system)
     setOpen(false);
     setActiveId(null);
     setViewMode(true);
@@ -3169,10 +3210,6 @@ export default function App() {
         setIsModalClosing(true);
         modalClosingTimerRef.current = setTimeout(() => {
           modalClosingTimerRef.current = null;
-          if (modalHistoryRef.current) {
-            modalHistoryRef.current = false;
-            window.history.back();
-          }
           setOpen(false);
           setActiveId(null);
           setViewMode(true);
@@ -3249,10 +3286,6 @@ export default function App() {
     setIsModalClosing(true);
     modalClosingTimerRef.current = setTimeout(() => {
       modalClosingTimerRef.current = null;
-      if (modalHistoryRef.current) {
-        modalHistoryRef.current = false;
-        window.history.back();
-      }
       setOpen(false);
       setActiveId(null);
       setViewMode(true);
