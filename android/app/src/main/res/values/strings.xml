@@ -16,5 +16,6 @@
     <string name="dialog_yes">Yes, change</string>
     <string name="dialog_no">No</string>
     <string name="download_started">Download started…</string>
+    <string name="download_complete">Saved: %1$s</string>
     <string name="download_error">Download error</string>
 </resources>

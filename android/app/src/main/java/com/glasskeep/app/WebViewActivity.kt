@@ -78,17 +78,28 @@ class WebViewActivity : AppCompatActivity() {
                     put(android.provider.MediaStore.Downloads.DISPLAY_NAME, filename)
                     put(android.provider.MediaStore.Downloads.MIME_TYPE, mimeType)
                     put(android.provider.MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                    put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
                 }
                 val uri = contentResolver.insert(
                     android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues
                 )
-                uri?.let {
-                    contentResolver.openOutputStream(it)?.use { out -> out.write(bytes) }
+                if (uri == null) {
                     runOnUiThread {
-                        Toast.makeText(this@WebViewActivity, getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@WebViewActivity, getString(R.string.download_error), Toast.LENGTH_SHORT).show()
                     }
+                    return
+                }
+                contentResolver.openOutputStream(uri)?.use { out -> out.write(bytes) }
+                // Mark file as complete so it becomes visible
+                val updateValues = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+                }
+                contentResolver.update(uri, updateValues, null, null)
+                runOnUiThread {
+                    Toast.makeText(this@WebViewActivity, getString(R.string.download_complete, filename), Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
+                android.util.Log.e("GlassKeep", "saveBlobFile failed", e)
                 runOnUiThread {
                     Toast.makeText(this@WebViewActivity, getString(R.string.download_error), Toast.LENGTH_SHORT).show()
                 }
