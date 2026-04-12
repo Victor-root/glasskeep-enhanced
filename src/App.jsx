@@ -821,63 +821,31 @@ export default function App() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [headerMenuOpen]);
 
-  // Android back button: close any open overlay/modal/menu on popstate.
-  // Tracks how many history entries we've pushed so we can clean up when
-  // overlays close via normal UI interaction (not back button).
-  const overlayDepthRef = useRef(0);
-  const backButtonFiringRef = useRef(false);
+  // Android back button: maintain exactly ONE history entry when any overlay
+  // is open. On back press, close the topmost overlay. If overlays remain,
+  // a new entry is pushed automatically on the next render.
+  const overlayHistoryRef = useRef(false);
 
-  // All overlay states in one snapshot (order = close priority, highest first)
-  const overlayStates = [
-    imgViewOpen,
-    confirmDeleteOpen,
-    genericConfirmOpen,
-    collaborationModalOpen,
-    showModalColorPop,
-    showModalFmt,
-    modalMenuOpen,
-    showColorPop,
-    showComposerFmt,
-    headerMenuOpen,
-    multiMode,
-    settingsPanelOpen,
-    adminPanelOpen,
-    sidebarOpen,
-    open, // note modal
-  ];
-  const openCount = overlayStates.filter(Boolean).length;
-  const prevOpenCountRef = useRef(0);
+  const anyOverlayOpen = imgViewOpen || confirmDeleteOpen || genericConfirmOpen ||
+    collaborationModalOpen || showModalColorPop || showModalFmt || modalMenuOpen ||
+    showColorPop || showComposerFmt || headerMenuOpen || multiMode ||
+    settingsPanelOpen || adminPanelOpen || sidebarOpen || open;
 
   useEffect(() => {
-    const prev = prevOpenCountRef.current;
-    prevOpenCountRef.current = openCount;
-    if (backButtonFiringRef.current) { backButtonFiringRef.current = false; return; }
-    if (openCount > prev) {
-      // New overlay(s) opened — push history entries for each new one
-      const delta = openCount - prev;
-      for (let i = 0; i < delta; i++) {
-        window.history.pushState({ overlay: true }, "");
-        overlayDepthRef.current++;
-      }
-    } else if (openCount < prev) {
-      // Overlay(s) closed via UI — pop matching history entries
-      const delta = prev - openCount;
-      for (let i = 0; i < delta; i++) {
-        if (overlayDepthRef.current > 0) {
-          overlayDepthRef.current--;
-          backButtonFiringRef.current = true;
-          window.history.back();
-        }
-      }
+    if (anyOverlayOpen && !overlayHistoryRef.current) {
+      window.history.pushState({ overlay: true }, "");
+      overlayHistoryRef.current = true;
+    } else if (!anyOverlayOpen && overlayHistoryRef.current) {
+      overlayHistoryRef.current = false;
+      window.history.back();
     }
-  }, [openCount]);
+  }, [anyOverlayOpen]);
 
   useEffect(() => {
     const onPopState = () => {
-      if (overlayDepthRef.current <= 0) return;
-      overlayDepthRef.current--;
-      backButtonFiringRef.current = true;
-      // Close topmost overlay (order matches overlayStates priority)
+      if (!overlayHistoryRef.current) return;
+      overlayHistoryRef.current = false;
+      // Close topmost overlay (highest z-index first)
       if (imgViewOpen) { setImgViewOpen(false); return; }
       if (confirmDeleteOpen) { setConfirmDeleteOpen(false); return; }
       if (genericConfirmOpen) { setGenericConfirmOpen(false); return; }
@@ -892,12 +860,7 @@ export default function App() {
       if (settingsPanelOpen) { setSettingsPanelOpen(false); return; }
       if (adminPanelOpen) { setAdminPanelOpen(false); return; }
       if (sidebarOpen) { setSidebarOpen(false); return; }
-      if (open) {
-        // Close note modal — reuse the same logic as the old popstate handler
-        modalHistoryRef.current = false;
-        closeModalRef.current?.();
-        return;
-      }
+      if (open) { closeModalRef.current?.(); return; }
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
