@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -205,51 +204,26 @@ fun SetupScreen(onConnect: (String) -> Unit) {
     val errorUnreachable = stringResource(R.string.error_unreachable)
 
     val doConnect: () -> Unit = {
-        try {
-            val trimmed = url.trim().trimEnd('/')
-            when {
-                trimmed.isBlank() -> error = errorEmpty
-                !trimmed.startsWith("http://") && !trimmed.startsWith("https://") -> error = errorInvalid
-                loading -> {}
-                else -> {
-                    loading = true
-                    error = null
-                    val t = Thread {
-                        try {
-                            val result = checkGlassKeepServer(trimmed)
-                            handler.post {
-                                try {
-                                    loading = false
-                                    when (result) {
-                                        ServerCheck.OK -> onConnect(trimmed)
-                                        ServerCheck.NOT_GLASSKEEP -> error = errorNotGlasskeep
-                                        ServerCheck.UNREACHABLE -> error = errorUnreachable
-                                    }
-                                } catch (e: Throwable) {
-                                    loading = false
-                                    error = "UI: ${e.javaClass.simpleName}: ${e.message}"
-                                }
-                            }
-                        } catch (e: Throwable) {
-                            handler.post {
-                                loading = false
-                                error = "BG: ${e.javaClass.simpleName}: ${e.message}"
-                            }
+        val trimmed = url.trim().trimEnd('/')
+        when {
+            trimmed.isBlank() -> error = errorEmpty
+            !trimmed.startsWith("http://") && !trimmed.startsWith("https://") -> error = errorInvalid
+            loading -> {}
+            else -> {
+                loading = true
+                error = null
+                Thread {
+                    val result = checkGlassKeepServer(trimmed)
+                    handler.post {
+                        loading = false
+                        when (result) {
+                            ServerCheck.OK -> onConnect(trimmed)
+                            ServerCheck.NOT_GLASSKEEP -> error = errorNotGlasskeep
+                            ServerCheck.UNREACHABLE -> error = errorUnreachable
                         }
                     }
-                    t.uncaughtExceptionHandler =
-                        Thread.UncaughtExceptionHandler { _, e ->
-                            handler.post {
-                                loading = false
-                                error = "UCE: ${e.javaClass.simpleName}: ${e.message}"
-                            }
-                        }
-                    t.start()
-                }
+                }.start()
             }
-        } catch (e: Throwable) {
-            loading = false
-            error = "Click: ${e.javaClass.simpleName}: ${e.message}"
         }
     }
 
@@ -356,20 +330,12 @@ fun SetupScreen(onConnect: (String) -> Unit) {
                         ) { doConnect() },
                     contentAlignment = Alignment.Center
                 ) {
-                    if (loading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Text(
-                            stringResource(R.string.setup_connect),
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White,
-                            fontSize = 16.sp
-                        )
-                    }
+                    Text(
+                        stringResource(if (loading) R.string.connecting else R.string.setup_connect),
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        fontSize = 16.sp
+                    )
                 }
             }
         }
