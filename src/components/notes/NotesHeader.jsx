@@ -175,7 +175,7 @@ export default function NotesHeader({
         {mobileSearchOpen && createPortal(
           <div
             className={`${mobileOnly} fixed inset-0 z-[999]`}
-            onClick={() => setMobileSearchOpen(false)}
+            onClick={() => { setSearch(""); setMobileSearchOpen(false); }}
           />,
           document.body
         )}
@@ -191,6 +191,7 @@ export default function NotesHeader({
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
+                    setSearch("");
                     setMobileSearchOpen(false);
                   }
                   if (
@@ -217,7 +218,7 @@ export default function NotesHeader({
                     type="button"
                     aria-label={t("clearSearch")}
                     className="h-5 w-5 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
-                    onClick={() => setSearch("")}
+                    onClick={() => { setSearch(""); setMobileSearchOpen(false); }}
                   >
                     ×
                   </button>
