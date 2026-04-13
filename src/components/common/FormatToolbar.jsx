@@ -3,6 +3,17 @@ import { t } from "../../i18n";
 
 /** ---------- Formatting helpers ---------- */
 export function wrapSelection(value, start, end, before, after, placeholder = "text") {
+  const bLen = before.length;
+  const aLen = after.length;
+
+  // Already wrapped with same markers → unwrap (toggle off)
+  if (start >= bLen && end + aLen <= value.length) {
+    if (value.slice(start - bLen, start) === before && value.slice(end, end + aLen) === after) {
+      const newText = value.slice(0, start - bLen) + value.slice(start, end) + value.slice(end + aLen);
+      return { text: newText, range: [start - bLen, end - bLen] };
+    }
+  }
+
   const hasSel = start !== end;
   const sel = hasSel ? value.slice(start, end) : placeholder;
   const newText =
@@ -12,6 +23,14 @@ export function wrapSelection(value, start, end, before, after, placeholder = "t
   return { text: newText, range: [s, e] };
 }
 export function fencedBlock(value, start, end) {
+  // Already fenced → unwrap (toggle off)
+  if (start >= 4 && end + 4 <= value.length &&
+      value.slice(start - 4, start) === "```\n" &&
+      value.slice(end, end + 4) === "\n```") {
+    const newText = value.slice(0, start - 4) + value.slice(start, end) + value.slice(end + 4);
+    return { text: newText, range: [start - 4, end - 4] };
+  }
+
   const hasSel = start !== end;
   const sel = hasSel ? value.slice(start, end) : "code";
   const block = "```\n" + sel + "\n```";
@@ -71,11 +90,31 @@ export function toggleList(value, start, end, kind /* 'ul' | 'ol' */) {
 export function prefixLines(value, start, end, prefix) {
   const { from, to } = selectionBounds(value, start, end);
   const segment = value.slice(from, to);
-  const lines = segment.split("\n").map((ln) => `${prefix}${ln}`);
-  const replaced = lines.join("\n");
+  const lines = segment.split("\n");
+  const nonEmpty = (ln) => ln.trim().length > 0;
+  const nonEmptyLines = lines.filter(nonEmpty);
+
+  // All non-empty lines already have this exact prefix → remove (toggle off)
+  if (nonEmptyLines.length > 0 && nonEmptyLines.every((ln) => ln.startsWith(prefix))) {
+    const newLines = lines.map((ln) => ln.startsWith(prefix) ? ln.slice(prefix.length) : ln);
+    const replaced = newLines.join("\n");
+    const newText = value.slice(0, from) + replaced + value.slice(to);
+    return { text: newText, range: [from, from + replaced.length] };
+  }
+
+  // For headings: strip any existing heading level before adding the new one
+  const HEADING_RE = /^#{1,6} /;
+  const isHeading = /^#{1,6} $/.test(prefix);
+
+  const newLines = lines.map((ln) => {
+    if (!nonEmpty(ln)) return ln;
+    const stripped = isHeading ? ln.replace(HEADING_RE, "") : ln;
+    return prefix + stripped;
+  });
+
+  const replaced = newLines.join("\n");
   const newText = value.slice(0, from) + replaced + value.slice(to);
-  const delta = replaced.length - segment.length;
-  return { text: newText, range: [start + prefix.length, end + delta] };
+  return { text: newText, range: [from + prefix.length, from + replaced.length] };
 }
 
 /** Smart Enter: continue lists/quotes, or exit on empty */
