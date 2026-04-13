@@ -25,6 +25,7 @@ export default function ModalHeader({
   viewMode,
   windowWidth,
   isLandscapeMobile,
+  isWebView,
   // formatting (mobile popover)
   modalFmtBtnRef,
   showModalFmt,
@@ -47,7 +48,7 @@ export default function ModalHeader({
   onToggleDrawMode,
 }) {
   const mobileTitleRef = useRef(null);
-  const isDesktop = windowWidth >= 768 && !isLandscapeMobile;
+  const isDesktop = windowWidth >= 768 && !isLandscapeMobile && !isWebView;
   const isPinned = !!notes.find((n) => String(n.id) === String(activeId))?.pinned;
   const showPinBtn = tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED";
   const isDrawEdit = mType === 'draw' && drawMode === 'draw';
@@ -69,7 +70,7 @@ export default function ModalHeader({
     <>
       {/* ── Sticky toolbar ── */}
       <div
-        className={`sticky top-0 z-20 rounded-t-none ${isDrawEdit ? '' : 'sm:rounded-t-xl'} ${isDrawEdit ? (dark ? 'border-b border-white/15' : 'border-b border-black/10') : ''}`}
+        className={`sticky top-0 z-20 rounded-t-none ${isDrawEdit || isWebView ? '' : 'sm:rounded-t-xl'} ${isDrawEdit ? (dark ? 'border-b border-white/15' : 'border-b border-black/10') : ''}`}
         style={{ backgroundColor: modalBgFor(mColor, dark) }}
       >
         <div className={`flex items-center ${

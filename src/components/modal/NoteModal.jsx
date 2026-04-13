@@ -24,6 +24,7 @@ export default function NoteModal({
   dark,
   windowWidth,
   isLandscapeMobile,
+  isWebView,
   edgeToEdgeLandscape,
   // modal state
   activeId,
@@ -212,12 +213,15 @@ export default function NoteModal({
     [undo, redo, mType, viewMode],
   );
 
+  // Force mobile layout when running inside Android WebView (tablets)
+  const mobileLayout = windowWidth < 640 || isLandscapeMobile || isWebView;
+
   if (!open && !isModalClosing) return null;
 
   return (
     <>
       <div
-        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 ${isLandscapeMobile ? 'bg-black' : 'bg-black/40 max-sm:bg-black'} z-40 flex items-center justify-center overscroll-contain`}
+        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 ${mobileLayout ? 'bg-black' : 'bg-black/40 max-sm:bg-black'} z-40 flex items-center justify-center overscroll-contain`}
         onMouseDown={(e) => {
           scrimClickStartRef.current = e.target === e.currentTarget;
         }}
@@ -230,17 +234,17 @@ export default function NoteModal({
       >
         <div
           className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full max-w-none ${
-            isLandscapeMobile ? ''
+            mobileLayout ? ''
             : isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen sm:!rounded-none'
             : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl'
           }${drawTransition === 'entering' ? ' draw-expand' : drawTransition === 'leaving' ? ' draw-collapse' : ''} flex flex-col relative overflow-hidden`}
           style={{
             backgroundColor: modalBgFor(mColor, dark),
-            height: (windowWidth < 640 || isLandscapeMobile) ? '100dvh' : undefined,
-            paddingTop: (windowWidth < 640 || isLandscapeMobile) ? 'env(safe-area-inset-top)' : undefined,
-            paddingBottom: (windowWidth < 640 || isLandscapeMobile) ? 'env(safe-area-inset-bottom)' : undefined,
-            paddingLeft: (windowWidth < 640 || isLandscapeMobile) && !edgeToEdgeLandscape ? 'env(safe-area-inset-left)' : undefined,
-            paddingRight: (windowWidth < 640 || isLandscapeMobile) ? 'env(safe-area-inset-right)' : undefined,
+            height: mobileLayout ? '100dvh' : undefined,
+            paddingTop: mobileLayout ? 'env(safe-area-inset-top)' : undefined,
+            paddingBottom: mobileLayout ? 'env(safe-area-inset-bottom)' : undefined,
+            paddingLeft: mobileLayout && !edgeToEdgeLandscape ? 'env(safe-area-inset-left)' : undefined,
+            paddingRight: mobileLayout ? 'env(safe-area-inset-right)' : undefined,
           }}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
@@ -270,6 +274,7 @@ export default function NoteModal({
               viewMode={viewMode}
               windowWidth={windowWidth}
               isLandscapeMobile={isLandscapeMobile}
+              isWebView={isWebView}
               // formatting
               modalFmtBtnRef={modalFmtBtnRef}
               showModalFmt={showModalFmt}
@@ -634,6 +639,7 @@ export default function NoteModal({
             dark={dark}
             windowWidth={windowWidth}
             isLandscapeMobile={isLandscapeMobile}
+            isWebView={isWebView}
             // tags
             mTagList={mTagList}
             setMTagList={setMTagList}

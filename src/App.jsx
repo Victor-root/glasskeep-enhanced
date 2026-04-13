@@ -73,6 +73,9 @@ export default function App() {
   const isMobileDevice = Math.min(windowWidth, windowHeight) < 500;
   const isLandscapeMobile = windowWidth > windowHeight && windowHeight < 500;
 
+  // Detect Android WebView (APK) — force mobile layout on tablets
+  const isWebView = !!window.AndroidTheme;
+
   // Notes & search
   const [notes, setNotes] = useState([]);
   const [allNotesForTags, setAllNotesForTags] = useState([]);
@@ -3892,6 +3895,7 @@ export default function App() {
       dark={dark}
       windowWidth={windowWidth}
       isLandscapeMobile={isLandscapeMobile}
+      isWebView={isWebView}
       edgeToEdgeLandscape={edgeToEdgeLandscape}
       activeId={activeId}
       mType={mType}

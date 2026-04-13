@@ -17,6 +17,7 @@ export default function ModalFooter({
   dark,
   windowWidth,
   isLandscapeMobile,
+  isWebView,
   // tags
   mTagList,
   setMTagList,
@@ -77,7 +78,7 @@ export default function ModalFooter({
   canUndo,
   canRedo,
 }) {
-  const isDesktop = windowWidth >= 768 && !isLandscapeMobile;
+  const isDesktop = windowWidth >= 768 && !isLandscapeMobile && !isWebView;
   const isTrashed = tagFilter === "TRASHED";
 
   const handleDownload = () => {
