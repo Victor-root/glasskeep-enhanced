@@ -297,6 +297,7 @@ export default function NoteModal({
                 images={mImages}
                 onOpenViewer={openImageViewer}
                 onRemoveImage={(id) => setMImages((prev) => prev.filter((x) => x.id !== id))}
+                viewMode={viewMode}
               />
             )}
 
