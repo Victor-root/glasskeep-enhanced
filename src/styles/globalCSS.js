@@ -17,6 +17,10 @@ html.dark {
   --border-light: var(--border-dark);
 }
 button, [role="button"] { cursor: pointer; }
+/* Default cursor everywhere except actual text inputs */
+* { cursor: default; }
+input, textarea, [contenteditable="true"] { cursor: text; }
+a { cursor: pointer; }
 body {
   background-color: #f0e8ff;
   background-image: linear-gradient(135deg, #f0e8ff 0%, #e8f4fd 50%, #fde8f0 100%);
