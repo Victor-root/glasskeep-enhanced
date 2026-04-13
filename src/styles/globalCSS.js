@@ -51,7 +51,7 @@ html.dark body {
   -webkit-user-select: none;
   user-select: none;
 }
-.note-card, .note-card * { cursor: pointer; }
+.note-card, .note-card * { cursor: pointer !important; }
 /* Draw note cards: disable content-visibility which forces paint containment */
 .note-card--draw {
   content-visibility: visible;
