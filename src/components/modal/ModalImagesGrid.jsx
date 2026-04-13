@@ -36,7 +36,7 @@ export default function ModalImagesGrid({
           {!viewMode && (
             <button
               data-tooltip={t("removeImage")}
-              className="absolute top-1.5 right-1.5 w-8 h-8 flex items-center justify-center rounded-full bg-red-600 text-white opacity-0 group-hover:opacity-100 hover:bg-red-700 transition-all shadow-lg cursor-pointer"
+              className="absolute top-1.5 right-1.5 w-8 h-8 flex items-center justify-center rounded-full bg-red-600 text-white sm:opacity-0 sm:group-hover:opacity-100 hover:bg-red-700 transition-all shadow-lg cursor-pointer"
               onClick={() => onRemoveImage(im.id)}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4.5 h-4.5">
