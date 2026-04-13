@@ -232,6 +232,7 @@ function NotesUI({
         windowWidth={windowWidth}
         isLandscapeMobile={isLandscapeMobile}
         sidebarPermanent={sidebarPermanent}
+        multiMode={multiMode}
         mobileSearchOpen={mobileSearchOpen}
         setMobileSearchOpen={setMobileSearchOpen}
         mobileSearchRef={mobileSearchRef}
