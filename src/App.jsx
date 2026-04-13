@@ -2834,8 +2834,9 @@ export default function App() {
       if (modalMenuOpen) { setModalMenuOpen(false); return; }
       if (modalKebabOpen) { setModalKebabOpen(false); return; }
       if (modalTagFocused) { setModalTagFocused(false); return; }
+      if (open) { closeModalRef.current?.(); return; }
       if (syncDropdownOpen) { setSyncDropdownOpen(false); return; }
-      if (mobileSearchOpen) { setMobileSearchOpen(false); return; }
+      if (mobileSearchOpen) { setSearch(""); setMobileSearchOpen(false); return; }
       if (showColorPop) { setShowColorPop(false); return; }
       if (showComposerFmt) { setShowComposerFmt(false); return; }
       if (headerMenuOpen) { setHeaderMenuOpen(false); return; }
@@ -2843,7 +2844,6 @@ export default function App() {
       if (settingsPanelOpen) { setSettingsPanelOpen(false); return; }
       if (adminPanelOpen) { setAdminPanelOpen(false); return; }
       if (sidebarOpen) { setSidebarOpen(false); return; }
-      if (open) { closeModalRef.current?.(); return; }
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
