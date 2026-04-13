@@ -31,8 +31,6 @@ export default function MultiSelectToolbar({
           style={{
             position: "sticky",
             top: "env(safe-area-inset-top)",
-            transform: headerVisible === false ? "translateY(-100%)" : "translateY(0)",
-            transition: "transform 0.3s ease",
           }}
         >
           <div className="flex items-center gap-2 flex-wrap">
