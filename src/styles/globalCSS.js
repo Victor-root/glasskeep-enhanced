@@ -81,6 +81,15 @@ html.dark header.glass-card {
   border-bottom: 1px solid var(--border-light);
   box-shadow: none;
 }
+header.multi-select-bar {
+  border: 1.5px solid rgba(139, 92, 246, 0.22);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.10), 0 0 0 1px rgba(139, 92, 246, 0.05);
+}
+html.dark header.multi-select-bar {
+  border: 1.5px solid rgba(139, 92, 246, 0.25);
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.08);
+}
 .note-content p { margin-bottom: 0.5rem; }
 .note-content h1, .note-content h2, .note-content h3 { margin-bottom: 0.75rem; font-weight: 600; }
 .note-content h1 { font-size: 1.5rem; line-height: 1.3; }
