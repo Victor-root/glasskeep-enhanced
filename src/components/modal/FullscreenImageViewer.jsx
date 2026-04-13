@@ -62,7 +62,7 @@ export default function FullscreenImageViewer({
       {images.length > 1 && (
         <>
           <button
-            className={`absolute top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-opacity duration-300 sm:opacity-100 ${mobileNavVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+            className={`absolute top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-opacity duration-300 sm:opacity-100 sm:pointer-events-auto ${mobileNavVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
             style={{ left: "calc(env(safe-area-inset-left) + 1rem)" }}
             data-tooltip={t("previousArrow")}
             onClick={(e) => {
@@ -74,7 +74,7 @@ export default function FullscreenImageViewer({
             <ArrowLeft />
           </button>
           <button
-            className={`absolute top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-opacity duration-300 sm:opacity-100 ${mobileNavVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+            className={`absolute top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-opacity duration-300 sm:opacity-100 sm:pointer-events-auto ${mobileNavVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
             style={{ right: "calc(env(safe-area-inset-right) + 1rem)" }}
             data-tooltip={t("nextArrow")}
             onClick={(e) => {
