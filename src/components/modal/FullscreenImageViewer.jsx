@@ -97,7 +97,7 @@ export default function FullscreenImageViewer({
         onClick={(e) => { e.stopPropagation(); onResetMobileNav(); }}
       />
       {/* Caption */}
-      <div className="absolute left-0 right-0 z-10 text-xs text-white text-center" style={{ top: "calc(env(safe-area-inset-top) + 1rem)" }}>
+      <div className="absolute left-0 right-0 z-10 text-xs text-white text-center pointer-events-none" style={{ top: "calc(env(safe-area-inset-top) + 1rem)" }}>
         <span className="hidden sm:inline">{images[currentIndex].name || `image-${currentIndex + 1}`} </span>
         {images.length > 1 && (
           <span>{currentIndex + 1}/{images.length}</span>
