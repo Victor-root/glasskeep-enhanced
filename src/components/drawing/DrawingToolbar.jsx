@@ -203,16 +203,15 @@ export default function DrawingToolbar({
   showPageLines = true,
   onTogglePageLines,
 }) {
-  // Mobile detection — popovers only on small screens (or WebView/APK on tablets)
-  const isWebView = !!window.AndroidTheme;
-  const [isMobile, setIsMobile] = useState(() => isWebView || (typeof window !== 'undefined' && window.innerWidth < 768));
+  // Mobile detection — popovers only on small screens
+  // Note: WebView tablets keep desktop toolbar since they have enough space
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   useEffect(() => {
-    if (isWebView) return; // always mobile in WebView
     const mq = window.matchMedia('(max-width: 767px)');
     const handler = (e) => setIsMobile(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
-  }, [isWebView]);
+  }, []);
 
   const [showCustomColor, setShowCustomColor] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
