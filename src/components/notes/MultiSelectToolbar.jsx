@@ -27,7 +27,7 @@ export default function MultiSelectToolbar({
 
   return (
         <header
-          className="p-3 sm:p-4 flex items-center justify-between sticky top-0 z-[25] glass-card multi-select-bar mx-4 sm:mx-6 md:mx-8 lg:mx-12 mb-4"
+          className="p-3 sm:p-4 flex items-center justify-between sticky top-0 z-[25] glass-card multi-select-bar mb-2"
           style={{
             position: "sticky",
             top: "env(safe-area-inset-top)",

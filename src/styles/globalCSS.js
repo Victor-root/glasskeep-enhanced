@@ -83,7 +83,6 @@ html.dark header.glass-card {
 }
 header.multi-select-bar {
   border: 1.5px solid rgba(139, 92, 246, 0.22);
-  border-radius: 0.75rem;
   box-shadow: 0 4px 20px rgba(139, 92, 246, 0.10), 0 0 0 1px rgba(139, 92, 246, 0.05);
 }
 html.dark header.multi-select-bar {
