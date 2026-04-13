@@ -82,12 +82,12 @@ html.dark header.glass-card {
   box-shadow: none;
 }
 header.multi-select-bar {
-  border: 1.5px solid rgba(139, 92, 246, 0.22);
-  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.10), 0 0 0 1px rgba(139, 92, 246, 0.05);
+  border: 2px solid rgba(139, 92, 246, 0.45);
+  box-shadow: 0 4px 24px rgba(139, 92, 246, 0.18), inset 0 0 0 1px rgba(139, 92, 246, 0.08);
 }
 html.dark header.multi-select-bar {
-  border: 1.5px solid rgba(139, 92, 246, 0.25);
-  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.08);
+  border: 2px solid rgba(139, 92, 246, 0.5);
+  box-shadow: 0 4px 24px rgba(139, 92, 246, 0.22), inset 0 0 0 1px rgba(139, 92, 246, 0.1);
 }
 .note-content p { margin-bottom: 0.5rem; }
 .note-content h1, .note-content h2, .note-content h3 { margin-bottom: 0.75rem; font-weight: 600; }
