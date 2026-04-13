@@ -150,6 +150,7 @@ html.dark header.multi-select-bar {
 .note-content a {
   color: #2563eb;
   text-decoration: underline;
+  cursor: pointer;
 }
 html.dark .note-content a {
   color: #93c5fd;
