@@ -207,7 +207,7 @@ export default function NotesSections({
 
         {notesLoading && pinned.length + others.length === 0 && (
           <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
-            Loading Notes…
+            {t("loadingNotes")}
           </p>
         )}
         {!notesLoading && filteredEmptyWithSearch && (
