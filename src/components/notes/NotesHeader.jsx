@@ -172,10 +172,10 @@ export default function NotesHeader({
           )}
         </div>
         {/* Mobile expanded search overlay - covers the header content */}
-        {mobileSearchOpen && createPortal(
+        {mobileSearchOpen && !search && createPortal(
           <div
             className={`${mobileOnly} fixed inset-0 z-[999]`}
-            onClick={() => { if (!search) setMobileSearchOpen(false); }}
+            onClick={() => setMobileSearchOpen(false)}
           />,
           document.body
         )}
