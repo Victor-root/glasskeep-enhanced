@@ -1,7 +1,7 @@
 import React, { useMemo, useRef } from "react";
 import { t } from "../../i18n";
 import { bgFor, solid } from "../../utils/colors.js";
-import { renderSafeMarkdown, linkifyPhoneNumbers } from "../../utils/markdown.jsx";
+import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { PinOutline, PinFilled, ImageIcon } from "../../icons/index.jsx";
 import ChecklistRow from "../common/ChecklistRow.jsx";
 import DrawingPreview from "../common/DrawingPreview.jsx";

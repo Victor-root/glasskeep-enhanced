@@ -10,7 +10,7 @@ import CollaborationModal from "./CollaborationModal.jsx";
 import FullscreenImageViewer from "./FullscreenImageViewer.jsx";
 import useChecklistDrag from "../../hooks/useChecklistDrag.js";
 import useModalHistory from "../../hooks/useModalHistory.js";
-import { renderSafeMarkdown } from "../../utils/markdown.jsx";
+import { renderSafeMarkdown, linkifyContactsHTML } from "../../utils/markdown.jsx";
 import { handleSmartEnter } from "../common/FormatToolbar.jsx";
 import { uid } from "../../utils/helpers.js";
 import { modalBgFor, scrollColorsFor, solid, bgFor, toHex } from "../../utils/colors.js";
@@ -314,7 +314,7 @@ export default function NoteModal({
                     ref={noteViewRef}
                     className="note-content note-content--dense whitespace-pre-wrap"
                     dangerouslySetInnerHTML={{
-                      __html: renderSafeMarkdown(mBody),
+                      __html: linkifyContactsHTML(renderSafeMarkdown(mBody)),
                     }}
                   />
                 ) : (
@@ -562,7 +562,7 @@ export default function NoteModal({
                     <div
                       className="note-content note-content--dense whitespace-pre-wrap"
                       dangerouslySetInnerHTML={{
-                        __html: renderSafeMarkdown(mBody),
+                        __html: linkifyContactsHTML(renderSafeMarkdown(mBody)),
                       }}
                     />
                   )}

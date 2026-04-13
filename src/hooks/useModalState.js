@@ -182,12 +182,18 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
 
   // ─── Modal link handler ───
   const onModalBodyClick = (e) => {
-    if (!(viewMode && mType === "text")) return;
+    if (!viewMode) return;
 
     const a = e.target.closest("a");
     if (a) {
       const href = a.getAttribute("href") || "";
-      if (/^(https?:|mailto:|tel:)/i.test(href)) {
+      if (/^(mailto:|tel:)/i.test(href)) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.location.href = href;
+        return;
+      }
+      if (/^https?:/i.test(href)) {
         e.preventDefault();
         e.stopPropagation();
         window.open(href, "_blank", "noopener,noreferrer");

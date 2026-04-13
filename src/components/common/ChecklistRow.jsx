@@ -1,6 +1,6 @@
 import React from "react";
 import { t } from "../../i18n";
-import { linkifyPhoneNumbers } from "../../utils/markdown.jsx";
+import { linkifyContacts } from "../../utils/markdown.jsx";
 
 export default function ChecklistRow({
   item,
@@ -14,7 +14,6 @@ export default function ChecklistRow({
   preview = false,
   initialEditing = false,
 }) {
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 700;
   const [editing, setEditing] = React.useState(initialEditing);
   const clickOffsetRef = React.useRef(null);
   const textareaRef = React.useRef(null);
@@ -74,7 +73,7 @@ export default function ChecklistRow({
             setEditing(true);
           } : undefined}
         >
-          {isMobile && !preview ? linkifyPhoneNumbers(item.text) : item.text}
+          {!preview ? linkifyContacts(item.text) : item.text}
         </span>
       ) : (
         <textarea
