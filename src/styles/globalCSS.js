@@ -17,10 +17,9 @@ html.dark {
   --border-light: var(--border-dark);
 }
 button, [role="button"] { cursor: pointer; }
-/* Prevent text cursor and selection caret on non-editable elements */
-* { cursor: default; -webkit-user-select: none; user-select: none; }
-input, textarea, [contenteditable="true"] { cursor: text; -webkit-user-select: text; user-select: text; }
-a { cursor: pointer; }
+/* Prevent blinking caret on non-editable elements */
+body { -webkit-user-select: none; user-select: none; }
+input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
 body {
   background-color: #f0e8ff;
   background-image: linear-gradient(135deg, #f0e8ff 0%, #e8f4fd 50%, #fde8f0 100%);
@@ -51,7 +50,7 @@ html.dark body {
   -webkit-user-select: none;
   user-select: none;
 }
-.note-card, .note-card * { cursor: pointer !important; }
+.note-card { cursor: pointer; }
 /* Draw note cards: disable content-visibility which forces paint containment */
 .note-card--draw {
   content-visibility: visible;
@@ -94,7 +93,7 @@ html.dark header.multi-select-bar {
   border: 2px solid rgba(139, 92, 246, 0.5);
   box-shadow: 0 4px 24px rgba(139, 92, 246, 0.22), inset 0 0 0 1px rgba(139, 92, 246, 0.1);
 }
-.note-content, .note-content * { -webkit-user-select: text; user-select: text; cursor: text; }
+.note-content { -webkit-user-select: text; user-select: text; }
 .note-content p { margin-bottom: 0.5rem; }
 .note-content h1, .note-content h2, .note-content h3 { margin-bottom: 0.75rem; font-weight: 600; }
 .note-content h1 { font-size: 1.5rem; line-height: 1.3; }
@@ -150,7 +149,6 @@ html.dark header.multi-select-bar {
 .note-content a {
   color: #2563eb;
   text-decoration: underline;
-  cursor: pointer;
 }
 html.dark .note-content a {
   color: #93c5fd;
