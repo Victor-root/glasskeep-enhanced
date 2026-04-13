@@ -209,23 +209,6 @@ function NotesUI({
       className="min-h-screen overflow-x-clip"
       style={{ marginLeft: sidebarPermanent ? `${sidebarWidth}px` : "0px", position:"relative", zIndex:2 }}
     >
-      <MultiSelectToolbar
-        multiMode={multiMode}
-        dark={dark}
-        activeTagFilter={activeTagFilter}
-        selectedIds={selectedIds}
-        filteredNotes={[...pinned, ...others]}
-        onBulkDownloadZip={onBulkDownloadZip}
-        onBulkRestore={onBulkRestore}
-        onBulkDelete={onBulkDelete}
-        onBulkColor={onBulkColor}
-        onBulkPin={onBulkPin}
-        onBulkArchive={onBulkArchive}
-        onSelectAll={onSelectAll}
-        onExitMulti={onExitMulti}
-        headerVisible={headerVisible}
-      />
-
       <NotesHeader
         dark={dark}
         headerVisible={headerVisible}
@@ -267,6 +250,23 @@ function NotesUI({
         SectionIcon={SectionIcon}
         openSidebar={openSidebar}
         activeTagFilter={activeTagFilter}
+      />
+
+      <MultiSelectToolbar
+        multiMode={multiMode}
+        dark={dark}
+        activeTagFilter={activeTagFilter}
+        selectedIds={selectedIds}
+        filteredNotes={[...pinned, ...others]}
+        onBulkDownloadZip={onBulkDownloadZip}
+        onBulkRestore={onBulkRestore}
+        onBulkDelete={onBulkDelete}
+        onBulkColor={onBulkColor}
+        onBulkPin={onBulkPin}
+        onBulkArchive={onBulkArchive}
+        onSelectAll={onSelectAll}
+        onExitMulti={onExitMulti}
+        headerVisible={headerVisible}
       />
 
       <NotesComposer
