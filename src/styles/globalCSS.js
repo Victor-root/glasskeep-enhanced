@@ -50,8 +50,8 @@ html.dark body {
   animation: noteAppear 0.15s ease-out;
   -webkit-user-select: none;
   user-select: none;
-  cursor: pointer;
 }
+.note-card, .note-card * { cursor: pointer; }
 /* Draw note cards: disable content-visibility which forces paint containment */
 .note-card--draw {
   content-visibility: visible;
