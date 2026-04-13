@@ -26,7 +26,7 @@ export default function MultiSelectToolbar({
   if (!multiMode) return null;
 
   return (
-        <div
+        <header
           className="p-3 sm:p-4 flex items-center justify-between sticky top-0 z-[25] glass-card mb-2"
           style={{
             position: "sticky",
@@ -109,6 +109,6 @@ export default function MultiSelectToolbar({
           >
             <CloseIcon />
           </button>
-        </div>
+        </header>
   );
 }
