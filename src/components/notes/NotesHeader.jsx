@@ -175,7 +175,7 @@ export default function NotesHeader({
         {mobileSearchOpen && createPortal(
           <div
             className={`${mobileOnly} fixed inset-0 z-[999]`}
-            onClick={() => { setSearch(""); setMobileSearchOpen(false); }}
+            onClick={() => { if (!search) setMobileSearchOpen(false); }}
           />,
           document.body
         )}
@@ -191,8 +191,11 @@ export default function NotesHeader({
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
-                    setSearch("");
-                    setMobileSearchOpen(false);
+                    if (search) {
+                      setSearch("");
+                    } else {
+                      setMobileSearchOpen(false);
+                    }
                   }
                   if (
                     e.key === "Enter" &&
