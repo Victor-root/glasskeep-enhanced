@@ -436,6 +436,11 @@ export default function App() {
     const ids = notes.filter((n) => !n.pinned).map((n) => String(n.id));
     setSelectedIds((prev) => Array.from(new Set([...prev, ...ids])));
   };
+  const onSelectAll = (filteredNotes) => {
+    const filteredIds = filteredNotes.map((n) => String(n.id));
+    const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.includes(id));
+    setSelectedIds(allSelected ? [] : filteredIds);
+  };
 
   // -------- View mode: Grid vs List --------
   const [listView, setListView] = useState(() => {
@@ -640,6 +645,29 @@ export default function App() {
         },
       });
     }
+  };
+
+  const onEmptyTrash = () => {
+    if (notes.length === 0) return;
+    showGenericConfirm({
+      title: t("emptyTrash"),
+      message: t("emptyTrashConfirm"),
+      confirmText: t("emptyTrash"),
+      danger: true,
+      onConfirm: async () => {
+        const count = notes.length;
+        for (const n of notes) {
+          const nid = String(n.id);
+          addDeleteTombstone(nid);
+          const leaseId = acquireLocalLease(nid);
+          try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
+          await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
+        }
+        invalidateTrashedNotesCache();
+        setNotes([]);
+        showToast(t("bulkDeletedSuccess").replace("{count}", String(count)), "success");
+      },
+    });
   };
 
   const onBulkPin = async (pinnedVal) => {
@@ -4261,6 +4289,8 @@ export default function App() {
         onBulkRestore={onBulkRestore}
         onBulkColor={onBulkColor}
         onBulkDownloadZip={onBulkDownloadZip}
+        onSelectAll={onSelectAll}
+        onEmptyTrash={onEmptyTrash}
         // view mode
         listView={listView}
         onToggleViewMode={onToggleViewMode}

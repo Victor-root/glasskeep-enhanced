@@ -27,10 +27,21 @@ export default function NotesSections({
   allEmpty,
   syncStatus,
   windowWidth,
+  onEmptyTrash,
 }) {
   const maxPreviewItems = windowWidth < 640 ? 4 : 8;
   return (
       <main className="px-4 sm:px-6 md:px-8 lg:px-12 pb-12">
+        {activeTagFilter === "TRASHED" && (pinned.length > 0 || others.length > 0) && !multiMode && (
+          <div className="flex justify-end mb-4">
+            <button
+              className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm font-medium"
+              onClick={onEmptyTrash}
+            >
+              {t("emptyTrash")}
+            </button>
+          </div>
+        )}
         {pinned.length > 0 && (
           <section className="mb-10">
             {listView ? (

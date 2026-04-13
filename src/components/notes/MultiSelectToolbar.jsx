@@ -9,12 +9,14 @@ export default function MultiSelectToolbar({
   dark,
   activeTagFilter,
   selectedIds,
+  filteredNotes,
   onBulkDownloadZip,
   onBulkRestore,
   onBulkDelete,
   onBulkColor,
   onBulkPin,
   onBulkArchive,
+  onSelectAll,
   onExitMulti,
   headerVisible,
 }) {
@@ -86,6 +88,16 @@ export default function MultiSelectToolbar({
                   {activeTagFilter === "ARCHIVED" ? t("unarchive") : t("archive")}
                 </button>
               </>
+            )}
+            {filteredNotes?.length > 0 && (
+              <button
+                className="px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10 text-sm"
+                onClick={() => onSelectAll?.(filteredNotes)}
+              >
+                {filteredNotes.length > 0 && filteredNotes.every((n) => selectedIds.includes(String(n.id)))
+                  ? t("deselectAll")
+                  : t("selectAll")}
+              </button>
             )}
             <span className="text-xs opacity-70 ml-2">{t("selectedPrefix")} {selectedIds.length}
             </span>

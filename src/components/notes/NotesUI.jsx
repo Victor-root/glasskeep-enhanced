@@ -106,6 +106,8 @@ function NotesUI({
   onBulkRestore,
   onBulkColor,
   onBulkDownloadZip,
+  onSelectAll,
+  onEmptyTrash,
   // view mode
   listView,
   onToggleViewMode,
@@ -212,12 +214,14 @@ function NotesUI({
         dark={dark}
         activeTagFilter={activeTagFilter}
         selectedIds={selectedIds}
+        filteredNotes={[...pinned, ...others]}
         onBulkDownloadZip={onBulkDownloadZip}
         onBulkRestore={onBulkRestore}
         onBulkDelete={onBulkDelete}
         onBulkColor={onBulkColor}
         onBulkPin={onBulkPin}
         onBulkArchive={onBulkArchive}
+        onSelectAll={onSelectAll}
         onExitMulti={onExitMulti}
         headerVisible={headerVisible}
       />
@@ -342,6 +346,7 @@ function NotesUI({
         allEmpty={allEmpty}
         syncStatus={syncStatus}
         windowWidth={windowWidth}
+        onEmptyTrash={onEmptyTrash}
       />
     </div>
   );
