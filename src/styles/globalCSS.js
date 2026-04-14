@@ -94,8 +94,8 @@ html.dark header.multi-select-bar {
   box-shadow: 0 4px 24px rgba(139, 92, 246, 0.22), inset 0 0 0 1px rgba(139, 92, 246, 0.1);
 }
 .note-content { -webkit-user-select: text; user-select: text; }
-.note-content p { margin-bottom: 0.5rem; }
-.note-content h1, .note-content h2, .note-content h3 { margin-bottom: 0; font-weight: 600; }
+.note-content p { margin: 0 0 0.5rem 0; }
+.note-content h1, .note-content h2, .note-content h3 { margin: 0; font-weight: 600; }
 .note-content h1 { font-size: 1.5rem; line-height: 1.3; }
 .note-content h2 { font-size: 1.25rem; line-height: 1.35; }
 .note-content h3 { font-size: 1.125rem; line-height: 1.4; }
