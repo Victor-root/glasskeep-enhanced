@@ -116,6 +116,8 @@ function DrawingCanvas({
   const isDrawingRef = useRef(false);
   const pendingTouchRef = useRef(null);
   const scrollStateRef = useRef({ lastY: 0, velocity: 0, momentumId: null });
+  const pathsRef = useRef([]);
+  const currentPathRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState('pen');
   const [color, setColor] = useState(darkMode ? '#FFFFFF' : '#000000');
@@ -373,31 +375,30 @@ function DrawingCanvas({
     const point = getCanvasCoordinates(e);
     if (tool === 'eraser') {
       // Stroke-based eraser: save initial state for undo
-      eraserStartPaths.current = paths;
-      eraserResultPaths.current = paths;
+      const currentPaths = pathsRef.current;
+      eraserStartPaths.current = currentPaths;
+      eraserResultPaths.current = currentPaths;
       eraserDidErase.current = false;
       const eraserRadius = Math.max(size, 8);
-      const hitIdx = paths.findIndex(p => p.tool !== 'eraser' && isPointNearPath(point.x, point.y, p, eraserRadius));
+      const hitIdx = currentPaths.findIndex(p => p.tool !== 'eraser' && isPointNearPath(point.x, point.y, p, eraserRadius));
       if (hitIdx !== -1) {
-        const filtered = paths.filter((_, i) => i !== hitIdx);
+        const filtered = currentPaths.filter((_, i) => i !== hitIdx);
         setPaths(filtered);
         eraserResultPaths.current = filtered;
         eraserDidErase.current = true;
       }
     } else {
-      setCurrentPath({
-        tool,
-        color,
-        size,
-        points: [point],
-      });
+      const newPath = { tool, color, size, points: [point] };
+      setCurrentPath(newPath);
+      currentPathRef.current = newPath;
     }
     setIsDrawing(true);
-  }, [readOnly, mode, tool, color, size, getCanvasCoordinates, paths, setPaths]);
+    isDrawingRef.current = true;
+  }, [readOnly, mode, tool, color, size, getCanvasCoordinates, setPaths]);
 
   const lastDrawTime = useRef(0);
   const draw = useCallback((e) => {
-    if (!isDrawing || readOnly || mode !== 'draw') return;
+    if (!isDrawingRef.current || readOnly || mode !== 'draw') return;
     const now = Date.now();
     if (now - lastDrawTime.current < 16) return;
     lastDrawTime.current = now;
@@ -413,15 +414,16 @@ function DrawingCanvas({
         eraserDidErase.current = true;
       }
     } else {
-      setCurrentPath(prev => ({
-        ...prev,
-        points: [...prev.points, point],
-      }));
+      setCurrentPath(prev => {
+        const updated = { ...prev, points: [...prev.points, point] };
+        currentPathRef.current = updated;
+        return updated;
+      });
     }
-  }, [isDrawing, readOnly, mode, tool, size, getCanvasCoordinates, setPaths]);
+  }, [readOnly, mode, tool, size, getCanvasCoordinates, setPaths]);
 
   const stopDrawing = useCallback(() => {
-    if (!isDrawing || readOnly || mode !== 'draw') return;
+    if (!isDrawingRef.current || readOnly || mode !== 'draw') return;
     if (tool === 'eraser') {
       if (eraserDidErase.current && eraserStartPaths.current) {
         const result = eraserResultPaths.current;
@@ -435,18 +437,23 @@ function DrawingCanvas({
       eraserResultPaths.current = null;
       eraserDidErase.current = false;
     } else {
-      if (currentPath && currentPath.points.length > 0) {
-        const newPaths = [...paths, currentPath];
+      const cp = currentPathRef.current;
+      if (cp && cp.points.length > 0) {
+        const newPaths = [...pathsRef.current, cp];
         pushPaths(newPaths);
         notifyChange(newPaths);
       }
       setCurrentPath(null);
+      currentPathRef.current = null;
     }
     setIsDrawing(false);
-  }, [isDrawing, readOnly, mode, tool, currentPath, paths, pushPaths, notifyChange, setPaths]);
+    isDrawingRef.current = false;
+  }, [readOnly, mode, tool, pushPaths, notifyChange, setPaths]);
 
-  // Keep isDrawingRef in sync for touch handlers (avoids re-registering listeners)
+  // Keep refs in sync for touch handlers (avoids re-registering listeners on every frame)
   useEffect(() => { isDrawingRef.current = isDrawing; }, [isDrawing]);
+  useEffect(() => { pathsRef.current = paths; }, [paths]);
+  useEffect(() => { currentPathRef.current = currentPath; }, [currentPath]);
 
   // Cancel in-progress stroke without saving (used when switching to scroll mode)
   const cancelCurrentStroke = useCallback(() => {
@@ -457,8 +464,10 @@ function DrawingCanvas({
       eraserDidErase.current = false;
     } else {
       setCurrentPath(null);
+      currentPathRef.current = null;
     }
     setIsDrawing(false);
+    isDrawingRef.current = false;
   }, [tool, setPaths]);
 
   // ─── Clear ───
