@@ -187,21 +187,30 @@ function DrawingCanvas({
       setCanvasHeight(height);
     }
 
-    const converted = convertThemeStrokes(pathsData, darkMode);
+    // Skip paths update for our own onChange echo — pushPaths already set the correct
+    // state, and calling setPaths here creates a race condition on mobile where the
+    // stale echo overwrites a newer stroke drawn between paint and effect execution.
+    if (isInternalChange.current) return;
 
-    if (isInternalChange.current) {
-      // Data came back from our own onChange (or autosave echo) — don't touch history
-      setPaths(converted);
-    } else {
-      // External data change (opened different drawing, remote sync, etc.) — full reset
-      resetHistory(converted);
-    }
+    // External data change (opened different drawing, remote sync, etc.) — full reset
+    const converted = convertThemeStrokes(pathsData, darkMode);
+    resetHistory(converted);
+    pathsRef.current = converted;
   }, [data, darkMode]);
 
-  // Default color on theme change
+  // Default color + stroke conversion on theme change
+  const prevDarkRef = useRef(darkMode);
   useEffect(() => {
     setColor(darkMode ? '#FFFFFF' : '#000000');
-  }, [darkMode]);
+    if (prevDarkRef.current !== darkMode) {
+      prevDarkRef.current = darkMode;
+      setPaths(prev => {
+        const converted = convertThemeStrokes(prev, darkMode);
+        pathsRef.current = converted;
+        return converted;
+      });
+    }
+  }, [darkMode, setPaths]);
 
   // ─── Notify parent (marks as internal so data-loading effect won't reset) ───
   const notifyChange = useCallback((newPaths) => {
@@ -230,13 +239,19 @@ function DrawingCanvas({
   const handleUndo = useCallback(() => {
     if (readOnly || mode !== 'draw') return;
     const result = historyUndo();
-    if (result !== null) notifyChange(result);
+    if (result !== null) {
+      pathsRef.current = result;
+      notifyChange(result);
+    }
   }, [readOnly, mode, historyUndo, notifyChange]);
 
   const handleRedo = useCallback(() => {
     if (readOnly || mode !== 'draw') return;
     const result = historyRedo();
-    if (result !== null) notifyChange(result);
+    if (result !== null) {
+      pathsRef.current = result;
+      notifyChange(result);
+    }
   }, [readOnly, mode, historyRedo, notifyChange]);
 
   // ─── Keyboard shortcuts ───
@@ -250,11 +265,11 @@ function DrawingCanvas({
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
         const result = historyRedo();
-        if (result !== null) notifyChange(result);
+        if (result !== null) { pathsRef.current = result; notifyChange(result); }
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
         const result = historyUndo();
-        if (result !== null) notifyChange(result);
+        if (result !== null) { pathsRef.current = result; notifyChange(result); }
       }
     };
 
@@ -431,6 +446,7 @@ function DrawingCanvas({
         setPaths(eraserStartPaths.current);
         // Now push the erased result (records before in undo, sets to result)
         pushPaths(result);
+        pathsRef.current = result; // Sync ref immediately
         notifyChange(result);
       }
       eraserStartPaths.current = null;
@@ -441,6 +457,7 @@ function DrawingCanvas({
       if (cp && cp.points.length > 0) {
         const newPaths = [...pathsRef.current, cp];
         pushPaths(newPaths);
+        pathsRef.current = newPaths; // Sync ref immediately — useEffect runs after paint
         notifyChange(newPaths);
       }
       setCurrentPath(null);
@@ -458,7 +475,10 @@ function DrawingCanvas({
   // Cancel in-progress stroke without saving (used when switching to scroll mode)
   const cancelCurrentStroke = useCallback(() => {
     if (tool === 'eraser') {
-      if (eraserStartPaths.current) setPaths(eraserStartPaths.current);
+      if (eraserStartPaths.current) {
+        setPaths(eraserStartPaths.current);
+        pathsRef.current = eraserStartPaths.current;
+      }
       eraserStartPaths.current = null;
       eraserResultPaths.current = null;
       eraserDidErase.current = false;
@@ -474,6 +494,7 @@ function DrawingCanvas({
   const clearCanvas = useCallback(() => {
     if (readOnly || mode !== 'draw') return;
     pushPaths([]);
+    pathsRef.current = [];
     notifyChange([]);
   }, [readOnly, mode, pushPaths, notifyChange]);
 
