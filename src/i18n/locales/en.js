@@ -438,4 +438,5 @@ loginFailed: "Login failed",
   failedApproveUser: "Failed to approve user",
   failedRejectUser: "Failed to reject user",
   pendingUserToast: "New registration awaiting approval: {name}",
+  alreadyHaveAccount: "Already have an account?",
 };

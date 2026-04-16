@@ -101,7 +101,7 @@ export default function RegisterView({ dark, onToggleDark, onRegister, goLogin, 
         >{t("createAccount")}</button>
       </form>
       <div className="mt-4 text-sm text-center">
-        Already have an account?{" "}
+        {t("alreadyHaveAccount")}{" "}
         <button className="text-indigo-600 hover:underline" onClick={goLogin}>{t("signInLower")}</button>
       </div>
     </AuthShell>

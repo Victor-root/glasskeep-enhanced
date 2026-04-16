@@ -438,4 +438,5 @@ loginFailed: "Échec de la connexion",
   failedApproveUser: "Échec de l'approbation de l'utilisateur",
   failedRejectUser: "Échec du refus de l'utilisateur",
   pendingUserToast: "Nouvelle inscription en attente : {name}",
+  alreadyHaveAccount: "Vous avez déjà un compte ?",
 };
