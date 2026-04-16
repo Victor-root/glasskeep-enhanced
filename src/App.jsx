@@ -337,7 +337,7 @@ export default function App() {
   const [showColorPop, setShowColorPop] = useState(false);
 
   // Loading state for notes
-  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesLoading, setNotesLoading] = useState(!!token);
   const notesAreRegular = useRef(true); // tracks whether notes[] holds regular (non-archive/trash) notes
 
   // ─── Per-noteId lease-based protection against SSE overwrite ───
@@ -1709,9 +1709,6 @@ export default function App() {
   // This will be added after signOut is defined below
 
   useEffect(() => {
-    if (token) {
-      loadNotes().catch(() => {});
-    }
     if (!token) return;
 
     let es;
