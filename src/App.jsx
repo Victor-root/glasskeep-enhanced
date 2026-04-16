@@ -38,6 +38,7 @@ import AuthShell from "./components/auth/AuthShell.jsx";
 import LoginView from "./components/auth/LoginView.jsx";
 import RegisterView from "./components/auth/RegisterView.jsx";
 import SecretLoginView from "./components/auth/SecretLoginView.jsx";
+import ChangePasswordModal from "./components/auth/ChangePasswordModal.jsx";
 import TagSidebar from "./components/panels/TagSidebar.jsx";
 import SettingsPanel from "./components/panels/SettingsPanel.jsx";
 import AdminPanel from "./components/panels/AdminPanel.jsx";
@@ -63,6 +64,10 @@ export default function App() {
   const token = session?.token;
   const currentUser = session?.user || null;
   const sessionId = session?.sessionId || null;
+
+  // Password change state
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   // Theme
   const [dark, setDark] = useState(false);
@@ -2495,35 +2500,33 @@ export default function App() {
   const signOut = () => {
     cleanupClientSession(true); // explicit sign-out → purge queue
   };
+  const completeLogin = (res) => {
+    const sessionWithId = { ...res, sessionId: crypto.randomUUID() };
+    setSession(sessionWithId);
+    setAuth(sessionWithId);
+    if (res.must_change_password) {
+      setMustChangePassword(true);
+    }
+    navigate("#/notes");
+    return { ok: true };
+  };
   const signIn = async (email, password) => {
     const res = await api("/login", {
       method: "POST",
       body: { email, password },
     });
-    const sessionWithId = { ...res, sessionId: crypto.randomUUID() };
-    setSession(sessionWithId);
-    setAuth(sessionWithId);
-    navigate("#/notes");
-    return { ok: true };
+    return completeLogin(res);
   };
   const signInById = async (userId, password) => {
     const res = await api("/login", {
       method: "POST",
       body: { user_id: userId, password },
     });
-    const sessionWithId = { ...res, sessionId: crypto.randomUUID() };
-    setSession(sessionWithId);
-    setAuth(sessionWithId);
-    navigate("#/notes");
-    return { ok: true };
+    return completeLogin(res);
   };
   const signInWithSecret = async (key) => {
     const res = await api("/login/secret", { method: "POST", body: { key } });
-    const sessionWithId = { ...res, sessionId: crypto.randomUUID() };
-    setSession(sessionWithId);
-    setAuth(sessionWithId);
-    navigate("#/notes");
-    return { ok: true };
+    return completeLogin(res);
   };
   const register = async (name, email, password) => {
     const res = await api("/register", {
@@ -4162,6 +4165,7 @@ export default function App() {
           setSession((prev) => prev ? { ...prev, user: { ...prev.user, ...updates } } : prev);
           setAuth({ ...getAuth(), user: { ...getAuth()?.user, ...updates } });
         }}
+        onChangePassword={() => setChangePasswordOpen(true)}
       />
 
       {/* Admin Panel */}
@@ -4333,6 +4337,40 @@ export default function App() {
       />
 
       <ToastContainer toasts={toasts} />
+
+      {/* Forced password change (first login with temp password) */}
+      {mustChangePassword && (
+        <ChangePasswordModal
+          forced
+          token={token}
+          dark={dark}
+          onSuccess={(res) => {
+            setMustChangePassword(false);
+            if (res.token && res.user) {
+              setSession((prev) => ({ ...prev, token: res.token, user: res.user }));
+              setAuth({ ...getAuth(), token: res.token, user: res.user });
+            }
+            showToast(t("passwordChangedSuccess"), "success");
+          }}
+        />
+      )}
+
+      {/* Voluntary password change (from Settings) */}
+      {changePasswordOpen && !mustChangePassword && (
+        <ChangePasswordModal
+          token={token}
+          dark={dark}
+          onClose={() => setChangePasswordOpen(false)}
+          onSuccess={(res) => {
+            setChangePasswordOpen(false);
+            if (res.token && res.user) {
+              setSession((prev) => ({ ...prev, token: res.token, user: res.user }));
+              setAuth({ ...getAuth(), token: res.token, user: res.user });
+            }
+            showToast(t("passwordChangedSuccess"), "success");
+          }}
+        />
+      )}
     </>
   );
 }

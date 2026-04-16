@@ -190,6 +190,9 @@ CREATE TABLE IF NOT EXISTS user_reorder_state (
       if (!names.has("show_on_login")) {
         db.exec(`ALTER TABLE users ADD COLUMN show_on_login INTEGER NOT NULL DEFAULT 0`);
       }
+      if (!names.has("must_change_password")) {
+        db.exec(`ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0`);
+      }
     });
     tx();
   } catch {
@@ -667,10 +670,12 @@ app.post("/api/login", (req, res) => {
     return res.status(401).json({ error: "Incorrect password." });
   }
   const token = signToken(user);
-  res.json({
+  const response = {
     token,
     user: { id: user.id, name: user.name, email: user.email, is_admin: !!user.is_admin, avatar_url: user.avatar_url || null },
-  });
+  };
+  if (user.must_change_password) response.must_change_password = true;
+  res.json(response);
 });
 
 // ---------- Secret Key (Recovery) ----------
@@ -709,10 +714,12 @@ app.post("/api/login/secret", (req, res) => {
     if (u.secret_key_hash && bcrypt.compareSync(key, u.secret_key_hash)) {
       const fullUser = getUserById.get(u.id);
       const token = signToken(u);
-      return res.json({
+      const response = {
         token,
         user: { id: u.id, name: u.name, email: u.email, is_admin: !!u.is_admin, avatar_url: fullUser?.avatar_url || null },
-      });
+      };
+      if (fullUser?.must_change_password) response.must_change_password = true;
+      return res.json(response);
     }
   }
   return res.status(401).json({ error: "Secret key not recognized." });
@@ -778,6 +785,36 @@ app.patch("/api/user/profile", auth, (req, res) => {
   }
   db.prepare("UPDATE users SET show_on_login = ? WHERE id = ?").run(show_on_login ? 1 : 0, req.user.id);
   res.json({ ok: true, show_on_login });
+});
+
+// ---------- Change Password (authenticated, any user) ----------
+app.post("/api/user/change-password", auth, (req, res) => {
+  const { current_password, new_password } = req.body || {};
+  if (!new_password || new_password.length < 6) {
+    return res.status(400).json({ error: "New password must be at least 6 characters." });
+  }
+
+  const user = getUserById.get(req.user.id);
+  if (!user) return res.status(404).json({ error: "User not found." });
+
+  // If user must change password (first login with temp password), skip current password check
+  if (!user.must_change_password) {
+    if (!current_password || !bcrypt.compareSync(current_password, user.password_hash)) {
+      return res.status(401).json({ error: "Current password is incorrect." });
+    }
+  }
+
+  const hash = bcrypt.hashSync(new_password, 10);
+  db.prepare("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?").run(hash, user.id);
+
+  // Return a fresh token so the session stays valid
+  const updatedUser = getUserById.get(user.id);
+  const token = signToken(updatedUser);
+  res.json({
+    ok: true,
+    token,
+    user: { id: updatedUser.id, name: updatedUser.name, email: updatedUser.email, is_admin: !!updatedUser.is_admin, avatar_url: updatedUser.avatar_url || null },
+  });
 });
 
 // ---------- Notes ----------
@@ -1611,11 +1648,10 @@ app.post("/api/admin/users", auth, adminOnly, (req, res) => {
   const hash = bcrypt.hashSync(password, 10);
   const info = insertUser.run(name.trim(), email.trim(), hash, nowISO());
 
-  // Set admin status if specified
-  if (is_admin) {
-    const mkAdmin = db.prepare("UPDATE users SET is_admin=1 WHERE id=?");
-    mkAdmin.run(info.lastInsertRowid);
-  }
+  // Set admin status if specified + always mark password as temporary
+  const updateParts = ["must_change_password = 1"];
+  if (is_admin) updateParts.push("is_admin = 1");
+  db.prepare(`UPDATE users SET ${updateParts.join(", ")} WHERE id = ?`).run(info.lastInsertRowid);
 
   const user = getUserById.get(info.lastInsertRowid);
   res.status(201).json({
@@ -1671,6 +1707,9 @@ app.patch("/api/admin/users/:id", auth, adminOnly, (req, res) => {
   if (password) {
     updates.push("password_hash = ?");
     params.push(bcrypt.hashSync(password, 10));
+    // When admin resets a password, force the user to change it on next login
+    updates.push("must_change_password = ?");
+    params.push(1);
   }
 
   if (is_admin !== undefined) {

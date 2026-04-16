@@ -408,4 +408,18 @@ loginFailed: "Login failed",
   undo: "Undo (Ctrl+Z)",
   redo: "Redo (Ctrl+Y)",
   image: "Image",
+
+  // Password change
+  changePassword: "Change password",
+  changePasswordDesc: "Update your account password",
+  changePasswordRequired: "Password change required",
+  changePasswordRequiredDesc: "Your account has a temporary password. Please choose a new password to continue.",
+  currentPassword: "Current password",
+  newPassword: "New password",
+  confirmNewPassword: "Confirm new password",
+  passwordChangedSuccess: "Password changed successfully",
+  temporaryPassword: "Temporary password",
+  temporaryPasswordHint: "The user will be asked to change this password on first login.",
+  resetPasswordLabel: "Reset password (leave empty to keep current)",
+  resetPasswordHint: "If set, the user will be asked to change it on next login.",
 };

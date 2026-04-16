@@ -408,4 +408,18 @@ loginFailed: "Échec de la connexion",
   undo: "Annuler (Ctrl+Z)",
   redo: "Rétablir (Ctrl+Y)",
   image: "Image",
+
+  // Password change
+  changePassword: "Changer le mot de passe",
+  changePasswordDesc: "Modifier le mot de passe de votre compte",
+  changePasswordRequired: "Changement de mot de passe requis",
+  changePasswordRequiredDesc: "Votre compte a un mot de passe temporaire. Veuillez choisir un nouveau mot de passe pour continuer.",
+  currentPassword: "Mot de passe actuel",
+  newPassword: "Nouveau mot de passe",
+  confirmNewPassword: "Confirmer le nouveau mot de passe",
+  passwordChangedSuccess: "Mot de passe modifié avec succès",
+  temporaryPassword: "Mot de passe temporaire",
+  temporaryPasswordHint: "L'utilisateur devra changer ce mot de passe à sa première connexion.",
+  resetPasswordLabel: "Réinitialiser le mot de passe (laisser vide pour conserver l'actuel)",
+  resetPasswordHint: "Si renseigné, l'utilisateur devra le changer à sa prochaine connexion.",
 };

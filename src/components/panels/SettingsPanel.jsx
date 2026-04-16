@@ -30,6 +30,7 @@ export default function SettingsPanel({
   currentUser,
   token,
   onProfileUpdated,
+  onChangePassword,
 }) {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [overridePositions, setOverridePositions] = useState(true);
@@ -195,6 +196,16 @@ export default function SettingsPanel({
                 />
               </button>
             </div>
+            <button
+              className={`mt-3 block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+              onClick={() => {
+                onClose();
+                onChangePassword?.();
+              }}
+            >
+              <div className="font-medium">{t("changePassword")}</div>
+              <div className="text-sm text-gray-500">{t("changePasswordDesc")}</div>
+            </button>
           </div>
 
           {/* Data Management Section */}

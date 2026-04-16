@@ -219,7 +219,7 @@ export default function AdminPanel({
               />
               <input
                 type="password"
-                placeholder={t("password")}
+                placeholder={t("temporaryPassword")}
                 value={newUserForm.password}
                 onChange={(e) =>
                   setNewUserForm((prev) => ({
@@ -229,6 +229,9 @@ export default function AdminPanel({
                 }
                 className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400"
               />
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                {t("temporaryPasswordHint")}
+              </p>
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -344,7 +347,7 @@ export default function AdminPanel({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">{t("passwordLeaveEmptyKeepCurrent")}</label>
+                <label className="block text-sm font-medium mb-1">{t("resetPasswordLabel")}</label>
                 <input
                   type="password"
                   value={editUserForm.password}
@@ -357,6 +360,9 @@ export default function AdminPanel({
                   className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400"
                   placeholder={t("leaveEmptyKeepCurrentPassword")}
                 />
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  {t("resetPasswordHint")}
+                </p>
               </div>
               <div className="flex items-center">
                 <input
