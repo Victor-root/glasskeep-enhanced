@@ -100,6 +100,10 @@ export default function App() {
   tokenRef.current = token;
   const currentUserIdRef = useRef(currentUser?.id);
   currentUserIdRef.current = currentUser?.id;
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+  const isAdminRef = useRef(!!currentUser?.is_admin);
+  isAdminRef.current = !!currentUser?.is_admin;
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
 
@@ -860,8 +864,10 @@ export default function App() {
     adminPanelOpen, setAdminPanelOpen,
     adminSettings, setAdminSettings,
     allUsers,
+    pendingUsers,
     newUserForm, setNewUserForm,
     updateAdminSettings, createUser, deleteUser, updateUser,
+    loadPendingUsers, approvePendingUser, rejectPendingUser,
     openAdminPanel,
   } = useAdminActions(token, {
     onSettingsUpdated: (settings) => {
@@ -2038,6 +2044,15 @@ export default function App() {
                   forceCloseModalForRemoteDelete(nid);
                 }
               }
+            } else if (msg && msg.type === "pending_user_registered") {
+              // Admin notification: a new user is awaiting approval.
+              if (currentUserRef.current?.is_admin) {
+                showToast(
+                  t("pendingUserToast", { name: msg.name || msg.email || "" }),
+                  "info",
+                );
+                loadPendingUsers?.();
+              }
             } else if (msg && msg.type === "note_access_revoked" && msg.noteId) {
               // Collaboration access revoked — note owner removed us.
               // Remove from all local state immediately (any view).
@@ -2533,11 +2548,15 @@ export default function App() {
       method: "POST",
       body: { name, email, password },
     });
-    const sessionWithId = { ...res, sessionId: crypto.randomUUID() };
-    setSession(sessionWithId);
-    setAuth(sessionWithId);
-    navigate("#/notes");
-    return { ok: true };
+    // New flow: registrations are held as pending until an admin approves them.
+    if (res?.pending) {
+      return { ok: true, pending: true };
+    }
+    // Fallback for legacy flows that might still return a token directly.
+    if (res?.token) {
+      return completeLogin(res);
+    }
+    return { ok: true, pending: true };
   };
 
   // Handle token expiration globally — same cleanup as signOut
@@ -2549,6 +2568,13 @@ export default function App() {
     window.addEventListener("auth-expired", handleAuthExpired);
     return () => window.removeEventListener("auth-expired", handleAuthExpired);
   }, []);
+
+  // Pre-load pending registrations count when an admin is logged in
+  useEffect(() => {
+    if (token && currentUser?.is_admin) {
+      loadPendingUsers?.();
+    }
+  }, [token, currentUser?.is_admin, loadPendingUsers]);
 
   /** -------- Composer helpers -------- */
   const addComposerItem = () => {
@@ -4176,12 +4202,15 @@ export default function App() {
         adminSettings={adminSettings}
         setAdminSettings={setAdminSettings}
         allUsers={allUsers}
+        pendingUsers={pendingUsers}
         newUserForm={newUserForm}
         setNewUserForm={setNewUserForm}
         updateAdminSettings={updateAdminSettings}
         createUser={createUser}
         deleteUser={deleteUser}
         updateUser={updateUser}
+        approvePendingUser={approvePendingUser}
+        rejectPendingUser={rejectPendingUser}
         currentUser={currentUser}
         showGenericConfirm={showGenericConfirm}
         showToast={showToast}

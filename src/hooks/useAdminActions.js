@@ -13,6 +13,7 @@ export default function useAdminActions(token, { onSettingsUpdated } = {}) {
     loginSlogan: "",
   });
   const [allUsers, setAllUsers] = useState([]);
+  const [pendingUsers, setPendingUsers] = useState([]);
   const [newUserForm, setNewUserForm] = useState({
     name: "",
     email: "",
@@ -93,11 +94,43 @@ export default function useAdminActions(token, { onSettingsUpdated } = {}) {
     return updatedUser;
   };
 
+  const loadPendingUsers = useCallback(async () => {
+    if (!token) return;
+    try {
+      const list = await api("/admin/pending-users", { token });
+      setPendingUsers(list || []);
+    } catch (e) {
+      console.error("Failed to load pending users:", e);
+    }
+  }, [token]);
+
+  const approvePendingUser = async (pendingId) => {
+    try {
+      const newUser = await api(`/admin/pending-users/${pendingId}/approve`, { method: "POST", token });
+      setPendingUsers((prev) => prev.filter((p) => p.id !== pendingId));
+      setAllUsers((prev) => [newUser, ...prev]);
+      return newUser;
+    } catch (e) {
+      alert(e.message || t("failedApproveUser"));
+      throw e;
+    }
+  };
+
+  const rejectPendingUser = async (pendingId) => {
+    try {
+      await api(`/admin/pending-users/${pendingId}/reject`, { method: "POST", token });
+      setPendingUsers((prev) => prev.filter((p) => p.id !== pendingId));
+    } catch (e) {
+      alert(e.message || t("failedRejectUser"));
+      throw e;
+    }
+  };
+
   const openAdminPanel = async () => {
     console.log("Opening admin panel...");
     setAdminPanelOpen(true);
     try {
-      await Promise.all([loadAdminSettings(), loadAllUsers()]);
+      await Promise.all([loadAdminSettings(), loadAllUsers(), loadPendingUsers()]);
       console.log("Admin panel data loaded successfully");
     } catch (error) {
       console.error("Error loading admin panel data:", error);
@@ -111,11 +144,16 @@ export default function useAdminActions(token, { onSettingsUpdated } = {}) {
     setAdminSettings,
     allUsers,
     setAllUsers,
+    pendingUsers,
+    setPendingUsers,
     newUserForm,
     setNewUserForm,
     loadAdminSettings,
     updateAdminSettings,
     loadAllUsers,
+    loadPendingUsers,
+    approvePendingUser,
+    rejectPendingUser,
     createUser,
     deleteUser,
     updateUser,

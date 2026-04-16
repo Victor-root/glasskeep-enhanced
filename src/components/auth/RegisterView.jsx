@@ -8,6 +8,7 @@ export default function RegisterView({ dark, onToggleDark, onRegister, goLogin, 
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [err, setErr] = useState("");
+  const [pendingSubmitted, setPendingSubmitted] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,11 +16,42 @@ export default function RegisterView({ dark, onToggleDark, onRegister, goLogin, 
     if (pw !== pw2) return setErr(t("passwordsDoNotMatch"));
     try {
       const res = await onRegister(name.trim() || "User", email.trim(), pw);
-      if (!res.ok) setErr(res.error || "Registration failed");
+      if (res?.pending) {
+        setPendingSubmitted(true);
+        return;
+      }
+      if (!res?.ok) setErr(res?.error || "Registration failed");
     } catch (er) {
       setErr(er.message || "Registration failed");
     }
   };
+
+  if (pendingSubmitted) {
+    return (
+      <AuthShell
+        dark={dark}
+        onToggleDark={onToggleDark}
+        floatingCardsEnabled={floatingCardsEnabled}
+        loginSlogan={loginSlogan}
+      >
+        <div className="text-center space-y-4">
+          <div className="text-5xl">⏳</div>
+          <h2 className={`text-lg font-semibold ${dark ? "text-gray-100" : "text-gray-800"}`}>
+            {t("registrationPendingTitle")}
+          </h2>
+          <p className={`text-sm ${dark ? "text-gray-300" : "text-gray-600"}`}>
+            {t("registrationPendingDesc")}
+          </p>
+          <button
+            onClick={goLogin}
+            className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+          >
+            {t("backToLogin")}
+          </button>
+        </div>
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell

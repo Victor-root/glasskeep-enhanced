@@ -10,12 +10,15 @@ export default function AdminPanel({
   adminSettings,
   setAdminSettings,
   allUsers,
+  pendingUsers,
   newUserForm,
   setNewUserForm,
   updateAdminSettings,
   createUser,
   deleteUser,
   updateUser,
+  approvePendingUser,
+  rejectPendingUser,
   currentUser,
   showGenericConfirm,
   showToast,
@@ -146,6 +149,73 @@ export default function AdminPanel({
         </div>
 
         <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
+          {/* Pending Registrations Section */}
+          {pendingUsers && pendingUsers.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-4">
+                <h4 className="text-md font-semibold">{t("pendingRegistrations")}</h4>
+                <span className="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 rounded-full">
+                  {pendingUsers.length}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                {t("pendingRegistrationsDesc")}
+              </p>
+              <div className="space-y-3">
+                {pendingUsers.map((p) => (
+                  <div
+                    key={p.id}
+                    className="p-3 border border-amber-300 dark:border-amber-700 rounded-lg bg-amber-50/50 dark:bg-amber-900/20"
+                  >
+                    <div className="mb-2">
+                      <div className="font-medium">{p.name}</div>
+                      <div className="text-sm text-gray-500">{p.email}</div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        {t("requestedOnPrefix")} {new Date(p.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => {
+                          showGenericConfirm({
+                            title: t("rejectRegistrationTitle"),
+                            message: t("rejectRegistrationConfirm").replace("{name}", p.name),
+                            confirmText: t("reject"),
+                            danger: true,
+                            onConfirm: async () => {
+                              try {
+                                await rejectPendingUser(p.id);
+                                showToast(t("registrationRejected"), "info");
+                              } catch (e) {
+                                showToast(e.message || t("failedRejectUser"), "error");
+                              }
+                            },
+                          });
+                        }}
+                        className="px-3 py-1.5 text-sm bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
+                      >
+                        {t("reject")}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await approvePendingUser(p.id);
+                            showToast(t("registrationApproved"), "success");
+                          } catch (e) {
+                            showToast(e.message || t("failedApproveUser"), "error");
+                          }
+                        }}
+                        className="px-3 py-1.5 text-sm font-semibold rounded bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700"
+                      >
+                        {t("approve")}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Settings Section */}
           <div className="mb-8">
             <h4 className="text-md font-semibold mb-4">{t("settings")}</h4>

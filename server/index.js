@@ -167,6 +167,14 @@ CREATE TABLE IF NOT EXISTS user_reorder_state (
   last_reorder_at TEXT NOT NULL,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS pending_users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 `);
 
 // Tiny migrations (safe to run repeatedly)
@@ -573,6 +581,15 @@ function sendEventToUser(userId, event) {
   }
 }
 
+function broadcastToAdmins(event) {
+  try {
+    const admins = db.prepare("SELECT id FROM users WHERE is_admin = 1").all();
+    for (const a of admins) sendEventToUser(a.id, event);
+  } catch (e) {
+    console.warn("[SSE] broadcastToAdmins failed:", e?.message);
+  }
+}
+
 function getCollaboratorUserIdsForNote(noteId) {
   try {
     const rows = getNoteCollaborators.all(noteId) || [];
@@ -630,6 +647,11 @@ app.get("/api/events", authFromQueryOrHeader, (req, res) => {
 });
 
 // ---------- Auth ----------
+const getPendingByEmail = db.prepare("SELECT * FROM pending_users WHERE lower(email)=lower(?)");
+const insertPendingUser = db.prepare(
+  "INSERT INTO pending_users (name,email,password_hash,created_at) VALUES (?,?,?,?)"
+);
+
 app.post("/api/register", (req, res) => {
   // Check if new account creation is allowed
   if (!adminSettings.allowNewAccounts) {
@@ -641,19 +663,21 @@ app.post("/api/register", (req, res) => {
     return res.status(400).json({ error: "Email and password are required." });
   if (getUserByEmail.get(email))
     return res.status(409).json({ error: "Email already registered." });
+  if (getPendingByEmail.get(email))
+    return res.status(409).json({ error: "A registration request for this email is already pending." });
 
   const hash = bcrypt.hashSync(password, 10);
-  const info = insertUser.run(name?.trim() || "User", email.trim(), hash, nowISO());
+  const info = insertPendingUser.run(name?.trim() || "User", email.trim(), hash, nowISO());
 
-  // Check if this user should be promoted to admin
-  const promoted = promoteToAdminIfNeeded(email.trim());
-
-  const user = getUserById.get(info.lastInsertRowid);
-  const token = signToken(user);
-  res.json({
-    token,
-    user: { id: user.id, name: user.name, email: user.email, is_admin: !!user.is_admin, avatar_url: user.avatar_url || null },
+  // Notify all connected admins in real-time
+  broadcastToAdmins({
+    type: "pending_user_registered",
+    pendingId: info.lastInsertRowid,
+    name: name?.trim() || "User",
+    email: email.trim(),
   });
+
+  res.status(202).json({ pending: true });
 });
 
 app.post("/api/login", (req, res) => {
@@ -1592,6 +1616,53 @@ app.get("/api/admin/users", auth, adminOnly, (_req, res) => {
       created_at: r.created_at,
     }))
   );
+});
+
+// ---------- Pending Registrations (admin) ----------
+const listPendingUsers = db.prepare(
+  "SELECT id, name, email, created_at FROM pending_users ORDER BY created_at ASC"
+);
+const getPendingById = db.prepare("SELECT * FROM pending_users WHERE id = ?");
+const deletePendingById = db.prepare("DELETE FROM pending_users WHERE id = ?");
+
+app.get("/api/admin/pending-users", auth, adminOnly, (_req, res) => {
+  res.json(listPendingUsers.all());
+});
+
+app.post("/api/admin/pending-users/:id/approve", auth, adminOnly, (req, res) => {
+  const id = Number(req.params.id);
+  const pending = getPendingById.get(id);
+  if (!pending) return res.status(404).json({ error: "Pending registration not found." });
+
+  // Guard against collision with a concurrently-created user
+  if (getUserByEmail.get(pending.email)) {
+    deletePendingById.run(id);
+    return res.status(409).json({ error: "A user with this email already exists." });
+  }
+
+  // Move to users table, preserving the user-chosen password_hash (no forced change)
+  const info = insertUser.run(pending.name, pending.email, pending.password_hash, nowISO());
+  deletePendingById.run(id);
+
+  // Check if this user should be auto-promoted to admin via env var
+  try { promoteToAdminIfNeeded(pending.email); } catch {}
+
+  const user = getUserById.get(info.lastInsertRowid);
+  res.json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    is_admin: !!user.is_admin,
+    created_at: user.created_at,
+  });
+});
+
+app.post("/api/admin/pending-users/:id/reject", auth, adminOnly, (req, res) => {
+  const id = Number(req.params.id);
+  const pending = getPendingById.get(id);
+  if (!pending) return res.status(404).json({ error: "Pending registration not found." });
+  deletePendingById.run(id);
+  res.json({ ok: true });
 });
 
 // Search users endpoint for collaboration
