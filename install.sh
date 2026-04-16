@@ -282,6 +282,9 @@ install_nodejs() {
 # ── Admin account setup ───────────────────────────────────────────────────────
 setup_admin() {
     local db_file="$1"
+    local admin_name="$2"
+    local admin_login="$3"
+    local admin_pass="$4"
 
     # If the database already exists and has users, skip admin creation entirely
     if [[ -f "$db_file" ]]; then
@@ -308,61 +311,9 @@ setup_admin() {
         fi
     fi
 
-    echo ""
-    echo -e "${BOLD}${CYAN}▶ ${MSG_ADMIN_SETUP_TITLE}${RESET}"
-    echo ""
-
-    local admin_name admin_login admin_pass admin_pass2
-
-    while true; do
-        read -rp "$(echo -e "${YELLOW}${MSG_ADMIN_NAME_PROMPT}${RESET}")" admin_name </dev/tty
-        # Trim leading/trailing whitespace
-        admin_name="$(echo -e "${admin_name}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-
-        if [[ -z "$admin_name" ]]; then
-            warn "$MSG_ADMIN_EMPTY_NAME"
-            continue
-        fi
-
-        if [[ ${#admin_name} -gt 40 ]]; then
-            warn "$MSG_ADMIN_NAME_TOO_LONG"
-            continue
-        fi
-
-        # shellcheck disable=SC2059
-        read -rp "$(echo -e "${YELLOW}$(printf "$MSG_ADMIN_LOGIN_PROMPT" "$admin_name")${RESET}")" admin_login </dev/tty
-        # Trim leading/trailing whitespace
-        admin_login="$(echo -e "${admin_login}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-        admin_login="${admin_login:-$admin_name}"
-
-        # Validate login: letters, digits, dot, hyphen, underscore only, 3-32 chars
-        if [[ ${#admin_login} -lt 3 || ${#admin_login} -gt 32 ]] || ! [[ "$admin_login" =~ ^[A-Za-z0-9._-]+$ ]]; then
-            warn "$MSG_ADMIN_LOGIN_INVALID"
-            continue
-        fi
-
-        read -rsp "$(echo -e "${YELLOW}${MSG_ADMIN_PASS_PROMPT}${RESET}")" admin_pass </dev/tty
-        echo ""
-        read -rsp "$(echo -e "${YELLOW}${MSG_ADMIN_PASS_CONFIRM}${RESET}")" admin_pass2 </dev/tty
-        echo ""
-
-        if [[ -z "$admin_pass" ]]; then
-            warn "$MSG_ADMIN_EMPTY_PASS"
-            continue
-        fi
-
-        if [[ ${#admin_pass} -lt 4 ]]; then
-            warn "$MSG_ADMIN_PASS_TOO_SHORT"
-            continue
-        fi
-
-        if [[ "$admin_pass" != "$admin_pass2" ]]; then
-            warn "$MSG_ADMIN_PASS_MISMATCH"
-            continue
-        fi
-
-        break
-    done
+    if [[ -z "$admin_name" || -z "$admin_login" || -z "$admin_pass" ]]; then
+        return
+    fi
 
     # Create admin via a small Node.js helper that uses the same bcrypt
     local create_script="${INSTALL_DIR}/server/create-admin.js"
@@ -447,6 +398,61 @@ action_install() {
         die "$(printf "$MSG_INVALID_PORT" "$port")"
     fi
 
+    # Collect admin credentials right after port (skip if database already exists)
+    local admin_name="" admin_login="" admin_pass=""
+
+    if [[ ! -f "${DATA_DIR}/notes.db" ]]; then
+        echo ""
+        echo -e "${BOLD}${CYAN}▶ ${MSG_ADMIN_SETUP_TITLE}${RESET}"
+        echo ""
+
+        local admin_pass2
+        while true; do
+            read -rp "$(echo -e "${YELLOW}${MSG_ADMIN_NAME_PROMPT}${RESET}")" admin_name </dev/tty
+            admin_name="$(echo -e "${admin_name}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+            if [[ -z "$admin_name" ]]; then
+                warn "$MSG_ADMIN_EMPTY_NAME"
+                continue
+            fi
+            if [[ ${#admin_name} -gt 40 ]]; then
+                warn "$MSG_ADMIN_NAME_TOO_LONG"
+                continue
+            fi
+
+            # shellcheck disable=SC2059
+            read -rp "$(echo -e "${YELLOW}$(printf "$MSG_ADMIN_LOGIN_PROMPT" "$admin_name")${RESET}")" admin_login </dev/tty
+            admin_login="$(echo -e "${admin_login}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            admin_login="${admin_login:-$admin_name}"
+
+            if [[ ${#admin_login} -lt 3 || ${#admin_login} -gt 32 ]] || ! [[ "$admin_login" =~ ^[A-Za-z0-9._-]+$ ]]; then
+                warn "$MSG_ADMIN_LOGIN_INVALID"
+                continue
+            fi
+
+            read -rsp "$(echo -e "${YELLOW}${MSG_ADMIN_PASS_PROMPT}${RESET}")" admin_pass </dev/tty
+            echo ""
+            read -rsp "$(echo -e "${YELLOW}${MSG_ADMIN_PASS_CONFIRM}${RESET}")" admin_pass2 </dev/tty
+            echo ""
+
+            if [[ -z "$admin_pass" ]]; then
+                warn "$MSG_ADMIN_EMPTY_PASS"
+                continue
+            fi
+            if [[ ${#admin_pass} -lt 4 ]]; then
+                warn "$MSG_ADMIN_PASS_TOO_SHORT"
+                continue
+            fi
+            if [[ "$admin_pass" != "$admin_pass2" ]]; then
+                warn "$MSG_ADMIN_PASS_MISMATCH"
+                continue
+            fi
+
+            break
+        done
+    fi
+
+    echo ""
     info "${MSG_INFO_DIR}${INSTALL_DIR}"
     info "${MSG_INFO_PORT}${port}"
     info "${MSG_INFO_SERVICE}${SERVICE_NAME}"
@@ -475,9 +481,8 @@ action_install() {
 
     mkdir -p "$DATA_DIR"
 
-    # Interactive admin account creation
     GLASSKEEP_ADMIN_LOGIN=""
-    setup_admin "${DATA_DIR}/notes.db"
+    setup_admin "${DATA_DIR}/notes.db" "$admin_name" "$admin_login" "$admin_pass"
 
     local jwt_secret
     jwt_secret=$(openssl rand -hex 32 2>/dev/null || cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 64)
