@@ -1244,32 +1244,25 @@ export default function App() {
   const TRASHED_NOTES_CACHE_KEY = `glass-keep-trashed-${currentUser?.id || "anonymous"}-${sessionId || "no-session"}`;
   const CACHE_TIMESTAMP_KEY = `glass-keep-cache-timestamp-${currentUser?.id || "anonymous"}-${sessionId || "no-session"}`;
 
-  // Cache invalidation functions
-  const invalidateNotesCache = () => {
+  // Purge stale localStorage notes caches to free quota (IndexedDB is now primary)
+  useEffect(() => {
     try {
-      localStorage.removeItem(NOTES_CACHE_KEY);
-      localStorage.removeItem(CACHE_TIMESTAMP_KEY);
-    } catch (error) {
-      console.error("Error invalidating notes cache:", error);
-    }
-  };
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith("glass-keep-notes-") || k.startsWith("glass-keep-archived-") || k.startsWith("glass-keep-trashed-"))) {
+          keys.push(k);
+        }
+      }
+      keys.forEach((k) => localStorage.removeItem(k));
+    } catch (e) {}
+  }, []);
 
-  const invalidateArchivedNotesCache = () => {
-    try {
-      localStorage.removeItem(ARCHIVED_NOTES_CACHE_KEY);
-      localStorage.removeItem(CACHE_TIMESTAMP_KEY);
-    } catch (error) {
-      console.error("Error invalidating archived notes cache:", error);
-    }
-  };
+  // Cache invalidation functions (no-op now, kept for call-site compatibility)
+  const invalidateNotesCache = () => {};
 
-  const invalidateTrashedNotesCache = () => {
-    try {
-      localStorage.removeItem(TRASHED_NOTES_CACHE_KEY);
-    } catch (error) {
-      console.error("Error invalidating trashed notes cache:", error);
-    }
-  };
+  const invalidateArchivedNotesCache = () => {};
+  const invalidateTrashedNotesCache = () => {};
 
   const uniqueById = (arr) => {
     const m = new Map();
@@ -1279,17 +1272,7 @@ export default function App() {
     }
     return Array.from(m.values());
   };
-  const persistNotesCache = (notes) => {
-    try {
-      localStorage.setItem(
-        NOTES_CACHE_KEY,
-        JSON.stringify(Array.isArray(notes) ? notes : []),
-      );
-      localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
-    } catch (e) {
-      console.error("Error caching notes:", e);
-    }
-  };
+  const persistNotesCache = () => {};
   // Consistent ordering: pinned first, then by position (server-persisted DnD),
   // fallback to updated_at/timestamp when position is missing
   const sortNotesByRecency = (arr) => {
@@ -1549,10 +1532,6 @@ export default function App() {
       const final = [...merged, ...localOnly].filter((n) => !!n.archived && !n.trashed);
       if (tagFilterRef.current !== expectedFilter) return;
       setNotes(sortNotesByRecency(final));
-      try {
-        localStorage.setItem(ARCHIVED_NOTES_CACHE_KEY, JSON.stringify(final));
-        localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
-      } catch (e) {}
       return true; // server data fetched successfully
     } catch (error) {
       console.error("Error loading archived notes from server:", error);
@@ -1641,9 +1620,6 @@ export default function App() {
       const final = [...merged, ...localOnly].filter((n) => !!n.trashed);
       if (tagFilterRef.current !== expectedFilter) return;
       setNotes(sortNotesByRecency(final));
-      try {
-        localStorage.setItem(TRASHED_NOTES_CACHE_KEY, JSON.stringify(final));
-      } catch (e) {}
       return true; // server data fetched successfully
     } catch (error) {
       console.error("Error loading trashed notes from server:", error);
