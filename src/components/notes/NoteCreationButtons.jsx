@@ -41,8 +41,8 @@ export default function NoteCreationButtons({
         description={t("drawingDesc")}
         onClick={onCreateDraw}
         icon={<BrushIcon />}
-        colorClasses="border-blue-400 bg-[linear-gradient(to_bottom_right,#c4b5fd,#93c5fd,#67e8f9,#f9a8d4)] text-indigo-950 shadow-blue-200/50 hover:bg-[linear-gradient(to_bottom_right,#a78bfa,#60a5fa,#22d3ee,#f472b6)] hover:border-blue-500 hover:shadow-blue-300/60 dark:bg-[linear-gradient(to_bottom_right,#5b21b6,#1e40af,#155e75,#9d174d)] dark:border-blue-500 dark:text-white dark:shadow-none dark:hover:bg-[linear-gradient(to_bottom_right,#6d28d9,#1d4ed8,#0e7490,#be185d)] dark:hover:border-blue-400"
-        iconBg="bg-white/85 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-100"
+        colorClasses="border-cyan-400 bg-gradient-to-br from-cyan-200 to-violet-300 text-indigo-950 shadow-cyan-200/50 hover:from-cyan-300 hover:to-violet-400 hover:border-cyan-500 hover:shadow-cyan-300/60 dark:from-cyan-800 dark:to-violet-900 dark:border-cyan-500 dark:text-cyan-50 dark:shadow-none dark:hover:from-cyan-700 dark:hover:to-violet-800 dark:hover:border-cyan-400"
+        iconBg="bg-white/85 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-100"
       />
     </div>
   );
