@@ -33,16 +33,16 @@ export default function NoteCreationButtons({
         description={t("checklistDesc")}
         onClick={onCreateChecklist}
         icon={<ChecklistIcon />}
-        colorClasses="border-sky-400 bg-gradient-to-br from-sky-200 to-blue-300 text-sky-950 shadow-sky-200/50 hover:from-sky-300 hover:to-blue-400 hover:border-sky-500 hover:shadow-sky-300/60 dark:from-sky-800 dark:to-blue-900 dark:border-sky-500 dark:text-sky-50 dark:shadow-none dark:hover:from-sky-700 dark:hover:to-blue-800 dark:hover:border-sky-400"
-        iconBg="bg-white/85 text-sky-600 dark:bg-sky-950/50 dark:text-sky-100"
+        colorClasses="border-[#a85bcc] bg-[linear-gradient(to_bottom_right,#d6a5ed,#be76de)] text-[#3a1850] shadow-purple-200/50 hover:bg-[linear-gradient(to_bottom_right,#c98ce4,#a85bcc)] hover:border-[#9343b6] hover:shadow-purple-300/60 dark:bg-[linear-gradient(to_bottom_right,#5e3a78,#422856)] dark:border-[#7d4699] dark:text-[#f3e5fb] dark:shadow-none dark:hover:bg-[linear-gradient(to_bottom_right,#6b4587,#523265)] dark:hover:border-[#a85bcc]"
+        iconBg="bg-white/85 text-[#a85bcc] dark:bg-[#3a1850]/50 dark:text-[#f3e5fb]"
       />
       <CreationButton
         title={t("drawing")}
         description={t("drawingDesc")}
         onClick={onCreateDraw}
         icon={<BrushIcon />}
-        colorClasses="border-[#a85bcc] bg-[linear-gradient(to_bottom_right,#d6a5ed,#be76de)] text-[#3a1850] shadow-purple-200/50 hover:bg-[linear-gradient(to_bottom_right,#c98ce4,#a85bcc)] hover:border-[#9343b6] hover:shadow-purple-300/60 dark:bg-[linear-gradient(to_bottom_right,#5e3a78,#422856)] dark:border-[#7d4699] dark:text-[#f3e5fb] dark:shadow-none dark:hover:bg-[linear-gradient(to_bottom_right,#6b4587,#523265)] dark:hover:border-[#a85bcc]"
-        iconBg="bg-white/85 text-[#a85bcc] dark:bg-[#3a1850]/50 dark:text-[#f3e5fb]"
+        colorClasses="border-sky-400 bg-gradient-to-br from-sky-200 to-blue-300 text-sky-950 shadow-sky-200/50 hover:from-sky-300 hover:to-blue-400 hover:border-sky-500 hover:shadow-sky-300/60 dark:from-sky-800 dark:to-blue-900 dark:border-sky-500 dark:text-sky-50 dark:shadow-none dark:hover:from-sky-700 dark:hover:to-blue-800 dark:hover:border-sky-400"
+        iconBg="bg-white/85 text-sky-600 dark:bg-sky-950/50 dark:text-sky-100"
       />
     </div>
   );
