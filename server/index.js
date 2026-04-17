@@ -162,6 +162,15 @@ CREATE TABLE IF NOT EXISTS user_settings (
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS note_user_tags (
+  note_id TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  tags_json TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (note_id, user_id),
+  FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS user_reorder_state (
   user_id INTEGER PRIMARY KEY,
   last_reorder_at TEXT NOT NULL,
@@ -243,6 +252,25 @@ CREATE TABLE IF NOT EXISTS pending_users (
     tx();
   } catch {
     // ignore if ALTER not supported or already applied
+  }
+})();
+
+// Migrate existing note tags into per-user table (one-time)
+(function migrateTagsToPerUser() {
+  try {
+    const count = db.prepare("SELECT COUNT(*) as c FROM note_user_tags").get();
+    if (count.c === 0) {
+      const migrated = db.prepare(`
+        INSERT OR IGNORE INTO note_user_tags (note_id, user_id, tags_json)
+        SELECT id, user_id, tags_json FROM notes
+        WHERE tags_json != '[]' AND tags_json IS NOT NULL AND tags_json != ''
+      `).run();
+      if (migrated.changes > 0) {
+        console.log(`[Migration] Copied tags for ${migrated.changes} notes to per-user table`);
+      }
+    }
+  } catch (e) {
+    console.error("[Migration] Tag migration error:", e);
   }
 })();
 
@@ -328,7 +356,9 @@ function isNewerOrEqual(incomingMs, storedTs) {
 }
 
 // Serialize a DB row into the canonical JSON note object returned by all endpoints.
-function serializeNote(r) {
+// When userId is provided, tags come from the per-user note_user_tags table.
+function serializeNote(r, userId) {
+  const tagsJson = userId ? getUserTags(r.id, userId) : (r.tags_json || "[]");
   return {
     id: r.id,
     user_id: r.user_id,
@@ -336,7 +366,7 @@ function serializeNote(r) {
     title: r.title,
     content: r.content,
     items: JSON.parse(r.items_json || "[]"),
-    tags: JSON.parse(r.tags_json || "[]"),
+    tags: JSON.parse(tagsJson),
     images: JSON.parse(r.images_json || "[]"),
     color: r.color,
     pinned: !!r.pinned,
@@ -520,12 +550,26 @@ const getCollaboratedNotes = db.prepare(`
   ORDER BY n.pinned DESC, n.position DESC, n.timestamp DESC
 `);
 const updateNoteWithEditor = db.prepare(`
-  UPDATE notes SET 
-    updated_at = ?, 
-    last_edited_by = ?, 
+  UPDATE notes SET
+    updated_at = ?,
+    last_edited_by = ?,
     last_edited_at = ?
   WHERE id = ?
 `);
+
+// Per-user tags
+const getUserTagsForNote = db.prepare(
+  "SELECT tags_json FROM note_user_tags WHERE note_id = ? AND user_id = ?"
+);
+const upsertUserTags = db.prepare(
+  `INSERT INTO note_user_tags (note_id, user_id, tags_json) VALUES (?, ?, ?)
+   ON CONFLICT(note_id, user_id) DO UPDATE SET tags_json = excluded.tags_json`
+);
+
+function getUserTags(noteId, userId) {
+  const row = getUserTagsForNote.get(noteId, userId);
+  return row ? row.tags_json : "[]";
+}
 
 // ---------- Realtime (SSE) ----------
 // Map of userId (integer) -> Set of response streams.
@@ -889,7 +933,7 @@ app.get("/api/notes", auth, (req, res) => {
         title: r.title,
         content: r.content,
         items: JSON.parse(r.items_json || "[]"),
-        tags: JSON.parse(r.tags_json || "[]"),
+        tags: JSON.parse(getUserTags(r.id, req.user.id)),
         images: JSON.parse(r.images_json || "[]"),
         color: r.color,
         pinned: !!r.pinned,
@@ -912,6 +956,7 @@ app.post("/api/notes", auth, (req, res) => {
   const rawClientTs = body.client_updated_at || body.timestamp || nowISO();
   const parsedClientTs = parseIsoTimestamp(rawClientTs);
   const clientTs = parsedClientTs ? parsedClientTs.iso : nowISO();
+  const userTags = JSON.stringify(Array.isArray(body.tags) ? body.tags : []);
   const n = {
     id: noteId,
     user_id: req.user.id,
@@ -919,7 +964,7 @@ app.post("/api/notes", auth, (req, res) => {
     title: String(body.title || ""),
     content: body.type === "checklist" ? "" : String(body.content || ""),
     items_json: JSON.stringify(Array.isArray(body.items) ? body.items : []),
-    tags_json: JSON.stringify(Array.isArray(body.tags) ? body.tags : []),
+    tags_json: "[]",
     images_json: JSON.stringify(Array.isArray(body.images) ? body.images : []),
     color: body.color && typeof body.color === "string" ? body.color : "default",
     pinned: body.pinned ? 1 : 0,
@@ -933,16 +978,17 @@ app.post("/api/notes", auth, (req, res) => {
   if (body.id) {
     const existing = getNoteById.get(body.id);
     if (existing && existing.user_id === req.user.id) {
-      return res.status(200).json(serializeNote(existing));
+      return res.status(200).json(serializeNote(existing, req.user.id));
     }
   }
 
   insertNote.run(n);
+  if (userTags !== "[]") upsertUserTags.run(noteId, req.user.id, userTags);
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), n.id);
   broadcastNoteUpdated(n.id);
   // Re-read to get updated_at/last_edited_* set by updateNoteWithEditor
   const created = getNoteById.get(n.id);
-  res.status(201).json(serializeNote(created || n));
+  res.status(201).json(serializeNote(created || n, req.user.id));
 });
 
 app.put("/api/notes/:id", auth, (req, res) => {
@@ -961,9 +1007,13 @@ app.put("/api/notes/:id", auth, (req, res) => {
 
   // LWW: reject stale writes (compare milliseconds)
   if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
-    return res.json({ ok: true, stale: true, note: serializeNote(existing) });
+    return res.json({ ok: true, stale: true, note: serializeNote(existing, req.user.id) });
   }
 
+  // Save tags to per-user table (not on the note itself)
+  if (Array.isArray(b.tags)) {
+    upsertUserTags.run(id, req.user.id, JSON.stringify(b.tags));
+  }
   const updated = {
     id,
     user_id: req.user.id,
@@ -971,7 +1021,7 @@ app.put("/api/notes/:id", auth, (req, res) => {
     title: String(b.title || ""),
     content: b.type === "checklist" ? "" : String(b.content || ""),
     items_json: JSON.stringify(Array.isArray(b.items) ? b.items : []),
-    tags_json: JSON.stringify(Array.isArray(b.tags) ? b.tags : []),
+    tags_json: existing.tags_json,
     images_json: JSON.stringify(Array.isArray(b.images) ? b.images : []),
     color: b.color && typeof b.color === "string" ? b.color : "default",
     pinned: b.pinned ? 1 : 0,
@@ -988,7 +1038,7 @@ app.put("/api/notes/:id", auth, (req, res) => {
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
   broadcastNoteUpdated(id);
   const fresh = getNoteById.get(id);
-  res.json({ ok: true, note: serializeNote(fresh || existing) });
+  res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });
 });
 
 app.patch("/api/notes/:id", auth, (req, res) => {
@@ -1006,16 +1056,20 @@ app.patch("/api/notes/:id", auth, (req, res) => {
 
   // LWW: reject stale writes (compare milliseconds)
   if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
-    return res.json({ ok: true, stale: true, note: serializeNote(existing) });
+    return res.json({ ok: true, stale: true, note: serializeNote(existing, req.user.id) });
   }
 
+  // Save tags to per-user table (not on the note itself)
+  if (Array.isArray(req.body.tags)) {
+    upsertUserTags.run(id, req.user.id, JSON.stringify(req.body.tags));
+  }
   const p = {
     id,
     user_id: req.user.id,
     title: typeof req.body.title === "string" ? String(req.body.title) : null,
     content: typeof req.body.content === "string" ? String(req.body.content) : null,
     items_json: Array.isArray(req.body.items) ? JSON.stringify(req.body.items) : null,
-    tags_json: Array.isArray(req.body.tags) ? JSON.stringify(req.body.tags) : null,
+    tags_json: null,
     images_json: Array.isArray(req.body.images) ? JSON.stringify(req.body.images) : null,
     color: typeof req.body.color === "string" ? req.body.color : null,
     pinned: typeof req.body.pinned === "boolean" ? (req.body.pinned ? 1 : 0) : null,
@@ -1031,7 +1085,7 @@ app.patch("/api/notes/:id", auth, (req, res) => {
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
   broadcastNoteUpdated(id);
   const fresh = getNoteById.get(id);
-  res.json({ ok: true, note: serializeNote(fresh || existing) });
+  res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });
 });
 
 // Legacy soft-delete route — disabled.
@@ -1211,6 +1265,9 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
     return res.status(404).json({ error: "Collaborator not found" });
   }
 
+  // Clean up per-user tags for the removed collaborator
+  db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(noteId, userIdToRemove);
+
   // Notify the removed user FIRST — they are no longer in the collaborator list
   // so broadcastNoteUpdated won't reach them. Send a dedicated event so their
   // client can remove the note immediately without a full reload.
@@ -1225,7 +1282,7 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
 
 app.get("/api/notes/collaborated", auth, (req, res) => {
   const rows = getCollaboratedNotes.all(req.user.id);
-  res.json(rows.map((r) => serializeNote(r)));
+  res.json(rows.map((r) => serializeNote(r, req.user.id)));
 });
 
 // Archive/Unarchive notes
@@ -1247,7 +1304,7 @@ app.post("/api/notes/:id/archive", auth, (req, res) => {
 
   // LWW: reject stale writes (compare milliseconds)
   if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
-    return res.json({ ok: true, stale: true, note: serializeNote(existing) });
+    return res.json({ ok: true, stale: true, note: serializeNote(existing, req.user.id) });
   }
 
   const updateArchived = db.prepare(`
@@ -1263,13 +1320,13 @@ app.post("/api/notes/:id/archive", auth, (req, res) => {
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
   broadcastNoteUpdated(id);
   const fresh = getNoteById.get(id);
-  res.json({ ok: true, note: serializeNote(fresh || existing) });
+  res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });
 });
 
 // Get archived notes
 app.get("/api/notes/archived", auth, (req, res) => {
   const rows = listArchivedNotes.all(req.user.id);
-  res.json(rows.map((r) => serializeNote(r)));
+  res.json(rows.map((r) => serializeNote(r, req.user.id)));
 });
 
 // Trash/Restore notes
@@ -1290,7 +1347,7 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
 
   // LWW: reject stale writes (compare milliseconds)
   if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
-    return res.json({ ok: true, stale: true, note: serializeNote(existing) });
+    return res.json({ ok: true, stale: true, note: serializeNote(existing, req.user.id) });
   }
 
   const updateTrashed = db.prepare(`
@@ -1306,7 +1363,7 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
   broadcastNoteUpdated(id);
   const fresh = getNoteById.get(id);
-  res.json({ ok: true, note: serializeNote(fresh || existing) });
+  res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });
 });
 
 app.post("/api/notes/:id/restore", auth, (req, res) => {
@@ -1326,7 +1383,7 @@ app.post("/api/notes/:id/restore", auth, (req, res) => {
 
   // LWW: reject stale writes (compare milliseconds)
   if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
-    return res.json({ ok: true, stale: true, note: serializeNote(existing) });
+    return res.json({ ok: true, stale: true, note: serializeNote(existing, req.user.id) });
   }
 
   // Calculate a position that places the restored note among active notes
@@ -1375,13 +1432,13 @@ app.post("/api/notes/:id/restore", auth, (req, res) => {
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
   broadcastNoteUpdated(id);
   const fresh = getNoteById.get(id);
-  res.json({ ok: true, note: serializeNote(fresh || existing) });
+  res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });
 });
 
 // Get trashed notes
 app.get("/api/notes/trashed", auth, (req, res) => {
   const rows = listTrashedNotes.all(req.user.id);
-  res.json(rows.map((r) => serializeNote(r)));
+  res.json(rows.map((r) => serializeNote(r, req.user.id)));
 });
 
 // Permanently delete a note (only from trash, LWW-protected)
@@ -1406,7 +1463,7 @@ app.delete("/api/notes/:id/permanent", auth, (req, res) => {
 
   // LWW: reject if a newer restore/update already applied
   if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
-    return res.json({ ok: true, stale: true, note: serializeNote(existing) });
+    return res.json({ ok: true, stale: true, note: serializeNote(existing, req.user.id) });
   }
 
   const recipientIds = new Set([existing.user_id, ...getCollaboratorUserIdsForNote(id)]);
@@ -1432,7 +1489,7 @@ app.get("/api/notes/export", auth, (req, res) => {
       title: r.title,
       content: r.content,
       items: JSON.parse(r.items_json || "[]"),
-      tags: JSON.parse(r.tags_json || "[]"),
+      tags: JSON.parse(getUserTags(r.id, req.user.id)),
       images: JSON.parse(r.images_json || "[]"),
       color: r.color,
       pinned: !!r.pinned,
@@ -1458,7 +1515,7 @@ app.get("/api/notes/:id", auth, (req, res) => {
     title: r.title,
     content: r.content,
     items: JSON.parse(r.items_json || "[]"),
-    tags: JSON.parse(r.tags_json || "[]"),
+    tags: JSON.parse(getUserTags(r.id, req.user.id)),
     images: JSON.parse(r.images_json || "[]"),
     color: r.color,
     pinned: !!r.pinned,
@@ -1493,6 +1550,7 @@ app.post("/api/notes/import", auth, (req, res) => {
       for (const n of arr) {
         const id = existing.has(String(n.id)) ? uid() : String(n.id);
         existing.add(id);
+        const importedTags = JSON.stringify(Array.isArray(n.tags) ? n.tags : []);
         insertNote.run({
           id,
           user_id: req.user.id,
@@ -1500,7 +1558,7 @@ app.post("/api/notes/import", auth, (req, res) => {
           title: String(n.title || ""),
           content: n.type === "checklist" ? "" : String(n.content || ""),
           items_json: JSON.stringify(Array.isArray(n.items) ? n.items : []),
-          tags_json: JSON.stringify(Array.isArray(n.tags) ? n.tags : []),
+          tags_json: "[]",
           images_json: JSON.stringify(Array.isArray(n.images) ? n.images : []),
           color: typeof n.color === "string" ? n.color : "default",
           pinned: n.pinned ? 1 : 0,
@@ -1508,6 +1566,7 @@ app.post("/api/notes/import", auth, (req, res) => {
           timestamp: n.timestamp || nowISO(),
           client_updated_at: (parseIsoTimestamp(n.client_updated_at || n.timestamp) || {}).iso || nowISO(),
         });
+        if (importedTags !== "[]") upsertUserTags.run(id, req.user.id, importedTags);
       }
     });
     tx(src);
