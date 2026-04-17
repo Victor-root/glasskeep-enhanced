@@ -3209,12 +3209,13 @@ export default function App() {
     if (serverChanged && !hasNoteBeenModified() && !isNoteLocallyProtected(String(activeId))) {
       initialModalStateRef.current = serverState;
       committedBaselineRef.current = { ...serverState };
-      // Update local modal state to match server (user hasn't edited, so safe to update)
-      setMTitle(serverState.title);
-      setMBody(serverState.content);
-      setMTagList(serverState.tags);
-      setMImages(serverState.images);
-      setMColor(serverState.color);
+      // Only update fields that actually changed to avoid re-rendering
+      // (re-render kills text selection in view mode)
+      if (serverState.title !== mTitle) setMTitle(serverState.title);
+      if (serverState.content !== mBody) setMBody(serverState.content);
+      if (JSON.stringify(serverState.tags) !== JSON.stringify(mTagList)) setMTagList(serverState.tags);
+      if (JSON.stringify(serverState.images) !== JSON.stringify(mImages)) setMImages(serverState.images);
+      if (serverState.color !== mColor) setMColor(serverState.color);
     }
   }, [notes, open, activeId, hasNoteBeenModified]);
 
