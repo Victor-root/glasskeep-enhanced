@@ -96,6 +96,8 @@ html.dark header.multi-select-bar {
 .note-content { -webkit-user-select: text; user-select: text; }
 .note-content p { margin: 0 0 0.5rem 0; }
 .note-content h1, .note-content h2, .note-content h3 { margin: 0; font-weight: 600; }
+.note-content p:has(+ h1), .note-content p:has(+ h2), .note-content p:has(+ h3),
+.note-content p:has(+ h4), .note-content p:has(+ h5), .note-content p:has(+ h6) { margin-bottom: 0; }
 .note-content h1 { font-size: 1.5rem; line-height: 1.3; }
 .note-content h2 { font-size: 1.25rem; line-height: 1.35; }
 .note-content h3 { font-size: 1.125rem; line-height: 1.4; }
