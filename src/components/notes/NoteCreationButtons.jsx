@@ -14,7 +14,7 @@ export default function NoteCreationButtons({
   onCreateDraw,
 }) {
   return (
-    <div className="glass-card rounded-xl shadow-lg p-3 mb-8 relative flex gap-3">
+    <div className="mb-8 flex gap-3">
       <CreationButton
         label={t("textNote")}
         tooltip={t("textNote")}
