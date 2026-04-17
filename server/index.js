@@ -1348,9 +1348,25 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     // Collaborator "delete" = leave the collaboration
     db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
+    broadcastNoteUpdated(id);
     return res.json({ ok: true, left: true });
   }
 
+  // Owner: check if the note has collaborators
+  const collaborators = getNoteCollaborators.all(id);
+  if (collaborators.length > 0) {
+    // Transfer ownership to the first collaborator
+    const newOwner = collaborators[0];
+    db.prepare("UPDATE notes SET user_id = ? WHERE id = ?").run(newOwner.id, id);
+    db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, newOwner.id);
+    // Clean up old owner's per-user tags
+    db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
+    // Notify remaining participants so they see updated collaboration status
+    broadcastNoteUpdated(id);
+    return res.json({ ok: true, left: true });
+  }
+
+  // Non-collaborative note: normal trash
   // LWW: reject stale writes (compare milliseconds)
   if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
     return res.json({ ok: true, stale: true, note: serializeNote(existing, req.user.id) });

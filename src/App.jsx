@@ -642,15 +642,15 @@ export default function App() {
           for (const id of selectedIds) {
             const nid = String(id);
             const note = notes.find((n) => String(n.id) === nid);
-            const owned = !note || note.user_id === currentUser?.id;
+            const isCollab = note && (note.user_id !== currentUser?.id || note.collaborators?.length > 0);
             const leaseId = acquireLocalLease(nid);
-            if (owned) {
+            if (isCollab) {
+              try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
+            } else {
               try {
                 const existing = await idbGetNote(nid, currentUser?.id, sessionId);
                 if (existing) await idbPutNote({ ...existing, trashed: true, client_updated_at: nowIso }, currentUser?.id, sessionId);
               } catch (e) { console.error(e); }
-            } else {
-              try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
             }
             await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
           }
@@ -3472,8 +3472,9 @@ export default function App() {
       closeModal();
       showToast(t("notePermanentlyDeleted"), "success");
       await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
-    } else if (!isOwner) {
-      // Collaborator: leave the collaboration (server handles via trash endpoint)
+    } else if (!isOwner || note?.collaborators?.length > 0) {
+      // Collaborative note (owner or collaborator): leave the collaboration
+      // Server transfers ownership if needed, note stays for other participants
       try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
       invalidateNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
@@ -3482,7 +3483,7 @@ export default function App() {
       const leaseId = acquireLocalLease(nid);
       await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
     } else {
-      // Owner: local-first move to trash
+      // Owner of non-collaborative note: local-first move to trash
       const leaseId = acquireLocalLease(nid);
       const nowIso = new Date().toISOString();
       try {
