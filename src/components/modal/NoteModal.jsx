@@ -162,6 +162,11 @@ export default function NoteModal({
       setDrawTransition('leaving');
     }
   }, [isDrawEdit]);
+  const viewHtml = React.useMemo(
+    () => linkifyContactsHTML(renderSafeMarkdown(mBody)),
+    [mBody],
+  );
+
   const { handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } =
     useChecklistDrag(mItems, setMItems, syncChecklistItems);
 
@@ -323,9 +328,7 @@ export default function NoteModal({
                   <div
                     ref={noteViewRef}
                     className="note-content note-content--dense whitespace-pre-wrap"
-                    dangerouslySetInnerHTML={{
-                      __html: linkifyContactsHTML(renderSafeMarkdown(mBody)),
-                    }}
+                    dangerouslySetInnerHTML={{ __html: viewHtml }}
                   />
                 ) : (
                   <div className="relative min-h-[160px]">
@@ -572,7 +575,7 @@ export default function NoteModal({
                     <div
                       className="note-content note-content--dense whitespace-pre-wrap"
                       dangerouslySetInnerHTML={{
-                        __html: linkifyContactsHTML(renderSafeMarkdown(mBody)),
+                        __html: viewHtml,
                       }}
                     />
                   )}
