@@ -33,16 +33,16 @@ export default function NoteCreationButtons({
         description={t("checklistDesc")}
         onClick={onCreateChecklist}
         icon={<ChecklistIcon />}
-        colorClasses="border-orange-300 bg-gradient-to-br from-orange-200 to-amber-200 text-orange-950 shadow-orange-200/50 hover:from-orange-300 hover:to-amber-300 hover:border-orange-400 hover:shadow-orange-300/60 dark:from-orange-800 dark:to-amber-900 dark:border-orange-500 dark:text-orange-50 dark:shadow-none dark:hover:from-orange-700 dark:hover:to-amber-800 dark:hover:border-orange-400"
-        iconBg="bg-white/85 text-orange-600 dark:bg-orange-950/50 dark:text-orange-100"
+        colorClasses="border-teal-500 bg-gradient-to-br from-teal-400 to-emerald-500 text-white shadow-teal-300/50 hover:from-teal-500 hover:to-emerald-600 hover:border-teal-600 hover:shadow-teal-400/60 dark:from-teal-700 dark:to-emerald-900 dark:border-teal-500 dark:text-teal-50 dark:shadow-none dark:hover:from-teal-600 dark:hover:to-emerald-800 dark:hover:border-teal-400"
+        iconBg="bg-white/85 text-teal-700 dark:bg-teal-950/50 dark:text-teal-100"
       />
       <CreationButton
         title={t("drawing")}
         description={t("drawingDesc")}
         onClick={onCreateDraw}
         icon={<BrushIcon />}
-        colorClasses="border-emerald-300 bg-gradient-to-br from-emerald-200 to-teal-200 text-teal-950 shadow-emerald-200/50 hover:from-emerald-300 hover:to-teal-300 hover:border-emerald-400 hover:shadow-emerald-300/60 dark:from-emerald-800 dark:to-teal-900 dark:border-teal-500 dark:text-teal-50 dark:shadow-none dark:hover:from-emerald-700 dark:hover:to-teal-800 dark:hover:border-teal-400"
-        iconBg="bg-white/85 text-teal-700 dark:bg-teal-950/50 dark:text-teal-100"
+        colorClasses="border-orange-400 bg-gradient-to-br from-rose-300 to-orange-300 text-rose-950 shadow-rose-200/50 hover:from-rose-400 hover:to-orange-400 hover:border-orange-500 hover:shadow-rose-300/60 dark:from-rose-800 dark:to-orange-900 dark:border-orange-500 dark:text-rose-50 dark:shadow-none dark:hover:from-rose-700 dark:hover:to-orange-800 dark:hover:border-orange-400"
+        iconBg="bg-white/85 text-rose-600 dark:bg-rose-950/50 dark:text-rose-100"
       />
     </div>
   );
