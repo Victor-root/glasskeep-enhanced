@@ -571,6 +571,23 @@ function getUserTags(noteId, userId) {
   return row ? row.tags_json : "[]";
 }
 
+// Build participant list for a note: shows the OTHER users, not the requesting user.
+// For the owner: shows collaborators. For a collaborator: shows the owner + other collaborators.
+function getNoteParticipants(noteId, noteOwnerId, requestingUserId) {
+  const collabList = getNoteCollaborators.all(noteId);
+  if (collabList.length === 0) return null;
+  const others = collabList
+    .filter(c => c.id !== requestingUserId)
+    .map(c => ({ id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url || null }));
+  if (noteOwnerId !== requestingUserId) {
+    const owner = getUserById.get(noteOwnerId);
+    if (owner) {
+      others.unshift({ id: owner.id, name: owner.name, email: owner.email, avatar_url: owner.avatar_url || null });
+    }
+  }
+  return others.length > 0 ? others : null;
+}
+
 // ---------- Realtime (SSE) ----------
 // Map of userId (integer) -> Set of response streams.
 // All access goes through parseSseKey() which rejects non-integer values,
@@ -915,38 +932,27 @@ app.get("/api/notes", auth, (req, res) => {
     ? allNotesWithPagingQuery.all(req.user.id, req.user.id, lim, off)
     : allNotesQuery.all(req.user.id, req.user.id);
 
-  // Get collaborators for each note
-  const getNoteCollaboratorsList = db.prepare(`
-    SELECT u.id, u.name, u.email, u.avatar_url
-    FROM note_collaborators nc
-    JOIN users u ON nc.user_id = u.id
-    WHERE nc.note_id = ?
-  `);
-
   res.json(
-    rows.map((r) => {
-      const collabList = getNoteCollaboratorsList.all(r.id);
-      return {
-        id: r.id,
-        user_id: r.user_id,
-        type: r.type,
-        title: r.title,
-        content: r.content,
-        items: JSON.parse(r.items_json || "[]"),
-        tags: JSON.parse(getUserTags(r.id, req.user.id)),
-        images: JSON.parse(r.images_json || "[]"),
-        color: r.color,
-        pinned: !!r.pinned,
-        position: r.position,
-        timestamp: r.timestamp,
-        updated_at: r.updated_at,
-        client_updated_at: r.client_updated_at,
-        lastEditedBy: r.last_edited_by,
-        lastEditedAt: r.last_edited_at,
-        archived: !!r.archived,
-        collaborators: collabList.length > 0 ? collabList.map(c => ({ id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url || null })) : null,
-      };
-    })
+    rows.map((r) => ({
+      id: r.id,
+      user_id: r.user_id,
+      type: r.type,
+      title: r.title,
+      content: r.content,
+      items: JSON.parse(r.items_json || "[]"),
+      tags: JSON.parse(getUserTags(r.id, req.user.id)),
+      images: JSON.parse(r.images_json || "[]"),
+      color: r.color,
+      pinned: !!r.pinned,
+      position: r.position,
+      timestamp: r.timestamp,
+      updated_at: r.updated_at,
+      client_updated_at: r.client_updated_at,
+      lastEditedBy: r.last_edited_by,
+      lastEditedAt: r.last_edited_at,
+      archived: !!r.archived,
+      collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
+    }))
   );
 });
 
@@ -1526,7 +1532,6 @@ app.get("/api/notes/export", auth, (req, res) => {
 app.get("/api/notes/:id", auth, (req, res) => {
   const r = getNoteWithCollaboration.get(req.user.id, req.params.id, req.user.id);
   if (!r) return res.status(404).json({ error: "Note not found" });
-  const collabList = getNoteCollaborators.all(r.id);
   res.json({
     id: r.id,
     user_id: r.user_id,
@@ -1546,7 +1551,7 @@ app.get("/api/notes/:id", auth, (req, res) => {
     lastEditedAt: r.last_edited_at,
     archived: !!r.archived,
     trashed: !!r.trashed,
-    collaborators: collabList.length > 0 ? collabList.map(c => ({ id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url || null })) : null,
+    collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
   });
 });
 
