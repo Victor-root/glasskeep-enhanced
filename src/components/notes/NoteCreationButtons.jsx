@@ -53,14 +53,14 @@ function CreationButton({ title, description, onClick, icon, colorClasses, iconB
     <button
       type="button"
       onClick={onClick}
-      className={`group relative flex-1 flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 text-left shadow-md transition-all duration-200 hover:scale-[1.03] hover:shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 btn-gradient ${colorClasses}`}
+      className={`group relative flex-1 flex items-center gap-2.5 px-3 py-3 rounded-xl border-2 text-left shadow-md transition-all duration-200 hover:scale-[1.03] hover:shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 btn-gradient ${colorClasses}`}
     >
-      <span className={`inline-flex shrink-0 items-center justify-center w-10 h-10 rounded-lg ${iconBg}`}>
+      <span className={`inline-flex shrink-0 items-center justify-center w-9 h-9 rounded-lg ${iconBg}`}>
         {icon}
       </span>
       <span className="flex-1 min-w-0">
-        <span className="block text-sm font-semibold leading-tight truncate">{title}</span>
-        <span className="block text-[11px] font-normal opacity-80 leading-tight truncate mt-0.5">{description}</span>
+        <span className="block text-sm font-semibold leading-tight">{title}</span>
+        <span className="block text-[11px] font-normal opacity-80 leading-snug mt-0.5">{description}</span>
       </span>
       <PlusHint />
     </button>
