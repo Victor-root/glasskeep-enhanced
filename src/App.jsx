@@ -2370,6 +2370,11 @@ export default function App() {
     );
     if (prevJson === currentJson) return;
 
+    // A real draw stroke reached us — materialise the draft before we save
+    // against it. The create payload will carry the new drawing, and the
+    // effect returns because baselines are realigned to the current state.
+    if (materializeDraftIfNeeded({ drawing: mDrawingData })) return;
+
     const dirtyNoteId = String(activeId);
 
     // Release the lease from the previous superseded debounce (if it didn't fire yet).
@@ -2649,24 +2654,48 @@ export default function App() {
     if (contentRef.current) contentRef.current.style.height = "auto";
   };
 
-  /** -------- Direct create: build a blank note of the given type and open the modal in edit mode.
-   *  Used by the desktop "3 big buttons" composer. The note is persisted immediately
-   *  (local-first + enqueue). If the user closes the modal without entering anything,
-   *  closeModal() will trash the empty note (freshlyCreatedNoteRef tracks this). */
-  const freshlyCreatedNoteRef = useRef(null);
+  /** -------- Direct create: open the modal in edit mode for a blank note of the
+   *  given type WITHOUT persisting anything yet. The note is only materialised
+   *  (IDB + state + enqueue "create") when the user makes the first real edit —
+   *  see materializeDraftIfNeeded() and the autosave effects that call it. If
+   *  the user closes the modal without touching anything, pendingDraftRef is
+   *  simply cleared and nothing ever hits the queue. */
+  const pendingDraftRef = useRef(null); // { id, type } | null
 
-  const createAndOpenBlankNote = async (type) => {
+  const materializeDraftIfNeeded = (overrides = {}) => {
+    const draft = pendingDraftRef.current;
+    if (!draft) return false;
+    // Only materialise when the open modal is actually this draft. Protects
+    // against a stale ref matching state from a different note.
+    if (String(activeId) !== String(draft.id)) return false;
+    // Clear the ref synchronously so concurrent effects don't re-enter.
+    pendingDraftRef.current = null;
+
+    // Callers may pass the not-yet-committed state (e.g. syncChecklistItems is
+    // invoked right after setMItems so mItems from closure is still stale).
+    const items = Array.isArray(overrides.items)
+      ? overrides.items
+      : (Array.isArray(mItems) ? mItems : []);
+    const drawing = overrides.drawing ?? mDrawingData;
+
+    const { id, type } = draft;
     const nowIso = new Date().toISOString();
     const isDraw = type === "draw";
     const newNote = {
-      id: uid(),
+      id,
       type,
-      title: "",
-      content: isDraw ? JSON.stringify({ paths: [], dimensions: null, text: "" }) : "",
-      items: [],
-      tags: [],
-      images: [],
-      color: "default",
+      title: (mTitle || "").trim(),
+      content: isDraw
+        ? JSON.stringify({
+            paths: drawing?.paths || [],
+            dimensions: drawing?.dimensions || null,
+            text: mBody || "",
+          })
+        : (mBody || ""),
+      items,
+      tags: Array.isArray(mTagList) ? mTagList : [],
+      images: Array.isArray(mImages) ? mImages : [],
+      color: mColor || "default",
       pinned: false,
       position: Date.now(),
       timestamp: nowIso,
@@ -2679,11 +2708,38 @@ export default function App() {
       archived: false,
       trashed: false,
     };
-    const leaseId = acquireLocalLease(String(newNote.id));
-    try { await idbPutNote(localNote, currentUser?.id, sessionId); } catch (e) { console.error("IndexedDB put failed:", e); }
+
+    const leaseId = acquireLocalLease(String(id));
+    idbPutNote(localNote, currentUser?.id, sessionId).catch((e) =>
+      console.error("IndexedDB put failed:", e),
+    );
     setNotes((prev) => sortNotesByRecency([localNote, ...(Array.isArray(prev) ? prev : [])]));
     invalidateNotesCache();
-    enqueueWithLease(String(newNote.id), { type: "create", noteId: newNote.id, payload: newNote }, leaseId);
+    enqueueWithLease(String(id), { type: "create", noteId: id, payload: newNote }, leaseId);
+
+    // Align baselines with what we just persisted so subsequent autosave diffs
+    // don't enqueue a redundant patch for content already in the create payload.
+    const newBaseline = {
+      title: newNote.title,
+      content: isDraw ? (mBody || "") : newNote.content,
+      tags: newNote.tags,
+      images: newNote.images,
+      color: newNote.color,
+    };
+    initialModalStateRef.current = newBaseline;
+    committedBaselineRef.current = { ...newBaseline };
+    if (isDraw) {
+      prevDrawingRef.current = drawing || { paths: [], dimensions: null };
+    }
+    if (type === "checklist") {
+      prevItemsRef.current = [...items];
+    }
+    return true;
+  };
+
+  const createAndOpenBlankNote = (type) => {
+    const tempId = uid();
+    const isDraw = type === "draw";
 
     // Reset composer state (mobile composer uses these)
     setTitle("");
@@ -2697,10 +2753,10 @@ export default function App() {
     setComposerType("text");
     setComposerCollapsed(true);
 
-    // Open the modal directly in edit mode. We can't use openModal() because
-    // the notes state won't have the new note yet in this render cycle.
+    // Open the modal in edit mode on a blank state. No IDB/state/enqueue work
+    // happens here — materializeDraftIfNeeded() will do it on first real edit.
     setSidebarOpen(false);
-    setActiveId(String(newNote.id));
+    setActiveId(tempId);
     setMType(type);
     setMTitle("");
     setMDrawingData({ paths: [], dimensions: null });
@@ -2720,7 +2776,7 @@ export default function App() {
     if (isDraw) setInitialDrawMode("draw");
     setViewMode(false);
     setModalMenuOpen(false);
-    freshlyCreatedNoteRef.current = String(newNote.id);
+    pendingDraftRef.current = { id: tempId, type };
     setOpen(true);
   };
 
@@ -2737,6 +2793,11 @@ export default function App() {
 
   /** -------- Archive/Unarchive note -------- */
   const handleArchiveNote = async (noteId, archived) => {
+    // Archiving a draft counts as a real action — materialise it first so the
+    // create reaches the queue before the archive patch follows.
+    if (pendingDraftRef.current && String(noteId) === String(pendingDraftRef.current.id)) {
+      materializeDraftIfNeeded();
+    }
     const nid = String(noteId);
     const leaseId = acquireLocalLease(nid);
     const nowIso = new Date().toISOString();
@@ -2925,6 +2986,9 @@ export default function App() {
   const openModal = (id) => {
     const n = notes.find((x) => String(x.id) === String(id));
     if (!n) return;
+    // Clear any stale pending-draft state — we're opening a real, persisted
+    // note, so the deferred-create path must not fire for it.
+    pendingDraftRef.current = null;
     setSidebarOpen(false);
     setActiveId(String(id));
     setMType(n.type || "text");
@@ -3066,6 +3130,11 @@ export default function App() {
 
     if (!colorChanged && !tagsChanged && !imagesChanged) return;
 
+    // A real metadata change reached us — materialise the draft before saving.
+    // The create payload carries the new metadata so the subsequent patch is
+    // redundant and the effect exits.
+    if (materializeDraftIfNeeded()) return;
+
     // Acquire lease before async enqueue (prevents SSE overwrite)
     const leaseId = acquireLocalLease(String(activeId));
 
@@ -3097,6 +3166,10 @@ export default function App() {
     const titleChanged = initial.title !== mTitle.trim();
     const contentChanged = initial.content !== mBody;
     if (!titleChanged && !contentChanged) return;
+
+    // Real keystroke reached us — materialise the draft. The create carries
+    // the typed content and baselines are aligned, so the effect exits.
+    if (materializeDraftIfNeeded()) return;
 
     // Acquire lease IMMEDIATELY (before debounce fires).
     // Prevents SSE overwriting IDB during the debounce window.
@@ -3145,6 +3218,8 @@ export default function App() {
     const titleChanged = initial.title !== mTitle.trim();
     const textChanged = initial.content !== mBody;
     if (!titleChanged && !textChanged) return;
+
+    if (materializeDraftIfNeeded()) return;
 
     const nId = String(activeId);
     const leaseId = acquireLocalLease(nId);
@@ -3268,52 +3343,24 @@ export default function App() {
     // Prevent double-triggering while exit animation is running
     if (modalClosingTimerRef.current) return;
 
-    // Auto-delete a freshly-created note that the user leaves completely empty.
-    // freshlyCreatedNoteRef is set by createAndOpenBlankNote and cleared on first
-    // real edit (so only untouched/empty new notes are trashed).
-    if (activeId && freshlyCreatedNoteRef.current === String(activeId)) {
-      const drawPaths = mType === "draw"
-        ? (mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []))
-        : [];
-      const bodyEmpty = !mBody?.trim();
-      const titleEmpty = !mTitle?.trim();
-      const noItems = !Array.isArray(mItems) || mItems.length === 0;
-      const noImages = !Array.isArray(mImages) || mImages.length === 0;
-      const noTags = !Array.isArray(mTagList) || mTagList.length === 0;
-      const noDrawing = drawPaths.length === 0;
-      if (titleEmpty && bodyEmpty && noItems && noImages && noTags && noDrawing) {
-        const nid = String(activeId);
-        const nowIso = new Date().toISOString();
-        const leaseId = acquireLocalLease(nid);
-        addDeleteTombstone(nid);
-        (async () => {
-          try {
-            const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-            if (existing) await idbPutNote({ ...existing, trashed: true, client_updated_at: nowIso }, currentUser?.id, sessionId);
-          } catch (e) {}
-        })();
-        invalidateNotesCache();
-        setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-        enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
-        if (mType === "draw") showToast(t("emptyDrawNoteDeleted"), "info");
-        freshlyCreatedNoteRef.current = null;
-
-        // Run the close animation
-        setIsModalClosing(true);
-        modalClosingTimerRef.current = setTimeout(() => {
-          modalClosingTimerRef.current = null;
-          setOpen(false);
-          setActiveId(null);
-          setViewMode(true);
-          setModalMenuOpen(false);
-          setConfirmDeleteOpen(false);
-          setShowModalFmt(false);
-          setIsModalClosing(false);
-        }, 180);
-        return;
-      }
+    // Unmaterialised draft: the user opened a blank note via the creation
+    // buttons and never touched it, so nothing was ever persisted. Just run
+    // the exit animation and drop the pending state — no IDB/queue work.
+    if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
+      pendingDraftRef.current = null;
+      setIsModalClosing(true);
+      modalClosingTimerRef.current = setTimeout(() => {
+        modalClosingTimerRef.current = null;
+        setOpen(false);
+        setActiveId(null);
+        setViewMode(true);
+        setModalMenuOpen(false);
+        setConfirmDeleteOpen(false);
+        setShowModalFmt(false);
+        setIsModalClosing(false);
+      }, 180);
+      return;
     }
-    freshlyCreatedNoteRef.current = null;
 
     // Flush any pending drawing debounce before closing.
     // flushPendingDrawingSave restores pendingDrawingSaveRef on failure,
@@ -3392,6 +3439,12 @@ export default function App() {
 
   const saveModal = async () => {
     if (activeId == null) return;
+    // Pressing save on a draft counts as committing it. materialize first so
+    // the create carries the current state and patches below operate on an
+    // existing note.
+    if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
+      materializeDraftIfNeeded();
+    }
     setSavingModal(true);
 
     const noteId = String(activeId);
@@ -3478,6 +3531,12 @@ export default function App() {
   };
   const deleteModal = async () => {
     if (activeId == null) return;
+    // Draft that was never materialised — deleting it is identical to just
+    // closing the modal (nothing has been persisted anywhere).
+    if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
+      closeModal();
+      return;
+    }
     const note = notes.find((n) => String(n.id) === String(activeId));
     const nid = String(activeId);
     const isOwner = !note || note.user_id === currentUser?.id;
@@ -3563,6 +3622,11 @@ export default function App() {
     await enqueueWithLease(nid, { type: "restore", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
   };
   const togglePin = async (id, toPinned) => {
+    // Pinning a draft counts as a real action — materialise it first so the
+    // create lands in the queue before the pin patch follows.
+    if (pendingDraftRef.current && String(id) === String(pendingDraftRef.current.id)) {
+      materializeDraftIfNeeded();
+    }
     const nid = String(id);
     const leaseId = acquireLocalLease(nid);
     const nowIso = new Date().toISOString();
@@ -3762,6 +3826,12 @@ export default function App() {
   // Local-first helper: persist checklist changes to IndexedDB + sync queue
   const syncChecklistItems = async (newItems) => {
     if (!activeId) return;
+    // A checklist edit is the first real action on a pending draft — materialise
+    // the note first so the create payload already contains newItems and we
+    // don't enqueue a patch for a note the server has never seen. mItems in
+    // closure is still the previous value here (setMItems hasn't committed
+    // yet), so hand newItems in explicitly.
+    if (materializeDraftIfNeeded({ items: newItems })) return;
     const noteId = String(activeId);
     const nowIso = new Date().toISOString();
 
