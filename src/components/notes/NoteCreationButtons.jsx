@@ -14,28 +14,38 @@ export default function NoteCreationButtons({
   onCreateDraw,
 }) {
   return (
-    <div className="mb-8 flex gap-3">
-      <CreationButton
-        label={t("textNote")}
-        tooltip={t("textNote")}
-        onClick={onCreateText}
-        icon={<TextNoteIcon />}
-        colorClasses="border-rose-200/80 bg-gradient-to-br from-rose-50 to-pink-50/60 text-rose-500 hover:from-rose-100 hover:to-pink-100 hover:border-rose-300 hover:shadow-rose-200/50 dark:from-rose-900/25 dark:to-pink-900/10 dark:border-rose-700/50 dark:text-rose-300 dark:hover:from-rose-800/40 dark:hover:to-pink-800/25"
-      />
-      <CreationButton
-        label={t("checklist")}
-        tooltip={t("checklist")}
-        onClick={onCreateChecklist}
-        icon={<ChecklistIcon />}
-        colorClasses="border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-green-50/60 text-emerald-600 hover:from-emerald-100 hover:to-green-100 hover:border-emerald-300 hover:shadow-emerald-200/50 dark:from-emerald-900/25 dark:to-green-900/10 dark:border-emerald-700/50 dark:text-emerald-300 dark:hover:from-emerald-800/40 dark:hover:to-green-800/25"
-      />
-      <CreationButton
-        label={t("drawing")}
-        tooltip={t("drawing")}
-        onClick={onCreateDraw}
-        icon={<BrushIcon />}
-        colorClasses="border-orange-200/80 bg-gradient-to-br from-orange-50 to-amber-50/60 text-orange-500 hover:from-orange-100 hover:to-amber-100 hover:border-orange-300 hover:shadow-orange-200/50 dark:from-orange-900/25 dark:to-amber-900/10 dark:border-orange-700/50 dark:text-orange-300 dark:hover:from-orange-800/40 dark:hover:to-amber-800/25"
-      />
+    <div className="mb-8">
+      <div className="mb-3 flex items-baseline gap-2 px-1">
+        <h2 className="text-sm font-semibold tracking-wide uppercase text-indigo-600/90 dark:text-indigo-300/90">
+          {t("createNotePrompt")}
+        </h2>
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          {t("createNoteHint")}
+        </span>
+      </div>
+      <div className="flex gap-3">
+        <CreationButton
+          label={t("textNote")}
+          tooltip={t("textNote")}
+          onClick={onCreateText}
+          icon={<TextNoteIcon />}
+          colorClasses="border-rose-300 bg-gradient-to-br from-rose-100 to-pink-200 text-rose-700 hover:from-rose-200 hover:to-pink-300 hover:border-rose-400 hover:shadow-rose-300/60 dark:from-rose-800/70 dark:to-pink-900/60 dark:border-rose-600 dark:text-rose-100 dark:hover:from-rose-700/80 dark:hover:to-pink-800/70"
+        />
+        <CreationButton
+          label={t("checklist")}
+          tooltip={t("checklist")}
+          onClick={onCreateChecklist}
+          icon={<ChecklistIcon />}
+          colorClasses="border-emerald-300 bg-gradient-to-br from-emerald-100 to-green-200 text-emerald-700 hover:from-emerald-200 hover:to-green-300 hover:border-emerald-400 hover:shadow-emerald-300/60 dark:from-emerald-800/70 dark:to-green-900/60 dark:border-emerald-600 dark:text-emerald-100 dark:hover:from-emerald-700/80 dark:hover:to-green-800/70"
+        />
+        <CreationButton
+          label={t("drawing")}
+          tooltip={t("drawing")}
+          onClick={onCreateDraw}
+          icon={<BrushIcon />}
+          colorClasses="border-orange-300 bg-gradient-to-br from-orange-100 to-amber-200 text-orange-700 hover:from-orange-200 hover:to-amber-300 hover:border-orange-400 hover:shadow-orange-300/60 dark:from-orange-800/70 dark:to-amber-900/60 dark:border-orange-600 dark:text-orange-100 dark:hover:from-orange-700/80 dark:hover:to-amber-800/70"
+        />
+      </div>
     </div>
   );
 }
@@ -46,7 +56,7 @@ function CreationButton({ label, tooltip, onClick, icon, colorClasses }) {
       type="button"
       onClick={onClick}
       data-tooltip={tooltip}
-      className={`flex-1 flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl border-2 font-semibold text-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 ${colorClasses}`}
+      className={`flex-1 flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-xl border-2 font-semibold text-sm shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 ${colorClasses}`}
     >
       <span className="inline-flex shrink-0">{icon}</span>
       <span className="truncate">{label}</span>
