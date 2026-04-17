@@ -4005,6 +4005,7 @@ export default function App() {
       togglePin={togglePin}
       addImagesToState={addImagesToState}
       isCollaborativeNote={isCollaborativeNote}
+      syncState={syncStatus.syncState}
       onModalBodyClick={onModalBodyClick}
       resizeModalTextarea={resizeModalTextarea}
       syncChecklistItems={syncChecklistItems}

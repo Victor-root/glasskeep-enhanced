@@ -8,6 +8,7 @@ import ModalImagesGrid from "./ModalImagesGrid.jsx";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog.jsx";
 import CollaborationModal from "./CollaborationModal.jsx";
 import FullscreenImageViewer from "./FullscreenImageViewer.jsx";
+import OfflineCollabBanner from "./OfflineCollabBanner.jsx";
 import useChecklistDrag from "../../hooks/useChecklistDrag.js";
 import useModalHistory from "../../hooks/useModalHistory.js";
 import { renderSafeMarkdown, linkifyContactsHTML } from "../../utils/markdown.jsx";
@@ -133,6 +134,7 @@ export default function NoteModal({
   togglePin,
   addImagesToState,
   isCollaborativeNote,
+  syncState,
   onModalBodyClick,
   resizeModalTextarea,
   // checklist handlers
@@ -305,6 +307,8 @@ export default function NoteModal({
                 viewMode={viewMode}
               />
             )}
+
+            <OfflineCollabBanner visible={isCollaborativeNote && syncState === "offline"} />
 
             {/* Content area */}
             <div
