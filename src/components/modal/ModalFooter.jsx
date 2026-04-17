@@ -65,6 +65,7 @@ export default function ModalFooter({
   tagFilter,
   activeNoteObj,
   addModalCollaborators,
+  currentUser,
   onDownloadNote,
   onRestoreFromTrash,
   onArchiveNote,
@@ -441,7 +442,7 @@ export default function ModalFooter({
 
         {/* ── Collaborate (hidden on mobile text edit mode & draw edit mode — moved to kebab) ── */}
         {(isDesktop || viewMode || mType !== "text") && !(mType === "draw" && drawMode !== "draw" && !viewMode) && (() => {
-          const collabs = addModalCollaborators || [];
+          const collabs = (addModalCollaborators || []).filter(c => c.id !== currentUser?.id);
           const hasCollabs = collabs.length > 0;
           return (
             <button

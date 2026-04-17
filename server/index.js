@@ -1227,14 +1227,27 @@ app.get("/api/notes/:id/collaborators", auth, (req, res) => {
   }
 
   const collaborators = getNoteCollaborators.all(noteId);
-  res.json(collaborators.map(c => ({
+  const result = collaborators.map(c => ({
     id: c.id,
     name: c.name,
     email: c.email,
     avatar_url: c.avatar_url || null,
     added_at: c.added_at,
     added_by: c.added_by
-  })));
+  }));
+
+  const owner = getUserById.get(note.user_id);
+  if (owner) {
+    result.unshift({
+      id: owner.id,
+      name: owner.name,
+      email: owner.email,
+      avatar_url: owner.avatar_url || null,
+      isOwner: true
+    });
+  }
+
+  res.json(result);
 });
 
 app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {

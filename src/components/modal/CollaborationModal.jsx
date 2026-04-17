@@ -67,9 +67,11 @@ export default function CollaborationModal({
             <div className="mb-4">
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t("currentCollaborators")}</p>
               <div className="space-y-2 max-h-48 overflow-y-auto">
-                {addModalCollaborators.map((collab) => {
+                {addModalCollaborators
+                  .filter((c) => c.id !== currentUser?.id)
+                  .map((collab) => {
                   const canRemove =
-                    isOwner || collab.id === currentUser?.id;
+                    !collab.isOwner && (isOwner || collab.id === currentUser?.id);
 
                   return (
                     <div
@@ -79,6 +81,11 @@ export default function CollaborationModal({
                       <div>
                         <p className="font-medium text-sm">
                           {collab.name || collab.email}
+                          {collab.isOwner && (
+                            <span className="ml-2 text-xs text-indigo-500 dark:text-indigo-400 font-normal">
+                              {t("owner")}
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
                           {collab.email}
@@ -93,15 +100,9 @@ export default function CollaborationModal({
                             );
                           }}
                           className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                          data-tooltip={
-                            collab.id === currentUser?.id
-                              ? t("removeYourself")
-                              : t("removeCollaborator")
-                          }
+                          data-tooltip={t("removeCollaborator")}
                         >
-                          {collab.id === currentUser?.id
-                            ? t("leaveCollaboration")
-                            : t("remove")}
+                          {t("remove")}
                         </button>
                       )}
                     </div>
