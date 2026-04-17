@@ -33,16 +33,16 @@ export default function NoteCreationButtons({
         description={t("checklistDesc")}
         onClick={onCreateChecklist}
         icon={<ChecklistIcon />}
-        colorClasses="border-emerald-400 bg-gradient-to-br from-emerald-200 to-green-300 text-emerald-950 shadow-emerald-200/50 hover:from-emerald-300 hover:to-green-400 hover:border-emerald-500 hover:shadow-emerald-300/60 dark:from-emerald-800 dark:to-green-900 dark:border-emerald-500 dark:text-emerald-50 dark:shadow-none dark:hover:from-emerald-700 dark:hover:to-green-800 dark:hover:border-emerald-400"
-        iconBg="bg-white/85 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-100"
+        colorClasses="border-orange-300 bg-gradient-to-br from-orange-200 to-amber-200 text-orange-950 shadow-orange-200/50 hover:from-orange-300 hover:to-amber-300 hover:border-orange-400 hover:shadow-orange-300/60 dark:from-orange-800 dark:to-amber-900 dark:border-orange-500 dark:text-orange-50 dark:shadow-none dark:hover:from-orange-700 dark:hover:to-amber-800 dark:hover:border-orange-400"
+        iconBg="bg-white/85 text-orange-600 dark:bg-orange-950/50 dark:text-orange-100"
       />
       <CreationButton
         title={t("drawing")}
         description={t("drawingDesc")}
         onClick={onCreateDraw}
         icon={<BrushIcon />}
-        colorClasses="border-amber-400 bg-gradient-to-br from-amber-200 to-yellow-300 text-amber-950 shadow-amber-200/50 hover:from-amber-300 hover:to-yellow-400 hover:border-amber-500 hover:shadow-amber-300/60 dark:from-amber-800 dark:to-yellow-900 dark:border-amber-500 dark:text-amber-50 dark:shadow-none dark:hover:from-amber-700 dark:hover:to-yellow-800 dark:hover:border-amber-400"
-        iconBg="bg-white/85 text-amber-600 dark:bg-amber-950/50 dark:text-amber-100"
+        colorClasses="border-emerald-300 bg-gradient-to-br from-emerald-200 to-teal-200 text-teal-950 shadow-emerald-200/50 hover:from-emerald-300 hover:to-teal-300 hover:border-emerald-400 hover:shadow-emerald-300/60 dark:from-emerald-800 dark:to-teal-900 dark:border-teal-500 dark:text-teal-50 dark:shadow-none dark:hover:from-emerald-700 dark:hover:to-teal-800 dark:hover:border-teal-400"
+        iconBg="bg-white/85 text-teal-700 dark:bg-teal-950/50 dark:text-teal-100"
       />
     </div>
   );
