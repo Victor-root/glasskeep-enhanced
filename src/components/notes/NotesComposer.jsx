@@ -8,6 +8,7 @@ import FormatToolbar from "../common/FormatToolbar.jsx";
 import Popover from "../common/Popover.jsx";
 import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
+import NoteCreationButtons from "./NoteCreationButtons.jsx";
 import { bgFor, COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { uid, fileToCompressedDataURL } from "../../utils/helpers.js";
@@ -43,6 +44,9 @@ export default function NotesComposer({
   setComposerColor,
   addNote,
   onDirectDraw,
+  onDirectText,
+  onDirectChecklist,
+  isDesktop,
   addImagesToState,
   formatComposer,
   showComposerFmt,
@@ -117,7 +121,13 @@ export default function NotesComposer({
       {activeTagFilter !== "TRASHED" && activeTagFilter !== "ARCHIVED" && (
       <div className="px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="max-w-2xl mx-auto">
-          {(
+          {isDesktop ? (
+            <NoteCreationButtons
+              onCreateText={onDirectText}
+              onCreateChecklist={onDirectChecklist}
+              onCreateDraw={onDirectDraw}
+            />
+          ) : (
             <div
               ref={composerRef}
               className="glass-card rounded-xl shadow-lg p-4 mb-8 relative"

@@ -44,6 +44,8 @@ function NotesUI({
   setComposerColor,
   addNote,
   onDirectDraw,
+  onDirectText,
+  onDirectChecklist,
   pinned,
   others,
   openModal,
@@ -300,6 +302,9 @@ function NotesUI({
         setComposerColor={setComposerColor}
         addNote={addNote}
         onDirectDraw={onDirectDraw}
+        onDirectText={onDirectText}
+        onDirectChecklist={onDirectChecklist}
+        isDesktop={windowWidth >= 700 && !isLandscapeMobile}
         formatComposer={formatComposer}
         showComposerFmt={showComposerFmt}
         setShowComposerFmt={setShowComposerFmt}

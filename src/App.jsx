@@ -2649,20 +2649,24 @@ export default function App() {
     if (contentRef.current) contentRef.current.style.height = "auto";
   };
 
-  /** -------- Direct draw: create blank draw note and open fullscreen -------- */
-  const handleDirectDraw = async () => {
+  /** -------- Direct create: build a blank note of the given type and open the modal in edit mode.
+   *  Used by the desktop "3 big buttons" composer. The note is persisted immediately
+   *  (local-first + enqueue). If the user closes the modal without entering anything,
+   *  closeModal() will trash the empty note (freshlyCreatedNoteRef tracks this). */
+  const freshlyCreatedNoteRef = useRef(null);
+
+  const createAndOpenBlankNote = async (type) => {
     const nowIso = new Date().toISOString();
-    const composerTitle = title.trim();
-    const composerText = content.trim();
+    const isDraw = type === "draw";
     const newNote = {
       id: uid(),
-      type: "draw",
-      title: composerTitle,
-      content: JSON.stringify({ paths: [], dimensions: null, text: composerText }),
+      type,
+      title: "",
+      content: isDraw ? JSON.stringify({ paths: [], dimensions: null, text: "" }) : "",
       items: [],
-      tags: composerTagList.length ? composerTagList : [],
+      tags: [],
       images: [],
-      color: composerColor !== "default" ? composerColor : "default",
+      color: "default",
       pinned: false,
       position: Date.now(),
       timestamp: nowIso,
@@ -2681,7 +2685,7 @@ export default function App() {
     invalidateNotesCache();
     enqueueWithLease(String(newNote.id), { type: "create", noteId: newNote.id, payload: newNote }, leaseId);
 
-    // Reset composer
+    // Reset composer state (mobile composer uses these)
     setTitle("");
     setContent("");
     setComposerTagList([]);
@@ -2693,31 +2697,36 @@ export default function App() {
     setComposerType("text");
     setComposerCollapsed(true);
 
-    // Open the modal directly in draw edit mode (can't use openModal because
-    // the notes state won't have the new note yet in this render cycle)
+    // Open the modal directly in edit mode. We can't use openModal() because
+    // the notes state won't have the new note yet in this render cycle.
     setSidebarOpen(false);
     setActiveId(String(newNote.id));
-    setMType("draw");
-    setMTitle(composerTitle);
+    setMType(type);
+    setMTitle("");
     setMDrawingData({ paths: [], dimensions: null });
     prevDrawingRef.current = { paths: [], dimensions: null };
-    setMBody(composerText);
+    setMBody("");
     skipNextDrawingAutosave.current = true;
     skipNextItemsAutosave.current = true;
     setMItems([]);
     prevItemsRef.current = [];
-    setMTagList(localNote.tags || []);
+    setMTagList([]);
     setMImages([]);
     setTagInput("");
-    setMColor(localNote.color || "default");
-    const baselineState = { title: composerTitle, content: composerText, tags: localNote.tags || [], images: [], color: localNote.color || "default" };
+    setMColor("default");
+    const baselineState = { title: "", content: "", tags: [], images: [], color: "default" };
     initialModalStateRef.current = baselineState;
     committedBaselineRef.current = { ...baselineState };
-    setInitialDrawMode("draw");
-    setViewMode(false); // New draw notes land in edit mode when exiting draw canvas
+    if (isDraw) setInitialDrawMode("draw");
+    setViewMode(false);
     setModalMenuOpen(false);
+    freshlyCreatedNoteRef.current = String(newNote.id);
     setOpen(true);
   };
+
+  const handleDirectText = () => createAndOpenBlankNote("text");
+  const handleDirectChecklist = () => createAndOpenBlankNote("checklist");
+  const handleDirectDraw = () => createAndOpenBlankNote("draw");
 
   /** -------- Download single note .md -------- */
   const handleDownloadNote = (note) => {
@@ -3259,12 +3268,20 @@ export default function App() {
     // Prevent double-triggering while exit animation is running
     if (modalClosingTimerRef.current) return;
 
-    // Auto-delete empty draw notes (created via direct draw but never drawn on)
-    if (activeId && mType === "draw") {
-      const drawPaths = mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []);
-      const note = notes.find((n) => String(n.id) === String(activeId));
-      if (drawPaths.length === 0 && note && !note.title?.trim() && !mTitle?.trim() && !mBody?.trim()) {
-        // Empty draw note — trash it (server requires trash before permanent delete)
+    // Auto-delete a freshly-created note that the user leaves completely empty.
+    // freshlyCreatedNoteRef is set by createAndOpenBlankNote and cleared on first
+    // real edit (so only untouched/empty new notes are trashed).
+    if (activeId && freshlyCreatedNoteRef.current === String(activeId)) {
+      const drawPaths = mType === "draw"
+        ? (mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []))
+        : [];
+      const bodyEmpty = !mBody?.trim();
+      const titleEmpty = !mTitle?.trim();
+      const noItems = !Array.isArray(mItems) || mItems.length === 0;
+      const noImages = !Array.isArray(mImages) || mImages.length === 0;
+      const noTags = !Array.isArray(mTagList) || mTagList.length === 0;
+      const noDrawing = drawPaths.length === 0;
+      if (titleEmpty && bodyEmpty && noItems && noImages && noTags && noDrawing) {
         const nid = String(activeId);
         const nowIso = new Date().toISOString();
         const leaseId = acquireLocalLease(nid);
@@ -3278,7 +3295,8 @@ export default function App() {
         invalidateNotesCache();
         setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
         enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: nowIso } }, leaseId);
-        showToast(t("emptyDrawNoteDeleted"), "info");
+        if (mType === "draw") showToast(t("emptyDrawNoteDeleted"), "info");
+        freshlyCreatedNoteRef.current = null;
 
         // Run the close animation
         setIsModalClosing(true);
@@ -3295,6 +3313,7 @@ export default function App() {
         return;
       }
     }
+    freshlyCreatedNoteRef.current = null;
 
     // Flush any pending drawing debounce before closing.
     // flushPendingDrawingSave restores pendingDrawingSaveRef on failure,
@@ -4240,6 +4259,8 @@ export default function App() {
         setComposerColor={setComposerColor}
         addNote={addNote}
         onDirectDraw={handleDirectDraw}
+        onDirectText={handleDirectText}
+        onDirectChecklist={handleDirectChecklist}
         pinned={pinned}
         others={others}
         openModal={openModal}
