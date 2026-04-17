@@ -21,12 +21,12 @@ export default function NoteCreationButtons({
   return (
     <div className="mb-8 flex gap-3">
       <CreationButton
-        title={t("textNote")}
-        description={t("textNoteDesc")}
-        onClick={onCreateText}
-        icon={<TextNoteIcon />}
-        colorClasses="border-indigo-400 bg-gradient-to-br from-indigo-200 to-violet-300 text-indigo-950 shadow-indigo-200/50 hover:from-indigo-300 hover:to-violet-400 hover:border-indigo-500 hover:shadow-indigo-300/60 dark:from-indigo-800 dark:to-violet-900 dark:border-indigo-500 dark:text-indigo-50 dark:shadow-none dark:hover:from-indigo-700 dark:hover:to-violet-800 dark:hover:border-indigo-400"
-        iconBg="bg-white/85 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-100"
+        title={t("drawing")}
+        description={t("drawingDesc")}
+        onClick={onCreateDraw}
+        icon={<BrushIcon />}
+        colorClasses="border-sky-400 bg-gradient-to-br from-sky-200 to-blue-300 text-sky-950 shadow-sky-200/50 hover:from-sky-300 hover:to-blue-400 hover:border-sky-500 hover:shadow-sky-300/60 dark:from-sky-800 dark:to-blue-900 dark:border-sky-500 dark:text-sky-50 dark:shadow-none dark:hover:from-sky-700 dark:hover:to-blue-800 dark:hover:border-sky-400"
+        iconBg="bg-white/85 text-sky-600 dark:bg-sky-950/50 dark:text-sky-100"
       />
       <CreationButton
         title={t("checklist")}
@@ -37,12 +37,12 @@ export default function NoteCreationButtons({
         iconBg="bg-white/85 text-[#a85bcc] dark:bg-[#3a1850]/50 dark:text-[#f3e5fb]"
       />
       <CreationButton
-        title={t("drawing")}
-        description={t("drawingDesc")}
-        onClick={onCreateDraw}
-        icon={<BrushIcon />}
-        colorClasses="border-sky-400 bg-gradient-to-br from-sky-200 to-blue-300 text-sky-950 shadow-sky-200/50 hover:from-sky-300 hover:to-blue-400 hover:border-sky-500 hover:shadow-sky-300/60 dark:from-sky-800 dark:to-blue-900 dark:border-sky-500 dark:text-sky-50 dark:shadow-none dark:hover:from-sky-700 dark:hover:to-blue-800 dark:hover:border-sky-400"
-        iconBg="bg-white/85 text-sky-600 dark:bg-sky-950/50 dark:text-sky-100"
+        title={t("textNote")}
+        description={t("textNoteDesc")}
+        onClick={onCreateText}
+        icon={<TextNoteIcon />}
+        colorClasses="border-indigo-400 bg-gradient-to-br from-indigo-200 to-violet-300 text-indigo-950 shadow-indigo-200/50 hover:from-indigo-300 hover:to-violet-400 hover:border-indigo-500 hover:shadow-indigo-300/60 dark:from-indigo-800 dark:to-violet-900 dark:border-indigo-500 dark:text-indigo-50 dark:shadow-none dark:hover:from-indigo-700 dark:hover:to-violet-800 dark:hover:border-indigo-400"
+        iconBg="bg-white/85 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-100"
       />
     </div>
   );
