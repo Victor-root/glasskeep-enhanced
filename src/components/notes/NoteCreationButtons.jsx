@@ -33,16 +33,16 @@ export default function NoteCreationButtons({
         description={t("checklistDesc")}
         onClick={onCreateChecklist}
         icon={<ChecklistIcon />}
-        colorClasses="border-[#a85bcc] bg-[linear-gradient(to_bottom_right,#d6a5ed,#be76de)] text-[#3a1850] shadow-purple-200/50 hover:bg-[linear-gradient(to_bottom_right,#c98ce4,#a85bcc)] hover:border-[#9343b6] hover:shadow-purple-300/60 dark:bg-[linear-gradient(to_bottom_right,#5e3a78,#422856)] dark:border-[#7d4699] dark:text-[#f3e5fb] dark:shadow-none dark:hover:bg-[linear-gradient(to_bottom_right,#6b4587,#523265)] dark:hover:border-[#a85bcc]"
-        iconBg="bg-white/85 text-[#a85bcc] dark:bg-[#3a1850]/50 dark:text-[#f3e5fb]"
+        colorClasses="border-emerald-400 bg-gradient-to-br from-emerald-200 to-green-300 text-emerald-950 shadow-emerald-200/50 hover:from-emerald-300 hover:to-green-400 hover:border-emerald-500 hover:shadow-emerald-300/60 dark:from-emerald-800 dark:to-green-900 dark:border-emerald-500 dark:text-emerald-50 dark:shadow-none dark:hover:from-emerald-700 dark:hover:to-green-800 dark:hover:border-emerald-400"
+        iconBg="bg-white/85 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-100"
       />
       <CreationButton
         title={t("drawing")}
         description={t("drawingDesc")}
         onClick={onCreateDraw}
         icon={<BrushIcon />}
-        colorClasses="border-sky-400 bg-gradient-to-br from-sky-200 to-blue-300 text-sky-950 shadow-sky-200/50 hover:from-sky-300 hover:to-blue-400 hover:border-sky-500 hover:shadow-sky-300/60 dark:from-sky-800 dark:to-blue-900 dark:border-sky-500 dark:text-sky-50 dark:shadow-none dark:hover:from-sky-700 dark:hover:to-blue-800 dark:hover:border-sky-400"
-        iconBg="bg-white/85 text-sky-600 dark:bg-sky-950/50 dark:text-sky-100"
+        colorClasses="border-amber-400 bg-gradient-to-br from-amber-200 to-yellow-300 text-amber-950 shadow-amber-200/50 hover:from-amber-300 hover:to-yellow-400 hover:border-amber-500 hover:shadow-amber-300/60 dark:from-amber-800 dark:to-yellow-900 dark:border-amber-500 dark:text-amber-50 dark:shadow-none dark:hover:from-amber-700 dark:hover:to-yellow-800 dark:hover:border-amber-400"
+        iconBg="bg-white/85 text-amber-600 dark:bg-amber-950/50 dark:text-amber-100"
       />
     </div>
   );
