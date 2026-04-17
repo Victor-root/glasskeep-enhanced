@@ -25,9 +25,8 @@ export default function NoteCreationButtons({
         description={t("textNoteDesc")}
         onClick={onCreateText}
         icon={<TextNoteIcon />}
-        colorClasses="border-indigo-600 bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-indigo-300/50 hover:from-indigo-600 hover:to-violet-700 hover:border-indigo-700 hover:shadow-indigo-400/60 dark:from-indigo-600 dark:to-violet-700 dark:border-indigo-500 dark:text-white dark:shadow-none dark:hover:from-indigo-700 dark:hover:to-violet-800 dark:hover:border-indigo-400"
-        iconBg="bg-white/95 text-indigo-600 dark:bg-white/90 dark:text-indigo-700"
-        plusHintClasses="bg-black/25 text-white dark:bg-black/30"
+        colorClasses="border-indigo-400 bg-gradient-to-br from-indigo-200 to-violet-300 text-indigo-950 shadow-indigo-200/50 hover:from-indigo-300 hover:to-violet-400 hover:border-indigo-500 hover:shadow-indigo-300/60 dark:from-indigo-800 dark:to-violet-900 dark:border-indigo-500 dark:text-indigo-50 dark:shadow-none dark:hover:from-indigo-700 dark:hover:to-violet-800 dark:hover:border-indigo-400"
+        iconBg="bg-white/85 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-100"
       />
       <CreationButton
         title={t("checklist")}
