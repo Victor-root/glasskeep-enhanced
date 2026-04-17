@@ -33,16 +33,16 @@ export default function NoteCreationButtons({
         description={t("checklistDesc")}
         onClick={onCreateChecklist}
         icon={<ChecklistIcon />}
-        colorClasses="border-emerald-400 bg-gradient-to-br from-emerald-200 to-green-300 text-emerald-950 shadow-emerald-200/50 hover:from-emerald-300 hover:to-green-400 hover:border-emerald-500 hover:shadow-emerald-300/60 dark:from-emerald-800 dark:to-green-900 dark:border-emerald-500 dark:text-emerald-50 dark:shadow-none dark:hover:from-emerald-700 dark:hover:to-green-800 dark:hover:border-emerald-400"
-        iconBg="bg-white/85 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-100"
+        colorClasses="border-sky-400 bg-gradient-to-br from-sky-200 to-blue-300 text-sky-950 shadow-sky-200/50 hover:from-sky-300 hover:to-blue-400 hover:border-sky-500 hover:shadow-sky-300/60 dark:from-sky-800 dark:to-blue-900 dark:border-sky-500 dark:text-sky-50 dark:shadow-none dark:hover:from-sky-700 dark:hover:to-blue-800 dark:hover:border-sky-400"
+        iconBg="bg-white/85 text-sky-600 dark:bg-sky-950/50 dark:text-sky-100"
       />
       <CreationButton
         title={t("drawing")}
         description={t("drawingDesc")}
         onClick={onCreateDraw}
         icon={<BrushIcon />}
-        colorClasses="border-orange-400 bg-gradient-to-br from-orange-200 to-amber-300 text-orange-950 shadow-orange-200/50 hover:from-orange-300 hover:to-amber-400 hover:border-orange-500 hover:shadow-orange-300/60 dark:from-orange-800 dark:to-amber-900 dark:border-orange-500 dark:text-orange-50 dark:shadow-none dark:hover:from-orange-700 dark:hover:to-amber-800 dark:hover:border-orange-400"
-        iconBg="bg-white/85 text-orange-600 dark:bg-orange-950/50 dark:text-orange-100"
+        colorClasses="border-fuchsia-400 bg-gradient-to-br from-fuchsia-200 to-pink-300 text-fuchsia-950 shadow-fuchsia-200/50 hover:from-fuchsia-300 hover:to-pink-400 hover:border-fuchsia-500 hover:shadow-fuchsia-300/60 dark:from-fuchsia-800 dark:to-pink-900 dark:border-fuchsia-500 dark:text-fuchsia-50 dark:shadow-none dark:hover:from-fuchsia-700 dark:hover:to-pink-800 dark:hover:border-fuchsia-400"
+        iconBg="bg-white/85 text-fuchsia-600 dark:bg-fuchsia-950/50 dark:text-fuchsia-100"
       />
     </div>
   );
