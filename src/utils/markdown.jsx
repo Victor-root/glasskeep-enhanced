@@ -27,9 +27,9 @@ const _PURIFY_CONFIG = {
 export const renderSafeMarkdown = (md) => {
   try {
     let text = md || "";
-    // Preserve intentional blank lines before headings: insert <br> so
-    // the gap survives marked's parsing (single \n vs \n\n produce the same HTML otherwise).
-    text = text.replace(/\n\n(#{1,6}\s)/g, "\n\n<br>\n\n$1");
+    // Preserve intentional blank lines before headings: insert a spacer so
+    // the p:has(+h*) CSS rule won't strip the paragraph's bottom margin.
+    text = text.replace(/\n\n(#{1,6}\s)/g, '\n\n<div class="hs"></div>\n\n$1');
     const raw = marked.parse(text);
     return DOMPurify.sanitize(raw, _PURIFY_CONFIG);
   } catch {
