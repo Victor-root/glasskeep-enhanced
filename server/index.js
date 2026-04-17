@@ -1778,6 +1778,7 @@ app.get("/api/users/search", auth, (req, res) => {
       id: r.id,
       name: r.name,
       email: r.email,
+      avatar_url: r.avatar_url || null,
     }))
   );
 });

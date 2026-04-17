@@ -1,5 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
+import UserAvatar from "../common/UserAvatar.jsx";
 import { t } from "../../i18n";
 
 /**
@@ -78,18 +79,28 @@ export default function CollaborationModal({
                       key={collab.id}
                       className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"
                     >
-                      <div>
-                        <p className="font-medium text-sm">
-                          {collab.name || collab.email}
-                          {collab.isOwner && (
-                            <span className="ml-2 text-xs text-indigo-500 dark:text-indigo-400 font-normal">
-                              {t("owner")}
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {collab.email}
-                        </p>
+                      <div className="flex items-center gap-2.5">
+                        <UserAvatar
+                          name={collab.name}
+                          email={collab.email}
+                          avatarUrl={collab.avatar_url}
+                          size="w-8 h-8"
+                          textSize="text-xs"
+                          dark={dark}
+                        />
+                        <div>
+                          <p className="font-medium text-sm">
+                            {collab.name || collab.email}
+                            {collab.isOwner && (
+                              <span className="ml-2 text-xs text-indigo-500 dark:text-indigo-400 font-normal">
+                                {t("owner")}
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {collab.email}
+                          </p>
+                        </div>
                       </div>
                       {canRemove && (
                         <button
@@ -209,20 +220,30 @@ export default function CollaborationModal({
               filteredUsers.map((user) => (
                 <div
                   key={user.id}
-                  className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                  className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0 flex items-center gap-2.5"
                   onClick={() => {
                     setCollaboratorUsername(user.name || user.email);
                     setShowUserDropdown(false);
                   }}
                 >
-                  <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                    {user.name || user.email}
-                  </div>
-                  {user.name && (
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      {user.email}
+                  <UserAvatar
+                    name={user.name}
+                    email={user.email}
+                    avatarUrl={user.avatar_url}
+                    size="w-7 h-7"
+                    textSize="text-[10px]"
+                    dark={dark}
+                  />
+                  <div>
+                    <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                      {user.name || user.email}
                     </div>
-                  )}
+                    {user.name && (
+                      <div className="text-xs text-gray-600 dark:text-gray-400">
+                        {user.email}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))
             )}
