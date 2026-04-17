@@ -1526,10 +1526,7 @@ app.get("/api/notes/export", auth, (req, res) => {
 app.get("/api/notes/:id", auth, (req, res) => {
   const r = getNoteWithCollaboration.get(req.user.id, req.params.id, req.user.id);
   if (!r) return res.status(404).json({ error: "Note not found" });
-  const collabCount = db.prepare(
-    "SELECT COUNT(*) as count FROM note_collaborators WHERE note_id = ?"
-  ).get(r.id);
-  const hasCollaborators = (collabCount?.count || 0) > 0;
+  const collabList = getNoteCollaborators.all(r.id);
   res.json({
     id: r.id,
     user_id: r.user_id,
@@ -1549,7 +1546,7 @@ app.get("/api/notes/:id", auth, (req, res) => {
     lastEditedAt: r.last_edited_at,
     archived: !!r.archived,
     trashed: !!r.trashed,
-    collaborators: hasCollaborators ? [] : null,
+    collaborators: collabList.length > 0 ? collabList.map(c => ({ id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url || null })) : null,
   });
 });
 
