@@ -1,5 +1,15 @@
-import React from "react";
+import React, { memo } from "react";
 import { t } from "../../i18n";
+
+const NoteViewContent = memo(function NoteViewContent({ html, noteViewRef }) {
+  return (
+    <div
+      ref={noteViewRef}
+      className="note-content note-content--dense whitespace-pre-wrap"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}, (prev, next) => prev.html === next.html);
 import DrawingCanvas from "../../DrawingCanvas";
 import ChecklistRow from "../common/ChecklistRow.jsx";
 import ModalHeader from "./ModalHeader.jsx";
@@ -325,11 +335,7 @@ export default function NoteModal({
               {/* Text, Checklist, or Drawing */}
               {mType === "text" ? (
                 viewMode ? (
-                  <div
-                    ref={noteViewRef}
-                    className="note-content note-content--dense whitespace-pre-wrap"
-                    dangerouslySetInnerHTML={{ __html: viewHtml }}
-                  />
+                  <NoteViewContent html={viewHtml} noteViewRef={noteViewRef} />
                 ) : (
                   <div className="relative min-h-[160px]">
                     <textarea
@@ -572,12 +578,7 @@ export default function NoteModal({
                 /* View mode: rendered text + read-only drawing preview */
                 <>
                   {mBody && (
-                    <div
-                      className="note-content note-content--dense whitespace-pre-wrap"
-                      dangerouslySetInnerHTML={{
-                        __html: viewHtml,
-                      }}
-                    />
+                    <NoteViewContent html={viewHtml} />
                   )}
                   <div className="mt-4">
                     <DrawingCanvas
