@@ -1342,7 +1342,13 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
 
   const existing = getNote.get(id, req.user.id);
   if (!existing) {
-    return res.status(404).json({ error: "Note not found" });
+    // Not the owner — check if user is a collaborator
+    const collabNote = getNoteWithCollaboration.get(req.user.id, id, req.user.id);
+    if (!collabNote) return res.status(404).json({ error: "Note not found" });
+    // Collaborator "delete" = leave the collaboration
+    db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
+    db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
+    return res.json({ ok: true, left: true });
   }
 
   // LWW: reject stale writes (compare milliseconds)
