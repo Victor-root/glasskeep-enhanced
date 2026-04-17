@@ -33,7 +33,7 @@ export default function NoteCreationButtons({
         description={t("checklistDesc")}
         onClick={onCreateChecklist}
         icon={<ChecklistIcon />}
-        colorClasses="border-teal-500 bg-gradient-to-br from-teal-400 to-emerald-500 text-white shadow-teal-300/50 hover:from-teal-500 hover:to-emerald-600 hover:border-teal-600 hover:shadow-teal-400/60 dark:from-teal-700 dark:to-emerald-900 dark:border-teal-500 dark:text-teal-50 dark:shadow-none dark:hover:from-teal-600 dark:hover:to-emerald-800 dark:hover:border-teal-400"
+        colorClasses="border-teal-300 bg-gradient-to-br from-teal-200 to-emerald-300 text-teal-950 shadow-teal-200/50 hover:from-teal-300 hover:to-emerald-400 hover:border-teal-400 hover:shadow-teal-300/60 dark:from-teal-800 dark:to-emerald-900 dark:border-teal-500 dark:text-teal-50 dark:shadow-none dark:hover:from-teal-700 dark:hover:to-emerald-800 dark:hover:border-teal-400"
         iconBg="bg-white/85 text-teal-700 dark:bg-teal-950/50 dark:text-teal-100"
       />
       <CreationButton
@@ -41,7 +41,7 @@ export default function NoteCreationButtons({
         description={t("drawingDesc")}
         onClick={onCreateDraw}
         icon={<BrushIcon />}
-        colorClasses="border-orange-400 bg-gradient-to-br from-rose-300 to-orange-300 text-rose-950 shadow-rose-200/50 hover:from-rose-400 hover:to-orange-400 hover:border-orange-500 hover:shadow-rose-300/60 dark:from-rose-800 dark:to-orange-900 dark:border-orange-500 dark:text-rose-50 dark:shadow-none dark:hover:from-rose-700 dark:hover:to-orange-800 dark:hover:border-orange-400"
+        colorClasses="border-orange-300 bg-gradient-to-br from-rose-200 to-orange-200 text-rose-950 shadow-rose-200/50 hover:from-rose-300 hover:to-orange-300 hover:border-orange-400 hover:shadow-rose-300/60 dark:from-rose-800 dark:to-orange-900 dark:border-orange-500 dark:text-rose-50 dark:shadow-none dark:hover:from-rose-700 dark:hover:to-orange-800 dark:hover:border-orange-400"
         iconBg="bg-white/85 text-rose-600 dark:bg-rose-950/50 dark:text-rose-100"
       />
     </div>
