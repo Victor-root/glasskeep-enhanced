@@ -25,7 +25,7 @@ export default function NoteCreationButtons({
         description={t("textNoteDesc")}
         onClick={onCreateText}
         icon={<TextNoteIcon />}
-        colorClasses="border-rose-500 bg-gradient-to-br from-rose-300 to-pink-400 text-rose-900 shadow-rose-300/50 hover:from-rose-400 hover:to-pink-500 hover:border-rose-600 hover:shadow-rose-400/70 dark:from-rose-700 dark:to-pink-800 dark:border-rose-500 dark:text-rose-50 dark:shadow-none dark:hover:from-rose-600 dark:hover:to-pink-700 dark:hover:border-rose-400"
+        colorClasses="border-rose-400 bg-gradient-to-br from-rose-200 to-pink-300 text-rose-950 shadow-rose-200/50 hover:from-rose-300 hover:to-pink-400 hover:border-rose-500 hover:shadow-rose-300/60 dark:from-rose-800 dark:to-pink-900 dark:border-rose-500 dark:text-rose-50 dark:shadow-none dark:hover:from-rose-700 dark:hover:to-pink-800 dark:hover:border-rose-400"
         iconBg="bg-white/85 text-rose-600 dark:bg-rose-950/50 dark:text-rose-100"
       />
       <CreationButton
@@ -33,7 +33,7 @@ export default function NoteCreationButtons({
         description={t("checklistDesc")}
         onClick={onCreateChecklist}
         icon={<ChecklistIcon />}
-        colorClasses="border-emerald-500 bg-gradient-to-br from-emerald-300 to-green-400 text-emerald-900 shadow-emerald-300/50 hover:from-emerald-400 hover:to-green-500 hover:border-emerald-600 hover:shadow-emerald-400/70 dark:from-emerald-700 dark:to-green-800 dark:border-emerald-500 dark:text-emerald-50 dark:shadow-none dark:hover:from-emerald-600 dark:hover:to-green-700 dark:hover:border-emerald-400"
+        colorClasses="border-emerald-400 bg-gradient-to-br from-emerald-200 to-green-300 text-emerald-950 shadow-emerald-200/50 hover:from-emerald-300 hover:to-green-400 hover:border-emerald-500 hover:shadow-emerald-300/60 dark:from-emerald-800 dark:to-green-900 dark:border-emerald-500 dark:text-emerald-50 dark:shadow-none dark:hover:from-emerald-700 dark:hover:to-green-800 dark:hover:border-emerald-400"
         iconBg="bg-white/85 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-100"
       />
       <CreationButton
@@ -41,7 +41,7 @@ export default function NoteCreationButtons({
         description={t("drawingDesc")}
         onClick={onCreateDraw}
         icon={<BrushIcon />}
-        colorClasses="border-orange-500 bg-gradient-to-br from-orange-300 to-amber-400 text-orange-900 shadow-orange-300/50 hover:from-orange-400 hover:to-amber-500 hover:border-orange-600 hover:shadow-orange-400/70 dark:from-orange-700 dark:to-amber-800 dark:border-orange-500 dark:text-orange-50 dark:shadow-none dark:hover:from-orange-600 dark:hover:to-amber-700 dark:hover:border-orange-400"
+        colorClasses="border-orange-400 bg-gradient-to-br from-orange-200 to-amber-300 text-orange-950 shadow-orange-200/50 hover:from-orange-300 hover:to-amber-400 hover:border-orange-500 hover:shadow-orange-300/60 dark:from-orange-800 dark:to-amber-900 dark:border-orange-500 dark:text-orange-50 dark:shadow-none dark:hover:from-orange-700 dark:hover:to-amber-800 dark:hover:border-orange-400"
         iconBg="bg-white/85 text-orange-600 dark:bg-orange-950/50 dark:text-orange-100"
       />
     </div>
