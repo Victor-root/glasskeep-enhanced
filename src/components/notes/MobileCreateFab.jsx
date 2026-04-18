@@ -15,37 +15,24 @@ export default function MobileCreateFab({
   useEffect(() => {
     if (!open) return;
 
-    // Track whether the gesture started outside the FAB container.
-    // We do NOT call setOpen here — doing so would re-render the backdrop to
-    // pointer-events:none before the click fires, causing the click to fall
-    // through and land on a note card.
-    let closingDown = false;
-    const onPointerDown = (e) => {
-      closingDown = !containerRef.current?.contains(e.target);
-    };
-
-    // Intercept the click in capture phase (fires before any element's onClick).
-    // At this point the backdrop is still pointer-events:auto, so we stop
-    // propagation to prevent note cards from receiving the click, then close.
+    // Close in the click capture phase at document level. This fires BEFORE any
+    // element's onClick. stopPropagation prevents React from ever dispatching
+    // the synthetic click to note cards. The click target is the backdrop
+    // (portaled to body, z-30, pointer-events:auto) — not the note — because we
+    // do NOT re-render the backdrop mid-event.
     const onClickCapture = (e) => {
-      if (!closingDown) return;
-      closingDown = false;
+      if (containerRef.current?.contains(e.target)) return;
       e.stopPropagation();
       setOpen(false);
     };
-
     const onKey = (e) => {
       if (e.key === "Escape") setOpen(false);
     };
 
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("touchstart", onPointerDown);
     document.addEventListener("click", onClickCapture, true);
     document.addEventListener("keydown", onKey);
 
     return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("touchstart", onPointerDown);
       document.removeEventListener("click", onClickCapture, true);
       document.removeEventListener("keydown", onKey);
     };
