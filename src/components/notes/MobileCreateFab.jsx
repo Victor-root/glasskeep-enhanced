@@ -101,7 +101,7 @@ export default function MobileCreateFab({
         onClick={() => setOpen((v) => !v)}
         aria-label={t("addNote")}
         aria-expanded={open}
-        className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white active:scale-95 transition-all duration-200 flex items-center justify-center focus:outline-none btn-gradient"
+        className="pointer-events-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white active:scale-95 transition-all duration-200 flex items-center justify-center focus:outline-none btn-gradient"
       >
         <svg
           className={`w-7 h-7 transition-transform duration-200 ${open ? "rotate-45" : ""}`}
