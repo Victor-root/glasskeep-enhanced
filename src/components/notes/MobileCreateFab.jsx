@@ -72,7 +72,7 @@ export default function MobileCreateFab({
           title={t("drawing")}
           description={t("drawingDesc")}
           icon={<BrushIcon />}
-          colorClasses="border-orange-300 bg-gradient-to-br from-rose-200 to-orange-200 text-rose-900 shadow-rose-300/40 dark:from-rose-800 dark:to-orange-900 dark:border-orange-500 dark:text-rose-50 dark:shadow-none"
+          colorClasses="border-orange-300 bg-gradient-to-br from-rose-200 to-orange-200 text-rose-900 dark:from-rose-800 dark:to-orange-900 dark:border-orange-500 dark:text-rose-50"
           iconBg="bg-white/85 text-rose-600 dark:bg-rose-950/50 dark:text-rose-100"
         />
         <FabDialButton
@@ -81,7 +81,7 @@ export default function MobileCreateFab({
           title={t("checklist")}
           description={t("checklistDesc")}
           icon={<ChecklistIcon />}
-          colorClasses="border-teal-300 bg-gradient-to-br from-teal-200 to-emerald-300 text-teal-900 shadow-teal-300/40 dark:from-teal-800 dark:to-emerald-900 dark:border-teal-500 dark:text-teal-50 dark:shadow-none"
+          colorClasses="border-teal-300 bg-gradient-to-br from-teal-200 to-emerald-300 text-teal-900 dark:from-teal-800 dark:to-emerald-900 dark:border-teal-500 dark:text-teal-50"
           iconBg="bg-white/85 text-teal-700 dark:bg-teal-950/50 dark:text-teal-100"
         />
         <FabDialButton
@@ -90,7 +90,7 @@ export default function MobileCreateFab({
           title={t("textNote")}
           description={t("textNoteDesc")}
           icon={<TextNoteIcon />}
-          colorClasses="border-indigo-400 bg-gradient-to-br from-indigo-200 to-violet-300 text-indigo-900 shadow-indigo-300/40 dark:from-indigo-800 dark:to-violet-900 dark:border-indigo-500 dark:text-indigo-50 dark:shadow-none"
+          colorClasses="border-indigo-400 bg-gradient-to-br from-indigo-200 to-violet-300 text-indigo-900 dark:from-indigo-800 dark:to-violet-900 dark:border-indigo-500 dark:text-indigo-50"
           iconBg="bg-white/85 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-100"
         />
       </div>
@@ -100,7 +100,7 @@ export default function MobileCreateFab({
         onClick={() => setOpen((v) => !v)}
         aria-label={t("addNote")}
         aria-expanded={open}
-        className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-xl shadow-indigo-500/40 active:scale-95 transition-all duration-200 flex items-center justify-center focus:outline-none btn-gradient"
+        className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white active:scale-95 transition-all duration-200 flex items-center justify-center focus:outline-none btn-gradient"
       >
         <svg
           className={`w-7 h-7 transition-transform duration-200 ${open ? "rotate-45" : ""}`}
@@ -126,7 +126,7 @@ function FabDialButton({ onClick, label, icon, colorClasses, iconBg, title, desc
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={`w-44 flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 shadow-md active:scale-[0.98] transition-transform duration-200 text-left focus:outline-none ${colorClasses}`}
+      className={`w-44 flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 active:scale-[0.98] transition-transform duration-200 text-left focus:outline-none ${colorClasses}`}
     >
       <span className={`inline-flex shrink-0 items-center justify-center w-9 h-9 rounded-lg ${iconBg}`}>
         {icon}
