@@ -49,7 +49,7 @@ export default function MobileCreateFab({
   return (
     <>
       <div
-        className={`fixed inset-0 z-30 transition-all duration-200 ease-out bg-black/30 backdrop-blur-sm ${
+        className={`fixed inset-0 z-30 transition-all duration-200 ease-out bg-black/30 backdrop-blur-[2px] ${
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         onClick={() => setOpen(false)}
@@ -100,7 +100,7 @@ export default function MobileCreateFab({
         onClick={() => setOpen((v) => !v)}
         aria-label={t("addNote")}
         aria-expanded={open}
-        className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-xl shadow-indigo-500/40 active:scale-95 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 btn-gradient"
+        className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-xl shadow-indigo-500/40 active:scale-95 transition-all duration-200 flex items-center justify-center focus:outline-none btn-gradient"
       >
         <svg
           className={`w-7 h-7 transition-transform duration-200 ${open ? "rotate-45" : ""}`}
@@ -126,7 +126,7 @@ function FabDialButton({ onClick, label, icon, colorClasses, iconBg, title, desc
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={`w-44 flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 shadow-md active:scale-[0.98] transition-transform duration-200 text-left focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${colorClasses}`}
+      className={`w-44 flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 shadow-md active:scale-[0.98] transition-transform duration-200 text-left focus:outline-none ${colorClasses}`}
     >
       <span className={`inline-flex shrink-0 items-center justify-center w-9 h-9 rounded-lg ${iconBg}`}>
         {icon}
