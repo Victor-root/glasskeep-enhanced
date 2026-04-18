@@ -1,20 +1,36 @@
 # Glass Keep — Enhanced Fork
 
 > **Fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with local-first sync (offline support), real-time multi-device sync, multi-language i18n support, UI improvements, and a **native Android app**.
+
 ---
-**Web App Screenshots**
 
-<img width="1218" height="677" alt="main-desktop" src="https://github.com/user-attachments/assets/8ee7e4cc-0033-4850-98cd-84d105437330" />
-<img width="1218" height="677" alt="modalchecklist-desktop" src="https://github.com/user-attachments/assets/36bfd2af-679b-481b-8c32-7337c5bf7685" />
-<img width="1218" height="677" alt="modaltext-desktop" src="https://github.com/user-attachments/assets/b08e30d1-2e5b-4de8-9f8a-8c5e6dc2a330" />
-<img width="1218" height="677" alt="main-desktop_dark" src="https://github.com/user-attachments/assets/263f8013-d2ec-458e-b347-29897ec0d8e8" />
+## 📸 Screenshots
 
-**Mobile Screenshots**
+### 🖥️ Desktop
 
-<img width="381" height="718" alt="main-mobile-+_dark" src="https://github.com/user-attachments/assets/d7a6f6e8-d6ff-4b2a-8270-9dfd56329d02" />
-<img width="381" height="718" alt="main-mobile-+_1080p" src="https://github.com/user-attachments/assets/c78669a9-dbb4-4534-be11-73aed32855d0" />
-<img width="381" height="718" alt="main-mobile_dark" src="https://github.com/user-attachments/assets/931178dd-153b-44a2-83d2-47e82c0a97c7" />
-<img width="381" height="718" alt="main-mobile_1080p" src="https://github.com/user-attachments/assets/1aa89208-a98d-4707-8690-84da537f9f33" />
+<table>
+  <tr>
+    <td align="center"><img src="https://github.com/user-attachments/assets/8ee7e4cc-0033-4850-98cd-84d105437330" /><br/><sub>Home — Light</sub></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/263f8013-d2ec-458e-b347-29897ec0d8e8" /><br/><sub>Home — Dark</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="https://github.com/user-attachments/assets/b08e30d1-2e5b-4de8-9f8a-8c5e6dc2a330" /><br/><sub>Text note</sub></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/36bfd2af-679b-481b-8c32-7337c5bf7685" /><br/><sub>Checklist</sub></td>
+  </tr>
+</table>
+
+### 📱 Mobile
+
+<table>
+  <tr>
+    <td align="center"><img src="https://github.com/user-attachments/assets/1aa89208-a98d-4707-8690-84da537f9f33" width="185" /><br/><sub>Home — Light</sub></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/931178dd-153b-44a2-83d2-47e82c0a97c7" width="185" /><br/><sub>Home — Dark</sub></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/c78669a9-dbb4-4534-be11-73aed32855d0" width="185" /><br/><sub>New note — Light</sub></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/d7a6f6e8-d6ff-4b2a-8270-9dfd56329d02" width="185" /><br/><sub>New note — Dark</sub></td>
+  </tr>
+</table>
+
+---
 
 ## 📱 Android App
 
