@@ -1,5 +1,4 @@
 import React, { useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { t } from "../../i18n";
 import { TextNoteIcon, ChecklistIcon, BrushIcon } from "../../icons/index.jsx";
 
@@ -17,11 +16,17 @@ export default function MobileCreateFab({
 
     // Close in the click capture phase at document level. This fires BEFORE any
     // element's onClick. stopPropagation prevents React from ever dispatching
-    // the synthetic click to note cards. The click target is the backdrop
-    // (portaled to body, z-30, pointer-events:auto) — not the note — because we
-    // do NOT re-render the backdrop mid-event.
+    // the synthetic click to note cards. We don't call setOpen on
+    // mousedown/touchstart, so the backdrop stays pointer-events:auto for the
+    // whole tap sequence — the click target is the backdrop, not a note.
     const onClickCapture = (e) => {
-      if (containerRef.current?.contains(e.target)) return;
+      // The FAB wrapper spans the vertical space including the hidden dial
+      // buttons, so plain containerRef.contains(target) treats empty padding
+      // clicks as "inside". Only preserve clicks that hit an actual button
+      // (FAB toggle or a dial button) inside the container — anything else,
+      // including the wrapper itself, counts as outside and closes the menu.
+      const btn = e.target.closest?.("button");
+      if (btn && containerRef.current?.contains(btn)) return;
       e.stopPropagation();
       setOpen(false);
     };
@@ -43,9 +48,7 @@ export default function MobileCreateFab({
     fn?.();
   };
 
-  // Portal to document.body so no ancestor CSS (transform, contain, filter) can
-  // alter fixed positioning or stacking — backdrop truly covers the viewport.
-  return createPortal(
+  return (
     <>
       <div
         className={`fixed inset-0 z-30 transition-all duration-200 ease-out bg-black/30 backdrop-blur-[2px] ${
@@ -54,7 +57,7 @@ export default function MobileCreateFab({
       />
       <div
         ref={containerRef}
-        className="fixed right-6 z-40 flex flex-col items-end gap-3"
+        className="fixed right-6 z-40 flex flex-col items-end gap-3 pointer-events-none"
         style={{ bottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
       >
       <div
@@ -114,8 +117,7 @@ export default function MobileCreateFab({
         </svg>
       </button>
     </div>
-    </>,
-    document.body
+    </>
   );
 }
 
