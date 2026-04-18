@@ -57,8 +57,11 @@ export default function MobileCreateFab({
       />
       <div
         ref={containerRef}
-        className="fixed right-6 z-40 flex flex-col items-end gap-3 pointer-events-none"
-        style={{ bottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
+        className="fixed z-40 flex flex-col items-end gap-3 pointer-events-none"
+        style={{
+          bottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))",
+          right: "max(1.5rem, calc(env(safe-area-inset-right) + 1rem))",
+        }}
       >
       <div
         className={`flex flex-col items-end gap-3 transition-all duration-200 ease-out ${
