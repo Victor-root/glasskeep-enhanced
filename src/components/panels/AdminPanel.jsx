@@ -338,9 +338,18 @@ export default function AdminPanel({
                   className="p-3 border border-[var(--border-light)] rounded-lg"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <div className="font-medium">{user.name}</div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
+                    <div className="flex items-center gap-3">
+                      <UserAvatar
+                        name={user.name}
+                        email={user.email}
+                        avatarUrl={user.avatar_url}
+                        size="w-9 h-9"
+                        textSize="text-sm"
+                      />
+                      <div>
+                        <div className="font-medium">{user.name}</div>
+                        <div className="text-sm text-gray-500">{user.email}</div>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {user.is_admin && (
