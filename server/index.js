@@ -1685,6 +1685,7 @@ const listAllUsers = db.prepare(`
     u.email,
     u.created_at,
     u.is_admin,
+    u.avatar_url,
     COUNT(n.id) AS notes,
     COALESCE(SUM(
       COALESCE(LENGTH(n.title),0) +
@@ -1710,6 +1711,7 @@ app.get("/api/admin/users", auth, adminOnly, (_req, res) => {
       notes: Number(r.notes || 0),
       storage_bytes: Number(r.storage_bytes || 0),
       created_at: r.created_at,
+      avatar_url: r.avatar_url || null,
     }))
   );
 });
