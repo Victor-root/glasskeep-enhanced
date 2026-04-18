@@ -1765,7 +1765,7 @@ app.post("/api/admin/pending-users/:id/reject", auth, adminOnly, (req, res) => {
 
 // Search users endpoint for collaboration
 const searchUsersStmt = db.prepare(`
-  SELECT id, name, email 
+  SELECT id, name, email, avatar_url
   FROM users 
   WHERE (name LIKE ? OR email LIKE ?)
   ORDER BY name ASC
