@@ -933,10 +933,16 @@ export default function App() {
 
   // Theme init/toggle
   useEffect(() => {
+    // Legacy `glass-keep-dark-mode` was written by both the user toggle AND the system/bridge
+    // sync, so its presence can't reliably signal a manual preference. Migrate to a dedicated
+    // `glass-keep-dark-mode-manual` key that is ONLY written by toggleDark. Drop the old key
+    // on first load so stuck users follow the system again.
+    if (!("glass-keep-dark-mode-manual" in localStorage)) {
+      localStorage.removeItem("glass-keep-dark-mode");
+    }
     const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
-    const savedDark =
-      localStorage.getItem("glass-keep-dark-mode") === "true" ||
-      (!("glass-keep-dark-mode" in localStorage) && mq?.matches);
+    const manualPref = localStorage.getItem("glass-keep-dark-mode-manual");
+    const savedDark = manualPref !== null ? manualPref === "true" : (mq?.matches ?? false);
     setDark(savedDark);
     document.documentElement.classList.toggle("dark", savedDark);
     setThemeColor(savedDark ? "#1a1a1a" : "#f0e8ff");
@@ -948,7 +954,7 @@ export default function App() {
       // Skip if note modal is open — NoteModal effect handles its own color
       if (!window.__noteModalOpen) setThemeColor(isDark ? "#1a1a1a" : "#f0e8ff");
     };
-    const hasManualPref = () => "glass-keep-dark-mode" in localStorage;
+    const hasManualPref = () => localStorage.getItem("glass-keep-dark-mode-manual") !== null;
 
     // Android WebView bridge: system preference doesn't propagate via matchMedia in WebView,
     // so the native side calls this. Ignored when the user has set a manual preference.
@@ -973,7 +979,7 @@ export default function App() {
     const next = !dark;
     setDark(next);
     document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("glass-keep-dark-mode", String(next));
+    localStorage.setItem("glass-keep-dark-mode-manual", String(next));
     // Skip if note modal is open — NoteModal effect handles its own color
     if (!window.__noteModalOpen) setThemeColor(next ? "#1a1a1a" : "#f0e8ff");
   };
