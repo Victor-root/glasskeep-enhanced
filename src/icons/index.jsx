@@ -469,31 +469,8 @@ export const ChecklistIcon = () => (
 
 
 export const BrushIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
-    {/* Palette (colored with currentColor) sits in the bottom-right */}
-    <path
-      fill="currentColor"
-      d="M14 6c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H18c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S7.67 12 8.5 12s1.5.67 1.5 1.5S9.33 15 8.5 15zm3-4C10.67 11 10 10.33 10 9.5S10.67 8 11.5 8s1.5.67 1.5 1.5S12.33 11 11.5 11zm5 0c-.83 0-1.5-.67-1.5-1.5S15.67 8 16.5 8s1.5.67 1.5 1.5S17.33 11 16.5 11zm3 4c-.83 0-1.5-.67-1.5-1.5S18.67 12 19.5 12s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"
-    />
-    {/* Paintbrush — tapered handle with rounded pencil-tip, ferrule, and a
-        teardrop bristle bulb. Drawn horizontally then rotated 45° so the
-        handle anchors in the top-left corner and the bristles plunge into
-        the palette. White fill with currentColor outline for contrast. */}
-    <g
-      transform="translate(2.6 -0.3) rotate(45)"
-      fill="white"
-      stroke="currentColor"
-      strokeWidth="0.7"
-      strokeLinejoin="round"
-      strokeLinecap="round"
-    >
-      {/* Tapered handle with a rounded tip */}
-      <path d="M-0.2 2 Q-0.6 1.7 -0.2 1.35 Q0.1 1.15 0.5 1.3 L11 0.1 L11 3.9 L0.5 2.7 Q0.1 2.85 -0.2 2.6 Z" />
-      {/* Ferrule (metal band, slightly skewed for perspective) */}
-      <path d="M11 -0.2 L13 -0.4 L13 4.4 L11 4.2 Z" />
-      {/* Teardrop bristle bulb, wider than the ferrule */}
-      <path d="M13 -0.7 C14.2 -1.6 17 -1.6 19 -0.3 C20.6 0.9 20.6 3.1 19 4.3 C17 5.6 14.2 5.6 13 4.7 Z" />
-    </g>
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M18.84 12.09L12 5.25 13.41 3.84c1.17-1.17 3.07-1.17 4.24 0l2.59 2.59c1.17 1.17 1.17 3.07 0 4.24l-1.4 1.42zM11.29 5.96l6.84 6.84-7.78 7.78H3.5v-6.84l7.79-7.78z" />
   </svg>
 );
 
