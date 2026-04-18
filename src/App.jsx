@@ -933,15 +933,14 @@ export default function App() {
 
   // Theme init/toggle
   useEffect(() => {
-    // Legacy `glass-keep-dark-mode` was written by both the user toggle AND the system/bridge
-    // sync, so its presence can't reliably signal a manual preference. Migrate to a dedicated
-    // `glass-keep-dark-mode-manual` key that is ONLY written by toggleDark. Drop the old key
-    // on first load so stuck users follow the system again.
-    if (!("glass-keep-dark-mode-manual" in localStorage)) {
-      localStorage.removeItem("glass-keep-dark-mode");
-    }
+    // Legacy localStorage keys from previous iterations — drop them so old installs reset cleanly.
+    // The manual preference now lives in sessionStorage so it's scoped to the current app session
+    // (preserved while backgrounded, cleared on full close/swipe-kill → next open follows system).
+    localStorage.removeItem("glass-keep-dark-mode");
+    localStorage.removeItem("glass-keep-dark-mode-manual");
+
     const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
-    const manualPref = localStorage.getItem("glass-keep-dark-mode-manual");
+    const manualPref = sessionStorage.getItem("glass-keep-dark-mode-manual");
     const savedDark = manualPref !== null ? manualPref === "true" : (mq?.matches ?? false);
     setDark(savedDark);
     document.documentElement.classList.toggle("dark", savedDark);
@@ -954,7 +953,7 @@ export default function App() {
       // Skip if note modal is open — NoteModal effect handles its own color
       if (!window.__noteModalOpen) setThemeColor(isDark ? "#1a1a1a" : "#f0e8ff");
     };
-    const hasManualPref = () => localStorage.getItem("glass-keep-dark-mode-manual") !== null;
+    const hasManualPref = () => sessionStorage.getItem("glass-keep-dark-mode-manual") !== null;
 
     // Android WebView bridge: system preference doesn't propagate via matchMedia in WebView,
     // so the native side calls this. Ignored when the user has set a manual preference.
@@ -979,7 +978,7 @@ export default function App() {
     const next = !dark;
     setDark(next);
     document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("glass-keep-dark-mode-manual", String(next));
+    sessionStorage.setItem("glass-keep-dark-mode-manual", String(next));
     // Skip if note modal is open — NoteModal effect handles its own color
     if (!window.__noteModalOpen) setThemeColor(next ? "#1a1a1a" : "#f0e8ff");
   };
