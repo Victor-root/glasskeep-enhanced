@@ -49,7 +49,8 @@ export default function MobileCreateFab({
   return (
     <div
       ref={containerRef}
-      className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3"
+      className="fixed right-6 z-40 flex flex-col items-end gap-3"
+      style={{ bottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
     >
       <div
         className={`flex flex-col items-end gap-3 transition-all duration-200 ease-out ${
@@ -59,10 +60,10 @@ export default function MobileCreateFab({
         }`}
       >
         <FabDialButton
-          onClick={pick(onCreateText)}
-          label={t("textNote")}
-          icon={<TextNoteIcon />}
-          colorClasses="border-indigo-400 bg-gradient-to-br from-indigo-200 to-violet-300 text-indigo-700 shadow-indigo-300/40 dark:from-indigo-800 dark:to-violet-900 dark:border-indigo-500 dark:text-indigo-100 dark:shadow-none"
+          onClick={pick(onCreateDraw)}
+          label={t("drawing")}
+          icon={<BrushIcon />}
+          colorClasses="border-orange-300 bg-gradient-to-br from-rose-200 to-orange-200 text-rose-700 shadow-rose-300/40 dark:from-rose-800 dark:to-orange-900 dark:border-orange-500 dark:text-rose-100 dark:shadow-none"
         />
         <FabDialButton
           onClick={pick(onCreateChecklist)}
@@ -71,10 +72,10 @@ export default function MobileCreateFab({
           colorClasses="border-teal-300 bg-gradient-to-br from-teal-200 to-emerald-300 text-teal-700 shadow-teal-300/40 dark:from-teal-800 dark:to-emerald-900 dark:border-teal-500 dark:text-teal-100 dark:shadow-none"
         />
         <FabDialButton
-          onClick={pick(onCreateDraw)}
-          label={t("drawing")}
-          icon={<BrushIcon />}
-          colorClasses="border-orange-300 bg-gradient-to-br from-rose-200 to-orange-200 text-rose-700 shadow-rose-300/40 dark:from-rose-800 dark:to-orange-900 dark:border-orange-500 dark:text-rose-100 dark:shadow-none"
+          onClick={pick(onCreateText)}
+          label={t("textNote")}
+          icon={<TextNoteIcon />}
+          colorClasses="border-indigo-400 bg-gradient-to-br from-indigo-200 to-violet-300 text-indigo-700 shadow-indigo-300/40 dark:from-indigo-800 dark:to-violet-900 dark:border-indigo-500 dark:text-indigo-100 dark:shadow-none"
         />
       </div>
 
@@ -83,7 +84,7 @@ export default function MobileCreateFab({
         onClick={() => setOpen((v) => !v)}
         aria-label={t("addNote")}
         aria-expanded={open}
-        className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-xl shadow-indigo-500/40 active:scale-95 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 btn-gradient"
+        className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-xl shadow-indigo-500/40 active:scale-95 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 btn-gradient"
       >
         <svg
           className={`w-7 h-7 transition-transform duration-200 ${open ? "rotate-45" : ""}`}
@@ -108,7 +109,7 @@ function FabDialButton({ onClick, label, icon, colorClasses }) {
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={`w-12 h-12 rounded-full border-2 shadow-md active:scale-95 transition-transform duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${colorClasses}`}
+      className={`w-12 h-12 rounded-2xl border-2 shadow-md active:scale-95 transition-transform duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${colorClasses}`}
     >
       {icon}
     </button>
