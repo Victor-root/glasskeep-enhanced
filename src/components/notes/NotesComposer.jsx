@@ -38,6 +38,8 @@ export default function NotesComposer({
   onDirectDraw,
   onDirectText,
   onDirectChecklist,
+  fabOpen,
+  setFabOpen,
   isDesktop,
   addImagesToState,
   formatComposer,
@@ -121,6 +123,8 @@ export default function NotesComposer({
             />
           ) : (
             <MobileCreateFab
+              open={fabOpen}
+              setOpen={setFabOpen}
               onCreateText={onDirectText}
               onCreateChecklist={onDirectChecklist}
               onCreateDraw={onDirectDraw}

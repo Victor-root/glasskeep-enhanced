@@ -1,45 +1,47 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useRef, useEffect } from "react";
 import { t } from "../../i18n";
 import { TextNoteIcon, ChecklistIcon, BrushIcon } from "../../icons/index.jsx";
 
-/**
- * MobileCreateFab — Mobile-only floating action button for note creation.
- *
- * Replaces the in-page mobile composer with a bottom-right "+" FAB that
- * unfolds the three creation entries (text / checklist / drawing) as
- * icon-only circular buttons stacked above it. Tapping one forwards to
- * the same handleDirect* callbacks the desktop creation buttons use —
- * opening the modal over a deferred draft (see useDraftNote.js).
- *
- * Outside click or Esc collapses the dial. Each speed-dial entry carries
- * the same gradient identity as its desktop sibling so the mobile UI stays
- * visually coherent with the rest of the app.
- */
 export default function MobileCreateFab({
+  open,
+  setOpen,
   onCreateText,
   onCreateChecklist,
   onCreateDraw,
 }) {
-  const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
-    const onPointer = (e) => {
-      if (!containerRef.current?.contains(e.target)) setOpen(false);
+
+    // Close in the click capture phase at document level. This fires BEFORE any
+    // element's onClick. stopPropagation prevents React from ever dispatching
+    // the synthetic click to note cards. We don't call setOpen on
+    // mousedown/touchstart, so the backdrop stays pointer-events:auto for the
+    // whole tap sequence — the click target is the backdrop, not a note.
+    const onClickCapture = (e) => {
+      // The FAB wrapper spans the vertical space including the hidden dial
+      // buttons, so plain containerRef.contains(target) treats empty padding
+      // clicks as "inside". Only preserve clicks that hit an actual button
+      // (FAB toggle or a dial button) inside the container — anything else,
+      // including the wrapper itself, counts as outside and closes the menu.
+      const btn = e.target.closest?.("button");
+      if (btn && containerRef.current?.contains(btn)) return;
+      e.stopPropagation();
+      setOpen(false);
     };
     const onKey = (e) => {
       if (e.key === "Escape") setOpen(false);
     };
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("touchstart", onPointer);
+
+    document.addEventListener("click", onClickCapture, true);
     document.addEventListener("keydown", onKey);
+
     return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("touchstart", onPointer);
+      document.removeEventListener("click", onClickCapture, true);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, setOpen]);
 
   const pick = (fn) => () => {
     setOpen(false);
@@ -52,12 +54,14 @@ export default function MobileCreateFab({
         className={`fixed inset-0 z-30 transition-all duration-200 ease-out bg-black/30 backdrop-blur-[2px] ${
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
-        onClick={() => setOpen(false)}
       />
       <div
         ref={containerRef}
-        className="fixed right-6 z-40 flex flex-col items-end gap-3"
-        style={{ bottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
+        className="fixed z-40 flex flex-col items-end gap-3 pointer-events-none"
+        style={{
+          bottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))",
+          right: "max(1.5rem, calc(env(safe-area-inset-right) + 1rem))",
+        }}
       >
       <div
         className={`flex flex-col items-end gap-3 transition-all duration-200 ease-out ${
@@ -100,7 +104,7 @@ export default function MobileCreateFab({
         onClick={() => setOpen((v) => !v)}
         aria-label={t("addNote")}
         aria-expanded={open}
-        className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white active:scale-95 transition-all duration-200 flex items-center justify-center focus:outline-none btn-gradient"
+        className="pointer-events-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white active:scale-95 transition-all duration-200 flex items-center justify-center focus:outline-none btn-gradient"
       >
         <svg
           className={`w-7 h-7 transition-transform duration-200 ${open ? "rotate-45" : ""}`}

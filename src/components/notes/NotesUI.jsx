@@ -144,6 +144,8 @@ function NotesUI({
   setSyncDropdownOpen,
   mobileSearchOpen,
   setMobileSearchOpen,
+  fabOpen,
+  setFabOpen,
 }) {
   const mobileSearchRef = useRef(null);
 
@@ -304,6 +306,8 @@ function NotesUI({
         onDirectDraw={onDirectDraw}
         onDirectText={onDirectText}
         onDirectChecklist={onDirectChecklist}
+        fabOpen={fabOpen}
+        setFabOpen={setFabOpen}
         isDesktop={windowWidth >= 700 && !isLandscapeMobile}
         formatComposer={formatComposer}
         showComposerFmt={showComposerFmt}
