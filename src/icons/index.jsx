@@ -470,25 +470,34 @@ export const ChecklistIcon = () => (
 
 export const BrushIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
-    {/* Palette (colored) */}
+    {/* Palette (colored with currentColor) sits in the bottom-right */}
     <path
       fill="currentColor"
-      d="M13 4C8.03 4 4 8.03 4 13s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H17c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S6.67 10 7.5 10 9 10.67 9 11.5 8.33 13 7.5 13zm3-4C9.67 9 9 8.33 9 7.5S9.67 6 10.5 6s1.5.67 1.5 1.5S11.33 9 10.5 9zm5 0c-.83 0-1.5-.67-1.5-1.5S14.67 6 15.5 6s1.5.67 1.5 1.5S16.33 9 15.5 9zm3 4c-.83 0-1.5-.67-1.5-1.5S17.67 10 18.5 10s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"
+      d="M14 6c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H18c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S7.67 12 8.5 12s1.5.67 1.5 1.5S9.33 15 8.5 15zm3-4C10.67 11 10 10.33 10 9.5S10.67 8 11.5 8s1.5.67 1.5 1.5S12.33 11 11.5 11zm5 0c-.83 0-1.5-.67-1.5-1.5S15.67 8 16.5 8s1.5.67 1.5 1.5S17.33 11 16.5 11zm3 4c-.83 0-1.5-.67-1.5-1.5S18.67 12 19.5 12s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"
     />
-    {/* White paintbrush overlaid on the top-left of the palette */}
+    {/* Paintbrush: handle in top-left corner, bristles plunging into the palette */}
     <g
-      transform="rotate(45 6 6)"
-      fill="white"
+      transform="translate(0.8 1) rotate(40)"
       stroke="currentColor"
-      strokeWidth="0.9"
+      strokeWidth="1"
       strokeLinejoin="round"
     >
-      {/* Handle */}
-      <rect x="-2.5" y="5" width="7" height="2.2" rx="0.5" />
-      {/* Ferrule */}
-      <rect x="4.5" y="4.5" width="1.8" height="3.2" />
-      {/* Bristles */}
-      <path d="M6.3 4.2 L10.5 3.2 L10.5 9 L6.3 8 Z" />
+      {/* Wooden handle — tapered toward the end for a natural brush shape */}
+      <path fill="white" d="M0.5 0.8 L1.2 0 L9 1 L9 3 L1.2 4 Z" />
+      {/* Ferrule (metal band) */}
+      <rect x="9" y="-0.4" width="2.6" height="4.8" fill="white" />
+      {/* Ferrule crimp lines for detail */}
+      <line x1="10" y1="-0.4" x2="10" y2="4.4" strokeWidth="0.5" />
+      <line x1="11" y1="-0.4" x2="11" y2="4.4" strokeWidth="0.5" />
+      {/* Bristles — flat fan, wider at the tip */}
+      <path
+        fill="white"
+        d="M11.6 -1 L17.5 -2.2 Q18.5 2 17.5 6.2 L11.6 5 Z"
+      />
+      {/* Bristle hair strokes (kept inside the bristle shape) */}
+      <line x1="13" y1="-1" x2="13" y2="4.9" strokeWidth="0.45" strokeLinecap="round" />
+      <line x1="14.5" y1="-1.4" x2="14.5" y2="5.4" strokeWidth="0.45" strokeLinecap="round" />
+      <line x1="16" y1="-1.7" x2="16" y2="5.7" strokeWidth="0.45" strokeLinecap="round" />
     </g>
   </svg>
 );
