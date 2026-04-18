@@ -939,7 +939,7 @@ export default function App() {
     document.documentElement.classList.toggle("dark", savedDark);
     setThemeColor(savedDark ? "#1a1a1a" : "#f0e8ff");
 
-    // Listen for system dark mode changes (always follow system)
+    // Apply dark mode from system/bridge — never overrides a manual user preference
     const applyDark = (isDark) => {
       setDark(isDark);
       document.documentElement.classList.toggle("dark", isDark);
@@ -947,12 +947,21 @@ export default function App() {
       // Skip if note modal is open — NoteModal effect handles its own color
       if (!window.__noteModalOpen) setThemeColor(isDark ? "#1a1a1a" : "#f0e8ff");
     };
+    const hasManualPref = () => "glass-keep-dark-mode" in localStorage;
 
-    // Expose for Android WebView bridge (prefers-color-scheme doesn't update in WebView)
-    window.__setDarkMode = applyDark;
+    // Android WebView bridge: system preference doesn't propagate via matchMedia in WebView,
+    // so the native side calls this. Ignored when the user has set a manual preference.
+    window.__setDarkMode = (isDark) => {
+      if (hasManualPref()) return;
+      applyDark(isDark);
+    };
 
     if (!mq) return () => { delete window.__setDarkMode; };
-    const onChange = (e) => applyDark(e.matches);
+    // Only follow system changes when no manual preference is set
+    const onChange = (e) => {
+      if (hasManualPref()) return;
+      applyDark(e.matches);
+    };
     mq.addEventListener("change", onChange);
     return () => {
       mq.removeEventListener("change", onChange);
