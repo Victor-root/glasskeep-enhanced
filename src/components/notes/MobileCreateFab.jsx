@@ -47,11 +47,18 @@ export default function MobileCreateFab({
   };
 
   return (
-    <div
-      ref={containerRef}
-      className="fixed right-6 z-40 flex flex-col items-end gap-3"
-      style={{ bottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
-    >
+    <>
+      <div
+        className={`fixed inset-0 z-30 transition-all duration-200 ease-out bg-black/30 backdrop-blur-sm ${
+          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => setOpen(false)}
+      />
+      <div
+        ref={containerRef}
+        className="fixed right-6 z-40 flex flex-col items-end gap-3"
+        style={{ bottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
+      >
       <div
         className={`flex flex-col items-end gap-3 transition-all duration-200 ease-out ${
           open
@@ -109,6 +116,7 @@ export default function MobileCreateFab({
         </svg>
       </button>
     </div>
+    </>
   );
 }
 
@@ -118,7 +126,7 @@ function FabDialButton({ onClick, label, icon, colorClasses, iconBg, title, desc
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 shadow-md active:scale-[0.98] transition-transform duration-200 text-left focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${colorClasses}`}
+      className={`w-44 flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 shadow-md active:scale-[0.98] transition-transform duration-200 text-left focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${colorClasses}`}
     >
       <span className={`inline-flex shrink-0 items-center justify-center w-9 h-9 rounded-lg ${iconBg}`}>
         {icon}
