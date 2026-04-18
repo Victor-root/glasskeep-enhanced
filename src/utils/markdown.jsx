@@ -27,9 +27,23 @@ const _PURIFY_CONFIG = {
 export const renderSafeMarkdown = (md) => {
   try {
     let text = md || "";
-    // Preserve intentional blank lines before headings: insert a spacer so
-    // the p:has(+h*) CSS rule won't strip the paragraph's bottom margin.
-    text = text.replace(/\n\n(#{1,6}\s)/g, '\n\n<div class="hs"></div>\n\n$1');
+
+    // Mirror edit-mode spacing in read mode: each blank line the user typed
+    // becomes one explicit spacer div. marked collapses all block-separating
+    // newlines, so without this the reader sees less vertical space than the
+    // writer typed.  Fenced code blocks are protected so their inner blank
+    // lines stay intact.
+    const codeBlocks = [];
+    text = text.replace(/```[\s\S]*?```/g, (m) => {
+      codeBlocks.push(m);
+      return `\x00CODE${codeBlocks.length - 1}\x00`;
+    });
+    text = text.replace(/\n{2,}/g, (match) => {
+      const blanks = match.length - 1;
+      return "\n\n" + '<div class="md-blank-line"></div>\n\n'.repeat(blanks);
+    });
+    text = text.replace(/\x00CODE(\d+)\x00/g, (_, i) => codeBlocks[+i]);
+
     const raw = marked.parse(text);
     return DOMPurify.sanitize(raw, _PURIFY_CONFIG);
   } catch {

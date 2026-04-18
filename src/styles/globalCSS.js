@@ -94,13 +94,20 @@ html.dark header.multi-select-bar {
   box-shadow: 0 4px 24px rgba(139, 92, 246, 0.22), inset 0 0 0 1px rgba(139, 92, 246, 0.1);
 }
 .note-content { -webkit-user-select: text; user-select: text; }
-.note-content p { margin: 0 0 0.5rem 0; }
-.note-content h1, .note-content h2, .note-content h3 { margin: 0; font-weight: 600; }
-.note-content p:has(+ h1), .note-content p:has(+ h2), .note-content p:has(+ h3),
-.note-content p:has(+ h4), .note-content p:has(+ h5), .note-content p:has(+ h6) { margin-bottom: 0; }
-.note-content h1 { font-size: 1.5rem; line-height: 1.3; }
-.note-content h2 { font-size: 1.25rem; line-height: 1.35; }
-.note-content h3 { font-size: 1.125rem; line-height: 1.4; }
+/* Block margins are zeroed so that vertical spacing is driven solely by the
+   blank lines the user typed — mirroring the textarea in edit mode.  Spacer
+   elements are injected by renderSafeMarkdown() (see markdown.jsx). */
+.note-content p { margin: 0; }
+.note-content h1, .note-content h2, .note-content h3,
+.note-content h4, .note-content h5, .note-content h6 { margin: 0; font-weight: 600; }
+.note-content h1 { font-size: 1.5rem; line-height: 1.5; }
+.note-content h2 { font-size: 1.25rem; line-height: 1.5; }
+.note-content h3 { font-size: 1.125rem; line-height: 1.5; }
+.note-content .md-blank-line { display: block; height: 1lh; }
+/* Fallback for engines without the lh unit: approximate 1.5x font-size */
+@supports not (height: 1lh) {
+  .note-content .md-blank-line { height: 1.5em; }
+}
 
 /* NEW: Prevent long headings/URLs from overflowing, allow tables/code to scroll */
 .note-content,
@@ -143,9 +150,9 @@ html.dark header.multi-select-bar {
 .note-content--dense h1, .note-content--dense h2, .note-content--dense h3,
 .note-content--dense h4, .note-content--dense h5, .note-content--dense h6,
 .note-content--dense td, .note-content--dense th { white-space: pre-wrap; }
-.note-content--dense p { margin: 0 0 0.45rem 0; }
-.note-content--dense pre { margin: 0.4rem 0; }
-.note-content--dense hr { margin: 0.8rem 0; }
+.note-content--dense p { margin: 0; }
+.note-content--dense pre { margin: 0; }
+.note-content--dense hr { margin: 0; }
 
 /* Hyperlinks in view mode */
 .note-content a {
