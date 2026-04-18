@@ -13,23 +13,11 @@ export default function MobileCreateFab({
 
   useEffect(() => {
     if (!open) return;
-    const onPointer = (e) => {
-      if (containerRef.current?.contains(e.target)) return;
-      // Absorb the click that follows the touchstart so it doesn't open a note
-      document.addEventListener("click", (ce) => ce.stopPropagation(), { capture: true, once: true });
-      setOpen(false);
-    };
     const onKey = (e) => {
       if (e.key === "Escape") setOpen(false);
     };
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("touchstart", onPointer);
     document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("touchstart", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
+    return () => document.removeEventListener("keydown", onKey);
   }, [open, setOpen]);
 
   const pick = (fn) => () => {
