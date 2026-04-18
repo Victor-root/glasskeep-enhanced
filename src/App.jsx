@@ -941,11 +941,10 @@ export default function App() {
     document.documentElement.classList.toggle("dark", savedDark);
     setThemeColor(savedDark ? "#1a1a1a" : "#f0e8ff");
 
-    // Apply dark mode from system/bridge — never overrides a manual user preference
+    // Apply dark mode from system/bridge without persisting — only toggleDark marks a manual pref
     const applyDark = (isDark) => {
       setDark(isDark);
       document.documentElement.classList.toggle("dark", isDark);
-      localStorage.setItem("glass-keep-dark-mode", String(isDark));
       // Skip if note modal is open — NoteModal effect handles its own color
       if (!window.__noteModalOpen) setThemeColor(isDark ? "#1a1a1a" : "#f0e8ff");
     };
