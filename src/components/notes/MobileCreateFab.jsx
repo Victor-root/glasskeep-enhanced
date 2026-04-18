@@ -10,14 +10,27 @@ export default function MobileCreateFab({
   onCreateDraw,
 }) {
   const containerRef = useRef(null);
+  const backdropRef = useRef(null);
 
+  // Escape key
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") setOpen(false);
-    };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
+  }, [open, setOpen]);
+
+  // Native non-passive touchstart on backdrop: preventDefault stops the browser
+  // from generating a synthetic click, so the note underneath is never activated.
+  // React synthetic onTouchStart can't reliably call preventDefault on Android
+  // WebView because the listener may be registered as passive.
+  useEffect(() => {
+    if (!open) return;
+    const el = backdropRef.current;
+    if (!el) return;
+    const onTouch = (e) => { e.preventDefault(); setOpen(false); };
+    el.addEventListener("touchstart", onTouch, { passive: false });
+    return () => el.removeEventListener("touchstart", onTouch);
   }, [open, setOpen]);
 
   const pick = (fn) => () => {
@@ -28,6 +41,7 @@ export default function MobileCreateFab({
   return (
     <>
       <div
+        ref={backdropRef}
         className={`fixed inset-0 z-30 transition-all duration-200 ease-out bg-black/30 backdrop-blur-[2px] ${
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
