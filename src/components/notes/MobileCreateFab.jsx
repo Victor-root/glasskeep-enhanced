@@ -10,27 +10,44 @@ export default function MobileCreateFab({
   onCreateDraw,
 }) {
   const containerRef = useRef(null);
-  const backdropRef = useRef(null);
 
-  // Escape key
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+
+    // Track whether the gesture started outside the FAB container.
+    // We do NOT call setOpen here — doing so would re-render the backdrop to
+    // pointer-events:none before the click fires, causing the click to fall
+    // through and land on a note card.
+    let closingDown = false;
+    const onPointerDown = (e) => {
+      closingDown = !containerRef.current?.contains(e.target);
+    };
+
+    // Intercept the click in capture phase (fires before any element's onClick).
+    // At this point the backdrop is still pointer-events:auto, so we stop
+    // propagation to prevent note cards from receiving the click, then close.
+    const onClickCapture = (e) => {
+      if (!closingDown) return;
+      closingDown = false;
+      e.stopPropagation();
+      setOpen(false);
+    };
+
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    document.addEventListener("click", onClickCapture, true);
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, setOpen]);
 
-  // Native non-passive touchstart on backdrop: preventDefault stops the browser
-  // from generating a synthetic click, so the note underneath is never activated.
-  // React synthetic onTouchStart can't reliably call preventDefault on Android
-  // WebView because the listener may be registered as passive.
-  useEffect(() => {
-    if (!open) return;
-    const el = backdropRef.current;
-    if (!el) return;
-    const onTouch = (e) => { e.preventDefault(); setOpen(false); };
-    el.addEventListener("touchstart", onTouch, { passive: false });
-    return () => el.removeEventListener("touchstart", onTouch);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      document.removeEventListener("click", onClickCapture, true);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open, setOpen]);
 
   const pick = (fn) => () => {
@@ -41,11 +58,9 @@ export default function MobileCreateFab({
   return (
     <>
       <div
-        ref={backdropRef}
         className={`fixed inset-0 z-30 transition-all duration-200 ease-out bg-black/30 backdrop-blur-[2px] ${
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
-        onClick={() => setOpen(false)}
       />
       <div
         ref={containerRef}
