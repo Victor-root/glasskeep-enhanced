@@ -3,15 +3,19 @@
 > **Fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep)** with local-first sync (offline support), real-time multi-device sync, multi-language i18n support, UI improvements, and a **native Android app**.
 ---
 **Web App Screenshots**
-<img width="4608" height="2394" alt="main-desktop" src="https://github.com/user-attachments/assets/8ee7e4cc-0033-4850-98cd-84d105437330" />
-<img width="4608" height="2394" alt="modalchecklist-desktop" src="https://github.com/user-attachments/assets/36bfd2af-679b-481b-8c32-7337c5bf7685" />
-<img width="4608" height="2394" alt="modaltext-desktop" src="https://github.com/user-attachments/assets/b08e30d1-2e5b-4de8-9f8a-8c5e6dc2a330" />
-<img width="4608" height="2394" alt="main-desktop_dark" src="https://github.com/user-attachments/assets/263f8013-d2ec-458e-b347-29897ec0d8e8" />
+
+<img width="1218" height="677" alt="main-desktop" src="https://github.com/user-attachments/assets/8ee7e4cc-0033-4850-98cd-84d105437330" />
+<img width="1218" height="677" alt="modalchecklist-desktop" src="https://github.com/user-attachments/assets/36bfd2af-679b-481b-8c32-7337c5bf7685" />
+<img width="1218" height="677" alt="modaltext-desktop" src="https://github.com/user-attachments/assets/b08e30d1-2e5b-4de8-9f8a-8c5e6dc2a330" />
+<img width="1218" height="677" alt="main-desktop_dark" src="https://github.com/user-attachments/assets/263f8013-d2ec-458e-b347-29897ec0d8e8" />
+
 **Mobile Screenshots**
-<img width="1080" height="2121" alt="main-mobile-+_dark" src="https://github.com/user-attachments/assets/d7a6f6e8-d6ff-4b2a-8270-9dfd56329d02" />
-<img width="1080" height="2121" alt="main-mobile-+_1080p" src="https://github.com/user-attachments/assets/c78669a9-dbb4-4534-be11-73aed32855d0" />
-<img width="1080" height="2121" alt="main-mobile_dark" src="https://github.com/user-attachments/assets/931178dd-153b-44a2-83d2-47e82c0a97c7" />
-<img width="1080" height="2121" alt="main-mobile_1080p" src="https://github.com/user-attachments/assets/1aa89208-a98d-4707-8690-84da537f9f33" />
+
+<img width="381" height="718" alt="main-mobile-+_dark" src="https://github.com/user-attachments/assets/d7a6f6e8-d6ff-4b2a-8270-9dfd56329d02" />
+<img width="381" height="718" alt="main-mobile-+_1080p" src="https://github.com/user-attachments/assets/c78669a9-dbb4-4534-be11-73aed32855d0" />
+<img width="381" height="718" alt="main-mobile_dark" src="https://github.com/user-attachments/assets/931178dd-153b-44a2-83d2-47e82c0a97c7" />
+<img width="381" height="718" alt="main-mobile_1080p" src="https://github.com/user-attachments/assets/1aa89208-a98d-4707-8690-84da537f9f33" />
+
 ## 📱 Android App
 
 A native Android wrapper is available for GlassKeep, turning your self-hosted instance into a full mobile app.
