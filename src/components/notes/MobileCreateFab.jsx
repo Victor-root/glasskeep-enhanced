@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { t } from "../../i18n";
 import { TextNoteIcon, ChecklistIcon, BrushIcon } from "../../icons/index.jsx";
 
@@ -55,7 +56,9 @@ export default function MobileCreateFab({
     fn?.();
   };
 
-  return (
+  // Portal to document.body so no ancestor CSS (transform, contain, filter) can
+  // alter fixed positioning or stacking — backdrop truly covers the viewport.
+  return createPortal(
     <>
       <div
         className={`fixed inset-0 z-30 transition-all duration-200 ease-out bg-black/30 backdrop-blur-[2px] ${
@@ -124,7 +127,8 @@ export default function MobileCreateFab({
         </svg>
       </button>
     </div>
-    </>
+    </>,
+    document.body
   );
 }
 
