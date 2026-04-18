@@ -893,6 +893,8 @@ export default function App() {
 
   // Mobile search expand (lifted for back button support)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  // FAB open state (lifted for Android back button support)
+  const [fabOpen, setFabOpen] = useState(false);
 
 
   useEffect(() => {
@@ -2776,7 +2778,7 @@ export default function App() {
     collaborationModalOpen, showModalColorPop, showModalFmt, modalMenuOpen,
     modalKebabOpen, modalTagFocused, syncDropdownOpen, mobileSearchOpen,
     showColorPop, showComposerFmt, headerMenuOpen, multiMode,
-    settingsPanelOpen, adminPanelOpen, sidebarOpen, open,
+    settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
   ].filter(Boolean).length;
   const prevOverlayCountRef = useRef(0);
 
@@ -2824,6 +2826,7 @@ export default function App() {
       if (modalKebabOpen) { setModalKebabOpen(false); return; }
       if (modalTagFocused) { setModalTagFocused(false); return; }
       if (open) { closeModalRef.current?.(); return; }
+      if (fabOpen) { setFabOpen(false); return; }
       if (syncDropdownOpen) { setSyncDropdownOpen(false); return; }
       if (mobileSearchOpen) { setSearch(""); setMobileSearchOpen(false); return; }
       if (showColorPop) { setShowColorPop(false); return; }
@@ -2839,7 +2842,7 @@ export default function App() {
   }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
       showModalColorPop, showModalFmt, modalMenuOpen, modalKebabOpen, modalTagFocused,
       syncDropdownOpen, mobileSearchOpen, showColorPop, showComposerFmt,
-      headerMenuOpen, multiMode, settingsPanelOpen, adminPanelOpen, sidebarOpen, open]);
+      headerMenuOpen, multiMode, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen]);
 
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
@@ -4332,6 +4335,8 @@ export default function App() {
         setSyncDropdownOpen={setSyncDropdownOpen}
         mobileSearchOpen={mobileSearchOpen}
         setMobileSearchOpen={setMobileSearchOpen}
+        fabOpen={fabOpen}
+        setFabOpen={setFabOpen}
         // checklist update
         onUpdateChecklistItem={onUpdateChecklistItem}
         // Admin panel

@@ -1,32 +1,23 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useRef, useEffect } from "react";
 import { t } from "../../i18n";
 import { TextNoteIcon, ChecklistIcon, BrushIcon } from "../../icons/index.jsx";
 
-/**
- * MobileCreateFab — Mobile-only floating action button for note creation.
- *
- * Replaces the in-page mobile composer with a bottom-right "+" FAB that
- * unfolds the three creation entries (text / checklist / drawing) as
- * icon-only circular buttons stacked above it. Tapping one forwards to
- * the same handleDirect* callbacks the desktop creation buttons use —
- * opening the modal over a deferred draft (see useDraftNote.js).
- *
- * Outside click or Esc collapses the dial. Each speed-dial entry carries
- * the same gradient identity as its desktop sibling so the mobile UI stays
- * visually coherent with the rest of the app.
- */
 export default function MobileCreateFab({
+  open,
+  setOpen,
   onCreateText,
   onCreateChecklist,
   onCreateDraw,
 }) {
-  const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
     const onPointer = (e) => {
-      if (!containerRef.current?.contains(e.target)) setOpen(false);
+      if (containerRef.current?.contains(e.target)) return;
+      // Absorb the click that follows the touchstart so it doesn't open a note
+      document.addEventListener("click", (ce) => ce.stopPropagation(), { capture: true, once: true });
+      setOpen(false);
     };
     const onKey = (e) => {
       if (e.key === "Escape") setOpen(false);
@@ -39,7 +30,7 @@ export default function MobileCreateFab({
       document.removeEventListener("touchstart", onPointer);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, setOpen]);
 
   const pick = (fn) => () => {
     setOpen(false);
