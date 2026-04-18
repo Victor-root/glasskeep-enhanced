@@ -967,6 +967,13 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
     background: rgba(40, 40, 40, 0.92);
   }
 }
+@media (max-width: 639px) {
+  /* Keep only left-edge (1-3) and right-edge (13-15) cards on mobile */
+  .floating-cards-bg > .login-deco-card:nth-child(n+4) { display: none; }
+  .floating-cards-bg > .login-deco-card:nth-child(13),
+  .floating-cards-bg > .login-deco-card:nth-child(14),
+  .floating-cards-bg > .login-deco-card:nth-child(15) { display: block; }
+}
 html.dark .login-deco-card {
   opacity: 0.35;
 }
