@@ -2009,10 +2009,15 @@ if (NODE_ENV === "production") {
 }
 
 // ---------- Listen ----------
-const SSL_CERT = process.env.SSL_CERT;
-const SSL_KEY  = process.env.SSL_KEY;
+const SSL_CERT    = process.env.SSL_CERT;
+const SSL_KEY     = process.env.SSL_KEY;
+const HTTPS_ENABLED = process.env.HTTPS_ENABLED !== "false";
 
-if (SSL_CERT && SSL_KEY && fs.existsSync(SSL_CERT) && fs.existsSync(SSL_KEY)) {
+if (
+  HTTPS_ENABLED &&
+  SSL_CERT && SSL_KEY &&
+  fs.existsSync(SSL_CERT) && fs.existsSync(SSL_KEY)
+) {
   const https = require("https");
   const sslOptions = {
     cert: fs.readFileSync(SSL_CERT),
