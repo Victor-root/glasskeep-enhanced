@@ -15,6 +15,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+WHITE='\033[1;37m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
@@ -490,11 +491,11 @@ action_install() {
         use_proxy="${use_proxy,,}"
         if [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_YES" || "$use_proxy" == "y" || "$use_proxy" == "o" ]]; then
             use_proxy="yes"
-            echo -e "${CYAN}${MSG_PROXY_YES_INFO}${RESET}"
+            echo -e "${WHITE}${MSG_PROXY_YES_INFO}${RESET}"
             break
         elif [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_NO" || "$use_proxy" == "n" ]]; then
             use_proxy="no"
-            echo -e "${CYAN}$(echo -e "$MSG_PROXY_NO_INFO")${RESET}"
+            echo -e "${WHITE}$(echo -e "$MSG_PROXY_NO_INFO")${RESET}"
             break
         else
             warn "$MSG_PROXY_INVALID"
@@ -629,11 +630,11 @@ action_update() {
         use_proxy="${use_proxy,,}"
         if [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_YES" || "$use_proxy" == "y" || "$use_proxy" == "o" ]]; then
             use_proxy="yes"
-            echo -e "${CYAN}${MSG_PROXY_YES_INFO}${RESET}"
+            echo -e "${WHITE}${MSG_PROXY_YES_INFO}${RESET}"
             break
         elif [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_NO" || "$use_proxy" == "n" ]]; then
             use_proxy="no"
-            echo -e "${CYAN}$(echo -e "$MSG_PROXY_NO_INFO")${RESET}"
+            echo -e "${WHITE}$(echo -e "$MSG_PROXY_NO_INFO")${RESET}"
             break
         else
             warn "$MSG_PROXY_INVALID"
