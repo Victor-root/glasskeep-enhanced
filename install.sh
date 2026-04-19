@@ -412,28 +412,6 @@ action_install() {
     echo -e "${BOLD}  ${MSG_HDR_INSTALL}${RESET}"
     echo -e "${BOLD}═══════════════════════════════════════${RESET}"
 
-    # Ask about reverse proxy (first, before anything else)
-    echo ""
-    echo -e "${BOLD}${CYAN}▶ HTTPS / SSL${RESET}"
-    echo ""
-    local use_proxy=""
-    while true; do
-        read -rp "$(echo -e "${YELLOW}${MSG_PROMPT_PROXY}${RESET}")" use_proxy </dev/tty
-        use_proxy="${use_proxy,,}"
-        if [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_YES" || "$use_proxy" == "y" || "$use_proxy" == "o" ]]; then
-            use_proxy="yes"
-            echo -e "${CYAN}${MSG_PROXY_YES_INFO}${RESET}"
-            break
-        elif [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_NO" || "$use_proxy" == "n" ]]; then
-            use_proxy="no"
-            echo -e "${CYAN}$(echo -e "$MSG_PROXY_NO_INFO")${RESET}"
-            break
-        else
-            warn "$MSG_PROXY_INVALID"
-        fi
-    done
-    echo ""
-
     # Ask port
     local port
     read -rp "$(echo -e "${YELLOW}${MSG_PROMPT_PORT}${RESET}")" port </dev/tty
@@ -497,6 +475,27 @@ action_install() {
             break
         done
     fi
+
+    # Ask about reverse proxy (last question, before installation starts)
+    echo ""
+    echo -e "${BOLD}${CYAN}▶ HTTPS / SSL${RESET}"
+    echo ""
+    local use_proxy=""
+    while true; do
+        read -rp "$(echo -e "${YELLOW}${MSG_PROMPT_PROXY}${RESET}")" use_proxy </dev/tty
+        use_proxy="${use_proxy,,}"
+        if [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_YES" || "$use_proxy" == "y" || "$use_proxy" == "o" ]]; then
+            use_proxy="yes"
+            echo -e "${CYAN}${MSG_PROXY_YES_INFO}${RESET}"
+            break
+        elif [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_NO" || "$use_proxy" == "n" ]]; then
+            use_proxy="no"
+            echo -e "${CYAN}$(echo -e "$MSG_PROXY_NO_INFO")${RESET}"
+            break
+        else
+            warn "$MSG_PROXY_INVALID"
+        fi
+    done
 
     echo ""
     info "${MSG_INFO_DIR}${INSTALL_DIR}"
