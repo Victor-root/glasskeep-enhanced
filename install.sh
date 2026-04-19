@@ -72,14 +72,21 @@ setup_i18n() {
         MSG_STEP_BUILD="Build de l'application (Vite)"
         MSG_ENV_CREATED="Fichier de configuration créé : %s"
         MSG_STEP_SSL="Génération du certificat SSL auto-signé"
-        MSG_PROMPT_PROXY="Utiliserez-vous un reverse proxy (Nginx, Caddy, Traefik…) devant GlassKeep ?\n  (Si vous ne savez pas ce que c'est, répondez non.) [oui/non] : "
-        MSG_PROXY_CONFIRM_YES="oui"
-        MSG_PROXY_CONFIRM_NO="non"
+        MSG_HTTPS_MENU_TITLE="Comment souhaitez-vous configurer le HTTPS ?"
+        MSG_HTTPS_OPT1="Reverse proxy (Nginx, Caddy, Traefik…) — le chiffrement est géré en amont"
+        MSG_HTTPS_OPT2="Certificat auto-signé — recommandé si vous accédez directement à GlassKeep"
+        MSG_HTTPS_OPT3="Mon propre certificat SSL — si vous avez déjà un certificat valide"
+        MSG_HTTPS_PROMPT="(Si vous ne savez pas, choisissez 2.) [1/2/3] : "
+        MSG_HTTPS_INVALID="Choix invalide. Entrez 1, 2 ou 3."
+        MSG_CERT_PATH_PROMPT="Chemin complet vers le fichier certificat (.crt ou .pem) : "
+        MSG_KEY_PATH_PROMPT="Chemin complet vers le fichier clé privée (.key ou .pem) : "
+        MSG_CERT_NOT_FOUND="Fichier introuvable : %s"
         MSG_PROXY_INVALID="Répondez par oui ou non."
         MSG_PRESS_KEY="Appuyez sur une touche pour lancer l'installation..."
         MSG_PRESS_KEY_UPDATE="Appuyez sur une touche pour lancer la mise à jour..."
         MSG_PROXY_YES_INFO="  → HTTPS désactivé côté GlassKeep : votre reverse proxy gère le chiffrement."
         MSG_PROXY_NO_INFO="  → Un certificat SSL auto-signé va être généré.\n     Ce certificat chiffre les échanges entre votre navigateur et GlassKeep,\n     protégeant vos données (mot de passe, notes) sur le réseau.\n     Votre navigateur affichera un avertissement \"site non sécurisé\" : c'est normal\n     pour un certificat auto-signé, cliquez sur \"Continuer quand même\".\n     Pour modifier ce réglage plus tard, relancez ce script et choisissez\n     \"2) ${MSG_OPT_UPDATE}\"."
+        MSG_HTTPS_OPT3_INFO="  → Votre certificat sera utilisé directement.\n     Assurez-vous que les fichiers restent accessibles par le service.\n     Pour modifier ce réglage plus tard, relancez ce script et choisissez\n     \"2) ${MSG_OPT_UPDATE}\"."
         MSG_STEP_DAEMON="Rechargement de systemd"
         MSG_STEP_SERVICE="Activation et démarrage du service %s"
         MSG_WARN_SERVICE="Le service ne semble pas démarré. Vérifiez les logs :"
@@ -164,14 +171,21 @@ setup_i18n() {
         MSG_STEP_BUILD="Building the application (Vite)"
         MSG_ENV_CREATED="Configuration file created: %s"
         MSG_STEP_SSL="Generating self-signed SSL certificate"
-        MSG_PROMPT_PROXY="Will you use a reverse proxy (Nginx, Caddy, Traefik…) in front of GlassKeep?\n  (If you don't know what that means, answer no.) [yes/no]: "
-        MSG_PROXY_CONFIRM_YES="yes"
-        MSG_PROXY_CONFIRM_NO="no"
+        MSG_HTTPS_MENU_TITLE="How do you want to configure HTTPS?"
+        MSG_HTTPS_OPT1="Reverse proxy (Nginx, Caddy, Traefik…) — encryption handled upstream"
+        MSG_HTTPS_OPT2="Self-signed certificate — recommended for direct access to GlassKeep"
+        MSG_HTTPS_OPT3="My own SSL certificate — if you already have a valid certificate"
+        MSG_HTTPS_PROMPT="(If unsure, choose 2.) [1/2/3]: "
+        MSG_HTTPS_INVALID="Invalid choice. Enter 1, 2 or 3."
+        MSG_CERT_PATH_PROMPT="Full path to the certificate file (.crt or .pem): "
+        MSG_KEY_PATH_PROMPT="Full path to the private key file (.key or .pem): "
+        MSG_CERT_NOT_FOUND="File not found: %s"
         MSG_PROXY_INVALID="Please answer yes or no."
         MSG_PRESS_KEY="Press any key to start the installation..."
         MSG_PRESS_KEY_UPDATE="Press any key to start the update..."
         MSG_PROXY_YES_INFO="  → HTTPS disabled on the GlassKeep side: your reverse proxy handles encryption."
         MSG_PROXY_NO_INFO="  → A self-signed SSL certificate will be generated.\n     This certificate encrypts traffic between your browser and GlassKeep,\n     protecting your data (password, notes) on the network.\n     Your browser will show a \"not secure\" warning: this is normal for\n     a self-signed certificate, just click \"Proceed anyway\".\n     To change this setting later, re-run this script and choose\n     \"2) ${MSG_OPT_UPDATE}\"."
+        MSG_HTTPS_OPT3_INFO="  → Your certificate will be used directly.\n     Make sure these files remain accessible by the service.\n     To change this setting later, re-run this script and choose\n     \"2) ${MSG_OPT_UPDATE}\"."
         MSG_STEP_DAEMON="Reloading systemd"
         MSG_STEP_SERVICE="Enabling and starting service %s"
         MSG_WARN_SERVICE="Service does not appear to be running. Check logs:"
@@ -270,6 +284,92 @@ check_os() {
 
 is_installed() {
     [[ -d "$INSTALL_DIR" ]] && [[ -f "$SERVICE_FILE" ]]
+}
+
+# Variables set by ask_ssl_config
+SSL_MODE=""          # "proxy" | "selfsigned" | "custom"
+CUSTOM_CERT_PATH=""
+CUSTOM_KEY_PATH=""
+
+ask_ssl_config() {
+    echo ""
+    echo -e "${BOLD}${CYAN}▶ HTTPS / SSL${RESET}"
+    echo -e "  ${MSG_HTTPS_MENU_TITLE}"
+    echo ""
+    echo -e "  ${GREEN}1)${RESET} ${MSG_HTTPS_OPT1}"
+    echo -e "  ${GREEN}2)${RESET} ${MSG_HTTPS_OPT2}"
+    echo -e "  ${GREEN}3)${RESET} ${MSG_HTTPS_OPT3}"
+    echo ""
+    local choice
+    while true; do
+        read -rp "$(echo -e "${YELLOW}${MSG_HTTPS_PROMPT}${RESET}")" choice </dev/tty
+        case "$choice" in
+            1)
+                SSL_MODE="proxy"
+                echo -e "${MSG_PROXY_YES_INFO}"
+                break ;;
+            2)
+                SSL_MODE="selfsigned"
+                echo -e "$(echo -e "$MSG_PROXY_NO_INFO")"
+                break ;;
+            3)
+                SSL_MODE="custom"
+                while true; do
+                    read -rp "$(echo -e "${YELLOW}${MSG_CERT_PATH_PROMPT}${RESET}")" CUSTOM_CERT_PATH </dev/tty
+                    CUSTOM_CERT_PATH="${CUSTOM_CERT_PATH/#\~/$HOME}"
+                    [[ -f "$CUSTOM_CERT_PATH" ]] && break
+                    # shellcheck disable=SC2059
+                    warn "$(printf "$MSG_CERT_NOT_FOUND" "$CUSTOM_CERT_PATH")"
+                done
+                while true; do
+                    read -rp "$(echo -e "${YELLOW}${MSG_KEY_PATH_PROMPT}${RESET}")" CUSTOM_KEY_PATH </dev/tty
+                    CUSTOM_KEY_PATH="${CUSTOM_KEY_PATH/#\~/$HOME}"
+                    [[ -f "$CUSTOM_KEY_PATH" ]] && break
+                    # shellcheck disable=SC2059
+                    warn "$(printf "$MSG_CERT_NOT_FOUND" "$CUSTOM_KEY_PATH")"
+                done
+                echo -e "$(echo -e "$MSG_HTTPS_OPT3_INFO")"
+                break ;;
+            *)
+                warn "$MSG_HTTPS_INVALID" ;;
+        esac
+    done
+}
+
+generate_selfsigned_cert() {
+    local ssl_dir="/opt/glass-keep/ssl"
+    [[ -f "$ssl_dir/cert.pem" ]] && return 0
+    local ssl_ip
+    ssl_ip=$(get_server_ip)
+    mkdir -p "$ssl_dir"
+    step "$MSG_STEP_SSL" \
+        openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+            -keyout "$ssl_dir/key.pem" \
+            -out    "$ssl_dir/cert.pem" \
+            -subj   "/CN=glasskeep" \
+            -addext "subjectAltName=IP:${ssl_ip},IP:127.0.0.1,DNS:localhost" \
+            2>/dev/null
+    chmod 600 "$ssl_dir/key.pem"
+}
+
+apply_ssl_to_env() {
+    local ssl_dir="/opt/glass-keep/ssl"
+    case "$SSL_MODE" in
+        proxy)
+            set_env_var "HTTPS_ENABLED" "false" "$ENV_FILE"
+            ;;
+        selfsigned)
+            generate_selfsigned_cert
+            set_env_var "HTTPS_ENABLED" "true"              "$ENV_FILE"
+            set_env_var "SSL_CERT"      "${ssl_dir}/cert.pem" "$ENV_FILE"
+            set_env_var "SSL_KEY"       "${ssl_dir}/key.pem"  "$ENV_FILE"
+            ;;
+        custom)
+            set_env_var "HTTPS_ENABLED" "true"              "$ENV_FILE"
+            set_env_var "SSL_CERT"      "$CUSTOM_CERT_PATH" "$ENV_FILE"
+            set_env_var "SSL_KEY"       "$CUSTOM_KEY_PATH"  "$ENV_FILE"
+            ;;
+    esac
 }
 
 # Set or update a KEY=VALUE line in a file
@@ -481,26 +581,8 @@ action_install() {
         done
     fi
 
-    # Ask about reverse proxy (last question, before installation starts)
-    echo ""
-    echo -e "${BOLD}${CYAN}▶ HTTPS / SSL${RESET}"
-    echo ""
-    local use_proxy=""
-    while true; do
-        read -rp "$(echo -e "${YELLOW}${MSG_PROMPT_PROXY}${RESET}")" use_proxy </dev/tty
-        use_proxy="${use_proxy,,}"
-        if [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_YES" || "$use_proxy" == "y" || "$use_proxy" == "o" ]]; then
-            use_proxy="yes"
-            echo -e "${MSG_PROXY_YES_INFO}"
-            break
-        elif [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_NO" || "$use_proxy" == "n" ]]; then
-            use_proxy="no"
-            echo -e "$(echo -e "$MSG_PROXY_NO_INFO")"
-            break
-        else
-            warn "$MSG_PROXY_INVALID"
-        fi
-    done
+    # Ask SSL config (last question, before installation starts)
+    ask_ssl_config
 
     echo ""
     read -rsn1 -p "$(echo -e "${BOLD}${MSG_PRESS_KEY}${RESET}")" </dev/tty
@@ -542,19 +624,7 @@ action_install() {
     jwt_secret=$(openssl rand -hex 32 2>/dev/null || cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 64)
 
     local ssl_dir="/opt/glass-keep/ssl"
-    if [[ "$use_proxy" == "no" ]]; then
-        mkdir -p "$ssl_dir"
-        local ssl_ip
-        ssl_ip=$(get_server_ip)
-        step "$MSG_STEP_SSL" \
-            openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
-                -keyout "$ssl_dir/key.pem" \
-                -out    "$ssl_dir/cert.pem" \
-                -subj   "/CN=glasskeep" \
-                -addext "subjectAltName=IP:${ssl_ip},IP:127.0.0.1,DNS:localhost" \
-                2>/dev/null
-        chmod 600 "$ssl_dir/key.pem"
-    fi
+    [[ "$SSL_MODE" == "selfsigned" ]] && generate_selfsigned_cert
 
     cat > "$ENV_FILE" <<EOF
 NODE_ENV=production
@@ -563,11 +633,12 @@ JWT_SECRET=${jwt_secret}
 DB_FILE=${DATA_DIR}/notes.db
 ADMIN_EMAILS=${GLASSKEEP_ADMIN_LOGIN}
 ALLOW_REGISTRATION=false
-HTTPS_ENABLED=$(  [[ "$use_proxy" == "no" ]] && echo "true" || echo "false")
+HTTPS_ENABLED=$([[ "$SSL_MODE" == "proxy" ]] && echo "false" || echo "true")
 EOF
-    if [[ "$use_proxy" == "no" ]]; then
-        printf 'SSL_CERT=%s/cert.pem\nSSL_KEY=%s/key.pem\n' "$ssl_dir" "$ssl_dir" >> "$ENV_FILE"
-    fi
+    case "$SSL_MODE" in
+        selfsigned) printf 'SSL_CERT=%s/cert.pem\nSSL_KEY=%s/key.pem\n' "$ssl_dir" "$ssl_dir" >> "$ENV_FILE" ;;
+        custom)     printf 'SSL_CERT=%s\nSSL_KEY=%s\n' "$CUSTOM_CERT_PATH" "$CUSTOM_KEY_PATH"  >> "$ENV_FILE" ;;
+    esac
     chmod 600 "$ENV_FILE"
     # shellcheck disable=SC2059
     success "$(printf "$MSG_ENV_CREATED" "$ENV_FILE")"
@@ -620,26 +691,8 @@ action_update() {
         port=$(grep -E '^API_PORT=' "$ENV_FILE" | cut -d= -f2 | tr -d '[:space:]' || echo "8080")
     fi
 
-    # Ask about reverse proxy (allow changing the setting)
-    echo ""
-    echo -e "${BOLD}${CYAN}▶ HTTPS / SSL${RESET}"
-    echo ""
-    local use_proxy=""
-    while true; do
-        read -rp "$(echo -e "${YELLOW}${MSG_PROMPT_PROXY}${RESET}")" use_proxy </dev/tty
-        use_proxy="${use_proxy,,}"
-        if [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_YES" || "$use_proxy" == "y" || "$use_proxy" == "o" ]]; then
-            use_proxy="yes"
-            echo -e "${MSG_PROXY_YES_INFO}"
-            break
-        elif [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_NO" || "$use_proxy" == "n" ]]; then
-            use_proxy="no"
-            echo -e "$(echo -e "$MSG_PROXY_NO_INFO")"
-            break
-        else
-            warn "$MSG_PROXY_INVALID"
-        fi
-    done
+    # Ask SSL config (allow changing the setting)
+    ask_ssl_config
 
     echo ""
     read -rsn1 -p "$(echo -e "${BOLD}${MSG_PRESS_KEY_UPDATE}${RESET}")" </dev/tty
@@ -658,28 +711,8 @@ action_update() {
     step "$MSG_STEP_REBUILD" \
         bash -c "cd '${INSTALL_DIR}' && npm run build"
 
-    # Apply HTTPS setting based on user's answer
-    local ssl_dir="/opt/glass-keep/ssl"
-    if [[ "$use_proxy" == "yes" ]]; then
-        set_env_var "HTTPS_ENABLED" "false" "$ENV_FILE"
-    else
-        if [[ ! -f "$ssl_dir/cert.pem" ]]; then
-            local ssl_ip
-            ssl_ip=$(get_server_ip)
-            mkdir -p "$ssl_dir"
-            step "$MSG_STEP_SSL" \
-                openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
-                    -keyout "$ssl_dir/key.pem" \
-                    -out    "$ssl_dir/cert.pem" \
-                    -subj   "/CN=glasskeep" \
-                    -addext "subjectAltName=IP:${ssl_ip},IP:127.0.0.1,DNS:localhost" \
-                    2>/dev/null
-            chmod 600 "$ssl_dir/key.pem"
-        fi
-        set_env_var "HTTPS_ENABLED" "true" "$ENV_FILE"
-        set_env_var "SSL_CERT" "${ssl_dir}/cert.pem" "$ENV_FILE"
-        set_env_var "SSL_KEY"  "${ssl_dir}/key.pem"  "$ENV_FILE"
-    fi
+    # Apply HTTPS setting based on user's choice
+    apply_ssl_to_env
 
     # shellcheck disable=SC2059
     step "$(printf "$MSG_STEP_START" "$SERVICE_NAME")" \
