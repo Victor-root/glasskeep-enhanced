@@ -75,6 +75,8 @@ setup_i18n() {
         MSG_PROXY_CONFIRM_YES="oui"
         MSG_PROXY_CONFIRM_NO="non"
         MSG_PROXY_INVALID="Répondez par oui ou non."
+        MSG_PRESS_KEY="Appuyez sur une touche pour lancer l'installation..."
+        MSG_PRESS_KEY_UPDATE="Appuyez sur une touche pour lancer la mise à jour..."
         MSG_PROXY_YES_INFO="  → HTTPS désactivé côté GlassKeep : votre reverse proxy gère le chiffrement."
         MSG_PROXY_NO_INFO="  → Un certificat SSL auto-signé va être généré.\n     Votre navigateur affichera un avertissement : cliquez sur \"Continuer quand même\".\n     Pour modifier ce réglage plus tard, relancez ce script et choisissez\n     \"2) ${MSG_OPT_UPDATE}\"."
         MSG_STEP_DAEMON="Rechargement de systemd"
@@ -165,6 +167,8 @@ setup_i18n() {
         MSG_PROXY_CONFIRM_YES="yes"
         MSG_PROXY_CONFIRM_NO="no"
         MSG_PROXY_INVALID="Please answer yes or no."
+        MSG_PRESS_KEY="Press any key to start the installation..."
+        MSG_PRESS_KEY_UPDATE="Press any key to start the update..."
         MSG_PROXY_YES_INFO="  → HTTPS disabled on the GlassKeep side: your reverse proxy handles encryption."
         MSG_PROXY_NO_INFO="  → A self-signed SSL certificate will be generated.\n     Your browser will show a warning: click \"Proceed anyway\".\n     To change this setting later, re-run this script and choose\n     \"2) ${MSG_OPT_UPDATE}\"."
         MSG_STEP_DAEMON="Reloading systemd"
@@ -498,6 +502,10 @@ action_install() {
     done
 
     echo ""
+    read -rsn1 -p "$(echo -e "${BOLD}${MSG_PRESS_KEY}${RESET}")" </dev/tty
+    echo ""
+
+    echo ""
     info "${MSG_INFO_DIR}${INSTALL_DIR}"
     info "${MSG_INFO_PORT}${port}"
     info "${MSG_INFO_SERVICE}${SERVICE_NAME}"
@@ -631,6 +639,9 @@ action_update() {
             warn "$MSG_PROXY_INVALID"
         fi
     done
+
+    echo ""
+    read -rsn1 -p "$(echo -e "${BOLD}${MSG_PRESS_KEY_UPDATE}${RESET}")" </dev/tty
     echo ""
 
     # shellcheck disable=SC2059
