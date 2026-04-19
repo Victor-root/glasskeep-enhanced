@@ -76,7 +76,7 @@ setup_i18n() {
         MSG_PROXY_CONFIRM_NO="non"
         MSG_PROXY_INVALID="Répondez par oui ou non."
         MSG_PROXY_YES_INFO="  → HTTPS désactivé côté GlassKeep : votre reverse proxy gère le chiffrement."
-        MSG_PROXY_NO_INFO="  → Un certificat SSL auto-signé va être généré.\n     Votre navigateur affichera un avertissement : cliquez sur \"Continuer quand même\".\n     Si vous ajoutez un reverse proxy plus tard, ajoutez la ligne HTTPS_ENABLED=false\n     dans /opt/glass-keep/.env puis exécutez : systemctl restart glass-keep"
+        MSG_PROXY_NO_INFO="  → Un certificat SSL auto-signé va être généré.\n     Votre navigateur affichera un avertissement : cliquez sur \"Continuer quand même\".\n     Pour changer ce réglage plus tard, relancez ce script et choisissez \"Mise à jour\"."
         MSG_STEP_DAEMON="Rechargement de systemd"
         MSG_STEP_SERVICE="Activation et démarrage du service %s"
         MSG_WARN_SERVICE="Le service ne semble pas démarré. Vérifiez les logs :"
@@ -166,7 +166,7 @@ setup_i18n() {
         MSG_PROXY_CONFIRM_NO="no"
         MSG_PROXY_INVALID="Please answer yes or no."
         MSG_PROXY_YES_INFO="  → HTTPS disabled on the GlassKeep side: your reverse proxy handles encryption."
-        MSG_PROXY_NO_INFO="  → A self-signed SSL certificate will be generated.\n     Your browser will show a warning: click \"Proceed anyway\".\n     If you add a reverse proxy later, add HTTPS_ENABLED=false\n     to /opt/glass-keep/.env then run: systemctl restart glass-keep"
+        MSG_PROXY_NO_INFO="  → A self-signed SSL certificate will be generated.\n     Your browser will show a warning: click \"Proceed anyway\".\n     To change this later, re-run this script and choose \"Update\"."
         MSG_STEP_DAEMON="Reloading systemd"
         MSG_STEP_SERVICE="Enabling and starting service %s"
         MSG_WARN_SERVICE="Service does not appear to be running. Check logs:"
@@ -265,6 +265,16 @@ check_os() {
 
 is_installed() {
     [[ -d "$INSTALL_DIR" ]] && [[ -f "$SERVICE_FILE" ]]
+}
+
+# Set or update a KEY=VALUE line in a file
+set_env_var() {
+    local key="$1" val="$2" file="$3"
+    if grep -q "^${key}=" "$file" 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${val}|" "$file"
+    else
+        echo "${key}=${val}" >> "$file"
+    fi
 }
 
 get_server_ip() {
@@ -602,6 +612,28 @@ action_update() {
         port=$(grep -E '^API_PORT=' "$ENV_FILE" | cut -d= -f2 | tr -d '[:space:]' || echo "8080")
     fi
 
+    # Ask about reverse proxy (allow changing the setting)
+    echo ""
+    echo -e "${BOLD}${CYAN}▶ HTTPS / SSL${RESET}"
+    echo ""
+    local use_proxy=""
+    while true; do
+        read -rp "$(echo -e "${YELLOW}${MSG_PROMPT_PROXY}${RESET}")" use_proxy </dev/tty
+        use_proxy="${use_proxy,,}"
+        if [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_YES" || "$use_proxy" == "y" || "$use_proxy" == "o" ]]; then
+            use_proxy="yes"
+            echo -e "${CYAN}${MSG_PROXY_YES_INFO}${RESET}"
+            break
+        elif [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_NO" || "$use_proxy" == "n" ]]; then
+            use_proxy="no"
+            echo -e "${CYAN}$(echo -e "$MSG_PROXY_NO_INFO")${RESET}"
+            break
+        else
+            warn "$MSG_PROXY_INVALID"
+        fi
+    done
+    echo ""
+
     # shellcheck disable=SC2059
     step "$(printf "$MSG_STEP_STOP" "$SERVICE_NAME")" \
         systemctl stop "$SERVICE_NAME"
@@ -615,26 +647,27 @@ action_update() {
     step "$MSG_STEP_REBUILD" \
         bash -c "cd '${INSTALL_DIR}' && npm run build"
 
-    # Generate SSL cert if missing (upgrade path from pre-SSL installs)
-    # Skip if user explicitly disabled HTTPS (reverse proxy mode)
+    # Apply HTTPS setting based on user's answer
     local ssl_dir="/opt/glass-keep/ssl"
-    local https_setting
-    https_setting=$(grep -E '^HTTPS_ENABLED=' "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
-    if [[ ! -f "$ssl_dir/cert.pem" && "$https_setting" != "false" ]]; then
-        local ssl_ip
-        ssl_ip=$(get_server_ip)
-        mkdir -p "$ssl_dir"
-        step "$MSG_STEP_SSL" \
-            openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
-                -keyout "$ssl_dir/key.pem" \
-                -out    "$ssl_dir/cert.pem" \
-                -subj   "/CN=glasskeep" \
-                -addext "subjectAltName=IP:${ssl_ip},IP:127.0.0.1,DNS:localhost" \
-                2>/dev/null
-        chmod 600 "$ssl_dir/key.pem"
-        if ! grep -q '^SSL_CERT=' "$ENV_FILE" 2>/dev/null; then
-            printf '\nHTTPS_ENABLED=true\nSSL_CERT=%s/cert.pem\nSSL_KEY=%s/key.pem\n' "$ssl_dir" "$ssl_dir" >> "$ENV_FILE"
+    if [[ "$use_proxy" == "yes" ]]; then
+        set_env_var "HTTPS_ENABLED" "false" "$ENV_FILE"
+    else
+        if [[ ! -f "$ssl_dir/cert.pem" ]]; then
+            local ssl_ip
+            ssl_ip=$(get_server_ip)
+            mkdir -p "$ssl_dir"
+            step "$MSG_STEP_SSL" \
+                openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+                    -keyout "$ssl_dir/key.pem" \
+                    -out    "$ssl_dir/cert.pem" \
+                    -subj   "/CN=glasskeep" \
+                    -addext "subjectAltName=IP:${ssl_ip},IP:127.0.0.1,DNS:localhost" \
+                    2>/dev/null
+            chmod 600 "$ssl_dir/key.pem"
         fi
+        set_env_var "HTTPS_ENABLED" "true" "$ENV_FILE"
+        set_env_var "SSL_CERT" "${ssl_dir}/cert.pem" "$ENV_FILE"
+        set_env_var "SSL_KEY"  "${ssl_dir}/key.pem"  "$ENV_FILE"
     fi
 
     # shellcheck disable=SC2059
