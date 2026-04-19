@@ -31,7 +31,7 @@ export default function LoginView({
       const res = await onLogin(email.trim(), pw);
       if (!res.ok) setErr(res.error || t("loginFailed"));
     } catch (er) {
-      setErr(t("loginUnexpectedError"));
+      setErr(window.isSecureContext === false ? t("loginInsecureContext") : t("loginUnexpectedError"));
     }
   };
 
@@ -42,7 +42,7 @@ export default function LoginView({
       const res = await onLoginById(selectedProfile.id, pw);
       if (!res.ok) setErr(res.error || t("loginFailed"));
     } catch (er) {
-      setErr(t("loginUnexpectedError"));
+      setErr(window.isSecureContext === false ? t("loginInsecureContext") : t("loginUnexpectedError"));
     }
   };
 
