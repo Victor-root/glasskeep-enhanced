@@ -76,7 +76,7 @@ setup_i18n() {
         MSG_PROXY_CONFIRM_NO="non"
         MSG_PROXY_INVALID="Répondez par oui ou non."
         MSG_PROXY_YES_INFO="  → HTTPS désactivé côté GlassKeep : votre reverse proxy gère le chiffrement."
-        MSG_PROXY_NO_INFO="  → Un certificat SSL auto-signé va être généré.\n     Votre navigateur affichera un avertissement : cliquez sur \"Continuer quand même\".\n     Pour changer ce réglage plus tard, relancez ce script et choisissez \"Mise à jour\"."
+        MSG_PROXY_NO_INFO="  → Un certificat SSL auto-signé va être généré.\n     Votre navigateur affichera un avertissement : cliquez sur \"Continuer quand même\".\n     Pour modifier ce réglage plus tard, relancez ce script et choisissez\n     \"2) ${MSG_OPT_UPDATE}\"."
         MSG_STEP_DAEMON="Rechargement de systemd"
         MSG_STEP_SERVICE="Activation et démarrage du service %s"
         MSG_WARN_SERVICE="Le service ne semble pas démarré. Vérifiez les logs :"
@@ -166,7 +166,7 @@ setup_i18n() {
         MSG_PROXY_CONFIRM_NO="no"
         MSG_PROXY_INVALID="Please answer yes or no."
         MSG_PROXY_YES_INFO="  → HTTPS disabled on the GlassKeep side: your reverse proxy handles encryption."
-        MSG_PROXY_NO_INFO="  → A self-signed SSL certificate will be generated.\n     Your browser will show a warning: click \"Proceed anyway\".\n     To change this later, re-run this script and choose \"Update\"."
+        MSG_PROXY_NO_INFO="  → A self-signed SSL certificate will be generated.\n     Your browser will show a warning: click \"Proceed anyway\".\n     To change this setting later, re-run this script and choose\n     \"2) ${MSG_OPT_UPDATE}\"."
         MSG_STEP_DAEMON="Reloading systemd"
         MSG_STEP_SERVICE="Enabling and starting service %s"
         MSG_WARN_SERVICE="Service does not appear to be running. Check logs:"
@@ -412,6 +412,28 @@ action_install() {
     echo -e "${BOLD}  ${MSG_HDR_INSTALL}${RESET}"
     echo -e "${BOLD}═══════════════════════════════════════${RESET}"
 
+    # Ask about reverse proxy (first, before anything else)
+    echo ""
+    echo -e "${BOLD}${CYAN}▶ HTTPS / SSL${RESET}"
+    echo ""
+    local use_proxy=""
+    while true; do
+        read -rp "$(echo -e "${YELLOW}${MSG_PROMPT_PROXY}${RESET}")" use_proxy </dev/tty
+        use_proxy="${use_proxy,,}"
+        if [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_YES" || "$use_proxy" == "y" || "$use_proxy" == "o" ]]; then
+            use_proxy="yes"
+            echo -e "${CYAN}${MSG_PROXY_YES_INFO}${RESET}"
+            break
+        elif [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_NO" || "$use_proxy" == "n" ]]; then
+            use_proxy="no"
+            echo -e "${CYAN}$(echo -e "$MSG_PROXY_NO_INFO")${RESET}"
+            break
+        else
+            warn "$MSG_PROXY_INVALID"
+        fi
+    done
+    echo ""
+
     # Ask port
     local port
     read -rp "$(echo -e "${YELLOW}${MSG_PROMPT_PORT}${RESET}")" port </dev/tty
@@ -507,28 +529,6 @@ action_install() {
 
     GLASSKEEP_ADMIN_LOGIN=""
     setup_admin "${DATA_DIR}/notes.db" "$admin_name" "$admin_login" "$admin_pass"
-
-    # Ask about reverse proxy
-    echo ""
-    echo -e "${BOLD}${CYAN}▶ HTTPS / SSL${RESET}"
-    echo ""
-    local use_proxy=""
-    while true; do
-        read -rp "$(echo -e "${YELLOW}${MSG_PROMPT_PROXY}${RESET}")" use_proxy </dev/tty
-        use_proxy="${use_proxy,,}"
-        if [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_YES" || "$use_proxy" == "y" || "$use_proxy" == "o" ]]; then
-            use_proxy="yes"
-            echo -e "${CYAN}${MSG_PROXY_YES_INFO}${RESET}"
-            break
-        elif [[ "$use_proxy" == "$MSG_PROXY_CONFIRM_NO" || "$use_proxy" == "n" ]]; then
-            use_proxy="no"
-            echo -e "${CYAN}$(echo -e "$MSG_PROXY_NO_INFO")${RESET}"
-            break
-        else
-            warn "$MSG_PROXY_INVALID"
-        fi
-    done
-    echo ""
 
     local jwt_secret
     jwt_secret=$(openssl rand -hex 32 2>/dev/null || cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 64)
