@@ -218,6 +218,56 @@ The script output language adapts to your system locale (English/French).
 
 ---
 
+### Install via Docker
+
+> **Heads up:** the native install script above is the recommended way to run GlassKeep. It's what I develop and maintain, and it's more flexible for day-to-day updates. Docker is provided for NAS users and similar appliances — it works, but it's a secondary target.
+
+The Docker image is **HTTP-only** (put a reverse proxy in front of it if you need HTTPS) and the AI features are **not bundled** in it, to keep it light.
+
+#### Install — one copy-paste
+
+Paste this single block into a terminal on your Docker host. It creates the folder, the compose file, and starts GlassKeep:
+
+```bash
+mkdir -p ~/glasskeep && cd ~/glasskeep && cat > docker-compose.yml <<'EOF'
+services:
+  glasskeep:
+    image: ghcr.io/victor-root/glasskeep-enhanced:latest
+    container_name: glasskeep
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADMIN_EMAIL: "admin"
+      ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./data:/data
+EOF
+docker compose up -d
+```
+
+Then:
+
+1. Open `http://<your-host>:8080`
+2. Log in with `admin` / `admin`
+3. **Change the admin password right away** from the admin settings panel
+
+That's it. Your notes, account and the auto-generated JWT secret all live in `~/glasskeep/data/` on the host — back up that folder to back up everything.
+
+#### Update — one copy-paste
+
+```bash
+cd ~/glasskeep && docker compose pull && docker compose up -d
+```
+
+Re-run it whenever you want the latest version. No data loss — the image itself is stateless, and the `./data` folder is preserved. The image is rebuilt automatically on every push to `main` so `pull` always fetches the freshest build.
+
+#### Optional tweaks
+
+If you want to change the port, allow self-registration, pin your own JWT secret, or use a different admin login, the commented reference `docker-compose.yml` at the root of this repo lists every supported environment variable.
+
+---
+
 ### Recommended system requirements
 
 #### Without AI features

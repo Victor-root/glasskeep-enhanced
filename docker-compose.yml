@@ -1,0 +1,54 @@
+# =============================================================================
+#  GlassKeep — Docker Compose
+#
+#  This image is HTTP-only on purpose: put it behind a reverse proxy
+#  (Nginx, Caddy, Traefik, your NAS's built-in reverse proxy...) for HTTPS.
+#
+#  The native install script (install.sh) remains the recommended install
+#  method — see the README.
+#
+#  Quick start:
+#    1. docker compose up -d
+#    2. Open http://<host>:8080 and log in with admin / admin.
+#    3. Change the admin password from the admin settings panel.
+#
+#  Update:
+#    docker compose pull && docker compose up -d
+#    (Your notes and account survive — they live in ./data on the host.)
+# =============================================================================
+services:
+  glasskeep:
+    image: ghcr.io/victor-root/glasskeep-enhanced:latest
+    container_name: glasskeep
+    restart: unless-stopped
+    ports:
+      # Left  = port on the host (change this freely, e.g. "9000:8080")
+      # Right = port inside the container (keep 8080, OR change it and
+      #         also set API_PORT below to the same value)
+      - "8080:8080"
+    environment:
+      # --- First-run admin account ------------------------------------------
+      # Only used when the database is empty (very first container start).
+      # On subsequent starts both values are ignored by the bootstrap —
+      # change the password from the admin settings panel in the UI.
+      ADMIN_EMAIL: "admin"
+      ADMIN_PASSWORD: "admin"
+      ADMIN_NAME: "Admin"
+
+      # --- Optional: change the port the server listens on ------------------
+      # Only needed if you also changed the right-hand side of "ports:" above.
+      # API_PORT: "8080"
+
+      # --- Optional: allow public self-registration (false by default) ------
+      # ALLOW_REGISTRATION: "false"
+
+      # --- Optional: bring your own JWT secret ------------------------------
+      # If unset, a persistent one is auto-generated in /data/.jwt_secret
+      # (survives restarts and image upgrades). Generate one with:
+      #   openssl rand -hex 32
+      # JWT_SECRET: ""
+
+    volumes:
+      # Persistent data: SQLite DB + auto-generated JWT secret.
+      # Back this directory up to preserve your notes.
+      - ./data:/data
