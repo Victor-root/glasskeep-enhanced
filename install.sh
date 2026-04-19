@@ -783,7 +783,9 @@ show_access_info() {
     ip=$(get_server_ip)
 
     local proto="http"
-    [[ -f "/opt/glass-keep/ssl/cert.pem" ]] && proto="https"
+    local https_val
+    https_val=$(grep -E '^HTTPS_ENABLED=' "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+    [[ "$https_val" == "true" ]] && proto="https"
 
     echo ""
     echo -e "${GREEN}${BOLD}╔═══════════════════════════════════════════╗${RESET}"
