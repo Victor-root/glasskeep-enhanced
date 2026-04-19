@@ -70,6 +70,7 @@ setup_i18n() {
         MSG_STEP_NPM="Installation des dépendances npm"
         MSG_STEP_BUILD="Build de l'application (Vite)"
         MSG_ENV_CREATED="Fichier de configuration créé : %s"
+        MSG_STEP_SSL="Génération du certificat SSL auto-signé"
         MSG_STEP_DAEMON="Rechargement de systemd"
         MSG_STEP_SERVICE="Activation et démarrage du service %s"
         MSG_WARN_SERVICE="Le service ne semble pas démarré. Vérifiez les logs :"
@@ -153,6 +154,7 @@ setup_i18n() {
         MSG_STEP_NPM="Installing npm dependencies"
         MSG_STEP_BUILD="Building the application (Vite)"
         MSG_ENV_CREATED="Configuration file created: %s"
+        MSG_STEP_SSL="Generating self-signed SSL certificate"
         MSG_STEP_DAEMON="Reloading systemd"
         MSG_STEP_SERVICE="Enabling and starting service %s"
         MSG_WARN_SERVICE="Service does not appear to be running. Check logs:"
@@ -487,6 +489,19 @@ action_install() {
     local jwt_secret
     jwt_secret=$(openssl rand -hex 32 2>/dev/null || cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 64)
 
+    local ssl_dir="/opt/glass-keep/ssl"
+    mkdir -p "$ssl_dir"
+    local ssl_ip
+    ssl_ip=$(get_server_ip)
+    step "$MSG_STEP_SSL" \
+        openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+            -keyout "$ssl_dir/key.pem" \
+            -out    "$ssl_dir/cert.pem" \
+            -subj   "/CN=glasskeep" \
+            -addext "subjectAltName=IP:${ssl_ip},IP:127.0.0.1,DNS:localhost" \
+            2>/dev/null
+    chmod 600 "$ssl_dir/key.pem"
+
     cat > "$ENV_FILE" <<EOF
 NODE_ENV=production
 API_PORT=${port}
@@ -494,6 +509,8 @@ JWT_SECRET=${jwt_secret}
 DB_FILE=${DATA_DIR}/notes.db
 ADMIN_EMAILS=${GLASSKEEP_ADMIN_LOGIN}
 ALLOW_REGISTRATION=false
+SSL_CERT=${ssl_dir}/cert.pem
+SSL_KEY=${ssl_dir}/key.pem
 EOF
     chmod 600 "$ENV_FILE"
     # shellcheck disable=SC2059
@@ -559,6 +576,25 @@ action_update() {
 
     step "$MSG_STEP_REBUILD" \
         bash -c "cd '${INSTALL_DIR}' && npm run build"
+
+    # Generate SSL cert if missing (upgrade path from non-SSL installs)
+    local ssl_dir="/opt/glass-keep/ssl"
+    if [[ ! -f "$ssl_dir/cert.pem" ]]; then
+        local ssl_ip
+        ssl_ip=$(get_server_ip)
+        mkdir -p "$ssl_dir"
+        step "$MSG_STEP_SSL" \
+            openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+                -keyout "$ssl_dir/key.pem" \
+                -out    "$ssl_dir/cert.pem" \
+                -subj   "/CN=glasskeep" \
+                -addext "subjectAltName=IP:${ssl_ip},IP:127.0.0.1,DNS:localhost" \
+                2>/dev/null
+        chmod 600 "$ssl_dir/key.pem"
+        if ! grep -q '^SSL_CERT=' "$ENV_FILE" 2>/dev/null; then
+            printf '\nSSL_CERT=%s/cert.pem\nSSL_KEY=%s/key.pem\n' "$ssl_dir" "$ssl_dir" >> "$ENV_FILE"
+        fi
+    fi
 
     # shellcheck disable=SC2059
     step "$(printf "$MSG_STEP_START" "$SERVICE_NAME")" \
@@ -628,13 +664,16 @@ show_access_info() {
     local ip
     ip=$(get_server_ip)
 
+    local proto="http"
+    [[ -f "/opt/glass-keep/ssl/cert.pem" ]] && proto="https"
+
     echo ""
     echo -e "${GREEN}${BOLD}╔═══════════════════════════════════════════╗${RESET}"
     echo -e "${GREEN}${BOLD}║   ${MSG_ACCESS_TITLE}${RESET}"
     echo -e "${GREEN}${BOLD}╚═══════════════════════════════════════════╝${RESET}"
     echo ""
-    echo -e "  ${BOLD}${MSG_ACCESS_LOCAL}${RESET} http://localhost:${port}"
-    echo -e "  ${BOLD}${MSG_ACCESS_NET}${RESET} http://${ip}:${port}"
+    echo -e "  ${BOLD}${MSG_ACCESS_LOCAL}${RESET} ${proto}://localhost:${port}"
+    echo -e "  ${BOLD}${MSG_ACCESS_NET}${RESET} ${proto}://${ip}:${port}"
     echo ""
     echo -e "  ${BOLD}${MSG_ACCESS_CREDS}${RESET}"
     echo ""

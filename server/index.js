@@ -2009,6 +2009,20 @@ if (NODE_ENV === "production") {
 }
 
 // ---------- Listen ----------
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`API listening on http://0.0.0.0:${PORT}  (env=${NODE_ENV})`);
-});
+const SSL_CERT = process.env.SSL_CERT;
+const SSL_KEY  = process.env.SSL_KEY;
+
+if (SSL_CERT && SSL_KEY && fs.existsSync(SSL_CERT) && fs.existsSync(SSL_KEY)) {
+  const https = require("https");
+  const sslOptions = {
+    cert: fs.readFileSync(SSL_CERT),
+    key:  fs.readFileSync(SSL_KEY),
+  };
+  https.createServer(sslOptions, app).listen(PORT, "0.0.0.0", () => {
+    console.log(`API listening on https://0.0.0.0:${PORT}  (env=${NODE_ENV})`);
+  });
+} else {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`API listening on http://0.0.0.0:${PORT}  (env=${NODE_ENV})`);
+  });
+}
