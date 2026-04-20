@@ -24,6 +24,11 @@ export default function LoginView({
   // If no visible profiles, show manual login directly
   const hasProfiles = loginProfiles && loginProfiles.length > 0;
 
+  const loginErrorMessage = (er) =>
+    er && (er.status || er.isNetworkError) && er.message
+      ? er.message
+      : t("loginUnexpectedError");
+
   const handleManualSubmit = async (e) => {
     e.preventDefault();
     setErr("");
@@ -31,7 +36,7 @@ export default function LoginView({
       const res = await onLogin(email.trim(), pw);
       if (!res.ok) setErr(res.error || t("loginFailed"));
     } catch (er) {
-      setErr(window.isSecureContext === false ? t("loginInsecureContext") : t("loginUnexpectedError"));
+      setErr(loginErrorMessage(er));
     }
   };
 
@@ -42,7 +47,7 @@ export default function LoginView({
       const res = await onLoginById(selectedProfile.id, pw);
       if (!res.ok) setErr(res.error || t("loginFailed"));
     } catch (er) {
-      setErr(window.isSecureContext === false ? t("loginInsecureContext") : t("loginUnexpectedError"));
+      setErr(loginErrorMessage(er));
     }
   };
 
