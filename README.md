@@ -309,16 +309,12 @@ Missing keys will fall back to English.
 
 ## 🗺️ Roadmap
 
-Work that's on the plan for upcoming releases.
-
-- **Server-side encryption at rest.** Encrypt stored data on the server so that a physical theft of the server or its drives does not expose note contents.
-- **Complete translations.** Ship additional locales so the UI is fully usable outside of the currently supported languages.
+### 🗓️ Planned
+- Implement server-side encryption to better protect data in case the server or its drives are stolen
+- Add more translations and proper right-to-left (RTL) language support
 
 ### 💭 Under consideration
-
-Ideas I'm still evaluating before committing to an implementation.
-
-- **Read-only viewing mode, à la Google Keep.** Opening a note would show a read-only rendered view first, with an explicit switch to jump into edit mode — instead of always opening in the editable state.
+- Explore an edit-only mode similar to Google Keep
 
 ---
 
