@@ -7,7 +7,10 @@ import { t } from "../../i18n";
  *   first item of the section (via onEnter).
  * - Drag handle (six dots) → move the whole section block (wired in
  *   ChecklistEditor through onHandlePointerDown).
- * - ✕ button → delete the section and all its items (cascade).
+ * - Trash button → two-step delete confirmation: first click swaps the
+ *   icon to a red check; second click confirms and triggers onRemove.
+ *   The pending state cancels on blur-out (click anywhere else) after
+ *   a short delay so the section isn't accidentally removed.
  */
 export default function SectionHeader({
   section,
@@ -20,7 +23,9 @@ export default function SectionHeader({
   onHandlePointerCancel,
 }) {
   const [editing, setEditing] = React.useState(!section.title);
+  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
   const inputRef = React.useRef(null);
+  const confirmTimerRef = React.useRef(null);
 
   React.useEffect(() => {
     if (editing && inputRef.current) {
@@ -29,10 +34,34 @@ export default function SectionHeader({
     }
   }, [editing]);
 
+  // Auto-cancel pending confirmation after 3 s of inaction.
+  React.useEffect(() => {
+    if (!confirmingDelete) return;
+    confirmTimerRef.current = setTimeout(() => {
+      setConfirmingDelete(false);
+    }, 3000);
+    return () => {
+      if (confirmTimerRef.current) {
+        clearTimeout(confirmTimerRef.current);
+        confirmTimerRef.current = null;
+      }
+    };
+  }, [confirmingDelete]);
+
   const commit = (value) => {
     const next = (value ?? "").trim();
     onRename(next);
     setEditing(false);
+  };
+
+  const handleDeleteClick = (e) => {
+    e.stopPropagation();
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
+    setConfirmingDelete(false);
+    onRemove?.();
   };
 
   return (
@@ -85,11 +114,21 @@ export default function SectionHeader({
         </h4>
       )}
       <button
-        onClick={onRemove}
-        data-tooltip={t("removeSection")}
-        className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 rounded-full border border-[var(--border-light)] flex items-center justify-center cursor-pointer w-6 h-6 text-sm"
+        type="button"
+        onClick={handleDeleteClick}
+        data-tooltip={confirmingDelete ? t("confirmRemoveSection") : t("removeSection")}
+        aria-label={confirmingDelete ? t("confirmRemoveSection") : t("removeSection")}
+        className="flex items-center justify-center w-7 h-7 rounded-md text-red-500 hover:text-red-600 hover:bg-red-500/10 dark:hover:bg-red-500/20 transition-colors cursor-pointer"
       >
-        ✕
+        {confirmingDelete ? (
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+          </svg>
+        )}
       </button>
     </div>
   );

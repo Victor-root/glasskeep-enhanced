@@ -137,6 +137,7 @@ loginInsecureContext: "Connexion impossible : votre navigateur bloque certaines 
   addSection: "Ajouter une section",
   addToSectionEllipsis: "Ajouter dans la section…",
   removeSection: "Supprimer la section",
+  confirmRemoveSection: "Confirmer la suppression",
   moveSection: "Déplacer la section",
   sectionTitlePlaceholder: "Titre de section",
   pasteSecretKeyHere: "Collez votre clé secrète ici",

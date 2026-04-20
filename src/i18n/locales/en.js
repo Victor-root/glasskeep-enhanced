@@ -137,6 +137,7 @@ loginInsecureContext: "Cannot sign in: your browser blocks some features over pl
   addSection: "Add section",
   addToSectionEllipsis: "Add to section…",
   removeSection: "Remove section",
+  confirmRemoveSection: "Confirm deletion",
   moveSection: "Move section",
   sectionTitlePlaceholder: "Section title",
   pasteSecretKeyHere: "Paste your secret key here",
