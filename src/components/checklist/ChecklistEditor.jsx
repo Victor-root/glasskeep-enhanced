@@ -19,6 +19,7 @@ import {
   makeSection,
   normalizeItems,
   removeEntry,
+  removeSectionKeepItems,
   removeSectionWithItems,
   sectionIdForItem,
   updateEntry,
@@ -43,6 +44,7 @@ export default function ChecklistEditor({
   setEntries,
   syncEntries,
   insertPosition = "bottom",
+  removeSectionBehavior = "cascade",
 }) {
   const items = React.useMemo(() => normalizeItems(entries), [entries]);
   const sections = React.useMemo(() => getSections(items), [items]);
@@ -144,8 +146,14 @@ export default function ChecklistEditor({
   };
 
   const removeSection = (id) => {
-    // Cascade delete: drop the section marker AND every item it owns.
-    commit(removeSectionWithItems(items, id));
+    // Two behaviours, controlled by the user setting:
+    //   "cascade" → drop the section marker AND every item it owns.
+    //   "keep"    → drop the marker but relocate its items back to the
+    //                default (unsectioned) zone.
+    const next = removeSectionBehavior === "keep"
+      ? removeSectionKeepItems(items, id)
+      : removeSectionWithItems(items, id);
+    commit(next);
   };
 
   // Called when the user presses Enter inside a section's title input.

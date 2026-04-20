@@ -148,6 +148,7 @@ export default function NoteModal({
   // checklist handlers
   syncChecklistItems,
   checklistInsertPosition,
+  checklistRemoveSectionBehavior,
   // direct draw mode
   initialDrawMode,
   onConsumeInitialDrawMode,
@@ -400,6 +401,7 @@ export default function NoteModal({
                     setEntries={setMItems}
                     syncEntries={syncChecklistItems}
                     insertPosition={checklistInsertPosition}
+                    removeSectionBehavior={checklistRemoveSectionBehavior}
                   />
                 </div>
               ) : drawMode === 'draw' ? (

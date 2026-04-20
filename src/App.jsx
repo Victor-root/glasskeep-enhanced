@@ -168,6 +168,16 @@ export default function App() {
       return "top";
     }
   });
+  // Behavior when the user deletes a section: "cascade" (also delete
+  // items) or "keep" (move items to the default section).
+  const [checklistRemoveSectionBehavior, setChecklistRemoveSectionBehavior] = useState(() => {
+    try {
+      const stored = localStorage.getItem("checklistRemoveSectionBehavior");
+      return stored === "keep" ? "keep" : "cascade";
+    } catch (e) {
+      return "cascade";
+    }
+  });
   // Edge-to-edge landscape: extend content under status bar on the left
   const [edgeToEdgeLandscape, setEdgeToEdgeLandscape] = useState(() => {
     try {
@@ -499,6 +509,10 @@ export default function App() {
           setChecklistInsertPosition(settings.checklistInsertPosition);
           localStorage.setItem("checklistInsertPosition", settings.checklistInsertPosition);
         }
+        if (settings?.checklistRemoveSectionBehavior === "keep" || settings?.checklistRemoveSectionBehavior === "cascade") {
+          setChecklistRemoveSectionBehavior(settings.checklistRemoveSectionBehavior);
+          localStorage.setItem("checklistRemoveSectionBehavior", settings.checklistRemoveSectionBehavior);
+        }
         if (typeof settings?.edgeToEdgeLandscape === "boolean") {
           setEdgeToEdgeLandscape(settings.edgeToEdgeLandscape);
           localStorage.setItem("edgeToEdgeLandscape", String(settings.edgeToEdgeLandscape));
@@ -570,6 +584,20 @@ export default function App() {
       }).catch(() => {});
     }
   }, [checklistInsertPosition]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("checklistRemoveSectionBehavior", checklistRemoveSectionBehavior);
+    } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { checklistRemoveSectionBehavior },
+      }).catch(() => {});
+    }
+  }, [checklistRemoveSectionBehavior]);
 
   // Edge-to-edge landscape: save + dynamically toggle body padding-left
   useEffect(() => {
@@ -4043,6 +4071,7 @@ export default function App() {
       resizeModalTextarea={resizeModalTextarea}
       syncChecklistItems={syncChecklistItems}
       checklistInsertPosition={checklistInsertPosition}
+      checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
       initialDrawMode={initialDrawMode}
       onConsumeInitialDrawMode={() => setInitialDrawMode(null)}
     />
@@ -4199,6 +4228,8 @@ export default function App() {
         setFloatingCardsEnabled={setFloatingCardsEnabled}
         checklistInsertPosition={checklistInsertPosition}
         setChecklistInsertPosition={setChecklistInsertPosition}
+        checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
+        setChecklistRemoveSectionBehavior={setChecklistRemoveSectionBehavior}
         edgeToEdgeLandscape={edgeToEdgeLandscape}
         setEdgeToEdgeLandscape={setEdgeToEdgeLandscape}
         showGenericConfirm={showGenericConfirm}

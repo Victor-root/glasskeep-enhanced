@@ -209,6 +209,30 @@ export function removeSectionWithItems(entries, sectionId) {
 }
 
 /**
+ * Remove a section marker and relocate its items into the default
+ * section (i.e. the unsectioned zone at the top, before any other
+ * section marker). Useful when the user wants to un-group items
+ * without losing them.
+ */
+export function removeSectionKeepItems(entries, sectionId) {
+  const arr = entries.slice();
+  const startIdx = arr.findIndex((e) => isSection(e) && e.id === sectionId);
+  if (startIdx === -1) return arr;
+  let endIdx = arr.length;
+  for (let i = startIdx + 1; i < arr.length; i++) {
+    if (isSection(arr[i])) { endIdx = i; break; }
+  }
+  const items = arr.slice(startIdx + 1, endIdx);
+  arr.splice(startIdx, endIdx - startIdx);
+  // Re-insert at the end of the default section (just before the first
+  // remaining section marker, or at the end if none remain).
+  const firstMarker = arr.findIndex(isSection);
+  const insertAt = firstMarker === -1 ? arr.length : firstMarker;
+  arr.splice(insertAt, 0, ...items);
+  return arr;
+}
+
+/**
  * Reorder named sections based on a new ordered list of section IDs.
  * The default section (items before the first section marker) stays
  * anchored at the top. Each section's marker and its items travel

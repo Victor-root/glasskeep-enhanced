@@ -22,6 +22,8 @@ export default function SettingsPanel({
   setFloatingCardsEnabled,
   checklistInsertPosition,
   setChecklistInsertPosition,
+  checklistRemoveSectionBehavior,
+  setChecklistRemoveSectionBehavior,
   edgeToEdgeLandscape,
   setEdgeToEdgeLandscape,
   showGenericConfirm,
@@ -395,6 +397,13 @@ export default function SettingsPanel({
                 </button>
               </div>
 
+            </div>
+          </div>
+
+          {/* Checklist Settings Section */}
+          <div className="mb-8">
+            <h4 className="text-md font-semibold mb-4">{t("checklistSettings")}</h4>
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="min-w-0">
                   <div className="font-medium">{t("checklistInsertPosition")}</div>
@@ -420,6 +429,35 @@ export default function SettingsPanel({
                     onClick={() => setChecklistInsertPosition("bottom")}
                   >
                     {t("checklistInsertBottom")}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="font-medium">{t("checklistRemoveSection")}</div>
+                  <div className="text-sm text-gray-500">{t("checklistRemoveSectionDesc")}</div>
+                </div>
+                <div className="ml-3 flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+                  <button
+                    className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
+                      checklistRemoveSectionBehavior === "cascade"
+                        ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                        : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                    onClick={() => setChecklistRemoveSectionBehavior("cascade")}
+                  >
+                    {t("checklistRemoveSectionCascade")}
+                  </button>
+                  <button
+                    className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
+                      checklistRemoveSectionBehavior === "keep"
+                        ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                        : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                    onClick={() => setChecklistRemoveSectionBehavior("keep")}
+                  >
+                    {t("checklistRemoveSectionKeep")}
                   </button>
                 </div>
               </div>
