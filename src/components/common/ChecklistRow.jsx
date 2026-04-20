@@ -13,10 +13,27 @@ export default function ChecklistRow({
   size = "md", // "sm" | "md" | "lg"
   preview = false,
   initialEditing = false,
+  // Keyboard editing callbacks (editor mode only)
+  onEnter,           // () => void : Enter (no modifiers) — create next item
+  onBackspaceEmpty,  // () => void : Backspace on empty content — delete + focus prev
+  // Imperative focus requests from parent. When focusToken changes and
+  // focusItemId matches this item's id, focus this row and place the
+  // caret at focusCaret ("start" | "end", default "end").
+  focusItemId,
+  focusToken,
+  focusCaret = "end",
 }) {
   const [editing, setEditing] = React.useState(initialEditing);
   const clickOffsetRef = React.useRef(null);
   const textareaRef = React.useRef(null);
+
+  const enterEdit = React.useCallback((caret) => {
+    if (readOnly) return;
+    if (typeof caret === "number") clickOffsetRef.current = caret;
+    else if (caret === "start") clickOffsetRef.current = 0;
+    else clickOffsetRef.current = null; // default: end
+    setEditing(true);
+  }, [readOnly]);
 
   React.useEffect(() => {
     if (editing && textareaRef.current) {
@@ -29,6 +46,12 @@ export default function ChecklistRow({
       clickOffsetRef.current = null;
     }
   }, [editing]);
+
+  // External focus trigger: parent bumps focusToken to request this row.
+  React.useEffect(() => {
+    if (focusItemId !== item.id || focusToken == null) return;
+    enterEdit(focusCaret);
+  }, [focusToken, focusItemId, item.id, focusCaret, enterEdit]);
 
   const boxSize =
     size === "lg"
@@ -47,6 +70,36 @@ export default function ChecklistRow({
   const removeVisibility = showRemove
     ? "opacity-80 hover:opacity-100"
     : "opacity-0 group-hover:opacity-100";
+
+  const handleKeyDown = (e) => {
+    // Enter without modifiers — create a new item below.
+    if (
+      e.key === "Enter" &&
+      !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey &&
+      typeof onEnter === "function"
+    ) {
+      e.preventDefault();
+      // Commit any pending IME/height change before the parent inserts.
+      onEnter();
+      return;
+    }
+    // Shift+Enter: default browser behaviour (newline inside item).
+
+    // Backspace on empty: delete item + focus previous.
+    if (
+      e.key === "Backspace" &&
+      !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey &&
+      typeof onBackspaceEmpty === "function"
+    ) {
+      const el = e.currentTarget;
+      const empty = (el.value || "").length === 0;
+      const caretAtStart = (el.selectionStart === 0 && el.selectionEnd === 0);
+      if (empty && caretAtStart) {
+        e.preventDefault();
+        onBackspaceEmpty();
+      }
+    }
+  };
 
   return (
     <div className="flex items-center gap-1.5 sm:gap-3 md:gap-2 group min-w-0">
@@ -69,8 +122,7 @@ export default function ChecklistRow({
             let offset = item.text.length;
             const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
             if (range) offset = range.startOffset;
-            clickOffsetRef.current = offset;
-            setEditing(true);
+            enterEdit(offset);
           } : undefined}
         >
           {!preview ? linkifyContacts(item.text) : item.text}
@@ -85,6 +137,7 @@ export default function ChecklistRow({
             e.target.style.height = "auto";
             e.target.style.height = e.target.scrollHeight + "px";
           }}
+          onKeyDown={handleKeyDown}
           onBlur={() => {
             setEditing(false);
             if (!item.text.trim()) onRemove?.();

@@ -75,7 +75,11 @@ export const mdForDownload = (n) => {
   } else {
     const items = Array.isArray(n.items) ? n.items : [];
     for (const it of items) {
-      lines.push(`- [${it.done ? "x" : " "}] ${it.text || ""}`);
+      if (it && it.kind === "section") {
+        lines.push("", `## ${it.title || ""}`, "");
+      } else if (it) {
+        lines.push(`- [${it.done ? "x" : " "}] ${it.text || ""}`);
+      }
     }
   }
   if (n.images?.length) {
