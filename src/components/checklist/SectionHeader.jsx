@@ -31,7 +31,7 @@ export default function SectionHeader({ section, onRename, onRemove, onEnter }) 
           ref={inputRef}
           type="text"
           defaultValue={section.title}
-          className="flex-1 bg-transparent text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-200 focus:outline-none border-0 border-b border-[var(--border-light)] px-0 py-1"
+          className="flex-1 bg-transparent text-sm font-semibold tracking-wide text-gray-700 dark:text-gray-200 focus:outline-none border-0 border-b border-[var(--border-light)] px-0 py-1"
           placeholder={t("sectionTitlePlaceholder")}
           onBlur={(e) => commit(e.target.value)}
           onKeyDown={(e) => {
@@ -47,7 +47,7 @@ export default function SectionHeader({ section, onRename, onRemove, onEnter }) 
         />
       ) : (
         <h4
-          className="flex-1 text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-200 cursor-text py-1"
+          className="flex-1 text-sm font-semibold tracking-wide text-gray-700 dark:text-gray-200 cursor-text py-1"
           onClick={() => setEditing(true)}
         >
           {section.title || t("sectionTitlePlaceholder")}

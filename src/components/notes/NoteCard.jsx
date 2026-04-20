@@ -281,7 +281,7 @@ export default function NoteCard({
           {previewSections.map((s) => (
             <div key={s.id} className="space-y-1">
               {hasAnyTitledSection && s.id !== DEFAULT_SECTION_ID && s.title && (
-                <div className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300 mt-2">
+                <div className="text-xs font-semibold tracking-wide text-gray-600 dark:text-gray-300 mt-2">
                   {s.title}
                 </div>
               )}

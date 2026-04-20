@@ -19,6 +19,7 @@ import {
   makeSection,
   normalizeItems,
   removeEntry,
+  removeSectionWithItems,
   sectionIdForItem,
   updateEntry,
 } from "../../utils/checklist.js";
@@ -127,14 +128,13 @@ export default function ChecklistEditor({
   // ---------- Section-level edits ----------
   const addSection = () => {
     const newSection = makeSection("");
-    // Append a new section at the very end so it opens a fresh empty
-    // group the user can fill in. We also append one empty item inside
-    // so typing flows immediately.
+    // Append a new section at the very end and seed one empty item
+    // inside. Focus will land on the title input automatically because
+    // SectionHeader opens in edit mode when its title is empty.
     const newItem = makeItem("", false);
     const next = [...items, newSection, newItem];
     setEntries(next);
     syncEntries(next);
-    requestFocus(newItem.id, "end");
   };
 
   const renameSection = (id, title) => {
@@ -142,9 +142,21 @@ export default function ChecklistEditor({
   };
 
   const removeSection = (id) => {
-    // Remove the section marker only — items below merge into the
-    // previous section. This is the least destructive behaviour.
-    commit(removeEntry(items, id));
+    // Cascade delete: drop the section marker AND every item it owns.
+    commit(removeSectionWithItems(items, id));
+  };
+
+  // Called when the user presses Enter inside a section's title input.
+  // Moves focus into the section so typing keeps flowing; creates an
+  // empty item on demand if the section is empty.
+  const focusFirstItemInSection = (sectionId) => {
+    const sec = sections.find((s) => s.id === sectionId);
+    const firstUnchecked = sec?.items.find((it) => !it.done);
+    if (firstUnchecked) {
+      requestFocus(firstUnchecked.id, "end");
+    } else {
+      addItemToSection(sectionId);
+    }
   };
 
   // ---------- Rendering helpers ----------
@@ -238,7 +250,7 @@ export default function ChecklistEditor({
                     section={section}
                     onRename={(title) => renameSection(section.id, title)}
                     onRemove={() => removeSection(section.id)}
-                    onEnter={() => addItemToSection(section.id)}
+                    onEnter={() => focusFirstItemInSection(section.id)}
                   />
                 )}
                 {uncheckedInSection.map(renderItemRow)}
@@ -280,7 +292,7 @@ export default function ChecklistEditor({
                   return (
                     <div key={sid} className="mb-3">
                       {label && (
-                        <div className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">
+                        <div className="text-xs font-semibold tracking-wide text-gray-400 dark:text-gray-500 mb-1">
                           {label}
                         </div>
                       )}

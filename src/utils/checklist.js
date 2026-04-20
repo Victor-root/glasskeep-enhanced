@@ -198,6 +198,23 @@ export function updateEntry(entries, id, patch) {
 }
 
 /**
+ * Remove a section marker and every entry that belongs to it (i.e.
+ * everything between this marker and the next section marker, or the
+ * end of the list). The default section cannot be removed this way.
+ */
+export function removeSectionWithItems(entries, sectionId) {
+  const arr = entries.slice();
+  const startIdx = arr.findIndex((e) => isSection(e) && e.id === sectionId);
+  if (startIdx === -1) return arr;
+  let endIdx = arr.length;
+  for (let i = startIdx + 1; i < arr.length; i++) {
+    if (isSection(arr[i])) { endIdx = i; break; }
+  }
+  arr.splice(startIdx, endIdx - startIdx);
+  return arr;
+}
+
+/**
  * Returns the previous focusable entry (non-section item) before the
  * entry with id=itemId, or null.
  */
