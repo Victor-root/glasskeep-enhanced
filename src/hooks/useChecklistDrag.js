@@ -217,28 +217,49 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
         const [movedRow] = shiftedRows.splice(fromIndex, 1);
         shiftedRows.splice(toIndex, 0, movedRow);
 
-        // Determine the dragged item's target section via its closest
-        // [data-section-block] ancestor (robust to the default block
-        // being rendered at the top or at the bottom). The position
-        // inside that section = number of unchecked item rows in the
-        // same block that come before the dragged one in the new
-        // visual order.
+        // Determine the dragged item's target section by inspecting
+        // the NEIGHBORS of its new position in the simulated row order.
+        // (The dragged DOM element itself hasn't physically moved, so
+        // calling closest() on it still returns its source section —
+        // which is why we look at what's next to it instead.)
         const DEFAULT = "__default__";
         const draggedIdxInShifted = shiftedRows.findIndex(
           (el) => el.getAttribute("data-checklist-item") === draggedId,
         );
         if (draggedIdxInShifted === -1) { dragState.current = null; return; }
-        const draggedBlock = shiftedRows[draggedIdxInShifted].closest("[data-section-block]");
-        const targetSection = draggedBlock
-          ? (draggedBlock.getAttribute("data-section-block") || DEFAULT)
-          : DEFAULT;
+
+        const blockIdOf = (el) => {
+          if (!el) return DEFAULT;
+          const b = el.closest("[data-section-block]");
+          return b ? (b.getAttribute("data-section-block") || DEFAULT) : DEFAULT;
+        };
+
+        const nextEl = shiftedRows[draggedIdxInShifted + 1] || null;
+        const prevEl = shiftedRows[draggedIdxInShifted - 1] || null;
+
+        let targetSection;
+        if (nextEl) {
+          // If the next row is a section header, the dragged item sits
+          // just before that header — i.e. in the previous block.
+          const nextIsHeader = !!nextEl.getAttribute("data-section-header");
+          if (nextIsHeader) {
+            targetSection = blockIdOf(prevEl);
+          } else {
+            targetSection = blockIdOf(nextEl);
+          }
+        } else {
+          targetSection = blockIdOf(prevEl);
+        }
+
+        // Position among unchecked items of the target section = number
+        // of non-header rows before draggedIdxInShifted whose own block
+        // matches targetSection.
         let targetPosInSection = 0;
         for (let i = 0; i < draggedIdxInShifted; i++) {
           const el = shiftedRows[i];
           const itemId = el.getAttribute("data-checklist-item");
           if (!itemId) continue;
-          const blockEl = el.closest("[data-section-block]");
-          if (blockEl === draggedBlock) targetPosInSection++;
+          if (blockIdOf(el) === targetSection) targetPosInSection++;
         }
 
         const isSection = (x) => !!x && x.kind === "section";
