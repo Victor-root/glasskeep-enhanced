@@ -265,7 +265,7 @@ export default function ChecklistEditor({
                 className="space-y-4 md:space-y-2"
               >
                 {!isDefault && (
-                  <div data-checklist-row>
+                  <div data-checklist-row data-section-header={section.id}>
                     <SectionHeader
                       section={section}
                       onRename={(title) => renameSection(section.id, title)}

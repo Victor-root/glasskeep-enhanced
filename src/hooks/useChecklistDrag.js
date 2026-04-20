@@ -217,13 +217,34 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
         const [movedRow] = shiftedRows.splice(fromIndex, 1);
         shiftedRows.splice(toIndex, 0, movedRow);
 
-        // Extract item IDs in the new visual order (skip section
-        // headers and buttons, which don't carry an item id).
-        const newOrderedItemIds = shiftedRows
-          .map((el) => el.getAttribute("data-checklist-item"))
-          .filter(Boolean);
-        const targetUncheckedPos = newOrderedItemIds.indexOf(draggedId);
-        if (targetUncheckedPos === -1) { dragState.current = null; return; }
+        // Walk the new order, tracking the "current section" context
+        // via [data-section-header]. Record which section the dragged
+        // item ended up in AND its index among unchecked items inside
+        // that section. This lets us put the item in the right block —
+        // including out of any section when the user drops it above
+        // the first header.
+        const DEFAULT = "__default__";
+        let currentSection = DEFAULT;
+        let seenInSection = 0;
+        let targetSection = null;
+        let targetPosInSection = 0;
+        for (const el of shiftedRows) {
+          const secId = el.getAttribute("data-section-header");
+          if (secId) {
+            currentSection = secId;
+            seenInSection = 0;
+            continue;
+          }
+          const itemId = el.getAttribute("data-checklist-item");
+          if (!itemId) continue;
+          if (itemId === draggedId) {
+            targetSection = currentSection;
+            targetPosInSection = seenInSection;
+            break;
+          }
+          seenInSection++;
+        }
+        if (targetSection == null) { dragState.current = null; return; }
 
         const isSection = (x) => !!x && x.kind === "section";
         const isUncheckedItem = (x) => !!x && !isSection(x) && !x.done;
@@ -233,11 +254,36 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
         if (srcIdx === -1) { dragState.current = null; return; }
         const [movedEntry] = src.splice(srcIdx, 1);
 
+        // Locate the target section's range [sectionStart, sectionEnd)
+        // in the rebuilt (post-removal) entries array.
+        let sectionStart = 0;
+        let sectionEnd = src.length;
+        if (targetSection === DEFAULT) {
+          const firstMarker = src.findIndex(isSection);
+          sectionEnd = firstMarker === -1 ? src.length : firstMarker;
+        } else {
+          const markerIdx = src.findIndex((x) => isSection(x) && x.id === targetSection);
+          if (markerIdx === -1) {
+            // Section vanished between render and commit — fall back to end.
+            src.push(movedEntry);
+            setEntries(src);
+            syncEntries(src);
+            dragState.current = null;
+            return;
+          }
+          sectionStart = markerIdx + 1;
+          sectionEnd = src.length;
+          for (let j = sectionStart; j < src.length; j++) {
+            if (isSection(src[j])) { sectionEnd = j; break; }
+          }
+        }
+
+        // Walk the section and find the k-th unchecked slot.
         let seen = 0;
-        let insertAt = src.length;
-        for (let i = 0; i < src.length; i++) {
-          if (isUncheckedItem(src[i])) {
-            if (seen === targetUncheckedPos) { insertAt = i; break; }
+        let insertAt = sectionEnd;
+        for (let j = sectionStart; j < sectionEnd; j++) {
+          if (isUncheckedItem(src[j])) {
+            if (seen === targetPosInSection) { insertAt = j; break; }
             seen++;
           }
         }
