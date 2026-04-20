@@ -119,6 +119,18 @@ export function insertAfter(entries, afterId, newEntry) {
   return arr;
 }
 
+/** Insert a new item right before the entry with id=beforeId. */
+export function insertBefore(entries, beforeId, newEntry) {
+  const arr = entries.slice();
+  const idx = arr.findIndex((e) => e.id === beforeId);
+  if (idx === -1) {
+    arr.unshift(newEntry);
+    return arr;
+  }
+  arr.splice(idx, 0, newEntry);
+  return arr;
+}
+
 /** Insert a new item at the end of the section containing anchorId. */
 export function insertAtSectionEnd(entries, sectionId, newEntry) {
   const arr = entries.slice();

@@ -13,6 +13,7 @@ import {
   insertAtSectionEnd,
   insertAtSectionStart,
   insertAtTop,
+  insertBefore,
   isItem,
   makeItem,
   makeSection,
@@ -79,9 +80,15 @@ export default function ChecklistEditor({
     commit(removeEntry(items, id));
   };
 
-  const addItemAfter = (afterId) => {
+  // Enter inside an item. Respects the global insert preference so
+  // rapid-fire Enter presses keep accumulating items on the user's
+  // preferred side (top/bottom) rather than always drifting downward.
+  const addItemAdjacent = (anchorId) => {
     const newItem = makeItem("", false);
-    const next = insertAfter(items, afterId, newItem);
+    const next =
+      insertPosition === "top"
+        ? insertBefore(items, anchorId, newItem)
+        : insertAfter(items, anchorId, newItem);
     setEntries(next);
     syncEntries(next);
     requestFocus(newItem.id, "end");
@@ -195,7 +202,7 @@ export default function ChecklistEditor({
           }}
           onChange={(txt) => changeText(it.id, txt)}
           onRemove={() => removeItem(it.id)}
-          onEnter={() => addItemAfter(it.id)}
+          onEnter={() => addItemAdjacent(it.id)}
           onBackspaceEmpty={() => removeAndFocusPrev(it.id)}
         />
       </div>
