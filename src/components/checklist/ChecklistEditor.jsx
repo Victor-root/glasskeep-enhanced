@@ -244,11 +244,23 @@ export default function ChecklistEditor({
     </div>
   );
 
+  // In "bottom" mode with named sections, render the default
+  // (unsectioned) block AFTER the named sections so the global "+ list
+  // item" button — which lives inside the default block — sits at the
+  // true visual bottom. In "top" mode the default stays at the top.
+  const orderedSections = React.useMemo(() => {
+    if (insertPosition !== "bottom") return sections;
+    const defaultSec = sections.find((s) => s.id === DEFAULT_SECTION_ID);
+    const named = sections.filter((s) => s.id !== DEFAULT_SECTION_ID);
+    if (!defaultSec || named.length === 0) return sections;
+    return [...named, defaultSec];
+  }, [sections, insertPosition]);
+
   return (
     <div className="space-y-4 md:space-y-2 max-sm:-mx-4">
       {items.length > 0 ? (
         <div className="space-y-4 md:space-y-2">
-          {sections.map((section) => {
+          {orderedSections.map((section) => {
             const uncheckedInSection = section.items.filter((it) => !it.done);
             const isDefault = section.id === DEFAULT_SECTION_ID;
             const sectionAddBtn = !isDefault ? (

@@ -217,34 +217,29 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
         const [movedRow] = shiftedRows.splice(fromIndex, 1);
         shiftedRows.splice(toIndex, 0, movedRow);
 
-        // Walk the new order, tracking the "current section" context
-        // via [data-section-header]. Record which section the dragged
-        // item ended up in AND its index among unchecked items inside
-        // that section. This lets us put the item in the right block —
-        // including out of any section when the user drops it above
-        // the first header.
+        // Determine the dragged item's target section via its closest
+        // [data-section-block] ancestor (robust to the default block
+        // being rendered at the top or at the bottom). The position
+        // inside that section = number of unchecked item rows in the
+        // same block that come before the dragged one in the new
+        // visual order.
         const DEFAULT = "__default__";
-        let currentSection = DEFAULT;
-        let seenInSection = 0;
-        let targetSection = null;
+        const draggedIdxInShifted = shiftedRows.findIndex(
+          (el) => el.getAttribute("data-checklist-item") === draggedId,
+        );
+        if (draggedIdxInShifted === -1) { dragState.current = null; return; }
+        const draggedBlock = shiftedRows[draggedIdxInShifted].closest("[data-section-block]");
+        const targetSection = draggedBlock
+          ? (draggedBlock.getAttribute("data-section-block") || DEFAULT)
+          : DEFAULT;
         let targetPosInSection = 0;
-        for (const el of shiftedRows) {
-          const secId = el.getAttribute("data-section-header");
-          if (secId) {
-            currentSection = secId;
-            seenInSection = 0;
-            continue;
-          }
+        for (let i = 0; i < draggedIdxInShifted; i++) {
+          const el = shiftedRows[i];
           const itemId = el.getAttribute("data-checklist-item");
           if (!itemId) continue;
-          if (itemId === draggedId) {
-            targetSection = currentSection;
-            targetPosInSection = seenInSection;
-            break;
-          }
-          seenInSection++;
+          const blockEl = el.closest("[data-section-block]");
+          if (blockEl === draggedBlock) targetPosInSection++;
         }
-        if (targetSection == null) { dragState.current = null; return; }
 
         const isSection = (x) => !!x && x.kind === "section";
         const isUncheckedItem = (x) => !!x && !isSection(x) && !x.done;
