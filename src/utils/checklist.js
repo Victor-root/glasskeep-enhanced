@@ -179,7 +179,15 @@ export function insertAtTop(entries, newEntry) {
 }
 
 export function insertAtBottom(entries, newEntry) {
-  return [...entries, newEntry];
+  // Mirror of insertAtTop for the "bottom" preference: also keep the
+  // item OUT of any section. With sections present, append at the end
+  // of the default (unsectioned) zone — i.e. just before the first
+  // section marker. With no sections, this is a plain array append.
+  const arr = entries.slice();
+  const firstMarker = arr.findIndex(isSection);
+  const idx = firstMarker === -1 ? arr.length : firstMarker;
+  arr.splice(idx, 0, newEntry);
+  return arr;
 }
 
 /** Remove an entry by id. Removing a section keeps its items (they merge into the previous section). */

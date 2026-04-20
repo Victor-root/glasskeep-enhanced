@@ -246,15 +246,11 @@ export default function ChecklistEditor({
 
   return (
     <div className="space-y-4 md:space-y-2 max-sm:-mx-4">
-      {insertPosition === "top" && topAddRow}
-
       {items.length > 0 ? (
         <div className="space-y-4 md:space-y-2">
           {sections.map((section) => {
             const uncheckedInSection = section.items.filter((it) => !it.done);
             const isDefault = section.id === DEFAULT_SECTION_ID;
-            // Hide an empty, untitled default section if sections exist.
-            if (isDefault && uncheckedInSection.length === 0 && showSectionBreaks) return null;
             const sectionAddBtn = !isDefault ? (
               <button
                 type="button"
@@ -266,6 +262,11 @@ export default function ChecklistEditor({
                 <span>{t("addToSectionEllipsis")}</span>
               </button>
             ) : null;
+            // The default section hosts the global "+ list item" button
+            // (the escape hatch for unsectioned items). We render it
+            // even when empty so the button stays anchored where the
+            // new item will actually appear.
+            const addBtn = isDefault ? topAddRow : sectionAddBtn;
             return (
               <div
                 key={section.id}
@@ -286,14 +287,12 @@ export default function ChecklistEditor({
                     />
                   </div>
                 )}
-                {insertPosition === "top" && sectionAddBtn}
+                {insertPosition === "top" && addBtn}
                 {uncheckedInSection.map(renderItemRow)}
-                {insertPosition === "bottom" && sectionAddBtn}
+                {insertPosition === "bottom" && addBtn}
               </div>
             );
           })}
-
-          {insertPosition === "bottom" && topAddRow}
 
           <div className="pt-1">
             <button
@@ -363,6 +362,7 @@ export default function ChecklistEditor({
         </div>
       ) : (
         <>
+          {insertPosition === "top" && topAddRow}
           <p className="text-sm text-gray-500">{t("noItemsYet")}</p>
           {insertPosition === "bottom" && topAddRow}
           <div className="pt-2">
