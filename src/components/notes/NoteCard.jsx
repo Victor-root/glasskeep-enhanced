@@ -51,46 +51,26 @@ export default function NoteCard({
 
   const total = countItems(n.items);
   const done = countChecked(n.items);
-  // Preview: walk sections in order, emit their unchecked items first.
-  // Any remaining budget is then filled with done items (crossed out)
-  // so the card keeps the same visual density as before sections.
+  // Preview: walk sections in order, emit unchecked items first, then
+  // checked. Section headers only appear when the note actually has any.
   const previewSections = useMemo(() => {
     const secs = getSections(n.items);
     const out = [];
     let remaining = maxPreviewItems;
-    // First pass: unchecked items per section.
     for (const s of secs) {
       if (remaining <= 0) break;
-      const unchecked = s.items.filter((it) => !it.done);
-      const take = unchecked.slice(0, remaining);
+      const uncheckedRaw = s.items.filter((it) => !it.done);
+      const take = uncheckedRaw.slice(0, remaining);
       remaining -= take.length;
       if (take.length > 0 || (s.id !== DEFAULT_SECTION_ID && s.title)) {
         out.push({ id: s.id, title: s.title, items: take });
       }
     }
-    // Second pass: fill with done items (oldest to newest, order of the array).
-    if (remaining > 0) {
-      const doneItems = (Array.isArray(n.items) ? n.items : [])
-        .filter((it) => isItem(it) && it.done)
-        .slice(0, remaining);
-      if (doneItems.length > 0) {
-        // Append to the last section so they stay visually close to
-        // their group; if no section rendered yet, use the default.
-        if (out.length === 0) {
-          out.push({ id: DEFAULT_SECTION_ID, title: "", items: doneItems });
-        } else {
-          out[out.length - 1] = {
-            ...out[out.length - 1],
-            items: [...out[out.length - 1].items, ...doneItems],
-          };
-        }
-      }
-    }
     return out;
   }, [n.items, maxPreviewItems]);
   const visibleCount = previewSections.reduce((n2, s) => n2 + s.items.length, 0);
-  const itemsTotal = total;
-  const extraCount = Math.max(0, itemsTotal - visibleCount);
+  const uncheckedTotal = (n.items || []).filter((it) => isItem(it) && !it.done).length;
+  const extraCount = Math.max(0, uncheckedTotal - visibleCount);
   const hasAnyTitledSection = previewSections.some((s) => s.id !== DEFAULT_SECTION_ID && s.title);
 
   const imgs = n.images || [];
