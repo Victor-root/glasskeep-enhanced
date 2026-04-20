@@ -2,12 +2,23 @@ import React from "react";
 import { t } from "../../i18n";
 
 /**
- * Inline-editable section header. Reads as a plain bold title, turns
- * into a one-line input on click. Onblur with empty title is treated as
- * a rename to "Untitled" — deletion is handled by a dedicated button
- * next to the section to avoid data-loss surprises.
+ * Inline-editable section header with a drag handle.
+ * - Click the title → edit it inline. Enter commits + advances to the
+ *   first item of the section (via onEnter).
+ * - Drag handle (six dots) → move the whole section block (wired in
+ *   ChecklistEditor through onHandlePointerDown).
+ * - ✕ button → delete the section and all its items (cascade).
  */
-export default function SectionHeader({ section, onRename, onRemove, onEnter }) {
+export default function SectionHeader({
+  section,
+  onRename,
+  onRemove,
+  onEnter,
+  onHandlePointerDown,
+  onHandlePointerMove,
+  onHandlePointerUp,
+  onHandlePointerCancel,
+}) {
   const [editing, setEditing] = React.useState(!section.title);
   const inputRef = React.useRef(null);
 
@@ -26,6 +37,26 @@ export default function SectionHeader({ section, onRename, onRemove, onEnter }) 
 
   return (
     <div className="flex items-center gap-2 group pt-2">
+      {onHandlePointerDown && (
+        <div
+          onPointerDown={(e) => onHandlePointerDown(section.id, e)}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={onHandlePointerUp}
+          onPointerCancel={onHandlePointerCancel}
+          className="flex items-center justify-center px-1 checklist-grab-handle opacity-40 group-hover:opacity-70 transition-opacity cursor-grab"
+          style={{ touchAction: "none" }}
+          data-tooltip={t("moveSection")}
+        >
+          <div className="grid grid-cols-2 gap-0.5">
+            <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+            <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+            <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+            <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+            <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+            <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+          </div>
+        </div>
+      )}
       {editing ? (
         <input
           ref={inputRef}

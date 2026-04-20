@@ -57,9 +57,11 @@ export default function ChecklistEditor({
     setFocusToken((n) => n + 1);
   }, []);
 
-  // Drag & drop within the unchecked list.
-  const { handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } =
-    useChecklistDrag(items, setEntries, syncEntries);
+  // Drag & drop within the unchecked list + section drag.
+  const {
+    handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel,
+    handleSectionPointerDown, handleSectionPointerMove, handleSectionPointerUp, handleSectionPointerCancel,
+  } = useChecklistDrag(items, setEntries, syncEntries);
 
   const commit = (next) => {
     setEntries(next);
@@ -253,11 +255,15 @@ export default function ChecklistEditor({
                 onClick={() => addItemToSection(section.id)}
               >
                 <span className="leading-none">+</span>
-                <span>{t("listItemEllipsis")}</span>
+                <span>{t("addToSectionEllipsis")}</span>
               </button>
             ) : null;
             return (
-              <div key={section.id} className="space-y-4 md:space-y-2">
+              <div
+                key={section.id}
+                data-section-block={section.id}
+                className="space-y-4 md:space-y-2"
+              >
                 {!isDefault && (
                   <div data-checklist-row>
                     <SectionHeader
@@ -265,6 +271,10 @@ export default function ChecklistEditor({
                       onRename={(title) => renameSection(section.id, title)}
                       onRemove={() => removeSection(section.id)}
                       onEnter={() => focusFirstItemInSection(section.id)}
+                      onHandlePointerDown={handleSectionPointerDown}
+                      onHandlePointerMove={handleSectionPointerMove}
+                      onHandlePointerUp={handleSectionPointerUp}
+                      onHandlePointerCancel={handleSectionPointerCancel}
                     />
                   </div>
                 )}

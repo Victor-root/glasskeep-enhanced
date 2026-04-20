@@ -209,6 +209,56 @@ export function removeSectionWithItems(entries, sectionId) {
 }
 
 /**
+ * Reorder named sections based on a new ordered list of section IDs.
+ * The default section (items before the first section marker) stays
+ * anchored at the top. Each section's marker and its items travel
+ * together as a block.
+ *
+ * Returns a new entries array.
+ */
+export function reorderSections(entries, newOrderedSectionIds) {
+  const arr = Array.isArray(entries) ? entries : [];
+  // Split into default prefix + list of blocks.
+  const firstSectionIdx = arr.findIndex(isSection);
+  if (firstSectionIdx === -1) return arr.slice();
+  const prefix = arr.slice(0, firstSectionIdx);
+
+  // Collect blocks in current order.
+  const blocks = new Map(); // id -> block (array of entries starting with marker)
+  const currentIds = [];
+  let i = firstSectionIdx;
+  while (i < arr.length) {
+    if (!isSection(arr[i])) { i++; continue; }
+    const startIdx = i;
+    let end = arr.length;
+    for (let j = i + 1; j < arr.length; j++) {
+      if (isSection(arr[j])) { end = j; break; }
+    }
+    const id = arr[startIdx].id;
+    blocks.set(id, arr.slice(startIdx, end));
+    currentIds.push(id);
+    i = end;
+  }
+
+  // Build the new order: follow newOrderedSectionIds for sections we
+  // know about, and append any unknown/missing ones at the end so we
+  // never lose data.
+  const seen = new Set();
+  const orderedBlocks = [];
+  for (const id of newOrderedSectionIds) {
+    if (blocks.has(id) && !seen.has(id)) {
+      orderedBlocks.push(blocks.get(id));
+      seen.add(id);
+    }
+  }
+  for (const id of currentIds) {
+    if (!seen.has(id)) orderedBlocks.push(blocks.get(id));
+  }
+
+  return [...prefix, ...orderedBlocks.flat()];
+}
+
+/**
  * Returns the previous focusable entry (non-section item) before the
  * entry with id=itemId, or null.
  */
