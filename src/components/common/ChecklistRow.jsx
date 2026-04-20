@@ -116,7 +116,7 @@ export default function ChecklistRow({
       />
       {readOnly || (!editing && !readOnly) ? (
         <span
-          className={`flex-1 text-sm break-words min-w-0 ${preview ? "line-clamp-3" : ""} ${!readOnly ? "cursor-pointer" : ""} ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
+          className={`flex-1 text-sm break-words min-w-0 min-h-[1.25rem] ${preview ? "line-clamp-3" : ""} ${!readOnly ? "cursor-pointer" : ""} ${item.done ? "line-through text-gray-500 dark:text-gray-400" : ""}`}
           onClick={!readOnly ? (e) => {
             e.stopPropagation();
             let offset = item.text.length;
@@ -125,7 +125,11 @@ export default function ChecklistRow({
             enterEdit(offset);
           } : undefined}
         >
-          {!preview ? linkifyContacts(item.text) : item.text}
+          {item.text
+            ? (!preview ? linkifyContacts(item.text) : item.text)
+            : !readOnly
+              ? <span className="text-gray-400 dark:text-gray-500 italic">{t("listItem")}</span>
+              : ""}
         </span>
       ) : (
         <textarea
