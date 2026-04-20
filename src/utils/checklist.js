@@ -140,6 +140,25 @@ export function insertAtSectionEnd(entries, sectionId, newEntry) {
   return arr;
 }
 
+/** Insert a new item at the start of the given section (right after the section marker). */
+export function insertAtSectionStart(entries, sectionId, newEntry) {
+  const arr = entries.slice();
+  if (sectionId === DEFAULT_SECTION_ID) {
+    // Default section = everything before the first explicit section.
+    // Place at the very beginning (or after any leading section marker,
+    // but for DEFAULT there isn't one).
+    arr.splice(0, 0, newEntry);
+    return arr;
+  }
+  const markerIdx = arr.findIndex((e) => isSection(e) && e.id === sectionId);
+  if (markerIdx === -1) {
+    arr.push(newEntry);
+    return arr;
+  }
+  arr.splice(markerIdx + 1, 0, newEntry);
+  return arr;
+}
+
 export function insertAtTop(entries, newEntry) {
   // Insert before the first item, but AFTER any leading section markers
   // so default items remain in the default section. If the list starts

@@ -11,6 +11,7 @@ import {
   insertAfter,
   insertAtBottom,
   insertAtSectionEnd,
+  insertAtSectionStart,
   insertAtTop,
   isItem,
   makeItem,
@@ -88,7 +89,10 @@ export default function ChecklistEditor({
 
   const addItemToSection = (sectionId) => {
     const newItem = makeItem("", false);
-    const next = insertAtSectionEnd(items, sectionId, newItem);
+    const next =
+      insertPosition === "top"
+        ? insertAtSectionStart(items, sectionId, newItem)
+        : insertAtSectionEnd(items, sectionId, newItem);
     setEntries(next);
     syncEntries(next);
     requestFocus(newItem.id, "end");
