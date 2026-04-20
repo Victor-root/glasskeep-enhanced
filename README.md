@@ -307,6 +307,21 @@ Missing keys will fall back to English.
 
 ---
 
+## 🗺️ Roadmap
+
+Work that's on the plan for upcoming releases.
+
+- **Server-side encryption at rest.** Encrypt stored data on the server so that a physical theft of the server or its drives does not expose note contents.
+- **Complete translations.** Ship additional locales so the UI is fully usable outside of the currently supported languages.
+
+### 💭 Under consideration
+
+Ideas I'm still evaluating before committing to an implementation.
+
+- **Read-only viewing mode, à la Google Keep.** Opening a note would show a read-only rendered view first, with an explicit switch to jump into edit mode — instead of always opening in the editable state.
+
+---
+
 ## 🔐 Security
 
 - `JWT_SECRET` is **automatically generated** by the install script and saved in `/etc/glass-keep.env` — no manual action required. If you run the server outside of the install script, you must set it yourself (the server will refuse to start without a valid, non-placeholder secret). Generate one with: `openssl rand -hex 32`
