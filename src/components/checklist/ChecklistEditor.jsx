@@ -245,6 +245,17 @@ export default function ChecklistEditor({
             const isDefault = section.id === DEFAULT_SECTION_ID;
             // Hide an empty, untitled default section if sections exist.
             if (isDefault && uncheckedInSection.length === 0 && showSectionBreaks) return null;
+            const sectionAddBtn = !isDefault ? (
+              <button
+                type="button"
+                data-checklist-row
+                className="flex items-center gap-2 pl-8 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                onClick={() => addItemToSection(section.id)}
+              >
+                <span className="leading-none">+</span>
+                <span>{t("listItemEllipsis")}</span>
+              </button>
+            ) : null;
             return (
               <div key={section.id} className="space-y-4 md:space-y-2">
                 {!isDefault && (
@@ -257,18 +268,9 @@ export default function ChecklistEditor({
                     />
                   </div>
                 )}
+                {insertPosition === "top" && sectionAddBtn}
                 {uncheckedInSection.map(renderItemRow)}
-                {!isDefault && (
-                  <button
-                    type="button"
-                    data-checklist-row
-                    className="flex items-center gap-2 pl-8 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                    onClick={() => addItemToSection(section.id)}
-                  >
-                    <span className="leading-none">+</span>
-                    <span>{t("listItemEllipsis")}</span>
-                  </button>
-                )}
+                {insertPosition === "bottom" && sectionAddBtn}
               </div>
             );
           })}

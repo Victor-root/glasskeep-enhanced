@@ -172,16 +172,10 @@ export function insertAtSectionStart(entries, sectionId, newEntry) {
 }
 
 export function insertAtTop(entries, newEntry) {
-  // Insert before the first item, but AFTER any leading section markers
-  // so default items remain in the default section. If the list starts
-  // with a section, we insert inside that section.
-  const arr = entries.slice();
-  let idx = 0;
-  // If the first entry is already a section, insert inside it.
-  // Otherwise insert at position 0 (default section).
-  if (arr.length > 0 && isSection(arr[0])) idx = 1;
-  arr.splice(idx, 0, newEntry);
-  return arr;
+  // Always insert at the very top, OUTSIDE any section. The global
+  // "+ list item" button is the escape hatch to add unsectioned items;
+  // to target a specific section the user uses its inline "+" button.
+  return [newEntry, ...entries];
 }
 
 export function insertAtBottom(entries, newEntry) {
