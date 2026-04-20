@@ -7,6 +7,7 @@ import ChecklistRow from "../common/ChecklistRow.jsx";
 import DrawingPreview from "../common/DrawingPreview.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
 import useNoteTouchDrag from "../../hooks/useNoteTouchDrag.js";
+import { getSections, isItem, countItems, countChecked, DEFAULT_SECTION_ID } from "../../utils/checklist.js";
 
 export default function NoteCard({
   n,
@@ -48,16 +49,29 @@ export default function NoteCard({
     } catch { return ""; }
   }, [isDraw, n.content]);
 
-  const total = (n.items || []).length;
-  const done = (n.items || []).filter((i) => i.done).length;
-  // Sort items with unchecked items first, just like in the modal
-  const sortedItems = (n.items || []).sort((a, b) => {
-    if (a.done === b.done) return 0; // Same status, maintain order
-    return a.done ? 1 : -1; // Unchecked (false) comes before checked (true)
-  });
-  const visibleItems = sortedItems.slice(0, maxPreviewItems);
-  const extraCount =
-    total > visibleItems.length ? total - visibleItems.length : 0;
+  const total = countItems(n.items);
+  const done = countChecked(n.items);
+  // Preview: walk sections in order, emit unchecked items first, then
+  // checked. Section headers only appear when the note actually has any.
+  const previewSections = useMemo(() => {
+    const secs = getSections(n.items);
+    const out = [];
+    let remaining = maxPreviewItems;
+    for (const s of secs) {
+      if (remaining <= 0) break;
+      const uncheckedRaw = s.items.filter((it) => !it.done);
+      const take = uncheckedRaw.slice(0, remaining);
+      remaining -= take.length;
+      if (take.length > 0 || (s.id !== DEFAULT_SECTION_ID && s.title)) {
+        out.push({ id: s.id, title: s.title, items: take });
+      }
+    }
+    return out;
+  }, [n.items, maxPreviewItems]);
+  const visibleCount = previewSections.reduce((n2, s) => n2 + s.items.length, 0);
+  const uncheckedTotal = (n.items || []).filter((it) => isItem(it) && !it.done).length;
+  const extraCount = Math.max(0, uncheckedTotal - visibleCount);
+  const hasAnyTitledSection = previewSections.some((s) => s.id !== DEFAULT_SECTION_ID && s.title);
 
   const imgs = n.images || [];
   const mainImg = imgs[0];
@@ -264,15 +278,24 @@ export default function NoteCard({
         </>
       ) : (
         <div className="space-y-2">
-          {visibleItems.map((it) => (
-            <ChecklistRow
-              key={it.id}
-              item={it}
-              size="md"
-              readOnly={true}
-              showRemove={false}
-              preview={true}
-            />
+          {previewSections.map((s) => (
+            <div key={s.id} className="space-y-1">
+              {hasAnyTitledSection && s.id !== DEFAULT_SECTION_ID && s.title && (
+                <div className="text-xs font-semibold tracking-wide text-gray-600 dark:text-gray-300 mt-2">
+                  {s.title}
+                </div>
+              )}
+              {s.items.map((it) => (
+                <ChecklistRow
+                  key={it.id}
+                  item={it}
+                  size="md"
+                  readOnly={true}
+                  showRemove={false}
+                  preview={true}
+                />
+              ))}
+            </div>
           ))}
           {extraCount > 0 && (
             <div className="text-xs text-gray-600 dark:text-gray-300">

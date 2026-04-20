@@ -11,7 +11,6 @@ const NoteViewContent = memo(function NoteViewContent({ html, noteViewRef }) {
   );
 }, (prev, next) => prev.html === next.html);
 import DrawingCanvas from "../../DrawingCanvas";
-import ChecklistRow from "../common/ChecklistRow.jsx";
 import ModalHeader from "./ModalHeader.jsx";
 import ModalFooter from "./ModalFooter.jsx";
 import ModalImagesGrid from "./ModalImagesGrid.jsx";
@@ -19,11 +18,10 @@ import ConfirmDeleteDialog from "./ConfirmDeleteDialog.jsx";
 import CollaborationModal from "./CollaborationModal.jsx";
 import FullscreenImageViewer from "./FullscreenImageViewer.jsx";
 import OfflineCollabBanner from "./OfflineCollabBanner.jsx";
-import useChecklistDrag from "../../hooks/useChecklistDrag.js";
+import ChecklistEditor from "../checklist/ChecklistEditor.jsx";
 import useModalHistory from "../../hooks/useModalHistory.js";
 import { renderSafeMarkdown, linkifyContactsHTML } from "../../utils/markdown.jsx";
 import { handleSmartEnter } from "../common/FormatToolbar.jsx";
-import { uid } from "../../utils/helpers.js";
 import { modalBgFor, scrollColorsFor, solid, bgFor, toHex } from "../../utils/colors.js";
 import { setThemeColor } from "../../utils/helpers.js";
 
@@ -150,11 +148,11 @@ export default function NoteModal({
   // checklist handlers
   syncChecklistItems,
   checklistInsertPosition,
+  checklistRemoveSectionBehavior,
   // direct draw mode
   initialDrawMode,
   onConsumeInitialDrawMode,
 }) {
-  const [autoEditId, setAutoEditId] = React.useState(null);
   const [drawMode, setDrawMode] = React.useState("view");
   const [drawToolbarEl, setDrawToolbarEl] = React.useState(null);
   const [drawTransition, setDrawTransition] = React.useState(null); // 'entering' | 'leaving' | null
@@ -176,9 +174,6 @@ export default function NoteModal({
     () => linkifyContactsHTML(renderSafeMarkdown(mBody)),
     [mBody],
   );
-
-  const { handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } =
-    useChecklistDrag(mItems, setMItems, syncChecklistItems);
 
   const { undo, redo, canUndo, canRedo } = useModalHistory({
     mTitle, mBody, setMTitle, setMBody,
@@ -400,164 +395,14 @@ export default function NoteModal({
                   </div>
                 )
               ) : mType === "checklist" ? (
-                <div className="space-y-4 md:space-y-2 max-sm:-mx-4">
-                  {/* Add new item row — top position */}
-                  {checklistInsertPosition === "top" && (
-                    <div
-                      className="flex items-center gap-2 cursor-pointer p-2 border-b border-[var(--border-light)] text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-100 transition-colors"
-                      onClick={() => {
-                        const newItem = { id: uid(), text: "", done: false };
-                        const newItems = [newItem, ...mItems];
-                        setMItems(newItems);
-                        setAutoEditId(newItem.id);
-                        syncChecklistItems(newItems);
-                      }}
-                    >
-                      <span className="text-lg leading-none">+</span>
-                      <span className="text-sm">{t("listItemEllipsis")}</span>
-                    </div>
-                  )}
-
-                  {mItems.length > 0 ? (
-                    <div className="space-y-4 md:space-y-2">
-                      {/* Unchecked items */}
-                      {mItems
-                        .filter((it) => !it.done)
-                        .map((it) => (
-                          <div
-                            key={it.id}
-                            data-checklist-item={it.id}
-                            className="group flex items-center gap-2"
-                          >
-                            <div
-                              onPointerDown={(e) => handlePointerDown(it.id, e)}
-                              onPointerMove={handlePointerMove}
-                              onPointerUp={handlePointerUp}
-                              onPointerCancel={handlePointerCancel}
-                              className="flex items-center justify-center px-1 checklist-grab-handle opacity-40 group-hover:opacity-70 transition-opacity"
-                              style={{ touchAction: "none" }}
-                            >
-                              <div className="grid grid-cols-2 gap-0.5">
-                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-                                <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-                              </div>
-                            </div>
-
-                            <div className="flex-1">
-                              <ChecklistRow
-                                item={it}
-                                readOnly={false}
-                                disableToggle={false}
-                                showRemove={true}
-                                size="lg"
-                                initialEditing={autoEditId === it.id}
-                                onToggle={(checked, e) => {
-                                  e?.stopPropagation();
-                                  const newItems = mItems.map((p) =>
-                                    p.id === it.id ? { ...p, done: checked } : p,
-                                  );
-                                  setMItems(newItems);
-                                  syncChecklistItems(newItems);
-                                }}
-                                onChange={(txt) => {
-                                  const newItems = mItems.map((p) =>
-                                    p.id === it.id ? { ...p, text: txt } : p,
-                                  );
-                                  setMItems(newItems);
-                                  syncChecklistItems(newItems);
-                                }}
-                                onRemove={() => {
-                                  const newItems = mItems.filter(
-                                    (p) => p.id !== it.id,
-                                  );
-                                  setMItems(newItems);
-                                  syncChecklistItems(newItems);
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-
-                      {/* Add new item row — bottom position */}
-                      {checklistInsertPosition === "bottom" && (
-                        <div
-                          className="flex items-center gap-2 cursor-pointer p-2 border-b border-[var(--border-light)] text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-100 transition-colors"
-                          onClick={() => {
-                            const newItem = { id: uid(), text: "", done: false };
-                            const newItems = [...mItems, newItem];
-                            setMItems(newItems);
-                            setAutoEditId(newItem.id);
-                            syncChecklistItems(newItems);
-                          }}
-                        >
-                          <span className="text-lg leading-none">+</span>
-                          <span className="text-sm">{t("listItemEllipsis")}</span>
-                        </div>
-                      )}
-
-                      {/* Done section */}
-                      {mItems.filter((it) => it.done).length > 0 && (
-                        <>
-                          <div className="border-t border-[var(--border-light)] pt-4 mt-4">
-                            <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3">{t("done")}</h4>
-                            {mItems
-                              .filter((it) => it.done)
-                              .map((it) => (
-                                <ChecklistRow
-                                  key={it.id}
-                                  item={it}
-                                  readOnly={false}
-                                  disableToggle={false}
-                                  showRemove={true}
-                                  size="lg"
-                                  onToggle={(checked, e) => {
-                                    e?.stopPropagation();
-                                    if (!checked) {
-                                      const unchecked = mItems.filter((p) => !p.done && p.id !== it.id);
-                                      const checkedItems = mItems.filter((p) => p.done && p.id !== it.id);
-                                      const restored = { ...it, done: false };
-                                      const newUnchecked = checklistInsertPosition === "top"
-                                        ? [restored, ...unchecked]
-                                        : [...unchecked, restored];
-                                      const newItems = [...newUnchecked, ...checkedItems];
-                                      setMItems(newItems);
-                                      syncChecklistItems(newItems);
-                                    } else {
-                                      const newItems = mItems.map((p) =>
-                                        p.id === it.id ? { ...p, done: checked } : p,
-                                      );
-                                      setMItems(newItems);
-                                      syncChecklistItems(newItems);
-                                    }
-                                  }}
-                                  onChange={(txt) => {
-                                    const newItems = mItems.map((p) =>
-                                      p.id === it.id ? { ...p, text: txt } : p,
-                                    );
-                                    setMItems(newItems);
-                                    syncChecklistItems(newItems);
-                                  }}
-                                  onRemove={() => {
-                                    const newItems = mItems.filter(
-                                      (p) => p.id !== it.id,
-                                    );
-                                    setMItems(newItems);
-                                    syncChecklistItems(newItems);
-                                  }}
-                                />
-                              ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500">{t("noItemsYet")}</p>
-                  )}
-
+                <div data-checklist-list>
+                  <ChecklistEditor
+                    entries={mItems}
+                    setEntries={setMItems}
+                    syncEntries={syncChecklistItems}
+                    insertPosition={checklistInsertPosition}
+                    removeSectionBehavior={checklistRemoveSectionBehavior}
+                  />
                 </div>
               ) : drawMode === 'draw' ? (
                 /* Draw mode: fullscreen interactive canvas */

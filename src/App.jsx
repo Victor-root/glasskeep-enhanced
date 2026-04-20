@@ -168,6 +168,16 @@ export default function App() {
       return "top";
     }
   });
+  // Behavior when the user deletes a section: "cascade" (also delete
+  // items) or "keep" (move items to the default section).
+  const [checklistRemoveSectionBehavior, setChecklistRemoveSectionBehavior] = useState(() => {
+    try {
+      const stored = localStorage.getItem("checklistRemoveSectionBehavior");
+      return stored === "keep" ? "keep" : "cascade";
+    } catch (e) {
+      return "cascade";
+    }
+  });
   // Edge-to-edge landscape: extend content under status bar on the left
   const [edgeToEdgeLandscape, setEdgeToEdgeLandscape] = useState(() => {
     try {
@@ -499,6 +509,10 @@ export default function App() {
           setChecklistInsertPosition(settings.checklistInsertPosition);
           localStorage.setItem("checklistInsertPosition", settings.checklistInsertPosition);
         }
+        if (settings?.checklistRemoveSectionBehavior === "keep" || settings?.checklistRemoveSectionBehavior === "cascade") {
+          setChecklistRemoveSectionBehavior(settings.checklistRemoveSectionBehavior);
+          localStorage.setItem("checklistRemoveSectionBehavior", settings.checklistRemoveSectionBehavior);
+        }
         if (typeof settings?.edgeToEdgeLandscape === "boolean") {
           setEdgeToEdgeLandscape(settings.edgeToEdgeLandscape);
           localStorage.setItem("edgeToEdgeLandscape", String(settings.edgeToEdgeLandscape));
@@ -570,6 +584,20 @@ export default function App() {
       }).catch(() => {});
     }
   }, [checklistInsertPosition]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("checklistRemoveSectionBehavior", checklistRemoveSectionBehavior);
+    } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { checklistRemoveSectionBehavior },
+      }).catch(() => {});
+    }
+  }, [checklistRemoveSectionBehavior]);
 
   // Edge-to-edge landscape: save + dynamically toggle body padding-left
   useEffect(() => {
@@ -3043,7 +3071,6 @@ export default function App() {
   // Works for text, checklist, AND draw notes (metadata fields are independent of content).
   useEffect(() => {
     if (!open || !activeId) return;
-    if (mType === "checklist") return; // checklists handle their own full save
     const initial = initialModalStateRef.current;
     if (!initial) return;
 
@@ -3072,7 +3099,7 @@ export default function App() {
     const committedFields = { ...(colorChanged ? { color: mColor } : {}), ...(tagsChanged ? { tags: mTagList } : {}), ...(imagesChanged ? { images: mImages } : {}) };
     initialModalStateRef.current = { ...initial, ...committedFields };
 
-    const noteType = mType === "draw" ? "draw" : "text";
+    const noteType = mType || "text";
     autoSaveTextNote(activeId, metaPatch, leaseId, noteType).then((ok) => {
       if (ok && committedBaselineRef.current) {
         committedBaselineRef.current = { ...committedBaselineRef.current, ...committedFields };
@@ -3080,14 +3107,17 @@ export default function App() {
     });
   }, [mColor, mTagList, mImages, open, activeId, mType, autoSaveTextNote]);
 
-  // Auto-save text content (title + body): debounced local-first persist + patch sync
+  // Auto-save text content (title + body): debounced local-first persist + patch sync.
+  // Checklists share this effect for title changes (their body is always "").
   useEffect(() => {
-    if (!open || !activeId || mType !== "text" || viewMode) return;
+    if (!open || !activeId || viewMode) return;
+    if (mType !== "text" && mType !== "checklist") return;
     const initial = initialModalStateRef.current;
     if (!initial) return;
 
     const titleChanged = initial.title !== mTitle.trim();
-    const contentChanged = initial.content !== mBody;
+    const bodyAppliesToType = mType === "text";
+    const contentChanged = bodyAppliesToType && initial.content !== mBody;
     if (!titleChanged && !contentChanged) return;
 
     // Real keystroke reached us — materialise the draft. The create carries
@@ -3115,7 +3145,7 @@ export default function App() {
         initialModalStateRef.current = { ...initialModalStateRef.current, ...committedFields };
       }
 
-      autoSaveTextNote(activeId, contentPatch, leaseId).then((ok) => {
+      autoSaveTextNote(activeId, contentPatch, leaseId, mType).then((ok) => {
         if (ok && committedBaselineRef.current) {
           committedBaselineRef.current = { ...committedBaselineRef.current, ...committedFields };
         }
@@ -3320,6 +3350,24 @@ export default function App() {
       const currentJson = JSON.stringify(mItems);
       if (prevJson !== currentJson) {
         syncChecklistItems(mItems);
+      }
+    }
+
+    // Flush pending title/metadata changes for checklists on close.
+    // syncChecklistItems only covers the items array; title, color, tags
+    // and images go through autoSaveTextNote with the debounced effect,
+    // so closing within the debounce window could otherwise lose them.
+    if (activeId && mType === "checklist") {
+      const baseline = committedBaselineRef.current;
+      if (baseline) {
+        const patch = {};
+        if (baseline.title !== mTitle.trim()) patch.title = mTitle.trim();
+        if (baseline.color !== mColor) patch.color = mColor;
+        if (JSON.stringify(baseline.tags) !== JSON.stringify(mTagList)) patch.tags = mTagList;
+        if (JSON.stringify(baseline.images) !== JSON.stringify(mImages)) patch.images = mImages;
+        if (Object.keys(patch).length > 0) {
+          autoSaveTextNote(activeId, patch, null, "checklist");
+        }
       }
     }
 
@@ -4023,6 +4071,7 @@ export default function App() {
       resizeModalTextarea={resizeModalTextarea}
       syncChecklistItems={syncChecklistItems}
       checklistInsertPosition={checklistInsertPosition}
+      checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
       initialDrawMode={initialDrawMode}
       onConsumeInitialDrawMode={() => setInitialDrawMode(null)}
     />
@@ -4179,6 +4228,8 @@ export default function App() {
         setFloatingCardsEnabled={setFloatingCardsEnabled}
         checklistInsertPosition={checklistInsertPosition}
         setChecklistInsertPosition={setChecklistInsertPosition}
+        checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
+        setChecklistRemoveSectionBehavior={setChecklistRemoveSectionBehavior}
         edgeToEdgeLandscape={edgeToEdgeLandscape}
         setEdgeToEdgeLandscape={setEdgeToEdgeLandscape}
         showGenericConfirm={showGenericConfirm}

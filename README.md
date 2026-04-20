@@ -307,6 +307,17 @@ Missing keys will fall back to English.
 
 ---
 
+## 🗺️ Roadmap
+
+### 🗓️ Planned
+- Implement server-side encryption to better protect data in case the server or its drives are stolen
+- Add more translations and proper right-to-left (RTL) language support
+
+### 💭 Under consideration
+- Explore an edit-only mode similar to Google Keep
+
+---
+
 ## 🔐 Security
 
 - `JWT_SECRET` is **automatically generated** by the install script and saved in `/etc/glass-keep.env` — no manual action required. If you run the server outside of the install script, you must set it yourself (the server will refuse to start without a valid, non-placeholder secret). Generate one with: `openssl rand -hex 32`
