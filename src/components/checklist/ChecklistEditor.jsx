@@ -178,6 +178,7 @@ export default function ChecklistEditor({
     <div
       key={it.id}
       data-checklist-item={it.id}
+      data-checklist-row
       className="group flex items-center gap-2"
     >
       <div
@@ -224,6 +225,7 @@ export default function ChecklistEditor({
   // ---------- Layout ----------
   const topAddRow = (
     <div
+      data-checklist-row
       className="flex items-center gap-2 cursor-pointer p-2 border-b border-[var(--border-light)] text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-100 transition-colors"
       onClick={addItemTopOrBottom}
     >
@@ -246,17 +248,20 @@ export default function ChecklistEditor({
             return (
               <div key={section.id} className="space-y-4 md:space-y-2">
                 {!isDefault && (
-                  <SectionHeader
-                    section={section}
-                    onRename={(title) => renameSection(section.id, title)}
-                    onRemove={() => removeSection(section.id)}
-                    onEnter={() => focusFirstItemInSection(section.id)}
-                  />
+                  <div data-checklist-row>
+                    <SectionHeader
+                      section={section}
+                      onRename={(title) => renameSection(section.id, title)}
+                      onRemove={() => removeSection(section.id)}
+                      onEnter={() => focusFirstItemInSection(section.id)}
+                    />
+                  </div>
                 )}
                 {uncheckedInSection.map(renderItemRow)}
                 {!isDefault && (
                   <button
                     type="button"
+                    data-checklist-row
                     className="flex items-center gap-2 pl-8 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
                     onClick={() => addItemToSection(section.id)}
                   >

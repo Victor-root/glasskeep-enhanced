@@ -3,16 +3,16 @@ import { useRef, useCallback, useEffect } from "react";
 /**
  * Pointer-based drag & drop for checklist items.
  *
- * Commits the new ordering by:
- *   1. Reading the DOM (`[data-checklist-item]` elements) to get the
- *      visual order of unchecked item IDs.
- *   2. Moving the dragged entry within the full `entries` array so that
- *      its relative position among unchecked entries matches the new
- *      visual order.
+ * Visual shifting happens on every `[data-checklist-row]` element
+ * (items, section headers, per-section "+ list item" buttons, the
+ * global "+ list item" button). This way dragging across a section
+ * boundary pushes the header/buttons out of the way cleanly instead of
+ * overlapping them.
  *
- * This keeps section markers and checked items in place, and naturally
- * supports cross-section drags: moving an item over a section boundary
- * physically relocates it, changing the section it belongs to.
+ * Commit logic uses `[data-checklist-item]` only: it simulates the new
+ * visual order of all rows, extracts the resulting order of item IDs,
+ * and moves the dragged entry in the full `entries` array so that its
+ * new index among unchecked items matches that simulated order.
  *
  * Usage:
  *   const { handlePointerDown, ... } = useChecklistDrag(entries, setEntries, syncEntries);
@@ -42,18 +42,24 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
       const midY = rect.top - scrollDelta + rect.height / 2;
       if (draggedCenterY > midY) newIndex = i;
     }
-    newIndex = Math.max(0, Math.min(ds.itemEls.length - 1, newIndex));
+    newIndex = Math.max(0, Math.min(ds.rowEls.length - 1, newIndex));
     ds.currentIndex = newIndex;
 
+    // All displaced rows shift by the same amount: the dragged row's
+    // height + the gap just after it. This is geometrically correct for
+    // heterogeneous row heights (the invariant is that every row below
+    // the removed one slides up by exactly (dragged + gap)).
     const draggedHeight = ds.rects[ds.fromIndex].height;
     let gap = 0;
-    if (ds.rects.length >= 2) {
-      gap = ds.rects[1].top - ds.rects[0].bottom;
-      if (gap < 0) gap = 0;
+    if (ds.fromIndex + 1 < ds.rects.length) {
+      gap = ds.rects[ds.fromIndex + 1].top - ds.rects[ds.fromIndex].bottom;
+    } else if (ds.fromIndex > 0) {
+      gap = ds.rects[ds.fromIndex].top - ds.rects[ds.fromIndex - 1].bottom;
     }
+    if (gap < 0) gap = 0;
     const shift = draggedHeight + gap;
 
-    ds.itemEls.forEach((el, i) => {
+    ds.rowEls.forEach((el, i) => {
       if (i === ds.fromIndex) return;
       let offset = 0;
       if (ds.fromIndex < ds.currentIndex) {
@@ -73,18 +79,17 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
     const rowEl = handle.closest("[data-checklist-item]");
     if (!rowEl) return;
 
-    // Drag container = the closest common list wrapper. Falls back to
-    // the row's parent to stay compatible with simple layouts.
     const containerEl = rowEl.closest("[data-checklist-list]") || rowEl.parentElement;
     if (!containerEl) return;
 
     const scrollEl = rowEl.closest("[data-modal-scroll]") || rowEl.closest(".overflow-y-auto") || rowEl.closest(".glass-card");
 
-    const itemEls = Array.from(containerEl.querySelectorAll("[data-checklist-item]"));
-    const fromIndex = itemEls.indexOf(rowEl);
+    // Visual rows = items + section headers + inline "+ list item" buttons.
+    const rowEls = Array.from(containerEl.querySelectorAll("[data-checklist-row]"));
+    const fromIndex = rowEls.indexOf(rowEl);
     if (fromIndex === -1) return;
 
-    const rects = itemEls.map((el) => el.getBoundingClientRect());
+    const rects = rowEls.map((el) => el.getBoundingClientRect());
     const rowRect = rects[fromIndex];
     const startScrollTop = scrollEl ? scrollEl.scrollTop : 0;
     const modalEl = rowEl.closest(".glass-card");
@@ -112,7 +117,7 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
     rowEl.style.transition = "none";
     containerEl.style.minHeight = `${containerEl.offsetHeight}px`;
 
-    itemEls.forEach((el, i) => {
+    rowEls.forEach((el, i) => {
       if (i !== fromIndex) {
         el.style.transition = "transform 0.2s cubic-bezier(.2,0,0,1)";
       }
@@ -126,7 +131,7 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
       startY: e.clientY,
       lastY: e.clientY,
       containerEl,
-      itemEls,
+      rowEls,
       rects,
       fromIndex,
       currentIndex: fromIndex,
@@ -183,37 +188,41 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
 
     const fromIndex = ds.fromIndex;
     const toIndex = ds.currentIndex;
-    const orderedIds = ds.itemEls.map((el) => el.getAttribute("data-checklist-item"));
+    const rowEls = ds.rowEls;
+    const draggedId = rowEls[fromIndex].getAttribute("data-checklist-item");
 
     setTimeout(() => {
       ds.clone.remove();
       ds.rowEl.style.opacity = "";
       ds.rowEl.style.transition = "";
       ds.containerEl.style.minHeight = "";
-      ds.itemEls.forEach((el) => {
+      ds.rowEls.forEach((el) => {
         el.style.transition = "";
         el.style.transform = "";
       });
 
-      if (fromIndex !== toIndex) {
-        const draggedId = orderedIds[fromIndex];
-        const newOrder = orderedIds.slice();
-        const [moved] = newOrder.splice(fromIndex, 1);
-        newOrder.splice(toIndex, 0, moved);
+      if (fromIndex !== toIndex && draggedId) {
+        // Simulate the new visual order of all rows.
+        const shiftedRows = rowEls.slice();
+        const [movedRow] = shiftedRows.splice(fromIndex, 1);
+        shiftedRows.splice(toIndex, 0, movedRow);
 
-        // Rebuild the full entries array. Strategy:
-        //   1. Remove the dragged entry from its current place.
-        //   2. Re-insert it at the position corresponding to its new
-        //      index within the unchecked-items stream.
-        const isSection = (e) => !!e && e.kind === "section";
-        const isUncheckedItem = (e) => !!e && !isSection(e) && !e.done;
+        // Extract item IDs in the new visual order (skip section
+        // headers and buttons, which don't carry an item id).
+        const newOrderedItemIds = shiftedRows
+          .map((el) => el.getAttribute("data-checklist-item"))
+          .filter(Boolean);
+        const targetUncheckedPos = newOrderedItemIds.indexOf(draggedId);
+        if (targetUncheckedPos === -1) { dragState.current = null; return; }
+
+        const isSection = (x) => !!x && x.kind === "section";
+        const isUncheckedItem = (x) => !!x && !isSection(x) && !x.done;
 
         const src = entries.slice();
-        const srcIdx = src.findIndex((e) => String(e?.id) === String(draggedId));
+        const srcIdx = src.findIndex((x) => String(x?.id) === String(draggedId));
         if (srcIdx === -1) { dragState.current = null; return; }
         const [movedEntry] = src.splice(srcIdx, 1);
 
-        const targetUncheckedPos = newOrder.indexOf(draggedId);
         let seen = 0;
         let insertAt = src.length;
         for (let i = 0; i < src.length; i++) {
@@ -240,7 +249,7 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
     ds.rowEl.style.opacity = "";
     ds.rowEl.style.transition = "";
     ds.containerEl.style.minHeight = "";
-    ds.itemEls.forEach((el) => {
+    ds.rowEls.forEach((el) => {
       el.style.transition = "";
       el.style.transform = "";
     });
