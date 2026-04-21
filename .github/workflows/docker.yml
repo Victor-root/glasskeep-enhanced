@@ -4,6 +4,17 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+    paths-ignore:
+      - 'README.md'
+      - 'AI_CHANGES.md'
+      - 'IMPROVEMENTS.md'
+      - 'SECURITY.md'
+      - 'CHANGELOG.md'
+      - 'android/**'
+      - 'install.sh'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.editorconfig'
   workflow_dispatch:
 
 concurrency:
