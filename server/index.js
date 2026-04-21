@@ -1412,6 +1412,50 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
     return res.status(403).json({ error: "Only note owner can remove other collaborators" });
   }
 
+  // Optional mode: "keep_copy" — give the removed collaborator a standalone
+  // (non-collab) copy of the note so they don't lose it entirely. Only the
+  // owner may grant this; a collaborator leaving themselves keeps the current
+  // behavior (clean exit, no copy).
+  const mode = typeof req.body?.mode === "string" ? req.body.mode : null;
+  const shouldGrantCopy = isOwner && !isRemovingSelf && mode === "keep_copy";
+  let copyNoteId = null;
+
+  if (shouldGrantCopy) {
+    copyNoteId = uid();
+    // Preserve the removed user's own per-user tags on the copy instead of
+    // inheriting the shared default — those tags are personal to them.
+    const userTagsJson = getUserTags(noteId, userIdToRemove);
+    insertNote.run({
+      id: copyNoteId,
+      user_id: userIdToRemove,
+      type: note.type,
+      title: note.title,
+      content: note.content,
+      items_json: note.items_json,
+      tags_json: userTagsJson,
+      images_json: note.images_json,
+      color: note.color,
+      pinned: 0,
+      position: note.position,
+      timestamp: note.timestamp,
+      client_updated_at: nowISO(),
+    });
+    // Seed the removed user's per-user position for the copy so it appears
+    // at the top of their list, matching the share-to-collaborator UX.
+    const { max_pos } = getMaxUserEffectivePosition.get(
+      userIdToRemove,
+      userIdToRemove,
+      userIdToRemove,
+      userIdToRemove,
+    );
+    upsertUserPosition.run({
+      note_id: copyNoteId,
+      user_id: userIdToRemove,
+      position: (typeof max_pos === "number" ? max_pos : 0) + 1,
+      pinned: 0,
+    });
+  }
+
   // Remove collaborator
   const removeCollaborator = db.prepare(`
     DELETE FROM note_collaborators
@@ -1424,19 +1468,21 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
     return res.status(404).json({ error: "Collaborator not found" });
   }
 
-  // Clean up per-user tags for the removed collaborator
+  // Clean up per-user tags and positions for the removed collaborator
   db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(noteId, userIdToRemove);
+  db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(noteId, userIdToRemove);
 
   // Notify the removed user FIRST — they are no longer in the collaborator list
   // so broadcastNoteUpdated won't reach them. Send a dedicated event so their
-  // client can remove the note immediately without a full reload.
-  sendEventToUser(userIdToRemove, { type: "note_access_revoked", noteId });
+  // client can remove the note immediately without a full reload. If a copy
+  // was granted, the payload also carries its id so the client fetches it in.
+  sendEventToUser(userIdToRemove, { type: "note_access_revoked", noteId, copyNoteId });
 
   // Update note with editor info and notify remaining participants
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
   broadcastNoteUpdated(noteId);
 
-  res.json({ ok: true, message: "Collaborator removed" });
+  res.json({ ok: true, message: "Collaborator removed", copyNoteId });
 });
 
 app.get("/api/notes/collaborated", auth, (req, res) => {

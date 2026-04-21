@@ -91,13 +91,14 @@ export default function useCollaboration(token, {
     [token],
   );
 
-  const removeCollaborator = async (collaboratorId, noteId = null) => {
+  const removeCollaborator = async (collaboratorId, noteId = null, mode = null) => {
     try {
       const targetNoteId = noteId || collaborationDialogNoteId || activeId;
       if (!targetNoteId) return;
       await api(`/notes/${targetNoteId}/collaborate/${collaboratorId}`, {
         method: "DELETE",
         token,
+        body: mode ? { mode } : undefined,
       });
       showToast(t("collaboratorRemovedSuccessfully"), "success");
       if (collaborationDialogNoteId) {

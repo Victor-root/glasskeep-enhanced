@@ -2087,6 +2087,11 @@ export default function App() {
               if (String(activeIdRef.current) === nid) {
                 forceCloseModalForRemoteDelete(nid);
               }
+              // If the owner chose to grant a standalone copy, fetch it so
+              // it appears in the current view without a full reload.
+              if (msg.copyNoteId) {
+                debouncedPatch(String(msg.copyNoteId));
+              }
             }
           } catch (_) {}
         };
