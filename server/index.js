@@ -1509,25 +1509,52 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
   const collaborators = getNoteCollaborators.all(id);
   if (collaborators.length > 0) {
     if (mode === "delete_for_all") {
-      // Hard-delete for every participant. Notify all first so each client
-      // removes the note locally; ON DELETE CASCADE cleans the aux tables.
-      const recipientIds = new Set([existing.user_id, ...collaborators.map((c) => c.id)]);
-      deleteNote.run(id, req.user.id);
+      // Revoke access for every collaborator, but keep the note in the
+      // owner's trash so they can still restore it if it was a mistake.
+      const collabIds = collaborators.map((c) => c.id);
+      for (const cid of collabIds) {
+        db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, cid);
+        db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, cid);
+        db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, cid);
+      }
+      db.prepare("UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ?").run(tsResult.iso, id);
+      updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+      // Collaborators lose access entirely — they must drop the note locally
+      // without it landing in their trash view.
       const evt = { type: "note_deleted", noteId: id };
-      for (const uid of recipientIds) sendEventToUser(uid, evt);
-      return res.json({ ok: true, deletedForAll: true });
+      for (const cid of collabIds) sendEventToUser(cid, evt);
+      const fresh = getNoteById.get(id);
+      return res.json({ ok: true, deletedForAll: true, note: serializeNote(fresh || existing, req.user.id) });
     }
-    // Default: "remove_self" — transfer ownership to the first collaborator,
-    // current owner leaves. Note stays for remaining participants.
+    // Default: "remove_self" — owner leaves the collaboration but keeps a
+    // trashed copy of the note so they can restore it later. The live note
+    // is handed over to the first collaborator so it stays available for
+    // remaining participants.
+    const trashedCopyId = uid();
+    insertNote.run({
+      id: trashedCopyId,
+      user_id: req.user.id,
+      type: existing.type,
+      title: existing.title,
+      content: existing.content,
+      items_json: existing.items_json,
+      tags_json: existing.tags_json,
+      images_json: existing.images_json,
+      color: existing.color,
+      pinned: 0,
+      position: existing.position,
+      timestamp: existing.timestamp,
+      client_updated_at: tsResult.iso,
+    });
+    db.prepare("UPDATE notes SET trashed = 1 WHERE id = ?").run(trashedCopyId);
     const newOwner = collaborators[0];
     db.prepare("UPDATE notes SET user_id = ? WHERE id = ?").run(newOwner.id, id);
     db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, newOwner.id);
-    // Clean up old owner's per-user tags and positions
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
-    // Notify remaining participants so they see updated collaboration status
     broadcastNoteUpdated(id);
-    return res.json({ ok: true, left: true });
+    const trashedCopy = getNoteById.get(trashedCopyId);
+    return res.json({ ok: true, left: true, trashedCopy: trashedCopy ? serializeNote(trashedCopy, req.user.id) : null });
   }
 
   // Non-collaborative note: normal trash

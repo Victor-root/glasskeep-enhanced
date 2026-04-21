@@ -3524,19 +3524,38 @@ export default function App() {
       showToast(t("notePermanentlyDeleted"), "success");
       await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
     } else if (isOwner && isCollabNote && mode === "delete_for_all") {
-      // Owner explicitly chose to delete the shared note for everyone.
-      // Tombstone prevents SSE note_deleted echo from re-fetching anything.
+      // Owner chose to delete the shared note for everyone.
+      // The note lands in the owner's trash (the server sets trashed=1 and
+      // revokes collaborators); collaborators lose access via SSE note_deleted.
       const leaseId = acquireLocalLease(nid);
-      addDeleteTombstone(nid);
-      try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
+      const nowIso = new Date().toISOString();
+      try {
+        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
+        if (existing) await idbPutNote({ ...existing, trashed: true, collaborators: [], client_updated_at: nowIso }, currentUser?.id, sessionId);
+      } catch (e) { console.error(e); }
       invalidateNotesCache();
+      invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("noteDeletedForAll"), "success");
-      await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: new Date().toISOString(), mode: "delete_for_all" } }, leaseId);
-    } else if (!isOwner || isCollabNote) {
-      // Collaborative note (owner or collaborator): leave the collaboration
-      // Server transfers ownership if needed, note stays for other participants
+      await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: nowIso, mode: "delete_for_all" } }, leaseId);
+    } else if (isOwner && isCollabNote) {
+      // Owner chose "remove for me" on a shared note. Server transfers
+      // ownership to the first collaborator (note stays live for them) and
+      // creates a trashed copy owned by the leaver so they can restore it.
+      // The trashed copy has a new id — local trash cache is invalidated so
+      // the next trash view fetches it from the server.
+      try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
+      invalidateNotesCache();
+      invalidateTrashedNotesCache();
+      setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+      closeModal();
+      showToast(t("noteMovedToTrash"), "success");
+      const leaseId = acquireLocalLease(nid);
+      await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: new Date().toISOString(), mode: "remove_self" } }, leaseId);
+    } else if (!isOwner) {
+      // Collaborator leaves the shared note. Nothing to put in their trash —
+      // they lose access cleanly, matching the original spec.
       try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
       invalidateNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
