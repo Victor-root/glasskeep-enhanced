@@ -314,7 +314,7 @@ export default function NoteModal({
                 images={mImages}
                 onOpenViewer={openImageViewer}
                 onRemoveImage={(id) => setMImages((prev) => prev.filter((x) => x.id !== id))}
-                viewMode={viewMode}
+                canRemove={mType === "checklist" || !viewMode}
               />
             )}
 
@@ -608,6 +608,8 @@ export default function NoteModal({
           onPrev={prevImage}
           mobileNavVisible={mobileNavVisible}
           onResetMobileNav={resetMobileNav}
+          canRemove={mType === "checklist" || !viewMode}
+          onRemoveImage={(id) => setMImages((prev) => prev.filter((x) => x.id !== id))}
         />
       )}
     </>
