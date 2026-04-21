@@ -3640,12 +3640,8 @@ export default function App() {
 
   /** -------- Reset note order -------- */
   const resetNoteOrder = async (overridePositions = true) => {
-    // Block if any note in the view is not owned — server rejects mixed payloads.
-    if (currentUser && notes.some((n) => n.user_id && n.user_id !== currentUser.id)) {
-      showToast(t("reorderBlockedCollabNotes"), "error");
-      return;
-    }
-
+    // Reorder is per-user on the server (note_user_positions), so shared
+    // notes are fine to include — each participant keeps their own order.
     const sorted = notes.slice().sort((a, b) => {
       const ap = a?.pinned ? 1 : 0;
       const bp = b?.pinned ? 1 : 0;
@@ -3729,14 +3725,8 @@ export default function App() {
     if (!dragged || String(dragged) === String(overId)) return;
     if (dragGroup.current !== group) return;
 
-    // Block reorder if any note in the view is not owned by the current user.
-    // Server rejects partial-ownership payloads, so don't even attempt it.
-    if (currentUser && notes.some((n) => n.user_id && n.user_id !== currentUser.id)) {
-      showToast(t("reorderBlockedCollabNotes"), "error");
-      dragGroup.current = null;
-      return;
-    }
-
+    // Reorder is stored per-user server-side, so shared notes can be moved
+    // freely without affecting other participants' ordering.
     const pinnedIds = notes.filter((n) => n.pinned).map((n) => String(n.id));
     const otherIds = notes.filter((n) => !n.pinned).map((n) => String(n.id));
     let newPinned = pinnedIds,

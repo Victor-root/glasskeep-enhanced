@@ -248,7 +248,6 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   resetNoteOrderConfirm: "Cela va réorganiser toutes vos notes par date de modification (les plus récentes en premier).",
   resetNoteOrderOverridePositions: "Écraser les positions personnalisées (ordre par glisser-déposer)",
   noteOrderReset: "L'ordre des notes a été réinitialisé",
-  reorderBlockedCollabNotes: "Réordonnement impossible : certaines notes partagées ne vous appartiennent pas",
   exportAllNotesJson: "Exporter toutes les notes (.json)",
   importMarkdownFilesMd: "Importer des fichiers Markdown (.md)",
   importNotesFromMarkdownFiles: "Importer des notes depuis des fichiers Markdown",

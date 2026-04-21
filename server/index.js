@@ -177,6 +177,16 @@ CREATE TABLE IF NOT EXISTS user_reorder_state (
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS note_user_positions (
+  note_id TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  position REAL NOT NULL DEFAULT 0,
+  pinned INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (note_id, user_id),
+  FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS pending_users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -356,9 +366,22 @@ function isNewerOrEqual(incomingMs, storedTs) {
 }
 
 // Serialize a DB row into the canonical JSON note object returned by all endpoints.
-// When userId is provided, tags come from the per-user note_user_tags table.
+// When userId is provided, tags come from the per-user note_user_tags table and
+// pinned/position come from note_user_positions (falling back to note defaults).
 function serializeNote(r, userId) {
   const tagsJson = userId ? getUserTags(r.id, userId) : (r.tags_json || "[]");
+  let pinned = !!r.pinned;
+  let position = r.position;
+  if (r && Object.prototype.hasOwnProperty.call(r, "eff_pinned")) {
+    pinned = !!r.eff_pinned;
+    position = r.eff_position;
+  } else if (userId) {
+    const ov = getUserPosition(r.id, userId);
+    if (ov) {
+      pinned = !!ov.pinned;
+      position = ov.position;
+    }
+  }
   return {
     id: r.id,
     user_id: r.user_id,
@@ -369,8 +392,8 @@ function serializeNote(r, userId) {
     tags: JSON.parse(tagsJson),
     images: JSON.parse(r.images_json || "[]"),
     color: r.color,
-    pinned: !!r.pinned,
-    position: r.position,
+    pinned,
+    position,
     timestamp: r.timestamp,
     updated_at: r.updated_at,
     client_updated_at: r.client_updated_at,
@@ -520,9 +543,6 @@ const patchPartialWithCollaboration = db.prepare(`
     WHERE nc.note_id=@id AND nc.user_id=@user_id
   ))
 `);
-const patchPosition = db.prepare(`
-  UPDATE notes SET position=@position, pinned=@pinned WHERE id=@id AND user_id=@user_id
-`);
 const getLastReorderAt = db.prepare("SELECT last_reorder_at FROM user_reorder_state WHERE user_id = ?");
 const upsertReorderAt = db.prepare(`
   INSERT INTO user_reorder_state (user_id, last_reorder_at) VALUES (?, ?)
@@ -542,12 +562,6 @@ const getNoteCollaborators = db.prepare(`
   FROM note_collaborators nc
   JOIN users u ON nc.user_id = u.id
   WHERE nc.note_id = ?
-`);
-const getCollaboratedNotes = db.prepare(`
-  SELECT n.* FROM notes n
-  JOIN note_collaborators nc ON n.id = nc.note_id
-  WHERE nc.user_id = ? AND n.trashed = 0
-  ORDER BY n.pinned DESC, n.position DESC, n.timestamp DESC
 `);
 const updateNoteWithEditor = db.prepare(`
   UPDATE notes SET
@@ -569,6 +583,56 @@ const upsertUserTags = db.prepare(
 function getUserTags(noteId, userId) {
   const row = getUserTagsForNote.get(noteId, userId);
   return row ? row.tags_json : "[]";
+}
+
+// Per-user position/pinned override for shared notes.
+// Each participant (owner or collaborator) keeps their own ordering state here;
+// the notes row only holds the initial default.
+const getUserPositionForNote = db.prepare(
+  "SELECT position, pinned FROM note_user_positions WHERE note_id = ? AND user_id = ?"
+);
+const upsertUserPosition = db.prepare(`
+  INSERT INTO note_user_positions (note_id, user_id, position, pinned)
+  VALUES (@note_id, @user_id, @position, @pinned)
+  ON CONFLICT(note_id, user_id) DO UPDATE SET
+    position = excluded.position,
+    pinned = excluded.pinned
+`);
+const upsertUserPinned = db.prepare(`
+  INSERT INTO note_user_positions (note_id, user_id, position, pinned)
+  VALUES (@note_id, @user_id, @position, @pinned)
+  ON CONFLICT(note_id, user_id) DO UPDATE SET pinned = excluded.pinned
+`);
+
+function getUserPosition(noteId, userId) {
+  return getUserPositionForNote.get(noteId, userId) || null;
+}
+
+// Write a partial per-user position/pinned update without losing the
+// other field. Seeds a row from the note's defaults on first write so
+// collaborators can pin or reorder before they've ever touched the note.
+function setUserPinOrPosition(noteId, userId, { pinned, position }) {
+  const note = getNoteById.get(noteId);
+  if (!note) return;
+  const existing = getUserPositionForNote.get(noteId, userId);
+  const nextPinned =
+    typeof pinned === "boolean"
+      ? (pinned ? 1 : 0)
+      : existing
+        ? existing.pinned
+        : note.pinned;
+  const nextPosition =
+    typeof position === "number"
+      ? position
+      : existing
+        ? existing.position
+        : note.position;
+  upsertUserPosition.run({
+    note_id: noteId,
+    user_id: userId,
+    position: nextPosition,
+    pinned: nextPinned,
+  });
 }
 
 // Build participant list for a note: shows the OTHER users, not the requesting user.
@@ -908,29 +972,41 @@ app.get("/api/notes", auth, (req, res) => {
   const lim = Number(req.query.limit ?? 0);
   const usePaging = Number.isFinite(lim) && lim > 0 && Number.isFinite(off) && off >= 0;
 
-  // Get all notes (own + collaborated) in a single query to avoid duplicates
+  // Get all notes (own + collaborated) in a single query to avoid duplicates.
+  // Sort by each user's own pinned/position (note_user_positions) with the
+  // note's stored column as the fallback default.
   const allNotesQuery = db.prepare(`
-    SELECT DISTINCT n.* FROM notes n
+    SELECT DISTINCT n.*,
+      COALESCE(nup.pinned, n.pinned) AS eff_pinned,
+      COALESCE(nup.position, n.position) AS eff_position
+    FROM notes n
+    LEFT JOIN note_user_positions nup
+      ON nup.note_id = n.id AND nup.user_id = ?
     WHERE (n.user_id = ? OR EXISTS(
       SELECT 1 FROM note_collaborators nc
       WHERE nc.note_id = n.id AND nc.user_id = ?
     )) AND n.archived = 0 AND n.trashed = 0
-    ORDER BY n.pinned DESC, n.position DESC, n.timestamp DESC
+    ORDER BY eff_pinned DESC, eff_position DESC, n.timestamp DESC
   `);
 
   const allNotesWithPagingQuery = db.prepare(`
-    SELECT DISTINCT n.* FROM notes n
+    SELECT DISTINCT n.*,
+      COALESCE(nup.pinned, n.pinned) AS eff_pinned,
+      COALESCE(nup.position, n.position) AS eff_position
+    FROM notes n
+    LEFT JOIN note_user_positions nup
+      ON nup.note_id = n.id AND nup.user_id = ?
     WHERE (n.user_id = ? OR EXISTS(
       SELECT 1 FROM note_collaborators nc
       WHERE nc.note_id = n.id AND nc.user_id = ?
     )) AND n.archived = 0 AND n.trashed = 0
-    ORDER BY n.pinned DESC, n.position DESC, n.timestamp DESC
+    ORDER BY eff_pinned DESC, eff_position DESC, n.timestamp DESC
     LIMIT ? OFFSET ?
   `);
 
   const rows = usePaging
-    ? allNotesWithPagingQuery.all(req.user.id, req.user.id, lim, off)
-    : allNotesQuery.all(req.user.id, req.user.id);
+    ? allNotesWithPagingQuery.all(req.user.id, req.user.id, req.user.id, lim, off)
+    : allNotesQuery.all(req.user.id, req.user.id, req.user.id);
 
   res.json(
     rows.map((r) => ({
@@ -943,8 +1019,8 @@ app.get("/api/notes", auth, (req, res) => {
       tags: JSON.parse(getUserTags(r.id, req.user.id)),
       images: JSON.parse(r.images_json || "[]"),
       color: r.color,
-      pinned: !!r.pinned,
-      position: r.position,
+      pinned: !!r.eff_pinned,
+      position: r.eff_position,
       timestamp: r.timestamp,
       updated_at: r.updated_at,
       client_updated_at: r.client_updated_at,
@@ -1030,8 +1106,10 @@ app.put("/api/notes/:id", auth, (req, res) => {
     tags_json: existing.tags_json,
     images_json: JSON.stringify(Array.isArray(b.images) ? b.images : []),
     color: b.color && typeof b.color === "string" ? b.color : "default",
-    pinned: b.pinned ? 1 : 0,
-    position: typeof b.position === "number" ? b.position : existing.position,
+    // Pinned/position are per-user: keep the shared columns untouched and
+    // write the requester's state to note_user_positions below.
+    pinned: existing.pinned,
+    position: existing.position,
     timestamp: b.timestamp || existing.timestamp,
     client_updated_at: tsResult.iso,
   };
@@ -1039,6 +1117,13 @@ app.put("/api/notes/:id", auth, (req, res) => {
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
+  }
+
+  if (typeof b.pinned === "boolean" || typeof b.position === "number") {
+    setUserPinOrPosition(id, req.user.id, {
+      pinned: typeof b.pinned === "boolean" ? b.pinned : undefined,
+      position: typeof b.position === "number" ? b.position : undefined,
+    });
   }
 
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
@@ -1078,7 +1163,9 @@ app.patch("/api/notes/:id", auth, (req, res) => {
     tags_json: null,
     images_json: Array.isArray(req.body.images) ? JSON.stringify(req.body.images) : null,
     color: typeof req.body.color === "string" ? req.body.color : null,
-    pinned: typeof req.body.pinned === "boolean" ? (req.body.pinned ? 1 : 0) : null,
+    // Pinned state is per-user; route it to note_user_positions below instead
+    // of mutating the shared notes.pinned column.
+    pinned: null,
     timestamp: req.body.timestamp || null,
     client_updated_at: tsResult.iso,
   };
@@ -1086,6 +1173,10 @@ app.patch("/api/notes/:id", auth, (req, res) => {
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
+  }
+
+  if (typeof req.body.pinned === "boolean") {
+    setUserPinOrPosition(id, req.user.id, { pinned: req.body.pinned });
   }
 
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
@@ -1113,13 +1204,14 @@ app.post("/api/notes/reorder", auth, (req, res) => {
     return res.status(400).json({ error: reorderTsResult.error });
   }
 
-  // Ownership check: every noteId must belong to the requesting user.
-  // Reject the entire payload if any note is not owned — no partial apply.
+  // Access check: every noteId must be visible to the requesting user
+  // (either owned or shared). Rejecting the whole payload on a stray id
+  // keeps the client and server state consistent.
   const reorderIds = [...pinnedIds, ...otherIds];
   for (const nid of reorderIds) {
-    const note = getNoteById.get(nid);
-    if (note && note.user_id !== req.user.id) {
-      return res.status(403).json({ error: "Reorder payload contains notes not owned by you" });
+    const visible = getNoteWithCollaboration.get(req.user.id, nid, req.user.id);
+    if (!visible) {
+      return res.status(403).json({ error: "Reorder payload contains notes you cannot access" });
     }
   }
 
@@ -1133,20 +1225,22 @@ app.post("/api/notes/reorder", auth, (req, res) => {
     }
   }
 
+  // Per-user reorder: write to note_user_positions so each participant
+  // (owner or collaborator) keeps an independent ordering/pin state.
   const base = Date.now();
   const step = 1;
   const reorder = db.transaction(() => {
     for (let i = 0; i < pinnedIds.length; i++) {
-      patchPosition.run({
-        id: pinnedIds[i],
+      upsertUserPosition.run({
+        note_id: pinnedIds[i],
         user_id: req.user.id,
         position: base + step * (pinnedIds.length - i),
         pinned: 1,
       });
     }
     for (let i = 0; i < otherIds.length; i++) {
-      patchPosition.run({
-        id: otherIds[i],
+      upsertUserPosition.run({
+        note_id: otherIds[i],
         user_id: req.user.id,
         position: base - step * (i + 1),
         pinned: 0,
@@ -1157,8 +1251,8 @@ app.post("/api/notes/reorder", auth, (req, res) => {
   });
   reorder();
 
-  // Notify other sessions with a single event (avoids N individual note_updated
-  // events that cause N parallel fetches and trip reverse proxy rate limits).
+  // Reorder is local to this user — only notify their own sessions so
+  // other participants don't refetch unnecessarily.
   const allIds = [...pinnedIds, ...otherIds];
   const evt = { type: "notes_reordered", noteIds: allIds };
   sendEventToUser(req.user.id, evt);
@@ -1300,7 +1394,17 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
 });
 
 app.get("/api/notes/collaborated", auth, (req, res) => {
-  const rows = getCollaboratedNotes.all(req.user.id);
+  const rows = db.prepare(`
+    SELECT n.*,
+      COALESCE(nup.pinned, n.pinned) AS eff_pinned,
+      COALESCE(nup.position, n.position) AS eff_position
+    FROM notes n
+    JOIN note_collaborators nc ON n.id = nc.note_id
+    LEFT JOIN note_user_positions nup
+      ON nup.note_id = n.id AND nup.user_id = ?
+    WHERE nc.user_id = ? AND n.trashed = 0
+    ORDER BY eff_pinned DESC, eff_position DESC, n.timestamp DESC
+  `).all(req.user.id, req.user.id);
   res.json(rows.map((r) => serializeNote(r, req.user.id)));
 });
 
