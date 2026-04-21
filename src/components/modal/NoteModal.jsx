@@ -208,21 +208,54 @@ export default function NoteModal({
     setThemeColor(color);
   }, [open, mColor, dark]);
 
-  /* Intercept Ctrl+Z / Ctrl+Y at modal level for chunk-level undo */
+  /* Intercept Ctrl+Z/Y for undo/redo and standard formatting shortcuts.
+     Uses e.code (layout-independent) for digit keys so AZERTY users keep
+     working shortcuts. */
   const handleModalKeyDown = React.useCallback(
     (e) => {
       if (mType !== "text" || viewMode) return; // let native handle non-text
       const isCtrl = e.ctrlKey || e.metaKey;
       if (!isCtrl) return;
-      if (e.key === "z" && !e.shiftKey) {
+      const shift = e.shiftKey;
+      const alt = e.altKey;
+
+      // Undo / redo
+      if (e.code === "KeyZ" && !shift && !alt) {
         e.preventDefault();
         undo();
-      } else if ((e.key === "z" && e.shiftKey) || e.key === "y") {
+        return;
+      }
+      if ((e.code === "KeyZ" && shift && !alt) || (e.code === "KeyY" && !shift && !alt)) {
         e.preventDefault();
         redo();
+        return;
       }
+
+      // Formatting shortcuts — only when focus is inside the body textarea
+      const active = document.activeElement;
+      if (!mBodyRef.current || active !== mBodyRef.current) return;
+
+      const apply = (type) => {
+        e.preventDefault();
+        formatModal(type);
+      };
+
+      if (!alt && !shift && e.code === "KeyB") return apply("bold");
+      if (!alt && !shift && e.code === "KeyI") return apply("italic");
+      if (!alt && shift && e.code === "KeyX") return apply("strike");
+      if (!alt && !shift && e.code === "KeyE") return apply("code");
+      if (!alt && shift && e.code === "KeyE") return apply("codeblock");
+      if (!alt && !shift && e.code === "KeyK") return apply("link");
+      // Match on produced character so it works across layouts
+      // (on AZERTY "." is typed via Shift+`;`, so e.code === "Period" never fires)
+      if (!alt && e.key === ".") return apply("quote");
+      if (!alt && shift && e.code === "Digit8") return apply("ul");
+      if (!alt && shift && e.code === "Digit7") return apply("ol");
+      if (alt && !shift && e.code === "Digit1") return apply("h1");
+      if (alt && !shift && e.code === "Digit2") return apply("h2");
+      if (alt && !shift && e.code === "Digit3") return apply("h3");
     },
-    [undo, redo, mType, viewMode],
+    [undo, redo, mType, viewMode, formatModal, mBodyRef],
   );
 
   // Force mobile layout when running inside Android WebView (tablets)
@@ -314,7 +347,7 @@ export default function NoteModal({
                 images={mImages}
                 onOpenViewer={openImageViewer}
                 onRemoveImage={(id) => setMImages((prev) => prev.filter((x) => x.id !== id))}
-                viewMode={viewMode}
+                canRemove={mType === "checklist" || !viewMode}
               />
             )}
 
@@ -565,10 +598,15 @@ export default function NoteModal({
             open={confirmDeleteOpen}
             dark={dark}
             isTrashed={tagFilter === "TRASHED"}
+            collabOwner={
+              tagFilter !== "TRASHED"
+              && activeNoteObj?.user_id === currentUser?.id
+              && (activeNoteObj?.collaborators?.length || 0) > 0
+            }
             onClose={() => setConfirmDeleteOpen(false)}
-            onConfirm={async () => {
+            onConfirm={async (mode) => {
               setConfirmDeleteOpen(false);
-              await deleteModal();
+              await deleteModal(mode);
             }}
           />
 
@@ -608,6 +646,8 @@ export default function NoteModal({
           onPrev={prevImage}
           mobileNavVisible={mobileNavVisible}
           onResetMobileNav={resetMobileNav}
+          canRemove={mType === "checklist" || !viewMode}
+          onRemoveImage={(id) => setMImages((prev) => prev.filter((x) => x.id !== id))}
         />
       )}
     </>

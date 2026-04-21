@@ -1,6 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import UserAvatar from "../common/UserAvatar.jsx";
+import ConfirmRemoveCollaboratorDialog from "./ConfirmRemoveCollaboratorDialog.jsx";
 import { t } from "../../i18n";
 
 /**
@@ -29,6 +30,7 @@ export default function CollaborationModal({
   searchUsers,
   updateDropdownPosition,
 }) {
+  const [confirmRemove, setConfirmRemove] = React.useState(null);
   if (!open) return null;
 
   const note = activeId
@@ -105,10 +107,14 @@ export default function CollaborationModal({
                       {canRemove && (
                         <button
                           onClick={async () => {
-                            await onRemoveCollaborator(
-                              collab.id,
-                              activeId,
-                            );
+                            // Self-remove (collaborator leaving themselves)
+                            // keeps the current one-step flow. Owner removing
+                            // a specific collaborator gets the explicit choice.
+                            if (collab.id === currentUser?.id) {
+                              await onRemoveCollaborator(collab.id, activeId);
+                            } else {
+                              setConfirmRemove(collab);
+                            }
                           }}
                           className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
                           data-tooltip={t("removeCollaborator")}
@@ -200,6 +206,20 @@ export default function CollaborationModal({
           )}
         </div>
       </div>
+
+      <ConfirmRemoveCollaboratorDialog
+        open={!!confirmRemove}
+        dark={dark}
+        collaboratorName={confirmRemove?.name || confirmRemove?.email || ""}
+        onClose={() => setConfirmRemove(null)}
+        onConfirm={async (mode) => {
+          const target = confirmRemove;
+          setConfirmRemove(null);
+          if (target) {
+            await onRemoveCollaborator(target.id, activeId, mode);
+          }
+        }}
+      />
 
       {/* User dropdown portal - rendered outside modal */}
       {showUserDropdown &&

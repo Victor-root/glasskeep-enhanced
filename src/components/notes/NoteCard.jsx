@@ -82,8 +82,9 @@ export default function NoteCard({
   const displayTags = allTags.slice(0, MAX_TAG_CHIPS);
 
   const group = n.pinned ? "pinned" : "others";
-  const isOwned = !currentUser || !n.user_id || n.user_id === currentUser.id;
-  const canDrag = !multiMode && isOwned;
+  // Ordering is stored per-user server-side, so collaborators can drag shared
+  // notes in their own view without affecting other participants.
+  const canDrag = !multiMode;
   const isTouchDevice = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
   const cardRef = useRef(null);
   useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId: n.id, group, onDragStart, onDrop, onDragEnd });

@@ -177,6 +177,16 @@ CREATE TABLE IF NOT EXISTS user_reorder_state (
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS note_user_positions (
+  note_id TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  position REAL NOT NULL DEFAULT 0,
+  pinned INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (note_id, user_id),
+  FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS pending_users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -356,9 +366,22 @@ function isNewerOrEqual(incomingMs, storedTs) {
 }
 
 // Serialize a DB row into the canonical JSON note object returned by all endpoints.
-// When userId is provided, tags come from the per-user note_user_tags table.
+// When userId is provided, tags come from the per-user note_user_tags table and
+// pinned/position come from note_user_positions (falling back to note defaults).
 function serializeNote(r, userId) {
   const tagsJson = userId ? getUserTags(r.id, userId) : (r.tags_json || "[]");
+  let pinned = !!r.pinned;
+  let position = r.position;
+  if (r && Object.prototype.hasOwnProperty.call(r, "eff_pinned")) {
+    pinned = !!r.eff_pinned;
+    position = r.eff_position;
+  } else if (userId) {
+    const ov = getUserPosition(r.id, userId);
+    if (ov) {
+      pinned = !!ov.pinned;
+      position = ov.position;
+    }
+  }
   return {
     id: r.id,
     user_id: r.user_id,
@@ -369,8 +392,8 @@ function serializeNote(r, userId) {
     tags: JSON.parse(tagsJson),
     images: JSON.parse(r.images_json || "[]"),
     color: r.color,
-    pinned: !!r.pinned,
-    position: r.position,
+    pinned,
+    position,
     timestamp: r.timestamp,
     updated_at: r.updated_at,
     client_updated_at: r.client_updated_at,
@@ -520,9 +543,6 @@ const patchPartialWithCollaboration = db.prepare(`
     WHERE nc.note_id=@id AND nc.user_id=@user_id
   ))
 `);
-const patchPosition = db.prepare(`
-  UPDATE notes SET position=@position, pinned=@pinned WHERE id=@id AND user_id=@user_id
-`);
 const getLastReorderAt = db.prepare("SELECT last_reorder_at FROM user_reorder_state WHERE user_id = ?");
 const upsertReorderAt = db.prepare(`
   INSERT INTO user_reorder_state (user_id, last_reorder_at) VALUES (?, ?)
@@ -542,12 +562,6 @@ const getNoteCollaborators = db.prepare(`
   FROM note_collaborators nc
   JOIN users u ON nc.user_id = u.id
   WHERE nc.note_id = ?
-`);
-const getCollaboratedNotes = db.prepare(`
-  SELECT n.* FROM notes n
-  JOIN note_collaborators nc ON n.id = nc.note_id
-  WHERE nc.user_id = ? AND n.trashed = 0
-  ORDER BY n.pinned DESC, n.position DESC, n.timestamp DESC
 `);
 const updateNoteWithEditor = db.prepare(`
   UPDATE notes SET
@@ -569,6 +583,67 @@ const upsertUserTags = db.prepare(
 function getUserTags(noteId, userId) {
   const row = getUserTagsForNote.get(noteId, userId);
   return row ? row.tags_json : "[]";
+}
+
+// Per-user position/pinned override for shared notes.
+// Each participant (owner or collaborator) keeps their own ordering state here;
+// the notes row only holds the initial default.
+const getUserPositionForNote = db.prepare(
+  "SELECT position, pinned FROM note_user_positions WHERE note_id = ? AND user_id = ?"
+);
+const upsertUserPosition = db.prepare(`
+  INSERT INTO note_user_positions (note_id, user_id, position, pinned)
+  VALUES (@note_id, @user_id, @position, @pinned)
+  ON CONFLICT(note_id, user_id) DO UPDATE SET
+    position = excluded.position,
+    pinned = excluded.pinned
+`);
+const upsertUserPinned = db.prepare(`
+  INSERT INTO note_user_positions (note_id, user_id, position, pinned)
+  VALUES (@note_id, @user_id, @position, @pinned)
+  ON CONFLICT(note_id, user_id) DO UPDATE SET pinned = excluded.pinned
+`);
+
+// Highest effective position across a user's visible (active) notes —
+// owned or collaborated. Used to seed a freshly shared note at the top
+// of the recipient's list so it doesn't bury under their existing notes.
+const getMaxUserEffectivePosition = db.prepare(`
+  SELECT COALESCE(MAX(COALESCE(nup.position, n.position)), 0) AS max_pos
+  FROM notes n
+  LEFT JOIN note_user_positions nup ON nup.note_id = n.id AND nup.user_id = ?
+  LEFT JOIN note_collaborators nc ON n.id = nc.note_id AND nc.user_id = ?
+  WHERE (n.user_id = ? OR nc.user_id = ?) AND n.trashed = 0 AND n.archived = 0
+`);
+
+function getUserPosition(noteId, userId) {
+  return getUserPositionForNote.get(noteId, userId) || null;
+}
+
+// Write a partial per-user position/pinned update without losing the
+// other field. Seeds a row from the note's defaults on first write so
+// collaborators can pin or reorder before they've ever touched the note.
+function setUserPinOrPosition(noteId, userId, { pinned, position }) {
+  const note = getNoteById.get(noteId);
+  if (!note) return;
+  const existing = getUserPositionForNote.get(noteId, userId);
+  const nextPinned =
+    typeof pinned === "boolean"
+      ? (pinned ? 1 : 0)
+      : existing
+        ? existing.pinned
+        : note.pinned;
+  const nextPosition =
+    typeof position === "number"
+      ? position
+      : existing
+        ? existing.position
+        : note.position;
+  upsertUserPosition.run({
+    note_id: noteId,
+    user_id: userId,
+    position: nextPosition,
+    pinned: nextPinned,
+  });
 }
 
 // Build participant list for a note: shows the OTHER users, not the requesting user.
@@ -908,29 +983,41 @@ app.get("/api/notes", auth, (req, res) => {
   const lim = Number(req.query.limit ?? 0);
   const usePaging = Number.isFinite(lim) && lim > 0 && Number.isFinite(off) && off >= 0;
 
-  // Get all notes (own + collaborated) in a single query to avoid duplicates
+  // Get all notes (own + collaborated) in a single query to avoid duplicates.
+  // Sort by each user's own pinned/position (note_user_positions) with the
+  // note's stored column as the fallback default.
   const allNotesQuery = db.prepare(`
-    SELECT DISTINCT n.* FROM notes n
+    SELECT DISTINCT n.*,
+      COALESCE(nup.pinned, n.pinned) AS eff_pinned,
+      COALESCE(nup.position, n.position) AS eff_position
+    FROM notes n
+    LEFT JOIN note_user_positions nup
+      ON nup.note_id = n.id AND nup.user_id = ?
     WHERE (n.user_id = ? OR EXISTS(
       SELECT 1 FROM note_collaborators nc
       WHERE nc.note_id = n.id AND nc.user_id = ?
     )) AND n.archived = 0 AND n.trashed = 0
-    ORDER BY n.pinned DESC, n.position DESC, n.timestamp DESC
+    ORDER BY eff_pinned DESC, eff_position DESC, n.timestamp DESC
   `);
 
   const allNotesWithPagingQuery = db.prepare(`
-    SELECT DISTINCT n.* FROM notes n
+    SELECT DISTINCT n.*,
+      COALESCE(nup.pinned, n.pinned) AS eff_pinned,
+      COALESCE(nup.position, n.position) AS eff_position
+    FROM notes n
+    LEFT JOIN note_user_positions nup
+      ON nup.note_id = n.id AND nup.user_id = ?
     WHERE (n.user_id = ? OR EXISTS(
       SELECT 1 FROM note_collaborators nc
       WHERE nc.note_id = n.id AND nc.user_id = ?
     )) AND n.archived = 0 AND n.trashed = 0
-    ORDER BY n.pinned DESC, n.position DESC, n.timestamp DESC
+    ORDER BY eff_pinned DESC, eff_position DESC, n.timestamp DESC
     LIMIT ? OFFSET ?
   `);
 
   const rows = usePaging
-    ? allNotesWithPagingQuery.all(req.user.id, req.user.id, lim, off)
-    : allNotesQuery.all(req.user.id, req.user.id);
+    ? allNotesWithPagingQuery.all(req.user.id, req.user.id, req.user.id, lim, off)
+    : allNotesQuery.all(req.user.id, req.user.id, req.user.id);
 
   res.json(
     rows.map((r) => ({
@@ -943,8 +1030,8 @@ app.get("/api/notes", auth, (req, res) => {
       tags: JSON.parse(getUserTags(r.id, req.user.id)),
       images: JSON.parse(r.images_json || "[]"),
       color: r.color,
-      pinned: !!r.pinned,
-      position: r.position,
+      pinned: !!r.eff_pinned,
+      position: r.eff_position,
       timestamp: r.timestamp,
       updated_at: r.updated_at,
       client_updated_at: r.client_updated_at,
@@ -1030,8 +1117,10 @@ app.put("/api/notes/:id", auth, (req, res) => {
     tags_json: existing.tags_json,
     images_json: JSON.stringify(Array.isArray(b.images) ? b.images : []),
     color: b.color && typeof b.color === "string" ? b.color : "default",
-    pinned: b.pinned ? 1 : 0,
-    position: typeof b.position === "number" ? b.position : existing.position,
+    // Pinned/position are per-user: keep the shared columns untouched and
+    // write the requester's state to note_user_positions below.
+    pinned: existing.pinned,
+    position: existing.position,
     timestamp: b.timestamp || existing.timestamp,
     client_updated_at: tsResult.iso,
   };
@@ -1039,6 +1128,13 @@ app.put("/api/notes/:id", auth, (req, res) => {
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
+  }
+
+  if (typeof b.pinned === "boolean" || typeof b.position === "number") {
+    setUserPinOrPosition(id, req.user.id, {
+      pinned: typeof b.pinned === "boolean" ? b.pinned : undefined,
+      position: typeof b.position === "number" ? b.position : undefined,
+    });
   }
 
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
@@ -1051,6 +1147,25 @@ app.patch("/api/notes/:id", auth, (req, res) => {
   const id = req.params.id;
   const existing = getNoteWithCollaboration.get(req.user.id, id, req.user.id);
   if (!existing) return res.status(404).json({ error: "Note not found" });
+
+  // Pin-only toggle: purely per-user state. Skip LWW/timestamp bumps,
+  // shared-column writes, and cross-user broadcasts so other participants
+  // see nothing move when someone else pins/unpins their shared copy.
+  const hasSharedChange = (
+    typeof req.body.title === "string" ||
+    typeof req.body.content === "string" ||
+    Array.isArray(req.body.items) ||
+    Array.isArray(req.body.images) ||
+    Array.isArray(req.body.tags) ||
+    typeof req.body.color === "string" ||
+    typeof req.body.timestamp === "string"
+  );
+  if (!hasSharedChange && typeof req.body.pinned === "boolean") {
+    setUserPinOrPosition(id, req.user.id, { pinned: req.body.pinned });
+    // Notify only the requester's other sessions so multi-device stays in sync.
+    sendEventToUser(req.user.id, { type: "notes_reordered", noteIds: [id] });
+    return res.json({ ok: true, note: serializeNote(existing, req.user.id) });
+  }
 
   if (!req.body.client_updated_at) {
     return res.status(400).json({ error: "client_updated_at is required" });
@@ -1078,7 +1193,9 @@ app.patch("/api/notes/:id", auth, (req, res) => {
     tags_json: null,
     images_json: Array.isArray(req.body.images) ? JSON.stringify(req.body.images) : null,
     color: typeof req.body.color === "string" ? req.body.color : null,
-    pinned: typeof req.body.pinned === "boolean" ? (req.body.pinned ? 1 : 0) : null,
+    // Pinned state is per-user; route it to note_user_positions below instead
+    // of mutating the shared notes.pinned column.
+    pinned: null,
     timestamp: req.body.timestamp || null,
     client_updated_at: tsResult.iso,
   };
@@ -1086,6 +1203,10 @@ app.patch("/api/notes/:id", auth, (req, res) => {
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
+  }
+
+  if (typeof req.body.pinned === "boolean") {
+    setUserPinOrPosition(id, req.user.id, { pinned: req.body.pinned });
   }
 
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
@@ -1113,13 +1234,14 @@ app.post("/api/notes/reorder", auth, (req, res) => {
     return res.status(400).json({ error: reorderTsResult.error });
   }
 
-  // Ownership check: every noteId must belong to the requesting user.
-  // Reject the entire payload if any note is not owned — no partial apply.
+  // Access check: every noteId must be visible to the requesting user
+  // (either owned or shared). Rejecting the whole payload on a stray id
+  // keeps the client and server state consistent.
   const reorderIds = [...pinnedIds, ...otherIds];
   for (const nid of reorderIds) {
-    const note = getNoteById.get(nid);
-    if (note && note.user_id !== req.user.id) {
-      return res.status(403).json({ error: "Reorder payload contains notes not owned by you" });
+    const visible = getNoteWithCollaboration.get(req.user.id, nid, req.user.id);
+    if (!visible) {
+      return res.status(403).json({ error: "Reorder payload contains notes you cannot access" });
     }
   }
 
@@ -1133,20 +1255,22 @@ app.post("/api/notes/reorder", auth, (req, res) => {
     }
   }
 
+  // Per-user reorder: write to note_user_positions so each participant
+  // (owner or collaborator) keeps an independent ordering/pin state.
   const base = Date.now();
   const step = 1;
   const reorder = db.transaction(() => {
     for (let i = 0; i < pinnedIds.length; i++) {
-      patchPosition.run({
-        id: pinnedIds[i],
+      upsertUserPosition.run({
+        note_id: pinnedIds[i],
         user_id: req.user.id,
         position: base + step * (pinnedIds.length - i),
         pinned: 1,
       });
     }
     for (let i = 0; i < otherIds.length; i++) {
-      patchPosition.run({
-        id: otherIds[i],
+      upsertUserPosition.run({
+        note_id: otherIds[i],
         user_id: req.user.id,
         position: base - step * (i + 1),
         pinned: 0,
@@ -1157,8 +1281,8 @@ app.post("/api/notes/reorder", auth, (req, res) => {
   });
   reorder();
 
-  // Notify other sessions with a single event (avoids N individual note_updated
-  // events that cause N parallel fetches and trip reverse proxy rate limits).
+  // Reorder is local to this user — only notify their own sessions so
+  // other participants don't refetch unnecessarily.
   const allIds = [...pinnedIds, ...otherIds];
   const evt = { type: "notes_reordered", noteIds: allIds };
   sendEventToUser(req.user.id, evt);
@@ -1195,6 +1319,22 @@ app.post("/api/notes/:id/collaborate", auth, (req, res) => {
   try {
     // Add collaborator
     addCollaborator.run(noteId, collaborator.id, req.user.id, nowISO());
+
+    // Seed the collaborator's per-user position so the shared note lands
+    // at the top of their list instead of inheriting the owner's (possibly
+    // very old) position via COALESCE fallback.
+    const { max_pos } = getMaxUserEffectivePosition.get(
+      collaborator.id,
+      collaborator.id,
+      collaborator.id,
+      collaborator.id,
+    );
+    upsertUserPosition.run({
+      note_id: noteId,
+      user_id: collaborator.id,
+      position: (typeof max_pos === "number" ? max_pos : 0) + 1,
+      pinned: 0,
+    });
 
     // Update note with editor info
     updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
@@ -1272,6 +1412,50 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
     return res.status(403).json({ error: "Only note owner can remove other collaborators" });
   }
 
+  // Optional mode: "keep_copy" — give the removed collaborator a standalone
+  // (non-collab) copy of the note so they don't lose it entirely. Only the
+  // owner may grant this; a collaborator leaving themselves keeps the current
+  // behavior (clean exit, no copy).
+  const mode = typeof req.body?.mode === "string" ? req.body.mode : null;
+  const shouldGrantCopy = isOwner && !isRemovingSelf && mode === "keep_copy";
+  let copyNoteId = null;
+
+  if (shouldGrantCopy) {
+    copyNoteId = uid();
+    // Preserve the removed user's own per-user tags on the copy instead of
+    // inheriting the shared default — those tags are personal to them.
+    const userTagsJson = getUserTags(noteId, userIdToRemove);
+    insertNote.run({
+      id: copyNoteId,
+      user_id: userIdToRemove,
+      type: note.type,
+      title: note.title,
+      content: note.content,
+      items_json: note.items_json,
+      tags_json: userTagsJson,
+      images_json: note.images_json,
+      color: note.color,
+      pinned: 0,
+      position: note.position,
+      timestamp: note.timestamp,
+      client_updated_at: nowISO(),
+    });
+    // Seed the removed user's per-user position for the copy so it appears
+    // at the top of their list, matching the share-to-collaborator UX.
+    const { max_pos } = getMaxUserEffectivePosition.get(
+      userIdToRemove,
+      userIdToRemove,
+      userIdToRemove,
+      userIdToRemove,
+    );
+    upsertUserPosition.run({
+      note_id: copyNoteId,
+      user_id: userIdToRemove,
+      position: (typeof max_pos === "number" ? max_pos : 0) + 1,
+      pinned: 0,
+    });
+  }
+
   // Remove collaborator
   const removeCollaborator = db.prepare(`
     DELETE FROM note_collaborators
@@ -1284,23 +1468,35 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
     return res.status(404).json({ error: "Collaborator not found" });
   }
 
-  // Clean up per-user tags for the removed collaborator
+  // Clean up per-user tags and positions for the removed collaborator
   db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(noteId, userIdToRemove);
+  db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(noteId, userIdToRemove);
 
   // Notify the removed user FIRST — they are no longer in the collaborator list
   // so broadcastNoteUpdated won't reach them. Send a dedicated event so their
-  // client can remove the note immediately without a full reload.
-  sendEventToUser(userIdToRemove, { type: "note_access_revoked", noteId });
+  // client can remove the note immediately without a full reload. If a copy
+  // was granted, the payload also carries its id so the client fetches it in.
+  sendEventToUser(userIdToRemove, { type: "note_access_revoked", noteId, copyNoteId });
 
   // Update note with editor info and notify remaining participants
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
   broadcastNoteUpdated(noteId);
 
-  res.json({ ok: true, message: "Collaborator removed" });
+  res.json({ ok: true, message: "Collaborator removed", copyNoteId });
 });
 
 app.get("/api/notes/collaborated", auth, (req, res) => {
-  const rows = getCollaboratedNotes.all(req.user.id);
+  const rows = db.prepare(`
+    SELECT n.*,
+      COALESCE(nup.pinned, n.pinned) AS eff_pinned,
+      COALESCE(nup.position, n.position) AS eff_position
+    FROM notes n
+    JOIN note_collaborators nc ON n.id = nc.note_id
+    LEFT JOIN note_user_positions nup
+      ON nup.note_id = n.id AND nup.user_id = ?
+    WHERE nc.user_id = ? AND n.trashed = 0
+    ORDER BY eff_pinned DESC, eff_position DESC, n.timestamp DESC
+  `).all(req.user.id, req.user.id);
   res.json(rows.map((r) => serializeNote(r, req.user.id)));
 });
 
@@ -1358,15 +1554,26 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
   if (tsResult.error) {
     return res.status(400).json({ error: tsResult.error });
   }
+  // Optional mode for collaborative notes:
+  //   - "remove_self" (default): current behavior — owner leaves via ownership
+  //     transfer, collaborator leaves the collaboration.
+  //   - "delete_for_all": owner-only — hard-deletes the note for every
+  //     participant (server broadcasts note_deleted).
+  const mode = typeof req.body?.mode === "string" ? req.body.mode : null;
 
   const existing = getNote.get(id, req.user.id);
   if (!existing) {
     // Not the owner — check if user is a collaborator
     const collabNote = getNoteWithCollaboration.get(req.user.id, id, req.user.id);
     if (!collabNote) return res.status(404).json({ error: "Note not found" });
+    // Only owners may request delete_for_all
+    if (mode === "delete_for_all") {
+      return res.status(403).json({ error: "Only owner can delete for all collaborators" });
+    }
     // Collaborator "delete" = leave the collaboration
     db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
+    db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     broadcastNoteUpdated(id);
     return res.json({ ok: true, left: true });
   }
@@ -1374,15 +1581,53 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
   // Owner: check if the note has collaborators
   const collaborators = getNoteCollaborators.all(id);
   if (collaborators.length > 0) {
-    // Transfer ownership to the first collaborator
+    if (mode === "delete_for_all") {
+      // Revoke access for every collaborator, but keep the note in the
+      // owner's trash so they can still restore it if it was a mistake.
+      const collabIds = collaborators.map((c) => c.id);
+      for (const cid of collabIds) {
+        db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, cid);
+        db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, cid);
+        db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, cid);
+      }
+      db.prepare("UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ?").run(tsResult.iso, id);
+      updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+      // Collaborators lose access entirely — they must drop the note locally
+      // without it landing in their trash view.
+      const evt = { type: "note_deleted", noteId: id };
+      for (const cid of collabIds) sendEventToUser(cid, evt);
+      const fresh = getNoteById.get(id);
+      return res.json({ ok: true, deletedForAll: true, note: serializeNote(fresh || existing, req.user.id) });
+    }
+    // Default: "remove_self" — owner leaves the collaboration but keeps a
+    // trashed copy of the note so they can restore it later. The live note
+    // is handed over to the first collaborator so it stays available for
+    // remaining participants.
+    const trashedCopyId = uid();
+    insertNote.run({
+      id: trashedCopyId,
+      user_id: req.user.id,
+      type: existing.type,
+      title: existing.title,
+      content: existing.content,
+      items_json: existing.items_json,
+      tags_json: existing.tags_json,
+      images_json: existing.images_json,
+      color: existing.color,
+      pinned: 0,
+      position: existing.position,
+      timestamp: existing.timestamp,
+      client_updated_at: tsResult.iso,
+    });
+    db.prepare("UPDATE notes SET trashed = 1 WHERE id = ?").run(trashedCopyId);
     const newOwner = collaborators[0];
     db.prepare("UPDATE notes SET user_id = ? WHERE id = ?").run(newOwner.id, id);
     db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, newOwner.id);
-    // Clean up old owner's per-user tags
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
-    // Notify remaining participants so they see updated collaboration status
+    db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     broadcastNoteUpdated(id);
-    return res.json({ ok: true, left: true });
+    const trashedCopy = getNoteById.get(trashedCopyId);
+    return res.json({ ok: true, left: true, trashedCopy: trashedCopy ? serializeNote(trashedCopy, req.user.id) : null });
   }
 
   // Non-collaborative note: normal trash
@@ -1545,6 +1790,7 @@ app.get("/api/notes/export", auth, (req, res) => {
 app.get("/api/notes/:id", auth, (req, res) => {
   const r = getNoteWithCollaboration.get(req.user.id, req.params.id, req.user.id);
   if (!r) return res.status(404).json({ error: "Note not found" });
+  const ov = getUserPosition(r.id, req.user.id);
   res.json({
     id: r.id,
     user_id: r.user_id,
@@ -1555,8 +1801,8 @@ app.get("/api/notes/:id", auth, (req, res) => {
     tags: JSON.parse(getUserTags(r.id, req.user.id)),
     images: JSON.parse(r.images_json || "[]"),
     color: r.color,
-    pinned: !!r.pinned,
-    position: r.position,
+    pinned: ov ? !!ov.pinned : !!r.pinned,
+    position: ov ? ov.position : r.position,
     timestamp: r.timestamp,
     updated_at: r.updated_at,
     client_updated_at: r.client_updated_at,

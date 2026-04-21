@@ -2078,14 +2078,42 @@ export default function App() {
               }
             } else if (msg && msg.type === "note_access_revoked" && msg.noteId) {
               // Collaboration access revoked — note owner removed us.
-              // Remove from all local state immediately (any view).
               const nid = String(msg.noteId);
-              setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-              idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
-              idbPurgeQueueForNote(nid, currentUser?.id).catch(() => {});
-              // Force-close if this note is currently open in modal
-              if (String(activeIdRef.current) === nid) {
-                forceCloseModalForRemoteDelete(nid);
+              if (msg.copyNoteId) {
+                // Grant-copy path: fetch the copy first, then swap the
+                // original out and the copy in within a single setNotes
+                // update so the user doesn't see a flash of empty slot.
+                (async () => {
+                  let copy = null;
+                  try {
+                    copy = await api(`/notes/${msg.copyNoteId}`, { token });
+                  } catch (_) {}
+                  const currentFilter = tagFilterRef.current;
+                  const belongsInView =
+                    copy && copy.id
+                    && !copy.archived && !copy.trashed
+                    && (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"));
+                  setNotes((prev) => {
+                    const filtered = prev.filter((n) => String(n.id) !== nid);
+                    return belongsInView ? sortNotesByRecency([...filtered, copy]) : filtered;
+                  });
+                  if (copy && copy.id) {
+                    try { await idbPutNote(copy, currentUser?.id, sessionId); } catch (_) {}
+                  }
+                  idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
+                  idbPurgeQueueForNote(nid, currentUser?.id).catch(() => {});
+                  if (String(activeIdRef.current) === nid) {
+                    forceCloseModalForRemoteDelete(nid);
+                  }
+                })();
+              } else {
+                // Legacy revoke-only path: drop the note immediately.
+                setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+                idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
+                idbPurgeQueueForNote(nid, currentUser?.id).catch(() => {});
+                if (String(activeIdRef.current) === nid) {
+                  forceCloseModalForRemoteDelete(nid);
+                }
               }
             }
           } catch (_) {}
@@ -3500,7 +3528,7 @@ export default function App() {
 
     setSavingModal(false);
   };
-  const deleteModal = async () => {
+  const deleteModal = async (mode) => {
     if (activeId == null) return;
     // Draft that was never materialised — deleting it is identical to just
     // closing the modal (nothing has been persisted anywhere).
@@ -3511,6 +3539,7 @@ export default function App() {
     const note = notes.find((n) => String(n.id) === String(activeId));
     const nid = String(activeId);
     const isOwner = !note || note.user_id === currentUser?.id;
+    const isCollabNote = (note?.collaborators?.length || 0) > 0;
 
     if (tagFilter === "TRASHED") {
       // Local-first: permanent delete — tombstone prevents resurrection by loaders/SSE
@@ -3522,16 +3551,46 @@ export default function App() {
       closeModal();
       showToast(t("notePermanentlyDeleted"), "success");
       await enqueueWithLease(nid, { type: "permanentDelete", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
-    } else if (!isOwner || note?.collaborators?.length > 0) {
-      // Collaborative note (owner or collaborator): leave the collaboration
-      // Server transfers ownership if needed, note stays for other participants
+    } else if (isOwner && isCollabNote && mode === "delete_for_all") {
+      // Owner chose to delete the shared note for everyone.
+      // The note lands in the owner's trash (the server sets trashed=1 and
+      // revokes collaborators); collaborators lose access via SSE note_deleted.
+      const leaseId = acquireLocalLease(nid);
+      const nowIso = new Date().toISOString();
+      try {
+        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
+        if (existing) await idbPutNote({ ...existing, trashed: true, collaborators: [], client_updated_at: nowIso }, currentUser?.id, sessionId);
+      } catch (e) { console.error(e); }
+      invalidateNotesCache();
+      invalidateTrashedNotesCache();
+      setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+      closeModal();
+      showToast(t("noteDeletedForAll"), "success");
+      await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: nowIso, mode: "delete_for_all" } }, leaseId);
+    } else if (isOwner && isCollabNote) {
+      // Owner chose "remove for me" on a shared note. Server transfers
+      // ownership to the first collaborator (note stays live for them) and
+      // creates a trashed copy owned by the leaver so they can restore it.
+      // The trashed copy has a new id — local trash cache is invalidated so
+      // the next trash view fetches it from the server.
+      try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
+      invalidateNotesCache();
+      invalidateTrashedNotesCache();
+      setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+      closeModal();
+      showToast(t("noteMovedToTrash"), "success");
+      const leaseId = acquireLocalLease(nid);
+      await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: new Date().toISOString(), mode: "remove_self" } }, leaseId);
+    } else if (!isOwner) {
+      // Collaborator leaves the shared note. Nothing to put in their trash —
+      // they lose access cleanly, matching the original spec.
       try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
       invalidateNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
       showToast(t("leftCollaboration"), "success");
       const leaseId = acquireLocalLease(nid);
-      await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: new Date().toISOString() } }, leaseId);
+      await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: new Date().toISOString(), mode: "remove_self" } }, leaseId);
     } else {
       // Owner of non-collaborative note: local-first move to trash
       const leaseId = acquireLocalLease(nid);
@@ -3640,12 +3699,8 @@ export default function App() {
 
   /** -------- Reset note order -------- */
   const resetNoteOrder = async (overridePositions = true) => {
-    // Block if any note in the view is not owned — server rejects mixed payloads.
-    if (currentUser && notes.some((n) => n.user_id && n.user_id !== currentUser.id)) {
-      showToast(t("reorderBlockedCollabNotes"), "error");
-      return;
-    }
-
+    // Reorder is per-user on the server (note_user_positions), so shared
+    // notes are fine to include — each participant keeps their own order.
     const sorted = notes.slice().sort((a, b) => {
       const ap = a?.pinned ? 1 : 0;
       const bp = b?.pinned ? 1 : 0;
@@ -3729,14 +3784,8 @@ export default function App() {
     if (!dragged || String(dragged) === String(overId)) return;
     if (dragGroup.current !== group) return;
 
-    // Block reorder if any note in the view is not owned by the current user.
-    // Server rejects partial-ownership payloads, so don't even attempt it.
-    if (currentUser && notes.some((n) => n.user_id && n.user_id !== currentUser.id)) {
-      showToast(t("reorderBlockedCollabNotes"), "error");
-      dragGroup.current = null;
-      return;
-    }
-
+    // Reorder is stored per-user server-side, so shared notes can be moved
+    // freely without affecting other participants' ordering.
     const pinnedIds = notes.filter((n) => n.pinned).map((n) => String(n.id));
     const otherIds = notes.filter((n) => !n.pinned).map((n) => String(n.id));
     let newPinned = pinnedIds,
