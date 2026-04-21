@@ -246,7 +246,9 @@ export default function NoteModal({
       if (!alt && !shift && e.code === "KeyE") return apply("code");
       if (!alt && shift && e.code === "KeyE") return apply("codeblock");
       if (!alt && !shift && e.code === "KeyK") return apply("link");
-      if (!alt && shift && e.code === "Period") return apply("quote");
+      // Match on produced character so it works across layouts
+      // (on AZERTY "." is typed via Shift+`;`, so e.code === "Period" never fires)
+      if (!alt && e.key === ".") return apply("quote");
       if (!alt && shift && e.code === "Digit8") return apply("ul");
       if (!alt && shift && e.code === "Digit7") return apply("ol");
       if (alt && !shift && e.code === "Digit1") return apply("h1");
