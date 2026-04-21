@@ -1137,6 +1137,25 @@ app.patch("/api/notes/:id", auth, (req, res) => {
   const existing = getNoteWithCollaboration.get(req.user.id, id, req.user.id);
   if (!existing) return res.status(404).json({ error: "Note not found" });
 
+  // Pin-only toggle: purely per-user state. Skip LWW/timestamp bumps,
+  // shared-column writes, and cross-user broadcasts so other participants
+  // see nothing move when someone else pins/unpins their shared copy.
+  const hasSharedChange = (
+    typeof req.body.title === "string" ||
+    typeof req.body.content === "string" ||
+    Array.isArray(req.body.items) ||
+    Array.isArray(req.body.images) ||
+    Array.isArray(req.body.tags) ||
+    typeof req.body.color === "string" ||
+    typeof req.body.timestamp === "string"
+  );
+  if (!hasSharedChange && typeof req.body.pinned === "boolean") {
+    setUserPinOrPosition(id, req.user.id, { pinned: req.body.pinned });
+    // Notify only the requester's other sessions so multi-device stays in sync.
+    sendEventToUser(req.user.id, { type: "notes_reordered", noteIds: [id] });
+    return res.json({ ok: true, note: serializeNote(existing, req.user.id) });
+  }
+
   if (!req.body.client_updated_at) {
     return res.status(400).json({ error: "client_updated_at is required" });
   }
@@ -1649,6 +1668,7 @@ app.get("/api/notes/export", auth, (req, res) => {
 app.get("/api/notes/:id", auth, (req, res) => {
   const r = getNoteWithCollaboration.get(req.user.id, req.params.id, req.user.id);
   if (!r) return res.status(404).json({ error: "Note not found" });
+  const ov = getUserPosition(r.id, req.user.id);
   res.json({
     id: r.id,
     user_id: r.user_id,
@@ -1659,8 +1679,8 @@ app.get("/api/notes/:id", auth, (req, res) => {
     tags: JSON.parse(getUserTags(r.id, req.user.id)),
     images: JSON.parse(r.images_json || "[]"),
     color: r.color,
-    pinned: !!r.pinned,
-    position: r.position,
+    pinned: ov ? !!ov.pinned : !!r.pinned,
+    position: ov ? ov.position : r.position,
     timestamp: r.timestamp,
     updated_at: r.updated_at,
     client_updated_at: r.client_updated_at,
