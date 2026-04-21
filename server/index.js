@@ -604,6 +604,17 @@ const upsertUserPinned = db.prepare(`
   ON CONFLICT(note_id, user_id) DO UPDATE SET pinned = excluded.pinned
 `);
 
+// Highest effective position across a user's visible (active) notes —
+// owned or collaborated. Used to seed a freshly shared note at the top
+// of the recipient's list so it doesn't bury under their existing notes.
+const getMaxUserEffectivePosition = db.prepare(`
+  SELECT COALESCE(MAX(COALESCE(nup.position, n.position)), 0) AS max_pos
+  FROM notes n
+  LEFT JOIN note_user_positions nup ON nup.note_id = n.id AND nup.user_id = ?
+  LEFT JOIN note_collaborators nc ON n.id = nc.note_id AND nc.user_id = ?
+  WHERE (n.user_id = ? OR nc.user_id = ?) AND n.trashed = 0 AND n.archived = 0
+`);
+
 function getUserPosition(noteId, userId) {
   return getUserPositionForNote.get(noteId, userId) || null;
 }
@@ -1308,6 +1319,22 @@ app.post("/api/notes/:id/collaborate", auth, (req, res) => {
   try {
     // Add collaborator
     addCollaborator.run(noteId, collaborator.id, req.user.id, nowISO());
+
+    // Seed the collaborator's per-user position so the shared note lands
+    // at the top of their list instead of inheriting the owner's (possibly
+    // very old) position via COALESCE fallback.
+    const { max_pos } = getMaxUserEffectivePosition.get(
+      collaborator.id,
+      collaborator.id,
+      collaborator.id,
+      collaborator.id,
+    );
+    upsertUserPosition.run({
+      note_id: noteId,
+      user_id: collaborator.id,
+      position: (typeof max_pos === "number" ? max_pos : 0) + 1,
+      pinned: 0,
+    });
 
     // Update note with editor info
     updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
