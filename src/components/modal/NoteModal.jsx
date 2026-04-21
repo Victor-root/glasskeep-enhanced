@@ -565,10 +565,15 @@ export default function NoteModal({
             open={confirmDeleteOpen}
             dark={dark}
             isTrashed={tagFilter === "TRASHED"}
+            collabOwner={
+              tagFilter !== "TRASHED"
+              && activeNoteObj?.user_id === currentUser?.id
+              && (activeNoteObj?.collaborators?.length || 0) > 0
+            }
             onClose={() => setConfirmDeleteOpen(false)}
-            onConfirm={async () => {
+            onConfirm={async (mode) => {
               setConfirmDeleteOpen(false);
-              await deleteModal();
+              await deleteModal(mode);
             }}
           />
 

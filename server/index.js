@@ -1481,15 +1481,26 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
   if (tsResult.error) {
     return res.status(400).json({ error: tsResult.error });
   }
+  // Optional mode for collaborative notes:
+  //   - "remove_self" (default): current behavior — owner leaves via ownership
+  //     transfer, collaborator leaves the collaboration.
+  //   - "delete_for_all": owner-only — hard-deletes the note for every
+  //     participant (server broadcasts note_deleted).
+  const mode = typeof req.body?.mode === "string" ? req.body.mode : null;
 
   const existing = getNote.get(id, req.user.id);
   if (!existing) {
     // Not the owner — check if user is a collaborator
     const collabNote = getNoteWithCollaboration.get(req.user.id, id, req.user.id);
     if (!collabNote) return res.status(404).json({ error: "Note not found" });
+    // Only owners may request delete_for_all
+    if (mode === "delete_for_all") {
+      return res.status(403).json({ error: "Only owner can delete for all collaborators" });
+    }
     // Collaborator "delete" = leave the collaboration
     db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
+    db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     broadcastNoteUpdated(id);
     return res.json({ ok: true, left: true });
   }
@@ -1497,12 +1508,23 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
   // Owner: check if the note has collaborators
   const collaborators = getNoteCollaborators.all(id);
   if (collaborators.length > 0) {
-    // Transfer ownership to the first collaborator
+    if (mode === "delete_for_all") {
+      // Hard-delete for every participant. Notify all first so each client
+      // removes the note locally; ON DELETE CASCADE cleans the aux tables.
+      const recipientIds = new Set([existing.user_id, ...collaborators.map((c) => c.id)]);
+      deleteNote.run(id, req.user.id);
+      const evt = { type: "note_deleted", noteId: id };
+      for (const uid of recipientIds) sendEventToUser(uid, evt);
+      return res.json({ ok: true, deletedForAll: true });
+    }
+    // Default: "remove_self" — transfer ownership to the first collaborator,
+    // current owner leaves. Note stays for remaining participants.
     const newOwner = collaborators[0];
     db.prepare("UPDATE notes SET user_id = ? WHERE id = ?").run(newOwner.id, id);
     db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, newOwner.id);
-    // Clean up old owner's per-user tags
+    // Clean up old owner's per-user tags and positions
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
+    db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     // Notify remaining participants so they see updated collaboration status
     broadcastNoteUpdated(id);
     return res.json({ ok: true, left: true });
