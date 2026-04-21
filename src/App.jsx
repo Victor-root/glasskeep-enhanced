@@ -2078,19 +2078,42 @@ export default function App() {
               }
             } else if (msg && msg.type === "note_access_revoked" && msg.noteId) {
               // Collaboration access revoked — note owner removed us.
-              // Remove from all local state immediately (any view).
               const nid = String(msg.noteId);
-              setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-              idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
-              idbPurgeQueueForNote(nid, currentUser?.id).catch(() => {});
-              // Force-close if this note is currently open in modal
-              if (String(activeIdRef.current) === nid) {
-                forceCloseModalForRemoteDelete(nid);
-              }
-              // If the owner chose to grant a standalone copy, fetch it so
-              // it appears in the current view without a full reload.
               if (msg.copyNoteId) {
-                debouncedPatch(String(msg.copyNoteId));
+                // Grant-copy path: fetch the copy first, then swap the
+                // original out and the copy in within a single setNotes
+                // update so the user doesn't see a flash of empty slot.
+                (async () => {
+                  let copy = null;
+                  try {
+                    copy = await api(`/notes/${msg.copyNoteId}`, { token });
+                  } catch (_) {}
+                  const currentFilter = tagFilterRef.current;
+                  const belongsInView =
+                    copy && copy.id
+                    && !copy.archived && !copy.trashed
+                    && (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"));
+                  setNotes((prev) => {
+                    const filtered = prev.filter((n) => String(n.id) !== nid);
+                    return belongsInView ? sortNotesByRecency([...filtered, copy]) : filtered;
+                  });
+                  if (copy && copy.id) {
+                    try { await idbPutNote(copy, currentUser?.id, sessionId); } catch (_) {}
+                  }
+                  idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
+                  idbPurgeQueueForNote(nid, currentUser?.id).catch(() => {});
+                  if (String(activeIdRef.current) === nid) {
+                    forceCloseModalForRemoteDelete(nid);
+                  }
+                })();
+              } else {
+                // Legacy revoke-only path: drop the note immediately.
+                setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+                idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
+                idbPurgeQueueForNote(nid, currentUser?.id).catch(() => {});
+                if (String(activeIdRef.current) === nid) {
+                  forceCloseModalForRemoteDelete(nid);
+                }
               }
             }
           } catch (_) {}
