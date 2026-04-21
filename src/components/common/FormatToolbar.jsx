@@ -203,6 +203,8 @@ export default function FormatToolbar({ dark, onAction, anchorRef }) {
   }, [anchorRef]);
 
   const base = `fmt-btn ${dark ? "hover:bg-white/10" : "hover:bg-black/5"}`;
+  const mod = (typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)) ? "⌘" : "Ctrl";
+  const tip = (labelKey, shortcut) => `${t(labelKey)} (${shortcut})`;
   return (
     <div
       ref={popRef}
@@ -210,20 +212,20 @@ export default function FormatToolbar({ dark, onAction, anchorRef }) {
       style={arrowLeft != null ? { "--fmt-arrow-left": `${arrowLeft}px` } : undefined}
     >
       <div className="fmt-pop-grid flex flex-wrap gap-1">
-        <button className={base} onClick={() => onAction("h1")}>H1</button>
-        <button className={base} onClick={() => onAction("h2")}>H2</button>
-        <button className={base} onClick={() => onAction("h3")}>H3</button>
+        <button className={base} onClick={() => onAction("h1")} data-tooltip={tip("fmtHeading1", `${mod}+Alt+1`)}>H1</button>
+        <button className={base} onClick={() => onAction("h2")} data-tooltip={tip("fmtHeading2", `${mod}+Alt+2`)}>H2</button>
+        <button className={base} onClick={() => onAction("h3")} data-tooltip={tip("fmtHeading3", `${mod}+Alt+3`)}>H3</button>
         <span className="fmt-sep mx-1 opacity-40">|</span>
-        <button className={base} onClick={() => onAction("bold")}><strong>B</strong></button>
-        <button className={base} onClick={() => onAction("italic")}><em>I</em></button>
-        <button className={base} onClick={() => onAction("strike")}><span className="line-through">S</span></button>
-        <button className={base} onClick={() => onAction("code")}>`code`</button>
-        <button className={base} onClick={() => onAction("codeblock")}>&lt;/&gt;</button>
+        <button className={base} onClick={() => onAction("bold")} data-tooltip={tip("fmtBold", `${mod}+B`)}><strong>B</strong></button>
+        <button className={base} onClick={() => onAction("italic")} data-tooltip={tip("fmtItalic", `${mod}+I`)}><em>I</em></button>
+        <button className={base} onClick={() => onAction("strike")} data-tooltip={tip("fmtStrike", `${mod}+Shift+X`)}><span className="line-through">S</span></button>
+        <button className={base} onClick={() => onAction("code")} data-tooltip={tip("fmtInlineCode", `${mod}+E`)}>`code`</button>
+        <button className={base} onClick={() => onAction("codeblock")} data-tooltip={tip("fmtCodeBlock", `${mod}+Shift+E`)}>&lt;/&gt;</button>
         <span className="fmt-sep mx-1 opacity-40">|</span>
-        <button className={base} onClick={() => onAction("quote")}>&gt;</button>
-        <button className={base} onClick={() => onAction("ul")}>{t("bulletListLabel")}</button>
-        <button className={base} onClick={() => onAction("ol")}>{t("orderedListLabel")}</button>
-        <button className={base} onClick={() => onAction("link")}>
+        <button className={base} onClick={() => onAction("quote")} data-tooltip={tip("fmtQuote", `${mod}+Shift+.`)}>&gt;</button>
+        <button className={base} onClick={() => onAction("ul")} data-tooltip={tip("fmtBulletList", `${mod}+Shift+8`)}>{t("bulletListLabel")}</button>
+        <button className={base} onClick={() => onAction("ol")} data-tooltip={tip("fmtOrderedList", `${mod}+Shift+7`)}>{t("orderedListLabel")}</button>
+        <button className={base} onClick={() => onAction("link")} data-tooltip={tip("fmtLink", `${mod}+K`)}>
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </button>
       </div>
