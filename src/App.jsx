@@ -27,6 +27,7 @@ import {
 import { api, getAuth, setAuth, AUTH_KEY } from "./utils/api.js";
 import { mdForDownload } from "./utils/markdown.jsx";
 import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, fileToCompressedDataURL, setThemeColor } from "./utils/helpers.js";
+import { textToChecklistItems, checklistItemsToText } from "./utils/noteConversion.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES } from "./utils/constants.js";
 import { ColorDot } from "./components/common/ColorDot.jsx";
@@ -3898,6 +3899,92 @@ export default function App() {
     releaseLocalLeaseWithPrune(noteId, leaseId);
   };
 
+  /**
+   * Convert a note between "text" and "checklist" in place.
+   * Preserves content: text lines become items (one per line, checkbox
+   * syntax honoured), items become markdown-like lines.
+   *
+   * Server-side `type` is immutable under PATCH — we persist via a full
+   * PUT update, mirroring the checklist branch of `saveModal`.
+   */
+  const convertNoteType = async () => {
+    if (!activeId) return;
+    if (mType !== "text" && mType !== "checklist") return;
+    if (tagFilter === "TRASHED") return;
+
+    const isDraft = !!pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id);
+    const targetType = mType === "text" ? "checklist" : "text";
+    const toastKey = targetType === "checklist" ? "convertedToChecklist" : "convertedToText";
+
+    const newItems = targetType === "checklist" ? textToChecklistItems(mBody || "") : [];
+    const newBody = targetType === "text" ? checklistItemsToText(mItems) : "";
+
+    // Local state first — keep the UI responsive even if the sync call lags.
+    skipNextItemsAutosave.current = true;
+    setMBody(newBody);
+    setMItems(newItems);
+    setMType(targetType);
+    prevItemsRef.current = newItems;
+    if (initialModalStateRef.current) {
+      initialModalStateRef.current = { ...initialModalStateRef.current, content: newBody };
+    }
+    if (committedBaselineRef.current) {
+      committedBaselineRef.current = { ...committedBaselineRef.current, content: newBody };
+    }
+
+    // Draft note: fold the conversion into the pending create payload.
+    if (isDraft) {
+      pendingDraftRef.current = { ...pendingDraftRef.current, type: targetType };
+      materializeDraftIfNeeded({ items: newItems, body: newBody });
+      showToast(t(toastKey), "success");
+      return;
+    }
+
+    // Persisted note: full update via PUT so `type` is actually written server-side.
+    const noteId = String(activeId);
+    const nowIso = new Date().toISOString();
+    const existingNote = notes.find((n) => String(n.id) === noteId);
+    const payload = {
+      id: activeId,
+      title: mTitle.trim(),
+      tags: mTagList,
+      images: mImages,
+      color: mColor,
+      pinned: !!existingNote?.pinned,
+      type: targetType,
+      content: newBody,
+      items: newItems,
+      client_updated_at: nowIso,
+    };
+    const updatedFields = {
+      ...payload,
+      updated_at: nowIso,
+      lastEditedBy: currentUser?.email || currentUser?.name,
+      lastEditedAt: nowIso,
+    };
+
+    const leaseId = acquireLocalLease(noteId);
+    try {
+      const existing = await idbGetNote(noteId, currentUser?.id, sessionId);
+      if (existing) {
+        await idbPutNote({ ...existing, ...updatedFields }, currentUser?.id, sessionId);
+      }
+    } catch (e) {
+      console.error("IndexedDB convert failed:", e);
+      return;
+    }
+    setNotes((prev) =>
+      prev.map((n) => (String(n.id) === noteId ? { ...n, ...updatedFields } : n)),
+    );
+    invalidateNotesCache();
+    const enqueued = await enqueueWithLease(
+      noteId,
+      { type: "update", noteId, payload },
+      leaseId,
+    );
+    if (enqueued) showToast(t(toastKey), "success");
+  };
+
   // Checklist drag-and-drop is handled by useChecklistDrag inside NoteModal
 
   /** -------- Tags list (unique + counts) -------- */
@@ -4121,6 +4208,7 @@ export default function App() {
       syncChecklistItems={syncChecklistItems}
       checklistInsertPosition={checklistInsertPosition}
       checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
+      onConvertNoteType={convertNoteType}
       initialDrawMode={initialDrawMode}
       onConsumeInitialDrawMode={() => setInitialDrawMode(null)}
     />

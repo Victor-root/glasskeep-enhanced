@@ -45,6 +45,7 @@ export default function useDraftNote(ctx) {
       ? overrides.items
       : (Array.isArray(ctx.mItems) ? ctx.mItems : []);
     const drawing = overrides.drawing ?? ctx.mDrawingData;
+    const body = typeof overrides.body === "string" ? overrides.body : (ctx.mBody || "");
 
     const { id, type } = draft;
     const nowIso = new Date().toISOString();
@@ -57,9 +58,9 @@ export default function useDraftNote(ctx) {
         ? JSON.stringify({
             paths: drawing?.paths || [],
             dimensions: drawing?.dimensions || null,
-            text: ctx.mBody || "",
+            text: body,
           })
-        : (ctx.mBody || ""),
+        : body,
       items,
       tags: Array.isArray(ctx.mTagList) ? ctx.mTagList : [],
       images: Array.isArray(ctx.mImages) ? ctx.mImages : [],
@@ -95,7 +96,7 @@ export default function useDraftNote(ctx) {
     // don't enqueue a redundant patch for content already in the create payload.
     const newBaseline = {
       title: newNote.title,
-      content: isDraw ? (ctx.mBody || "") : newNote.content,
+      content: isDraw ? body : newNote.content,
       tags: newNote.tags,
       images: newNote.images,
       color: newNote.color,

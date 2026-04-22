@@ -4,7 +4,7 @@ import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
 import Popover from "../common/Popover.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
-import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, FormatIcon, Kebab } from "../../icons/index.jsx";
+import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, FormatIcon, Kebab, TextNoteIcon, ChecklistIcon } from "../../icons/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 import { t } from "../../i18n";
 
@@ -78,6 +78,8 @@ export default function ModalFooter({
   redo,
   canUndo,
   canRedo,
+  // note type conversion (text <-> checklist)
+  onConvertNoteType,
 }) {
   const isDesktop = windowWidth >= 768 && !isLandscapeMobile && !isWebView;
   const isTrashed = tagFilter === "TRASHED";
@@ -534,6 +536,17 @@ export default function ModalFooter({
                 onClick={() => { handleArchiveToggle(); setModalKebabOpen(false); }}
               >
                 <ArchiveIcon />{activeNoteObj?.archived ? t("unarchive") : t("archive")}
+              </button>
+            )}
+            {/* Convert between text and checklist — hidden on draw notes & in trash */}
+            {!isTrashed && onConvertNoteType && (mType === "text" || mType === "checklist") && (
+              <button
+                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                style={{ color: dark ? "#c4b5fd" : "#7c3aed" }}
+                onClick={() => { onConvertNoteType(); setModalKebabOpen(false); }}
+              >
+                {mType === "text" ? <ChecklistIcon /> : <TextNoteIcon />}
+                {mType === "text" ? t("convertToChecklist") : t("convertToText")}
               </button>
             )}
             {/* Download */}

@@ -149,6 +149,8 @@ export default function NoteModal({
   syncChecklistItems,
   checklistInsertPosition,
   checklistRemoveSectionBehavior,
+  // note type conversion (text <-> checklist)
+  onConvertNoteType,
   // direct draw mode
   initialDrawMode,
   onConsumeInitialDrawMode,
@@ -592,6 +594,7 @@ export default function NoteModal({
             redo={redo}
             canUndo={canUndo}
             canRedo={canRedo}
+            onConvertNoteType={onConvertNoteType}
           />
 
           <ConfirmDeleteDialog
