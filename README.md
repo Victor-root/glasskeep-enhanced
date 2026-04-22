@@ -225,13 +225,13 @@ Missing keys will automatically fall back to English.
 ## 🗺️ Roadmap
 
 ### 🗓️ Planned
-- server-side encryption to better protect data in case the server or its drives are stolen
-- more translations
-- better RTL language support
-- make the Android app available on **F-Droid**
+- Server-side encryption to better protect data in case the server or its drives are stolen
+- More translations with better RTL language support
+- Make the Android app available on **F-Droid**
+- Rich Text / Live Formatting Editor
 
 ### 💭 Under consideration
-- explore an edit flow closer to Google Keep
+- Explore an edit flow closer to Google Keep
 
 ---
 
