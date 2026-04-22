@@ -45,7 +45,19 @@ export const renderSafeMarkdown = (md) => {
     text = text.replace(/\x00CODE(\d+)\x00/g, (_, i) => codeBlocks[+i]);
 
     const raw = marked.parse(text);
-    return DOMPurify.sanitize(raw, _PURIFY_CONFIG);
+    // Collapse whitespace between tags so that `white-space: pre-wrap` on
+    // leaf elements (needed to preserve user-typed soft breaks inside text)
+    // doesn't render marked's formatting newlines — especially the ones
+    // inside nested-list <li> wrappers — as phantom blank lines.
+    // Fenced code content is protected so its inner whitespace stays intact.
+    const preBlocks = [];
+    let cleaned = raw.replace(/<pre[\s\S]*?<\/pre>/g, (m) => {
+      preBlocks.push(m);
+      return `\x00PRE${preBlocks.length - 1}\x00`;
+    });
+    cleaned = cleaned.replace(/>[ \t]*\n[ \t\n]*</g, "><");
+    cleaned = cleaned.replace(/\x00PRE(\d+)\x00/g, (_, i) => preBlocks[+i]);
+    return DOMPurify.sanitize(cleaned, _PURIFY_CONFIG);
   } catch {
     return "";
   }

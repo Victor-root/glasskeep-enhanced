@@ -156,19 +156,6 @@ export default function ChecklistEditor({
     commit(next);
   };
 
-  // Called when the user presses Enter inside a section's title input.
-  // Moves focus into the section so typing keeps flowing; creates an
-  // empty item on demand if the section is empty.
-  const focusFirstItemInSection = (sectionId) => {
-    const sec = sections.find((s) => s.id === sectionId);
-    const firstUnchecked = sec?.items.find((it) => !it.done);
-    if (firstUnchecked) {
-      requestFocus(firstUnchecked.id, "end");
-    } else {
-      addItemToSection(sectionId);
-    }
-  };
-
   // ---------- Rendering helpers ----------
   const checkedItems = items.filter((e) => isItem(e) && e.done);
   // Map each checked item to its original section (for the Done group).
@@ -279,7 +266,7 @@ export default function ChecklistEditor({
                       section={section}
                       onRename={(title) => renameSection(section.id, title)}
                       onRemove={() => removeSection(section.id)}
-                      onEnter={() => focusFirstItemInSection(section.id)}
+                      onEnter={() => addItemToSection(section.id)}
                       onHandlePointerDown={handleSectionPointerDown}
                       onHandlePointerMove={handleSectionPointerMove}
                       onHandlePointerUp={handleSectionPointerUp}
