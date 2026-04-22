@@ -139,6 +139,8 @@ export default function NoteModal({
   restoreFromTrash,
   handleArchiveNote,
   handleDownloadNote,
+  convertModalToChecklist,
+  convertModalToText,
   togglePin,
   addImagesToState,
   isCollaborativeNote,
@@ -569,6 +571,8 @@ export default function NoteModal({
               setViewMode((v) => !v);
               setShowModalFmt(false);
             }}
+            onConvertToChecklist={convertModalToChecklist}
+            onConvertToText={convertModalToText}
             // drawing mode toggle
             drawMode={drawMode}
             onToggleDrawMode={() => setDrawMode((m) => m === "view" ? "draw" : "view")}

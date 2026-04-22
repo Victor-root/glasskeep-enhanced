@@ -205,6 +205,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   viewMode: "Mode lecture",
   switchToViewMode: "Passer en mode lecture",
   switchToEditMode: "Passer en mode édition",
+  convertToChecklist: "Convertir en checklist",
+  convertToTextNote: "Convertir en note texte",
   makeAdmin: "Promouvoir admin",
   updateUser: "Mettre à jour l'utilisateur",
   allUsers: "Tous les utilisateurs",

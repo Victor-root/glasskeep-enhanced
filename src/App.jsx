@@ -55,6 +55,7 @@ import useAdminActions from "./hooks/useAdminActions.js";
 import useImportExport from "./hooks/useImportExport.js";
 import useCollaboration from "./hooks/useCollaboration.js";
 import useFormatting from "./hooks/useFormatting.js";
+import { textToChecklistItems, checklistItemsToText } from "./utils/noteTypeConversion.js";
 
 /** ---------- App ---------- */
 export default function App() {
@@ -3095,6 +3096,49 @@ export default function App() {
     return true;
   }, [enqueueAndSync]);
 
+  const convertModalNoteType = useCallback((targetType) => {
+    if (!activeId || (targetType !== "text" && targetType !== "checklist")) return;
+    if (mType === targetType) return;
+    if (mType !== "text" && mType !== "checklist") return;
+
+    if (targetType === "checklist") {
+      const convertedItems = textToChecklistItems(mBody);
+      setMType("checklist");
+      setMItems(convertedItems);
+      setMBody("");
+      setViewMode(false);
+      prevItemsRef.current = convertedItems;
+
+      const baselinePatch = { content: "" };
+      if (committedBaselineRef.current) {
+        committedBaselineRef.current = { ...committedBaselineRef.current, ...baselinePatch };
+      }
+      if (initialModalStateRef.current) {
+        initialModalStateRef.current = { ...initialModalStateRef.current, ...baselinePatch };
+      }
+
+      autoSaveTextNote(activeId, { items: convertedItems, content: "" }, null, "checklist");
+      return;
+    }
+
+    const convertedContent = checklistItemsToText(mItems);
+    setMType("text");
+    setMBody(convertedContent);
+    setMItems([]);
+    setViewMode(false);
+    prevItemsRef.current = [];
+
+    const baselinePatch = { content: convertedContent };
+    if (committedBaselineRef.current) {
+      committedBaselineRef.current = { ...committedBaselineRef.current, ...baselinePatch };
+    }
+    if (initialModalStateRef.current) {
+      initialModalStateRef.current = { ...initialModalStateRef.current, ...baselinePatch };
+    }
+
+    autoSaveTextNote(activeId, { content: convertedContent, items: [] }, null, "text");
+  }, [activeId, mType, mBody, mItems, autoSaveTextNote]);
+
   // Local-first auto-save for metadata (color, tags, images) — immediate, no debounce
   // Works for text, checklist, AND draw notes (metadata fields are independent of content).
   useEffect(() => {
@@ -4112,6 +4156,8 @@ export default function App() {
       restoreFromTrash={restoreFromTrash}
       handleArchiveNote={handleArchiveNote}
       handleDownloadNote={handleDownloadNote}
+      convertModalToChecklist={() => convertModalNoteType("checklist")}
+      convertModalToText={() => convertModalNoteType("text")}
       togglePin={togglePin}
       addImagesToState={addImagesToState}
       isCollaborativeNote={isCollaborativeNote}
