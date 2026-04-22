@@ -153,6 +153,10 @@ html.dark header.multi-select-bar {
 .note-content--dense p { margin: 0; }
 .note-content--dense pre { margin: 0.4rem 0; }
 .note-content--dense hr { margin: 0; }
+/* Parity with edit-mode textarea: only user-typed blank lines (materialized
+   as .md-blank-line spacers) may contribute vertical space. Catches any
+   residual block margin injected by marked or browser defaults. */
+.note-content--dense > *:not(.md-blank-line):not(pre) { margin-block: 0; }
 
 /* Hyperlinks in view mode */
 .note-content a {

@@ -5,7 +5,7 @@ const NoteViewContent = memo(function NoteViewContent({ html, noteViewRef }) {
   return (
     <div
       ref={noteViewRef}
-      className="note-content note-content--dense whitespace-pre-wrap"
+      className="note-content note-content--dense"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
