@@ -3143,8 +3143,12 @@ export default function App() {
 
   // Auto-save text content (title + body): debounced local-first persist + patch sync.
   // Checklists share this effect for title changes (their body is always "").
+  // NOTE: runs in BOTH view and edit mode. Toggling to view mode after a pending
+  // edit used to cancel the debounce and leak the change (only a manual save or
+  // closing from edit-mode would catch it). Read/write mode is a pure display
+  // concern — the underlying mBody/mTitle state is equally dirty either way.
   useEffect(() => {
-    if (!open || !activeId || viewMode) return;
+    if (!open || !activeId) return;
     if (mType !== "text" && mType !== "checklist") return;
     const initial = initialModalStateRef.current;
     if (!initial) return;
@@ -3192,7 +3196,7 @@ export default function App() {
       // If it fired, autoSaveTextNote owns the lease and will release it.
       if (!transferred) releaseLocalLease(nId, leaseId);
     };
-  }, [mBody, mTitle, open, activeId, mType, viewMode, autoSaveTextNote]);
+  }, [mBody, mTitle, open, activeId, mType, autoSaveTextNote]);
 
   // Auto-save draw note title + text body: debounced local-first persist + patch sync.
   // Drawing data changes are handled by the drawing autosave effect above.
@@ -3408,7 +3412,10 @@ export default function App() {
     // Flush any pending text changes immediately before closing (local-first).
     // Use committedBaselineRef (not initialModalStateRef) so that a failed
     // autosave still produces a diff here and gets retried.
-    if (activeId && mType === "text" && !viewMode) {
+    // Runs for both view and edit mode: a user may edit, toggle to view
+    // to preview before the 1s debounce fires, then close — the change is
+    // still dirty in mBody/mTitle and must be flushed.
+    if (activeId && mType === "text") {
       const baseline = committedBaselineRef.current;
       if (baseline) {
         const patch = {};
