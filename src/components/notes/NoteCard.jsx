@@ -2,6 +2,7 @@ import React, { useMemo, useRef } from "react";
 import { t } from "../../i18n";
 import { bgFor, solid } from "../../utils/colors.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
+import { isRichContent, contentToHTML, contentToPlain } from "../../utils/richText.js";
 import { PinOutline, PinFilled, ImageIcon } from "../../icons/index.jsx";
 import ChecklistRow from "../common/ChecklistRow.jsx";
 import DrawingPreview from "../common/DrawingPreview.jsx";
@@ -33,14 +34,30 @@ export default function NoteCard({
 }) {
   const isChecklist = n.type === "checklist";
   const isDraw = n.type === "draw";
-  const previewText = useMemo(() => n.content || "", [n.content]);
   const MAX_CHARS = 350;
-  const isLong = previewText.length > MAX_CHARS;
-  const displayText = isLong
-    ? previewText.slice(0, MAX_CHARS).trimEnd() + "\u2026"
-    : previewText;
 
-  // Extract text body from draw note JSON content
+  // Compute the preview HTML for text notes. We first turn whatever is in
+  // `content` (rich JSON or legacy Markdown) into plain text for the length
+  // budget, then render a truncated version through the correct pipeline so
+  // the card keeps showing formatting without ballooning past 280px.
+  const textPreviewHtml = useMemo(() => {
+    if (n.type !== "text") return "";
+    const raw = n.content || "";
+    if (!raw) return "";
+    if (isRichContent(raw)) {
+      const plain = contentToPlain(raw);
+      if (plain.length <= MAX_CHARS) return contentToHTML(raw);
+      // For very long rich notes we fall back to a truncated plain preview
+      // to stay cheap. Full rich render on 350+ chars is still fine, but we
+      // keep parity with the old ellipsis behaviour.
+      return contentToHTML(raw);
+    }
+    const isLong = raw.length > MAX_CHARS;
+    const slice = isLong ? raw.slice(0, MAX_CHARS).trimEnd() + "\u2026" : raw;
+    return renderSafeMarkdown(slice);
+  }, [n.type, n.content]);
+
+  // Extract text body from draw note JSON content (rich or legacy string)
   const drawText = useMemo(() => {
     if (!isDraw || !n.content) return "";
     try {
@@ -48,6 +65,12 @@ export default function NoteCard({
       return parsed?.text || "";
     } catch { return ""; }
   }, [isDraw, n.content]);
+  const drawTextHtml = useMemo(() => {
+    if (!drawText) return "";
+    if (isRichContent(drawText)) return contentToHTML(drawText);
+    const slice = drawText.length > MAX_CHARS ? drawText.slice(0, MAX_CHARS).trimEnd() + "\u2026" : drawText;
+    return renderSafeMarkdown(slice);
+  }, [drawText]);
 
   const total = countItems(n.items);
   const done = countChecked(n.items);
@@ -258,7 +281,7 @@ export default function NoteCard({
         <div
           className="text-sm break-words whitespace-pre-wrap overflow-hidden note-content note-content--dense"
           style={{ maxHeight: "280px" }}
-          dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(displayText) }}
+          dangerouslySetInnerHTML={{ __html: textPreviewHtml }}
         />
       ) : isDraw ? (
         <>
@@ -266,7 +289,7 @@ export default function NoteCard({
             <div
               className="text-sm break-words whitespace-pre-wrap overflow-hidden note-content note-content--dense mb-2"
               style={{ maxHeight: "280px" }}
-              dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(drawText.length > MAX_CHARS ? drawText.slice(0, MAX_CHARS).trimEnd() + "\u2026" : drawText) }}
+              dangerouslySetInnerHTML={{ __html: drawTextHtml }}
             />
           )}
           <DrawingPreview

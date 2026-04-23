@@ -999,4 +999,162 @@ html.dark .login-deco-card {
   opacity: 0.15;
   margin-bottom: 7px;
 }
+
+/* ---------- Rich-text editor (Tiptap) ---------- */
+.rt-editor { display: flex; flex-direction: column; gap: 0.5rem; }
+.rt-editor-content { outline: none; cursor: text; }
+.rt-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+html.dark .rt-editor-content p.is-editor-empty:first-child::before { color: #6b7280; }
+.rt-editor-content ul[data-type="taskList"] { list-style: none; padding-left: 0; }
+.rt-editor-content blockquote {
+  border-left: 3px solid currentColor;
+  padding-left: 0.75rem;
+  opacity: 0.85;
+  margin: 0.4rem 0;
+}
+.rt-editor-content pre {
+  background: rgba(0,0,0,0.06);
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+html.dark .rt-editor-content pre { background: rgba(255,255,255,0.06); }
+.rt-editor-content code {
+  background: rgba(0,0,0,0.06);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+html.dark .rt-editor-content code { background: rgba(255,255,255,0.08); }
+.rt-editor-content pre code { background: transparent; padding: 0; }
+.rt-editor-content hr {
+  border: none;
+  border-top: 1px solid rgba(0,0,0,0.25);
+  margin: 0.75rem 0;
+}
+html.dark .rt-editor-content hr { border-top-color: rgba(255,255,255,0.2); }
+.rt-editor-content a { color: #2563eb; text-decoration: underline; }
+html.dark .rt-editor-content a { color: #93c5fd; }
+.rt-editor-content mark { border-radius: 2px; padding: 0 2px; }
+
+/* Toolbar */
+.rt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.04);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  backdrop-filter: saturate(1.1) blur(6px);
+}
+html.dark .rt-toolbar { background: rgba(255,255,255,0.05); }
+.rt-toolbar--compact { padding: 2px 4px; }
+.rt-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font-size: 0.85rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+}
+.rt-btn:hover { background: rgba(0,0,0,0.06); }
+html.dark .rt-btn:hover { background: rgba(255,255,255,0.08); }
+.rt-btn.is-active {
+  background: rgba(99,102,241,0.18);
+  border-color: rgba(99,102,241,0.35);
+}
+.rt-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.rt-sep {
+  width: 1px;
+  height: 20px;
+  background: rgba(0,0,0,0.15);
+  margin: 0 4px;
+  display: inline-block;
+}
+html.dark .rt-sep { background: rgba(255,255,255,0.15); }
+.rt-select {
+  height: 28px;
+  padding: 0 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.12);
+  background: rgba(255,255,255,0.7);
+  color: inherit;
+  font-size: 0.8rem;
+}
+html.dark .rt-select {
+  border-color: rgba(255,255,255,0.15);
+  background: rgba(0,0,0,0.4);
+}
+.rt-pop-wrap { position: relative; display: inline-block; }
+.rt-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+  min-width: 168px;
+  padding: 6px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  border: 1px solid rgba(0,0,0,0.08);
+}
+html.dark .rt-pop {
+  background: #1f2937;
+  border-color: rgba(255,255,255,0.1);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.rt-swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.rt-swatch {
+  width: 22px; height: 22px; border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.1);
+  cursor: pointer;
+}
+.rt-swatch:hover { transform: scale(1.08); }
+.rt-pop-clear {
+  margin-top: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.rt-pop-clear:hover { background: rgba(0,0,0,0.05); }
+html.dark .rt-pop-clear:hover { background: rgba(255,255,255,0.08); }
+.rt-swatch-anchor {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 3px;
+}
+.rt-swatch-anchor--hl { text-decoration: none; font-size: 0.9rem; }
 `;

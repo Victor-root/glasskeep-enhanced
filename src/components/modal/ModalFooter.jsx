@@ -4,7 +4,7 @@ import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
 import Popover from "../common/Popover.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
-import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, FormatIcon, Kebab, TextNoteIcon, ChecklistIcon } from "../../icons/index.jsx";
+import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon } from "../../icons/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 import { t } from "../../i18n";
 
@@ -427,20 +427,8 @@ export default function ModalFooter({
         {/* Spacer */}
         <div className="flex-1 modal-footer-spacer" />
 
-        {/* ── Formatting (mobile edit mode only — replaces collab in this position) ── */}
-        {!isDesktop && mType === "text" && !viewMode && (
-          <button
-            ref={modalFmtBtnRef}
-            className="modal-footer-btn focus:outline-none"
-            data-tooltip={t("formatting")}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowModalFmt((v) => !v);
-            }}
-          >
-            <FormatIcon />
-          </button>
-        )}
+        {/* Legacy mobile Markdown formatting button removed — rich-text
+            editor now ships its own in-body toolbar for text notes. */}
 
         {/* ── Collaborate (hidden on mobile text edit mode & draw edit mode — moved to kebab) ── */}
         {(isDesktop || viewMode || mType !== "text") && !(mType === "draw" && drawMode !== "draw" && !viewMode) && (() => {

@@ -1,6 +1,7 @@
 import React from "react";
 import { marked as markedParser } from "marked";
 import DOMPurify from "dompurify";
+import { isRichContent, contentToPlain } from "./richText.js";
 
 // Ensure we can call marked.parse(...)
 export const marked =
@@ -84,7 +85,9 @@ export const mdToPlain = (md) => {
   }
 };
 
-// Build MARKDOWN content for download
+// Build MARKDOWN content for download.
+// Rich-JSON notes are flattened to plain text (no round-trip to Markdown) —
+// the Markdown export is best-effort and no longer a first-class feature.
 export const mdForDownload = (n) => {
   const lines = [];
   if (n.title) lines.push(`# ${n.title}`, "");
@@ -92,7 +95,8 @@ export const mdForDownload = (n) => {
     lines.push(`**Tags:** ${n.tags.map((t) => `\`${t}\``).join(", ")}`, "");
   }
   if (n.type === "text") {
-    lines.push(String(n.content || ""));
+    const raw = String(n.content || "");
+    lines.push(isRichContent(raw) ? contentToPlain(raw) : raw);
   } else {
     const items = Array.isArray(n.items) ? n.items : [];
     for (const it of items) {

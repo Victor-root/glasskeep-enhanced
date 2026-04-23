@@ -2,6 +2,20 @@ import { useCallback } from "react";
 import { api } from "../utils/api.js";
 import { uid, sanitizeFilename, downloadText } from "../utils/helpers.js";
 import { t } from "../i18n";
+import {
+  isRichContent,
+  legacyMarkdownToRichDoc,
+  serializeRichContent,
+} from "../utils/richText.js";
+
+// Normalise any inbound text note `content` (plain string, Markdown, or
+// already-rich envelope) into our current rich-JSON envelope string. Keeps
+// imported notes consistent with new ones while still accepting older exports.
+function ensureRichContent(raw) {
+  if (typeof raw !== "string") return serializeRichContent(legacyMarkdownToRichDoc(""));
+  if (isRichContent(raw)) return raw;
+  return serializeRichContent(legacyMarkdownToRichDoc(raw));
+}
 
 /**
  * Hook encapsulating import/export actions and secret key download.
@@ -52,10 +66,17 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
         alert(t("noNotesFoundInFile"));
         return;
       }
+      // Upgrade text-note content to the rich-JSON envelope so older JSON
+      // exports (which store Markdown strings) come in as first-class rich
+      // notes — no legacy branch needed for imported data.
+      const upgraded = notesArr.map((n) => {
+        if (!n || n.type !== "text") return n;
+        return { ...n, content: ensureRichContent(n.content) };
+      });
       await api("/notes/import", {
         method: "POST",
         token,
-        body: { notes: notesArr },
+        body: { notes: upgraded },
       });
       await loadNotes();
       alert(t("importedNotesSuccessfully").replace("{count}", String(notesArr.length)));
@@ -88,7 +109,9 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
                 done: !!it?.isChecked,
               }))
             : [];
-          const content = hasChecklist ? "" : String(obj.textContent || "");
+          const content = hasChecklist
+            ? ""
+            : serializeRichContent(legacyMarkdownToRichDoc(String(obj.textContent || "")));
           const usec = Number(
             obj.userEditedTimestampUsec || obj.createdTimestampUsec || 0,
           );
@@ -160,9 +183,10 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
           }
 
           // Join remaining lines as content
-          const content = lines.slice(contentStartIndex).join("\n").trim();
+          const markdown = lines.slice(contentStartIndex).join("\n").trim();
+          const content = serializeRichContent(legacyMarkdownToRichDoc(markdown));
 
-          if (title || content) {
+          if (title || markdown) {
             notesArr.push({
               id: uid(),
               type: "text",

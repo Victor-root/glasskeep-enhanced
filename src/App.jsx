@@ -28,6 +28,7 @@ import { api, getAuth, setAuth, AUTH_KEY } from "./utils/api.js";
 import { mdForDownload } from "./utils/markdown.jsx";
 import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, fileToCompressedDataURL, setThemeColor } from "./utils/helpers.js";
 import { textToChecklistItems, checklistItemsToText } from "./utils/noteConversion.js";
+import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRichDoc } from "./utils/richText.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES } from "./utils/constants.js";
 import { ColorDot } from "./components/common/ColorDot.jsx";
@@ -3958,8 +3959,19 @@ export default function App() {
     const targetType = mType === "text" ? "checklist" : "text";
     const toastKey = targetType === "checklist" ? "convertedToChecklist" : "convertedToText";
 
-    const newItems = targetType === "checklist" ? textToChecklistItems(mBody || "") : [];
-    const newBody = targetType === "text" ? checklistItemsToText(mItems) : "";
+    // Text → checklist: flatten rich JSON (or legacy Markdown) to plain lines
+    // so textToChecklistItems can parse bullets / tasks / headings.
+    // Checklist → text: wrap the generated Markdown in our rich envelope so
+    // the resulting text note opens directly in rich mode (no second-edit
+    // upgrade needed).
+    const textForConversion =
+      mType === "text" && isRichContent(mBody)
+        ? contentToPlain(mBody)
+        : mBody || "";
+    const newItems = targetType === "checklist" ? textToChecklistItems(textForConversion) : [];
+    const newBody = targetType === "text"
+      ? serializeRichContent(legacyMarkdownToRichDoc(checklistItemsToText(mItems)))
+      : "";
 
     // Local state first — keep the UI responsive even if the sync call lags.
     skipNextItemsAutosave.current = true;

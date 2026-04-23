@@ -21,7 +21,8 @@ import OfflineCollabBanner from "./OfflineCollabBanner.jsx";
 import ChecklistEditor from "../checklist/ChecklistEditor.jsx";
 import useModalHistory from "../../hooks/useModalHistory.js";
 import { renderSafeMarkdown, linkifyContactsHTML } from "../../utils/markdown.jsx";
-import { handleSmartEnter } from "../common/FormatToolbar.jsx";
+import RichTextEditor from "../richtext/RichTextEditor.jsx";
+import { contentToHTML, serializeRichContent, isRichContent } from "../../utils/richText.js";
 import { modalBgFor, scrollColorsFor, solid, bgFor, toHex } from "../../utils/colors.js";
 import { setThemeColor } from "../../utils/helpers.js";
 
@@ -172,9 +173,23 @@ export default function NoteModal({
       setDrawTransition('leaving');
     }
   }, [isDrawEdit]);
-  const viewHtml = React.useMemo(
-    () => linkifyContactsHTML(renderSafeMarkdown(mBody)),
-    [mBody],
+  // Rendered HTML for view mode. Rich-format notes render through Tiptap's
+  // generateHTML (also sanitized); legacy Markdown notes keep the old marked
+  // pipeline so they look identical until the user edits and upgrades them.
+  const viewHtml = React.useMemo(() => {
+    if (isRichContent(mBody)) return linkifyContactsHTML(contentToHTML(mBody));
+    return linkifyContactsHTML(renderSafeMarkdown(mBody));
+  }, [mBody]);
+
+  // Serialize a Tiptap doc from the editor back into the string shape that
+  // mBody / autosave / sync expect. Centralised here so the two editor mount
+  // points (text note / draw-note body) stay in lockstep.
+  const handleRichDocChange = React.useCallback(
+    (doc) => {
+      const serialized = serializeRichContent(doc);
+      setMBody(serialized);
+    },
+    [setMBody],
   );
 
   const { undo, redo, canUndo, canRedo } = useModalHistory({
@@ -210,18 +225,26 @@ export default function NoteModal({
     setThemeColor(color);
   }, [open, mColor, dark]);
 
-  /* Intercept Ctrl+Z/Y for undo/redo and standard formatting shortcuts.
-     Uses e.code (layout-independent) for digit keys so AZERTY users keep
-     working shortcuts. */
+  /* Intercept Ctrl+Z/Y at the modal level for title-only undo.
+   *
+   * For the text-note body, the rich editor owns its own history and
+   * keyboard shortcuts (bold/italic/strike/code/headings/lists/link/quote
+   * all come from Tiptap's StarterKit keymaps). We deliberately skip those
+   * here to avoid double-handling. The modal-level Ctrl+Z still works for
+   * checklist/draw note title changes and anywhere outside a contenteditable.
+   */
   const handleModalKeyDown = React.useCallback(
     (e) => {
-      if (mType !== "text" || viewMode) return; // let native handle non-text
       const isCtrl = e.ctrlKey || e.metaKey;
       if (!isCtrl) return;
       const shift = e.shiftKey;
       const alt = e.altKey;
 
-      // Undo / redo
+      // If the keystroke originated inside a Tiptap contenteditable we bail
+      // out: the editor handles formatting and undo natively.
+      const active = document.activeElement;
+      if (active && active.isContentEditable) return;
+
       if (e.code === "KeyZ" && !shift && !alt) {
         e.preventDefault();
         undo();
@@ -232,32 +255,8 @@ export default function NoteModal({
         redo();
         return;
       }
-
-      // Formatting shortcuts — only when focus is inside the body textarea
-      const active = document.activeElement;
-      if (!mBodyRef.current || active !== mBodyRef.current) return;
-
-      const apply = (type) => {
-        e.preventDefault();
-        formatModal(type);
-      };
-
-      if (!alt && !shift && e.code === "KeyB") return apply("bold");
-      if (!alt && !shift && e.code === "KeyI") return apply("italic");
-      if (!alt && shift && e.code === "KeyX") return apply("strike");
-      if (!alt && !shift && e.code === "KeyE") return apply("code");
-      if (!alt && shift && e.code === "KeyE") return apply("codeblock");
-      if (!alt && !shift && e.code === "KeyK") return apply("link");
-      // Match on produced character so it works across layouts
-      // (on AZERTY "." is typed via Shift+`;`, so e.code === "Period" never fires)
-      if (!alt && e.key === ".") return apply("quote");
-      if (!alt && shift && e.code === "Digit8") return apply("ul");
-      if (!alt && shift && e.code === "Digit7") return apply("ol");
-      if (alt && !shift && e.code === "Digit1") return apply("h1");
-      if (alt && !shift && e.code === "Digit2") return apply("h2");
-      if (alt && !shift && e.code === "Digit3") return apply("h3");
     },
-    [undo, redo, mType, viewMode, formatModal, mBodyRef],
+    [undo, redo],
   );
 
   // Force mobile layout when running inside Android WebView (tablets)
@@ -379,64 +378,14 @@ export default function NoteModal({
                   <NoteViewContent html={viewHtml} noteViewRef={noteViewRef} />
                 ) : (
                   <div className="relative min-h-[160px]">
-                    <textarea
-                      ref={mBodyRef}
-                      className="w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden min-h-[160px] pb-8"
-                      style={{ scrollBehavior: "unset" }}
+                    <RichTextEditor
+                      key={activeId || "new"}
                       value={mBody}
-                      onChange={(e) => {
-                        setMBody(e.target.value);
-                        resizeModalTextarea();
-                      }}
-                      onKeyDown={(e) => {
-                        if (
-                          e.key === "Enter" &&
-                          !e.shiftKey &&
-                          !e.altKey &&
-                          !e.ctrlKey &&
-                          !e.metaKey
-                        ) {
-                          const el = mBodyRef.current;
-                          const value = mBody;
-                          const start = el.selectionStart ?? value.length;
-                          const end = el.selectionEnd ?? value.length;
-
-                          const lastNewlineIndex = value.lastIndexOf("\n");
-                          const isOnLastLine = start > lastNewlineIndex;
-
-                          const res = handleSmartEnter(value, start, end);
-                          if (res) {
-                            e.preventDefault();
-                            setMBody(res.text);
-                            requestAnimationFrame(() => {
-                              try {
-                                el.setSelectionRange(
-                                  res.range[0],
-                                  res.range[1],
-                                );
-                              } catch (e) {}
-                              resizeModalTextarea();
-
-                              if (isOnLastLine) {
-                                const modalScrollEl = modalScrollRef.current;
-                                if (modalScrollEl) {
-                                  setTimeout(() => {
-                                    modalScrollEl.scrollTop += 30;
-                                  }, 50);
-                                }
-                              }
-                            });
-                          } else if (isOnLastLine) {
-                            setTimeout(() => {
-                              const modalScrollEl = modalScrollRef.current;
-                              if (modalScrollEl) {
-                                modalScrollEl.scrollTop += 30;
-                              }
-                            }, 10);
-                          }
-                        }
-                      }}
+                      onDocChange={handleRichDocChange}
                       placeholder={t("writeYourNoteEllipsis")}
+                      dark={dark}
+                      autoFocus={!mTitle}
+                      minHeightClass="min-h-[160px]"
                     />
                   </div>
                 )
@@ -483,17 +432,15 @@ export default function NoteModal({
                   </div>
                 </>
               ) : (
-                /* Edit mode: text body textarea + drawing preview */
+                /* Edit mode: rich text body + drawing preview */
                 <>
-                  <textarea
-                    ref={mBodyRef}
-                    className="w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden min-h-[80px] pb-4"
+                  <RichTextEditor
+                    key={`draw-${activeId || "new"}`}
                     value={mBody}
-                    onChange={(e) => {
-                      setMBody(e.target.value);
-                      resizeModalTextarea();
-                    }}
+                    onDocChange={handleRichDocChange}
                     placeholder={t("writeYourNoteEllipsis")}
+                    dark={dark}
+                    minHeightClass="min-h-[80px]"
                   />
                   <DrawingCanvas
                     data={mDrawingData}

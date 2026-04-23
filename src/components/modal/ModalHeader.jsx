@@ -1,7 +1,5 @@
 import React, { useRef, useEffect, useCallback } from "react";
 import { PinOutline, PinFilled, CloseIcon } from "../../icons/index.jsx";
-import FormatToolbar from "../common/FormatToolbar.jsx";
-import Popover from "../common/Popover.jsx";
 import { modalBgFor } from "../../utils/colors.js";
 import { t } from "../../i18n";
 
@@ -179,57 +177,8 @@ export default function ModalHeader({
           </div>
         </div>
 
-        {/* Formatting popover for mobile (anchored to format icon button in footer) */}
-        {!isDesktop && mType === "text" && !viewMode && (
-          <Popover
-            anchorRef={modalFmtBtnRef}
-            open={showModalFmt}
-            onClose={() => setShowModalFmt(false)}
-          >
-            <FormatToolbar
-              dark={dark}
-              anchorRef={modalFmtBtnRef}
-              onAction={(type) => {
-                setShowModalFmt(false);
-                onFormatModal(type);
-              }}
-            />
-          </Popover>
-        )}
-
-        {/* Desktop inline formatting toolbar (always visible in edit mode) */}
-        {mType === "text" && !viewMode && isDesktop && (
-          <div
-            className={`px-4 sm:px-6 pt-2 pb-3 border-t flex flex-wrap items-center gap-1 ${
-              dark ? "border-white/10" : "border-black/8"
-            }`}
-          >
-            {(() => {
-              const base = `fmt-btn ${dark ? "hover:bg-white/10" : "hover:bg-black/5"}`;
-              const mod = (typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)) ? "⌘" : "Ctrl";
-              const tip = (labelKey, shortcut) => `${t(labelKey)} (${shortcut})`;
-              return (
-                <>
-                  <button className={base} onClick={() => onFormatModal("h1")} data-tooltip={tip("fmtHeading1", `${mod}+Alt+1`)}>H1</button>
-                  <button className={base} onClick={() => onFormatModal("h2")} data-tooltip={tip("fmtHeading2", `${mod}+Alt+2`)}>H2</button>
-                  <button className={base} onClick={() => onFormatModal("h3")} data-tooltip={tip("fmtHeading3", `${mod}+Alt+3`)}>H3</button>
-                  <span className="mx-1 opacity-40">|</span>
-                  <button className={base} onClick={() => onFormatModal("bold")} data-tooltip={tip("fmtBold", `${mod}+B`)}><strong>B</strong></button>
-                  <button className={base} onClick={() => onFormatModal("italic")} data-tooltip={tip("fmtItalic", `${mod}+I`)}><em>I</em></button>
-                  <button className={base} onClick={() => onFormatModal("strike")} data-tooltip={tip("fmtStrike", `${mod}+Shift+X`)}><span className="line-through">S</span></button>
-                  <button className={base} onClick={() => onFormatModal("code")} data-tooltip={tip("fmtInlineCode", `${mod}+E`)}>`code`</button>
-                  <button className={base} onClick={() => onFormatModal("codeblock")} data-tooltip={tip("fmtCodeBlock", `${mod}+Shift+E`)}>&lt;/&gt;</button>
-                  <span className="mx-1 opacity-40">|</span>
-                  <button className={base} onClick={() => onFormatModal("quote")} data-tooltip={tip("fmtQuote", `${mod}+Shift+.`)}>&gt;</button>
-                  <button className={base} onClick={() => onFormatModal("ul")} data-tooltip={tip("fmtBulletList", `${mod}+Shift+8`)}>{t("bulletListLabel")}</button>
-                  <button className={base} onClick={() => onFormatModal("ol")} data-tooltip={tip("fmtOrderedList", `${mod}+Shift+7`)}>{t("orderedListLabel")}</button>
-                  <button className={base} onClick={() => onFormatModal("link")} data-tooltip={tip("fmtLink", `${mod}+K`)}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
-                  <button className={base} onClick={() => onFormatModal("hr")} data-tooltip={t("fmtSeparator")}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="12" x2="20" y2="12" /></svg></button>
-                </>
-              );
-            })()}
-          </div>
-        )}
+        {/* Legacy Markdown toolbar removed — the rich-text editor ships its
+            own in-body toolbar for text notes (see RichTextEditor). */}
       </div>
 
       {/* ── Mobile title — outside sticky, scrolls with content (hidden in draw edit mode) ── */}
