@@ -21,6 +21,18 @@ export default function TagSidebar({
   const isAllNotes = activeTag === null && activeTagFilters.length === 0;
   const isAllImages = activeTag === ALL_IMAGES;
 
+  // Active / hover styling for sidebar entries — tinted with the app's
+  // indigo accent instead of the old neutral gray "bg-black/5" which
+  // looked washed out against the violet background.
+  const itemClass = (active) => {
+    if (active) {
+      return dark
+        ? "bg-indigo-500/20 text-indigo-100 font-semibold"
+        : "bg-indigo-100/80 text-indigo-800 font-semibold";
+    }
+    return dark ? "hover:bg-indigo-500/10" : "hover:bg-indigo-100/50";
+  };
+
   // Long-press support for multi-tag selection on touch devices
   const longPressTimer = useRef(null);
   const longPressTriggered = useRef(false);
@@ -122,7 +134,7 @@ export default function TagSidebar({
 
           {/* Notes (All) */}
           <button
-            className={`w-full text-left px-3 py-2 rounded-md mb-1 flex items-center gap-3 ${isAllNotes ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+            className={`w-full text-left px-3 py-2 rounded-md mb-1 flex items-center gap-3 transition-colors ${itemClass(isAllNotes)}`}
             onClick={() => {
               onSelect(null);
               if (!permanent) onClose();
@@ -131,7 +143,7 @@ export default function TagSidebar({
 
           {/* All Images */}
           <button
-            className={`w-full text-left px-3 py-2 rounded-md mb-2 flex items-center gap-3 ${isAllImages ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+            className={`w-full text-left px-3 py-2 rounded-md mb-2 flex items-center gap-3 transition-colors ${itemClass(isAllImages)}`}
             onClick={() => {
               onSelect(ALL_IMAGES);
               if (!permanent) onClose();
@@ -140,7 +152,7 @@ export default function TagSidebar({
 
           {/* Archived Notes */}
           <button
-            className={`w-full text-left px-3 py-2 rounded-md mb-2 flex items-center gap-3 ${activeTag === "ARCHIVED" ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+            className={`w-full text-left px-3 py-2 rounded-md mb-2 flex items-center gap-3 transition-colors ${itemClass(activeTag === "ARCHIVED")}`}
             onClick={() => {
               onSelect("ARCHIVED");
               if (!permanent) onClose();
@@ -149,7 +161,7 @@ export default function TagSidebar({
 
           {/* Trash */}
           <button
-            className={`w-full text-left px-3 py-2 rounded-md mb-2 flex items-center gap-3 ${activeTag === "TRASHED" ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+            className={`w-full text-left px-3 py-2 rounded-md mb-2 flex items-center gap-3 transition-colors ${itemClass(activeTag === "TRASHED")}`}
             onClick={() => {
               onSelect("TRASHED");
               if (!permanent) onClose();
@@ -167,7 +179,7 @@ export default function TagSidebar({
             return (
               <button
                 key={tag}
-                className={`w-full text-left px-3 py-2 rounded-md mb-1 flex items-center justify-between cursor-pointer ${active ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+                className={`w-full text-left px-3 py-2 rounded-md mb-1 flex items-center justify-between cursor-pointer transition-colors ${itemClass(active)}`}
                 onClick={(e) => {
                   if (longPressTriggered.current) {
                     longPressTriggered.current = false;

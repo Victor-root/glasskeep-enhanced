@@ -173,7 +173,12 @@ function NotesUI({
     return () => window.removeEventListener("scroll", onScroll);
   }, [windowWidth]);
   const sectionLabel = (() => {
-    if (activeTagFilters.length > 1) return activeTagFilters.join(", ");
+    // Multiple tags selected: show a compact count badge instead of the
+    // concatenated list. Joining names produces "tag1, tag2, tag3…"
+    // which gets truncated into an unhelpful "tag1, t…" in the header.
+    if (activeTagFilters.length > 1) {
+      return t("activeTagFiltersCount", { count: activeTagFilters.length });
+    }
     if (activeTagFilters.length === 1) return activeTagFilters[0];
     if (activeTagFilter === ALL_IMAGES) return t("allImages");
     if (activeTagFilter === "ARCHIVED") return t("archivedNotes");
