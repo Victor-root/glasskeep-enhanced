@@ -342,6 +342,17 @@ export default function NoteModal({
               drawMode={drawMode}
               drawToolbarMount={setDrawToolbarEl}
               onToggleDrawMode={() => setDrawMode((m) => m === "view" ? "draw" : "view")}
+              // keyboard: Tab from title → body, skipping the toolbar buttons
+              onTitleTab={() => {
+                if (mType === "checklist") {
+                  const first = document.querySelector(
+                    '[data-checklist-list] textarea, [data-checklist-list] input[type="text"]'
+                  );
+                  if (first) first.focus();
+                  return;
+                }
+                mBodyRef.current?.focus();
+              }}
             />
 
             {!isDrawEdit && (

@@ -46,7 +46,16 @@ export default function ModalHeader({
   drawMode,
   drawToolbarMount,
   onToggleDrawMode,
+  // keyboard: Tab from title → body (skip the toolbar buttons)
+  onTitleTab,
 }) {
+  const handleTitleKeyDown = (e) => {
+    if (e.key !== "Tab") return;
+    if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (!onTitleTab) return;
+    e.preventDefault();
+    onTitleTab();
+  };
   const mobileTitleRef = useRef(null);
   const isDesktop = windowWidth >= 768 && !isLandscapeMobile && !isWebView;
   const isPinned = !!notes.find((n) => String(n.id) === String(activeId))?.pinned;
@@ -107,14 +116,24 @@ export default function ModalHeader({
 
           {/* Desktop: title inline (hidden in draw edit mode) */}
           {isDesktop && !isDrawEdit && (
-            <textarea
-              ref={mobileTitleRef}
-              className="flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 pr-2 order-first bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden"
-              rows={1}
-              value={mTitle}
-              onChange={(e) => setMTitle(e.target.value)}
-              placeholder={t("noteTitle")}
-            />
+            viewMode ? (
+              <div
+                className="flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 pr-2 order-first font-bold whitespace-pre-wrap break-words select-text"
+                aria-label={t("noteTitle")}
+              >
+                {mTitle}
+              </div>
+            ) : (
+              <textarea
+                ref={mobileTitleRef}
+                className="flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 pr-2 order-first bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden"
+                rows={1}
+                value={mTitle}
+                onChange={(e) => setMTitle(e.target.value)}
+                onKeyDown={handleTitleKeyDown}
+                placeholder={t("noteTitle")}
+              />
+            )
           )}
 
           {/* Spacer pushes right-side buttons on mobile (only when no toolbar filling the space) */}
@@ -215,15 +234,26 @@ export default function ModalHeader({
       {/* ── Mobile title — outside sticky, scrolls with content (hidden in draw edit mode) ── */}
       {!isDesktop && !(mType === 'draw' && drawMode === 'draw') && (
         <div className="px-5 pt-0 pb-1">
-          <textarea
-            ref={mobileTitleRef}
-            className="w-full bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden"
-            style={{ fontSize: "1.15rem", lineHeight: 1.3 }}
-            rows={1}
-            value={mTitle}
-            onChange={(e) => setMTitle(e.target.value)}
-            placeholder={t("noteTitle")}
-          />
+          {viewMode ? (
+            <div
+              className="w-full font-bold whitespace-pre-wrap break-words select-text"
+              style={{ fontSize: "1.15rem", lineHeight: 1.3, minHeight: "1.3em" }}
+              aria-label={t("noteTitle")}
+            >
+              {mTitle}
+            </div>
+          ) : (
+            <textarea
+              ref={mobileTitleRef}
+              className="w-full bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden"
+              style={{ fontSize: "1.15rem", lineHeight: 1.3 }}
+              rows={1}
+              value={mTitle}
+              onChange={(e) => setMTitle(e.target.value)}
+              onKeyDown={handleTitleKeyDown}
+              placeholder={t("noteTitle")}
+            />
+          )}
         </div>
       )}
     </>

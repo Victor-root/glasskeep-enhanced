@@ -44,17 +44,26 @@ export const renderSafeMarkdown = (md) => {
     });
     text = text.replace(/\x00CODE(\d+)\x00/g, (_, i) => codeBlocks[+i]);
 
-    const raw = marked.parse(text);
+    const raw = marked.parse(text, { breaks: true });
+    // `breaks: true` turns user soft-breaks into explicit <br> tags that
+    // survive the post-processing whitespace collapse below. Without this,
+    // marked emits e.g. `</strong>\n<strong>` for "**a**\n**b**" and the
+    // collapse strips the \n — both bold runs end up on the same line.
+    //
+    // Strip the newline marked still emits right after <br> ("<br>\n"),
+    // otherwise `white-space: pre-wrap` on the leaf element would render
+    // it as a second line break on top of the explicit <br>.
     // Collapse whitespace between tags so that `white-space: pre-wrap` on
-    // leaf elements (needed to preserve user-typed soft breaks inside text)
-    // doesn't render marked's formatting newlines — especially the ones
-    // inside nested-list <li> wrappers — as phantom blank lines.
+    // leaf elements (kept to preserve incidental whitespace) doesn't render
+    // marked's formatting newlines — especially the ones inside nested-list
+    // <li> wrappers — as phantom blank lines.
     // Fenced code content is protected so its inner whitespace stays intact.
     const preBlocks = [];
     let cleaned = raw.replace(/<pre[\s\S]*?<\/pre>/g, (m) => {
       preBlocks.push(m);
       return `\x00PRE${preBlocks.length - 1}\x00`;
     });
+    cleaned = cleaned.replace(/<br\s*\/?>\s*\n/g, "<br>");
     cleaned = cleaned.replace(/>[ \t]*\n[ \t\n]*</g, "><");
     cleaned = cleaned.replace(/\x00PRE(\d+)\x00/g, (_, i) => preBlocks[+i]);
     return DOMPurify.sanitize(cleaned, _PURIFY_CONFIG);
