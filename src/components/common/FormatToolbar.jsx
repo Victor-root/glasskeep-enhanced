@@ -88,11 +88,12 @@ export function toggleList(value, start, end, kind /* 'ul' | 'ol' */) {
   return { text: newText, range: [newStart, newEnd] };
 }
 /** Insert a standalone markdown horizontal rule ("---") at the caret.
- *  The rule needs blank lines around it to be parsed as a block-level
- *  separator rather than a Setext heading underline — we normalise the
- *  surrounding whitespace so the user can click the button from any
- *  position (start of doc, mid-paragraph, end of doc). Any current
- *  selection is preserved; the rule is inserted after it. */
+ *  The rule needs a blank line above it (otherwise `-` is parsed as a
+ *  Setext H2 underline and the separator disappears). Below, a single
+ *  newline is enough — we don't add a blank line there so the next
+ *  paragraph stays visually adjacent to the rule, matching what the
+ *  user would write by hand. Any current selection is preserved;
+ *  the rule is inserted after it. */
 export function insertHr(value, start, end) {
   const insertAt = end;
   const before = value.slice(0, insertAt);
@@ -105,9 +106,8 @@ export function insertHr(value, start, end) {
 
   let trail;
   if (after.length === 0) trail = "\n";
-  else if (after.startsWith("\n\n")) trail = "\n";
-  else if (after.startsWith("\n")) trail = "\n\n";
-  else trail = "\n\n";
+  else if (after.startsWith("\n")) trail = "";
+  else trail = "\n";
 
   const insert = `${lead}---${trail}`;
   const newText = before + insert + after;
