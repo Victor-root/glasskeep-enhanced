@@ -8,6 +8,7 @@
 // above everything else without influencing parent layout.
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const POP_GAP = 6;
 const POP_EDGE_MARGIN = 8;
@@ -87,7 +88,14 @@ export function Popover({ open, onClose, anchorRef, children, className = "", pr
   const style = pos
     ? { top: `${pos.top}px`, left: `${pos.left}px` }
     : { top: "-9999px", left: "-9999px" }; // first-frame measurement off-screen
-  return (
+
+  // Render into document.body so the popover escapes any ancestor that holds
+  // a `transform` (the modal card keeps one after its open animation), which
+  // would otherwise turn `position: fixed` into "fixed relative to the
+  // transformed ancestor" — that's what put popovers in the middle of the
+  // modal instead of next to the button.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div
       ref={ref}
       className={`rt-pop ${className}`.trim()}
@@ -95,7 +103,8 @@ export function Popover({ open, onClose, anchorRef, children, className = "", pr
       role="dialog"
     >
       {children}
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -797,7 +797,13 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
 }
 @keyframes scrimFadeIn  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scrimFadeOut { from { opacity: 1; } to { opacity: 0; } }
-.note-modal-anim         { animation: noteModalIn  200ms ease-out both; }
+/* Intentionally NOT using "both" for the open animation — retaining the
+   "transform: scale(1) translateY(0)" after the keyframes ends turns the
+   modal card into a containing block, which in turn broke "position: sticky"
+   (toolbar stops following scroll) and "position: fixed" (popovers landed
+   in the middle of the modal). Ending the animation returns the card to
+   its declared no-transform state, which is visually identical. */
+.note-modal-anim         { animation: noteModalIn  200ms ease-out; }
 .note-modal-anim.closing { animation: noteModalOut 180ms ease-in  both; }
 .note-scrim-anim         { animation: scrimFadeIn  200ms ease-out both; }
 .note-scrim-anim.closing { animation: scrimFadeOut 180ms ease-in  both; }
@@ -807,7 +813,10 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.modal-content-fade { animation: modalContentFade 200ms ease-out both; }
+/* No "both" — same reason as .note-modal-anim. Keeping a transform on an
+   ancestor of the rich-text toolbar prevented position: sticky from binding
+   to the real modal scroll container. */
+.modal-content-fade { animation: modalContentFade 200ms ease-out; }
 
 /* Smooth expand/collapse when entering/leaving draw canvas mode */
 @media (min-width: 640px) {
@@ -1035,10 +1044,13 @@ html.dark {
 }
 
 /* ---------- Editor surface ---------- */
-.rt-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+/* Block layout (not flex) so the sticky toolbar has a clean containing
+   block. In a flex column the sticky element's "stick area" depends on the
+   flex sizing pass, which led to the toolbar occasionally ignoring scroll. */
+.rt-editor { display: block; }
+.rt-toolbar + .rt-editor-content,
+.rt-toolbar + .ProseMirror {
+  margin-top: 0.4rem;
 }
 .rt-editor-content {
   outline: none;
@@ -1132,17 +1144,15 @@ html.dark .rt-editor-content a { color: #93c5fd; }
   gap: 2px;
   padding: 4px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.55);
+  background: #ffffff;
   border: 1px solid var(--rt-divider);
-  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.05);
   position: sticky;
   top: 0;
   z-index: 6;
-  backdrop-filter: saturate(1.2) blur(8px);
-  -webkit-backdrop-filter: saturate(1.2) blur(8px);
 }
 html.dark .rt-toolbar {
-  background: rgba(17, 24, 39, 0.5);
+  background: #1f2937;
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }

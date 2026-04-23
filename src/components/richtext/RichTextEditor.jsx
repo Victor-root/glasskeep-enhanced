@@ -75,7 +75,11 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     extensions,
     content: initialContent,
     editable,
-    autofocus: autoFocus ? "end" : false,
+    // Never use Tiptap's `autofocus: "end"` — it triggers a scrollIntoView on
+    // the ProseMirror view which visibly nudges the modal content down when
+    // the user toggles from view to edit mode. If the parent asked for
+    // autofocus, the dedicated effect below handles it WITHOUT scrollIntoView.
+    autofocus: false,
     editorProps: {
       attributes: {
         class: `rt-editor-content note-content note-content--dense focus:outline-none ${minHeightClass}`,
@@ -107,6 +111,21 @@ const RichTextEditor = forwardRef(function RichTextEditor(
   useEffect(() => {
     if (editor && onReady) onReady(editor);
   }, [editor, onReady]);
+
+  // Opt-in focus after mount, WITHOUT scrolling the surrounding modal.
+  // Tiptap's built-in autofocus triggers ProseMirror's scrollIntoView, which
+  // nudges the view when switching between view-mode and edit-mode.
+  useEffect(() => {
+    if (!editor || !autoFocus) return;
+    const id = requestAnimationFrame(() => {
+      try {
+        editor.commands.focus("end", { scrollIntoView: false });
+      } catch {}
+    });
+    return () => cancelAnimationFrame(id);
+    // We only want this on true mount (per editor instance).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
 
   // External content changes: when the parent swaps to a different note or
   // pulls a fresh doc from the server, re-seed the editor.
