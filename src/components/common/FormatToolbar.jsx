@@ -88,26 +88,30 @@ export function toggleList(value, start, end, kind /* 'ul' | 'ol' */) {
   return { text: newText, range: [newStart, newEnd] };
 }
 /** Insert a standalone markdown horizontal rule ("---") at the caret.
- *  The rule needs a blank line above it (otherwise `-` is parsed as a
- *  Setext H2 underline and the separator disappears). Below, a single
- *  newline is enough — we don't add a blank line there so the next
- *  paragraph stays visually adjacent to the rule, matching what the
- *  user would write by hand. Any current selection is preserved;
- *  the rule is inserted after it. */
+ *  We aim for a visually symmetric result — exactly one blank line above
+ *  and one blank line below the rule — by normalising the surrounding
+ *  whitespace. The blank line above is also a CommonMark requirement
+ *  (otherwise `-` would be parsed as a Setext H2 underline). Any
+ *  whitespace already present is reused, so we never over-insert.
+ *  Any current selection is preserved; the rule is inserted after it. */
 export function insertHr(value, start, end) {
   const insertAt = end;
   const before = value.slice(0, insertAt);
   const after = value.slice(insertAt);
 
+  // Leading: target is "...\n\n---" (blank line above).
   let lead;
   if (before.length === 0 || before.endsWith("\n\n")) lead = "";
   else if (before.endsWith("\n")) lead = "\n";
   else lead = "\n\n";
 
+  // Trailing: target is "---\n\n..." (blank line below), or just "\n"
+  // at end of document so the caret lands on a fresh line.
   let trail;
   if (after.length === 0) trail = "\n";
-  else if (after.startsWith("\n")) trail = "";
-  else trail = "\n";
+  else if (after.startsWith("\n\n")) trail = "";
+  else if (after.startsWith("\n")) trail = "\n";
+  else trail = "\n\n";
 
   const insert = `${lead}---${trail}`;
   const newText = before + insert + after;
