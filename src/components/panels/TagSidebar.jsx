@@ -83,6 +83,43 @@ export default function TagSidebar({
           </button>
         </div>
         <nav className="p-2 overflow-y-auto h-[calc(100%-56px)]">
+          {/* Multi-tag filter indicator — at the top so it's impossible to miss */}
+          {activeTagFilters.length > 1 && (
+            <div
+              className={`mx-1 mb-3 rounded-lg border px-3 py-2 flex items-center gap-2 ${
+                dark
+                  ? "bg-indigo-500/15 border-indigo-400/40 text-indigo-200"
+                  : "bg-indigo-100/90 border-indigo-300 text-indigo-800"
+              }`}
+            >
+              <svg
+                className="w-4 h-4 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              <span className="text-sm font-semibold flex-1">
+                {t("activeTagFiltersCount", { count: activeTagFilters.length })}
+              </span>
+              <button
+                onClick={() => onSelect(null)}
+                className={`text-xs font-medium px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
+                  dark
+                    ? "hover:bg-indigo-400/20 text-indigo-200"
+                    : "hover:bg-indigo-200 text-indigo-700"
+                }`}
+              >
+                {t("clearTagFilters")}
+              </button>
+            </div>
+          )}
+
           {/* Notes (All) */}
           <button
             className={`w-full text-left px-3 py-2 rounded-md mb-1 flex items-center gap-3 ${isAllNotes ? (dark ? "bg-white/10" : "bg-black/5") : dark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
@@ -153,15 +190,6 @@ export default function TagSidebar({
           })}
           {tagsWithCounts.length === 0 && (
             <p className="text-sm text-gray-500 mt-2">{t("noTagsYet")}</p>
-          )}
-          {activeTagFilters.length > 1 && (
-            <div className="px-3 py-1 mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
-              <span>🔀 {activeTagFilters.length} tags actifs</span>
-              <button
-                onClick={() => onSelect(null)}
-                className="text-xs underline hover:no-underline cursor-pointer"
-              >tout effacer</button>
-            </div>
           )}
         </nav>
 

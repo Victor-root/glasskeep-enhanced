@@ -105,6 +105,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   noMatchingNotes: "Aucune note correspondante trouvée.",
   noNotesYet: "Aucune note pour le moment. Ajoutez-en une pour commencer !",
   noTagsYet: "Pas encore de tags. Ajoutez des tags à vos notes !",
+  activeTagFiltersCount: "{count} tags actifs",
+  clearTagFilters: "Tout effacer",
   noUsersFound: "Aucun utilisateur trouvé.",
   notesAll: "Notes (Toutes)",
   offline: "Hors ligne",
