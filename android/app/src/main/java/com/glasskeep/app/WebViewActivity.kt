@@ -137,6 +137,20 @@ class WebViewActivity : AppCompatActivity() {
         swipeRefresh.setOnRefreshListener {
             webView.reload()
         }
+
+        // Shift the refresh spinner below the status bar (edge-to-edge layout
+        // puts the SwipeRefreshLayout at y=0, so the default end position sits
+        // behind the system bar and the arrow gets clipped on release).
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(swipeRefresh) { _, insets ->
+            val topInset = insets.getInsets(
+                androidx.core.view.WindowInsetsCompat.Type.statusBars()
+            ).top
+            val density = resources.displayMetrics.density
+            val startPx = (-40 * density).toInt() + topInset
+            val endPx = (64 * density).toInt() + topInset
+            swipeRefresh.setProgressViewOffset(false, startPx, endPx)
+            insets
+        }
         // Hide spinner once page finishes loading (set in webViewClient below)
 
         // Service Worker support
