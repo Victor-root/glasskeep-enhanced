@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { wrapSelection, fencedBlock, toggleList, prefixLines } from "../components/common/FormatToolbar.jsx";
+import { wrapSelection, fencedBlock, toggleList, prefixLines, insertHr } from "../components/common/FormatToolbar.jsx";
 
 /**
  * useFormatting — Shared markdown formatting helper.
@@ -84,6 +84,9 @@ export default function useFormatting() {
         break;
       case "link":
         result = wrapSelection(value, start, end, "[", "](https://)");
+        break;
+      case "hr":
+        result = insertHr(value, start, end);
         break;
       default:
         return;

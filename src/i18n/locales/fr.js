@@ -185,6 +185,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fmtBulletList: "Liste à puces",
   fmtOrderedList: "Liste numérotée",
   fmtLink: "Lien",
+  fmtSeparator: "Séparateur",
   listView: "Vue liste",
   multiSelect: "Sélection multiple",
   hiPrefix: "Salut,",

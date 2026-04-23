@@ -224,6 +224,7 @@ export default function ModalHeader({
                   <button className={base} onClick={() => onFormatModal("ul")} data-tooltip={tip("fmtBulletList", `${mod}+Shift+8`)}>{t("bulletListLabel")}</button>
                   <button className={base} onClick={() => onFormatModal("ol")} data-tooltip={tip("fmtOrderedList", `${mod}+Shift+7`)}>{t("orderedListLabel")}</button>
                   <button className={base} onClick={() => onFormatModal("link")} data-tooltip={tip("fmtLink", `${mod}+K`)}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+                  <button className={base} onClick={() => onFormatModal("hr")} data-tooltip={t("fmtSeparator")}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="12" x2="20" y2="12" /></svg></button>
                 </>
               );
             })()}

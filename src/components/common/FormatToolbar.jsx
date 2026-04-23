@@ -87,6 +87,34 @@ export function toggleList(value, start, end, kind /* 'ul' | 'ol' */) {
   const newEnd = end + delta;
   return { text: newText, range: [newStart, newEnd] };
 }
+/** Insert a standalone markdown horizontal rule ("---") at the caret.
+ *  The rule needs blank lines around it to be parsed as a block-level
+ *  separator rather than a Setext heading underline — we normalise the
+ *  surrounding whitespace so the user can click the button from any
+ *  position (start of doc, mid-paragraph, end of doc). Any current
+ *  selection is preserved; the rule is inserted after it. */
+export function insertHr(value, start, end) {
+  const insertAt = end;
+  const before = value.slice(0, insertAt);
+  const after = value.slice(insertAt);
+
+  let lead;
+  if (before.length === 0 || before.endsWith("\n\n")) lead = "";
+  else if (before.endsWith("\n")) lead = "\n";
+  else lead = "\n\n";
+
+  let trail;
+  if (after.length === 0) trail = "\n";
+  else if (after.startsWith("\n\n")) trail = "\n";
+  else if (after.startsWith("\n")) trail = "\n\n";
+  else trail = "\n\n";
+
+  const insert = `${lead}---${trail}`;
+  const newText = before + insert + after;
+  const caret = before.length + insert.length;
+  return { text: newText, range: [caret, caret] };
+}
+
 export function prefixLines(value, start, end, prefix) {
   const { from, to } = selectionBounds(value, start, end);
   const segment = value.slice(from, to);
@@ -227,6 +255,9 @@ export default function FormatToolbar({ dark, onAction, anchorRef }) {
         <button className={base} onClick={() => onAction("ol")} data-tooltip={tip("fmtOrderedList", `${mod}+Shift+7`)}>{t("orderedListLabel")}</button>
         <button className={base} onClick={() => onAction("link")} data-tooltip={tip("fmtLink", `${mod}+K`)}>
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </button>
+        <button className={base} onClick={() => onAction("hr")} data-tooltip={t("fmtSeparator")}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="12" x2="20" y2="12" /></svg>
         </button>
       </div>
     </div>
