@@ -1355,20 +1355,35 @@ html.dark .rt-icon-swatch-bar { border-color: rgba(255, 255, 255, 0.12); }
   gap: 5px;
 }
 .rt-swatch {
-  width: 26px;
-  height: 26px;
-  border-radius: 5px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  /* Inner ring keeps pale highlight swatches visible against the opaque
+     popover background; outer border gives a clean outline. */
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.08);
+  border: 0;
   cursor: pointer;
   padding: 0;
   transition: transform 0.08s ease, box-shadow 0.12s ease;
 }
 .rt-swatch:hover { transform: scale(1.1); }
 .rt-swatch.is-current {
-  box-shadow: 0 0 0 2px rgba(var(--rt-accent), 0.8);
-  border-color: transparent;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.2),
+    0 0 0 2px rgba(var(--rt-accent), 0.9);
 }
-html.dark .rt-swatch { border-color: rgba(255, 255, 255, 0.15); }
+html.dark .rt-swatch {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+html.dark .rt-swatch.is-current {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.25),
+    0 0 0 2px rgba(var(--rt-accent), 0.9);
+}
 .rt-pop-clear {
   margin-top: 8px;
   width: 100%;
@@ -1464,6 +1479,14 @@ html.dark .rt-pop-clear--danger { color: #f87171; border-color: rgba(248, 113, 1
   border-color: rgba(220, 38, 38, 0.28);
 }
 html.dark .rt-link-btn--danger { color: #f87171; border-color: rgba(248, 113, 113, 0.32); }
+.rt-link-btn--icon {
+  width: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.rt-link-btn--icon svg { width: 16px; height: 16px; }
 
 /* ---------- Settings — typography preview grid ---------- */
 .settings-type-grid {

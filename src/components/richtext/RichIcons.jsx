@@ -128,12 +128,26 @@ const Link = () =>
     </>,
   );
 
+// "Clear formatting" — an eraser glyph over a baseline. Reads as
+// "remove formatting / wipe styles", clearly different from the global
+// delete / trash can that already lives elsewhere in the UI.
 const Clear = () =>
   svg(
     <>
-      <path d="M4 7h16" />
-      <path d="M7 7l2 12h6l2-12" />
-      <line x1="9" y1="4" x2="15" y2="4" />
+      <path d="M16.5 3.5l4 4-9 9H7l-2-2z" />
+      <line x1="9.5" y1="10.5" x2="13.5" y2="14.5" />
+      <line x1="11" y1="20" x2="21" y2="20" />
+    </>,
+  );
+
+// External-link arrow — box with an arrow breaking out to the top right.
+// Replaces the ambiguous ↗ glyph on the link popover's "open" button.
+const LinkOpen = () =>
+  svg(
+    <>
+      <path d="M14 4h6v6" />
+      <line x1="20" y1="4" x2="11" y2="13" />
+      <path d="M18 13v5a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h5" />
     </>,
   );
 
@@ -254,7 +268,7 @@ const Highlight = ({ swatch = "#fef3c7" }) => (
 
 const RichIcons = {
   Chevron, Paragraph,
-  Bold, Italic, Underline, Strike, Code, CodeBlock, Quote, HR, Link, Clear,
+  Bold, Italic, Underline, Strike, Code, CodeBlock, Quote, HR, Link, LinkOpen, Clear,
   Subscript, Superscript,
   BulletList, OrderedList, Indent, Outdent,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,

@@ -1,25 +1,19 @@
 // Underline mark with style / color attributes.
+//
 // Extends Tiptap's official underline so we can offer simple / double /
 // dotted / dashed / wavy underlines plus an optional colour, without
 // forking the upstream keymap or paste handling.
 //
-// We render as `<u style="text-decoration: underline <style> <color>">`
-// because every modern browser supports the CSS `text-decoration-*` longhand
-// through the shorthand, and this keeps the serialized HTML portable —
-// DOMPurify already allows the `style` attribute in our rich-text sanitizer.
+// Implementation note — each attribute's own renderHTML emits the CSS
+// `text-decoration-*` fragment it is responsible for. Tiptap's
+// mergeAttributes then concatenates the `style` values with "; ", so the
+// final <u> ends up with a correct combined declaration. Doing it in the
+// mark's own renderHTML didn't work because at that point we only receive
+// the already-transformed HTMLAttributes (no raw attribute access).
 
 import { Underline as BaseUnderline } from "@tiptap/extension-underline";
-import { mergeAttributes } from "@tiptap/core";
 
 const STYLE_VALUES = new Set(["simple", "double", "dotted", "dashed", "wavy"]);
-
-function buildDecorationStyle(style, color) {
-  if (!style && !color) return null;
-  const parts = ["underline"];
-  if (style && style !== "simple" && STYLE_VALUES.has(style)) parts.push(style);
-  if (color) parts.push(color);
-  return parts.join(" ");
-}
 
 export const UnderlineVariant = BaseUnderline.extend({
   addAttributes() {
@@ -32,7 +26,22 @@ export const UnderlineVariant = BaseUnderline.extend({
           const inline = el.style?.textDecorationStyle || "";
           return STYLE_VALUES.has(inline) ? inline : null;
         },
-        renderHTML: (attrs) => (attrs.style ? { "data-underline-style": attrs.style } : {}),
+        renderHTML: (attrs) => {
+          if (!attrs.style || !STYLE_VALUES.has(attrs.style)) return {};
+          // "simple" is the browser default — still flag it so the toolbar
+          // knows the mark has an explicit style, but don't paint inline CSS
+          // that would override nested decorations.
+          if (attrs.style === "simple") {
+            return { "data-underline-style": "simple" };
+          }
+          return {
+            "data-underline-style": attrs.style,
+            // `text-decoration-line: underline` is explicit because the raw
+            // <u> already carries the default line, but if another extension
+            // changes text-decoration we still want ours to win.
+            style: `text-decoration-line: underline; text-decoration-style: ${attrs.style}`,
+          };
+        },
       },
       color: {
         default: null,
@@ -40,21 +49,15 @@ export const UnderlineVariant = BaseUnderline.extend({
           el.getAttribute("data-underline-color") ||
           el.style?.textDecorationColor ||
           null,
-        renderHTML: (attrs) => (attrs.color ? { "data-underline-color": attrs.color } : {}),
+        renderHTML: (attrs) => {
+          if (!attrs.color) return {};
+          return {
+            "data-underline-color": attrs.color,
+            style: `text-decoration-color: ${attrs.color}`,
+          };
+        },
       },
     };
-  },
-  renderHTML({ HTMLAttributes }) {
-    const { style, color, ...rest } = HTMLAttributes;
-    const decoration = buildDecorationStyle(style, color);
-    const merged = mergeAttributes(this.options.HTMLAttributes, rest);
-    if (decoration) {
-      const existing = merged.style ? `${merged.style};` : "";
-      merged.style = `${existing}text-decoration: ${decoration}`;
-    }
-    if (style) merged["data-underline-style"] = style;
-    if (color) merged["data-underline-color"] = color;
-    return ["u", merged, 0];
   },
   addCommands() {
     const parent = this.parent?.() || {};

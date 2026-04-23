@@ -9,6 +9,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
 import { Popover } from "./Popover.jsx";
+import RichIcons from "./RichIcons.jsx";
 
 function ensureSchemeURL(raw) {
   const v = (raw || "").trim();
@@ -95,12 +96,13 @@ export default function LinkPopover({ editor, anchorRef, open, onClose }) {
           <>
             <button
               type="button"
-              className="rt-link-btn"
+              className="rt-link-btn rt-link-btn--icon"
               onMouseDown={(e) => e.preventDefault()}
               onClick={visit}
               title={t("linkOpen")}
+              aria-label={t("linkOpen")}
             >
-              ↗
+              <RichIcons.LinkOpen />
             </button>
             <button
               type="button"
