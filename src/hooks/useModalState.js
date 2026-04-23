@@ -210,7 +210,7 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
       const note = notes.find((n) => String(n.id) === String(noteId));
       if (!note) return false;
       const hasCollaborators =
-        note.collaborators !== undefined && note.collaborators !== null;
+        Array.isArray(note.collaborators) && note.collaborators.length > 0;
       const isOwnedByOther =
         note.user_id && currentUser && note.user_id !== currentUser.id;
       return hasCollaborators || isOwnedByOther;

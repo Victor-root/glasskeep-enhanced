@@ -353,7 +353,7 @@ export default function NoteModal({
               />
             )}
 
-            <OfflineCollabBanner visible={isCollaborativeNote && syncState === "offline"} />
+            <OfflineCollabBanner visible={isCollaborativeNote(activeId) && syncState === "offline"} />
 
             {/* Content area */}
             <div
