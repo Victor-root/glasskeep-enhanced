@@ -197,6 +197,11 @@ export default function NoteModal({
     open, activeId, mType, viewMode,
   });
 
+  // DOM node of the slot inside ModalHeader where the rich-text toolbar is
+  // portaled. Using useState-as-ref so the RichTextEditor re-renders once
+  // the slot actually mounts (a useRef wouldn't trigger the re-render).
+  const [toolbarSlot, setToolbarSlot] = React.useState(null);
+
   /* Set draw mode when modal opens (reset to view, or honour initialDrawMode) */
   React.useEffect(() => {
     if (open) {
@@ -341,6 +346,7 @@ export default function NoteModal({
               drawMode={drawMode}
               drawToolbarMount={setDrawToolbarEl}
               onToggleDrawMode={() => setDrawMode((m) => m === "view" ? "draw" : "view")}
+              toolbarSlotRef={setToolbarSlot}
               // keyboard: Tab from title → body, skipping the toolbar buttons
               onTitleTab={() => {
                 if (mType === "checklist") {
@@ -386,6 +392,7 @@ export default function NoteModal({
                       dark={dark}
                       autoFocus={!mTitle}
                       minHeightClass="min-h-[160px]"
+                      toolbarContainer={toolbarSlot}
                     />
                   </div>
                 )
@@ -441,6 +448,7 @@ export default function NoteModal({
                     placeholder={t("writeYourNoteEllipsis")}
                     dark={dark}
                     minHeightClass="min-h-[80px]"
+                    toolbarContainer={toolbarSlot}
                   />
                   <DrawingCanvas
                     data={mDrawingData}

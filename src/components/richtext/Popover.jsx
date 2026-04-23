@@ -76,10 +76,17 @@ export function Popover({ open, onClose, anchorRef, children, className = "", pr
         onClose?.();
       }
     };
-    document.addEventListener("mousedown", onDown);
+    // Capture phase: ProseMirror calls stopPropagation on some mousedowns
+    // inside the editor (its selection handling), which otherwise swallowed
+    // this document-level listener. Listening at capture phase guarantees we
+    // see the event before the editor handles it, so clicking on the note
+    // body now reliably closes an open popover.
+    document.addEventListener("mousedown", onDown, true);
+    document.addEventListener("touchstart", onDown, true);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("touchstart", onDown, true);
       document.removeEventListener("keydown", onKey);
     };
   }, [open, anchorRef, onClose]);

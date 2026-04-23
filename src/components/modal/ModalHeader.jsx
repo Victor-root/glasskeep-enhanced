@@ -46,6 +46,9 @@ export default function ModalHeader({
   onToggleDrawMode,
   // keyboard: Tab from title → body (skip the toolbar buttons)
   onTitleTab,
+  // Rich-text editor toolbar is portaled into this slot (a ref to the
+  // div we render below the header row, inside the sticky wrapper).
+  toolbarSlotRef,
 }) {
   const handleTitleKeyDown = (e) => {
     if (e.key !== "Tab") return;
@@ -177,8 +180,11 @@ export default function ModalHeader({
           </div>
         </div>
 
-        {/* Legacy Markdown toolbar removed — the rich-text editor ships its
-            own in-body toolbar for text notes (see RichTextEditor). */}
+        {/* Rich-text toolbar mount point. Lives inside the sticky header so
+            it sits just below the title/save/close row and stays pinned
+            while the note scrolls. The editor portals its toolbar here
+            when showToolbar is true. */}
+        <div ref={toolbarSlotRef || null} className="rt-toolbar-slot" />
       </div>
 
       {/* ── Mobile title — outside sticky, scrolls with content (hidden in draw edit mode) ── */}

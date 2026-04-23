@@ -1,4 +1,5 @@
 import React, { useEffect, useImperativeHandle, useMemo, useRef, forwardRef } from "react";
+import { createPortal } from "react-dom";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { buildRichTextExtensions } from "./richTextSchema.js";
 import {
@@ -46,6 +47,11 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     minHeightClass = "min-h-[160px]",
     showToolbar = true,
     onEnterBottom,
+    // When provided, the toolbar is portaled into this DOM element instead of
+    // rendered inline above the editor. This lets the host (NoteModal) mount
+    // the toolbar inside its sticky header so it stays pinned while the note
+    // scrolls.
+    toolbarContainer = null,
   },
   ref,
 ) {
@@ -164,9 +170,15 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     editor.setEditable(editable);
   }, [editor, editable]);
 
+  const toolbar = editable && showToolbar && editor
+    ? <RichTextToolbar editor={editor} />
+    : null;
+
   return (
     <div className={`rt-editor${dark ? " rt-editor--dark" : ""} ${className}`}>
-      {editable && showToolbar && <RichTextToolbar editor={editor} />}
+      {toolbar && (toolbarContainer
+        ? createPortal(toolbar, toolbarContainer)
+        : toolbar)}
       <EditorContent editor={editor} />
     </div>
   );

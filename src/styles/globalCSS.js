@@ -1137,48 +1137,54 @@ html.dark .rt-editor-content a { color: #93c5fd; }
 .rt-editor-content ul[data-type="taskList"] { list-style: none; padding-left: 0; }
 
 /* ---------- Toolbar ---------- */
+.rt-toolbar-slot {
+  /* Slot inside the ModalHeader sticky container that receives the rich
+     text toolbar via a React portal. Empty when no text note is being
+     edited — collapses to no height. */
+  display: contents;
+}
 .rt-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 2px;
-  padding: 4px;
+  gap: 3px;
+  padding: 6px 8px;
+  margin: 4px 8px 8px;
   border-radius: 10px;
-  background: #ffffff;
-  border: 1px solid var(--rt-divider);
-  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.05);
-  position: sticky;
-  top: 0;
-  z-index: 6;
+  background: transparent;
+  /* Toolbar is portaled INSIDE the ModalHeader sticky wrapper, so it
+     inherits that wrapper's stickiness — no own position: sticky needed. */
+  border-top: 1px solid var(--rt-divider);
+  padding-top: 8px;
 }
 html.dark .rt-toolbar {
-  background: #1f2937;
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  border-top-color: rgba(255, 255, 255, 0.08);
 }
-.rt-toolbar--compact { padding: 2px; }
+.rt-toolbar--compact { padding: 4px 6px; gap: 2px; }
 
+/* display: contents flattens the group wrapper: individual buttons become
+   direct children of .rt-toolbar, so flex-wrap can break between buttons
+   instead of wrapping entire groups (the old behaviour caused big empty
+   gaps on the right with buttons overflowing onto line 2). */
 .rt-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
+  display: contents;
 }
 
 .rt-btn {
   position: relative;
-  min-width: 26px;
-  height: 26px;
-  padding: 0 5px;
-  border-radius: 6px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 7px;
   border: 1px solid transparent;
   background: transparent;
   color: inherit;
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.1s ease;
   user-select: none;
@@ -1194,33 +1200,37 @@ html.dark .rt-toolbar {
 }
 .rt-btn[disabled] { opacity: 0.38; cursor: not-allowed; }
 .rt-btn:active:not(:disabled) { transform: translateY(0.5px); }
-.rt-btn--menu { padding: 0 6px; }
-.rt-btn--wide { min-width: 72px; justify-content: space-between; }
-.rt-btn--narrow { min-width: 40px; justify-content: space-between; }
-.rt-btn--chevron { min-width: 18px; padding: 0 2px; }
-.rt-btn--swatch { padding: 0 4px; }
+.rt-btn--menu { padding: 0 8px; gap: 5px; }
+.rt-btn--block { min-width: 56px; }
+.rt-btn--wide { min-width: 90px; justify-content: space-between; }
+.rt-btn--narrow { min-width: 50px; justify-content: space-between; }
+.rt-btn--chevron { min-width: 22px; padding: 0 3px; }
+.rt-btn--swatch { padding: 0 6px; }
 .rt-btn-label {
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 500;
   letter-spacing: 0.01em;
   white-space: nowrap;
 }
 .rt-btn-inner { display: inline-flex; align-items: center; justify-content: center; }
+.rt-btn svg { width: 18px; height: 18px; }
+.rt-btn--chevron svg { width: 12px; height: 12px; }
 
 .rt-splitbtn {
   display: inline-flex;
   align-items: stretch;
   position: relative;
-  border-radius: 6px;
+  border-radius: 7px;
 }
-.rt-splitbtn > .rt-btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.rt-splitbtn > .rt-btn--chevron { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.rt-splitbtn > .rt-btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 4px; }
+.rt-splitbtn > .rt-btn--chevron { border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 2px; }
 
 .rt-sep {
   width: 1px;
-  align-self: stretch;
+  align-self: center;
+  height: 22px;
   background: var(--rt-divider-strong);
-  margin: 2px 4px;
+  margin: 0 5px;
   display: inline-block;
 }
 
@@ -1508,15 +1518,16 @@ html.dark .settings-type-field select {
    screens. Groups stay grouped visually via the separators. */
 @media (max-width: 640px) {
   .rt-toolbar {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    padding: 3px;
-    scrollbar-width: thin;
+    flex-wrap: wrap;
+    padding: 5px 6px;
+    margin: 2px 6px 6px;
+    gap: 3px;
   }
-  .rt-toolbar::-webkit-scrollbar { height: 4px; }
-  .rt-btn { min-width: 28px; height: 28px; }
-  .rt-btn--wide { min-width: 60px; }
+  .rt-btn { min-width: 34px; height: 34px; }
+  .rt-btn--wide { min-width: 78px; }
+  .rt-btn--block { min-width: 50px; }
   .rt-pop { min-width: 220px; }
+  .rt-sep { margin: 0 3px; }
 }
 
 /* Read-only note-content renderings (cards + modal view) should ALSO honour
