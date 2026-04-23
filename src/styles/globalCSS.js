@@ -138,7 +138,7 @@ html.dark header.multi-select-bar {
 .note-content--dense ul, .note-content--dense ol { margin: 0; padding-left: 1.1rem; }
 .note-content--dense li { margin: 0; padding: 0; line-height: 1.45; }
 .note-content--dense li > p { margin: 0; }
-.note-content--dense li ul, .note-content--dense li ol { margin: 0.1rem 0 0 1.1rem; padding-left: 1.1rem; }
+.note-content--dense li ul, .note-content--dense li ol { margin: 0.1rem 0 0; padding-left: 1rem; }
 
 /* Fix: marked outputs \n between block elements; with white-space:pre-wrap on
    the container these render as visible ~24px anonymous blocks.  Set normal on
