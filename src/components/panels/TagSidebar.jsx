@@ -28,9 +28,9 @@ export default function TagSidebar({
     if (active) {
       return dark
         ? "bg-indigo-500/20 text-indigo-100 font-semibold"
-        : "bg-indigo-100/80 text-indigo-800 font-semibold";
+        : "bg-[#c1cfffcc] text-indigo-800 font-semibold";
     }
-    return dark ? "hover:bg-indigo-500/10" : "hover:bg-indigo-100/50";
+    return dark ? "hover:bg-indigo-500/10" : "hover:bg-[#c1cfff66]";
   };
 
   // Long-press support for multi-tag selection on touch devices
