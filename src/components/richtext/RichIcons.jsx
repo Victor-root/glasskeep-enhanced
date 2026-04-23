@@ -114,9 +114,13 @@ const Quote = () =>
 const HR = () =>
   svg(
     <>
-      <line x1="4" y1="6" x2="20" y2="6" opacity="0.35" />
-      <line x1="4" y1="12" x2="20" y2="12" />
-      <line x1="4" y1="18" x2="14" y2="18" opacity="0.35" />
+      <line x1="6"  y1="7"  x2="18" y2="7"  opacity="0.35" />
+      <line x1="8"  y1="9"  x2="16" y2="9"  opacity="0.35" />
+      <circle cx="3"  cy="13" r="1.5" fill="currentColor" stroke="none" />
+      <line x1="6"  y1="13" x2="18" y2="13" strokeWidth="2.6" />
+      <circle cx="21" cy="13" r="1.5" fill="currentColor" stroke="none" />
+      <line x1="6"  y1="17" x2="18" y2="17" opacity="0.35" />
+      <line x1="8"  y1="19" x2="16" y2="19" opacity="0.35" />
     </>,
   );
 
@@ -169,47 +173,52 @@ const Superscript = () =>
     </>,
   );
 
+// Lists — big, unmistakable markers so bullet vs. ordered vs. indent don't
+// blur together at toolbar size.
 const BulletList = () =>
   svg(
     <>
-      <line x1="9" y1="6" x2="20" y2="6" />
-      <line x1="9" y1="12" x2="20" y2="12" />
-      <line x1="9" y1="18" x2="20" y2="18" />
-      <circle cx="5" cy="6" r="1.5" fill="currentColor" />
-      <circle cx="5" cy="12" r="1.5" fill="currentColor" />
-      <circle cx="5" cy="18" r="1.5" fill="currentColor" />
+      <circle cx="5" cy="7"  r="2" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="12" r="2" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="17" r="2" fill="currentColor" stroke="none" />
+      <line x1="11" y1="7"  x2="20" y2="7" />
+      <line x1="11" y1="12" x2="20" y2="12" />
+      <line x1="11" y1="17" x2="20" y2="17" />
     </>,
   );
 
 const OrderedList = () =>
   svg(
     <>
-      <line x1="10" y1="6" x2="20" y2="6" />
-      <line x1="10" y1="12" x2="20" y2="12" />
-      <line x1="10" y1="18" x2="20" y2="18" />
-      <text x="3" y="8" fontSize="7" fontWeight="700" fill="currentColor" stroke="none">1.</text>
-      <text x="3" y="14" fontSize="7" fontWeight="700" fill="currentColor" stroke="none">2.</text>
-      <text x="3" y="20" fontSize="7" fontWeight="700" fill="currentColor" stroke="none">3.</text>
+      <text x="2" y="9"  fontSize="8" fontWeight="900" fill="currentColor" stroke="none">1</text>
+      <text x="2" y="15" fontSize="8" fontWeight="900" fill="currentColor" stroke="none">2</text>
+      <text x="2" y="21" fontSize="8" fontWeight="900" fill="currentColor" stroke="none">3</text>
+      <line x1="10" y1="7"  x2="20" y2="7" />
+      <line x1="10" y1="13" x2="20" y2="13" />
+      <line x1="10" y1="19" x2="20" y2="19" />
     </>,
   );
 
+// Indent / outdent — big directional chevron INSIDE the lines area so the
+// arrow is the dominant shape, not the background lines. Keeps them
+// visually separate from lists (no markers) and from separators (no rule).
 const Indent = () =>
   svg(
     <>
-      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4"  y1="6"  x2="20" y2="6" />
       <line x1="10" y1="12" x2="20" y2="12" />
       <line x1="10" y1="18" x2="20" y2="18" />
-      <polyline points="4 10 7 13 4 16" />
+      <polyline points="3 9 7 12 3 15" fill="none" />
     </>,
   );
 
 const Outdent = () =>
   svg(
     <>
-      <line x1="4" y1="6" x2="20" y2="6" />
-      <line x1="4" y1="12" x2="14" y2="12" />
-      <line x1="4" y1="18" x2="14" y2="18" />
-      <polyline points="20 10 17 13 20 16" />
+      <line x1="4"  y1="6"  x2="20" y2="6" />
+      <line x1="4"  y1="12" x2="14" y2="12" />
+      <line x1="4"  y1="18" x2="14" y2="18" />
+      <polyline points="21 9 17 12 21 15" fill="none" />
     </>,
   );
 
