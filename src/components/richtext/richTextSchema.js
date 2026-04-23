@@ -10,6 +10,9 @@ import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
 import TextAlign from "@tiptap/extension-text-align";
 import Placeholder from "@tiptap/extension-placeholder";
+import UnderlineVariant from "./extensions/UnderlineVariant.js";
+import Indent from "./extensions/Indent.js";
+import SmartCodeBlock from "./extensions/SmartCodeBlock.js";
 
 // Factory so the editor instance and the (stateless) render helpers can share
 // the same configured extensions but the editor can still override
@@ -17,10 +20,17 @@ import Placeholder from "@tiptap/extension-placeholder";
 export function buildRichTextExtensions({ placeholder = "" } = {}) {
   return [
     StarterKit.configure({
-      // StarterKit already ships with undo/redo; we rely on it.
-      link: { openOnClick: false, autolink: true, HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" } },
+      // Disable StarterKit's default Underline — we replace it with our own
+      // variant-aware mark below (see UnderlineVariant).
+      underline: false,
+      link: {
+        openOnClick: false,
+        autolink: true,
+        HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" },
+      },
       heading: { levels: [1, 2, 3] },
     }),
+    UnderlineVariant,
     TextStyle,
     Color,
     FontFamily,
@@ -28,7 +38,14 @@ export function buildRichTextExtensions({ placeholder = "" } = {}) {
     Highlight.configure({ multicolor: true }),
     Subscript,
     Superscript,
-    TextAlign.configure({ types: ["heading", "paragraph"] }),
+    TextAlign.configure({
+      types: ["heading", "paragraph"],
+      // Emit explicit `text-align: left` so round-trips through HTML keep
+      // the attribute and our toolbar can reliably detect the left state.
+      alignments: ["left", "center", "right", "justify"],
+    }),
+    Indent,
+    SmartCodeBlock,
     Placeholder.configure({ placeholder }),
   ];
 }

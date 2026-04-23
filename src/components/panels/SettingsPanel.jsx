@@ -4,6 +4,7 @@ import { api } from "../../utils/api.js";
 import UserAvatar from "../common/UserAvatar.jsx";
 import { SunIcon, MoonIcon, FloatingCardsIcon, SettingsIcon, CloseIcon } from "../../icons/index.jsx";
 import { fileToCompressedDataURL } from "../../utils/helpers.js";
+import TypographySettings from "./TypographySettings.jsx";
 
 export default function SettingsPanel({
   open,
@@ -26,6 +27,8 @@ export default function SettingsPanel({
   setChecklistRemoveSectionBehavior,
   edgeToEdgeLandscape,
   setEdgeToEdgeLandscape,
+  typographyPresets,
+  setTypographyPresets,
   showGenericConfirm,
   showToast,
   onResetNoteOrder,
@@ -396,6 +399,12 @@ export default function SettingsPanel({
                   />
                 </button>
               </div>
+
+              {/* Rich-text editor typography presets */}
+              <TypographySettings
+                presets={typographyPresets}
+                setPresets={setTypographyPresets}
+              />
 
             </div>
           </div>

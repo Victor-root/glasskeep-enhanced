@@ -66,6 +66,11 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     [],
   );
 
+  // Refs declared before useEditor so the onUpdate closure can always reach
+  // them without depending on declaration order subtleties.
+  const lastAppliedRef = useRef(null);
+  const lastEmittedRef = useRef(null);
+
   const editor = useEditor({
     extensions,
     content: initialContent,
@@ -107,8 +112,6 @@ const RichTextEditor = forwardRef(function RichTextEditor(
   // pulls a fresh doc from the server, re-seed the editor.
   // We track the last serialized string we pushed into the editor so we don't
   // reset on every autosave echo.
-  const lastAppliedRef = useRef(null);
-  const lastEmittedRef = useRef(null);
   useEffect(() => {
     if (!editor) return;
     if (value == null) return;

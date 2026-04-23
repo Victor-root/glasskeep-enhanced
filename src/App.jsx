@@ -29,6 +29,12 @@ import { mdForDownload } from "./utils/markdown.jsx";
 import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, fileToCompressedDataURL, setThemeColor } from "./utils/helpers.js";
 import { textToChecklistItems, checklistItemsToText } from "./utils/noteConversion.js";
 import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRichDoc } from "./utils/richText.js";
+import {
+  DEFAULT_TYPOGRAPHY_PRESETS,
+  TYPOGRAPHY_STORAGE_KEY,
+  applyTypographyPresets,
+  normalizeTypographyPresets,
+} from "./utils/typographyPresets.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES } from "./utils/constants.js";
 import { ColorDot } from "./components/common/ColorDot.jsx";
@@ -189,6 +195,18 @@ export default function App() {
       return true;
     }
   });
+  const [typographyPresets, setTypographyPresets] = useState(() => {
+    try {
+      const stored = localStorage.getItem(TYPOGRAPHY_STORAGE_KEY);
+      if (stored) return normalizeTypographyPresets(JSON.parse(stored));
+    } catch (e) {}
+    return { ...DEFAULT_TYPOGRAPHY_PRESETS };
+  });
+  // Push the current presets onto :root as CSS variables whenever they change
+  // so the editor AND the view-mode / card previews pick them up instantly.
+  useEffect(() => {
+    applyTypographyPresets(typographyPresets);
+  }, [typographyPresets]);
   const [aiResponse, setAiResponse] = useState(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiLoadingProgress, setAiLoadingProgress] = useState(null);
@@ -519,6 +537,11 @@ export default function App() {
           setEdgeToEdgeLandscape(settings.edgeToEdgeLandscape);
           localStorage.setItem("edgeToEdgeLandscape", String(settings.edgeToEdgeLandscape));
         }
+        if (settings?.typographyPresets && typeof settings.typographyPresets === "object") {
+          const normalized = normalizeTypographyPresets(settings.typographyPresets);
+          setTypographyPresets(normalized);
+          try { localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(normalized)); } catch (e) {}
+        }
       } catch (e) {
         // Network error — default to true
         setAlwaysShowSidebarOnWide((prev) => prev === null ? true : prev);
@@ -614,6 +637,19 @@ export default function App() {
       }).catch(() => {});
     }
   }, [edgeToEdgeLandscape]);
+
+  // Typography presets: local-first + server sync, mirroring the other prefs.
+  useEffect(() => {
+    try { localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(typographyPresets)); } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { typographyPresets },
+      }).catch(() => {});
+    }
+  }, [typographyPresets]);
 
   // Window resize listener for responsive sidebar behavior
   useEffect(() => {
@@ -4439,6 +4475,8 @@ export default function App() {
         setChecklistRemoveSectionBehavior={setChecklistRemoveSectionBehavior}
         edgeToEdgeLandscape={edgeToEdgeLandscape}
         setEdgeToEdgeLandscape={setEdgeToEdgeLandscape}
+        typographyPresets={typographyPresets}
+        setTypographyPresets={(next) => setTypographyPresets(normalizeTypographyPresets(next))}
         showGenericConfirm={showGenericConfirm}
         showToast={showToast}
         onResetNoteOrder={resetNoteOrder}

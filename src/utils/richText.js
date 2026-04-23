@@ -95,7 +95,12 @@ const SANITIZE_CONFIG = {
     "mark",
     "span", "div",
   ],
-  ALLOWED_ATTR: ["href", "title", "class", "target", "rel", "start", "style", "data-color", "data-text-align"],
+  ALLOWED_ATTR: [
+    "href", "title", "class", "target", "rel", "start", "style",
+    "data-color", "data-text-align",
+    "data-indent",
+    "data-underline-style", "data-underline-color",
+  ],
   // `style` is allowed above so Tiptap's color/alignment/font rendering
   // survives sanitization. Keep this narrow — no tags with scripting or
   // arbitrary url attributes.

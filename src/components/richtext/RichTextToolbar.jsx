@@ -1,27 +1,88 @@
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
+import LinkPopover from "./LinkPopover.jsx";
+import RichIcons from "./RichIcons.jsx";
 
-// Small reusable button that highlights when the corresponding mark/node is
-// active in the editor. All commands run through editor.chain() so focus and
-// history stay consistent.
-function ToolbarButton({ editor, active, onClick, disabled, title, children }) {
+// Design principles:
+//  • Compact icon buttons (tighter than v1) — one clean grid, grouped by
+//    intent with subtle separators.
+//  • Every control renders the same `rt-btn` primitive so states (active /
+//    hover / focus / disabled) are consistent.
+//  • Popovers (color, highlight, underline, link, text style) anchor on the
+//    triggering button and close on outside click / Escape. No more browser
+//    prompts.
+//  • Selection-tracking is via editor.on("selectionUpdate" | "transaction")
+//    so the toolbar reacts without prop drilling.
+
+function useEditorSignal(editor) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!editor) return;
+    const bump = () => setTick((n) => (n + 1) % 1000000);
+    editor.on("selectionUpdate", bump);
+    editor.on("transaction", bump);
+    editor.on("focus", bump);
+    editor.on("blur", bump);
+    return () => {
+      editor.off("selectionUpdate", bump);
+      editor.off("transaction", bump);
+      editor.off("focus", bump);
+      editor.off("blur", bump);
+    };
+  }, [editor]);
+  return tick;
+}
+
+function ToolbarButton({ active, onClick, disabled, title, children, className = "" }) {
   return (
     <button
       type="button"
-      className={`rt-btn${active ? " is-active" : ""}`}
+      className={`rt-btn${active ? " is-active" : ""} ${className}`}
       data-tooltip={title}
       aria-label={title}
+      aria-pressed={active ? "true" : undefined}
       disabled={disabled}
-      // Prevent focus shift so the selection in the editor is preserved.
       onMouseDown={(e) => e.preventDefault()}
       onClick={(e) => {
         e.preventDefault();
-        if (!editor || disabled) return;
-        onClick();
+        if (disabled) return;
+        onClick(e);
       }}
     >
       {children}
     </button>
+  );
+}
+
+// Anchored popover shell. Decouples open/close state from the button row so
+// the same UX applies to every dropdown (colour, highlight, underline, …).
+function Popover({ open, onClose, anchorRef, children, className = "" }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (ref.current?.contains(e.target)) return;
+      if (anchorRef?.current?.contains(e.target)) return;
+      onClose?.();
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose?.();
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, anchorRef, onClose]);
+  if (!open) return null;
+  return (
+    <div ref={ref} className={`rt-pop ${className}`.trim()} role="dialog">
+      {children}
+    </div>
   );
 }
 
@@ -33,93 +94,257 @@ const PRESET_HIGHLIGHTS = [
   "#fef3c7", "#fee2e2", "#fde68a", "#d1fae5", "#dbeafe", "#ede9fe",
   "#fce7f3", "#e5e7eb",
 ];
+const PRESET_UNDERLINE_COLORS = [
+  "#111827", "#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#8b5cf6",
+  "#ec4899", "#64748b",
+];
+
+// Ubuntu is self-hosted via @fontsource/ubuntu (see src/main.jsx) — no cloud.
 const FONT_FAMILIES = [
   { label: "Sans", value: "" },
-  { label: "Serif", value: "Georgia, \"Times New Roman\", serif" },
+  { label: "Serif", value: 'Georgia, "Times New Roman", serif' },
   { label: "Mono", value: "ui-monospace, SFMono-Regular, Menlo, monospace" },
   { label: "Display", value: '"Trebuchet MS", Verdana, sans-serif' },
+  { label: "Ubuntu", value: 'Ubuntu, "Ubuntu Sans", sans-serif' },
 ];
-const FONT_SIZES = ["", "12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px"];
+const FONT_SIZES = ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px"];
+const DEFAULT_FONT_SIZE = "16px";
 
-function SwatchPopover({ label, colors, onPick, onClear, anchor }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const popRef = useRef(null);
+const UNDERLINE_STYLES = [
+  { value: "simple", label: "fmtUnderlineSimple", preview: "underline" },
+  { value: "double", label: "fmtUnderlineDouble", preview: "underline double" },
+  { value: "dotted", label: "fmtUnderlineDotted", preview: "underline dotted" },
+  { value: "dashed", label: "fmtUnderlineDashed", preview: "underline dashed" },
+  { value: "wavy", label: "fmtUnderlineWavy", preview: "underline wavy" },
+];
 
-  useEffect(() => {
-    if (!open) return;
-    const onDocDown = (e) => {
-      if (popRef.current?.contains(e.target)) return;
-      if (btnRef.current?.contains(e.target)) return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", onDocDown);
-    return () => document.removeEventListener("mousedown", onDocDown);
-  }, [open]);
-
+function Swatches({ colors, onPick, current, onClear, clearLabel }) {
   return (
-    <div className="rt-pop-wrap">
-      <button
-        ref={btnRef}
-        type="button"
-        className="rt-btn"
-        data-tooltip={label}
-        aria-label={label}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {anchor}
-      </button>
-      {open && (
-        <div ref={popRef} className="rt-pop">
-          <div className="rt-swatches">
-            {colors.map((c) => (
-              <button
-                key={c}
-                type="button"
-                className="rt-swatch"
-                style={{ background: c }}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onPick(c);
-                  setOpen(false);
-                }}
-                aria-label={c}
-              />
-            ))}
-          </div>
+    <div>
+      <div className="rt-swatches">
+        {colors.map((c) => (
           <button
+            key={c}
             type="button"
-            className="rt-pop-clear"
+            className={`rt-swatch${current === c ? " is-current" : ""}`}
+            style={{ background: c }}
             onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              onClear();
-              setOpen(false);
-            }}
-          >
-            {t("fmtDefault")}
-          </button>
-        </div>
+            onClick={() => onPick(c)}
+            aria-label={c}
+          />
+        ))}
+      </div>
+      {onClear && (
+        <button
+          type="button"
+          className="rt-pop-clear"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onClear}
+        >
+          {clearLabel || t("fmtDefault")}
+        </button>
       )}
     </div>
   );
 }
 
+function BlockTypeMenu({ editor, anchorRef, open, onClose }) {
+  const items = [
+    { value: "p",  label: t("fmtParagraph"), sample: "Aa" },
+    { value: "h1", label: t("fmtHeading1"),  sample: "H1" },
+    { value: "h2", label: t("fmtHeading2"),  sample: "H2" },
+    { value: "h3", label: t("fmtHeading3"),  sample: "H3" },
+  ];
+  const currentHeading = [1, 2, 3].find((l) => editor.isActive("heading", { level: l }));
+  const current = currentHeading ? `h${currentHeading}` : "p";
+  const pick = (v) => {
+    const chain = editor.chain().focus();
+    if (v === "p") chain.setParagraph().run();
+    else chain.setHeading({ level: Number(v.slice(1)) }).run();
+    onClose?.();
+  };
+  return (
+    <Popover open={open} onClose={onClose} anchorRef={anchorRef} className="rt-pop--blocks">
+      {items.map((it) => (
+        <button
+          key={it.value}
+          type="button"
+          className={`rt-menu-item rt-menu-item--${it.value}${current === it.value ? " is-current" : ""}`}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => pick(it.value)}
+        >
+          <span className="rt-menu-item-sample">{it.sample}</span>
+          <span className="rt-menu-item-label">{it.label}</span>
+        </button>
+      ))}
+    </Popover>
+  );
+}
+
+function UnderlinePopover({ editor, anchorRef, open, onClose }) {
+  const attrs = editor.getAttributes("underline") || {};
+  const currentStyle = attrs.style || "simple";
+  const currentColor = attrs.color || null;
+  const apply = (next) => {
+    const merged = { style: currentStyle, color: currentColor, ...next };
+    // If turning underline on for the first time this keystroke, make sure
+    // the mark is applied — otherwise just update its attributes.
+    editor.chain().focus().setUnderline(merged).run();
+  };
+  const removeColor = () => apply({ color: null });
+  const off = () => {
+    editor.chain().focus().unsetMark("underline").run();
+    onClose?.();
+  };
+  return (
+    <Popover open={open} onClose={onClose} anchorRef={anchorRef} className="rt-pop--underline">
+      <div className="rt-pop-label">{t("fmtUnderlineStyleLabel")}</div>
+      <div className="rt-ul-styles">
+        {UNDERLINE_STYLES.map((s) => (
+          <button
+            key={s.value}
+            type="button"
+            className={`rt-ul-style${currentStyle === s.value ? " is-current" : ""}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => apply({ style: s.value })}
+            data-tooltip={t(s.label)}
+          >
+            <span style={{ textDecoration: s.preview, textDecorationColor: currentColor || undefined }}>
+              Aa
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="rt-pop-label rt-pop-label--spaced">{t("fmtUnderlineColorLabel")}</div>
+      <Swatches
+        colors={PRESET_UNDERLINE_COLORS}
+        onPick={(c) => apply({ color: c })}
+        current={currentColor}
+        onClear={removeColor}
+        clearLabel={t("fmtDefault")}
+      />
+      <button
+        type="button"
+        className="rt-pop-clear rt-pop-clear--danger"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={off}
+      >
+        {t("fmtUnderlineRemove")}
+      </button>
+    </Popover>
+  );
+}
+
+function ColorPopover({ editor, anchorRef, open, onClose }) {
+  const current = editor.getAttributes("textStyle")?.color || null;
+  const apply = (c) => {
+    editor.chain().focus().setColor(c).run();
+    onClose?.();
+  };
+  const clear = () => {
+    editor.chain().focus().unsetColor().run();
+    onClose?.();
+  };
+  return (
+    <Popover open={open} onClose={onClose} anchorRef={anchorRef} className="rt-pop--color">
+      <Swatches colors={PRESET_TEXT_COLORS} onPick={apply} current={current} onClear={clear} />
+    </Popover>
+  );
+}
+
+function HighlightPopover({ editor, anchorRef, open, onClose }) {
+  const current = editor.getAttributes("highlight")?.color || null;
+  const apply = (c) => {
+    editor.chain().focus().setHighlight({ color: c }).run();
+    onClose?.();
+  };
+  const clear = () => {
+    editor.chain().focus().unsetHighlight().run();
+    onClose?.();
+  };
+  return (
+    <Popover open={open} onClose={onClose} anchorRef={anchorRef} className="rt-pop--highlight">
+      <Swatches colors={PRESET_HIGHLIGHTS} onPick={apply} current={current} onClear={clear} />
+    </Popover>
+  );
+}
+
+function FontSizePopover({ editor, anchorRef, open, onClose }) {
+  const current = editor.getAttributes("textStyle")?.fontSize || "";
+  const pick = (v) => {
+    const chain = editor.chain().focus();
+    if (v) chain.setFontSize(v).run();
+    else chain.unsetFontSize().run();
+    onClose?.();
+  };
+  return (
+    <Popover open={open} onClose={onClose} anchorRef={anchorRef} className="rt-pop--fontsize">
+      <button
+        type="button"
+        className={`rt-size-row rt-size-row--default${!current ? " is-current" : ""}`}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => pick("")}
+      >
+        <span className="rt-size-value">{DEFAULT_FONT_SIZE.replace("px", "")}</span>
+        <span className="rt-size-label">{t("fmtDefault")}</span>
+      </button>
+      {FONT_SIZES.map((s) => (
+        <button
+          key={s}
+          type="button"
+          className={`rt-size-row${current === s ? " is-current" : ""}`}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => pick(s)}
+        >
+          <span className="rt-size-value">{s.replace("px", "")}</span>
+        </button>
+      ))}
+    </Popover>
+  );
+}
+
+function FontFamilyPopover({ editor, anchorRef, open, onClose }) {
+  const current = editor.getAttributes("textStyle")?.fontFamily || "";
+  const pick = (value) => {
+    const chain = editor.chain().focus();
+    if (value) chain.setFontFamily(value).run();
+    else chain.unsetFontFamily().run();
+    onClose?.();
+  };
+  return (
+    <Popover open={open} onClose={onClose} anchorRef={anchorRef} className="rt-pop--font">
+      {FONT_FAMILIES.map((f) => (
+        <button
+          key={f.label}
+          type="button"
+          className={`rt-font-row${current === f.value ? " is-current" : ""}`}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => pick(f.value)}
+          style={{ fontFamily: f.value || undefined }}
+        >
+          {f.label}
+        </button>
+      ))}
+    </Popover>
+  );
+}
+
 export default function RichTextToolbar({ editor, compact = false }) {
-  // We don't actually need to subscribe to editor changes here because the
-  // parent wraps us in a re-render on every transaction via the useEditor
-  // hook. But to be safe for edge cases we force a tick counter.
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!editor) return;
-    const fn = () => setTick((n) => (n + 1) % 1000000);
-    editor.on("selectionUpdate", fn);
-    editor.on("transaction", fn);
-    return () => {
-      editor.off("selectionUpdate", fn);
-      editor.off("transaction", fn);
-    };
-  }, [editor]);
+  useEditorSignal(editor);
+
+  const [openMenu, setOpenMenu] = useState(null); // name of the open popover
+  const blockBtnRef = useRef(null);
+  const fontBtnRef = useRef(null);
+  const sizeBtnRef = useRef(null);
+  const colorBtnRef = useRef(null);
+  const hlBtnRef = useRef(null);
+  const underlineBtnRef = useRef(null);
+  const linkBtnRef = useRef(null);
+
+  const closeMenu = useCallback(() => setOpenMenu(null), []);
+  const toggleMenu = useCallback((name) => {
+    setOpenMenu((cur) => (cur === name ? null : name));
+  }, []);
 
   const isActive = useCallback(
     (name, attrs) => !!editor && editor.isActive(name, attrs),
@@ -127,190 +352,250 @@ export default function RichTextToolbar({ editor, compact = false }) {
   );
 
   if (!editor) return null;
-  const chain = () => editor.chain().focus();
 
-  const currentHeading = [1, 2, 3].find((l) => isActive("heading", { level: l }));
-  const blockValue = currentHeading ? `h${currentHeading}` : "p";
-  const onBlockChange = (e) => {
-    const v = e.target.value;
-    if (v === "p") chain().setParagraph().run();
-    else chain().toggleHeading({ level: Number(v.slice(1)) }).run();
+  const chain = () => editor.chain().focus();
+  const headingLevel = [1, 2, 3].find((l) => editor.isActive("heading", { level: l }));
+  const blockLabel = headingLevel ? `H${headingLevel}` : "¶";
+  const attrs = editor.getAttributes("textStyle") || {};
+  const currentColor = attrs.color || null;
+  const currentHighlight = editor.getAttributes("highlight")?.color || null;
+  const underlineAttrs = editor.getAttributes("underline") || {};
+  const currentFontFamily = attrs.fontFamily || "";
+  const currentFontSize = attrs.fontSize || "";
+  const fontFamilyLabel =
+    FONT_FAMILIES.find((f) => f.value === currentFontFamily)?.label || "Sans";
+  const fontSizeLabel = currentFontSize
+    ? currentFontSize.replace("px", "")
+    : DEFAULT_FONT_SIZE.replace("px", "");
+
+  // Alignment default: when no explicit text-align attribute is set on the
+  // current block we treat the state as "left" so the button reads active
+  // just like in any word processor.
+  const isAlignCenter = isActive({ textAlign: "center" });
+  const isAlignRight = isActive({ textAlign: "right" });
+  const isAlignJustify = isActive({ textAlign: "justify" });
+  const isAlignLeft = !isAlignCenter && !isAlignRight && !isAlignJustify;
+
+  const canIndent =
+    editor.can().sinkListItem?.("listItem") || editor.can().indent?.();
+  const canOutdent =
+    editor.can().liftListItem?.("listItem") || editor.can().outdent?.();
+
+  const doIndent = () => {
+    if (editor.can().sinkListItem?.("listItem")) {
+      chain().sinkListItem("listItem").run();
+    } else {
+      chain().indent().run();
+    }
+  };
+  const doOutdent = () => {
+    if (editor.can().liftListItem?.("listItem")) {
+      chain().liftListItem("listItem").run();
+    } else {
+      chain().outdent().run();
+    }
   };
 
-  const currentFontFamily =
-    editor.getAttributes("textStyle")?.fontFamily || "";
-  const currentFontSize =
-    editor.getAttributes("textStyle")?.fontSize || "";
-
   return (
-    <div className={`rt-toolbar${compact ? " rt-toolbar--compact" : ""}`} role="toolbar">
-      <select
-        className="rt-select"
-        value={blockValue}
-        onChange={onBlockChange}
-        onMouseDown={(e) => e.stopPropagation()}
-        title={t("fmtParagraph")}
-      >
-        <option value="p">{t("fmtParagraph")}</option>
-        <option value="h1">{t("fmtHeading1")}</option>
-        <option value="h2">{t("fmtHeading2")}</option>
-        <option value="h3">{t("fmtHeading3")}</option>
-      </select>
+    <div className={`rt-toolbar${compact ? " rt-toolbar--compact" : ""}`} role="toolbar" aria-label={t("fmtToolbarLabel")}>
+      {/* Group 1 — block + font structure */}
+      <div className="rt-group">
+        <button
+          ref={blockBtnRef}
+          type="button"
+          className={`rt-btn rt-btn--menu${headingLevel ? " is-active" : ""}`}
+          data-tooltip={t("fmtParagraph")}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => toggleMenu("block")}
+        >
+          <span className="rt-btn-label">{blockLabel}</span>
+          <RichIcons.Chevron />
+        </button>
+        <BlockTypeMenu editor={editor} anchorRef={blockBtnRef} open={openMenu === "block"} onClose={closeMenu} />
 
-      <select
-        className="rt-select"
-        value={currentFontFamily}
-        onChange={(e) => {
-          const v = e.target.value;
-          if (v) chain().setFontFamily(v).run();
-          else chain().unsetFontFamily().run();
-        }}
-        title={t("fmtFontFamily")}
-      >
-        {FONT_FAMILIES.map((f) => (
-          <option key={f.label} value={f.value}>
-            {f.label}
-          </option>
-        ))}
-      </select>
+        <button
+          ref={fontBtnRef}
+          type="button"
+          className="rt-btn rt-btn--menu rt-btn--wide"
+          data-tooltip={t("fmtFontFamily")}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => toggleMenu("font")}
+          style={{ fontFamily: currentFontFamily || undefined }}
+        >
+          <span className="rt-btn-label">{fontFamilyLabel}</span>
+          <RichIcons.Chevron />
+        </button>
+        <FontFamilyPopover editor={editor} anchorRef={fontBtnRef} open={openMenu === "font"} onClose={closeMenu} />
 
-      <select
-        className="rt-select"
-        value={currentFontSize}
-        onChange={(e) => {
-          const v = e.target.value;
-          if (v) chain().setFontSize(v).run();
-          else chain().unsetFontSize().run();
-        }}
-        title={t("fmtFontSize")}
-      >
-        <option value="">{t("fmtDefault")}</option>
-        {FONT_SIZES.filter(Boolean).map((s) => (
-          <option key={s} value={s}>
-            {s.replace("px", "")}
-          </option>
-        ))}
-      </select>
+        <button
+          ref={sizeBtnRef}
+          type="button"
+          className={`rt-btn rt-btn--menu rt-btn--narrow${currentFontSize ? " is-active" : ""}`}
+          data-tooltip={t("fmtFontSize")}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => toggleMenu("size")}
+        >
+          <span className="rt-btn-label">{fontSizeLabel}</span>
+          <RichIcons.Chevron />
+        </button>
+        <FontSizePopover editor={editor} anchorRef={sizeBtnRef} open={openMenu === "size"} onClose={closeMenu} />
+      </div>
 
-      <span className="rt-sep" />
+      <span className="rt-sep" aria-hidden="true" />
 
-      <ToolbarButton editor={editor} active={isActive("bold")} title={t("fmtBold")} onClick={() => chain().toggleBold().run()}>
-        <strong>B</strong>
-      </ToolbarButton>
-      <ToolbarButton editor={editor} active={isActive("italic")} title={t("fmtItalic")} onClick={() => chain().toggleItalic().run()}>
-        <em>I</em>
-      </ToolbarButton>
-      <ToolbarButton editor={editor} active={isActive("underline")} title={t("fmtUnderline")} onClick={() => chain().toggleUnderline().run()}>
-        <u>U</u>
-      </ToolbarButton>
-      <ToolbarButton editor={editor} active={isActive("strike")} title={t("fmtStrike")} onClick={() => chain().toggleStrike().run()}>
-        <span className="line-through">S</span>
-      </ToolbarButton>
-      <ToolbarButton editor={editor} active={isActive("code")} title={t("fmtInlineCode")} onClick={() => chain().toggleCode().run()}>
-        <code>{"</>"}</code>
-      </ToolbarButton>
+      {/* Group 2 — inline formatting marks */}
+      <div className="rt-group">
+        <ToolbarButton active={isActive("bold")} title={t("fmtBold")} onClick={() => chain().toggleBold().run()}>
+          <RichIcons.Bold />
+        </ToolbarButton>
+        <ToolbarButton active={isActive("italic")} title={t("fmtItalic")} onClick={() => chain().toggleItalic().run()}>
+          <RichIcons.Italic />
+        </ToolbarButton>
 
-      <SwatchPopover
-        label={t("fmtTextColor")}
-        colors={PRESET_TEXT_COLORS}
-        onPick={(c) => chain().setColor(c).run()}
-        onClear={() => chain().unsetColor().run()}
-        anchor={<span className="rt-swatch-anchor" style={{ color: editor.getAttributes("textStyle")?.color || "inherit" }}>A</span>}
-      />
-      <SwatchPopover
-        label={t("fmtHighlight")}
-        colors={PRESET_HIGHLIGHTS}
-        onPick={(c) => chain().toggleHighlight({ color: c }).run()}
-        onClear={() => chain().unsetHighlight().run()}
-        anchor={<span className="rt-swatch-anchor rt-swatch-anchor--hl">🖍</span>}
-      />
+        {/* Underline with split chevron for variants */}
+        <div className="rt-splitbtn">
+          <ToolbarButton
+            active={isActive("underline")}
+            title={t("fmtUnderline")}
+            onClick={() => chain().toggleUnderline({ style: underlineAttrs.style || "simple", color: underlineAttrs.color || null }).run()}
+          >
+            <RichIcons.Underline style={underlineAttrs.style} color={underlineAttrs.color} />
+          </ToolbarButton>
+          <button
+            ref={underlineBtnRef}
+            type="button"
+            className={`rt-btn rt-btn--chevron${openMenu === "underline" ? " is-active" : ""}`}
+            data-tooltip={t("fmtUnderlineOptions")}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => toggleMenu("underline")}
+          >
+            <RichIcons.Chevron />
+          </button>
+          <UnderlinePopover editor={editor} anchorRef={underlineBtnRef} open={openMenu === "underline"} onClose={closeMenu} />
+        </div>
 
-      <ToolbarButton editor={editor} active={isActive("subscript")} title={t("fmtSubscript")} onClick={() => chain().toggleSubscript().run()}>
-        <span>X<sub>2</sub></span>
-      </ToolbarButton>
-      <ToolbarButton editor={editor} active={isActive("superscript")} title={t("fmtSuperscript")} onClick={() => chain().toggleSuperscript().run()}>
-        <span>X<sup>2</sup></span>
-      </ToolbarButton>
+        <ToolbarButton active={isActive("strike")} title={t("fmtStrike")} onClick={() => chain().toggleStrike().run()}>
+          <RichIcons.Strike />
+        </ToolbarButton>
+        <ToolbarButton active={isActive("code")} title={t("fmtInlineCode")} onClick={() => chain().toggleCode().run()}>
+          <RichIcons.Code />
+        </ToolbarButton>
 
-      <span className="rt-sep" />
+        <ToolbarButton
+          active={isActive("subscript")}
+          title={t("fmtSubscript")}
+          onClick={() => chain().toggleSubscript().run()}
+        >
+          <RichIcons.Subscript />
+        </ToolbarButton>
+        <ToolbarButton
+          active={isActive("superscript")}
+          title={t("fmtSuperscript")}
+          onClick={() => chain().toggleSuperscript().run()}
+        >
+          <RichIcons.Superscript />
+        </ToolbarButton>
+      </div>
 
-      <ToolbarButton editor={editor} active={isActive("bulletList")} title={t("fmtBulletList")} onClick={() => chain().toggleBulletList().run()}>
-        •
-      </ToolbarButton>
-      <ToolbarButton editor={editor} active={isActive("orderedList")} title={t("fmtOrderedList")} onClick={() => chain().toggleOrderedList().run()}>
-        1.
-      </ToolbarButton>
-      <ToolbarButton
-        editor={editor}
-        title={t("fmtOutdent")}
-        disabled={!editor.can().liftListItem("listItem")}
-        onClick={() => chain().liftListItem("listItem").run()}
-      >
-        ⇤
-      </ToolbarButton>
-      <ToolbarButton
-        editor={editor}
-        title={t("fmtIndent")}
-        disabled={!editor.can().sinkListItem("listItem")}
-        onClick={() => chain().sinkListItem("listItem").run()}
-      >
-        ⇥
-      </ToolbarButton>
+      <span className="rt-sep" aria-hidden="true" />
 
-      <span className="rt-sep" />
+      {/* Group 3 — color + highlight */}
+      <div className="rt-group">
+        <button
+          ref={colorBtnRef}
+          type="button"
+          className={`rt-btn rt-btn--swatch${currentColor ? " is-active" : ""}`}
+          data-tooltip={t("fmtTextColor")}
+          aria-label={t("fmtTextColor")}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => toggleMenu("color")}
+        >
+          <RichIcons.TextColor swatch={currentColor || "#111827"} />
+        </button>
+        <ColorPopover editor={editor} anchorRef={colorBtnRef} open={openMenu === "color"} onClose={closeMenu} />
 
-      <ToolbarButton editor={editor} active={isActive({ textAlign: "left" })} title={t("fmtAlignLeft")} onClick={() => chain().setTextAlign("left").run()}>
-        ⬱
-      </ToolbarButton>
-      <ToolbarButton editor={editor} active={isActive({ textAlign: "center" })} title={t("fmtAlignCenter")} onClick={() => chain().setTextAlign("center").run()}>
-        ⇔
-      </ToolbarButton>
-      <ToolbarButton editor={editor} active={isActive({ textAlign: "right" })} title={t("fmtAlignRight")} onClick={() => chain().setTextAlign("right").run()}>
-        ⬲
-      </ToolbarButton>
-      <ToolbarButton editor={editor} active={isActive({ textAlign: "justify" })} title={t("fmtAlignJustify")} onClick={() => chain().setTextAlign("justify").run()}>
-        ≡
-      </ToolbarButton>
+        <button
+          ref={hlBtnRef}
+          type="button"
+          className={`rt-btn rt-btn--swatch${currentHighlight ? " is-active" : ""}`}
+          data-tooltip={t("fmtHighlight")}
+          aria-label={t("fmtHighlight")}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => toggleMenu("highlight")}
+        >
+          <RichIcons.Highlight swatch={currentHighlight || "#fef3c7"} />
+        </button>
+        <HighlightPopover editor={editor} anchorRef={hlBtnRef} open={openMenu === "highlight"} onClose={closeMenu} />
+      </div>
 
-      <span className="rt-sep" />
+      <span className="rt-sep" aria-hidden="true" />
 
-      <ToolbarButton editor={editor} active={isActive("blockquote")} title={t("fmtQuote")} onClick={() => chain().toggleBlockquote().run()}>
-        ❝
-      </ToolbarButton>
-      <ToolbarButton editor={editor} active={isActive("codeBlock")} title={t("fmtCodeBlock")} onClick={() => chain().toggleCodeBlock().run()}>
-        {"{ }"}
-      </ToolbarButton>
-      <ToolbarButton editor={editor} title={t("fmtSeparator")} onClick={() => chain().setHorizontalRule().run()}>
-        —
-      </ToolbarButton>
+      {/* Group 4 — lists, indent, align */}
+      <div className="rt-group">
+        <ToolbarButton active={isActive("bulletList")} title={t("fmtBulletList")} onClick={() => chain().toggleBulletList().run()}>
+          <RichIcons.BulletList />
+        </ToolbarButton>
+        <ToolbarButton active={isActive("orderedList")} title={t("fmtOrderedList")} onClick={() => chain().toggleOrderedList().run()}>
+          <RichIcons.OrderedList />
+        </ToolbarButton>
 
-      <span className="rt-sep" />
+        <ToolbarButton title={t("fmtOutdent")} disabled={!canOutdent} onClick={doOutdent}>
+          <RichIcons.Outdent />
+        </ToolbarButton>
+        <ToolbarButton title={t("fmtIndent")} disabled={!canIndent} onClick={doIndent}>
+          <RichIcons.Indent />
+        </ToolbarButton>
 
-      <ToolbarButton
-        editor={editor}
-        title={t("fmtLink")}
-        onClick={() => {
-          const prev = editor.getAttributes("link")?.href || "";
-          // eslint-disable-next-line no-alert
-          const url = window.prompt(t("fmtLink"), prev);
-          if (url === null) return;
-          if (url === "") {
-            chain().unsetLink().run();
-          } else {
-            chain().extendMarkRange("link").setLink({ href: url }).run();
-          }
-        }}
-      >
-        🔗
-      </ToolbarButton>
+        <ToolbarButton active={isAlignLeft} title={t("fmtAlignLeft")} onClick={() => chain().setTextAlign("left").run()}>
+          <RichIcons.AlignLeft />
+        </ToolbarButton>
+        <ToolbarButton active={isAlignCenter} title={t("fmtAlignCenter")} onClick={() => chain().setTextAlign("center").run()}>
+          <RichIcons.AlignCenter />
+        </ToolbarButton>
+        <ToolbarButton active={isAlignRight} title={t("fmtAlignRight")} onClick={() => chain().setTextAlign("right").run()}>
+          <RichIcons.AlignRight />
+        </ToolbarButton>
+        <ToolbarButton active={isAlignJustify} title={t("fmtAlignJustify")} onClick={() => chain().setTextAlign("justify").run()}>
+          <RichIcons.AlignJustify />
+        </ToolbarButton>
+      </div>
 
-      <ToolbarButton
-        editor={editor}
-        title={t("fmtClearFormatting")}
-        onClick={() => chain().clearNodes().unsetAllMarks().run()}
-      >
-        ⌫
-      </ToolbarButton>
+      <span className="rt-sep" aria-hidden="true" />
+
+      {/* Group 5 — blocks + link + clear */}
+      <div className="rt-group">
+        <ToolbarButton active={isActive("blockquote")} title={t("fmtQuote")} onClick={() => chain().toggleBlockquote().run()}>
+          <RichIcons.Quote />
+        </ToolbarButton>
+        <ToolbarButton
+          active={isActive("codeBlock")}
+          title={t("fmtCodeBlock")}
+          onClick={() => chain().smartToggleCodeBlock().run()}
+        >
+          <RichIcons.CodeBlock />
+        </ToolbarButton>
+        <ToolbarButton title={t("fmtSeparator")} onClick={() => chain().setHorizontalRule().run()}>
+          <RichIcons.HR />
+        </ToolbarButton>
+
+        <div className="rt-pop-wrap" ref={linkBtnRef}>
+          <ToolbarButton
+            active={isActive("link") || openMenu === "link"}
+            title={t("fmtLink")}
+            onClick={() => toggleMenu("link")}
+          >
+            <RichIcons.Link />
+          </ToolbarButton>
+          <LinkPopover editor={editor} anchorRef={linkBtnRef} open={openMenu === "link"} onClose={closeMenu} />
+        </div>
+
+        <ToolbarButton
+          title={t("fmtClearFormatting")}
+          onClick={() => chain().clearNodes().unsetAllMarks().run()}
+        >
+          <RichIcons.Clear />
+        </ToolbarButton>
+      </div>
     </div>
   );
 }
