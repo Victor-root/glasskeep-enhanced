@@ -3949,7 +3949,7 @@ export default function App() {
    * Server-side `type` is immutable under PATCH — we persist via a full
    * PUT update, mirroring the checklist branch of `saveModal`.
    */
-  const convertNoteType = async () => {
+  const performConvertNoteType = async () => {
     if (!activeId) return;
     if (mType !== "text" && mType !== "checklist") return;
     if (tagFilter === "TRASHED") return;
@@ -4025,6 +4025,22 @@ export default function App() {
       leaseId,
     );
     if (enqueued) showToast(t(toastKey), "success");
+  };
+
+  // Public wrapper: gate the conversion behind a confirmation dialog so
+  // a misclick on the kebab entry doesn't silently rewrite the note.
+  const convertNoteType = () => {
+    if (!activeId) return;
+    if (mType !== "text" && mType !== "checklist") return;
+    if (tagFilter === "TRASHED") return;
+    const targetType = mType === "text" ? "checklist" : "text";
+    setGenericConfirmConfig({
+      title: t(targetType === "checklist" ? "convertToChecklist" : "convertToText"),
+      message: t(targetType === "checklist" ? "convertToChecklistConfirm" : "convertToTextConfirm"),
+      confirmText: t("convertConfirmAction"),
+      onConfirm: () => performConvertNoteType(),
+    });
+    setGenericConfirmOpen(true);
   };
 
   // Checklist drag-and-drop is handled by useChecklistDrag inside NoteModal
