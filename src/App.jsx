@@ -2207,13 +2207,16 @@ export default function App() {
       // auto-triggers processQueue on recovery. Also restarts the
       // health timer chain if it was broken by tab suspension.
       if (engine) {
-        let ok = await engine.healthCheck();
+        // force=true on every attempt: the retry gap (1.5s) is shorter than
+        // the 3s throttle in healthCheck(), so unforced retries silently
+        // return the cached "offline" value and waste a slot in the loop.
+        let ok = await engine.healthCheck(true);
         // On mobile after long background, the first fetch often fails because
         // Chrome reuses stale TCP sockets from before suspension. Retry with
         // increasing delays to give the browser time to recycle the socket pool.
         for (let i = 0; i < 3 && !ok; i++) {
           await new Promise((r) => setTimeout(r, 1500 + i * 1500));
-          ok = await engine.healthCheck();
+          ok = await engine.healthCheck(true);
         }
         // Restart the health timer chain unconditionally — mobile browsers
         // may have GC'd the previous setTimeout during background suspension.
@@ -2245,12 +2248,14 @@ export default function App() {
       // the health check that sets _serverReachable = true.
       const engine = syncEngineRef.current;
       if (engine) {
-        let ok = await engine.healthCheck();
+        // force=true: same reason as in visibilitychange — the 1.5s retry
+        // gap would otherwise trip the 3s throttle inside healthCheck().
+        let ok = await engine.healthCheck(true);
         // On mobile, stale TCP sockets survive the offline→online transition.
         // Retry with increasing delays so the browser can recycle them.
         for (let i = 0; i < 3 && !ok; i++) {
           await new Promise((r) => setTimeout(r, 1500 + i * 1500));
-          ok = await engine.healthCheck();
+          ok = await engine.healthCheck(true);
         }
         engine.restartHealthTimer();
         if (ok) {

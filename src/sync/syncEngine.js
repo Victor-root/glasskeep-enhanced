@@ -56,6 +56,7 @@ export class SyncEngine {
     this._failedChecks = 0; // consecutive failed health checks (reset on success)
     this._consecutiveTimeouts = 0; // consecutive AbortErrors (reset on success or hard failure)
     this._healthCheckInFlight = false; // guard against concurrent health checks
+    this._healthCheckStartedAt = 0; // timestamp a check became in-flight — for stale-guard reset
     this._lastHealthCheckAt = 0; // timestamp of last healthCheck start (for throttling)
     this._rateLimited = false; // true when server returns 403/429 — backs off more aggressively
     this._sseConnected = false; // true while SSE EventSource is open
@@ -380,8 +381,21 @@ export class SyncEngine {
     const token = this.getToken();
     if (!token) return false;
 
-    // Prevent concurrent health checks (e.g. forceSync + scheduled check)
-    if (this._healthCheckInFlight) return this._serverReachable ?? false;
+    // Prevent concurrent health checks (e.g. forceSync + scheduled check).
+    // Stale-guard: on mobile WebView, a fetch issued just before background
+    // suspension can see its `finally` block skipped if the task is dropped,
+    // leaving _healthCheckInFlight stuck at true forever. After 10s we assume
+    // the previous check was lost and break out so a fresh one can run —
+    // otherwise the app stays "offline" until the user restarts it.
+    if (this._healthCheckInFlight) {
+      const staleness = Date.now() - (this._healthCheckStartedAt || 0);
+      if (staleness > 10000) {
+        console.warn("[SyncEngine] healthCheck: stale in-flight (age=%dms) — resetting guard", staleness);
+        this._healthCheckInFlight = false;
+      } else {
+        return this._serverReachable ?? false;
+      }
+    }
 
     // Throttle: reject calls within 3s of the last one (prevents SSE onerror
     // storm from flooding the server with health checks). Scheduled checks
@@ -392,6 +406,7 @@ export class SyncEngine {
       return this._serverReachable ?? false;
     }
     this._lastHealthCheckAt = now;
+    this._healthCheckStartedAt = now;
     this._healthCheckInFlight = true;
 
     try {
