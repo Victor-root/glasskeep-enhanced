@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { t } from "../../i18n";
 import LinkPopover from "./LinkPopover.jsx";
 import RichIcons from "./RichIcons.jsx";
+import { Popover } from "./Popover.jsx";
 
 // Design principles:
 //  • Compact icon buttons (tighter than v1) — one clean grid, grouped by
@@ -54,37 +55,9 @@ function ToolbarButton({ active, onClick, disabled, title, children, className =
   );
 }
 
-// Anchored popover shell. Decouples open/close state from the button row so
-// the same UX applies to every dropdown (colour, highlight, underline, …).
-function Popover({ open, onClose, anchorRef, children, className = "" }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e) => {
-      if (ref.current?.contains(e.target)) return;
-      if (anchorRef?.current?.contains(e.target)) return;
-      onClose?.();
-    };
-    const onKey = (e) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        onClose?.();
-      }
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, anchorRef, onClose]);
-  if (!open) return null;
-  return (
-    <div ref={ref} className={`rt-pop ${className}`.trim()} role="dialog">
-      {children}
-    </div>
-  );
-}
+// Popover primitive lives in ./Popover.jsx — it uses fixed positioning and
+// clamps to the viewport so a popover near the right edge of the modal no
+// longer extends the modal's scroll width.
 
 const PRESET_TEXT_COLORS = [
   "#111827", "#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4",
@@ -150,7 +123,7 @@ function Swatches({ colors, onPick, current, onClear, clearLabel }) {
 
 function BlockTypeMenu({ editor, anchorRef, open, onClose }) {
   const items = [
-    { value: "p",  label: t("fmtParagraph"), sample: "Aa" },
+    { value: "p",  label: t("fmtParagraph"), icon: <RichIcons.Paragraph /> },
     { value: "h1", label: t("fmtHeading1"),  sample: "H1" },
     { value: "h2", label: t("fmtHeading2"),  sample: "H2" },
     { value: "h3", label: t("fmtHeading3"),  sample: "H3" },
@@ -173,7 +146,9 @@ function BlockTypeMenu({ editor, anchorRef, open, onClose }) {
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => pick(it.value)}
         >
-          <span className="rt-menu-item-sample">{it.sample}</span>
+          <span className="rt-menu-item-sample">
+            {it.icon ? it.icon : it.sample}
+          </span>
           <span className="rt-menu-item-label">{it.label}</span>
         </button>
       ))}
@@ -355,7 +330,11 @@ export default function RichTextToolbar({ editor, compact = false }) {
 
   const chain = () => editor.chain().focus();
   const headingLevel = [1, 2, 3].find((l) => editor.isActive("heading", { level: l }));
-  const blockLabel = headingLevel ? `H${headingLevel}` : "¶";
+  // Block-type button shows the current heading level as text ("H1" / "H2" /
+  // "H3") or a proper paragraph SVG icon when the block is a normal paragraph.
+  const blockContent = headingLevel
+    ? <span className="rt-btn-label">{`H${headingLevel}`}</span>
+    : <RichIcons.Paragraph />;
   const attrs = editor.getAttributes("textStyle") || {};
   const currentColor = attrs.color || null;
   const currentHighlight = editor.getAttributes("highlight")?.color || null;
@@ -403,12 +382,12 @@ export default function RichTextToolbar({ editor, compact = false }) {
         <button
           ref={blockBtnRef}
           type="button"
-          className={`rt-btn rt-btn--menu${headingLevel ? " is-active" : ""}`}
+          className={`rt-btn rt-btn--menu rt-btn--block${headingLevel ? " is-active" : ""}`}
           data-tooltip={t("fmtParagraph")}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => toggleMenu("block")}
         >
-          <span className="rt-btn-label">{blockLabel}</span>
+          {blockContent}
           <RichIcons.Chevron />
         </button>
         <BlockTypeMenu editor={editor} anchorRef={blockBtnRef} open={openMenu === "block"} onClose={closeMenu} />

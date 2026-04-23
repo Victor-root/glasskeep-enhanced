@@ -2,11 +2,13 @@
 //
 // Detects whether the current selection already carries a link (extends the
 // caret to the full link range when inside one) and offers create / update /
-// remove actions. Anchors to the supplied button so the flow reads naturally
-// from the toolbar.
+// remove actions. Anchored via the shared fixed-position Popover so it
+// never pushes the modal's scroll width (fixes the "horizontal scrollbar on
+// open" regression).
 
 import React, { useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
+import { Popover } from "./Popover.jsx";
 
 function ensureSchemeURL(raw) {
   const v = (raw || "").trim();
@@ -18,7 +20,6 @@ function ensureSchemeURL(raw) {
 }
 
 export default function LinkPopover({ editor, anchorRef, open, onClose }) {
-  const popRef = useRef(null);
   const inputRef = useRef(null);
   const [href, setHref] = useState("");
   const existingHref = editor?.getAttributes("link")?.href || "";
@@ -27,32 +28,13 @@ export default function LinkPopover({ editor, anchorRef, open, onClose }) {
   useEffect(() => {
     if (!open) return;
     setHref(existingHref || "");
-    // Focus the URL field on open so the user can type immediately.
-    requestAnimationFrame(() => inputRef.current?.focus());
+    // Focus the URL field on open so the user can type immediately. Defer
+    // to the next frame so the popover is already positioned.
+    const id = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(id);
   }, [open, existingHref]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDocDown = (e) => {
-      if (popRef.current?.contains(e.target)) return;
-      if (anchorRef?.current?.contains(e.target)) return;
-      onClose?.();
-    };
-    const onKey = (e) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        onClose?.();
-      }
-    };
-    document.addEventListener("mousedown", onDocDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, anchorRef, onClose]);
-
-  if (!open || !editor) return null;
+  if (!editor) return null;
 
   const apply = () => {
     const url = ensureSchemeURL(href);
@@ -77,7 +59,13 @@ export default function LinkPopover({ editor, anchorRef, open, onClose }) {
   };
 
   return (
-    <div ref={popRef} className="rt-pop rt-pop--link" role="dialog" aria-label={t("fmtLink")}>
+    <Popover
+      open={open}
+      onClose={onClose}
+      anchorRef={anchorRef}
+      className="rt-pop--link"
+      preferredWidth={300}
+    >
       <input
         ref={inputRef}
         type="url"
@@ -125,6 +113,6 @@ export default function LinkPopover({ editor, anchorRef, open, onClose }) {
           </>
         )}
       </div>
-    </div>
+    </Popover>
   );
 }

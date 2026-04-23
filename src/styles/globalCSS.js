@@ -1019,9 +1019,9 @@ html.dark .login-deco-card {
   --rt-btn-hover: rgba(0, 0, 0, 0.055);
   --rt-btn-active-bg: rgba(var(--rt-accent), 0.14);
   --rt-btn-active-text: rgb(var(--rt-accent));
-  --rt-pop-bg: rgba(255, 255, 255, 0.96);
-  --rt-pop-border: rgba(0, 0, 0, 0.08);
-  --rt-pop-shadow: 0 10px 30px -6px rgba(17, 24, 39, 0.22), 0 2px 8px rgba(17, 24, 39, 0.08);
+  --rt-pop-bg: #ffffff;
+  --rt-pop-border: rgba(0, 0, 0, 0.1);
+  --rt-pop-shadow: 0 12px 32px -6px rgba(17, 24, 39, 0.28), 0 2px 8px rgba(17, 24, 39, 0.1);
 }
 html.dark {
   --rt-divider: rgba(255, 255, 255, 0.1);
@@ -1029,9 +1029,9 @@ html.dark {
   --rt-btn-hover: rgba(255, 255, 255, 0.08);
   --rt-btn-active-bg: rgba(var(--rt-accent), 0.26);
   --rt-btn-active-text: rgb(165, 180, 252);
-  --rt-pop-bg: rgba(31, 41, 55, 0.96);
-  --rt-pop-border: rgba(255, 255, 255, 0.1);
-  --rt-pop-shadow: 0 10px 30px -6px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --rt-pop-bg: #1f2937;
+  --rt-pop-border: rgba(255, 255, 255, 0.12);
+  --rt-pop-shadow: 0 12px 32px -6px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 /* ---------- Editor surface ---------- */
@@ -1234,18 +1234,18 @@ html.dark .rt-icon-swatch-bar { border-color: rgba(255, 255, 255, 0.12); }
 /* ---------- Popovers ---------- */
 .rt-pop-wrap { position: relative; display: inline-flex; }
 .rt-pop {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 60;
+  /* Fixed positioning: coordinates come from usePopoverPosition so the
+     popover never extends the parent's scroll area (previously, opening a
+     popover near the modal's right edge pushed a horizontal scrollbar). */
+  position: fixed;
+  z-index: 9999;
   min-width: 180px;
   padding: 8px;
   border-radius: 10px;
   background: var(--rt-pop-bg);
   border: 1px solid var(--rt-pop-border);
   box-shadow: var(--rt-pop-shadow);
-  backdrop-filter: saturate(1.2) blur(10px);
-  -webkit-backdrop-filter: saturate(1.2) blur(10px);
+  /* Fully opaque — no backdrop blur. Popovers now look like proper menus. */
   animation: rt-pop-in 0.12s ease-out;
 }
 @keyframes rt-pop-in {

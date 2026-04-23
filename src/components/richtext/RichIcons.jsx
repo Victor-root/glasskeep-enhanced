@@ -25,6 +25,18 @@ function svg(children, extra) {
 const Chevron = () =>
   svg(<path d="M6 9l6 6 6-6" />, { width: 10, height: 10 });
 
+// Modern "body text" glyph — four horizontal text lines, the last one
+// shorter, as used by Notion / Google Docs to mean "paragraph / normal".
+const Paragraph = () =>
+  svg(
+    <>
+      <line x1="4"  y1="6"  x2="20" y2="6" />
+      <line x1="4"  y1="10" x2="20" y2="10" />
+      <line x1="4"  y1="14" x2="20" y2="14" />
+      <line x1="4"  y1="18" x2="13" y2="18" />
+    </>,
+  );
+
 const Bold = () =>
   svg(
     <>
@@ -241,7 +253,7 @@ const Highlight = ({ swatch = "#fef3c7" }) => (
 );
 
 const RichIcons = {
-  Chevron,
+  Chevron, Paragraph,
   Bold, Italic, Underline, Strike, Code, CodeBlock, Quote, HR, Link, Clear,
   Subscript, Superscript,
   BulletList, OrderedList, Indent, Outdent,
