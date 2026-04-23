@@ -2938,6 +2938,35 @@ export default function App() {
   // eagerly to prevent effect re-triggers — this ref is the safety net.
   const committedBaselineRef = useRef(null);
 
+  // Compute the tag context that should pre-fill a freshly created note.
+  // Rule:
+  //  - Special filters (ARCHIVED / TRASHED / ALL_IMAGES) → no auto-tag.
+  //  - activeTagFilters (real multi-tag selection, OR logic) → apply them all:
+  //    the new note then satisfies the current filter and stays visible.
+  //    Single-tag clicks also land in activeTagFilters, so this covers both.
+  //  - Fallback on tagFilter if it ever held a real tag (defensive; the
+  //    current sidebar never sets it to a tag string).
+  const getInitialTagsForNewNote = useCallback(() => {
+    const isSpecial =
+      tagFilter === "ARCHIVED" || tagFilter === "TRASHED" || tagFilter === ALL_IMAGES;
+    if (isSpecial) return [];
+    const collected = [];
+    if (Array.isArray(activeTagFilters) && activeTagFilters.length > 0) {
+      collected.push(...activeTagFilters);
+    } else if (typeof tagFilter === "string" && tagFilter) {
+      collected.push(tagFilter);
+    }
+    const seen = new Set();
+    const out = [];
+    for (const t of collected) {
+      const key = String(t).toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(String(t));
+    }
+    return out;
+  }, [tagFilter, activeTagFilters]);
+
   // Deferred-create lifecycle for the desktop creation buttons — see
   // src/hooks/useDraftNote.js. App.jsx keeps only the intercept calls in
   // autosave effects, the guard branches in togglePin/archive/save/delete,
@@ -2966,6 +2995,7 @@ export default function App() {
     initialModalStateRef, committedBaselineRef,
     acquireLocalLease, enqueueWithLease,
     idbPutNote, invalidateNotesCache, sortNotesByRecency,
+    getInitialTags: getInitialTagsForNewNote,
   });
 
   const openModal = (id) => {

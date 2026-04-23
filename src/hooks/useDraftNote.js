@@ -116,10 +116,17 @@ export default function useDraftNote(ctx) {
     const tempId = uid();
     const isDraw = type === "draw";
 
+    // Inherit the current tag filter context so the new note stays visible
+    // under whatever filter the user was browsing. Returns [] for special
+    // filters or an empty filter (ARCHIVED / TRASHED / ALL_IMAGES / none).
+    const initialTags = typeof ctx.getInitialTags === "function"
+      ? (ctx.getInitialTags() || [])
+      : [];
+
     // Reset composer state (mobile composer uses these)
     ctx.setTitle("");
     ctx.setContent("");
-    ctx.setComposerTagList([]);
+    ctx.setComposerTagList(initialTags);
     ctx.setComposerTagInput("");
     ctx.setComposerTagFocused(false);
     ctx.setComposerImages([]);
@@ -141,11 +148,14 @@ export default function useDraftNote(ctx) {
     ctx.skipNextItemsAutosave.current = true;
     ctx.setMItems([]);
     ctx.prevItemsRef.current = [];
-    ctx.setMTagList([]);
+    ctx.setMTagList(initialTags);
     ctx.setMImages([]);
     ctx.setTagInput("");
     ctx.setMColor("default");
-    const baselineState = { title: "", content: "", tags: [], images: [], color: "default" };
+    // Baseline tags MUST match what we just seeded, otherwise the metadata
+    // autosave effect would immediately diff and try to patch a note that
+    // hasn't been materialised yet.
+    const baselineState = { title: "", content: "", tags: initialTags, images: [], color: "default" };
     ctx.initialModalStateRef.current = baselineState;
     ctx.committedBaselineRef.current = { ...baselineState };
     if (isDraw) ctx.setInitialDrawMode("draw");
