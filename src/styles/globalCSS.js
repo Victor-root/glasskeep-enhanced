@@ -1347,12 +1347,36 @@ html.dark .rt-block-badge {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: Georgia, "Times New Roman", serif;
+  /* Inherit the note's typography so the preview actually MATCHES what
+     the user will see once the style is applied — font family, italic /
+     oblique, colour, all carry through to the sample. The per-block
+     font-size / weight come from the --gk-type-* variables the
+     typography-presets panel drives, scaled to fit the button. */
+  font-family: inherit;
+  font-style: inherit;
+  color: inherit;
 }
-.rt-style-btn--p  .rt-style-btn-sample  { font-size: 0.82rem; font-weight: 400; }
-.rt-style-btn--h1 .rt-style-btn-sample  { font-size: 1rem;    font-weight: 800; letter-spacing: 0.01em; }
-.rt-style-btn--h2 .rt-style-btn-sample  { font-size: 0.92rem; font-weight: 700; letter-spacing: 0.01em; }
-.rt-style-btn--h3 .rt-style-btn-sample  { font-size: 0.86rem; font-weight: 600; letter-spacing: 0.01em; }
+/* Per-block preview: font-size is the user's configured value * 0.7
+   (scaled so the H1 preview fits in the 32-px button), capped by min()
+   so extreme values still sit inside the row. font-weight is the raw
+   configured weight — keeping that exact preserves the visual impact
+   of Bold vs Medium vs Regular in the preview. */
+.rt-style-btn--p  .rt-style-btn-sample {
+  font-size: min(calc(var(--gk-type-p-size,  1rem)    * 0.82), 1rem);
+  font-weight: var(--gk-type-p-weight, 400);
+}
+.rt-style-btn--h1 .rt-style-btn-sample {
+  font-size: min(calc(var(--gk-type-h1-size, 1.5rem)  * 0.82), 1.25rem);
+  font-weight: var(--gk-type-h1-weight, 600);
+}
+.rt-style-btn--h2 .rt-style-btn-sample {
+  font-size: min(calc(var(--gk-type-h2-size, 1.25rem) * 0.82), 1.12rem);
+  font-weight: var(--gk-type-h2-weight, 600);
+}
+.rt-style-btn--h3 .rt-style-btn-sample {
+  font-size: min(calc(var(--gk-type-h3-size, 1.125rem) * 0.82), 1rem);
+  font-weight: var(--gk-type-h3-weight, 600);
+}
 
 .rt-splitbtn {
   display: inline-flex;
