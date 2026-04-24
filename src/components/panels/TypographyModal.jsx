@@ -4,15 +4,16 @@
 // (size / weight / colour / italic / underline × 6 block types) without
 // cramming them. The settings panel now exposes a button that opens this
 // modal, which is free to use the full viewport width and therefore
-// allows a "real" customisation layout: big preview cards, swatch rows
-// that never wrap awkwardly, toggles that sit next to their label, and
-// a persistent reset button.
+// allows a "real" customisation layout with THREE profiles the user
+// can switch between.
 
 import React, { useEffect } from "react";
 import { t } from "../../i18n";
 import { CloseIcon } from "../../icons/index.jsx";
+import TI from "../../icons/editor/index.jsx";
 import {
-  DEFAULT_TYPOGRAPHY_PRESETS,
+  DEFAULT_PROFILE,
+  PROFILE_KEYS,
   TYPOGRAPHY_SIZE_PRESETS,
   TYPOGRAPHY_WEIGHT_PRESETS,
   TYPOGRAPHY_COLOR_PRESETS,
@@ -27,6 +28,12 @@ const BLOCKS = [
   { key: "h4", labelKey: "typographyBlockH4" },
   { key: "h5", labelKey: "typographyBlockH5" },
 ];
+
+const PROFILE_LABEL_KEYS = {
+  profile1: "typographyProfile1",
+  profile2: "typographyProfile2",
+  profile3: "typographyProfile3",
+};
 
 function ColorRow({ value, onChange }) {
   return (
@@ -66,7 +73,7 @@ function ColorRow({ value, onChange }) {
   );
 }
 
-function Toggle({ active, onClick, label, sample }) {
+function Toggle({ active, onClick, label, icon }) {
   return (
     <button
       type="button"
@@ -74,7 +81,7 @@ function Toggle({ active, onClick, label, sample }) {
       aria-pressed={active ? "true" : "false"}
       onClick={onClick}
     >
-      <span className="typo-modal-toggle-sample">{sample}</span>
+      <span className="typo-modal-toggle-sample">{icon}</span>
       <span className="typo-modal-toggle-label">{label}</span>
     </button>
   );
@@ -142,13 +149,13 @@ function BlockCard({ blockKey, labelKey, state, update }) {
               active={state.italic}
               onClick={() => update({ italic: !state.italic })}
               label={t("typographyFieldItalic")}
-              sample={<em>I</em>}
+              icon={<TI.Italic />}
             />
             <Toggle
               active={state.underline}
               onClick={() => update({ underline: !state.underline })}
               label={t("typographyFieldUnderline")}
-              sample={<span style={{ textDecoration: "underline" }}>U</span>}
+              icon={<TI.Underline />}
             />
           </div>
         </div>
@@ -157,10 +164,31 @@ function BlockCard({ blockKey, labelKey, state, update }) {
   );
 }
 
+function ProfileTabs({ active, onSwitch }) {
+  return (
+    <div className="typo-modal-profiles" role="tablist" aria-label={t("typographyProfileLabel")}>
+      {PROFILE_KEYS.map((key) => (
+        <button
+          key={key}
+          type="button"
+          role="tab"
+          aria-selected={active === key ? "true" : "false"}
+          className={`typo-modal-profile${active === key ? " is-active" : ""}`}
+          onClick={() => onSwitch(key)}
+        >
+          {t(PROFILE_LABEL_KEYS[key])}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function TypographyModal({ open, onClose, presets, setPresets, dark }) {
   const normalized = normalizeTypographyPresets(presets);
+  const activeKey = normalized.active;
+  const activeProfile = normalized[activeKey];
 
-  // Escape closes the modal, matching every other modal in the app.
+  // Escape closes the modal.
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => {
@@ -172,13 +200,29 @@ export default function TypographyModal({ open, onClose, presets, setPresets, da
 
   if (!open) return null;
 
-  const update = (block, patch) => {
+  const switchProfile = (key) => {
+    if (key === activeKey) return;
+    setPresets({ ...normalized, active: key });
+  };
+
+  const updateBlock = (block, patch) => {
     setPresets({
       ...normalized,
-      [block]: { ...normalized[block], ...patch },
+      [activeKey]: {
+        ...activeProfile,
+        [block]: { ...activeProfile[block], ...patch },
+      },
     });
   };
-  const reset = () => setPresets({ ...DEFAULT_TYPOGRAPHY_PRESETS });
+
+  // Reset only touches the profile currently on screen — other profiles
+  // keep whatever the user set up for them.
+  const resetActiveProfile = () => {
+    setPresets({
+      ...normalized,
+      [activeKey]: { ...DEFAULT_PROFILE },
+    });
+  };
 
   return (
     <div
@@ -189,17 +233,19 @@ export default function TypographyModal({ open, onClose, presets, setPresets, da
     >
       <div className="typo-modal" role="dialog" aria-label={t("typographyTitle")}>
         <header className="typo-modal-header">
-          <div>
+          <div className="typo-modal-header-main">
             <div className="typo-modal-title">{t("typographyTitle")}</div>
             <div className="typo-modal-desc">{t("typographyDesc")}</div>
+            <ProfileTabs active={activeKey} onSwitch={switchProfile} />
           </div>
           <div className="typo-modal-header-actions">
             <button
               type="button"
               className="px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
-              onClick={reset}
+              onClick={resetActiveProfile}
+              title={t("typographyResetActiveHint")}
             >
-              {t("typographyReset")}
+              {t("typographyResetActive")}
             </button>
             <button
               type="button"
@@ -214,11 +260,11 @@ export default function TypographyModal({ open, onClose, presets, setPresets, da
         <div className="typo-modal-body">
           {BLOCKS.map(({ key, labelKey }) => (
             <BlockCard
-              key={key}
+              key={`${activeKey}-${key}`}
               blockKey={key}
               labelKey={labelKey}
-              state={normalized[key]}
-              update={(patch) => update(key, patch)}
+              state={activeProfile[key]}
+              update={(patch) => updateBlock(key, patch)}
             />
           ))}
         </div>

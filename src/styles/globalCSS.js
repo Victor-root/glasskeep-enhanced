@@ -1977,6 +1977,10 @@ html.dark .typo-modal {
   padding: 16px 20px 14px;
   border-bottom: 1px solid var(--rt-divider);
 }
+.typo-modal-header-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
 .typo-modal-title {
   font-size: 1.05rem;
   font-weight: 700;
@@ -1987,6 +1991,48 @@ html.dark .typo-modal {
   margin-top: 2px;
   line-height: 1.35;
 }
+
+/* Profile tabs — segmented control under the title so the user can
+   switch which profile they're editing without leaving the modal. */
+.typo-modal-profiles {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 3px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  border: 1px solid var(--rt-divider);
+}
+html.dark .typo-modal-profiles {
+  background: rgba(255, 255, 255, 0.06);
+}
+.typo-modal-profile {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, transform 0.08s ease;
+}
+.typo-modal-profile:hover:not(.is-active) {
+  background: var(--rt-btn-hover);
+}
+.typo-modal-profile.is-active {
+  background: #ffffff;
+  color: rgb(var(--rt-accent));
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.12);
+}
+html.dark .typo-modal-profile.is-active {
+  background: rgba(99, 102, 241, 0.22);
+  color: rgb(196, 181, 253);
+  box-shadow: none;
+}
+
 .typo-modal-header-actions {
   display: inline-flex;
   align-items: center;
@@ -2172,7 +2218,14 @@ html.dark .typo-modal-toggle {
   line-height: 1;
   min-width: 14px;
   text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
+/* Tabler icons used inside the italic / underline toggles — same look
+   as the note-modal toolbar for visual consistency. */
+.typo-modal-toggle-sample .tabler-icon { width: 18px; height: 18px; }
+.typo-modal-toggle-sample .tabler-icon svg { width: 18px; height: 18px; }
 .typo-modal-toggle-label { font-size: 0.78rem; font-weight: 500; }
 
 @media (max-width: 560px) {
