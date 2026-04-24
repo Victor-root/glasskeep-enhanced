@@ -1144,15 +1144,17 @@ html.dark .rt-editor-content a { color: #93c5fd; }
   display: contents;
 }
 .rt-toolbar {
-  /* Word-style dense ribbon: tight columns, intact groups, visible
-     vertical separators between groups. Two-row wrap is the expected
-     resting state on standard modal widths — every group stays a
-     coherent block, nothing reads as "leftover". */
+  /* Word-style ribbon. Each "super-group" (.rt-sg) is a 2-row internal
+     column; super-groups sit side by side, separated by a full-height
+     vertical divider. When the viewport is too narrow for all
+     super-groups on one ribbon row, a super-group wraps as a whole
+     block — it never spills its own items across different rows of
+     the toolbar, matching the reference screenshot. */
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  row-gap: 3px;
+  align-items: stretch;
   column-gap: 0;
+  row-gap: 6px;
   padding: 5px 8px 6px;
   margin: 4px 8px 6px;
   border-radius: 10px;
@@ -1164,17 +1166,20 @@ html.dark .rt-toolbar {
 }
 .rt-toolbar--compact { padding: 3px 6px 4px; }
 
-/* A group is one flex item — flex-wrap on the toolbar wraps WHOLE groups,
-   never individual buttons. Within a group buttons are flush (no gap)
-   and flex-wrap lets items of an extra-wide group fold onto a second
-   internal sub-row (Word-ribbon behaviour) rather than spilling across
-   the toolbar row. */
-.rt-group {
+/* Super-group — two vertically stacked rows of flush buttons. */
+.rt-sg {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2px;
+}
+
+/* Sub-row inside a super-group — buttons flush, no gap between them. */
+.rt-sg-row {
+  display: inline-flex;
   align-items: center;
-  row-gap: 2px;
-  column-gap: 0;
+  gap: 0;
+  flex-wrap: nowrap;
 }
 
 .rt-btn {
@@ -1232,17 +1237,17 @@ html.dark .rt-toolbar {
 .rt-splitbtn > .rt-btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 3px; }
 .rt-splitbtn > .rt-btn--chevron { border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 2px; }
 
-/* Separator scales with the new button height so it reads as a divider
-   between columns of icons rather than a short orphan line. */
+/* Separator spans the full super-group height (both sub-rows) so the
+   visual break between groups reads unambiguously in the Word-ribbon
+   layout. 6 px horizontal margin matches the ribbon padding rhythm. */
 .rt-sep {
   width: 1px;
-  align-self: center;
-  height: 24px;
+  align-self: stretch;
   background: var(--rt-divider-strong);
-  margin: 0 5px;
+  margin: 2px 6px;
   display: inline-block;
   flex-shrink: 0;
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
 /* Inline swatch markers on the text-colour / highlight buttons */

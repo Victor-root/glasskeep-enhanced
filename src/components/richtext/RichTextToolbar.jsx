@@ -411,203 +411,194 @@ export default function RichTextToolbar({ editor, compact = false }) {
 
   return (
     <div className={`rt-toolbar${compact ? " rt-toolbar--compact" : ""}`} role="toolbar" aria-label={t("fmtToolbarLabel")}>
-      {/* Group 1 — block structure: paragraph/heading, font family, font size */}
-      <div className="rt-group" data-group="block">
-        <button
-          ref={blockBtnRef}
-          type="button"
-          className={`rt-btn rt-btn--menu rt-btn--block${headingLevel ? " is-active" : ""}`}
-          data-tooltip={t("fmtParagraph")}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => toggleMenu("block")}
-        >
-          {blockContent}
-          <RichIcons.Chevron />
-        </button>
-        <BlockTypeMenu editor={editor} anchorRef={blockBtnRef} open={openMenu === "block"} onClose={closeMenu} />
+      {/*
+        Word-ribbon layout. Each "super-group" is a 2-sub-row block:
+        structural controls on top, character/inline controls on the
+        bottom — so the group reads as one homogeneous unit even when
+        it wraps onto a second visual row.
+      */}
 
-        <button
-          ref={fontBtnRef}
-          type="button"
-          className="rt-btn rt-btn--menu rt-btn--wide"
-          data-tooltip={t("fmtFontFamily")}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => toggleMenu("font")}
-          style={{ fontFamily: currentFontFamily || undefined }}
-        >
-          <span className="rt-btn-label">{fontFamilyLabel}</span>
-          <RichIcons.Chevron />
-        </button>
-        <FontFamilyPopover editor={editor} anchorRef={fontBtnRef} open={openMenu === "font"} onClose={closeMenu} />
-
-        <button
-          ref={sizeBtnRef}
-          type="button"
-          className={`rt-btn rt-btn--menu rt-btn--narrow${currentFontSize ? " is-active" : ""}`}
-          data-tooltip={t("fmtFontSize")}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => toggleMenu("size")}
-        >
-          <span className="rt-btn-label">{fontSizeLabel}</span>
-          <RichIcons.Chevron />
-        </button>
-        <FontSizePopover editor={editor} anchorRef={sizeBtnRef} open={openMenu === "size"} onClose={closeMenu} />
-      </div>
-
-      <span className="rt-sep" aria-hidden="true" />
-
-      {/* Group 2 — inline character formatting */}
-      <div className="rt-group" data-group="marks">
-        <ToolbarButton active={isActive("bold")} title={t("fmtBold")} onClick={() => chain().toggleBold().run()}>
-          <RichIcons.Bold />
-        </ToolbarButton>
-        <ToolbarButton active={isActive("italic")} title={t("fmtItalic")} onClick={() => chain().toggleItalic().run()}>
-          <RichIcons.Italic />
-        </ToolbarButton>
-
-        {/* Underline + chevron for advanced variants. */}
-        <div className="rt-splitbtn">
-          <ToolbarButton
-            active={isActive("underline")}
-            title={t("fmtUnderline")}
-            onClick={() => chain().toggleUnderline({ style: underlineAttrs.style || "simple", color: underlineAttrs.color || null }).run()}
-          >
-            <RichIcons.Underline style={underlineAttrs.style} color={underlineAttrs.color} />
-          </ToolbarButton>
+      {/* Super-group A — Font / character formatting */}
+      <div className="rt-sg" data-sg="font">
+        <div className="rt-sg-row">
           <button
-            ref={underlineBtnRef}
+            ref={blockBtnRef}
             type="button"
-            className={`rt-btn rt-btn--chevron${openMenu === "underline" ? " is-active" : ""}`}
-            data-tooltip={t("fmtUnderlineOptions")}
+            className={`rt-btn rt-btn--menu rt-btn--block${headingLevel ? " is-active" : ""}`}
+            data-tooltip={t("fmtParagraph")}
             onMouseDown={(e) => e.preventDefault()}
-            onClick={() => toggleMenu("underline")}
+            onClick={() => toggleMenu("block")}
           >
+            {blockContent}
             <RichIcons.Chevron />
           </button>
-          <UnderlinePopover editor={editor} anchorRef={underlineBtnRef} open={openMenu === "underline"} onClose={closeMenu} />
-        </div>
+          <BlockTypeMenu editor={editor} anchorRef={blockBtnRef} open={openMenu === "block"} onClose={closeMenu} />
 
-        <ToolbarButton active={isActive("strike")} title={t("fmtStrike")} onClick={() => chain().toggleStrike().run()}>
-          <RichIcons.Strike />
-        </ToolbarButton>
-        <ToolbarButton active={isActive("subscript")} title={t("fmtSubscript")} onClick={() => chain().toggleSubscript().run()}>
-          <RichIcons.Subscript />
-        </ToolbarButton>
-        <ToolbarButton active={isActive("superscript")} title={t("fmtSuperscript")} onClick={() => chain().toggleSuperscript().run()}>
-          <RichIcons.Superscript />
-        </ToolbarButton>
-      </div>
-
-      <span className="rt-sep" aria-hidden="true" />
-
-      {/* Group 3 — colour + highlight */}
-      <div className="rt-group" data-group="color">
-        <button
-          ref={colorBtnRef}
-          type="button"
-          className={`rt-btn rt-btn--swatch${currentColor ? " is-active" : ""}`}
-          data-tooltip={t("fmtTextColor")}
-          aria-label={t("fmtTextColor")}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => toggleMenu("color")}
-        >
-          <RichIcons.TextColor swatch={currentColor || "#111827"} />
-        </button>
-        <ColorPopover editor={editor} anchorRef={colorBtnRef} open={openMenu === "color"} onClose={closeMenu} />
-
-        <button
-          ref={hlBtnRef}
-          type="button"
-          className={`rt-btn rt-btn--swatch${currentHighlight ? " is-active" : ""}`}
-          data-tooltip={t("fmtHighlight")}
-          aria-label={t("fmtHighlight")}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => toggleMenu("highlight")}
-        >
-          <RichIcons.Highlight swatch={currentHighlight || (isDark ? "#b45309" : "#fde047")} />
-        </button>
-        <HighlightPopover editor={editor} anchorRef={hlBtnRef} open={openMenu === "highlight"} onClose={closeMenu} isDark={isDark} />
-      </div>
-
-      <span className="rt-sep" aria-hidden="true" />
-
-      {/* Group 4 — list structure: bullet / ordered + outdent / indent */}
-      <div className="rt-group" data-group="lists">
-        <ToolbarButton active={isActive("bulletList")} title={t("fmtBulletList")} onClick={() => chain().toggleBulletList().run()}>
-          <RichIcons.BulletList />
-        </ToolbarButton>
-        <ToolbarButton active={isActive("orderedList")} title={t("fmtOrderedList")} onClick={() => chain().toggleOrderedList().run()}>
-          <RichIcons.OrderedList />
-        </ToolbarButton>
-        <ToolbarButton title={t("fmtOutdent")} disabled={!canOutdent} onClick={doOutdent}>
-          <RichIcons.Outdent />
-        </ToolbarButton>
-        <ToolbarButton title={t("fmtIndent")} disabled={!canIndent} onClick={doIndent}>
-          <RichIcons.Indent />
-        </ToolbarButton>
-      </div>
-
-      <span className="rt-sep" aria-hidden="true" />
-
-      {/* Group 5 — block alignment */}
-      <div className="rt-group" data-group="align">
-        <ToolbarButton active={isAlignLeft} title={t("fmtAlignLeft")} onClick={() => chain().setTextAlign("left").run()}>
-          <RichIcons.AlignLeft />
-        </ToolbarButton>
-        <ToolbarButton active={isAlignCenter} title={t("fmtAlignCenter")} onClick={() => chain().setTextAlign("center").run()}>
-          <RichIcons.AlignCenter />
-        </ToolbarButton>
-        <ToolbarButton active={isAlignRight} title={t("fmtAlignRight")} onClick={() => chain().setTextAlign("right").run()}>
-          <RichIcons.AlignRight />
-        </ToolbarButton>
-        <ToolbarButton active={isAlignJustify} title={t("fmtAlignJustify")} onClick={() => chain().setTextAlign("justify").run()}>
-          <RichIcons.AlignJustify />
-        </ToolbarButton>
-      </div>
-
-      <span className="rt-sep" aria-hidden="true" />
-
-      {/* Group 6 — content inserts: quote, inline code, code block, HR, link */}
-      <div className="rt-group" data-group="insert">
-        <ToolbarButton active={isActive("blockquote")} title={t("fmtQuote")} onClick={() => chain().toggleBlockquote().run()}>
-          <RichIcons.Quote />
-        </ToolbarButton>
-        <ToolbarButton active={isActive("code")} title={t("fmtInlineCode")} onClick={() => chain().toggleCode().run()}>
-          <RichIcons.Code />
-        </ToolbarButton>
-        <ToolbarButton
-          active={isActive("codeBlock")}
-          title={t("fmtCodeBlock")}
-          onClick={() => chain().smartToggleCodeBlock().run()}
-        >
-          <RichIcons.CodeBlock />
-        </ToolbarButton>
-        <ToolbarButton title={t("fmtSeparator")} onClick={() => chain().setHorizontalRule().run()}>
-          <RichIcons.HR />
-        </ToolbarButton>
-        <div className="rt-pop-wrap" ref={linkBtnRef}>
-          <ToolbarButton
-            active={isActive("link") || openMenu === "link"}
-            title={t("fmtLink")}
-            onClick={() => toggleMenu("link")}
+          <button
+            ref={fontBtnRef}
+            type="button"
+            className="rt-btn rt-btn--menu rt-btn--wide"
+            data-tooltip={t("fmtFontFamily")}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => toggleMenu("font")}
+            style={{ fontFamily: currentFontFamily || undefined }}
           >
-            <RichIcons.Link />
+            <span className="rt-btn-label">{fontFamilyLabel}</span>
+            <RichIcons.Chevron />
+          </button>
+          <FontFamilyPopover editor={editor} anchorRef={fontBtnRef} open={openMenu === "font"} onClose={closeMenu} />
+
+          <button
+            ref={sizeBtnRef}
+            type="button"
+            className={`rt-btn rt-btn--menu rt-btn--narrow${currentFontSize ? " is-active" : ""}`}
+            data-tooltip={t("fmtFontSize")}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => toggleMenu("size")}
+          >
+            <span className="rt-btn-label">{fontSizeLabel}</span>
+            <RichIcons.Chevron />
+          </button>
+          <FontSizePopover editor={editor} anchorRef={sizeBtnRef} open={openMenu === "size"} onClose={closeMenu} />
+
+          <ToolbarButton
+            title={t("fmtClearFormatting")}
+            onClick={() => chain().clearNodes().unsetAllMarks().run()}
+          >
+            <RichIcons.Clear />
           </ToolbarButton>
-          <LinkPopover editor={editor} anchorRef={linkBtnRef} open={openMenu === "link"} onClose={closeMenu} />
+        </div>
+        <div className="rt-sg-row">
+          <ToolbarButton active={isActive("bold")} title={t("fmtBold")} onClick={() => chain().toggleBold().run()}>
+            <RichIcons.Bold />
+          </ToolbarButton>
+          <ToolbarButton active={isActive("italic")} title={t("fmtItalic")} onClick={() => chain().toggleItalic().run()}>
+            <RichIcons.Italic />
+          </ToolbarButton>
+          <div className="rt-splitbtn">
+            <ToolbarButton
+              active={isActive("underline")}
+              title={t("fmtUnderline")}
+              onClick={() => chain().toggleUnderline({ style: underlineAttrs.style || "simple", color: underlineAttrs.color || null }).run()}
+            >
+              <RichIcons.Underline style={underlineAttrs.style} color={underlineAttrs.color} />
+            </ToolbarButton>
+            <button
+              ref={underlineBtnRef}
+              type="button"
+              className={`rt-btn rt-btn--chevron${openMenu === "underline" ? " is-active" : ""}`}
+              data-tooltip={t("fmtUnderlineOptions")}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => toggleMenu("underline")}
+            >
+              <RichIcons.Chevron />
+            </button>
+            <UnderlinePopover editor={editor} anchorRef={underlineBtnRef} open={openMenu === "underline"} onClose={closeMenu} />
+          </div>
+          <ToolbarButton active={isActive("strike")} title={t("fmtStrike")} onClick={() => chain().toggleStrike().run()}>
+            <RichIcons.Strike />
+          </ToolbarButton>
+          <ToolbarButton active={isActive("subscript")} title={t("fmtSubscript")} onClick={() => chain().toggleSubscript().run()}>
+            <RichIcons.Subscript />
+          </ToolbarButton>
+          <ToolbarButton active={isActive("superscript")} title={t("fmtSuperscript")} onClick={() => chain().toggleSuperscript().run()}>
+            <RichIcons.Superscript />
+          </ToolbarButton>
+          <button
+            ref={colorBtnRef}
+            type="button"
+            className={`rt-btn rt-btn--swatch${currentColor ? " is-active" : ""}`}
+            data-tooltip={t("fmtTextColor")}
+            aria-label={t("fmtTextColor")}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => toggleMenu("color")}
+          >
+            <RichIcons.TextColor swatch={currentColor || "#111827"} />
+          </button>
+          <ColorPopover editor={editor} anchorRef={colorBtnRef} open={openMenu === "color"} onClose={closeMenu} />
+          <button
+            ref={hlBtnRef}
+            type="button"
+            className={`rt-btn rt-btn--swatch${currentHighlight ? " is-active" : ""}`}
+            data-tooltip={t("fmtHighlight")}
+            aria-label={t("fmtHighlight")}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => toggleMenu("highlight")}
+          >
+            <RichIcons.Highlight swatch={currentHighlight || (isDark ? "#b45309" : "#fde047")} />
+          </button>
+          <HighlightPopover editor={editor} anchorRef={hlBtnRef} open={openMenu === "highlight"} onClose={closeMenu} isDark={isDark} />
         </div>
       </div>
 
       <span className="rt-sep" aria-hidden="true" />
 
-      {/* Group 7 — utility: clear formatting (kept visible per Word-style
-          spec; sits as its own group so it never reads as orphan). */}
-      <div className="rt-group" data-group="clear">
-        <ToolbarButton
-          title={t("fmtClearFormatting")}
-          onClick={() => chain().clearNodes().unsetAllMarks().run()}
-        >
-          <RichIcons.Clear />
-        </ToolbarButton>
+      {/* Super-group B — Paragraph / block structure */}
+      <div className="rt-sg" data-sg="paragraph">
+        <div className="rt-sg-row">
+          <ToolbarButton active={isActive("bulletList")} title={t("fmtBulletList")} onClick={() => chain().toggleBulletList().run()}>
+            <RichIcons.BulletList />
+          </ToolbarButton>
+          <ToolbarButton active={isActive("orderedList")} title={t("fmtOrderedList")} onClick={() => chain().toggleOrderedList().run()}>
+            <RichIcons.OrderedList />
+          </ToolbarButton>
+          <ToolbarButton title={t("fmtOutdent")} disabled={!canOutdent} onClick={doOutdent}>
+            <RichIcons.Outdent />
+          </ToolbarButton>
+          <ToolbarButton title={t("fmtIndent")} disabled={!canIndent} onClick={doIndent}>
+            <RichIcons.Indent />
+          </ToolbarButton>
+        </div>
+        <div className="rt-sg-row">
+          <ToolbarButton active={isAlignLeft} title={t("fmtAlignLeft")} onClick={() => chain().setTextAlign("left").run()}>
+            <RichIcons.AlignLeft />
+          </ToolbarButton>
+          <ToolbarButton active={isAlignCenter} title={t("fmtAlignCenter")} onClick={() => chain().setTextAlign("center").run()}>
+            <RichIcons.AlignCenter />
+          </ToolbarButton>
+          <ToolbarButton active={isAlignRight} title={t("fmtAlignRight")} onClick={() => chain().setTextAlign("right").run()}>
+            <RichIcons.AlignRight />
+          </ToolbarButton>
+          <ToolbarButton active={isAlignJustify} title={t("fmtAlignJustify")} onClick={() => chain().setTextAlign("justify").run()}>
+            <RichIcons.AlignJustify />
+          </ToolbarButton>
+        </div>
+      </div>
+
+      <span className="rt-sep" aria-hidden="true" />
+
+      {/* Super-group C — Insert / content elements */}
+      <div className="rt-sg" data-sg="insert">
+        <div className="rt-sg-row">
+          <ToolbarButton active={isActive("blockquote")} title={t("fmtQuote")} onClick={() => chain().toggleBlockquote().run()}>
+            <RichIcons.Quote />
+          </ToolbarButton>
+          <ToolbarButton
+            active={isActive("codeBlock")}
+            title={t("fmtCodeBlock")}
+            onClick={() => chain().smartToggleCodeBlock().run()}
+          >
+            <RichIcons.CodeBlock />
+          </ToolbarButton>
+          <ToolbarButton title={t("fmtSeparator")} onClick={() => chain().setHorizontalRule().run()}>
+            <RichIcons.HR />
+          </ToolbarButton>
+        </div>
+        <div className="rt-sg-row">
+          <ToolbarButton active={isActive("code")} title={t("fmtInlineCode")} onClick={() => chain().toggleCode().run()}>
+            <RichIcons.Code />
+          </ToolbarButton>
+          <div className="rt-pop-wrap" ref={linkBtnRef}>
+            <ToolbarButton
+              active={isActive("link") || openMenu === "link"}
+              title={t("fmtLink")}
+              onClick={() => toggleMenu("link")}
+            >
+              <RichIcons.Link />
+            </ToolbarButton>
+            <LinkPopover editor={editor} anchorRef={linkBtnRef} open={openMenu === "link"} onClose={closeMenu} />
+          </div>
+        </div>
       </div>
     </div>
   );
