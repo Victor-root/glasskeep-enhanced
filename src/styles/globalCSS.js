@@ -94,6 +94,15 @@ html.dark header.multi-select-bar {
   box-shadow: 0 4px 24px rgba(139, 92, 246, 0.22), inset 0 0 0 1px rgba(139, 92, 246, 0.1);
 }
 .note-content { -webkit-user-select: text; user-select: text; }
+/* Text cursor on the modal's note body (both edit AND view mode) so the
+   user sees the selection cursor when hovering the text — useful for
+   copy-paste in read mode. Scoped with .note-modal-anim so the closed-
+   note cards in the grid keep their pointer cursor (clicking a card
+   opens the modal). */
+.note-modal-anim .note-content,
+.note-modal-anim .note-content--dense {
+  cursor: text;
+}
 /* Block margins are zeroed so that vertical spacing is driven solely by the
    blank lines the user typed — mirroring the textarea in edit mode.  Spacer
    elements are injected by renderSafeMarkdown() (see markdown.jsx). */
