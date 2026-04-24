@@ -20,9 +20,44 @@ const STYLES = [
 function StyleButton({ editor, value, labelKey, className, active }) {
   const label = t(labelKey);
   const apply = () => {
-    const chain = editor.chain().focus();
-    if (value === "p") chain.setParagraph().run();
-    else chain.setHeading({ level: Number(value.slice(1)) }).run();
+    // Behave like every other toolbar tool:
+    //   - with a non-empty selection → convert the selected block(s)
+    //     (Tiptap's default setHeading / setParagraph)
+    //   - with just a caret in an EMPTY block → convert that empty
+    //     block (so pressing H1 on a fresh line starts typing into H1)
+    //   - with just a caret in a block that ALREADY has content →
+    //     insert a NEW empty block of the target type right AFTER the
+    //     current block and move the caret into it. Nothing around the
+    //     caret is silently promoted to H1 / H2 / …
+    if (value === "p") {
+      // Back-to-paragraph: convert the current block (or selection) —
+      // the user wants to stop being a heading.
+      editor.chain().focus().setParagraph().run();
+      return;
+    }
+
+    const level = Number(value.slice(1));
+    const { selection } = editor.state;
+    const $from = selection.$from;
+    const parent = $from.parent;
+    const caretIsInsideContent =
+      selection.empty && parent.isTextblock && parent.content.size > 0;
+
+    if (!caretIsInsideContent) {
+      editor.chain().focus().setHeading({ level }).run();
+      return;
+    }
+
+    // Caret sits inside a non-empty block: insert a fresh empty heading
+    // AFTER the current block so existing content is preserved verbatim
+    // and the user starts writing into the new heading.
+    const posAfter = $from.after();
+    editor
+      .chain()
+      .focus()
+      .insertContentAt(posAfter, { type: "heading", attrs: { level } })
+      .focus(posAfter + 1)
+      .run();
   };
   return (
     <button

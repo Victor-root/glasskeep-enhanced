@@ -4,7 +4,7 @@ import { api } from "../../utils/api.js";
 import UserAvatar from "../common/UserAvatar.jsx";
 import { SunIcon, MoonIcon, FloatingCardsIcon, SettingsIcon, CloseIcon } from "../../icons/index.jsx";
 import { fileToCompressedDataURL } from "../../utils/helpers.js";
-import TypographySettings from "./TypographySettings.jsx";
+import TypographyModal from "./TypographyModal.jsx";
 
 export default function SettingsPanel({
   open,
@@ -40,6 +40,7 @@ export default function SettingsPanel({
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [overridePositions, setOverridePositions] = useState(true);
   const [profileShowOnLogin, setProfileShowOnLogin] = useState(true);
+  const [typographyModalOpen, setTypographyModalOpen] = useState(false);
   const avatarFileRef = React.useRef(null);
 
   // Load profile data when panel opens
@@ -400,11 +401,23 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              {/* Rich-text editor typography presets */}
-              <TypographySettings
-                presets={typographyPresets}
-                setPresets={setTypographyPresets}
-              />
+              {/* Rich-text editor typography presets — opens its own
+                  full-viewport modal so the 6 block cards have enough
+                  room to show size / weight / colour / italic / underline
+                  controls without being cut off on the narrow side sheet. */}
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="font-medium">{t("typographyTitle")}</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">{t("typographyDesc")}</div>
+                </div>
+                <button
+                  type="button"
+                  className="ml-3 shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium border border-indigo-500/40 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors"
+                  onClick={() => setTypographyModalOpen(true)}
+                >
+                  {t("typographyOpen")}
+                </button>
+              </div>
 
             </div>
           </div>
@@ -525,6 +538,15 @@ export default function SettingsPanel({
           </div>
         </div>
       )}
+
+      {/* Dedicated modal for advanced typography customisation. */}
+      <TypographyModal
+        open={typographyModalOpen}
+        onClose={() => setTypographyModalOpen(false)}
+        presets={typographyPresets}
+        setPresets={setTypographyPresets}
+        dark={dark}
+      />
     </>
   );
 }

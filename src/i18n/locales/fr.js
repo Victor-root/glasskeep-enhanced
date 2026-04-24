@@ -245,6 +245,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   typographyWeightSemibold: "Demi-gras",
   typographyWeightBold: "Gras",
   typographyReset: "Réinitialiser",
+  typographyOpen: "Personnaliser…",
+  typographyCardHint: "Les modifications s’appliquent partout où ce style est utilisé.",
   listView: "Vue liste",
   multiSelect: "Sélection multiple",
   hiPrefix: "Salut,",

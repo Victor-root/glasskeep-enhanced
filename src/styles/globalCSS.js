@@ -168,6 +168,19 @@ html.dark .note-content a {
   pointer-events: none;
 }
 
+/* Closed-note size: body text in the card preview renders at 14 px so
+   a card shows more of the note at a glance. Only applies to the CARD
+   (.note-card). The modal's edit and view modes keep their configured
+   rendering (default 16 px / the user's typography-preset size). */
+.note-card .note-content,
+.note-card .note-content--dense {
+  font-size: 0.875rem;
+}
+.note-card .note-content--dense p {
+  font-size: 0.875rem;
+  font-weight: var(--gk-type-p-weight, 400);
+}
+
 /* Inline code and fenced code styling */
 .note-content code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -1880,6 +1893,255 @@ html.dark .settings-type-color--none {
 html.dark .settings-type-toggle {
   background: rgba(0, 0, 0, 0.35);
   border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ================================================================
+   Typography customisation modal — dedicated full-viewport surface
+   for size / weight / colour / italic / underline per block type.
+   ================================================================ */
+.typo-modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(17, 24, 39, 0.48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.typo-modal-scrim--dark { background: rgba(0, 0, 0, 0.62); }
+
+.typo-modal {
+  width: min(820px, 100%);
+  max-height: min(92vh, 960px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 16px 44px -6px rgba(17, 24, 39, 0.35), 0 4px 12px rgba(17, 24, 39, 0.12);
+  overflow: hidden;
+  color: inherit;
+}
+html.dark .typo-modal {
+  background: #1f2937;
+  box-shadow: 0 16px 44px -6px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.typo-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--rt-divider);
+}
+.typo-modal-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.typo-modal-desc {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+.typo-modal-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.typo-modal-reset {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--rt-divider);
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.typo-modal-reset:hover { background: var(--rt-btn-hover); }
+.typo-modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.typo-modal-close:hover { background: var(--rt-btn-hover); }
+
+.typo-modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 14px 16px 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.typo-modal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--rt-divider);
+}
+html.dark .typo-modal-card { background: rgba(255, 255, 255, 0.04); }
+
+.typo-modal-card-preview {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 0 6px;
+  border-bottom: 1px dashed var(--rt-divider);
+}
+.typo-modal-card-hint {
+  font-size: 0.72rem;
+  opacity: 0.6;
+  line-height: 1.3;
+}
+
+.typo-modal-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+.typo-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.75;
+}
+.typo-modal-field--wide { grid-column: 1 / -1; }
+.typo-modal-field-label { font-weight: 600; }
+.typo-modal-field select {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--rt-divider);
+  background: rgba(255, 255, 255, 0.6);
+  color: inherit;
+  font-size: 0.85rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+html.dark .typo-modal-field select {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.typo-modal-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.typo-modal-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.08s ease, box-shadow 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.typo-modal-color:hover { transform: scale(1.1); }
+.typo-modal-color.is-current {
+  box-shadow: 0 0 0 2px rgba(var(--rt-accent), 0.85);
+  border-color: transparent;
+}
+html.dark .typo-modal-color { border-color: rgba(255, 255, 255, 0.18); }
+.typo-modal-color--none {
+  background: #ffffff;
+  color: rgba(0, 0, 0, 0.4);
+}
+html.dark .typo-modal-color--none {
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.5);
+}
+.typo-modal-color-custom {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px dashed var(--rt-divider);
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  background: linear-gradient(135deg, #ef4444, #eab308, #22c55e, #0ea5e9, #a855f7);
+}
+.typo-modal-color-custom input[type="color"] {
+  position: absolute;
+  inset: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.typo-modal-toggles { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.typo-modal-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--rt-divider);
+  background: rgba(255, 255, 255, 0.55);
+  color: inherit;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.typo-modal-toggle:hover { background: var(--rt-btn-hover); }
+.typo-modal-toggle.is-current {
+  background: var(--rt-btn-active-bg);
+  color: var(--rt-btn-active-text);
+  border-color: rgba(var(--rt-accent), 0.45);
+}
+html.dark .typo-modal-toggle {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.typo-modal-toggle-sample {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1;
+  min-width: 14px;
+  text-align: center;
+}
+.typo-modal-toggle-label { font-size: 0.78rem; font-weight: 500; }
+
+@media (max-width: 560px) {
+  .typo-modal { max-height: 100vh; border-radius: 0; }
+  .typo-modal-scrim { padding: 0; }
+  .typo-modal-body {
+    grid-template-columns: 1fr;
+    padding: 12px 12px 16px;
+  }
 }
 
 /* Mobile squeeze: the toolbar stays on one or two lines and each row uses

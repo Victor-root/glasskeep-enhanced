@@ -1,0 +1,228 @@
+// Dedicated full-screen modal for the typography-preset editor.
+//
+// The settings side sheet is too narrow to display all the controls
+// (size / weight / colour / italic / underline × 6 block types) without
+// cramming them. The settings panel now exposes a button that opens this
+// modal, which is free to use the full viewport width and therefore
+// allows a "real" customisation layout: big preview cards, swatch rows
+// that never wrap awkwardly, toggles that sit next to their label, and
+// a persistent reset button.
+
+import React, { useEffect } from "react";
+import { t } from "../../i18n";
+import { CloseIcon } from "../../icons/index.jsx";
+import {
+  DEFAULT_TYPOGRAPHY_PRESETS,
+  TYPOGRAPHY_SIZE_PRESETS,
+  TYPOGRAPHY_WEIGHT_PRESETS,
+  TYPOGRAPHY_COLOR_PRESETS,
+  normalizeTypographyPresets,
+} from "../../utils/typographyPresets.js";
+
+const BLOCKS = [
+  { key: "p",  labelKey: "typographyBlockParagraph" },
+  { key: "h1", labelKey: "typographyBlockH1" },
+  { key: "h2", labelKey: "typographyBlockH2" },
+  { key: "h3", labelKey: "typographyBlockH3" },
+  { key: "h4", labelKey: "typographyBlockH4" },
+  { key: "h5", labelKey: "typographyBlockH5" },
+];
+
+function ColorRow({ value, onChange }) {
+  return (
+    <div className="typo-modal-colors" role="group" aria-label={t("typographyFieldColor")}>
+      <button
+        type="button"
+        className={`typo-modal-color typo-modal-color--none${value === null ? " is-current" : ""}`}
+        onClick={() => onChange(null)}
+        title={t("fmtDefault")}
+        aria-label={t("fmtDefault")}
+      >
+        <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+          <line x1="3" y1="17" x2="17" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </button>
+      {TYPOGRAPHY_COLOR_PRESETS.map((c) => (
+        <button
+          key={c}
+          type="button"
+          className={`typo-modal-color${value === c ? " is-current" : ""}`}
+          style={{ background: c }}
+          onClick={() => onChange(c)}
+          aria-label={c}
+          title={c}
+        />
+      ))}
+      {/* Free-form colour picker for users who want exact control. */}
+      <label className="typo-modal-color-custom" title={t("typographyFieldColor")}>
+        <input
+          type="color"
+          value={value || "#111827"}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label={t("typographyFieldColor")}
+        />
+      </label>
+    </div>
+  );
+}
+
+function Toggle({ active, onClick, label, sample }) {
+  return (
+    <button
+      type="button"
+      className={`typo-modal-toggle${active ? " is-current" : ""}`}
+      aria-pressed={active ? "true" : "false"}
+      onClick={onClick}
+    >
+      <span className="typo-modal-toggle-sample">{sample}</span>
+      <span className="typo-modal-toggle-label">{label}</span>
+    </button>
+  );
+}
+
+function BlockCard({ blockKey, labelKey, state, update }) {
+  const label = t(labelKey);
+  return (
+    <div className="typo-modal-card" data-block={blockKey}>
+      <div
+        className="typo-modal-card-preview"
+        style={{
+          fontSize: state.size,
+          fontWeight: state.weight,
+          color: state.color || undefined,
+          fontStyle: state.italic ? "italic" : undefined,
+          textDecoration: state.underline ? "underline" : undefined,
+          lineHeight: 1.2,
+        }}
+      >
+        {label}
+      </div>
+      <div className="typo-modal-card-hint">{t("typographyCardHint")}</div>
+
+      <div className="typo-modal-fields">
+        <label className="typo-modal-field">
+          <span className="typo-modal-field-label">{t("typographyFieldSize")}</span>
+          <select
+            value={state.size}
+            onChange={(e) => update({ size: e.target.value })}
+          >
+            {TYPOGRAPHY_SIZE_PRESETS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="typo-modal-field">
+          <span className="typo-modal-field-label">{t("typographyFieldWeight")}</span>
+          <select
+            value={state.weight}
+            onChange={(e) => update({ weight: Number(e.target.value) })}
+          >
+            {TYPOGRAPHY_WEIGHT_PRESETS.map((w) => (
+              <option key={w.value} value={w.value}>
+                {t(w.labelKey)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="typo-modal-field typo-modal-field--wide">
+          <span className="typo-modal-field-label">{t("typographyFieldColor")}</span>
+          <ColorRow
+            value={state.color}
+            onChange={(color) => update({ color })}
+          />
+        </div>
+
+        <div className="typo-modal-field typo-modal-field--wide">
+          <span className="typo-modal-field-label">{t("typographyFieldStyle")}</span>
+          <div className="typo-modal-toggles">
+            <Toggle
+              active={state.italic}
+              onClick={() => update({ italic: !state.italic })}
+              label={t("typographyFieldItalic")}
+              sample={<em>I</em>}
+            />
+            <Toggle
+              active={state.underline}
+              onClick={() => update({ underline: !state.underline })}
+              label={t("typographyFieldUnderline")}
+              sample={<span style={{ textDecoration: "underline" }}>U</span>}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function TypographyModal({ open, onClose, presets, setPresets, dark }) {
+  const normalized = normalizeTypographyPresets(presets);
+
+  // Escape closes the modal, matching every other modal in the app.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const update = (block, patch) => {
+    setPresets({
+      ...normalized,
+      [block]: { ...normalized[block], ...patch },
+    });
+  };
+  const reset = () => setPresets({ ...DEFAULT_TYPOGRAPHY_PRESETS });
+
+  return (
+    <div
+      className={`typo-modal-scrim${dark ? " typo-modal-scrim--dark" : ""}`}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <div className="typo-modal" role="dialog" aria-label={t("typographyTitle")}>
+        <header className="typo-modal-header">
+          <div>
+            <div className="typo-modal-title">{t("typographyTitle")}</div>
+            <div className="typo-modal-desc">{t("typographyDesc")}</div>
+          </div>
+          <div className="typo-modal-header-actions">
+            <button
+              type="button"
+              className="typo-modal-reset"
+              onClick={reset}
+            >
+              {t("typographyReset")}
+            </button>
+            <button
+              type="button"
+              className="typo-modal-close"
+              onClick={onClose}
+              aria-label={t("close")}
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        </header>
+        <div className="typo-modal-body">
+          {BLOCKS.map(({ key, labelKey }) => (
+            <BlockCard
+              key={key}
+              blockKey={key}
+              labelKey={labelKey}
+              state={normalized[key]}
+              update={(patch) => update(key, patch)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
