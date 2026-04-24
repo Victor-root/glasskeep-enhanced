@@ -48,15 +48,81 @@ export const SmartCodeBlock = Extension.create({
           return false;
         }
 
-        // Selection (or caret) → collect the textContent of every block the
-        // selection touches, join them with \n, replace the whole range with
-        // a single code block.
+        // Selection that sits INLINE inside a single text block: carve
+        // the selected text out as its own code block, keep the text
+        // on either side of the selection as paragraphs.
+        //
+        //   Before:  paragraph("Hello [selected] world")
+        //   After:   paragraph("Hello ")
+        //            codeBlock("selected")
+        //            paragraph(" world")
+        //
+        // This matches what the user actually expects when they select
+        // two words and press "Code block" — the same scope-behaviour
+        // that the inline Code mark already has, but materialised as a
+        // block because a code block IS a block-level element.
+        const $from = state.doc.resolve(selection.from);
+        const $to = state.doc.resolve(selection.to);
+        if (
+          !selection.empty &&
+          $from.sameParent($to) &&
+          $from.parent.isTextblock
+        ) {
+          const parent = $from.parent;
+          const blockStart = $from.before();
+          const blockEnd = $from.after();
+          const inlineStart = $from.start();
+          const inlineEnd = $from.end();
+
+          const beforeFrag = state.doc.slice(inlineStart, selection.from).content;
+          // The code block only accepts plain text; keep hard-breaks as \n
+          // so user's line structure survives.
+          const selectedText = state.doc.textBetween(
+            selection.from,
+            selection.to,
+            "\n",
+            "\n",
+          );
+          const afterFrag = state.doc.slice(selection.to, inlineEnd).content;
+
+          const replacement = [];
+          if (beforeFrag.size > 0) {
+            replacement.push(parent.type.create(parent.attrs, beforeFrag));
+          }
+          const codeContent = selectedText.length
+            ? [schema.text(selectedText)]
+            : [];
+          replacement.push(codeBlockType.create(null, codeContent));
+          if (afterFrag.size > 0) {
+            replacement.push(parent.type.create(parent.attrs, afterFrag));
+          }
+
+          tr.replaceWith(blockStart, blockEnd, replacement);
+          // Place the caret at the end of the new code block so further
+          // typing goes into it.
+          let caret = blockStart;
+          for (let i = 0; i < replacement.length; i++) {
+            const node = replacement[i];
+            if (node.type === codeBlockType) {
+              caret = caret + node.nodeSize - 1;
+              break;
+            }
+            caret += node.nodeSize;
+          }
+          tr.setSelection(TextSelection.create(tr.doc, caret));
+          if (dispatch) dispatch(tr);
+          return true;
+        }
+
+        // Multi-block selection (or empty caret): collect the
+        // textContent of every block the selection touches, join them
+        // with \n, replace the whole range with a single code block.
         const from = Math.min(selection.from, selection.to);
         const to = Math.max(selection.from, selection.to);
-        const $from = state.doc.resolve(from);
-        const $to = state.doc.resolve(to);
-        const blockFrom = $from.before(1);
-        const blockTo = $to.after(1);
+        const $from2 = state.doc.resolve(from);
+        const $to2 = state.doc.resolve(to);
+        const blockFrom = $from2.before(1);
+        const blockTo = $to2.after(1);
 
         const lines = [];
         state.doc.nodesBetween(blockFrom, blockTo, (node) => {
