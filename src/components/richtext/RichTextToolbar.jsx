@@ -152,7 +152,7 @@ function Swatches({ colors, onPick, current, onClear, clearLabel }) {
 
 function BlockTypeMenu({ editor, anchorRef, open, onClose }) {
   const items = [
-    { value: "p",  label: t("fmtParagraph"), badge: "¶"  },
+    { value: "p",  label: t("fmtParagraph"), icon: <RichIcons.Paragraph /> },
     { value: "h1", label: t("fmtHeading1"),  badge: "H1" },
     { value: "h2", label: t("fmtHeading2"),  badge: "H2" },
     { value: "h3", label: t("fmtHeading3"),  badge: "H3" },
@@ -175,7 +175,11 @@ function BlockTypeMenu({ editor, anchorRef, open, onClose }) {
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => pick(it.value)}
         >
-          <span className={`rt-block-badge rt-block-badge--${it.value}`}>{it.badge}</span>
+          {it.icon ? (
+            <span className="rt-menu-item-icon">{it.icon}</span>
+          ) : (
+            <span className={`rt-block-badge rt-block-badge--${it.value}`}>{it.badge}</span>
+          )}
           <span className="rt-menu-item-label">{it.label}</span>
         </button>
       ))}
@@ -375,14 +379,17 @@ export default function RichTextToolbar({ editor, compact = false }) {
 
   const chain = () => editor.chain().focus();
   const headingLevel = [1, 2, 3].find((l) => editor.isActive("heading", { level: l }));
-  // Block-type button: each state gets a typographic badge (colour chip
-  // with the block's label) so the button reads as a DISTINCT style from
-  // the surrounding line-based icons. ¶ for paragraph, H1/H2/H3 for
-  // heading levels — same shape, different label.
-  const blockContent = (
-    <span className={`rt-block-badge rt-block-badge--${headingLevel ? `h${headingLevel}` : "p"}`}>
-      {headingLevel ? `H${headingLevel}` : "¶"}
+  // Block-type button: when the current block is a plain paragraph we
+  // show the Tabler "heading" glyph (capital-H outline) — it reads as
+  // "block style selector" without competing with the character-mark
+  // row. When a heading level is active we still show a crisp H1/H2/H3
+  // badge so the level is legible.
+  const blockContent = headingLevel ? (
+    <span className={`rt-block-badge rt-block-badge--h${headingLevel}`}>
+      H{headingLevel}
     </span>
+  ) : (
+    <RichIcons.Paragraph />
   );
   const attrs = editor.getAttributes("textStyle") || {};
   const currentColor = attrs.color || null;
@@ -453,13 +460,14 @@ export default function RichTextToolbar({ editor, compact = false }) {
             ref={fontBtnRef}
             type="button"
             className={`rt-btn rt-btn--menu rt-btn--wide${currentFontFamily ? " is-active" : ""}`}
-            data-tooltip={t("fmtFontFamily") + (currentFontFamily ? ` — ${fontFamilyLabel}` : "")}
+            data-tooltip={t("fmtFontFamily")}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => toggleMenu("font")}
+            style={{ fontFamily: currentFontFamily || undefined }}
           >
-            {/* Static label so the button width never jumps when Ubuntu etc.
-                is picked — the pick happens inside the popover instead. */}
-            <span className="rt-btn-label">{t("fmtFontFamily")}</span>
+            {/* Show the currently-picked font name in the button (Word-style)
+                so the current state is legible without opening the popover. */}
+            <span className="rt-btn-label">{fontFamilyLabel}</span>
             <RichIcons.Chevron />
           </button>
           <FontFamilyPopover editor={editor} anchorRef={fontBtnRef} open={openMenu === "font"} onClose={closeMenu} />

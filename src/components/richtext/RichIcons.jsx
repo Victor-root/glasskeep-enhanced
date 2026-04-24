@@ -24,7 +24,9 @@ const Bold       = () => <T Icon={TI.Bold} />;
 const Italic     = () => <T Icon={TI.Italic} />;
 const Strike     = () => <T Icon={TI.Strike} />;
 const Code       = () => <T Icon={TI.Code} />;
-const CodeBlock  = () => <T Icon={TI.CodeBlock} />;
+// Code block uses the Tabler terminal-2 glyph (matches the user's request
+// better than the curly-braces one we had before).
+const CodeBlock  = () => <T Icon={TI.Terminal2} />;
 const Quote      = () => <T Icon={TI.Quote} />;
 const HR         = () => <T Icon={TI.Separator} />;
 const Link       = () => <T Icon={TI.Link} />;
@@ -38,7 +40,10 @@ const AlignLeft    = () => <T Icon={TI.AlignLeft} />;
 const AlignCenter  = () => <T Icon={TI.AlignCenter} />;
 const AlignRight   = () => <T Icon={TI.AlignRight} />;
 const AlignJustify = () => <T Icon={TI.AlignJustified} />;
-const Paragraph  = () => <T Icon={TI.Pilcrow} />;
+// Block-type button uses the Tabler "heading" glyph (looks like a capital
+// H). This is only rendered when the block IS a paragraph — when a
+// heading level is active, the toolbar swaps in the H1/H2/H3 badge.
+const Paragraph  = () => <T Icon={TI.Heading} />;
 const More       = () => <T Icon={TI.ChevronDown} />;
 // Chevron is styled smaller via the `.rt-btn--chevron svg` / `.rt-btn--has-chevron`
 // CSS rules — same component, the container decides the size.

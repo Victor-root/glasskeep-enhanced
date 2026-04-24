@@ -1382,13 +1382,16 @@ html.dark .rt-icon-swatch-bar { border-color: rgba(255, 255, 255, 0.12); }
   overflow-y: auto;
 }
 
-.rt-menu-item--action .rt-menu-item-icon {
+.rt-menu-item--action .rt-menu-item-icon,
+.rt-menu-item-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 28px;
 }
-.rt-menu-item--action .rt-menu-item-icon svg { width: 17px; height: 17px; }
+.rt-menu-item--action .rt-menu-item-icon svg,
+.rt-menu-item-icon .tabler-icon,
+.rt-menu-item-icon .tabler-icon svg { width: 18px; height: 18px; }
 .rt-menu-item--action .rt-menu-item-label { flex: 1; font-weight: 500; font-size: 0.85rem; }
 
 /* Menu rows (block types, fonts) */
