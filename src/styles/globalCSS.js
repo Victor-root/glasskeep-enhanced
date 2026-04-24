@@ -1149,15 +1149,10 @@ html.dark .rt-editor-content a { color: #93c5fd; }
      vertical divider. When the viewport is too narrow for all
      super-groups on one ribbon row, a super-group wraps as a whole
      block — it never spills its own items across different rows of
-     the toolbar, matching the reference screenshot.
-     The whole compact block is centred horizontally in its container
-     (justify-content: center) so the width is dictated by the content,
-     not stretched to fill the sticky header — no more "ruban vide"
-     feeling when there's extra horizontal room. */
+     the toolbar, matching the reference screenshot. */
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
-  justify-content: center;
   column-gap: 0;
   row-gap: 6px;
   /* Horizontal padding stays on the toolbar so buttons breathe, but we
@@ -1322,15 +1317,11 @@ html.dark .rt-block-badge {
 /* Separator spans the full super-group height (both sub-rows) so the
    visual break between groups reads unambiguously in the Word-ribbon
    layout. 6 px horizontal margin matches the ribbon padding rhythm. */
-/* Separator spans the full super-group height (both sub-rows) so the
-   visual break between groups reads unambiguously in the Word-ribbon
-   layout. Fixed 1-px line with symmetric 10-px horizontal margin — no
-   flex-grow, no stretchy spacer: groups stay tight to each other. */
 .rt-sep {
   width: 1px;
   align-self: stretch;
   background: var(--rt-divider-strong);
-  margin: 2px 10px;
+  margin: 2px 6px;
   display: inline-block;
   flex-shrink: 0;
   opacity: 0.75;
@@ -1683,7 +1674,7 @@ html.dark .settings-type-field select {
   .rt-btn--block { min-width: 50px; }
   .rt-btn svg { width: 20px; height: 20px; }
   .rt-pop { min-width: 220px; }
-  .rt-sep { margin: 2px 6px; }
+  .rt-sep { margin: 0 4px; height: 26px; }
 }
 
 /* Read-only note-content renderings (cards + modal view) should ALSO honour
