@@ -40,6 +40,9 @@ import chevronDownSvg     from "./tabler/chevron-down.svg?raw";
 import pilcrowSvg         from "./tabler/pilcrow.svg?raw";
 import headingSvg         from "./tabler/heading.svg?raw";
 import terminal2Svg       from "./tabler/terminal-2.svg?raw";
+import h1Svg               from "./tabler/h-1.svg?raw";
+import h2Svg               from "./tabler/h-2.svg?raw";
+import h3Svg               from "./tabler/h-3.svg?raw";
 
 // Cache of sanitised markup keyed by the raw SVG string. The transformation
 // only depends on the SVG source, so each icon is processed exactly once.
@@ -107,6 +110,9 @@ export const TI = {
   Pilcrow:         (p) => <TablerIcon svg={pilcrowSvg} {...p} />,
   Heading:         (p) => <TablerIcon svg={headingSvg} {...p} />,
   Terminal2:       (p) => <TablerIcon svg={terminal2Svg} {...p} />,
+  H1:              (p) => <TablerIcon svg={h1Svg} {...p} />,
+  H2:              (p) => <TablerIcon svg={h2Svg} {...p} />,
+  H3:              (p) => <TablerIcon svg={h3Svg} {...p} />,
 };
 
 export default TI;

@@ -153,9 +153,9 @@ function Swatches({ colors, onPick, current, onClear, clearLabel }) {
 function BlockTypeMenu({ editor, anchorRef, open, onClose }) {
   const items = [
     { value: "p",  label: t("fmtParagraph"), icon: <RichIcons.Paragraph /> },
-    { value: "h1", label: t("fmtHeading1"),  badge: "H1" },
-    { value: "h2", label: t("fmtHeading2"),  badge: "H2" },
-    { value: "h3", label: t("fmtHeading3"),  badge: "H3" },
+    { value: "h1", label: t("fmtHeading1"),  icon: <RichIcons.H1 /> },
+    { value: "h2", label: t("fmtHeading2"),  icon: <RichIcons.H2 /> },
+    { value: "h3", label: t("fmtHeading3"),  icon: <RichIcons.H3 /> },
   ];
   const currentHeading = [1, 2, 3].find((l) => editor.isActive("heading", { level: l }));
   const current = currentHeading ? `h${currentHeading}` : "p";
