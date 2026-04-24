@@ -3,6 +3,7 @@ import { t } from "../../i18n";
 import LinkPopover from "./LinkPopover.jsx";
 import RichIcons from "./RichIcons.jsx";
 import { Popover } from "./Popover.jsx";
+import BlockStyleButtons from "./BlockStyleButtons.jsx";
 
 // Design principles:
 //  • Compact icon buttons (tighter than v1) — one clean grid, grouped by
@@ -150,42 +151,8 @@ function Swatches({ colors, onPick, current, onClear, clearLabel }) {
   );
 }
 
-function BlockTypeMenu({ editor, anchorRef, open, onClose }) {
-  const items = [
-    { value: "p",  label: t("fmtParagraph"), icon: <RichIcons.Paragraph /> },
-    { value: "h1", label: t("fmtHeading1"),  icon: <RichIcons.H1 /> },
-    { value: "h2", label: t("fmtHeading2"),  icon: <RichIcons.H2 /> },
-    { value: "h3", label: t("fmtHeading3"),  icon: <RichIcons.H3 /> },
-  ];
-  const currentHeading = [1, 2, 3].find((l) => editor.isActive("heading", { level: l }));
-  const current = currentHeading ? `h${currentHeading}` : "p";
-  const pick = (v) => {
-    const chain = editor.chain().focus();
-    if (v === "p") chain.setParagraph().run();
-    else chain.setHeading({ level: Number(v.slice(1)) }).run();
-    onClose?.();
-  };
-  return (
-    <Popover open={open} onClose={onClose} anchorRef={anchorRef} className="rt-pop--blocks">
-      {items.map((it) => (
-        <button
-          key={it.value}
-          type="button"
-          className={`rt-menu-item rt-menu-item--${it.value}${current === it.value ? " is-current" : ""}`}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => pick(it.value)}
-        >
-          {it.icon ? (
-            <span className="rt-menu-item-icon">{it.icon}</span>
-          ) : (
-            <span className={`rt-block-badge rt-block-badge--${it.value}`}>{it.badge}</span>
-          )}
-          <span className="rt-menu-item-label">{it.label}</span>
-        </button>
-      ))}
-    </Popover>
-  );
-}
+// Block-type picker is no longer a dropdown — it's rendered inline in
+// the toolbar as four preview buttons (see BlockStyleButtons.jsx).
 
 function UnderlinePopover({ editor, anchorRef, open, onClose }) {
   const attrs = editor.getAttributes("underline") || {};
@@ -357,7 +324,6 @@ export default function RichTextToolbar({ editor, compact = false }) {
   const isDark = useIsDark();
 
   const [openMenu, setOpenMenu] = useState(null); // name of the open popover
-  const blockBtnRef = useRef(null);
   const fontBtnRef = useRef(null);
   const sizeBtnRef = useRef(null);
   const colorBtnRef = useRef(null);
@@ -378,19 +344,6 @@ export default function RichTextToolbar({ editor, compact = false }) {
   if (!editor) return null;
 
   const chain = () => editor.chain().focus();
-  const headingLevel = [1, 2, 3].find((l) => editor.isActive("heading", { level: l }));
-  // Block-type button: when the current block is a plain paragraph we
-  // show the Tabler "heading" glyph (capital-H outline) — it reads as
-  // "block style selector" without competing with the character-mark
-  // row. When a heading level is active we still show a crisp H1/H2/H3
-  // badge so the level is legible.
-  const blockContent = headingLevel ? (
-    <span className={`rt-block-badge rt-block-badge--h${headingLevel}`}>
-      H{headingLevel}
-    </span>
-  ) : (
-    <RichIcons.Paragraph />
-  );
   const attrs = editor.getAttributes("textStyle") || {};
   const currentColor = attrs.color || null;
   const currentHighlight = editor.getAttributes("highlight")?.color || null;
@@ -440,21 +393,12 @@ export default function RichTextToolbar({ editor, compact = false }) {
         it wraps onto a second visual row.
       */}
 
-      {/* Super-group A — Font / character formatting */}
+      {/* Super-group A — Font / character formatting.
+          (Block type selection — Paragraph / H1 / H2 / H3 — moved out
+          of this group into its own Style super-group on the right,
+          rendered as 4 preview buttons.) */}
       <div className="rt-sg" data-sg="font">
         <div className="rt-sg-row">
-          <button
-            ref={blockBtnRef}
-            type="button"
-            className={`rt-btn rt-btn--menu rt-btn--block${headingLevel ? " is-active" : ""}`}
-            data-tooltip={t("fmtParagraph")}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => toggleMenu("block")}
-          >
-            {blockContent}
-            <RichIcons.Chevron />
-          </button>
-          <BlockTypeMenu editor={editor} anchorRef={blockBtnRef} open={openMenu === "block"} onClose={closeMenu} />
 
           <button
             ref={fontBtnRef}
@@ -642,6 +586,14 @@ export default function RichTextToolbar({ editor, compact = false }) {
           </ToolbarButton>
         </div>
       </div>
+
+      <span className="rt-sep" aria-hidden="true" />
+
+      {/* Super-group D — Style gallery (Paragraph / H1 / H2 / H3) rendered
+          as four preview buttons that carry their own typography so the
+          button IS its visual preview. Replaces the old block-type
+          dropdown and uses the space on the right of the toolbar. */}
+      <BlockStyleButtons editor={editor} />
     </div>
   );
 }

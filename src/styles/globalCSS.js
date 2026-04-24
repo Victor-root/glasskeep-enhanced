@@ -1305,6 +1305,55 @@ html.dark .rt-block-badge {
   background: rgba(255, 255, 255, 0.25);
 }
 
+/* Block-style gallery (Paragraph / H1 / H2 / H3) — four preview buttons
+   arranged 2x2 inside their own super-group at the right of the toolbar. */
+.rt-sg--style { gap: 3px; }
+.rt-sg--style .rt-sg-row { gap: 3px; }
+
+.rt-style-btn {
+  min-width: 88px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--rt-divider);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.1s ease;
+  user-select: none;
+  overflow: hidden;
+}
+.rt-style-btn:hover:not(:disabled) {
+  background: var(--rt-btn-hover);
+  border-color: var(--rt-divider-strong);
+}
+.rt-style-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--rt-accent), 0.55);
+}
+.rt-style-btn.is-active {
+  background: var(--rt-btn-active-bg);
+  color: var(--rt-btn-active-text);
+  border-color: rgba(var(--rt-accent), 0.45);
+}
+.rt-style-btn:active:not(:disabled) { transform: translateY(0.5px); }
+
+.rt-style-btn-sample {
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: Georgia, "Times New Roman", serif;
+}
+.rt-style-btn--p  .rt-style-btn-sample  { font-size: 0.82rem; font-weight: 400; }
+.rt-style-btn--h1 .rt-style-btn-sample  { font-size: 1rem;    font-weight: 800; letter-spacing: 0.01em; }
+.rt-style-btn--h2 .rt-style-btn-sample  { font-size: 0.92rem; font-weight: 700; letter-spacing: 0.01em; }
+.rt-style-btn--h3 .rt-style-btn-sample  { font-size: 0.86rem; font-weight: 600; letter-spacing: 0.01em; }
+
 .rt-splitbtn {
   display: inline-flex;
   align-items: stretch;
@@ -1675,6 +1724,7 @@ html.dark .settings-type-field select {
   .rt-btn svg { width: 20px; height: 20px; }
   .rt-pop { min-width: 220px; }
   .rt-sep { margin: 0 4px; height: 26px; }
+  .rt-style-btn { min-width: 76px; height: 34px; padding: 0 8px; }
 }
 
 /* Read-only note-content renderings (cards + modal view) should ALSO honour
