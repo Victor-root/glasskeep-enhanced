@@ -412,7 +412,7 @@ export default function SettingsPanel({
                 </div>
                 <button
                   type="button"
-                  className="ml-3 shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium border border-indigo-500/40 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors"
+                  className="ml-3 shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                   onClick={() => setTypographyModalOpen(true)}
                 >
                   {t("typographyOpen")}

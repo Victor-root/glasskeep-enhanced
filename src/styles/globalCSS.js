@@ -1050,6 +1050,20 @@ html.dark .login-deco-card {
   --rt-pop-bg: #ffffff;
   --rt-pop-border: rgba(0, 0, 0, 0.1);
   --rt-pop-shadow: 0 12px 32px -6px rgba(17, 24, 39, 0.28), 0 2px 8px rgba(17, 24, 39, 0.1);
+
+  /* Highlight palette — 8 THEMED slots. The editor stores the variable
+     REFERENCE in the mark's style (background-color: var(--rt-hl-N))
+     instead of a concrete hex, so switching theme re-resolves the
+     variable and the highlight automatically swaps to the light /
+     dark variant that stays readable. */
+  --rt-hl-1: #fde047; /* yellow */
+  --rt-hl-2: #fdba74; /* orange */
+  --rt-hl-3: #fca5a5; /* red */
+  --rt-hl-4: #f9a8d4; /* pink */
+  --rt-hl-5: #c4b5fd; /* violet */
+  --rt-hl-6: #93c5fd; /* blue */
+  --rt-hl-7: #86efac; /* green */
+  --rt-hl-8: #d1d5db; /* gray */
 }
 html.dark {
   --rt-divider: rgba(255, 255, 255, 0.1);
@@ -1057,6 +1071,32 @@ html.dark {
   --rt-btn-hover: rgba(255, 255, 255, 0.08);
   --rt-btn-active-bg: rgba(var(--rt-accent), 0.26);
   --rt-btn-active-text: rgb(165, 180, 252);
+  --rt-hl-1: #b45309;
+  --rt-hl-2: #c2410c;
+  --rt-hl-3: #b91c1c;
+  --rt-hl-4: #be185d;
+  --rt-hl-5: #6d28d9;
+  --rt-hl-6: #1d4ed8;
+  --rt-hl-7: #047857;
+  --rt-hl-8: #4b5563;
+}
+
+/* Defensive fallback: Tiptap's Highlight mark stores the variable
+   string both as inline style AND as data-color. If the sanitizer
+   strips var() from the inline style during view-mode rendering, these
+   rules rescue the highlight via the data-color attribute — which is
+   always kept. Comparison is a literal string match, so the stored
+   data-color must be EXACTLY "var(--rt-hl-N)" (which is what the
+   highlight popover writes). */
+mark[data-color="var(--rt-hl-1)"] { background-color: var(--rt-hl-1); color: inherit; }
+mark[data-color="var(--rt-hl-2)"] { background-color: var(--rt-hl-2); color: inherit; }
+mark[data-color="var(--rt-hl-3)"] { background-color: var(--rt-hl-3); color: inherit; }
+mark[data-color="var(--rt-hl-4)"] { background-color: var(--rt-hl-4); color: inherit; }
+mark[data-color="var(--rt-hl-5)"] { background-color: var(--rt-hl-5); color: inherit; }
+mark[data-color="var(--rt-hl-6)"] { background-color: var(--rt-hl-6); color: inherit; }
+mark[data-color="var(--rt-hl-7)"] { background-color: var(--rt-hl-7); color: inherit; }
+mark[data-color="var(--rt-hl-8)"] { background-color: var(--rt-hl-8); color: inherit; }
+html.dark {
   --rt-pop-bg: #1f2937;
   --rt-pop-border: rgba(255, 255, 255, 0.12);
   --rt-pop-shadow: 0 12px 32px -6px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5);

@@ -64,43 +64,32 @@ const PRESET_TEXT_COLORS = [
   "#111827", "#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4",
   "#3b82f6", "#6366f1", "#a855f7", "#ec4899", "#64748b", "#ffffff",
 ];
-// Highlight palettes are theme-aware so colours stay readable (and visible
-// in the picker itself — the old pale pastels were almost invisible on the
-// white popover background).
-const PRESET_HIGHLIGHTS_LIGHT = [
-  "#fde047", "#fdba74", "#fca5a5", "#f9a8d4",
-  "#c4b5fd", "#93c5fd", "#86efac", "#d1d5db",
+// Highlight palette — 8 named slots backed by CSS variables. Each slot
+// resolves to a different hex in light vs dark mode (see globalCSS.js
+// :root / html.dark rules) — we store the var() REFERENCE in the mark,
+// so switching theme re-resolves the highlight automatically and a
+// "red" highlight picked in dark mode becomes the light-mode "red"
+// equivalent without having to touch the document.
+const PRESET_HIGHLIGHTS = [
+  "var(--rt-hl-1)",
+  "var(--rt-hl-2)",
+  "var(--rt-hl-3)",
+  "var(--rt-hl-4)",
+  "var(--rt-hl-5)",
+  "var(--rt-hl-6)",
+  "var(--rt-hl-7)",
+  "var(--rt-hl-8)",
 ];
-const PRESET_HIGHLIGHTS_DARK = [
-  "#b45309", "#c2410c", "#b91c1c", "#be185d",
-  "#6d28d9", "#1d4ed8", "#047857", "#4b5563",
-];
+const DEFAULT_HIGHLIGHT_SWATCH = "var(--rt-hl-1)";
 const PRESET_UNDERLINE_COLORS = [
   "#111827", "#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#8b5cf6",
   "#ec4899", "#64748b",
 ];
 
-// Track whether <html> currently carries the .dark class so the highlight
-// palette can flip without a page reload. We observe the class attribute
-// rather than reading media queries so the manual dark toggle still works.
-function useIsDark() {
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof document === "undefined") return false;
-    return document.documentElement.classList.contains("dark");
-  });
-  useEffect(() => {
-    if (typeof document === "undefined") return undefined;
-    const update = () =>
-      setIsDark(document.documentElement.classList.contains("dark"));
-    const obs = new MutationObserver(update);
-    obs.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-    return () => obs.disconnect();
-  }, []);
-  return isDark;
-}
+// (useIsDark was needed when the highlight palette had two JS arrays
+// for light / dark mode. The palette is now backed by CSS variables
+// that re-resolve automatically on theme change, so no JS tracking is
+// required.)
 
 // Ubuntu is self-hosted via @fontsource/ubuntu (see src/main.jsx) — no cloud.
 const FONT_FAMILIES = [
@@ -225,9 +214,8 @@ function ColorPopover({ editor, anchorRef, open, onClose }) {
   );
 }
 
-function HighlightPopover({ editor, anchorRef, open, onClose, isDark }) {
+function HighlightPopover({ editor, anchorRef, open, onClose }) {
   const current = editor.getAttributes("highlight")?.color || null;
-  const colors = isDark ? PRESET_HIGHLIGHTS_DARK : PRESET_HIGHLIGHTS_LIGHT;
   const apply = (c) => {
     editor.chain().focus().setHighlight({ color: c }).run();
     onClose?.();
@@ -238,7 +226,7 @@ function HighlightPopover({ editor, anchorRef, open, onClose, isDark }) {
   };
   return (
     <Popover open={open} onClose={onClose} anchorRef={anchorRef} className="rt-pop--highlight">
-      <Swatches colors={colors} onPick={apply} current={current} onClear={clear} />
+      <Swatches colors={PRESET_HIGHLIGHTS} onPick={apply} current={current} onClear={clear} />
     </Popover>
   );
 }
@@ -321,7 +309,6 @@ function FontFamilyPopover({ editor, anchorRef, open, onClose }) {
 
 export default function RichTextToolbar({ editor, compact = false }) {
   useEditorSignal(editor);
-  const isDark = useIsDark();
 
   const [openMenu, setOpenMenu] = useState(null); // name of the open popover
   const fontBtnRef = useRef(null);
@@ -501,10 +488,10 @@ export default function RichTextToolbar({ editor, compact = false }) {
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => toggleMenu("highlight")}
           >
-            <RichIcons.Highlight swatch={currentHighlight || (isDark ? "#b45309" : "#fde047")} />
+            <RichIcons.Highlight swatch={currentHighlight || DEFAULT_HIGHLIGHT_SWATCH} />
             <RichIcons.Chevron />
           </button>
-          <HighlightPopover editor={editor} anchorRef={hlBtnRef} open={openMenu === "highlight"} onClose={closeMenu} isDark={isDark} />
+          <HighlightPopover editor={editor} anchorRef={hlBtnRef} open={openMenu === "highlight"} onClose={closeMenu} />
         </div>
       </div>
 
