@@ -151,56 +151,32 @@ html.dark header.multi-select-bar {
    was confusing the user ("mon 2. est redevenu 1. après un bloc de
    code").
 
-   Fix: a named CSS counter — gk-ol — scoped to the editor / view
-   container. The counter is NOT reset between sibling <ol>s at top
-   level, so the numbering carries over. Nested ordered lists (inside
-   an <li>) explicitly reset the counter so sub-lists still start at
-   1 as they should.
+   Fix: a named CSS counter (gk-ol) scoped to the editor / view
+   container, surfaced via ::marker so the NATIVE <ol> layout is kept
+   untouched (no padding/indent change — only the digits displayed are
+   replaced). Nested ordered lists (inside an <li>) explicitly reset
+   the counter so sub-lists still start at 1.
    -------------------------------------------------------------------- */
 .rt-editor-content,
 .note-content--dense,
 .note-content {
   counter-reset: gk-ol;
 }
-/* Nested ordered lists (sub-items) reset the counter so they start at
-   1 under their parent <li>. */
 .rt-editor-content li ol,
 .note-content--dense li ol,
 .note-content li ol {
   counter-reset: gk-ol;
 }
-/* Replace the native decimal marker with our continuous counter. */
-.rt-editor-content ol,
-.note-content--dense ol,
-.note-content ol {
-  list-style: none;
-}
 .rt-editor-content ol > li,
 .note-content--dense ol > li,
 .note-content ol > li {
   counter-increment: gk-ol;
-  position: relative;
-  padding-left: 1.9em;
 }
-.rt-editor-content ol > li::before,
-.note-content--dense ol > li::before,
-.note-content ol > li::before {
-  content: counter(gk-ol) ".";
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 1.6em;
-  text-align: right;
-  padding-right: 0.25em;
+.rt-editor-content ol > li::marker,
+.note-content--dense ol > li::marker,
+.note-content ol > li::marker {
+  content: counter(gk-ol) ". ";
   font-variant-numeric: tabular-nums;
-  opacity: 0.8;
-}
-/* Restore bullet list markers (they weren't affected, but keep the
-   rule explicit since we disabled list-style on <ol>). */
-.rt-editor-content ul,
-.note-content--dense ul,
-.note-content ul {
-  list-style: disc;
 }
 
 /* Fix: marked outputs \n between block elements; with white-space:pre-wrap on
