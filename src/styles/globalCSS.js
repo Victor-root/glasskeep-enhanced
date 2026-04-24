@@ -1165,29 +1165,33 @@ html.dark .rt-toolbar {
 .rt-toolbar--compact { padding: 3px 6px 4px; }
 
 /* A group is one flex item — flex-wrap on the toolbar wraps WHOLE groups,
-   never individual buttons. Within a group buttons are flush (no gap),
-   matching the Word ribbon density. */
+   never individual buttons. Within a group buttons are flush (no gap)
+   and flex-wrap lets items of an extra-wide group fold onto a second
+   internal sub-row (Word-ribbon behaviour) rather than spilling across
+   the toolbar row. */
 .rt-group {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0;
+  row-gap: 2px;
+  column-gap: 0;
 }
 
 .rt-btn {
   position: relative;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 5px;
-  border-radius: 5px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 7px;
+  border-radius: 6px;
   border: 1px solid transparent;
   background: transparent;
   color: inherit;
-  font-size: 0.85rem;
+  font-size: 0.92rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.1s ease;
   user-select: none;
@@ -1203,39 +1207,39 @@ html.dark .rt-toolbar {
 }
 .rt-btn[disabled] { opacity: 0.38; cursor: not-allowed; }
 .rt-btn:active:not(:disabled) { transform: translateY(0.5px); }
-.rt-btn--menu { padding: 0 6px; gap: 3px; }
-.rt-btn--block { min-width: 42px; }
-.rt-btn--wide { min-width: 72px; justify-content: space-between; }
-.rt-btn--narrow { min-width: 38px; justify-content: space-between; }
-.rt-btn--chevron { min-width: 16px; padding: 0 2px; }
-.rt-btn--swatch { padding: 0 4px; min-width: 28px; }
+.rt-btn--menu { padding: 0 8px; gap: 4px; }
+.rt-btn--block { min-width: 50px; }
+.rt-btn--wide { min-width: 90px; justify-content: space-between; }
+.rt-btn--narrow { min-width: 46px; justify-content: space-between; }
+.rt-btn--chevron { min-width: 20px; padding: 0 3px; }
+.rt-btn--swatch { padding: 0 6px; min-width: 34px; }
 .rt-btn-label {
-  font-size: 0.78rem;
+  font-size: 0.88rem;
   font-weight: 500;
   letter-spacing: 0.01em;
   white-space: nowrap;
 }
 .rt-btn-inner { display: inline-flex; align-items: center; justify-content: center; }
-.rt-btn svg { width: 16px; height: 16px; }
-.rt-btn--chevron svg { width: 10px; height: 10px; }
+.rt-btn svg { width: 20px; height: 20px; }
+.rt-btn--chevron svg { width: 12px; height: 12px; }
 
 .rt-splitbtn {
   display: inline-flex;
   align-items: stretch;
   position: relative;
-  border-radius: 5px;
+  border-radius: 6px;
 }
-.rt-splitbtn > .rt-btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 2px; }
-.rt-splitbtn > .rt-btn--chevron { border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 1px; }
+.rt-splitbtn > .rt-btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 3px; }
+.rt-splitbtn > .rt-btn--chevron { border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 2px; }
 
-/* Word-ribbon style vertical divider between groups: 1 px line, ~70% of
-   the row height, sits in its own column (4 px on each side). */
+/* Separator scales with the new button height so it reads as a divider
+   between columns of icons rather than a short orphan line. */
 .rt-sep {
   width: 1px;
   align-self: center;
-  height: 20px;
+  height: 24px;
   background: var(--rt-divider-strong);
-  margin: 0 4px;
+  margin: 0 5px;
   display: inline-block;
   flex-shrink: 0;
   opacity: 0.7;
@@ -1560,16 +1564,16 @@ html.dark .settings-type-field select {
     flex-wrap: wrap;
     padding: 4px 6px 6px;
     margin: 2px 6px 6px;
-    row-gap: 3px;
+    row-gap: 4px;
   }
-  /* Touch-friendly minimum size on mobile, otherwise same Word-style
-     density (zero gap inside groups, separators in between). */
-  .rt-btn { min-width: 32px; height: 32px; padding: 0 6px; }
-  .rt-btn--wide { min-width: 64px; }
-  .rt-btn--block { min-width: 44px; }
-  .rt-btn svg { width: 18px; height: 18px; }
+  /* Touch-friendly minimum size on mobile, matching the enlarged desktop
+     density. */
+  .rt-btn { min-width: 36px; height: 36px; padding: 0 7px; }
+  .rt-btn--wide { min-width: 80px; }
+  .rt-btn--block { min-width: 50px; }
+  .rt-btn svg { width: 20px; height: 20px; }
   .rt-pop { min-width: 220px; }
-  .rt-sep { margin: 0 4px; height: 22px; }
+  .rt-sep { margin: 0 4px; height: 26px; }
 }
 
 /* Read-only note-content renderings (cards + modal view) should ALSO honour
