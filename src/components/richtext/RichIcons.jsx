@@ -44,53 +44,64 @@ const Paragraph = () =>
     </text>,
   );
 
+// --------------------------------------------------------------
+// Character-mark letters (B / I / U / S) — rendered as SVG <text>
+// with identical font-size and positioning so they share the same
+// optical footprint inside the 20x20 toolbar box. Using fills instead
+// of strokes avoids the wildly uneven sizes the stroke-based
+// geometries produced (Italic was visibly 2x bigger than Bold).
+// --------------------------------------------------------------
+const MARK_LETTER_PROPS = {
+  x: 12,
+  y: 17.5,
+  textAnchor: "middle",
+  fontSize: 17,
+  fill: "currentColor",
+  stroke: "none",
+  fontFamily: "Georgia, 'Times New Roman', serif",
+};
+
 const Bold = () =>
   svg(
-    <>
-      <path d="M7 5h6a3.5 3.5 0 010 7H7z" />
-      <path d="M7 12h7a3.5 3.5 0 010 7H7z" />
-    </>,
+    <text {...MARK_LETTER_PROPS} fontWeight="900">B</text>,
   );
 
 const Italic = () =>
   svg(
-    <>
-      <line x1="19" y1="4" x2="10" y2="4" />
-      <line x1="14" y1="20" x2="5" y2="20" />
-      <line x1="15" y1="4" x2="9" y2="20" />
-    </>,
+    <text {...MARK_LETTER_PROPS} fontWeight="700" fontStyle="italic">I</text>,
   );
 
 const Underline = ({ style = "simple", color }) => {
-  const deco = {
-    simple: "solid",
-    double: "double",
-    dotted: "dotted",
-    dashed: "dashed",
-    wavy: "wavy",
-  }[style] || "solid";
-  return (
-    <span
-      style={{
-        fontFamily: "inherit",
-        fontWeight: 600,
-        fontSize: "13px",
-        textDecoration: `underline ${deco === "solid" ? "" : deco} ${color || ""}`.trim(),
-        textUnderlineOffset: "3px",
-      }}
+  const deco =
+    {
+      simple: "solid",
+      double: "double",
+      dotted: "dotted",
+      dashed: "dashed",
+      wavy: "wavy",
+    }[style] || "solid";
+  const textDecoration =
+    `underline ${deco === "solid" ? "" : deco} ${color || ""}`.trim();
+  return svg(
+    <text
+      {...MARK_LETTER_PROPS}
+      fontWeight="700"
+      style={{ textDecoration, textUnderlineOffset: "2px" }}
     >
       U
-    </span>
+    </text>,
   );
 };
 
 const Strike = () =>
   svg(
-    <>
-      <line x1="4" y1="12" x2="20" y2="12" />
-      <path d="M16 6a4 4 0 00-4-2c-2.5 0-4 1.5-4 3.5 0 1.5 1 2.5 3 3" />
-      <path d="M8 18a4 4 0 004 2c2.5 0 4-1.5 4-3.5 0-1.5-1-2.5-3-3" />
-    </>,
+    <text
+      {...MARK_LETTER_PROPS}
+      fontWeight="700"
+      textDecoration="line-through"
+    >
+      S
+    </text>,
   );
 
 const Code = () =>
@@ -173,27 +184,22 @@ const LinkOpen = () =>
     </>,
   );
 
-// Subscript / Superscript — big clear "X" base with a prominent "2"
-// offset below / above. Previous versions used an X made of thin paths
-// and a 7-px glyph, which was nearly invisible at toolbar size.
+// Subscript / Superscript — reuse the same MARK_LETTER_PROPS (X base
+// matches B / I / U / S in size and baseline), then paint the "2" as
+// a smaller offset glyph.
 const Subscript = () =>
   svg(
     <>
+      <text {...MARK_LETTER_PROPS} fontWeight="700" x="9">X</text>
       <text
-        x="1"
-        y="15"
-        fontSize="15"
-        fontWeight="700"
-        fill="currentColor"
-        stroke="none"
-      >X</text>
-      <text
-        x="13"
-        y="22"
+        x="17"
+        y="21"
         fontSize="10"
         fontWeight="800"
         fill="currentColor"
         stroke="none"
+        textAnchor="middle"
+        fontFamily="Georgia, 'Times New Roman', serif"
       >2</text>
     </>,
   );
@@ -201,54 +207,36 @@ const Subscript = () =>
 const Superscript = () =>
   svg(
     <>
+      <text {...MARK_LETTER_PROPS} fontWeight="700" x="9">X</text>
       <text
-        x="1"
-        y="22"
-        fontSize="15"
-        fontWeight="700"
-        fill="currentColor"
-        stroke="none"
-      >X</text>
-      <text
-        x="13"
-        y="10"
+        x="17"
+        y="9"
         fontSize="10"
         fontWeight="800"
         fill="currentColor"
         stroke="none"
+        textAnchor="middle"
+        fontFamily="Georgia, 'Times New Roman', serif"
       >2</text>
     </>,
   );
 
-// A+ / A- font size steppers.
+// A+ / A- font size steppers — "A" scaled to match MARK_LETTER_PROPS,
+// with a compact plus / minus badge on the right.
 const SizeUp = () =>
   svg(
     <>
-      <text
-        x="0"
-        y="18"
-        fontSize="14"
-        fontWeight="700"
-        fill="currentColor"
-        stroke="none"
-      >A</text>
-      <line x1="15" y1="6" x2="22" y2="6" strokeWidth="2" />
-      <line x1="18.5" y1="2.5" x2="18.5" y2="9.5" strokeWidth="2" />
+      <text {...MARK_LETTER_PROPS} fontWeight="700" x="9">A</text>
+      <line x1="16" y1="6" x2="22" y2="6" strokeWidth="2" />
+      <line x1="19" y1="3" x2="19" y2="9" strokeWidth="2" />
     </>,
   );
 
 const SizeDown = () =>
   svg(
     <>
-      <text
-        x="0"
-        y="18"
-        fontSize="14"
-        fontWeight="700"
-        fill="currentColor"
-        stroke="none"
-      >A</text>
-      <line x1="15" y1="6" x2="22" y2="6" strokeWidth="2" />
+      <text {...MARK_LETTER_PROPS} fontWeight="700" x="9">A</text>
+      <line x1="16" y1="6" x2="22" y2="6" strokeWidth="2" />
     </>,
   );
 
