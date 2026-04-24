@@ -205,6 +205,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fmtParagraph: "Paragraphe",
   fmtFontFamily: "Police",
   fmtFontSize: "Taille",
+  fmtFontSizeUp: "Augmenter la taille",
+  fmtFontSizeDown: "Diminuer la taille",
   fmtClearFormatting: "Supprimer la mise en forme",
   fmtMore: "Plus d’outils",
   fmtDefault: "Par défaut",

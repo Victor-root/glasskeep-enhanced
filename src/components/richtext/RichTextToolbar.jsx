@@ -152,10 +152,10 @@ function Swatches({ colors, onPick, current, onClear, clearLabel }) {
 
 function BlockTypeMenu({ editor, anchorRef, open, onClose }) {
   const items = [
-    { value: "p",  label: t("fmtParagraph"), icon: <RichIcons.Paragraph /> },
-    { value: "h1", label: t("fmtHeading1"),  sample: "H1" },
-    { value: "h2", label: t("fmtHeading2"),  sample: "H2" },
-    { value: "h3", label: t("fmtHeading3"),  sample: "H3" },
+    { value: "p",  label: t("fmtParagraph"), badge: "¶"  },
+    { value: "h1", label: t("fmtHeading1"),  badge: "H1" },
+    { value: "h2", label: t("fmtHeading2"),  badge: "H2" },
+    { value: "h3", label: t("fmtHeading3"),  badge: "H3" },
   ];
   const currentHeading = [1, 2, 3].find((l) => editor.isActive("heading", { level: l }));
   const current = currentHeading ? `h${currentHeading}` : "p";
@@ -175,9 +175,7 @@ function BlockTypeMenu({ editor, anchorRef, open, onClose }) {
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => pick(it.value)}
         >
-          <span className="rt-menu-item-sample">
-            {it.icon ? it.icon : it.sample}
-          </span>
+          <span className={`rt-block-badge rt-block-badge--${it.value}`}>{it.badge}</span>
           <span className="rt-menu-item-label">{it.label}</span>
         </button>
       ))}
@@ -278,34 +276,47 @@ function FontSizePopover({ editor, anchorRef, open, onClose }) {
   const current = editor.getAttributes("textStyle")?.fontSize || "";
   const pick = (v) => {
     const chain = editor.chain().focus();
-    if (v) chain.setFontSize(v).run();
-    else chain.unsetFontSize().run();
+    // Clicking the "default" size removes the explicit attribute so the
+    // text goes back to inheriting whatever the block's default size is.
+    if (!v || v === DEFAULT_FONT_SIZE) chain.unsetFontSize().run();
+    else chain.setFontSize(v).run();
     onClose?.();
   };
+  // Whether the "default" marker is effectively active: no explicit size OR
+  // explicit size equal to the default.
+  const defaultActive = !current || current === DEFAULT_FONT_SIZE;
   return (
     <Popover open={open} onClose={onClose} anchorRef={anchorRef} className="rt-pop--fontsize">
-      <button
-        type="button"
-        className={`rt-size-row rt-size-row--default${!current ? " is-current" : ""}`}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => pick("")}
-      >
-        <span className="rt-size-value">{DEFAULT_FONT_SIZE.replace("px", "")}</span>
-        <span className="rt-size-label">{t("fmtDefault")}</span>
-      </button>
-      {FONT_SIZES.map((s) => (
-        <button
-          key={s}
-          type="button"
-          className={`rt-size-row${current === s ? " is-current" : ""}`}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => pick(s)}
-        >
-          <span className="rt-size-value">{s.replace("px", "")}</span>
-        </button>
-      ))}
+      {FONT_SIZES.map((s) => {
+        const isDefault = s === DEFAULT_FONT_SIZE;
+        const isCurrent = isDefault ? defaultActive : current === s;
+        return (
+          <button
+            key={s}
+            type="button"
+            className={`rt-size-row${isCurrent ? " is-current" : ""}${isDefault ? " rt-size-row--is-default" : ""}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => pick(s)}
+          >
+            <span className="rt-size-value">{s.replace("px", "")}</span>
+            {isDefault && <span className="rt-size-default-badge">{t("fmtDefault")}</span>}
+          </button>
+        );
+      })}
     </Popover>
   );
+}
+
+// Step through the ordered list of font sizes. Used by the A+ / A- buttons.
+function stepFontSize(editor, direction) {
+  const current = editor.getAttributes("textStyle")?.fontSize || DEFAULT_FONT_SIZE;
+  let idx = FONT_SIZES.indexOf(current);
+  if (idx === -1) idx = FONT_SIZES.indexOf(DEFAULT_FONT_SIZE);
+  const next = Math.max(0, Math.min(FONT_SIZES.length - 1, idx + direction));
+  const value = FONT_SIZES[next];
+  const chain = editor.chain().focus();
+  if (value === DEFAULT_FONT_SIZE) chain.unsetFontSize().run();
+  else chain.setFontSize(value).run();
 }
 
 function FontFamilyPopover({ editor, anchorRef, open, onClose }) {
@@ -364,11 +375,15 @@ export default function RichTextToolbar({ editor, compact = false }) {
 
   const chain = () => editor.chain().focus();
   const headingLevel = [1, 2, 3].find((l) => editor.isActive("heading", { level: l }));
-  // Block-type button shows the current heading level as text ("H1" / "H2" /
-  // "H3") or a proper paragraph SVG icon when the block is a normal paragraph.
-  const blockContent = headingLevel
-    ? <span className="rt-btn-label">{`H${headingLevel}`}</span>
-    : <RichIcons.Paragraph />;
+  // Block-type button: each state gets a typographic badge (colour chip
+  // with the block's label) so the button reads as a DISTINCT style from
+  // the surrounding line-based icons. ¶ for paragraph, H1/H2/H3 for
+  // heading levels — same shape, different label.
+  const blockContent = (
+    <span className={`rt-block-badge rt-block-badge--${headingLevel ? `h${headingLevel}` : "p"}`}>
+      {headingLevel ? `H${headingLevel}` : "¶"}
+    </span>
+  );
   const attrs = editor.getAttributes("textStyle") || {};
   const currentColor = attrs.color || null;
   const currentHighlight = editor.getAttributes("highlight")?.color || null;
@@ -437,13 +452,14 @@ export default function RichTextToolbar({ editor, compact = false }) {
           <button
             ref={fontBtnRef}
             type="button"
-            className="rt-btn rt-btn--menu rt-btn--wide"
-            data-tooltip={t("fmtFontFamily")}
+            className={`rt-btn rt-btn--menu rt-btn--wide${currentFontFamily ? " is-active" : ""}`}
+            data-tooltip={t("fmtFontFamily") + (currentFontFamily ? ` — ${fontFamilyLabel}` : "")}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => toggleMenu("font")}
-            style={{ fontFamily: currentFontFamily || undefined }}
           >
-            <span className="rt-btn-label">{fontFamilyLabel}</span>
+            {/* Static label so the button width never jumps when Ubuntu etc.
+                is picked — the pick happens inside the popover instead. */}
+            <span className="rt-btn-label">{t("fmtFontFamily")}</span>
             <RichIcons.Chevron />
           </button>
           <FontFamilyPopover editor={editor} anchorRef={fontBtnRef} open={openMenu === "font"} onClose={closeMenu} />
@@ -460,6 +476,19 @@ export default function RichTextToolbar({ editor, compact = false }) {
             <RichIcons.Chevron />
           </button>
           <FontSizePopover editor={editor} anchorRef={sizeBtnRef} open={openMenu === "size"} onClose={closeMenu} />
+
+          <ToolbarButton
+            title={t("fmtFontSizeUp")}
+            onClick={() => stepFontSize(editor, +1)}
+          >
+            <RichIcons.SizeUp />
+          </ToolbarButton>
+          <ToolbarButton
+            title={t("fmtFontSizeDown")}
+            onClick={() => stepFontSize(editor, -1)}
+          >
+            <RichIcons.SizeDown />
+          </ToolbarButton>
 
           <ToolbarButton
             title={t("fmtClearFormatting")}
@@ -501,25 +530,27 @@ export default function RichTextToolbar({ editor, compact = false }) {
           <button
             ref={colorBtnRef}
             type="button"
-            className={`rt-btn rt-btn--swatch${currentColor ? " is-active" : ""}`}
+            className={`rt-btn rt-btn--swatch rt-btn--has-chevron${currentColor ? " is-active" : ""}`}
             data-tooltip={t("fmtTextColor")}
             aria-label={t("fmtTextColor")}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => toggleMenu("color")}
           >
             <RichIcons.TextColor swatch={currentColor || "#111827"} />
+            <RichIcons.Chevron />
           </button>
           <ColorPopover editor={editor} anchorRef={colorBtnRef} open={openMenu === "color"} onClose={closeMenu} />
           <button
             ref={hlBtnRef}
             type="button"
-            className={`rt-btn rt-btn--swatch${currentHighlight ? " is-active" : ""}`}
+            className={`rt-btn rt-btn--swatch rt-btn--has-chevron${currentHighlight ? " is-active" : ""}`}
             data-tooltip={t("fmtHighlight")}
             aria-label={t("fmtHighlight")}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => toggleMenu("highlight")}
           >
             <RichIcons.Highlight swatch={currentHighlight || (isDark ? "#b45309" : "#fde047")} />
+            <RichIcons.Chevron />
           </button>
           <HighlightPopover editor={editor} anchorRef={hlBtnRef} open={openMenu === "highlight"} onClose={closeMenu} isDark={isDark} />
         </div>
@@ -561,30 +592,18 @@ export default function RichTextToolbar({ editor, compact = false }) {
 
       <span className="rt-sep" aria-hidden="true" />
 
-      {/* Super-group C — Insert / content elements (incl. sub/sup, which
-          conceptually belong with the other inline content tools). */}
+      {/* Super-group C — Insert / content elements.
+          Row 1 clusters "code"-ish content together (code block, inline
+          code, link); row 2 groups the remaining block/inline inserts
+          (quote, HR, sub, sup). */}
       <div className="rt-sg" data-sg="insert">
         <div className="rt-sg-row">
-          <ToolbarButton active={isActive("blockquote")} title={t("fmtQuote")} onClick={() => chain().toggleBlockquote().run()}>
-            <RichIcons.Quote />
-          </ToolbarButton>
           <ToolbarButton
             active={isActive("codeBlock")}
             title={t("fmtCodeBlock")}
             onClick={() => chain().smartToggleCodeBlock().run()}
           >
             <RichIcons.CodeBlock />
-          </ToolbarButton>
-          <ToolbarButton title={t("fmtSeparator")} onClick={() => chain().setHorizontalRule().run()}>
-            <RichIcons.HR />
-          </ToolbarButton>
-        </div>
-        <div className="rt-sg-row">
-          <ToolbarButton active={isActive("subscript")} title={t("fmtSubscript")} onClick={() => chain().toggleSubscript().run()}>
-            <RichIcons.Subscript />
-          </ToolbarButton>
-          <ToolbarButton active={isActive("superscript")} title={t("fmtSuperscript")} onClick={() => chain().toggleSuperscript().run()}>
-            <RichIcons.Superscript />
           </ToolbarButton>
           <ToolbarButton active={isActive("code")} title={t("fmtInlineCode")} onClick={() => chain().toggleCode().run()}>
             <RichIcons.Code />
@@ -599,6 +618,20 @@ export default function RichTextToolbar({ editor, compact = false }) {
             </ToolbarButton>
             <LinkPopover editor={editor} anchorRef={linkBtnRef} open={openMenu === "link"} onClose={closeMenu} />
           </div>
+        </div>
+        <div className="rt-sg-row">
+          <ToolbarButton active={isActive("blockquote")} title={t("fmtQuote")} onClick={() => chain().toggleBlockquote().run()}>
+            <RichIcons.Quote />
+          </ToolbarButton>
+          <ToolbarButton title={t("fmtSeparator")} onClick={() => chain().setHorizontalRule().run()}>
+            <RichIcons.HR />
+          </ToolbarButton>
+          <ToolbarButton active={isActive("subscript")} title={t("fmtSubscript")} onClick={() => chain().toggleSubscript().run()}>
+            <RichIcons.Subscript />
+          </ToolbarButton>
+          <ToolbarButton active={isActive("superscript")} title={t("fmtSuperscript")} onClick={() => chain().toggleSuperscript().run()}>
+            <RichIcons.Superscript />
+          </ToolbarButton>
         </div>
       </div>
     </div>

@@ -1155,16 +1155,22 @@ html.dark .rt-editor-content a { color: #93c5fd; }
   align-items: stretch;
   column-gap: 0;
   row-gap: 6px;
-  padding: 5px 8px 6px;
-  margin: 4px 8px 6px;
-  border-radius: 10px;
+  /* Horizontal padding stays on the toolbar so buttons breathe, but we
+     deliberately drop horizontal MARGIN + border-radius: the top border
+     below is now a flat line spanning the full sticky-header width
+     (no rounded corners clipping its ends). The negative top margin
+     pulls the toolbar up toward the close/pin/save row, giving more
+     vertical room to the note body in edit mode. */
+  padding: 4px 10px 6px;
+  margin: -6px 0 4px;
+  border-radius: 0;
   background: transparent;
   border-top: 1px solid var(--rt-divider);
 }
 html.dark .rt-toolbar {
-  border-top-color: rgba(255, 255, 255, 0.08);
+  border-top-color: rgba(255, 255, 255, 0.1);
 }
-.rt-toolbar--compact { padding: 3px 6px 4px; }
+.rt-toolbar--compact { padding: 2px 8px 4px; }
 
 /* Super-group — two vertically stacked rows of flush buttons. */
 .rt-sg {
@@ -1227,6 +1233,41 @@ html.dark .rt-toolbar {
 .rt-btn-inner { display: inline-flex; align-items: center; justify-content: center; }
 .rt-btn svg { width: 20px; height: 20px; }
 .rt-btn--chevron svg { width: 12px; height: 12px; }
+
+/* Chevron appended INSIDE a .rt-btn (colour / highlight buttons) — small
+   so it signals "dropdown" without competing with the swatch. */
+.rt-btn--has-chevron { gap: 2px; }
+.rt-btn--has-chevron > svg:last-child { width: 11px; height: 11px; opacity: 0.75; }
+
+/* Block-type button — typographic badge that stands visually apart
+   from the line-based icons of the rest of the toolbar. */
+.rt-block-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1;
+  background: rgba(99, 102, 241, 0.12);
+  color: rgb(99, 102, 241);
+  letter-spacing: 0.02em;
+}
+.rt-block-badge--p   { font-size: 1.15rem; }
+.rt-block-badge--h1  { font-size: 0.92rem; }
+.rt-block-badge--h2  { font-size: 0.88rem; }
+.rt-block-badge--h3  { font-size: 0.82rem; }
+html.dark .rt-block-badge {
+  background: rgba(129, 140, 248, 0.18);
+  color: rgb(165, 180, 252);
+}
+.rt-btn.is-active .rt-block-badge {
+  background: rgba(255, 255, 255, 0.25);
+}
 
 .rt-splitbtn {
   display: inline-flex;
@@ -1363,13 +1404,26 @@ html.dark .rt-icon-swatch-bar { border-color: rgba(255, 255, 255, 0.12); }
   letter-spacing: 0.04em;
   opacity: 0.7;
 }
-.rt-size-row--default { position: relative; }
-.rt-size-row--default::before {
-  content: "";
-  position: absolute;
-  left: 3px; right: 3px; bottom: -1px;
-  height: 1px;
-  background: var(--rt-divider);
+/* "par défaut" badge on the 16-row — small chip on the right side so
+   the list stays a single ordered sequence (12, 14, 16, 18 …) without a
+   duplicated row at the top. */
+.rt-size-default-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.14);
+  color: rgb(99, 102, 241);
+  line-height: 1;
+}
+html.dark .rt-size-default-badge {
+  background: rgba(129, 140, 248, 0.22);
+  color: rgb(165, 180, 252);
+}
+.rt-size-row--is-default {
+  font-weight: 700;
 }
 
 /* Colour popovers */

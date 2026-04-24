@@ -25,16 +25,23 @@ function svg(children, extra) {
 const Chevron = () =>
   svg(<path d="M6 9l6 6 6-6" />, { width: 10, height: 10 });
 
-// Modern "body text" glyph — four horizontal text lines, the last one
-// shorter, as used by Notion / Google Docs to mean "paragraph / normal".
+// Paragraph mark — rendered as a stylised pilcrow glyph (¶) with a
+// subtle accent fill. Deliberately typographic rather than another
+// "rows of lines" icon so the block-type button never blurs into the
+// alignment / list family.
 const Paragraph = () =>
   svg(
-    <>
-      <line x1="4"  y1="6"  x2="20" y2="6" />
-      <line x1="4"  y1="10" x2="20" y2="10" />
-      <line x1="4"  y1="14" x2="20" y2="14" />
-      <line x1="4"  y1="18" x2="13" y2="18" />
-    </>,
+    <text
+      x="5"
+      y="19"
+      fontSize="20"
+      fontWeight="700"
+      fill="currentColor"
+      stroke="none"
+      fontFamily='Georgia, "Times New Roman", serif'
+    >
+      ¶
+    </text>,
   );
 
 const Bold = () =>
@@ -166,21 +173,82 @@ const LinkOpen = () =>
     </>,
   );
 
+// Subscript / Superscript — big clear "X" base with a prominent "2"
+// offset below / above. Previous versions used an X made of thin paths
+// and a 7-px glyph, which was nearly invisible at toolbar size.
 const Subscript = () =>
   svg(
     <>
-      <path d="M5 6l6 8" />
-      <path d="M11 6l-6 8" />
-      <text x="15" y="19" fontSize="7" fontWeight="700" fill="currentColor" stroke="none">2</text>
+      <text
+        x="1"
+        y="15"
+        fontSize="15"
+        fontWeight="700"
+        fill="currentColor"
+        stroke="none"
+      >X</text>
+      <text
+        x="13"
+        y="22"
+        fontSize="10"
+        fontWeight="800"
+        fill="currentColor"
+        stroke="none"
+      >2</text>
     </>,
   );
 
 const Superscript = () =>
   svg(
     <>
-      <path d="M5 10l6 8" />
-      <path d="M11 10l-6 8" />
-      <text x="15" y="10" fontSize="7" fontWeight="700" fill="currentColor" stroke="none">2</text>
+      <text
+        x="1"
+        y="22"
+        fontSize="15"
+        fontWeight="700"
+        fill="currentColor"
+        stroke="none"
+      >X</text>
+      <text
+        x="13"
+        y="10"
+        fontSize="10"
+        fontWeight="800"
+        fill="currentColor"
+        stroke="none"
+      >2</text>
+    </>,
+  );
+
+// A+ / A- font size steppers.
+const SizeUp = () =>
+  svg(
+    <>
+      <text
+        x="0"
+        y="18"
+        fontSize="14"
+        fontWeight="700"
+        fill="currentColor"
+        stroke="none"
+      >A</text>
+      <line x1="15" y1="6" x2="22" y2="6" strokeWidth="2" />
+      <line x1="18.5" y1="2.5" x2="18.5" y2="9.5" strokeWidth="2" />
+    </>,
+  );
+
+const SizeDown = () =>
+  svg(
+    <>
+      <text
+        x="0"
+        y="18"
+        fontSize="14"
+        fontWeight="700"
+        fill="currentColor"
+        stroke="none"
+      >A</text>
+      <line x1="15" y1="6" x2="22" y2="6" strokeWidth="2" />
     </>,
   );
 
@@ -198,24 +266,26 @@ const LIST_INDENT_COLOR   = "#10b981"; // emerald — indent chevron
 const BulletList = () =>
   svg(
     <>
-      <circle cx="5" cy="7"  r="2" fill={LIST_BULLET_COLOR} stroke="none" />
-      <circle cx="5" cy="12" r="2" fill={LIST_BULLET_COLOR} stroke="none" />
-      <circle cx="5" cy="17" r="2" fill={LIST_BULLET_COLOR} stroke="none" />
-      <line x1="11" y1="7"  x2="20" y2="7" />
-      <line x1="11" y1="12" x2="20" y2="12" />
-      <line x1="11" y1="17" x2="20" y2="17" />
+      {/* Vertical spacing widened (5 / 12 / 19 instead of 7 / 12 / 17)
+          so the markers aren't packed against each other. */}
+      <circle cx="5" cy="5"  r="1.8" fill={LIST_BULLET_COLOR} stroke="none" />
+      <circle cx="5" cy="12" r="1.8" fill={LIST_BULLET_COLOR} stroke="none" />
+      <circle cx="5" cy="19" r="1.8" fill={LIST_BULLET_COLOR} stroke="none" />
+      <line x1="10" y1="5"  x2="20" y2="5" />
+      <line x1="10" y1="12" x2="20" y2="12" />
+      <line x1="10" y1="19" x2="20" y2="19" />
     </>,
   );
 
 const OrderedList = () =>
   svg(
     <>
-      <text x="2" y="9"  fontSize="8" fontWeight="900" fill={LIST_ORDERED_COLOR} stroke="none">1</text>
-      <text x="2" y="15" fontSize="8" fontWeight="900" fill={LIST_ORDERED_COLOR} stroke="none">2</text>
-      <text x="2" y="21" fontSize="8" fontWeight="900" fill={LIST_ORDERED_COLOR} stroke="none">3</text>
-      <line x1="10" y1="7"  x2="20" y2="7" />
-      <line x1="10" y1="13" x2="20" y2="13" />
-      <line x1="10" y1="19" x2="20" y2="19" />
+      <text x="1.5" y="8"  fontSize="7" fontWeight="900" fill={LIST_ORDERED_COLOR} stroke="none">1</text>
+      <text x="1.5" y="15" fontSize="7" fontWeight="900" fill={LIST_ORDERED_COLOR} stroke="none">2</text>
+      <text x="1.5" y="22" fontSize="7" fontWeight="900" fill={LIST_ORDERED_COLOR} stroke="none">3</text>
+      <line x1="9" y1="6"  x2="20" y2="6" />
+      <line x1="9" y1="13" x2="20" y2="13" />
+      <line x1="9" y1="20" x2="20" y2="20" />
     </>,
   );
 
@@ -306,7 +376,7 @@ const Highlight = ({ swatch = "#fef3c7" }) => (
 const RichIcons = {
   Chevron, Paragraph, More,
   Bold, Italic, Underline, Strike, Code, CodeBlock, Quote, HR, Link, LinkOpen, Clear,
-  Subscript, Superscript,
+  Subscript, Superscript, SizeUp, SizeDown,
   BulletList, OrderedList, Indent, Outdent,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   TextColor, Highlight,
