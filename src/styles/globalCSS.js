@@ -1757,16 +1757,19 @@ html.dark .rt-link-btn--danger { color: #f87171; border-color: rgba(248, 113, 11
 .settings-type-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8px;
+  gap: 10px;
   margin-top: 10px;
 }
+/* Per-block card. Preview sits at the top, controls flow below in a
+   flexible grid that wraps gracefully — settings panels are narrow
+   (side sheet on desktop, full-width on mobile) so a single horizontal
+   row of controls can't fit and would get cut off. */
 .settings-type-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-items: center;
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
   background: rgba(0, 0, 0, 0.03);
   border: 1px solid var(--rt-divider);
 }
@@ -1775,8 +1778,15 @@ html.dark .settings-type-row { background: rgba(255, 255, 255, 0.04); }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  padding: 2px 0;
+  border-bottom: 1px dashed var(--rt-divider);
 }
-.settings-type-controls { display: inline-flex; gap: 6px; align-items: center; }
+.settings-type-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: flex-end;
+}
 .settings-type-field {
   display: inline-flex;
   flex-direction: column;
@@ -1804,10 +1814,12 @@ html.dark .settings-type-field select {
 /* Colour swatches in the typography settings panel — one row per block.
    A "none" chip (diagonal slash) resets the colour to inherit. */
 .settings-type-colors {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   padding: 2px 0;
+  max-width: 100%;
 }
 .settings-type-color {
   width: 18px;

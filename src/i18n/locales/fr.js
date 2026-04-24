@@ -227,7 +227,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   linkRemove: "Retirer",
   linkOpen: "Ouvrir",
   typographyTitle: "Typographie de l’éditeur",
-  typographyDesc: "Personnalisez la taille et la graisse des quatre styles de bloc utilisés par les notes texte.",
+  typographyDesc: "Personnalisez taille, graisse, couleur, italique et soulignement pour chaque style de bloc des notes texte.",
   typographyBlockParagraph: "Paragraphe",
   typographyBlockH1: "Titre 1",
   typographyBlockH2: "Titre 2",
