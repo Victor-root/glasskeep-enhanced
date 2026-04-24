@@ -1317,13 +1317,30 @@ html.dark .rt-block-badge {
 /* Separator spans the full super-group height (both sub-rows) so the
    visual break between groups reads unambiguously in the Word-ribbon
    layout. 6 px horizontal margin matches the ribbon padding rhythm. */
+/* Separator spans the full super-group height (both sub-rows) so the
+   visual break between groups reads unambiguously in the Word-ribbon
+   layout. The separator now ALSO acts as a flexible spacer: it grows
+   to absorb the empty horizontal room (flex: 1 1 0), so the three
+   super-groups distribute themselves across the whole toolbar width
+   instead of being tassed on the left with a big void on the right.
+   The visible 1-px line is painted by the ::before pseudo, kept
+   centred horizontally inside the spacer area. */
 .rt-sep {
-  width: 1px;
+  flex: 1 1 0;
+  min-width: 18px;
+  max-width: 140px;
   align-self: stretch;
-  background: var(--rt-divider-strong);
-  margin: 2px 6px;
+  position: relative;
   display: inline-block;
-  flex-shrink: 0;
+}
+.rt-sep::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 50%;
+  width: 1px;
+  background: var(--rt-divider-strong);
   opacity: 0.75;
 }
 
@@ -1674,7 +1691,7 @@ html.dark .settings-type-field select {
   .rt-btn--block { min-width: 50px; }
   .rt-btn svg { width: 20px; height: 20px; }
   .rt-pop { min-width: 220px; }
-  .rt-sep { margin: 0 4px; height: 26px; }
+  .rt-sep { min-width: 12px; max-width: 80px; }
 }
 
 /* Read-only note-content renderings (cards + modal view) should ALSO honour
