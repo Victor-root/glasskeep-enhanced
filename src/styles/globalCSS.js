@@ -1162,13 +1162,19 @@ html.dark .rt-editor-content a { color: #93c5fd; }
      pulls the toolbar up toward the close/pin/save row, giving more
      vertical room to the note body in edit mode. */
   padding: 4px 10px 6px;
-  margin: -6px 0 4px;
+  margin: -6px 0 0;
   border-radius: 0;
   background: transparent;
+  /* Two flush dividers framing the toolbar: one above (between the
+     close/pin/save row and the toolbar) and one below (between the
+     toolbar and the note body). Same hairline as the existing top
+     separator so the two read as a matched pair. */
   border-top: 1px solid var(--rt-divider);
+  border-bottom: 1px solid var(--rt-divider);
 }
 html.dark .rt-toolbar {
   border-top-color: rgba(255, 255, 255, 0.1);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 .rt-toolbar--compact { padding: 2px 8px 4px; }
 
