@@ -43,6 +43,8 @@ import terminal2Svg       from "./tabler/terminal-2.svg?raw";
 import h1Svg               from "./tabler/h-1.svg?raw";
 import h2Svg               from "./tabler/h-2.svg?raw";
 import h3Svg               from "./tabler/h-3.svg?raw";
+import h4Svg               from "./tabler/h-4.svg?raw";
+import h5Svg               from "./tabler/h-5.svg?raw";
 
 // Cache of sanitised markup keyed by the raw SVG string. The transformation
 // only depends on the SVG source, so each icon is processed exactly once.
@@ -113,6 +115,8 @@ export const TI = {
   H1:              (p) => <TablerIcon svg={h1Svg} {...p} />,
   H2:              (p) => <TablerIcon svg={h2Svg} {...p} />,
   H3:              (p) => <TablerIcon svg={h3Svg} {...p} />,
+  H4:              (p) => <TablerIcon svg={h4Svg} {...p} />,
+  H5:              (p) => <TablerIcon svg={h5Svg} {...p} />,
 };
 
 export default TI;

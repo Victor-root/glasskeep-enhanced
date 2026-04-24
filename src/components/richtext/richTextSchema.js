@@ -28,7 +28,7 @@ export function buildRichTextExtensions({ placeholder = "" } = {}) {
         autolink: true,
         HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" },
       },
-      heading: { levels: [1, 2, 3] },
+      heading: { levels: [1, 2, 3, 4, 5] },
     }),
     UnderlineVariant,
     TextStyle,

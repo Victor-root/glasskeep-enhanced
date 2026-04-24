@@ -17,6 +17,8 @@ const BLOCKS = [
   { key: "h1", labelKey: "typographyBlockH1" },
   { key: "h2", labelKey: "typographyBlockH2" },
   { key: "h3", labelKey: "typographyBlockH3" },
+  { key: "h4", labelKey: "typographyBlockH4" },
+  { key: "h5", labelKey: "typographyBlockH5" },
 ];
 
 export default function TypographySettings({ presets, setPresets }) {

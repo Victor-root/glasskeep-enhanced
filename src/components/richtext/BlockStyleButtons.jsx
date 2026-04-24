@@ -13,6 +13,8 @@ const STYLES = [
   { value: "h1", labelKey: "fmtHeading1",  className: "rt-style-btn--h1" },
   { value: "h2", labelKey: "fmtHeading2",  className: "rt-style-btn--h2" },
   { value: "h3", labelKey: "fmtHeading3",  className: "rt-style-btn--h3" },
+  { value: "h4", labelKey: "fmtHeading4",  className: "rt-style-btn--h4" },
+  { value: "h5", labelKey: "fmtHeading5",  className: "rt-style-btn--h5" },
 ];
 
 function StyleButton({ editor, value, labelKey, className, active }) {
@@ -39,12 +41,13 @@ function StyleButton({ editor, value, labelKey, className, active }) {
 
 export default function BlockStyleButtons({ editor }) {
   if (!editor) return null;
-  const headingLevel = [1, 2, 3].find((l) => editor.isActive("heading", { level: l }));
+  const headingLevel = [1, 2, 3, 4, 5].find((l) => editor.isActive("heading", { level: l }));
   const current = headingLevel ? `h${headingLevel}` : "p";
+  // 2 x 3 grid: row 1 = P + H1 + H2, row 2 = H3 + H4 + H5.
   return (
     <div className="rt-sg rt-sg--style" data-sg="style">
       <div className="rt-sg-row">
-        {STYLES.slice(0, 2).map((s) => (
+        {STYLES.slice(0, 3).map((s) => (
           <StyleButton
             key={s.value}
             editor={editor}
@@ -54,7 +57,7 @@ export default function BlockStyleButtons({ editor }) {
         ))}
       </div>
       <div className="rt-sg-row">
-        {STYLES.slice(2).map((s) => (
+        {STYLES.slice(3).map((s) => (
           <StyleButton
             key={s.value}
             editor={editor}

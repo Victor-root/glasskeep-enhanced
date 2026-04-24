@@ -44,10 +44,12 @@ const AlignJustify = () => <T Icon={TI.AlignJustified} />;
 // H). This is only rendered when the block IS a paragraph — when a
 // heading level is active, the toolbar swaps in the H1/H2/H3 badge.
 const Paragraph  = () => <T Icon={TI.Heading} />;
-// Heading levels — Tabler ships dedicated glyphs per level (h-1, h-2, h-3).
+// Heading levels — Tabler ships dedicated glyphs per level (h-1 .. h-5).
 const H1 = () => <T Icon={TI.H1} />;
 const H2 = () => <T Icon={TI.H2} />;
 const H3 = () => <T Icon={TI.H3} />;
+const H4 = () => <T Icon={TI.H4} />;
+const H5 = () => <T Icon={TI.H5} />;
 const More       = () => <T Icon={TI.ChevronDown} />;
 // Chevron is styled smaller via the `.rt-btn--chevron svg` / `.rt-btn--has-chevron`
 // CSS rules — same component, the container decides the size.
@@ -151,7 +153,7 @@ const Highlight = ({ swatch = "#fef3c7" }) => (
 );
 
 const RichIcons = {
-  Chevron, Paragraph, H1, H2, H3, More,
+  Chevron, Paragraph, H1, H2, H3, H4, H5, More,
   Bold, Italic, Underline, Strike, Code, CodeBlock, Quote, HR, Link, LinkOpen, Clear,
   Subscript, Superscript, SizeUp, SizeDown,
   BulletList, OrderedList, Indent, Outdent,

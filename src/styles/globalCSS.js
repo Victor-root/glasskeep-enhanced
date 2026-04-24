@@ -103,6 +103,8 @@ html.dark header.multi-select-bar {
 .note-content h1 { font-size: 1.5rem; line-height: 1.5; }
 .note-content h2 { font-size: 1.25rem; line-height: 1.5; }
 .note-content h3 { font-size: 1.125rem; line-height: 1.5; }
+.note-content h4 { font-size: 1rem;    line-height: 1.5; }
+.note-content h5 { font-size: 0.9rem;  line-height: 1.5; }
 .note-content .md-blank-line { display: block; height: 1lh; }
 /* Fallback for engines without the lh unit: approximate 1.5x font-size */
 @supports not (height: 1lh) {
@@ -1021,6 +1023,10 @@ html.dark .login-deco-card {
   --gk-type-h2-weight: 600;
   --gk-type-h3-size: 1.125rem;
   --gk-type-h3-weight: 600;
+  --gk-type-h4-size: 1rem;
+  --gk-type-h4-weight: 600;
+  --gk-type-h5-size: 0.9rem;
+  --gk-type-h5-weight: 600;
 
   --rt-accent: 99, 102, 241;  /* indigo-500 */
   --rt-divider: rgba(0, 0, 0, 0.08);
@@ -1089,6 +1095,16 @@ html.dark .rt-editor-content p.is-editor-empty:first-child::before { color: #6b7
 .note-content--dense h3 {
   font-size: var(--gk-type-h3-size);
   font-weight: var(--gk-type-h3-weight);
+}
+.rt-editor-content h4,
+.note-content--dense h4 {
+  font-size: var(--gk-type-h4-size);
+  font-weight: var(--gk-type-h4-weight);
+}
+.rt-editor-content h5,
+.note-content--dense h5 {
+  font-size: var(--gk-type-h5-size);
+  font-weight: var(--gk-type-h5-weight);
 }
 
 .rt-editor-content blockquote {
@@ -1376,6 +1392,14 @@ html.dark .rt-block-badge {
 .rt-style-btn--h3 .rt-style-btn-sample {
   font-size: min(calc(var(--gk-type-h3-size, 1.125rem) * 0.82), 1rem);
   font-weight: var(--gk-type-h3-weight, 600);
+}
+.rt-style-btn--h4 .rt-style-btn-sample {
+  font-size: min(calc(var(--gk-type-h4-size, 1rem)    * 0.82), 0.95rem);
+  font-weight: var(--gk-type-h4-weight, 600);
+}
+.rt-style-btn--h5 .rt-style-btn-sample {
+  font-size: min(calc(var(--gk-type-h5-size, 0.9rem)  * 0.82), 0.88rem);
+  font-weight: var(--gk-type-h5-weight, 600);
 }
 
 .rt-splitbtn {
