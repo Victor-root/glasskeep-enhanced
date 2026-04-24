@@ -45,47 +45,58 @@ const More       = () => <T Icon={TI.ChevronDown} />;
 const Chevron    = () => <T Icon={TI.ChevronDown} className="tabler-icon--chevron" />;
 
 // --- Underline (variant-aware) ----------------------------------------
-// Tabler's "underline" is just an outlined U with a line below. To keep
-// the live preview of style / colour variants that the split-button pops
-// open, we render an SVG <text> for the "U" glyph with CSS text-decoration
-// so wavy / dotted / dashed / double + custom colour still reflect on
-// the button itself.
+// Starts from Tabler's own underline geometry: U-curve on top + base line.
+// We re-render it as an inline SVG so the base line can change to reflect
+// the selected variant (simple / double / dotted / dashed / wavy) and
+// carry an optional user colour, while the U-curve stays on the same
+// visual grid as every other Tabler icon in the toolbar.
+const UNDERLINE_U_CURVE = "M7 5v5a5 5 0 0 0 10 0v-5";
 const Underline = ({ style = "simple", color }) => {
-  const deco =
-    {
-      simple: "solid",
-      double: "double",
-      dotted: "dotted",
-      dashed: "dashed",
-      wavy: "wavy",
-    }[style] || "solid";
-  const textDecoration = `underline ${deco === "solid" ? "" : deco} ${color || ""}`.trim();
+  const lineColor = color || "currentColor";
+  let baseLine;
+  if (style === "wavy") {
+    // 3 full sine-like bumps from x=5 to x=19, amplitude ±1.5 around y=19.
+    baseLine = (
+      <path
+        d="M5 19 q2.33 -2 4.66 0 t4.66 0 t4.66 0"
+        stroke={lineColor}
+        fill="none"
+      />
+    );
+  } else if (style === "double") {
+    baseLine = (
+      <>
+        <path d="M5 18h14" stroke={lineColor} />
+        <path d="M5 21h14" stroke={lineColor} />
+      </>
+    );
+  } else {
+    const dash =
+      style === "dotted" ? "0.01 3"
+        : style === "dashed" ? "3 2"
+          : undefined;
+    baseLine = (
+      <path
+        d="M5 19h14"
+        stroke={lineColor}
+        strokeDasharray={dash}
+      />
+    );
+  }
   return (
-    <svg
-      className="tabler-icon"
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <text
-        x="12"
-        y="17"
-        textAnchor="middle"
-        fontSize="14"
-        fontWeight="600"
-        fill="currentColor"
-        stroke="none"
-        fontFamily="ui-sans-serif, system-ui, sans-serif"
-        style={{ textDecoration, textUnderlineOffset: "2px" }}
+    <span className="tabler-icon" aria-hidden="true">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       >
-        U
-      </text>
-    </svg>
+        <path d={UNDERLINE_U_CURVE} />
+        {baseLine}
+      </svg>
+    </span>
   );
 };
 
