@@ -498,12 +498,6 @@ export default function RichTextToolbar({ editor, compact = false }) {
           <ToolbarButton active={isActive("strike")} title={t("fmtStrike")} onClick={() => chain().toggleStrike().run()}>
             <RichIcons.Strike />
           </ToolbarButton>
-          <ToolbarButton active={isActive("subscript")} title={t("fmtSubscript")} onClick={() => chain().toggleSubscript().run()}>
-            <RichIcons.Subscript />
-          </ToolbarButton>
-          <ToolbarButton active={isActive("superscript")} title={t("fmtSuperscript")} onClick={() => chain().toggleSuperscript().run()}>
-            <RichIcons.Superscript />
-          </ToolbarButton>
           <button
             ref={colorBtnRef}
             type="button"
@@ -567,7 +561,8 @@ export default function RichTextToolbar({ editor, compact = false }) {
 
       <span className="rt-sep" aria-hidden="true" />
 
-      {/* Super-group C — Insert / content elements */}
+      {/* Super-group C — Insert / content elements (incl. sub/sup, which
+          conceptually belong with the other inline content tools). */}
       <div className="rt-sg" data-sg="insert">
         <div className="rt-sg-row">
           <ToolbarButton active={isActive("blockquote")} title={t("fmtQuote")} onClick={() => chain().toggleBlockquote().run()}>
@@ -585,6 +580,12 @@ export default function RichTextToolbar({ editor, compact = false }) {
           </ToolbarButton>
         </div>
         <div className="rt-sg-row">
+          <ToolbarButton active={isActive("subscript")} title={t("fmtSubscript")} onClick={() => chain().toggleSubscript().run()}>
+            <RichIcons.Subscript />
+          </ToolbarButton>
+          <ToolbarButton active={isActive("superscript")} title={t("fmtSuperscript")} onClick={() => chain().toggleSuperscript().run()}>
+            <RichIcons.Superscript />
+          </ToolbarButton>
           <ToolbarButton active={isActive("code")} title={t("fmtInlineCode")} onClick={() => chain().toggleCode().run()}>
             <RichIcons.Code />
           </ToolbarButton>

@@ -184,14 +184,23 @@ const Superscript = () =>
     </>,
   );
 
+// Paragraph / list accents. These four icons (bullet, ordered list,
+// outdent, indent) all sit in Super-group B and get distinct colour
+// accents so the list family stands out visually from the monochrome
+// marks / alignment / insert families around them.
+const LIST_BULLET_COLOR   = "#6366f1"; // indigo — bullet markers
+const LIST_ORDERED_COLOR  = "#0ea5e9"; // sky   — numeral markers
+const LIST_OUTDENT_COLOR  = "#f59e0b"; // amber — outdent chevron
+const LIST_INDENT_COLOR   = "#10b981"; // emerald — indent chevron
+
 // Lists — big, unmistakable markers so bullet vs. ordered vs. indent don't
 // blur together at toolbar size.
 const BulletList = () =>
   svg(
     <>
-      <circle cx="5" cy="7"  r="2" fill="currentColor" stroke="none" />
-      <circle cx="5" cy="12" r="2" fill="currentColor" stroke="none" />
-      <circle cx="5" cy="17" r="2" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="7"  r="2" fill={LIST_BULLET_COLOR} stroke="none" />
+      <circle cx="5" cy="12" r="2" fill={LIST_BULLET_COLOR} stroke="none" />
+      <circle cx="5" cy="17" r="2" fill={LIST_BULLET_COLOR} stroke="none" />
       <line x1="11" y1="7"  x2="20" y2="7" />
       <line x1="11" y1="12" x2="20" y2="12" />
       <line x1="11" y1="17" x2="20" y2="17" />
@@ -201,25 +210,28 @@ const BulletList = () =>
 const OrderedList = () =>
   svg(
     <>
-      <text x="2" y="9"  fontSize="8" fontWeight="900" fill="currentColor" stroke="none">1</text>
-      <text x="2" y="15" fontSize="8" fontWeight="900" fill="currentColor" stroke="none">2</text>
-      <text x="2" y="21" fontSize="8" fontWeight="900" fill="currentColor" stroke="none">3</text>
+      <text x="2" y="9"  fontSize="8" fontWeight="900" fill={LIST_ORDERED_COLOR} stroke="none">1</text>
+      <text x="2" y="15" fontSize="8" fontWeight="900" fill={LIST_ORDERED_COLOR} stroke="none">2</text>
+      <text x="2" y="21" fontSize="8" fontWeight="900" fill={LIST_ORDERED_COLOR} stroke="none">3</text>
       <line x1="10" y1="7"  x2="20" y2="7" />
       <line x1="10" y1="13" x2="20" y2="13" />
       <line x1="10" y1="19" x2="20" y2="19" />
     </>,
   );
 
-// Indent / outdent — big directional chevron INSIDE the lines area so the
-// arrow is the dominant shape, not the background lines. Keeps them
-// visually separate from lists (no markers) and from separators (no rule).
+// Indent / outdent — coloured directional chevron dominates the shape.
 const Indent = () =>
   svg(
     <>
       <line x1="4"  y1="6"  x2="20" y2="6" />
       <line x1="10" y1="12" x2="20" y2="12" />
       <line x1="10" y1="18" x2="20" y2="18" />
-      <polyline points="3 9 7 12 3 15" fill="none" />
+      <polyline
+        points="3 9 7 12 3 15"
+        fill="none"
+        stroke={LIST_INDENT_COLOR}
+        strokeWidth="2.4"
+      />
     </>,
   );
 
@@ -229,7 +241,12 @@ const Outdent = () =>
       <line x1="4"  y1="6"  x2="20" y2="6" />
       <line x1="4"  y1="12" x2="14" y2="12" />
       <line x1="4"  y1="18" x2="14" y2="18" />
-      <polyline points="21 9 17 12 21 15" fill="none" />
+      <polyline
+        points="21 9 17 12 21 15"
+        fill="none"
+        stroke={LIST_OUTDENT_COLOR}
+        strokeWidth="2.4"
+      />
     </>,
   );
 
