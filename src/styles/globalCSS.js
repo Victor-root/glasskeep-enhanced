@@ -1231,13 +1231,43 @@ html.dark .rt-toolbar {
   white-space: nowrap;
 }
 .rt-btn-inner { display: inline-flex; align-items: center; justify-content: center; }
+
+/* Tabler icons are rendered inline via <span dangerouslySetInnerHTML>. The
+   wrapping span acts as the sizing box; the inner <svg> fills it. Using
+   stroke-width: 1.75 nudges the Tabler stroke a touch lighter so the
+   toolbar doesn't feel heavy at 20 px. */
+.tabler-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  line-height: 0;
+  color: inherit;
+  flex-shrink: 0;
+}
+.tabler-icon > svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+.tabler-icon--chevron,
+.tabler-icon--chevron > svg { width: 12px; height: 12px; stroke-width: 2; opacity: 0.75; }
+
+/* Legacy .rt-btn svg rules kept for anything still rendering a bare SVG
+   (Underline variant, text-only marks). Tabler-backed spans are sized
+   by .tabler-icon above and ignore this rule. */
 .rt-btn svg { width: 20px; height: 20px; }
 .rt-btn--chevron svg { width: 12px; height: 12px; }
 
 /* Chevron appended INSIDE a .rt-btn (colour / highlight buttons) — small
    so it signals "dropdown" without competing with the swatch. */
 .rt-btn--has-chevron { gap: 2px; }
-.rt-btn--has-chevron > svg:last-child { width: 11px; height: 11px; opacity: 0.75; }
+.rt-btn--has-chevron > .tabler-icon--chevron { opacity: 0.7; }
 
 /* Block-type button — typographic badge that stands visually apart
    from the line-based icons of the rest of the toolbar. */
@@ -1291,17 +1321,20 @@ html.dark .rt-block-badge {
   opacity: 0.75;
 }
 
-/* Inline swatch markers on the text-colour / highlight buttons */
+/* Inline swatch markers on the text-colour / highlight buttons. The Tabler
+   typography/highlight glyph stacks on top of a colour bar that shows the
+   currently picked colour — matches Word's "A + bar" pattern. */
 .rt-icon-swatch {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  line-height: 1;
+  line-height: 0;
 }
+.rt-icon-swatch .tabler-icon { width: 18px; height: 18px; }
 .rt-icon-swatch-bar {
   display: block;
-  width: 14px;
+  width: 16px;
   height: 3px;
   border-radius: 1px;
   border: 1px solid rgba(0, 0, 0, 0.08);
