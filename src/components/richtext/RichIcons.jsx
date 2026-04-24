@@ -144,6 +144,17 @@ const Clear = () =>
     </>,
   );
 
+// "More" overflow menu trigger — three small horizontal dots, the universal
+// "additional actions" affordance.
+const More = () =>
+  svg(
+    <>
+      <circle cx="6"  cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    </>,
+  );
+
 // External-link arrow — box with an arrow breaking out to the top right.
 // Replaces the ambiguous ↗ glyph on the link popover's "open" button.
 const LinkOpen = () =>
@@ -276,7 +287,7 @@ const Highlight = ({ swatch = "#fef3c7" }) => (
 );
 
 const RichIcons = {
-  Chevron, Paragraph,
+  Chevron, Paragraph, More,
   Bold, Italic, Underline, Strike, Code, CodeBlock, Quote, HR, Link, LinkOpen, Clear,
   Subscript, Superscript,
   BulletList, OrderedList, Indent, Outdent,

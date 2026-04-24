@@ -206,6 +206,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fmtFontFamily: "Police",
   fmtFontSize: "Taille",
   fmtClearFormatting: "Supprimer la mise en forme",
+  fmtMore: "Plus d’outils",
   fmtDefault: "Par défaut",
   fmtToolbarLabel: "Mise en forme du texte",
   fmtUnderlineOptions: "Options de soulignement",

@@ -1167,9 +1167,10 @@ html.dark .rt-toolbar {
   align-items: center;
   gap: 1px;
 }
-/* Trailing utilities (Clear formatting) sit at the far right of the
-   first row, so the visual rhythm is "groups → spacer → utilities". */
-.rt-group--trailing {
+/* The "More" overflow group is pinned to the far right of the toolbar.
+   It holds anything outside the user's main-row spec (inline code, clear
+   formatting), so the visible bar stays strictly grouped with no orphans. */
+.rt-group--more {
   margin-left: auto;
 }
 
@@ -1291,7 +1292,7 @@ html.dark .rt-icon-swatch-bar { border-color: rgba(255, 255, 255, 0.12); }
 }
 .rt-pop-label--spaced { margin-top: 8px; }
 
-.rt-pop--blocks, .rt-pop--font, .rt-pop--fontsize {
+.rt-pop--blocks, .rt-pop--font, .rt-pop--fontsize, .rt-pop--more {
   min-width: 180px;
   padding: 4px;
   display: flex;
@@ -1300,6 +1301,15 @@ html.dark .rt-icon-swatch-bar { border-color: rgba(255, 255, 255, 0.12); }
   max-height: 260px;
   overflow-y: auto;
 }
+
+.rt-menu-item--action .rt-menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+}
+.rt-menu-item--action .rt-menu-item-icon svg { width: 17px; height: 17px; }
+.rt-menu-item--action .rt-menu-item-label { flex: 1; font-weight: 500; font-size: 0.85rem; }
 
 /* Menu rows (block types, fonts) */
 .rt-menu-item, .rt-font-row, .rt-size-row {
