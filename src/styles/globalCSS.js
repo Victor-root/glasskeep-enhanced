@@ -1147,39 +1147,42 @@ html.dark .rt-editor-content a { color: #93c5fd; }
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 3px;
-  padding: 6px 8px;
+  gap: 4px 6px;
+  padding: 6px 10px 8px;
   margin: 4px 8px 8px;
   border-radius: 10px;
   background: transparent;
-  /* Toolbar is portaled INSIDE the ModalHeader sticky wrapper, so it
-     inherits that wrapper's stickiness — no own position: sticky needed. */
   border-top: 1px solid var(--rt-divider);
-  padding-top: 8px;
 }
 html.dark .rt-toolbar {
   border-top-color: rgba(255, 255, 255, 0.08);
 }
-.rt-toolbar--compact { padding: 4px 6px; gap: 2px; }
+.rt-toolbar--compact { padding: 4px 8px; gap: 3px 4px; }
 
-/* display: contents flattens the group wrapper: individual buttons become
-   direct children of .rt-toolbar, so flex-wrap can break between buttons
-   instead of wrapping entire groups (the old behaviour caused big empty
-   gaps on the right with buttons overflowing onto line 2). */
+/* Groups stay together: a group is one flex item. flex-wrap on the toolbar
+   wraps WHOLE groups, never individual buttons (this is what the user
+   asked for — coherent visual blocks instead of scattered controls). */
 .rt-group {
-  display: contents;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+/* Trailing utilities (Clear formatting) sit at the far right of the
+   first row, so the visual rhythm is "groups → spacer → utilities". */
+.rt-group--trailing {
+  margin-left: auto;
 }
 
 .rt-btn {
   position: relative;
-  min-width: 34px;
-  height: 34px;
-  padding: 0 8px;
-  border-radius: 7px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border-radius: 6px;
   border: 1px solid transparent;
   background: transparent;
   color: inherit;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -1200,38 +1203,44 @@ html.dark .rt-toolbar {
 }
 .rt-btn[disabled] { opacity: 0.38; cursor: not-allowed; }
 .rt-btn:active:not(:disabled) { transform: translateY(0.5px); }
-.rt-btn--menu { padding: 0 8px; gap: 5px; }
-.rt-btn--block { min-width: 56px; }
-.rt-btn--wide { min-width: 90px; justify-content: space-between; }
-.rt-btn--narrow { min-width: 50px; justify-content: space-between; }
-.rt-btn--chevron { min-width: 22px; padding: 0 3px; }
-.rt-btn--swatch { padding: 0 6px; }
+.rt-btn--menu { padding: 0 6px; gap: 4px; }
+.rt-btn--block { min-width: 48px; }
+.rt-btn--wide { min-width: 80px; justify-content: space-between; }
+.rt-btn--narrow { min-width: 44px; justify-content: space-between; }
+.rt-btn--chevron { min-width: 18px; padding: 0 3px; }
+.rt-btn--swatch { padding: 0 5px; min-width: 32px; }
 .rt-btn-label {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 500;
   letter-spacing: 0.01em;
   white-space: nowrap;
 }
 .rt-btn-inner { display: inline-flex; align-items: center; justify-content: center; }
-.rt-btn svg { width: 18px; height: 18px; }
-.rt-btn--chevron svg { width: 12px; height: 12px; }
+.rt-btn svg { width: 17px; height: 17px; }
+.rt-btn--chevron svg { width: 11px; height: 11px; }
 
 .rt-splitbtn {
   display: inline-flex;
   align-items: stretch;
   position: relative;
-  border-radius: 7px;
+  border-radius: 6px;
 }
-.rt-splitbtn > .rt-btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 4px; }
-.rt-splitbtn > .rt-btn--chevron { border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 2px; }
+.rt-splitbtn > .rt-btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 3px; }
+.rt-splitbtn > .rt-btn--chevron { border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 1px; }
 
+/* Discreet, evenly spaced vertical divider between groups. Slim line, ~60%
+   of the button height, bracketed by symmetric horizontal margins so each
+   group sits in its own visual lane. */
 .rt-sep {
   width: 1px;
   align-self: center;
-  height: 22px;
+  height: 20px;
   background: var(--rt-divider-strong);
-  margin: 0 5px;
+  margin: 0 6px;
   display: inline-block;
+  flex-shrink: 0;
+  border-radius: 1px;
+  opacity: 0.7;
 }
 
 /* Inline swatch markers on the text-colour / highlight buttons */
@@ -1542,15 +1551,20 @@ html.dark .settings-type-field select {
 @media (max-width: 640px) {
   .rt-toolbar {
     flex-wrap: wrap;
-    padding: 5px 6px;
+    padding: 5px 6px 7px;
     margin: 2px 6px 6px;
-    gap: 3px;
+    gap: 4px 5px;
   }
-  .rt-btn { min-width: 34px; height: 34px; }
-  .rt-btn--wide { min-width: 78px; }
-  .rt-btn--block { min-width: 50px; }
+  /* On mobile the trailing utility (Clear) joins the same line as the rest
+     instead of being pushed to the right edge — that empty space looks odd
+     on a narrow viewport. */
+  .rt-group--trailing { margin-left: 0; }
+  .rt-btn { min-width: 34px; height: 34px; padding: 0 6px; }
+  .rt-btn--wide { min-width: 70px; }
+  .rt-btn--block { min-width: 46px; }
+  .rt-btn svg { width: 18px; height: 18px; }
   .rt-pop { min-width: 220px; }
-  .rt-sep { margin: 0 3px; }
+  .rt-sep { margin: 0 4px; height: 22px; }
 }
 
 /* Read-only note-content renderings (cards + modal view) should ALSO honour

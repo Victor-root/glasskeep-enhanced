@@ -408,8 +408,8 @@ export default function RichTextToolbar({ editor, compact = false }) {
 
   return (
     <div className={`rt-toolbar${compact ? " rt-toolbar--compact" : ""}`} role="toolbar" aria-label={t("fmtToolbarLabel")}>
-      {/* Group 1 — block + font structure */}
-      <div className="rt-group">
+      {/* Group 1 — block structure: paragraph/heading, font family, font size */}
+      <div className="rt-group" data-group="block">
         <button
           ref={blockBtnRef}
           type="button"
@@ -453,8 +453,9 @@ export default function RichTextToolbar({ editor, compact = false }) {
 
       <span className="rt-sep" aria-hidden="true" />
 
-      {/* Group 2 — inline formatting marks */}
-      <div className="rt-group">
+      {/* Group 2 — inline character formatting (no inline code: that lives in
+          group 6 next to the code block, so all "code" controls cluster). */}
+      <div className="rt-group" data-group="marks">
         <ToolbarButton active={isActive("bold")} title={t("fmtBold")} onClick={() => chain().toggleBold().run()}>
           <RichIcons.Bold />
         </ToolbarButton>
@@ -462,7 +463,7 @@ export default function RichTextToolbar({ editor, compact = false }) {
           <RichIcons.Italic />
         </ToolbarButton>
 
-        {/* Underline with split chevron for variants */}
+        {/* Underline + chevron for advanced variants. */}
         <div className="rt-splitbtn">
           <ToolbarButton
             active={isActive("underline")}
@@ -487,30 +488,18 @@ export default function RichTextToolbar({ editor, compact = false }) {
         <ToolbarButton active={isActive("strike")} title={t("fmtStrike")} onClick={() => chain().toggleStrike().run()}>
           <RichIcons.Strike />
         </ToolbarButton>
-        <ToolbarButton active={isActive("code")} title={t("fmtInlineCode")} onClick={() => chain().toggleCode().run()}>
-          <RichIcons.Code />
-        </ToolbarButton>
-
-        <ToolbarButton
-          active={isActive("subscript")}
-          title={t("fmtSubscript")}
-          onClick={() => chain().toggleSubscript().run()}
-        >
+        <ToolbarButton active={isActive("subscript")} title={t("fmtSubscript")} onClick={() => chain().toggleSubscript().run()}>
           <RichIcons.Subscript />
         </ToolbarButton>
-        <ToolbarButton
-          active={isActive("superscript")}
-          title={t("fmtSuperscript")}
-          onClick={() => chain().toggleSuperscript().run()}
-        >
+        <ToolbarButton active={isActive("superscript")} title={t("fmtSuperscript")} onClick={() => chain().toggleSuperscript().run()}>
           <RichIcons.Superscript />
         </ToolbarButton>
       </div>
 
       <span className="rt-sep" aria-hidden="true" />
 
-      {/* Group 3 — color + highlight */}
-      <div className="rt-group">
+      {/* Group 3 — colour + highlight */}
+      <div className="rt-group" data-group="color">
         <button
           ref={colorBtnRef}
           type="button"
@@ -540,22 +529,26 @@ export default function RichTextToolbar({ editor, compact = false }) {
 
       <span className="rt-sep" aria-hidden="true" />
 
-      {/* Group 4 — lists, indent, align */}
-      <div className="rt-group">
+      {/* Group 4 — list structure: bullet / ordered + outdent / indent */}
+      <div className="rt-group" data-group="lists">
         <ToolbarButton active={isActive("bulletList")} title={t("fmtBulletList")} onClick={() => chain().toggleBulletList().run()}>
           <RichIcons.BulletList />
         </ToolbarButton>
         <ToolbarButton active={isActive("orderedList")} title={t("fmtOrderedList")} onClick={() => chain().toggleOrderedList().run()}>
           <RichIcons.OrderedList />
         </ToolbarButton>
-
         <ToolbarButton title={t("fmtOutdent")} disabled={!canOutdent} onClick={doOutdent}>
           <RichIcons.Outdent />
         </ToolbarButton>
         <ToolbarButton title={t("fmtIndent")} disabled={!canIndent} onClick={doIndent}>
           <RichIcons.Indent />
         </ToolbarButton>
+      </div>
 
+      <span className="rt-sep" aria-hidden="true" />
+
+      {/* Group 5 — block alignment */}
+      <div className="rt-group" data-group="align">
         <ToolbarButton active={isAlignLeft} title={t("fmtAlignLeft")} onClick={() => chain().setTextAlign("left").run()}>
           <RichIcons.AlignLeft />
         </ToolbarButton>
@@ -572,10 +565,13 @@ export default function RichTextToolbar({ editor, compact = false }) {
 
       <span className="rt-sep" aria-hidden="true" />
 
-      {/* Group 5 — blocks + link + clear */}
-      <div className="rt-group">
+      {/* Group 6 — content inserts: quote, code (inline+block), HR, link */}
+      <div className="rt-group" data-group="insert">
         <ToolbarButton active={isActive("blockquote")} title={t("fmtQuote")} onClick={() => chain().toggleBlockquote().run()}>
           <RichIcons.Quote />
+        </ToolbarButton>
+        <ToolbarButton active={isActive("code")} title={t("fmtInlineCode")} onClick={() => chain().toggleCode().run()}>
+          <RichIcons.Code />
         </ToolbarButton>
         <ToolbarButton
           active={isActive("codeBlock")}
@@ -587,7 +583,6 @@ export default function RichTextToolbar({ editor, compact = false }) {
         <ToolbarButton title={t("fmtSeparator")} onClick={() => chain().setHorizontalRule().run()}>
           <RichIcons.HR />
         </ToolbarButton>
-
         <div className="rt-pop-wrap" ref={linkBtnRef}>
           <ToolbarButton
             active={isActive("link") || openMenu === "link"}
@@ -598,7 +593,11 @@ export default function RichTextToolbar({ editor, compact = false }) {
           </ToolbarButton>
           <LinkPopover editor={editor} anchorRef={linkBtnRef} open={openMenu === "link"} onClose={closeMenu} />
         </div>
+      </div>
 
+      {/* Trailing utility — clear formatting. Pushed to the far right via
+          margin-left: auto so it has its own resting place. */}
+      <div className="rt-group rt-group--trailing" data-group="clear">
         <ToolbarButton
           title={t("fmtClearFormatting")}
           onClick={() => chain().clearNodes().unsetAllMarks().run()}
