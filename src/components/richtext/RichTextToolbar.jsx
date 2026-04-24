@@ -334,41 +334,8 @@ function FontFamilyPopover({ editor, anchorRef, open, onClose }) {
   );
 }
 
-// "More" overflow menu — holds tools that aren't part of the user's spec
-// for the main row (inline code, clear formatting). Keeps the main toolbar
-// strictly limited to the spec'd groups so nothing reads as orphaned.
-function MoreMenu({ editor, anchorRef, open, onClose }) {
-  if (!editor) return null;
-  const isActive = (name) => editor.isActive(name);
-  const chain = () => editor.chain().focus();
-  const Item = ({ active, onClick, icon, label }) => (
-    <button
-      type="button"
-      className={`rt-menu-item rt-menu-item--action${active ? " is-current" : ""}`}
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={() => { onClick(); onClose?.(); }}
-    >
-      <span className="rt-menu-item-icon">{icon}</span>
-      <span className="rt-menu-item-label">{label}</span>
-    </button>
-  );
-  return (
-    <Popover open={open} onClose={onClose} anchorRef={anchorRef} className="rt-pop--more">
-      <Item
-        active={isActive("code")}
-        onClick={() => chain().toggleCode().run()}
-        icon={<RichIcons.Code />}
-        label={t("fmtInlineCode")}
-      />
-      <Item
-        active={false}
-        onClick={() => chain().clearNodes().unsetAllMarks().run()}
-        icon={<RichIcons.Clear />}
-        label={t("fmtClearFormatting")}
-      />
-    </Popover>
-  );
-}
+// (No "More" menu — every tool from the spec stays visible in the main bar
+// in a Word-style dense layout.)
 
 export default function RichTextToolbar({ editor, compact = false }) {
   useEditorSignal(editor);
@@ -382,7 +349,6 @@ export default function RichTextToolbar({ editor, compact = false }) {
   const hlBtnRef = useRef(null);
   const underlineBtnRef = useRef(null);
   const linkBtnRef = useRef(null);
-  const moreBtnRef = useRef(null);
 
   const closeMenu = useCallback(() => setOpenMenu(null), []);
   const toggleMenu = useCallback((name) => {
@@ -601,12 +567,13 @@ export default function RichTextToolbar({ editor, compact = false }) {
 
       <span className="rt-sep" aria-hidden="true" />
 
-      {/* Group 6 — content inserts: quote, code block, separator, link
-          Per the user's group spec — inline code + clear formatting are
-          available through the More menu so the main row stays strict. */}
+      {/* Group 6 — content inserts: quote, inline code, code block, HR, link */}
       <div className="rt-group" data-group="insert">
         <ToolbarButton active={isActive("blockquote")} title={t("fmtQuote")} onClick={() => chain().toggleBlockquote().run()}>
           <RichIcons.Quote />
+        </ToolbarButton>
+        <ToolbarButton active={isActive("code")} title={t("fmtInlineCode")} onClick={() => chain().toggleCode().run()}>
+          <RichIcons.Code />
         </ToolbarButton>
         <ToolbarButton
           active={isActive("codeBlock")}
@@ -630,20 +597,17 @@ export default function RichTextToolbar({ editor, compact = false }) {
         </div>
       </div>
 
-      {/* Overflow — anything not in the user's main-row spec lives here so
-          the visible bar stays strictly grouped: inline code + clear fmt. */}
-      <div className="rt-group rt-group--more" data-group="more" ref={moreBtnRef}>
-        <button
-          type="button"
-          className={`rt-btn rt-btn--menu${openMenu === "more" ? " is-active" : ""}`}
-          data-tooltip={t("fmtMore")}
-          aria-label={t("fmtMore")}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => toggleMenu("more")}
+      <span className="rt-sep" aria-hidden="true" />
+
+      {/* Group 7 — utility: clear formatting (kept visible per Word-style
+          spec; sits as its own group so it never reads as orphan). */}
+      <div className="rt-group" data-group="clear">
+        <ToolbarButton
+          title={t("fmtClearFormatting")}
+          onClick={() => chain().clearNodes().unsetAllMarks().run()}
         >
-          <RichIcons.More />
-        </button>
-        <MoreMenu editor={editor} anchorRef={moreBtnRef} open={openMenu === "more"} onClose={closeMenu} />
+          <RichIcons.Clear />
+        </ToolbarButton>
       </div>
     </div>
   );

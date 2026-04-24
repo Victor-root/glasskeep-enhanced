@@ -1144,12 +1144,17 @@ html.dark .rt-editor-content a { color: #93c5fd; }
   display: contents;
 }
 .rt-toolbar {
+  /* Word-style dense ribbon: tight columns, intact groups, visible
+     vertical separators between groups. Two-row wrap is the expected
+     resting state on standard modal widths — every group stays a
+     coherent block, nothing reads as "leftover". */
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 6px;
-  padding: 6px 10px 8px;
-  margin: 4px 8px 8px;
+  row-gap: 3px;
+  column-gap: 0;
+  padding: 5px 8px 6px;
+  margin: 4px 8px 6px;
   border-radius: 10px;
   background: transparent;
   border-top: 1px solid var(--rt-divider);
@@ -1157,38 +1162,32 @@ html.dark .rt-editor-content a { color: #93c5fd; }
 html.dark .rt-toolbar {
   border-top-color: rgba(255, 255, 255, 0.08);
 }
-.rt-toolbar--compact { padding: 4px 8px; gap: 3px 4px; }
+.rt-toolbar--compact { padding: 3px 6px 4px; }
 
-/* Groups stay together: a group is one flex item. flex-wrap on the toolbar
-   wraps WHOLE groups, never individual buttons (this is what the user
-   asked for — coherent visual blocks instead of scattered controls). */
+/* A group is one flex item — flex-wrap on the toolbar wraps WHOLE groups,
+   never individual buttons. Within a group buttons are flush (no gap),
+   matching the Word ribbon density. */
 .rt-group {
   display: inline-flex;
   align-items: center;
-  gap: 1px;
-}
-/* The "More" overflow group is pinned to the far right of the toolbar.
-   It holds anything outside the user's main-row spec (inline code, clear
-   formatting), so the visible bar stays strictly grouped with no orphans. */
-.rt-group--more {
-  margin-left: auto;
+  gap: 0;
 }
 
 .rt-btn {
   position: relative;
-  min-width: 32px;
-  height: 32px;
-  padding: 0 6px;
-  border-radius: 6px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 5px;
+  border-radius: 5px;
   border: 1px solid transparent;
   background: transparent;
   color: inherit;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.1s ease;
   user-select: none;
@@ -1204,43 +1203,41 @@ html.dark .rt-toolbar {
 }
 .rt-btn[disabled] { opacity: 0.38; cursor: not-allowed; }
 .rt-btn:active:not(:disabled) { transform: translateY(0.5px); }
-.rt-btn--menu { padding: 0 6px; gap: 4px; }
-.rt-btn--block { min-width: 48px; }
-.rt-btn--wide { min-width: 80px; justify-content: space-between; }
-.rt-btn--narrow { min-width: 44px; justify-content: space-between; }
-.rt-btn--chevron { min-width: 18px; padding: 0 3px; }
-.rt-btn--swatch { padding: 0 5px; min-width: 32px; }
+.rt-btn--menu { padding: 0 6px; gap: 3px; }
+.rt-btn--block { min-width: 42px; }
+.rt-btn--wide { min-width: 72px; justify-content: space-between; }
+.rt-btn--narrow { min-width: 38px; justify-content: space-between; }
+.rt-btn--chevron { min-width: 16px; padding: 0 2px; }
+.rt-btn--swatch { padding: 0 4px; min-width: 28px; }
 .rt-btn-label {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 500;
   letter-spacing: 0.01em;
   white-space: nowrap;
 }
 .rt-btn-inner { display: inline-flex; align-items: center; justify-content: center; }
-.rt-btn svg { width: 17px; height: 17px; }
-.rt-btn--chevron svg { width: 11px; height: 11px; }
+.rt-btn svg { width: 16px; height: 16px; }
+.rt-btn--chevron svg { width: 10px; height: 10px; }
 
 .rt-splitbtn {
   display: inline-flex;
   align-items: stretch;
   position: relative;
-  border-radius: 6px;
+  border-radius: 5px;
 }
-.rt-splitbtn > .rt-btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 3px; }
+.rt-splitbtn > .rt-btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 2px; }
 .rt-splitbtn > .rt-btn--chevron { border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 1px; }
 
-/* Discreet, evenly spaced vertical divider between groups. Slim line, ~60%
-   of the button height, bracketed by symmetric horizontal margins so each
-   group sits in its own visual lane. */
+/* Word-ribbon style vertical divider between groups: 1 px line, ~70% of
+   the row height, sits in its own column (4 px on each side). */
 .rt-sep {
   width: 1px;
   align-self: center;
   height: 20px;
   background: var(--rt-divider-strong);
-  margin: 0 6px;
+  margin: 0 4px;
   display: inline-block;
   flex-shrink: 0;
-  border-radius: 1px;
   opacity: 0.7;
 }
 
@@ -1561,17 +1558,15 @@ html.dark .settings-type-field select {
 @media (max-width: 640px) {
   .rt-toolbar {
     flex-wrap: wrap;
-    padding: 5px 6px 7px;
+    padding: 4px 6px 6px;
     margin: 2px 6px 6px;
-    gap: 4px 5px;
+    row-gap: 3px;
   }
-  /* On mobile the trailing utility (Clear) joins the same line as the rest
-     instead of being pushed to the right edge — that empty space looks odd
-     on a narrow viewport. */
-  .rt-group--trailing { margin-left: 0; }
-  .rt-btn { min-width: 34px; height: 34px; padding: 0 6px; }
-  .rt-btn--wide { min-width: 70px; }
-  .rt-btn--block { min-width: 46px; }
+  /* Touch-friendly minimum size on mobile, otherwise same Word-style
+     density (zero gap inside groups, separators in between). */
+  .rt-btn { min-width: 32px; height: 32px; padding: 0 6px; }
+  .rt-btn--wide { min-width: 64px; }
+  .rt-btn--block { min-width: 44px; }
   .rt-btn svg { width: 18px; height: 18px; }
   .rt-pop { min-width: 220px; }
   .rt-sep { margin: 0 4px; height: 22px; }
