@@ -1149,10 +1149,15 @@ html.dark .rt-editor-content a { color: #93c5fd; }
      vertical divider. When the viewport is too narrow for all
      super-groups on one ribbon row, a super-group wraps as a whole
      block — it never spills its own items across different rows of
-     the toolbar, matching the reference screenshot. */
+     the toolbar, matching the reference screenshot.
+     The whole compact block is centred horizontally in its container
+     (justify-content: center) so the width is dictated by the content,
+     not stretched to fill the sticky header — no more "ruban vide"
+     feeling when there's extra horizontal room. */
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
+  justify-content: center;
   column-gap: 0;
   row-gap: 6px;
   /* Horizontal padding stays on the toolbar so buttons breathe, but we
@@ -1319,28 +1324,15 @@ html.dark .rt-block-badge {
    layout. 6 px horizontal margin matches the ribbon padding rhythm. */
 /* Separator spans the full super-group height (both sub-rows) so the
    visual break between groups reads unambiguously in the Word-ribbon
-   layout. The separator now ALSO acts as a flexible spacer: it grows
-   to absorb the empty horizontal room (flex: 1 1 0), so the three
-   super-groups distribute themselves across the whole toolbar width
-   instead of being tassed on the left with a big void on the right.
-   The visible 1-px line is painted by the ::before pseudo, kept
-   centred horizontally inside the spacer area. */
+   layout. Fixed 1-px line with symmetric 10-px horizontal margin — no
+   flex-grow, no stretchy spacer: groups stay tight to each other. */
 .rt-sep {
-  flex: 1 1 0;
-  min-width: 18px;
-  max-width: 140px;
-  align-self: stretch;
-  position: relative;
-  display: inline-block;
-}
-.rt-sep::before {
-  content: "";
-  position: absolute;
-  top: 2px;
-  bottom: 2px;
-  left: 50%;
   width: 1px;
+  align-self: stretch;
   background: var(--rt-divider-strong);
+  margin: 2px 10px;
+  display: inline-block;
+  flex-shrink: 0;
   opacity: 0.75;
 }
 
@@ -1691,7 +1683,7 @@ html.dark .settings-type-field select {
   .rt-btn--block { min-width: 50px; }
   .rt-btn svg { width: 20px; height: 20px; }
   .rt-pop { min-width: 220px; }
-  .rt-sep { min-width: 12px; max-width: 80px; }
+  .rt-sep { margin: 2px 6px; }
 }
 
 /* Read-only note-content renderings (cards + modal view) should ALSO honour
