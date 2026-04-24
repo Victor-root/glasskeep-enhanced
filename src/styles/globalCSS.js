@@ -1081,30 +1081,55 @@ html.dark .rt-editor-content p.is-editor-empty:first-child::before { color: #6b7
   font-size: var(--gk-type-p-size);
   font-weight: var(--gk-type-p-weight);
 }
+/* Every block style reads from the --gk-type-{key}-* family of CSS
+   variables so edit-mode, rich view-mode and legacy markdown view-mode
+   all share exactly the same rendering rules. An inline text-colour
+   mark (textStyle.color) keeps priority over this baseline because the
+   inline span wins specificity-wise. */
 .rt-editor-content h1,
-.note-content--dense h1 {
+.note-content--dense h1,
+.note-content h1 {
   font-size: var(--gk-type-h1-size);
   font-weight: var(--gk-type-h1-weight);
+  color: var(--gk-type-h1-color, inherit);
+  font-style: var(--gk-type-h1-italic, normal);
+  text-decoration: var(--gk-type-h1-underline, none);
 }
 .rt-editor-content h2,
-.note-content--dense h2 {
+.note-content--dense h2,
+.note-content h2 {
   font-size: var(--gk-type-h2-size);
   font-weight: var(--gk-type-h2-weight);
+  color: var(--gk-type-h2-color, inherit);
+  font-style: var(--gk-type-h2-italic, normal);
+  text-decoration: var(--gk-type-h2-underline, none);
 }
 .rt-editor-content h3,
-.note-content--dense h3 {
+.note-content--dense h3,
+.note-content h3 {
   font-size: var(--gk-type-h3-size);
   font-weight: var(--gk-type-h3-weight);
+  color: var(--gk-type-h3-color, inherit);
+  font-style: var(--gk-type-h3-italic, normal);
+  text-decoration: var(--gk-type-h3-underline, none);
 }
 .rt-editor-content h4,
-.note-content--dense h4 {
+.note-content--dense h4,
+.note-content h4 {
   font-size: var(--gk-type-h4-size);
   font-weight: var(--gk-type-h4-weight);
+  color: var(--gk-type-h4-color, inherit);
+  font-style: var(--gk-type-h4-italic, normal);
+  text-decoration: var(--gk-type-h4-underline, none);
 }
 .rt-editor-content h5,
-.note-content--dense h5 {
+.note-content--dense h5,
+.note-content h5 {
   font-size: var(--gk-type-h5-size);
   font-weight: var(--gk-type-h5-weight);
+  color: var(--gk-type-h5-color, inherit);
+  font-style: var(--gk-type-h5-italic, normal);
+  text-decoration: var(--gk-type-h5-underline, none);
 }
 
 .rt-editor-content blockquote {
@@ -1380,27 +1405,49 @@ html.dark .rt-block-badge {
 .rt-style-btn--p  .rt-style-btn-sample {
   font-size: min(calc(var(--gk-type-p-size,  1rem)    * 0.82), 1rem);
   font-weight: var(--gk-type-p-weight, 400);
+  color: var(--gk-type-p-color, inherit);
+  font-style: var(--gk-type-p-italic, normal);
+  text-decoration: var(--gk-type-p-underline, none);
 }
 .rt-style-btn--h1 .rt-style-btn-sample {
   font-size: min(calc(var(--gk-type-h1-size, 1.5rem)  * 0.82), 1.25rem);
   font-weight: var(--gk-type-h1-weight, 600);
+  color: var(--gk-type-h1-color, inherit);
+  font-style: var(--gk-type-h1-italic, normal);
+  text-decoration: var(--gk-type-h1-underline, none);
 }
 .rt-style-btn--h2 .rt-style-btn-sample {
   font-size: min(calc(var(--gk-type-h2-size, 1.25rem) * 0.82), 1.12rem);
   font-weight: var(--gk-type-h2-weight, 600);
+  color: var(--gk-type-h2-color, inherit);
+  font-style: var(--gk-type-h2-italic, normal);
+  text-decoration: var(--gk-type-h2-underline, none);
 }
 .rt-style-btn--h3 .rt-style-btn-sample {
   font-size: min(calc(var(--gk-type-h3-size, 1.125rem) * 0.82), 1rem);
   font-weight: var(--gk-type-h3-weight, 600);
+  color: var(--gk-type-h3-color, inherit);
+  font-style: var(--gk-type-h3-italic, normal);
+  text-decoration: var(--gk-type-h3-underline, none);
 }
 .rt-style-btn--h4 .rt-style-btn-sample {
   font-size: min(calc(var(--gk-type-h4-size, 1rem)    * 0.82), 0.95rem);
   font-weight: var(--gk-type-h4-weight, 600);
+  color: var(--gk-type-h4-color, inherit);
+  font-style: var(--gk-type-h4-italic, normal);
+  text-decoration: var(--gk-type-h4-underline, none);
 }
 .rt-style-btn--h5 .rt-style-btn-sample {
   font-size: min(calc(var(--gk-type-h5-size, 0.9rem)  * 0.82), 0.88rem);
   font-weight: var(--gk-type-h5-weight, 600);
+  color: var(--gk-type-h5-color, inherit);
+  font-style: var(--gk-type-h5-italic, normal);
+  text-decoration: var(--gk-type-h5-underline, none);
 }
+/* When the button is active (current block matches), the indigo active
+   colour wins over the preset colour so the selection state stays
+   readable against the active-background tint. */
+.rt-style-btn.is-active .rt-style-btn-sample { color: inherit; }
 
 .rt-splitbtn {
   display: inline-flex;
@@ -1750,6 +1797,75 @@ html.dark .settings-type-row { background: rgba(255, 255, 255, 0.04); }
   font-size: 0.85rem;
 }
 html.dark .settings-type-field select {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Colour swatches in the typography settings panel — one row per block.
+   A "none" chip (diagonal slash) resets the colour to inherit. */
+.settings-type-colors {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 0;
+}
+.settings-type-color {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.08s ease, box-shadow 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.settings-type-color:hover { transform: scale(1.12); }
+.settings-type-color.is-current {
+  box-shadow: 0 0 0 2px rgba(var(--rt-accent), 0.85);
+  border-color: transparent;
+}
+html.dark .settings-type-color { border-color: rgba(255, 255, 255, 0.18); }
+.settings-type-color--none {
+  background: #ffffff;
+  color: rgba(0, 0, 0, 0.35);
+}
+html.dark .settings-type-color--none {
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Italic / underline toggle pair — small pill buttons showing the style. */
+.settings-type-field--inline .settings-type-field-label { margin-bottom: 2px; }
+.settings-type-toggles { display: inline-flex; gap: 4px; }
+.settings-type-toggle {
+  width: 28px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--rt-divider);
+  background: rgba(255, 255, 255, 0.6);
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: Georgia, "Times New Roman", serif;
+  padding: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.settings-type-toggle:hover { background: var(--rt-btn-hover); }
+.settings-type-toggle.is-current {
+  background: var(--rt-btn-active-bg);
+  color: var(--rt-btn-active-text);
+  border-color: rgba(var(--rt-accent), 0.45);
+}
+html.dark .settings-type-toggle {
   background: rgba(0, 0, 0, 0.35);
   border-color: rgba(255, 255, 255, 0.12);
 }

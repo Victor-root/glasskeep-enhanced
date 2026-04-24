@@ -1,7 +1,8 @@
 // Typography preset editor, surfaced from SettingsPanel.
-// Lets the user pick a size + weight for each block style (P, H1, H2, H3)
-// used by the rich-text editor. Values flow through applyTypographyPresets
-// (CSS variables on :root) so edit-mode and view-mode stay consistent.
+// Lets the user customise size, weight, colour, italic and underline for
+// each block style (P, H1..H5) used by the rich-text editor. Values flow
+// through applyTypographyPresets (CSS variables on :root) so edit-mode and
+// view-mode stay consistent.
 
 import React from "react";
 import { t } from "../../i18n";
@@ -9,6 +10,7 @@ import {
   DEFAULT_TYPOGRAPHY_PRESETS,
   TYPOGRAPHY_SIZE_PRESETS,
   TYPOGRAPHY_WEIGHT_PRESETS,
+  TYPOGRAPHY_COLOR_PRESETS,
   normalizeTypographyPresets,
 } from "../../utils/typographyPresets.js";
 
@@ -20,6 +22,49 @@ const BLOCKS = [
   { key: "h4", labelKey: "typographyBlockH4" },
   { key: "h5", labelKey: "typographyBlockH5" },
 ];
+
+function ColorPicker({ value, onChange }) {
+  return (
+    <div className="settings-type-colors" role="group" aria-label={t("typographyFieldColor")}>
+      <button
+        type="button"
+        className={`settings-type-color settings-type-color--none${value === null ? " is-current" : ""}`}
+        onClick={() => onChange(null)}
+        title={t("fmtDefault")}
+        aria-label={t("fmtDefault")}
+      >
+        <svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true">
+          <line x1="3" y1="17" x2="17" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </button>
+      {TYPOGRAPHY_COLOR_PRESETS.map((c) => (
+        <button
+          key={c}
+          type="button"
+          className={`settings-type-color${value === c ? " is-current" : ""}`}
+          style={{ background: c }}
+          onClick={() => onChange(c)}
+          aria-label={c}
+          title={c}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Toggle({ active, onClick, label, sample }) {
+  return (
+    <button
+      type="button"
+      className={`settings-type-toggle${active ? " is-current" : ""}`}
+      aria-pressed={active ? "true" : "false"}
+      onClick={onClick}
+      title={label}
+    >
+      {sample}
+    </button>
+  );
+}
 
 export default function TypographySettings({ presets, setPresets }) {
   const normalized = normalizeTypographyPresets(presets);
@@ -58,6 +103,9 @@ export default function TypographySettings({ presets, setPresets }) {
                 style={{
                   fontSize: state.size,
                   fontWeight: state.weight,
+                  color: state.color || undefined,
+                  fontStyle: state.italic ? "italic" : undefined,
+                  textDecoration: state.underline ? "underline" : undefined,
                   lineHeight: 1.15,
                 }}
               >
@@ -90,6 +138,30 @@ export default function TypographySettings({ presets, setPresets }) {
                     ))}
                   </select>
                 </label>
+                <div className="settings-type-field">
+                  <span className="settings-type-field-label">{t("typographyFieldColor")}</span>
+                  <ColorPicker
+                    value={state.color}
+                    onChange={(color) => update(key, { color })}
+                  />
+                </div>
+                <div className="settings-type-field settings-type-field--inline">
+                  <span className="settings-type-field-label">{t("typographyFieldStyle")}</span>
+                  <div className="settings-type-toggles">
+                    <Toggle
+                      active={state.italic}
+                      onClick={() => update(key, { italic: !state.italic })}
+                      label={t("typographyFieldItalic")}
+                      sample={<em>I</em>}
+                    />
+                    <Toggle
+                      active={state.underline}
+                      onClick={() => update(key, { underline: !state.underline })}
+                      label={t("typographyFieldUnderline")}
+                      sample={<span style={{ textDecoration: "underline" }}>U</span>}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           );
