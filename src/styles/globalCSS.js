@@ -1431,16 +1431,16 @@ html.dark .rt-toolbar {
   position: relative;
   width: 68px;
   flex: 0 0 68px;
-  padding: 0 6px 4px;
-  gap: 2px;
+  padding: 0 6px 2px;
+  gap: 0;
   justify-content: center;
 }
 .rt-btn--link::after {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: 5px;
-  width: 40px;
+  bottom: 7px;
+  width: 36px;
   height: 1.5px;
   transform: translateX(-50%);
   background: currentColor;
