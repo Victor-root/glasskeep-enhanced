@@ -29,7 +29,34 @@ const Code       = () => <T Icon={TI.Code} />;
 const CodeBlock  = () => <T Icon={TI.Terminal2} />;
 const Quote      = () => <T Icon={TI.Quote} />;
 const HR         = () => <T Icon={TI.Separator} />;
-const Link       = () => <T Icon={TI.Link} />;
+// Link glyph — a single composite SVG that fuses the chain icon AND
+// the "www" mark into ONE shape so the toolbar's Link button reads as
+// a single, deliberate glyph instead of an icon + an after-thought
+// caption. The chain occupies the left half (Tabler "link" geometry,
+// native coordinates) and three zigzag w's sit on the right half on
+// the same baseline. Both halves stroke with currentColor so the icon
+// inherits the toolbar's text colour like every other Tabler glyph.
+const Link = () => (
+  <span className="tabler-icon tabler-icon--link-www" aria-hidden="true">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 38 24"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {/* Chain — Tabler "link" path at its native 24x24 coordinates */}
+      <path d="M9 15l6 -6" />
+      <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464" />
+      <path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" />
+      {/* "www" mark — three tight zigzag w's sharing the same baseline */}
+      <path d="M22 8 L23 16 L24 11 L25 16 L26 8" />
+      <path d="M27 8 L28 16 L29 11 L30 16 L31 8" />
+      <path d="M32 8 L33 16 L34 11 L35 16 L36 8" />
+    </svg>
+  </span>
+);
 const LinkOpen   = () => <T Icon={TI.ExternalLink} />;
 const Clear      = () => <T Icon={TI.ClearFormatting} />;
 const Subscript  = () => <T Icon={TI.Subscript} />;
