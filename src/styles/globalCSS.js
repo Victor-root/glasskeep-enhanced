@@ -1406,7 +1406,17 @@ html.dark .rt-toolbar {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.rt-btn--narrow { min-width: 64px; justify-content: space-between; }
+/* Size button — ALWAYS sits next to the Font button (which wears a
+   permanent indigo "active" background). Adding margin-left here pushes
+   the Size button a few pixels right so its OWN active outline never
+   overlaps the Font button's edge when a non-default size is picked.
+   The room is borrowed from the empty space SG A had between the
+   Clear-formatting button and the right separator. */
+.rt-btn--narrow {
+  min-width: 64px;
+  justify-content: space-between;
+  margin-left: 6px;
+}
 .rt-btn--chevron { min-width: 20px; padding: 0 3px; }
 .rt-btn--swatch { padding: 0 6px; min-width: 34px; }
 /* Link button — sits in SG C row 2 next to the HR button. Carries an
@@ -1829,10 +1839,17 @@ html.dark .rt-swatch.is-current {
     0 0 0 2px rgba(var(--rt-accent), 0.9);
 }
 .rt-pop-clear {
-  /* Same indigo→violet gradient as the rest of GlassKeep's primary
-     actions (LoginView, ChangePasswordModal, Typography modal reset)
-     so the "Par défaut" / "Default" pills feel like deliberate
-     theme buttons instead of neutral border boxes. */
+  /* Same indigo→violet "Personnaliser" pill as the typography settings
+     button (and LoginView / ChangePasswordModal). Mirrors Tailwind's
+     "from-indigo-500 to-violet-600 text-white shadow-md
+      shadow-indigo-300/40 hover:from-indigo-600 hover:to-violet-700
+      hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03]
+      active:scale-[0.98] transition-all duration-200 btn-gradient"
+     so the "Par défaut" pills feel like deliberate theme buttons
+     instead of neutral border boxes — and use the same shimmer
+     sweep on hover for parity. */
+  position: relative;
+  overflow: hidden;
   margin-top: 8px;
   width: 100%;
   padding: 6px 10px;
@@ -1843,13 +1860,38 @@ html.dark .rt-swatch.is-current {
   font-size: 0.8rem;
   cursor: pointer;
   font-weight: 600;
-  box-shadow: 0 4px 12px -2px rgba(99, 102, 241, 0.4);
-  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  box-shadow:
+    0 4px 6px -1px rgba(165, 180, 252, 0.4),
+    0 2px 4px -2px rgba(165, 180, 252, 0.4);
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.rt-pop-clear::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 35%,
+    rgba(255, 255, 255, 0.25) 45%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0.25) 55%,
+    transparent 65%,
+    transparent 100%
+  );
+  transform: translateX(-100%) skewX(-15deg);
+  pointer-events: none;
 }
 .rt-pop-clear:hover {
-  background: linear-gradient(to right, rgb(79, 82, 221), rgb(109, 40, 217));
-  box-shadow: 0 6px 14px -2px rgba(99, 102, 241, 0.55);
-  transform: scale(1.02);
+  background: linear-gradient(to right, rgb(79, 70, 229), rgb(109, 40, 217));
+  box-shadow:
+    0 10px 15px -3px rgba(165, 180, 252, 0.5),
+    0 4px 6px -4px rgba(165, 180, 252, 0.5);
+  transform: scale(1.03);
+}
+.rt-pop-clear:hover::after {
+  animation: btn-shimmer 0.7s ease-in-out;
 }
 .rt-pop-clear:active {
   transform: scale(0.98);
@@ -1857,12 +1899,22 @@ html.dark .rt-swatch.is-current {
 html.dark .rt-pop-clear { box-shadow: none; }
 html.dark .rt-pop-clear:hover { box-shadow: none; }
 .rt-pop-clear--danger {
+  /* Danger variant overrides the gradient — it's a "remove" action,
+     not a primary CTA, so it reads as a flat red link button. */
   margin-top: 6px;
+  background: transparent;
   color: #dc2626;
   border-color: rgba(220, 38, 38, 0.28);
+  box-shadow: none;
+  font-weight: 500;
+}
+.rt-pop-clear--danger::after { display: none; }
+.rt-pop-clear--danger:hover {
+  background: rgba(220, 38, 38, 0.08);
+  box-shadow: none;
+  transform: none;
 }
 html.dark .rt-pop-clear--danger { color: #f87171; border-color: rgba(248, 113, 113, 0.32); }
-.rt-pop-clear--danger:hover { background: rgba(220, 38, 38, 0.08); }
 
 /* Underline variants popover */
 .rt-ul-styles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
