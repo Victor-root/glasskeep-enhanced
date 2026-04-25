@@ -201,6 +201,13 @@ export default function NoteModal({
   // portaled. Using useState-as-ref so the RichTextEditor re-renders once
   // the slot actually mounts (a useRef wouldn't trigger the re-render).
   const [toolbarSlot, setToolbarSlot] = React.useState(null);
+  // Mobile-only: the rich-text toolbar moves out of the sticky header
+  // (which is too cramped on phone widths) and lives inside a bottom
+  // sheet the user opens via the "Mise en forme" footer button. The
+  // sheet's content div is registered here as a portal target.
+  const [mobileToolbarSlot, setMobileToolbarSlot] = React.useState(null);
+  const isDesktopLayout = windowWidth >= 768 && !isLandscapeMobile && !isWebView;
+  const toolbarMount = isDesktopLayout ? toolbarSlot : mobileToolbarSlot;
 
   /* Set draw mode when modal opens (reset to view, or honour initialDrawMode) */
   React.useEffect(() => {
@@ -392,7 +399,7 @@ export default function NoteModal({
                       dark={dark}
                       autoFocus={!mTitle}
                       minHeightClass="min-h-[160px]"
-                      toolbarContainer={toolbarSlot}
+                      toolbarContainer={toolbarMount}
                     />
                   </div>
                 )
@@ -488,6 +495,33 @@ export default function NoteModal({
               </div>
             )}
           </div>
+
+          {/* Mobile-only formatting bottom sheet — hosts the rich-text
+              toolbar via a portal. Always mounted so the editor's toolbar
+              keeps a stable target across open/close; visibility is
+              driven by the "is-open" class. Only relevant for text notes
+              (and the inline text body of draw notes) in edit mode. */}
+          {!isDesktopLayout && mType !== "checklist" && !viewMode && !(mType === 'draw' && drawMode === 'draw') && (
+            <div
+              className={`mobile-fmt-sheet${showModalFmt ? " is-open" : ""}${dark ? " mobile-fmt-sheet--dark" : ""}`}
+              role="dialog"
+              aria-label={t("formatting")}
+              aria-hidden={showModalFmt ? "false" : "true"}
+            >
+              <div className="mobile-fmt-sheet-handle">
+                <span className="mobile-fmt-sheet-title">{t("formatting")}</span>
+                <button
+                  type="button"
+                  className="mobile-fmt-sheet-close"
+                  onClick={() => setShowModalFmt(false)}
+                  aria-label={t("close")}
+                >
+                  ×
+                </button>
+              </div>
+              <div ref={setMobileToolbarSlot} className="mobile-fmt-sheet-content" />
+            </div>
+          )}
 
           <ModalFooter
             dark={dark}

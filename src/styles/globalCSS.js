@@ -555,6 +555,85 @@ html.dark .modal-footer-toolbar {
   background: rgba(0, 0, 0, 0.15);
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.2);
 }
+
+/* Mobile-only formatting bottom sheet. Lives as a flex child of the modal
+   panel between the scroll container and the footer; collapses to 0 height
+   when closed, expands to its natural height (capped) when open, so the
+   editor area shrinks instead of being overlaid. The sheet stays mounted
+   while the modal is open so the rich-text toolbar's portal target is
+   stable across opens — visibility is driven by max-height + opacity on
+   the .is-open class. */
+.mobile-fmt-sheet {
+  flex-shrink: 0;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  background: #ffffff;
+  border-top: 1px solid var(--border-light);
+  box-shadow: 0 -6px 18px -8px rgba(0, 0, 0, 0.18);
+  transition: max-height 0.22s ease, opacity 0.18s ease;
+  display: flex;
+  flex-direction: column;
+}
+.mobile-fmt-sheet.is-open {
+  max-height: min(58vh, 460px);
+  opacity: 1;
+}
+.mobile-fmt-sheet--dark { background: #1f2937; border-top-color: rgba(255, 255, 255, 0.1); }
+.mobile-fmt-sheet-handle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px 4px;
+  border-bottom: 1px solid var(--border-light);
+}
+.mobile-fmt-sheet--dark .mobile-fmt-sheet-handle { border-bottom-color: rgba(255, 255, 255, 0.08); }
+.mobile-fmt-sheet-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.mobile-fmt-sheet-close {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  line-height: 1;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.7;
+}
+.mobile-fmt-sheet-close:hover { background: rgba(0, 0, 0, 0.06); opacity: 1; }
+.mobile-fmt-sheet--dark .mobile-fmt-sheet-close:hover { background: rgba(255, 255, 255, 0.08); }
+.mobile-fmt-sheet-content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Inside the sheet the toolbar reflows to a comfortable mobile layout —
+   no horizontal scrolling, super-groups stack as needed. */
+.mobile-fmt-sheet-content .rt-toolbar {
+  margin: 0;
+  padding: 8px 8px 10px;
+  border-top: none;
+  border-bottom: none;
+}
+
+/* Mobile-only "Mise en forme" footer toggle styling — flag the active
+   state with the same indigo accent the toolbar already uses. */
+.modal-footer-btn--fmt.is-active {
+  background: rgba(99, 102, 241, 0.14);
+  color: rgb(99, 102, 241);
+}
+html.dark .modal-footer-btn--fmt.is-active {
+  background: rgba(129, 140, 248, 0.22);
+  color: rgb(165, 180, 252);
+}
 .modal-footer-btn {
   position: relative;
   display: inline-flex;

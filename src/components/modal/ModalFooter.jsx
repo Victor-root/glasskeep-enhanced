@@ -424,11 +424,32 @@ export default function ModalFooter({
         </button>
         )}
 
+        {/* Mobile-only formatting button — opens the rich-text toolbar
+            in a bottom sheet. The desktop ribbon stays in the sticky
+            header (handled by NoteModal), so this button is hidden
+            there. Available for text notes (always) and draw notes
+            when not in canvas mode (their inline text body still uses
+            the same rich editor). View mode hides it. */}
+        {!isDesktop && !viewMode && (mType === "text" || (mType === "draw" && drawMode !== "draw")) && (
+          <button
+            ref={modalFmtBtnRef}
+            className={`modal-footer-btn modal-footer-btn--fmt focus:outline-none${showModalFmt ? " is-active" : ""}`}
+            onClick={() => setShowModalFmt((v) => !v)}
+            data-tooltip={t("formatting")}
+            aria-pressed={showModalFmt ? "true" : "false"}
+          >
+            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 7h6" />
+              <path d="M4 12h10" />
+              <path d="M4 17h7" />
+              <path d="M14 7l6 6" />
+              <path d="M20 7l-6 6" />
+            </svg>
+          </button>
+        )}
+
         {/* Spacer */}
         <div className="flex-1 modal-footer-spacer" />
-
-        {/* Legacy mobile Markdown formatting button removed — rich-text
-            editor now ships its own in-body toolbar for text notes. */}
 
         {/* ── Collaborate (hidden on mobile text edit mode & draw edit mode — moved to kebab) ── */}
         {(isDesktop || viewMode || mType !== "text") && !(mType === "draw" && drawMode !== "draw" && !viewMode) && (() => {
