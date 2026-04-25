@@ -602,12 +602,9 @@ html.dark .modal-footer-toolbar {
   z-index: 1;
 }
 .mobile-fmt-sheet--dark::before {
-  /* Dark mode: keep the same thinner band, just swap in a subtle
-     white sheen + a softer black to stay visible against the dark
-     panel without becoming opaque. */
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 50%),
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0));
+  /* Dark mode: a flat 10 % white wash on top reads better than a
+     gradient against an already-dark panel. */
+  background: rgb(255 255 255 / 10%);
 }
 /* Lift the grabber and the toolbar above the gradient so they remain
    crisp on top of the darkening overlay. */
@@ -622,8 +619,9 @@ html.dark .modal-footer-toolbar {
   flex-shrink: 0;
   height: 22px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding-top: 4px;
   cursor: grab;
   touch-action: none;
   user-select: none;
