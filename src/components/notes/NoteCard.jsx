@@ -36,6 +36,19 @@ export default function NoteCard({
   const isDraw = n.type === "draw";
   const MAX_CHARS = 350;
 
+  // Glue a "- " informal bullet to the word that follows by converting
+  // the space after the dash into a non-breaking space. Targets only
+  // dashes that look like bullet markers (start of a paragraph / line
+  // break / list item / plain start of string), so things like
+  // "mid-2024" or "left-align" stay untouched.
+  const tightenInformalBullets = (html) => {
+    if (!html) return html;
+    return html.replace(
+      /(<br\s*\/?>|<p[^>]*>|<li[^>]*>|^)([ \t\u00a0]*)(-)[ \t]+/g,
+      (_, openTag, leadingWs, dash) => `${openTag}${leadingWs}${dash}\u00a0`,
+    );
+  };
+
   // Compute the preview HTML for text notes. We first turn whatever is in
   // `content` (rich JSON or legacy Markdown) into plain text for the length
   // budget, then render a truncated version through the correct pipeline so
@@ -46,15 +59,12 @@ export default function NoteCard({
     if (!raw) return "";
     if (isRichContent(raw)) {
       const plain = contentToPlain(raw);
-      if (plain.length <= MAX_CHARS) return contentToHTML(raw);
-      // For very long rich notes we fall back to a truncated plain preview
-      // to stay cheap. Full rich render on 350+ chars is still fine, but we
-      // keep parity with the old ellipsis behaviour.
-      return contentToHTML(raw);
+      const html = contentToHTML(raw);
+      return tightenInformalBullets(html);
     }
     const isLong = raw.length > MAX_CHARS;
     const slice = isLong ? raw.slice(0, MAX_CHARS).trimEnd() + "\u2026" : raw;
-    return renderSafeMarkdown(slice);
+    return tightenInformalBullets(renderSafeMarkdown(slice));
   }, [n.type, n.content]);
 
   // Extract text body from draw note JSON content (rich or legacy string)
