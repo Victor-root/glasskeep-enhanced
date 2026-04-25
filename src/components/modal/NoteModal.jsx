@@ -210,32 +210,53 @@ export default function NoteModal({
   const toolbarMount = isDesktopLayout ? toolbarSlot : mobileToolbarSlot;
 
   /* ── Mobile fmt-sheet swipe-to-close ──
-     The grabber bar at the top of the sheet captures pointer events so
-     the user can drag the panel down a few dozen pixels and let go to
-     dismiss it (in addition to re-tapping the "Mise en forme" footer
-     toggle). During the drag we manipulate the sheet's transform
-     directly via a ref so the gesture stays at 60 fps without the cost
-     of a React state update on every move. */
+     The grabber captures pointer events so the user can drag the
+     panel down to dismiss it. We drive the gesture via the sheet's
+     max-height (not transform) for two reasons:
+       1. The sheet is the bottom-anchored flex child of the modal,
+          so shrinking max-height moves its top edge down 1:1 with
+          the finger AND lets the editor above expand into the space
+          the sheet vacates — the user sees their note re-appear
+          progressively while dragging.
+       2. When the user lets go past threshold, we just animate the
+          max-height we already have down to 0 — no transform reset
+          first, so the close stays continuous (no flash where the
+          sheet snaps back to full open before collapsing).
+     Direct DOM mutation via a ref keeps the per-frame work off the
+     React render path. */
   const fmtSheetRef = React.useRef(null);
-  const fmtDragRef = React.useRef({ active: false, startY: 0, currentY: 0 });
+  const fmtDragRef = React.useRef({ active: false, startY: 0, currentY: 0, baseHeight: 0 });
+  const fmtCleanupTimerRef = React.useRef(null);
   const FMT_CLOSE_THRESHOLD = 60; // px
 
   const handleFmtGrabberDown = (e) => {
     if (e.button != null && e.button !== 0) return;
-    fmtDragRef.current = { active: true, startY: e.clientY, currentY: 0 };
+    const sheet = fmtSheetRef.current;
+    if (fmtCleanupTimerRef.current) {
+      clearTimeout(fmtCleanupTimerRef.current);
+      fmtCleanupTimerRef.current = null;
+    }
+    fmtDragRef.current = {
+      active: true,
+      startY: e.clientY,
+      currentY: 0,
+      baseHeight: sheet ? sheet.getBoundingClientRect().height : 0,
+    };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
-    if (fmtSheetRef.current) {
-      // Disable the sheet's own max-height/opacity transition during the
-      // drag so the translate follows the finger 1:1.
-      fmtSheetRef.current.style.transition = "none";
+    if (sheet) {
+      // Disable the sheet's own transitions during the drag so
+      // max-height tracks the finger 1:1.
+      sheet.style.transition = "none";
     }
   };
   const handleFmtGrabberMove = (e) => {
     if (!fmtDragRef.current.active) return;
     const dy = Math.max(0, e.clientY - fmtDragRef.current.startY);
     fmtDragRef.current.currentY = dy;
-    if (fmtSheetRef.current) {
-      fmtSheetRef.current.style.transform = `translateY(${dy}px)`;
+    const sheet = fmtSheetRef.current;
+    if (sheet) {
+      const newH = Math.max(0, fmtDragRef.current.baseHeight - dy);
+      sheet.style.maxHeight = `${newH}px`;
     }
   };
   const handleFmtGrabberUp = (e) => {
@@ -244,12 +265,25 @@ export default function NoteModal({
     fmtDragRef.current.active = false;
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
     const sheet = fmtSheetRef.current;
-    if (sheet) {
-      sheet.style.transition = "";
-      sheet.style.transform = "";
-    }
+    if (!sheet) return;
+    // Restore the CSS transition so the next height change animates.
+    sheet.style.transition = "";
     if (dy > FMT_CLOSE_THRESHOLD) {
+      // Continue the close from the current dragged height down to 0
+      // in one smooth motion — no snap-back to full-open in between.
+      sheet.style.maxHeight = "0px";
       setShowModalFmt(false);
+      // Once the close animation has finished, drop the inline
+      // max-height so a future re-open returns to the CSS-defined
+      // height via .is-open.
+      fmtCleanupTimerRef.current = setTimeout(() => {
+        fmtCleanupTimerRef.current = null;
+        if (fmtSheetRef.current) fmtSheetRef.current.style.maxHeight = "";
+      }, 260);
+    } else {
+      // Snap back: clearing the inline max-height lets the CSS rule
+      // animate the sheet back to its open height.
+      sheet.style.maxHeight = "";
     }
   };
 
