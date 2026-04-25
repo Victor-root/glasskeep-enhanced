@@ -199,8 +199,11 @@ html.dark header.multi-select-bar {
 .note-content--dense h4, .note-content--dense h5, .note-content--dense h6,
 .note-content--dense td, .note-content--dense th { white-space: pre-wrap; }
 .note-content--dense p { margin: 0; }
-.note-content--dense pre { margin: 0.4rem 0; }
-.note-content--dense hr { margin: 0.4rem 0; }
+/* Match the rich-text editor's spacing (.rt-editor-content hr / pre)
+   so the separator-to-block gap reads identically in lecture and
+   édition mode. */
+.note-content--dense pre { margin: 1rem 0; }
+.note-content--dense hr { margin: 0.85rem 0; }
 
 /* Hyperlinks in view mode */
 .note-content a {
@@ -1304,11 +1307,11 @@ html.dark .note-content blockquote::before {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.9em;
   border: 1px solid var(--rt-divider);
-  /* Match the dense read view (.note-content--dense pre) so the gap
-     between, e.g., a separator and the code block reads identically
-     in edit and lecture mode. Browser default for <pre> is 1em which
-     made the editor noticeably more spaced out. */
-  margin: 0.4rem 0;
+  /* Explicit 1 rem (the browser default for <pre>) so the dense read
+     view can mirror the same value and the gap between, e.g., a
+     separator and the code block reads identically in edit and
+     lecture mode. */
+  margin: 1rem 0;
 }
 html.dark .rt-editor-content pre {
   background: rgba(255, 255, 255, 0.06);
@@ -1326,9 +1329,7 @@ html.dark .rt-editor-content code { background: rgba(255, 255, 255, 0.08); }
 .rt-editor-content hr {
   border: none;
   border-top: 1px solid rgba(0, 0, 0, 0.2);
-  /* Match the dense read view spacing (.note-content--dense hr / pre)
-     so the separator-to-block gap is identical in both modes. */
-  margin: 0.4rem 0;
+  margin: 0.85rem 0;
 }
 html.dark .rt-editor-content hr { border-top-color: rgba(255, 255, 255, 0.2); }
 .rt-editor-content a { color: #2563eb; text-decoration: underline; }
