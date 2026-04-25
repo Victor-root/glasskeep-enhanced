@@ -3427,16 +3427,11 @@ export default function App() {
       return;
     }
 
-    // Auto-trash a freshly-created note the user emptied before closing.
-    // freshlyCreatedNoteRef is set in useDraftNote.createAndOpenBlankNote
-    // and stays set across materialise — so a note that was typed into,
-    // autosaved, then erased back to blank still trips this branch and
-    // gets removed instead of leaving a 0-content shell on disk / on the
-    // server. Body emptiness is checked through contentToPlain so the
-    // Tiptap JSON envelope (which is always non-empty as a string, even
-    // for an empty doc) is collapsed to its actual user-visible text
-    // before the trim test.
-    if (activeId && freshlyCreatedNoteRef.current === String(activeId)) {
+    // Auto-trash any note the user emptied before closing — fresh or not.
+    // Body emptiness is checked through contentToPlain so the Tiptap JSON
+    // envelope (which is never an empty STRING even when the doc is empty)
+    // collapses to its actual user-visible text before the trim test.
+    if (activeId) {
       const drawPaths = mType === "draw"
         ? (mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []))
         : [];
