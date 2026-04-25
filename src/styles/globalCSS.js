@@ -580,37 +580,6 @@ html.dark .modal-footer-toolbar {
   opacity: 1;
 }
 .mobile-fmt-sheet--dark { background: #1f2937; border-top-color: rgba(255, 255, 255, 0.1); }
-.mobile-fmt-sheet-handle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px 4px;
-  border-bottom: 1px solid var(--border-light);
-}
-.mobile-fmt-sheet--dark .mobile-fmt-sheet-handle { border-bottom-color: rgba(255, 255, 255, 0.08); }
-.mobile-fmt-sheet-title {
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  opacity: 0.7;
-}
-.mobile-fmt-sheet-close {
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.4rem;
-  line-height: 1;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  color: inherit;
-  opacity: 0.7;
-}
-.mobile-fmt-sheet-close:hover { background: rgba(0, 0, 0, 0.06); opacity: 1; }
-.mobile-fmt-sheet--dark .mobile-fmt-sheet-close:hover { background: rgba(255, 255, 255, 0.08); }
 .mobile-fmt-sheet-content {
   overflow-y: auto;
   overscroll-behavior: contain;

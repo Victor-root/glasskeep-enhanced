@@ -499,8 +499,10 @@ export default function NoteModal({
           {/* Mobile-only formatting bottom sheet — hosts the rich-text
               toolbar via a portal. Always mounted so the editor's toolbar
               keeps a stable target across open/close; visibility is
-              driven by the "is-open" class. Only relevant for text notes
-              (and the inline text body of draw notes) in edit mode. */}
+              driven by the "is-open" class. Closed by tapping the
+              "Mise en forme" footer toggle again. Only relevant for
+              text notes (and the inline text body of draw notes) in
+              edit mode. */}
           {!isDesktopLayout && mType !== "checklist" && !viewMode && !(mType === 'draw' && drawMode === 'draw') && (
             <div
               className={`mobile-fmt-sheet${showModalFmt ? " is-open" : ""}${dark ? " mobile-fmt-sheet--dark" : ""}`}
@@ -508,17 +510,6 @@ export default function NoteModal({
               aria-label={t("formatting")}
               aria-hidden={showModalFmt ? "false" : "true"}
             >
-              <div className="mobile-fmt-sheet-handle">
-                <span className="mobile-fmt-sheet-title">{t("formatting")}</span>
-                <button
-                  type="button"
-                  className="mobile-fmt-sheet-close"
-                  onClick={() => setShowModalFmt(false)}
-                  aria-label={t("close")}
-                >
-                  ×
-                </button>
-              </div>
               <div ref={setMobileToolbarSlot} className="mobile-fmt-sheet-content" />
             </div>
           )}
