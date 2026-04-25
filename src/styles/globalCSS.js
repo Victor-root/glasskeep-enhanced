@@ -1440,12 +1440,14 @@ html.dark .rt-toolbar {
   position: absolute;
   left: 50%;
   bottom: 7px;
-  width: 36px;
+  width: 42px;
   height: 1.5px;
   transform: translateX(-50%);
-  background: currentColor;
+  /* Match the same blue Tiptap renders for actual <a> tags inside
+     the editor (.rt-editor-content a) — the underline then reads
+     unambiguously as "this button toggles a hyperlink". */
+  background: #2563eb;
   border-radius: 1px;
-  opacity: 0.85;
   pointer-events: none;
 }
 .rt-btn--link .tabler-icon { width: 16px; height: 16px; }
