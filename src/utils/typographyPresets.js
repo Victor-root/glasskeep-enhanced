@@ -19,12 +19,12 @@
 //   underline  — boolean
 
 export const DEFAULT_PROFILE = Object.freeze({
-  p:  { size: "1rem",    weight: 400, color: null,       italic: false, underline: false },
-  h1: { size: "1.75rem", weight: 800, color: "#4f46e5", italic: false, underline: false },
-  h2: { size: "1.35rem", weight: 700, color: "#059669", italic: false, underline: false },
-  h3: { size: "1.15rem", weight: 600, color: "#0284c7", italic: false, underline: true  },
-  h4: { size: "1.05rem", weight: 600, color: "#d97706", italic: true,  underline: false },
-  h5: { size: "0.95rem", weight: 500, color: "#db2777", italic: true,  underline: true  },
+  p:  { size: "1rem",     weight: 400, color: null,      italic: false, underline: false },
+  h1: { size: "1.75rem",  weight: 800, color: "#4f46e5", italic: false, underline: false },
+  h2: { size: "1.5rem",   weight: 700, color: "#059669", italic: false, underline: false },
+  h3: { size: "1.25rem",  weight: 600, color: "#0284c7", italic: false, underline: true  },
+  h4: { size: "1.125rem", weight: 600, color: "#d97706", italic: true,  underline: false },
+  h5: { size: "1rem",     weight: 500, color: "#db2777", italic: true,  underline: true  },
 });
 
 export const PROFILE_KEYS = ["profile1", "profile2", "profile3"];

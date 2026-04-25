@@ -113,6 +113,14 @@ function BlockCard({ blockKey, labelKey, state, update }) {
             value={state.size}
             onChange={(e) => update({ size: e.target.value })}
           >
+            {/* Surface the current size as an extra option when it's not in
+                the preset list — without this the <select> falls back to
+                showing the first option ("14") while state.size keeps its
+                real value, which is exactly the "preview shows a different
+                size than the dropdown" bug. */}
+            {!TYPOGRAPHY_SIZE_PRESETS.some((s) => s.value === state.size) && (
+              <option value={state.size}>{state.size}</option>
+            )}
             {TYPOGRAPHY_SIZE_PRESETS.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
