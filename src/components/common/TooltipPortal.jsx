@@ -10,9 +10,10 @@ export default function TooltipPortal() {
     const getTooltipData = (el) => {
       const label = el.getAttribute('data-tooltip');
       if (!label) return null;
+      const hint = el.getAttribute('data-tooltip-hint') || null;
       const rect = el.getBoundingClientRect();
       const below = rect.top < 60;
-      return { label, x: rect.left + rect.width / 2, y: below ? rect.bottom : rect.top, below };
+      return { label, hint, x: rect.left + rect.width / 2, y: below ? rect.bottom : rect.top, below };
     };
 
     // Desktop: mouse pointer only (pointerType === 'mouse' excludes touch/pen)
@@ -95,8 +96,11 @@ export default function TooltipPortal() {
         : { top: tooltip.y - 8, left: tooltip.x, transform: 'translate(-50%, -100%)' }
       }
     >
-      <div className="px-2.5 py-1 text-xs font-medium text-white bg-gray-800 rounded-lg whitespace-nowrap shadow-xl">
-        {tooltip.label}
+      <div className={`px-2.5 py-1 text-xs font-medium text-white bg-gray-800 rounded-lg shadow-xl ${tooltip.hint ? "max-w-[260px] text-center" : "whitespace-nowrap"}`}>
+        <div>{tooltip.label}</div>
+        {tooltip.hint && (
+          <div className="mt-0.5 text-[10px] font-normal opacity-75 leading-snug">{tooltip.hint}</div>
+        )}
         <div className={`absolute left-1/2 -translate-x-1/2 border-4 border-transparent ${tooltip.below ? 'bottom-full border-b-gray-800' : 'top-full border-t-gray-800'}`} />
       </div>
     </div>,

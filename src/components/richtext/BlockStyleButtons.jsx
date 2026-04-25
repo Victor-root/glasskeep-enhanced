@@ -35,6 +35,7 @@ function StyleButton({ editor, value, labelKey, className, active }) {
       type="button"
       className={`rt-style-btn ${className}${active ? " is-active" : ""}`}
       data-tooltip={label}
+      data-tooltip-hint={t("fmtBlockStyleHint")}
       aria-label={label}
       aria-pressed={active ? "true" : undefined}
       onMouseDown={(e) => e.preventDefault()}
