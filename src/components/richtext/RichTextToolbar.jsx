@@ -351,21 +351,45 @@ export default function RichTextToolbar({ editor, compact = false }) {
   const isAlignJustify = isActive({ textAlign: "justify" });
   const isAlignLeft = !isAlignCenter && !isAlignRight && !isAlignJustify;
 
-  const canIndent =
-    editor.can().sinkListItem?.("listItem") || editor.can().indent?.();
-  const canOutdent =
-    editor.can().liftListItem?.("listItem") || editor.can().outdent?.();
+  // Indent / outdent: list-aware so the bullet / numbered marker stays
+  // attached to its line. When the caret is INSIDE a list item we route
+  // strictly to sink / liftListItem and refuse to fall back to the
+  // generic Indent extension (that one only shifts the inner paragraph
+  // via margin-inline-start, which leaves the marker behind — visibly
+  // broken). Outside a list, the generic Indent / Outdent commands
+  // shift block-level paragraphs / headings / blockquotes / code blocks
+  // as before.
+  const inListItem = isActive("listItem");
+  // Inside a list, "outdent" is only meaningful when we're nested at
+  // depth ≥ 2 — at the root level lifting would lift the item out of
+  // the list entirely (i.e. drop the bullet), which the user reported
+  // as "ça supprime juste la puce". So we disable the button in that
+  // case rather than trigger a destructive action.
+  let listDepth = 0;
+  if (inListItem) {
+    const $from = editor.state.selection.$from;
+    for (let d = $from.depth; d > 0; d--) {
+      const t = $from.node(d).type.name;
+      if (t === "bulletList" || t === "orderedList") listDepth++;
+    }
+  }
+  const canIndent = inListItem
+    ? !!editor.can().sinkListItem?.("listItem")
+    : !!editor.can().indent?.();
+  const canOutdent = inListItem
+    ? listDepth > 1 && !!editor.can().liftListItem?.("listItem")
+    : !!editor.can().outdent?.();
 
   const doIndent = () => {
-    if (editor.can().sinkListItem?.("listItem")) {
-      chain().sinkListItem("listItem").run();
+    if (inListItem) {
+      if (canIndent) chain().sinkListItem("listItem").run();
     } else {
       chain().indent().run();
     }
   };
   const doOutdent = () => {
-    if (editor.can().liftListItem?.("listItem")) {
-      chain().liftListItem("listItem").run();
+    if (inListItem) {
+      if (canOutdent) chain().liftListItem("listItem").run();
     } else {
       chain().outdent().run();
     }
