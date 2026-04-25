@@ -564,14 +564,16 @@ html.dark .modal-footer-toolbar {
    stable across opens — visibility is driven by max-height + opacity on
    the .is-open class. */
 .mobile-fmt-sheet {
+  position: relative;
   flex-shrink: 0;
   overflow: hidden;
   max-height: 0;
   opacity: 0;
   background: #ffffff;
   /* Subtle hairline frame + a soft drop shadow. The real "this is a
-     dismissible sheet" affordance is the Android-style grabber pill
-     painted by .mobile-fmt-sheet::before. */
+     dismissible sheet" affordance is the Android-style grabber bar
+     (.mobile-fmt-sheet-grabber) plus a darkening gradient painted by
+     the ::before below to make the top edge stand out. */
   border-top: 1px solid rgba(0, 0, 0, 0.15);
   border-left: 1px solid rgba(0, 0, 0, 0.1);
   border-right: 1px solid rgba(0, 0, 0, 0.1);
@@ -583,6 +585,34 @@ html.dark .modal-footer-toolbar {
   display: flex;
   flex-direction: column;
 }
+/* Top "shadow header" — a soft darker band that fades to transparent
+   over the first ~28 px of the sheet so the panel reads as a clearly
+   distinct surface rising out of the editor. pointer-events: none so
+   it never intercepts the grabber's pointer events. */
+.mobile-fmt-sheet::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0));
+  border-radius: 12px 12px 0 0;
+  z-index: 1;
+}
+.mobile-fmt-sheet--dark::before {
+  /* In dark mode pure black on top of an already-dark panel doesn't
+     read — push the opacity higher AND blend a white sheen at the
+     very top so the edge catches light like iOS / Android sheets. */
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 35%),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0));
+}
+/* Lift the grabber and the toolbar above the gradient so they remain
+   crisp on top of the darkening overlay. */
+.mobile-fmt-sheet-grabber,
+.mobile-fmt-sheet-content { position: relative; z-index: 2; }
 /* Drag-handle bar, the same affordance Android / iOS bottom sheets use
    to signal "this surface is dismissible". A real DOM element so we
    can attach pointer events for swipe-to-close — the visible pill is
