@@ -617,11 +617,10 @@ html.dark .modal-footer-toolbar {
    pill itself so the touch target stays comfortable on mobile. */
 .mobile-fmt-sheet-grabber {
   flex-shrink: 0;
-  height: 22px;
+  height: 10px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding-top: 4px;
   cursor: grab;
   touch-action: none;
   user-select: none;
