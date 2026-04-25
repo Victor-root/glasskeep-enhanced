@@ -56,8 +56,23 @@ export const Indent = Extension.create({
       const from = Math.min(selection.from, selection.to);
       const to = Math.max(selection.from, selection.to);
       let changed = false;
-      state.doc.nodesBetween(from, to, (node, pos) => {
+      // We need to know each node's parent so we can collapse the indent
+      // onto the OUTERMOST applicable node instead of stacking it on
+      // every nested layer (e.g. a paragraph inside a listItem must not
+      // get its own margin-inline-start, otherwise the text shifts by
+      // 2× the configured step while the bullet only shifts by 1×).
+      state.doc.nodesBetween(from, to, (node, pos, parent) => {
         if (!this.options.types.includes(node.type.name)) return;
+        // Inside a listItem, only the <li> itself carries the indent —
+        // its inner paragraph stays neutral so the bullet / number and
+        // the text shift together.
+        if (
+          node.type.name === "paragraph" &&
+          parent &&
+          parent.type.name === "listItem"
+        ) {
+          return;
+        }
         const current = Number(node.attrs.indent) || 0;
         const next = Math.max(
           this.options.min,
