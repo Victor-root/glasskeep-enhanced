@@ -569,23 +569,34 @@ html.dark .modal-footer-toolbar {
   max-height: 0;
   opacity: 0;
   background: #ffffff;
-  /* Stylised frame: a more pronounced black hairline on the three
-     visible edges plus a generous drop shadow above and a faint
-     inner highlight so the sheet clearly reads as a deliberate
-     floating panel even when its background matches the modal's
-     note colour. Top corners rounded to soften the seam against
-     the editor above. */
-  border-top: 1.5px solid rgba(0, 0, 0, 0.55);
-  border-left: 1.5px solid rgba(0, 0, 0, 0.45);
-  border-right: 1.5px solid rgba(0, 0, 0, 0.45);
+  /* Subtle hairline frame + a soft drop shadow. The real "this is a
+     dismissible sheet" affordance is the Android-style grabber pill
+     painted by .mobile-fmt-sheet::before. */
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
+  border-left: 1px solid rgba(0, 0, 0, 0.1);
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 12px 12px 0 0;
   box-shadow:
-    0 -10px 24px -10px rgba(0, 0, 0, 0.35),
-    0 -3px 8px -4px rgba(0, 0, 0, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    0 -10px 22px -10px rgba(0, 0, 0, 0.22),
+    0 -2px 6px -3px rgba(0, 0, 0, 0.14);
   transition: max-height 0.22s ease, opacity 0.18s ease;
   display: flex;
   flex-direction: column;
+}
+/* Drag-handle pill, the same affordance Android / iOS bottom sheets
+   use to signal "this surface is dismissible". Lives as the first
+   flex child via the ::before pseudo-element so the toolbar starts
+   right under it. Pure visual cue — closing happens by re-tapping
+   the "Mise en forme" footer toggle. */
+.mobile-fmt-sheet::before {
+  content: "";
+  flex-shrink: 0;
+  align-self: center;
+  width: 42px;
+  height: 4px;
+  margin: 8px 0 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
 }
 .mobile-fmt-sheet.is-open {
   max-height: min(58vh, 460px);
@@ -593,17 +604,14 @@ html.dark .modal-footer-toolbar {
 }
 .mobile-fmt-sheet--dark {
   background: #1f2937;
-  /* In dark mode pure black would disappear into the panel — switch
-     to a darker-still tone with a touch more opacity so the frame
-     still reads as a deliberate edge against the dark surface. */
-  border-top-color: rgba(0, 0, 0, 0.85);
-  border-left-color: rgba(0, 0, 0, 0.7);
-  border-right-color: rgba(0, 0, 0, 0.7);
+  border-top-color: rgba(255, 255, 255, 0.14);
+  border-left-color: rgba(255, 255, 255, 0.08);
+  border-right-color: rgba(255, 255, 255, 0.08);
   box-shadow:
-    0 -10px 26px -10px rgba(0, 0, 0, 0.7),
-    0 -3px 10px -4px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 -10px 26px -10px rgba(0, 0, 0, 0.55),
+    0 -2px 6px -3px rgba(0, 0, 0, 0.4);
 }
+.mobile-fmt-sheet--dark::before { background: rgba(255, 255, 255, 0.32); }
 .mobile-fmt-sheet-content {
   overflow-y: auto;
   overscroll-behavior: contain;
