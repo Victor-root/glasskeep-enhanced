@@ -3431,19 +3431,25 @@ export default function App() {
     // Body emptiness is checked through contentToPlain so the Tiptap JSON
     // envelope (which is never an empty STRING even when the doc is empty)
     // collapses to its actual user-visible text before the trim test.
+    //
+    // Only TITLE and BODY count. Tags get auto-inherited from the sidebar
+    // filter (a fresh note opened from inside a tag would never qualify for
+    // deletion otherwise), and a colour / images alone aren't enough signal
+    // that the user wants to keep an otherwise-blank shell.
     if (activeId) {
       const drawPaths = mType === "draw"
         ? (mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []))
         : [];
+      // For each note type, "body" means what the user actually authored —
+      // the rich-text doc for text notes, the items list for checklists,
+      // the drawing strokes (+ optional inline text) for draw notes.
       const bodyEmpty = mType === "text"
         ? !contentToPlain(mBody).trim()
-        : !mBody?.trim();
+        : mType === "checklist"
+          ? !Array.isArray(mItems) || mItems.length === 0
+          : !mBody?.trim() && drawPaths.length === 0;
       const titleEmpty = !mTitle?.trim();
-      const noItems = !Array.isArray(mItems) || mItems.length === 0;
-      const noImages = !Array.isArray(mImages) || mImages.length === 0;
-      const noTags = !Array.isArray(mTagList) || mTagList.length === 0;
-      const noDrawing = drawPaths.length === 0;
-      if (titleEmpty && bodyEmpty && noItems && noImages && noTags && noDrawing) {
+      if (titleEmpty && bodyEmpty) {
         const nid = String(activeId);
         const nowIso = new Date().toISOString();
         // Server contract: a note must be trashed before it can be
