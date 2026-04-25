@@ -1234,13 +1234,17 @@ html.dark .rt-editor-content p.is-editor-empty:first-child::before { color: #6b7
 .rt-editor-content blockquote,
 .note-content--dense blockquote,
 .note-content blockquote {
-  border-left: 3px solid rgba(var(--rt-accent), 0.45);
-  padding: 0.15rem 0.85rem;
-  margin: 0.4rem 0;
+  /* "Bookmark-tab" geometry: the coloured bar sits flush on the left
+     (sharp corners) while the right side rounds — the bar reads as
+     deliberately attached to the quote rather than a stray rule. */
+  border-left: 4px solid rgba(var(--rt-accent), 0.75);
+  padding: 0.35rem 0.95rem;
+  margin: 0.5rem 0;
   color: inherit;
-  opacity: 0.92;
-  background: rgba(var(--rt-accent), 0.05);
-  border-radius: 4px;
+  opacity: 0.94;
+  background: rgba(var(--rt-accent), 0.06);
+  border-radius: 0 6px 6px 0;
+  box-shadow: 0 1px 2px rgba(99, 102, 241, 0.06);
   /* Hug the content: a 1-word quote stays narrow, a multi-line one
      wraps inside the modal width. Only the highlighted "card" shrinks
      — vertical stacking with siblings is preserved. */
@@ -1250,7 +1254,13 @@ html.dark .rt-editor-content p.is-editor-empty:first-child::before { color: #6b7
 html.dark .rt-editor-content blockquote,
 html.dark .note-content--dense blockquote,
 html.dark .note-content blockquote {
-  background: rgba(var(--rt-accent), 0.08);
+  /* Dark mode: the indigo-500 accent bar drowns against the dark
+     surface, so we swap to the brighter indigo-300 (165 180 252)
+     and crank the background tint up so the card is clearly
+     readable as a quote. */
+  border-left-color: rgb(165, 180, 252);
+  background: rgba(165, 180, 252, 0.13);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 .rt-editor-content pre {
   background: rgba(0, 0, 0, 0.06);
