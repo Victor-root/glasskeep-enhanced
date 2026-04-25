@@ -3446,27 +3446,36 @@ export default function App() {
       if (titleEmpty && bodyEmpty && noItems && noImages && noTags && noDrawing) {
         const nid = String(activeId);
         const nowIso = new Date().toISOString();
-        const leaseId = acquireLocalLease(nid);
-        // Hard delete — sending an empty note to trash would clutter it for
-        // no reason (the user emptied it deliberately, the only sensible
-        // action is to remove it). Mirrors the trash-view "permanently
-        // delete" path: tombstone + idbDeleteNote + permanentDelete enqueue.
+        // Server contract: a note must be trashed before it can be
+        // permanently deleted (DELETE /notes/:id/permanent returns 400
+        // otherwise). Locally we still want the note gone immediately
+        // — tombstone + idbDeleteNote handle the UI/storage side. The
+        // queue then plays out in FIFO order: trash THEN permanent
+        // delete, so the server walks through the legal transition
+        // and the note doesn't end up stuck mid-pipeline.
         addDeleteTombstone(nid);
+        setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+        invalidateNotesCache();
+        invalidateTrashedNotesCache();
+        showToast(t("emptyNoteDeleted"), "info");
+        freshlyCreatedNoteRef.current = null;
         (async () => {
           try {
             await idbDeleteNote(nid, currentUser?.id, sessionId);
           } catch (e) {}
+          const trashLease = acquireLocalLease(nid);
+          await enqueueWithLease(
+            nid,
+            { type: "trash", noteId: nid, payload: { client_updated_at: nowIso } },
+            trashLease,
+          );
+          const purgeLease = acquireLocalLease(nid);
+          await enqueueWithLease(
+            nid,
+            { type: "permanentDelete", noteId: nid, payload: { client_updated_at: nowIso } },
+            purgeLease,
+          );
         })();
-        invalidateNotesCache();
-        invalidateTrashedNotesCache();
-        setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
-        enqueueWithLease(
-          nid,
-          { type: "permanentDelete", noteId: nid, payload: { client_updated_at: nowIso } },
-          leaseId,
-        );
-        showToast(t("emptyNoteDeleted"), "info");
-        freshlyCreatedNoteRef.current = null;
 
         setIsModalClosing(true);
         modalClosingTimerRef.current = setTimeout(() => {
