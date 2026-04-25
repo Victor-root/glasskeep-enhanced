@@ -1500,9 +1500,9 @@ html.dark .rt-block-badge {
 .rt-sg--style .rt-sg-row { gap: 3px; }
 
 .rt-style-btn {
-  min-width: 88px;
+  min-width: 76px;
   height: 32px;
-  padding: 0 10px;
+  padding: 0 8px;
   border-radius: 6px;
   border: 1px solid var(--rt-divider);
   background: transparent;
