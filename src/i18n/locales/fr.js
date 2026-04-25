@@ -228,7 +228,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   linkOpen: "Ouvrir",
   typographyTitle: "Typographie de l’éditeur",
   typographyDesc: "Personnalisez taille, graisse, couleur, italique et soulignement pour chaque style de bloc des notes texte.",
-  fmtBlockStyleHint: "Personnalisez taille, couleur et style dans les paramètres",
+  fmtBlockStyleHint: "Personnalisable dans paramètres",
   typographyBlockParagraph: "Paragraphe",
   typographyBlockH1: "Titre 1",
   typographyBlockH2: "Titre 2",

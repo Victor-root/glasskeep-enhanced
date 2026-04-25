@@ -19,6 +19,7 @@ const STYLES = [
 
 function StyleButton({ editor, value, labelKey, className, active }) {
   const label = t(labelKey);
+  const tooltip = `${label} : ${t("fmtBlockStyleHint")}.`;
   // Word / Google Docs semantics: a heading is a BLOCK property, not an
   // inline mark. Clicking H1/H2/… converts the current block (or every
   // block the selection touches) to that heading level. Press Enter and
@@ -34,8 +35,7 @@ function StyleButton({ editor, value, labelKey, className, active }) {
     <button
       type="button"
       className={`rt-style-btn ${className}${active ? " is-active" : ""}`}
-      data-tooltip={label}
-      data-tooltip-hint={t("fmtBlockStyleHint")}
+      data-tooltip={tooltip}
       aria-label={label}
       aria-pressed={active ? "true" : undefined}
       onMouseDown={(e) => e.preventDefault()}
