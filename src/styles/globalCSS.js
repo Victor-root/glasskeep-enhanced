@@ -569,7 +569,12 @@ html.dark .modal-footer-toolbar {
   overflow: hidden;
   max-height: 0;
   opacity: 0;
-  background: #ffffff;
+  background-color: #ffffff;
+  /* Flat darkening wash on top of the inline-styled modal color so
+     the sheet sits a shade darker than the modal it lives in. The
+     inline backgroundColor (modalBgFor) provides the note-tinted base,
+     and this background-image lays a uniform alpha tint on top. */
+  background-image: linear-gradient(rgba(0, 0, 0, 0.07), rgba(0, 0, 0, 0.07));
   /* Subtle hairline frame; the "this is a dismissible sheet"
      affordance is the Android-style grabber bar
      (.mobile-fmt-sheet-grabber) plus a darkening gradient painted by
@@ -644,7 +649,11 @@ html.dark .modal-footer-toolbar {
   opacity: 1;
 }
 .mobile-fmt-sheet--dark {
-  background: #1f2937;
+  background-color: #1f2937;
+  /* Stronger overlay in dark mode — pure black at 0.07 on a dark
+     modal barely shifts; bump to 0.18 so the sheet still reads as
+     "a notch deeper" than the modal underneath. */
+  background-image: linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18));
   border-top-color: rgba(255, 255, 255, 0.14);
   border-left-color: rgba(255, 255, 255, 0.08);
   border-right-color: rgba(255, 255, 255, 0.08);
