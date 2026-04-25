@@ -651,6 +651,7 @@ export default function RichTextToolbar({ editor, compact = false }) {
               onClick={() => toggleMenu("link")}
             >
               <RichIcons.Link />
+              <span className="rt-btn-label">www</span>
             </button>
             <LinkPopover editor={editor} anchorRef={linkBtnRef} open={openMenu === "link"} onClose={closeMenu} />
           </div>

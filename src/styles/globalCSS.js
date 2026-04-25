@@ -1419,31 +1419,45 @@ html.dark .rt-toolbar {
 }
 .rt-btn--chevron { min-width: 20px; padding: 0 3px; }
 .rt-btn--swatch { padding: 0 6px; min-width: 34px; }
-/* Link button — sits in SG C row 2 next to the HR button. The Link
-   GLYPH itself (RichIcons.Link) bakes the chain AND the "www" mark
-   into one composite SVG so the button needs no separate label
-   anymore. We just give the button enough horizontal room to render
-   the wider 38x24 viewBox at a readable size, and otherwise let it
-   inherit the standard transparent toolbar look (background only on
-   hover / is-active, like every other rt-btn). */
+/* Link button — sits in SG C row 2 next to the HR button. Carries an
+   icon AND a "www" label so the row matches the visual length of row
+   1 (CodeBlock / Code / Quote). The icon and the "www" used to read
+   as two disconnected glyphs sharing the same hit-target by accident.
+   To visually fuse them we:
+     * shrink the gap between them (2 px),
+     * shrink the icon a touch (16 px) so it's proportional to the
+       text instead of towering over it,
+     * give the button an always-on subtle chip background — same
+       indigo accent surface the Font picker uses — so icon + text
+       clearly sit on ONE shared coloured pill. */
 .rt-btn--link {
-  width: 60px;
-  flex: 0 0 60px;
-  padding: 0 4px;
+  width: 68px;
+  flex: 0 0 68px;
+  padding: 0 6px;
+  gap: 2px;
   justify-content: center;
+  background: rgba(var(--rt-accent), 0.12);
+  border-color: rgba(var(--rt-accent), 0.22);
 }
-.tabler-icon--link-www {
-  width: 38px;
-  height: 24px;
+.rt-btn--link:hover:not(:disabled) {
+  background: rgba(var(--rt-accent), 0.22);
+  border-color: rgba(var(--rt-accent), 0.4);
 }
-.tabler-icon--link-www > svg {
-  width: 100%;
-  height: 100%;
-  stroke: currentColor;
-  stroke-width: 1.75;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  fill: none;
+.rt-btn--link.is-active {
+  background: var(--rt-btn-active-bg);
+  color: var(--rt-btn-active-text);
+  border-color: rgba(var(--rt-accent), 0.45);
+}
+.rt-btn--link .tabler-icon { width: 16px; height: 16px; }
+.rt-btn--link .tabler-icon > svg { width: 100%; height: 100%; }
+.rt-btn--link .rt-btn-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  /* Pull the label flush against the icon so the pair reads as a
+     single "icon + caption" unit, not two side-by-side controls. */
+  margin-left: 0;
 }
 .rt-btn-label {
   font-size: 0.88rem;
