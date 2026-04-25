@@ -1388,6 +1388,16 @@ html.dark .rt-toolbar {
   justify-content: space-between;
   /* Prevent the chevron from being pushed out by an outsized label. */
   overflow: hidden;
+  /* Always wear the accent background — gives the picker a visible
+     "filled" look so it never reads as empty / faded next to the
+     other controls, and matches the active-state vocabulary used
+     throughout the toolbar. */
+  background: var(--rt-btn-active-bg);
+  color: var(--rt-btn-active-text);
+  border-color: rgba(var(--rt-accent), 0.35);
+}
+.rt-btn--wide:hover:not(:disabled) {
+  background: rgba(var(--rt-accent), 0.24);
 }
 .rt-btn--wide .rt-btn-label {
   flex: 1 1 0;
