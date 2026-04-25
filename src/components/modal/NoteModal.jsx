@@ -509,6 +509,7 @@ export default function NoteModal({
               role="dialog"
               aria-label={t("formatting")}
               aria-hidden={showModalFmt ? "false" : "true"}
+              style={{ backgroundColor: modalBgFor(mColor, dark) }}
             >
               <div ref={setMobileToolbarSlot} className="mobile-fmt-sheet-content" />
             </div>
