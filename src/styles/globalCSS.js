@@ -569,8 +569,19 @@ html.dark .modal-footer-toolbar {
   max-height: 0;
   opacity: 0;
   background: #ffffff;
-  border-top: 1px solid var(--border-light);
-  box-shadow: 0 -6px 18px -8px rgba(0, 0, 0, 0.18);
+  /* Stylised frame: indigo-accent hairline on the three visible edges
+     plus a generous drop shadow above and a faint inner highlight so
+     the sheet reads as a deliberate floating panel even when its
+     background matches the modal's note colour. Top corners rounded
+     to soften the seam against the editor. */
+  border-top: 1px solid rgba(99, 102, 241, 0.32);
+  border-left: 1px solid rgba(99, 102, 241, 0.2);
+  border-right: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 12px 12px 0 0;
+  box-shadow:
+    0 -10px 24px -10px rgba(99, 102, 241, 0.25),
+    0 -3px 8px -4px rgba(17, 24, 39, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
   transition: max-height 0.22s ease, opacity 0.18s ease;
   display: flex;
   flex-direction: column;
@@ -579,7 +590,16 @@ html.dark .modal-footer-toolbar {
   max-height: min(58vh, 460px);
   opacity: 1;
 }
-.mobile-fmt-sheet--dark { background: #1f2937; border-top-color: rgba(255, 255, 255, 0.1); }
+.mobile-fmt-sheet--dark {
+  background: #1f2937;
+  border-top-color: rgba(165, 180, 252, 0.32);
+  border-left-color: rgba(165, 180, 252, 0.2);
+  border-right-color: rgba(165, 180, 252, 0.2);
+  box-shadow:
+    0 -10px 26px -10px rgba(0, 0, 0, 0.55),
+    0 -3px 8px -4px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
 .mobile-fmt-sheet-content {
   overflow-y: auto;
   overscroll-behavior: contain;
