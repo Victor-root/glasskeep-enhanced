@@ -2000,13 +2000,57 @@ html.dark .rt-pop-clear--danger { color: #f87171; border-color: rgba(248, 113, 1
 }
 .rt-link-btn:hover { background: var(--rt-btn-hover); }
 .rt-link-btn--primary {
+  /* Same Personnaliser theme as the typography settings button:
+     indigo→violet gradient, indigo-300 shadows, hover scale 1.03,
+     200 ms transition, plus the shared btn-shimmer ::after sweep. */
+  position: relative;
+  overflow: hidden;
   flex: 1 1 auto;
-  background: rgb(var(--rt-accent));
+  background: linear-gradient(to right, rgb(99, 102, 241), rgb(124, 58, 237));
   color: #fff;
   border-color: transparent;
+  font-weight: 600;
+  box-shadow:
+    0 4px 6px -1px rgba(165, 180, 252, 0.4),
+    0 2px 4px -2px rgba(165, 180, 252, 0.4);
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
-.rt-link-btn--primary:hover { background: rgba(var(--rt-accent), 0.9); }
-.rt-link-btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.rt-link-btn--primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 35%,
+    rgba(255, 255, 255, 0.25) 45%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0.25) 55%,
+    transparent 65%,
+    transparent 100%
+  );
+  transform: translateX(-100%) skewX(-15deg);
+  pointer-events: none;
+}
+.rt-link-btn--primary:hover:not(:disabled) {
+  background: linear-gradient(to right, rgb(79, 70, 229), rgb(109, 40, 217));
+  box-shadow:
+    0 10px 15px -3px rgba(165, 180, 252, 0.5),
+    0 4px 6px -4px rgba(165, 180, 252, 0.5);
+  transform: scale(1.03);
+}
+.rt-link-btn--primary:hover:not(:disabled)::after {
+  animation: btn-shimmer 0.7s ease-in-out;
+}
+.rt-link-btn--primary:active:not(:disabled) { transform: scale(0.98); }
+.rt-link-btn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+html.dark .rt-link-btn--primary { box-shadow: none; }
+html.dark .rt-link-btn--primary:hover:not(:disabled) { box-shadow: none; }
 .rt-link-btn--danger {
   color: #dc2626;
   border-color: rgba(220, 38, 38, 0.28);
