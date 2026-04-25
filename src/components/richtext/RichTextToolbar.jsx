@@ -351,69 +351,50 @@ export default function RichTextToolbar({ editor, compact = false }) {
   const isAlignJustify = isActive({ textAlign: "justify" });
   const isAlignLeft = !isAlignCenter && !isAlignRight && !isAlignJustify;
 
-  // Indent / outdent — keep the bullet / number attached to its line
-  // and never silently drop a marker.
+  // Indent / outdent — keep each line independent.
   //
-  //   In a list:
-  //     • Indent: prefer sinkListItem (proper Word-style nesting under
-  //       the previous sibling). When sink isn't possible — typically
-  //       the FIRST item of a list which has no previous sibling — we
-  //       fall back to bumping a per-listItem indent attribute, so the
-  //       <li> AND its marker shift right together.
-  //     • Outdent: prefer liftListItem ONLY when the item is in a
-  //       nested sub-list (lifting at root would remove the bullet).
-  //       Otherwise we decrement the listItem's indent attribute,
-  //       reversing the visual shift. Bullet / number always preserved.
-  //   Outside a list, the generic Indent / Outdent commands shift
-  //   paragraphs / headings / blockquotes / code blocks as before.
+  // We deliberately AVOID sinkListItem / liftListItem from the toolbar
+  // buttons because nesting one list item under another (which is what
+  // sinkListItem does) wraps the whole sub-list inside the previous
+  // item's <li>. That re-renders the previous item's geometry, which
+  // the user perceived as "ma Puce 1 a bougé quand j'ai indenté Puce
+  // 2". Instead the toolbar always bumps a per-listItem indent
+  // attribute (rendered as inline margin-inline-start on the <li>):
+  //
+  //   * the bullet / number marker AND its text shift together as one
+  //     unit (the inner <p> is intentionally skipped by the Indent
+  //     extension so the shift isn't doubled),
+  //   * each item is fully independent — touching Puce 2 never moves
+  //     Puce 1 or any other line.
+  //
+  // Tab / Shift+Tab inside a list still trigger Tiptap's native sink /
+  // liftListItem keymap for users who explicitly want the nested-list
+  // semantics.
   const inListItem = isActive("listItem");
-  let listDepth = 0;
   let listItemIndent = 0;
   if (inListItem) {
     const $from = editor.state.selection.$from;
     for (let d = $from.depth; d > 0; d--) {
       const node = $from.node(d);
-      const t = node.type.name;
-      if (t === "bulletList" || t === "orderedList") listDepth++;
-      if (t === "listItem") listItemIndent = Number(node.attrs?.indent) || 0;
+      if (node.type.name === "listItem") {
+        listItemIndent = Number(node.attrs?.indent) || 0;
+        break;
+      }
     }
   }
 
   const doIndent = () => {
-    if (inListItem) {
-      if (editor.can().sinkListItem?.("listItem")) {
-        chain().sinkListItem("listItem").run();
-      } else if (editor.can().indent?.()) {
-        // First item of a list (no prev sibling to nest under) → shift
-        // the whole listItem (with its marker) via margin-inline-start.
-        chain().indent().run();
-      }
-    } else {
-      chain().indent().run();
-    }
+    chain().indent().run();
   };
   const doOutdent = () => {
-    if (inListItem) {
-      // First, undo any visual indent on the <li> itself.
-      if (listItemIndent > 0 && editor.can().outdent?.()) {
-        chain().outdent().run();
-        return;
-      }
-      // Then, only lift if we're truly nested (depth > 1) — at root
-      // level lifting would drop the bullet entirely.
-      if (listDepth > 1 && editor.can().liftListItem?.("listItem")) {
-        chain().liftListItem("listItem").run();
-      }
-    } else {
-      chain().outdent().run();
-    }
+    chain().outdent().run();
   };
 
   const canIndent = inListItem
-    ? !!editor.can().sinkListItem?.("listItem") || !!editor.can().indent?.()
+    ? !!editor.can().indent?.()
     : !!editor.can().indent?.();
   const canOutdent = inListItem
-    ? listItemIndent > 0 || (listDepth > 1 && !!editor.can().liftListItem?.("listItem"))
+    ? listItemIndent > 0
     : !!editor.can().outdent?.();
 
   return (
