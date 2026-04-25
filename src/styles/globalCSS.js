@@ -1376,22 +1376,23 @@ html.dark .rt-toolbar {
 .rt-btn--menu { padding: 0 8px; gap: 4px; }
 .rt-btn--block { min-width: 50px; }
 .rt-btn--wide {
-  /* Font picker button. Bumped from 90 → 130 px so we comfortably fit
-     long-ish names ("Open Sans", "Roboto Mono", "EB Garamond"), and
-     capped at 170 px so a really long label ("Playfair Display",
-     "Source Code Pro") truncates with ellipsis instead of pushing the
-     rest of the toolbar around. */
-  min-width: 130px;
-  max-width: 170px;
-  min-height: 0; /* allow vertical shrink in flex contexts */
+  /* Font picker button. FIXED width — no min/max, no flex grow/shrink —
+     so picking ANY font (even "Source Code Pro" rendered in its own
+     wide mono glyphs) never resizes the button and therefore never
+     reflows the rest of the toolbar. The label inside clips with
+     ellipsis when the chosen name doesn't fit. */
+  width: 150px;
+  flex: 0 0 150px;
   justify-content: space-between;
+  /* Prevent the chevron from being pushed out by an outsized label. */
+  overflow: hidden;
 }
 .rt-btn--wide .rt-btn-label {
+  flex: 1 1 0;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-width: 0;
-  flex: 1 1 auto;
 }
 .rt-btn--narrow { min-width: 46px; justify-content: space-between; }
 .rt-btn--chevron { min-width: 20px; padding: 0 3px; }
@@ -2332,7 +2333,7 @@ html.dark .typo-modal-toggle {
   /* Touch-friendly minimum size on mobile, matching the enlarged desktop
      density. */
   .rt-btn { min-width: 36px; height: 36px; padding: 0 7px; }
-  .rt-btn--wide { min-width: 80px; }
+  .rt-btn--wide { width: 120px; flex: 0 0 120px; }
   .rt-btn--block { min-width: 50px; }
   .rt-btn svg { width: 20px; height: 20px; }
   .rt-pop { min-width: 220px; }
