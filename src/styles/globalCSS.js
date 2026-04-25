@@ -570,17 +570,16 @@ html.dark .modal-footer-toolbar {
   max-height: 0;
   opacity: 0;
   background: #ffffff;
-  /* Subtle hairline frame + a soft drop shadow. The real "this is a
-     dismissible sheet" affordance is the Android-style grabber bar
+  /* Subtle hairline frame; the "this is a dismissible sheet"
+     affordance is the Android-style grabber bar
      (.mobile-fmt-sheet-grabber) plus a darkening gradient painted by
-     the ::before below to make the top edge stand out. */
+     the ::before below to make the top edge stand out. No drop
+     shadow above the sheet — the gradient already separates the
+     sheet from the editor cleanly. */
   border-top: 1px solid rgba(0, 0, 0, 0.15);
   border-left: 1px solid rgba(0, 0, 0, 0.1);
   border-right: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 12px 12px 0 0;
-  box-shadow:
-    0 -10px 22px -10px rgba(0, 0, 0, 0.22),
-    0 -2px 6px -3px rgba(0, 0, 0, 0.14);
   transition: max-height 0.22s ease, opacity 0.18s ease;
   display: flex;
   flex-direction: column;
@@ -619,7 +618,7 @@ html.dark .modal-footer-toolbar {
   flex-shrink: 0;
   height: 10px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   cursor: grab;
   touch-action: none;
@@ -649,9 +648,6 @@ html.dark .modal-footer-toolbar {
   border-top-color: rgba(255, 255, 255, 0.14);
   border-left-color: rgba(255, 255, 255, 0.08);
   border-right-color: rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 -10px 26px -10px rgba(0, 0, 0, 0.55),
-    0 -2px 6px -3px rgba(0, 0, 0, 0.4);
 }
 .mobile-fmt-sheet--dark::before { background: rgba(255, 255, 255, 0.32); }
 .mobile-fmt-sheet-content {
