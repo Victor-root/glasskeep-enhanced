@@ -199,6 +199,16 @@ html.dark header.multi-select-bar {
 .note-content--dense h4, .note-content--dense h5, .note-content--dense h6,
 .note-content--dense td, .note-content--dense th { white-space: pre-wrap; }
 .note-content--dense p { margin: 0; }
+/* Empty paragraphs in the editor render as one visible line (cursor +
+   line-height); after serialisation they end up as bare <p></p> nodes
+   that, with margin:0, collapse to zero height in the dense read view.
+   That's what makes a deliberately-inserted blank line between two
+   blocks (especially between a paragraph and a heading) disappear in
+   lecture mode. Inject a non-breaking space via ::before so an empty
+   <p> reserves one line of vertical space again. */
+.note-content--dense p:empty::before {
+  content: " ";
+}
 /* Match the rich-text editor's spacing (.rt-editor-content hr / pre)
    so the separator-to-block gap reads identically in lecture and
    édition mode. */
