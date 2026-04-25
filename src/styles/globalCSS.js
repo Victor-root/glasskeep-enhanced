@@ -1380,9 +1380,11 @@ html.dark .rt-toolbar {
      so picking ANY font (even "Source Code Pro" rendered in its own
      wide mono glyphs) never resizes the button and therefore never
      reflows the rest of the toolbar. The label inside clips with
-     ellipsis when the chosen name doesn't fit. */
-  width: 150px;
-  flex: 0 0 150px;
+     ellipsis when the chosen name doesn't fit. 130 px matches the
+     natural button size when Bebas Neue is the active font, which
+     the user confirmed as the visually perfect toolbar layout. */
+  width: 130px;
+  flex: 0 0 130px;
   justify-content: space-between;
   /* Prevent the chevron from being pushed out by an outsized label. */
   overflow: hidden;
@@ -2333,7 +2335,7 @@ html.dark .typo-modal-toggle {
   /* Touch-friendly minimum size on mobile, matching the enlarged desktop
      density. */
   .rt-btn { min-width: 36px; height: 36px; padding: 0 7px; }
-  .rt-btn--wide { width: 120px; flex: 0 0 120px; }
+  .rt-btn--wide { width: 110px; flex: 0 0 110px; }
   .rt-btn--block { min-width: 50px; }
   .rt-btn svg { width: 20px; height: 20px; }
   .rt-pop { min-width: 220px; }
