@@ -29,6 +29,12 @@ import { uid } from "../utils/helpers.js";
  */
 export default function useDraftNote(ctx) {
   const pendingDraftRef = useRef(null); // { id, type } | null
+  // Stays set across the note's whole "first session" — from creation until
+  // the modal closes. Lets closeModal in App.jsx auto-trash a freshly-created
+  // note that the user emptied before closing (typed something, autosave
+  // materialised the draft, then user erased everything). Cleared on close,
+  // pin, archive or explicit delete — durable actions imply intent to keep.
+  const freshlyCreatedNoteRef = useRef(null); // string id | null
 
   const materializeDraftIfNeeded = (overrides = {}) => {
     const draft = pendingDraftRef.current;
@@ -162,6 +168,7 @@ export default function useDraftNote(ctx) {
     ctx.setViewMode(false);
     ctx.setModalMenuOpen(false);
     pendingDraftRef.current = { id: tempId, type };
+    freshlyCreatedNoteRef.current = tempId;
     ctx.setOpen(true);
   };
 
@@ -170,6 +177,7 @@ export default function useDraftNote(ctx) {
 
   return {
     pendingDraftRef,
+    freshlyCreatedNoteRef,
     materializeDraftIfNeeded,
     handleDirectText: () => createAndOpenBlankNote("text"),
     handleDirectChecklist: () => createAndOpenBlankNote("checklist"),

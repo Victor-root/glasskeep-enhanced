@@ -2788,6 +2788,11 @@ export default function App() {
     if (pendingDraftRef.current && String(noteId) === String(pendingDraftRef.current.id)) {
       materializeDraftIfNeeded();
     }
+    // Archiving is a durable commitment — clear the freshly-created marker
+    // so the empty-on-close auto-trash doesn't undo it for an empty note.
+    if (freshlyCreatedNoteRef.current === String(noteId)) {
+      freshlyCreatedNoteRef.current = null;
+    }
     const nid = String(noteId);
     const leaseId = acquireLocalLease(nid);
     const nowIso = new Date().toISOString();
@@ -3010,6 +3015,7 @@ export default function App() {
   // and the closeModal early-exit branch; those are orchestration.
   const {
     pendingDraftRef,
+    freshlyCreatedNoteRef,
     materializeDraftIfNeeded,
     handleDirectText,
     handleDirectChecklist,
@@ -3406,6 +3412,7 @@ export default function App() {
     // the exit animation and drop the pending state — no IDB/queue work.
     if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
       pendingDraftRef.current = null;
+      freshlyCreatedNoteRef.current = null;
       setIsModalClosing(true);
       modalClosingTimerRef.current = setTimeout(() => {
         modalClosingTimerRef.current = null;
@@ -3419,6 +3426,70 @@ export default function App() {
       }, 180);
       return;
     }
+
+    // Auto-trash a freshly-created note the user emptied before closing.
+    // freshlyCreatedNoteRef is set in useDraftNote.createAndOpenBlankNote
+    // and stays set across materialise — so a note that was typed into,
+    // autosaved, then erased back to blank still trips this branch and
+    // gets removed instead of leaving a 0-content shell on disk / on the
+    // server. Body emptiness is checked through contentToPlain so the
+    // Tiptap JSON envelope (which is always non-empty as a string, even
+    // for an empty doc) is collapsed to its actual user-visible text
+    // before the trim test.
+    if (activeId && freshlyCreatedNoteRef.current === String(activeId)) {
+      const drawPaths = mType === "draw"
+        ? (mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []))
+        : [];
+      const bodyEmpty = mType === "text"
+        ? !contentToPlain(mBody).trim()
+        : !mBody?.trim();
+      const titleEmpty = !mTitle?.trim();
+      const noItems = !Array.isArray(mItems) || mItems.length === 0;
+      const noImages = !Array.isArray(mImages) || mImages.length === 0;
+      const noTags = !Array.isArray(mTagList) || mTagList.length === 0;
+      const noDrawing = drawPaths.length === 0;
+      if (titleEmpty && bodyEmpty && noItems && noImages && noTags && noDrawing) {
+        const nid = String(activeId);
+        const nowIso = new Date().toISOString();
+        const leaseId = acquireLocalLease(nid);
+        addDeleteTombstone(nid);
+        (async () => {
+          try {
+            const existing = await idbGetNote(nid, currentUser?.id, sessionId);
+            if (existing) {
+              await idbPutNote(
+                { ...existing, trashed: true, client_updated_at: nowIso },
+                currentUser?.id,
+                sessionId,
+              );
+            }
+          } catch (e) {}
+        })();
+        invalidateNotesCache();
+        setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+        enqueueWithLease(
+          nid,
+          { type: "trash", noteId: nid, payload: { client_updated_at: nowIso } },
+          leaseId,
+        );
+        if (mType === "draw") showToast(t("emptyDrawNoteDeleted"), "info");
+        freshlyCreatedNoteRef.current = null;
+
+        setIsModalClosing(true);
+        modalClosingTimerRef.current = setTimeout(() => {
+          modalClosingTimerRef.current = null;
+          setOpen(false);
+          setActiveId(null);
+          setViewMode(true);
+          setModalMenuOpen(false);
+          setConfirmDeleteOpen(false);
+          setShowModalFmt(false);
+          setIsModalClosing(false);
+        }, 180);
+        return;
+      }
+    }
+    freshlyCreatedNoteRef.current = null;
 
     // Flush any pending drawing debounce before closing.
     // flushPendingDrawingSave restores pendingDrawingSaveRef on failure,
@@ -3524,6 +3595,12 @@ export default function App() {
     if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
       materializeDraftIfNeeded();
     }
+    // Explicit save = user intent to keep this note even if it's empty.
+    // Drop the freshly-created marker so closeModal's auto-trash branch
+    // won't undo the commit.
+    if (freshlyCreatedNoteRef.current === String(activeId)) {
+      freshlyCreatedNoteRef.current = null;
+    }
     setSavingModal(true);
 
     const noteId = String(activeId);
@@ -3615,6 +3692,12 @@ export default function App() {
     if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
       closeModal();
       return;
+    }
+    // The user is explicitly deleting — drop the freshly-created marker so
+    // closeModal's auto-trash branch doesn't enqueue a redundant trash on
+    // top of whatever delete-flow we're about to run.
+    if (freshlyCreatedNoteRef.current === String(activeId)) {
+      freshlyCreatedNoteRef.current = null;
     }
     const note = notes.find((n) => String(n.id) === String(activeId));
     const nid = String(activeId);
@@ -3736,6 +3819,11 @@ export default function App() {
     // create lands in the queue before the pin patch follows.
     if (pendingDraftRef.current && String(id) === String(pendingDraftRef.current.id)) {
       materializeDraftIfNeeded();
+    }
+    // Pinning is a durable commitment — clear the freshly-created marker so
+    // the empty-on-close auto-trash doesn't undo a pinned empty note.
+    if (freshlyCreatedNoteRef.current === String(id)) {
+      freshlyCreatedNoteRef.current = null;
     }
     const nid = String(id);
     const leaseId = acquireLocalLease(nid);
