@@ -544,6 +544,12 @@ export default function RichTextToolbar({ editor, compact = false }) {
           <ToolbarButton active={isActive("strike")} title={t("fmtStrike")} onClick={() => chain().toggleStrike().run()}>
             <RichIcons.Strike />
           </ToolbarButton>
+          <ToolbarButton active={isActive("subscript")} title={t("fmtSubscript")} onClick={() => chain().toggleSubscript().run()}>
+            <RichIcons.Subscript />
+          </ToolbarButton>
+          <ToolbarButton active={isActive("superscript")} title={t("fmtSuperscript")} onClick={() => chain().toggleSuperscript().run()}>
+            <RichIcons.Superscript />
+          </ToolbarButton>
           <button
             ref={colorBtnRef}
             type="button"
@@ -642,12 +648,6 @@ export default function RichTextToolbar({ editor, compact = false }) {
           </ToolbarButton>
           <ToolbarButton title={t("fmtSeparator")} onClick={() => chain().setHorizontalRule().run()}>
             <RichIcons.HR />
-          </ToolbarButton>
-          <ToolbarButton active={isActive("subscript")} title={t("fmtSubscript")} onClick={() => chain().toggleSubscript().run()}>
-            <RichIcons.Subscript />
-          </ToolbarButton>
-          <ToolbarButton active={isActive("superscript")} title={t("fmtSuperscript")} onClick={() => chain().toggleSuperscript().run()}>
-            <RichIcons.Superscript />
           </ToolbarButton>
         </div>
       </div>
