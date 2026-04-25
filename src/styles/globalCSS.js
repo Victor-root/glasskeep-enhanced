@@ -1231,7 +1231,9 @@ html.dark .rt-editor-content p.is-editor-empty:first-child::before { color: #6b7
   text-decoration: var(--gk-type-h5-underline, none);
 }
 
-.rt-editor-content blockquote {
+.rt-editor-content blockquote,
+.note-content--dense blockquote,
+.note-content blockquote {
   border-left: 3px solid rgba(var(--rt-accent), 0.45);
   padding: 0.15rem 0.85rem;
   margin: 0.4rem 0;
@@ -1239,8 +1241,15 @@ html.dark .rt-editor-content p.is-editor-empty:first-child::before { color: #6b7
   opacity: 0.92;
   background: rgba(var(--rt-accent), 0.05);
   border-radius: 4px;
+  /* Hug the content: a 1-word quote stays narrow, a multi-line one
+     wraps inside the modal width. Only the highlighted "card" shrinks
+     — vertical stacking with siblings is preserved. */
+  width: fit-content;
+  max-width: 100%;
 }
-html.dark .rt-editor-content blockquote {
+html.dark .rt-editor-content blockquote,
+html.dark .note-content--dense blockquote,
+html.dark .note-content blockquote {
   background: rgba(var(--rt-accent), 0.08);
 }
 .rt-editor-content pre {
