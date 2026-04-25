@@ -351,49 +351,70 @@ export default function RichTextToolbar({ editor, compact = false }) {
   const isAlignJustify = isActive({ textAlign: "justify" });
   const isAlignLeft = !isAlignCenter && !isAlignRight && !isAlignJustify;
 
-  // Indent / outdent: list-aware so the bullet / numbered marker stays
-  // attached to its line. When the caret is INSIDE a list item we route
-  // strictly to sink / liftListItem and refuse to fall back to the
-  // generic Indent extension (that one only shifts the inner paragraph
-  // via margin-inline-start, which leaves the marker behind — visibly
-  // broken). Outside a list, the generic Indent / Outdent commands
-  // shift block-level paragraphs / headings / blockquotes / code blocks
-  // as before.
+  // Indent / outdent — keep the bullet / number attached to its line
+  // and never silently drop a marker.
+  //
+  //   In a list:
+  //     • Indent: prefer sinkListItem (proper Word-style nesting under
+  //       the previous sibling). When sink isn't possible — typically
+  //       the FIRST item of a list which has no previous sibling — we
+  //       fall back to bumping a per-listItem indent attribute, so the
+  //       <li> AND its marker shift right together.
+  //     • Outdent: prefer liftListItem ONLY when the item is in a
+  //       nested sub-list (lifting at root would remove the bullet).
+  //       Otherwise we decrement the listItem's indent attribute,
+  //       reversing the visual shift. Bullet / number always preserved.
+  //   Outside a list, the generic Indent / Outdent commands shift
+  //   paragraphs / headings / blockquotes / code blocks as before.
   const inListItem = isActive("listItem");
-  // Inside a list, "outdent" is only meaningful when we're nested at
-  // depth ≥ 2 — at the root level lifting would lift the item out of
-  // the list entirely (i.e. drop the bullet), which the user reported
-  // as "ça supprime juste la puce". So we disable the button in that
-  // case rather than trigger a destructive action.
   let listDepth = 0;
+  let listItemIndent = 0;
   if (inListItem) {
     const $from = editor.state.selection.$from;
     for (let d = $from.depth; d > 0; d--) {
-      const t = $from.node(d).type.name;
+      const node = $from.node(d);
+      const t = node.type.name;
       if (t === "bulletList" || t === "orderedList") listDepth++;
+      if (t === "listItem") listItemIndent = Number(node.attrs?.indent) || 0;
     }
   }
-  const canIndent = inListItem
-    ? !!editor.can().sinkListItem?.("listItem")
-    : !!editor.can().indent?.();
-  const canOutdent = inListItem
-    ? listDepth > 1 && !!editor.can().liftListItem?.("listItem")
-    : !!editor.can().outdent?.();
 
   const doIndent = () => {
     if (inListItem) {
-      if (canIndent) chain().sinkListItem("listItem").run();
+      if (editor.can().sinkListItem?.("listItem")) {
+        chain().sinkListItem("listItem").run();
+      } else if (editor.can().indent?.()) {
+        // First item of a list (no prev sibling to nest under) → shift
+        // the whole listItem (with its marker) via margin-inline-start.
+        chain().indent().run();
+      }
     } else {
       chain().indent().run();
     }
   };
   const doOutdent = () => {
     if (inListItem) {
-      if (canOutdent) chain().liftListItem("listItem").run();
+      // First, undo any visual indent on the <li> itself.
+      if (listItemIndent > 0 && editor.can().outdent?.()) {
+        chain().outdent().run();
+        return;
+      }
+      // Then, only lift if we're truly nested (depth > 1) — at root
+      // level lifting would drop the bullet entirely.
+      if (listDepth > 1 && editor.can().liftListItem?.("listItem")) {
+        chain().liftListItem("listItem").run();
+      }
     } else {
       chain().outdent().run();
     }
   };
+
+  const canIndent = inListItem
+    ? !!editor.can().sinkListItem?.("listItem") || !!editor.can().indent?.()
+    : !!editor.can().indent?.();
+  const canOutdent = inListItem
+    ? listItemIndent > 0 || (listDepth > 1 && !!editor.can().liftListItem?.("listItem"))
+    : !!editor.can().outdent?.();
 
   return (
     <div className={`rt-toolbar${compact ? " rt-toolbar--compact" : ""}`} role="toolbar" aria-label={t("fmtToolbarLabel")}>

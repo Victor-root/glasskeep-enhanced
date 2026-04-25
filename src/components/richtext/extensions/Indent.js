@@ -18,7 +18,7 @@ export const Indent = Extension.create({
 
   addOptions() {
     return {
-      types: ["paragraph", "heading", "blockquote", "codeBlock"],
+      types: ["paragraph", "heading", "blockquote", "codeBlock", "listItem"],
       min: 0,
       max: 8,
     };
