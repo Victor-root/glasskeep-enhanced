@@ -1440,12 +1440,9 @@ html.dark .rt-toolbar {
   position: absolute;
   left: 50%;
   bottom: 7px;
-  width: 42px;
+  width: 39px;
   height: 1.5px;
-  transform: translateX(-50%);
-  /* Match the same blue Tiptap renders for actual <a> tags inside
-     the editor (.rt-editor-content a) — the underline then reads
-     unambiguously as "this button toggles a hyperlink". */
+  transform: translateX(-45%);
   background: #2563eb;
   border-radius: 1px;
   pointer-events: none;
