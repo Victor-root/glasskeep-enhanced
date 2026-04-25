@@ -1488,21 +1488,24 @@ html.dark .rt-block-badge {
    arranged 2x2 inside their own super-group at the right of the toolbar. */
 .rt-sg--style {
   gap: 3px;
-  /* Float the Style super-group to the far right of the toolbar so the
-     leftover horizontal room (which used to sit empty between Insert
-     and the right edge) is absorbed BEFORE the Style block, not after.
-     Result: the toolbar visually fills the modal width, the font
-     picker on the far left has more breathing room before pushing
-     anything around, and the Style group is naturally aligned with
-     the modal's right edge. */
-  margin-left: auto;
+  /* Style super-group sits at the END of the toolbar but no margin-
+     left: auto: the giant gap that used to appear between SG C's
+     separator and the Style block (when the toolbar didn't fully
+     fill the modal width) was visually unbalanced. Adjacent to the
+     last separator now — empty room, if any, sits at the right
+     edge of the modal where it reads as natural padding. */
 }
 .rt-sg--style .rt-sg-row { gap: 3px; }
 
 .rt-style-btn {
-  min-width: 76px;
+  /* Fixed width — all six buttons render at the same exact size so
+     the gallery reads as a uniform 2x3 grid. Labels that don't fit
+     ("Paragraphe" at the longer end) clip with ellipsis via the
+     .rt-style-btn-sample rules. */
+  width: 84px;
+  flex: 0 0 84px;
   height: 32px;
-  padding: 0 8px;
+  padding: 0 6px;
   border-radius: 6px;
   border: 1px solid var(--rt-divider);
   background: transparent;
@@ -1550,43 +1553,48 @@ html.dark .rt-block-badge {
    so extreme values still sit inside the row. font-weight is the raw
    configured weight — keeping that exact preserves the visual impact
    of Bold vs Medium vs Regular in the preview. */
+/* Per-block sample. font-size is the user's configured value scaled
+   down (* 0.7) AND capped via min() so even with aggressive presets
+   the label fits inside the 84-px button without overflowing.
+   font-weight stays exact so "Bold" looks bold and "Normal" looks
+   normal in the preview. */
 .rt-style-btn--p  .rt-style-btn-sample {
-  font-size: min(calc(var(--gk-type-p-size,  1rem)    * 0.82), 1rem);
+  font-size: min(calc(var(--gk-type-p-size,  1rem)    * 0.7), 0.78rem);
   font-weight: var(--gk-type-p-weight, 400);
   color: var(--gk-type-p-color, inherit);
   font-style: var(--gk-type-p-italic, normal);
   text-decoration: var(--gk-type-p-underline, none);
 }
 .rt-style-btn--h1 .rt-style-btn-sample {
-  font-size: min(calc(var(--gk-type-h1-size, 1.5rem)  * 0.82), 1.25rem);
+  font-size: min(calc(var(--gk-type-h1-size, 1.5rem)  * 0.7), 1.1rem);
   font-weight: var(--gk-type-h1-weight, 600);
   color: var(--gk-type-h1-color, inherit);
   font-style: var(--gk-type-h1-italic, normal);
   text-decoration: var(--gk-type-h1-underline, none);
 }
 .rt-style-btn--h2 .rt-style-btn-sample {
-  font-size: min(calc(var(--gk-type-h2-size, 1.25rem) * 0.82), 1.12rem);
+  font-size: min(calc(var(--gk-type-h2-size, 1.25rem) * 0.7), 1rem);
   font-weight: var(--gk-type-h2-weight, 600);
   color: var(--gk-type-h2-color, inherit);
   font-style: var(--gk-type-h2-italic, normal);
   text-decoration: var(--gk-type-h2-underline, none);
 }
 .rt-style-btn--h3 .rt-style-btn-sample {
-  font-size: min(calc(var(--gk-type-h3-size, 1.125rem) * 0.82), 1rem);
+  font-size: min(calc(var(--gk-type-h3-size, 1.125rem) * 0.7), 0.9rem);
   font-weight: var(--gk-type-h3-weight, 600);
   color: var(--gk-type-h3-color, inherit);
   font-style: var(--gk-type-h3-italic, normal);
   text-decoration: var(--gk-type-h3-underline, none);
 }
 .rt-style-btn--h4 .rt-style-btn-sample {
-  font-size: min(calc(var(--gk-type-h4-size, 1rem)    * 0.82), 0.95rem);
+  font-size: min(calc(var(--gk-type-h4-size, 1rem)    * 0.7), 0.82rem);
   font-weight: var(--gk-type-h4-weight, 600);
   color: var(--gk-type-h4-color, inherit);
   font-style: var(--gk-type-h4-italic, normal);
   text-decoration: var(--gk-type-h4-underline, none);
 }
 .rt-style-btn--h5 .rt-style-btn-sample {
-  font-size: min(calc(var(--gk-type-h5-size, 0.9rem)  * 0.82), 0.88rem);
+  font-size: min(calc(var(--gk-type-h5-size, 0.9rem)  * 0.7), 0.78rem);
   font-weight: var(--gk-type-h5-weight, 600);
   color: var(--gk-type-h5-color, inherit);
   font-style: var(--gk-type-h5-italic, normal);
@@ -2350,7 +2358,7 @@ html.dark .typo-modal-toggle {
   .rt-btn svg { width: 20px; height: 20px; }
   .rt-pop { min-width: 220px; }
   .rt-sep { margin: 0 4px; height: 26px; }
-  .rt-style-btn { min-width: 76px; height: 34px; padding: 0 8px; }
+  .rt-style-btn { width: 80px; flex: 0 0 80px; height: 34px; padding: 0 6px; }
 }
 
 /* Read-only note-content renderings (cards + modal view) should ALSO honour
