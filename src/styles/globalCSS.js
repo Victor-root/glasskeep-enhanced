@@ -221,18 +221,6 @@ html.dark .note-content a {
 .note-card .note-content,
 .note-card .note-content--dense {
   font-size: 0.875rem;
-  /* Better line-break heuristics in narrow cards: avoid orphans like a
-     dash sitting alone on its own line because a long path doesn't fit
-     after it (text-wrap: pretty), and stop the global overflow-wrap:
-     anywhere from chopping long URLs / paths into several pieces. */
-  text-wrap: pretty;
-  overflow-wrap: break-word;
-  word-break: normal;
-}
-.note-card .note-content *,
-.note-card .note-content--dense * {
-  overflow-wrap: break-word;
-  word-break: normal;
 }
 .note-card .note-content--dense p {
   font-size: 0.875rem;
