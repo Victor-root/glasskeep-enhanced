@@ -1375,7 +1375,24 @@ html.dark .rt-toolbar {
 .rt-btn:active:not(:disabled) { transform: translateY(0.5px); }
 .rt-btn--menu { padding: 0 8px; gap: 4px; }
 .rt-btn--block { min-width: 50px; }
-.rt-btn--wide { min-width: 90px; justify-content: space-between; }
+.rt-btn--wide {
+  /* Font picker button. Bumped from 90 → 130 px so we comfortably fit
+     long-ish names ("Open Sans", "Roboto Mono", "EB Garamond"), and
+     capped at 170 px so a really long label ("Playfair Display",
+     "Source Code Pro") truncates with ellipsis instead of pushing the
+     rest of the toolbar around. */
+  min-width: 130px;
+  max-width: 170px;
+  min-height: 0; /* allow vertical shrink in flex contexts */
+  justify-content: space-between;
+}
+.rt-btn--wide .rt-btn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
 .rt-btn--narrow { min-width: 46px; justify-content: space-between; }
 .rt-btn--chevron { min-width: 20px; padding: 0 3px; }
 .rt-btn--swatch { padding: 0 6px; min-width: 34px; }
@@ -1456,7 +1473,17 @@ html.dark .rt-block-badge {
 
 /* Block-style gallery (Paragraph / H1 / H2 / H3) — four preview buttons
    arranged 2x2 inside their own super-group at the right of the toolbar. */
-.rt-sg--style { gap: 3px; }
+.rt-sg--style {
+  gap: 3px;
+  /* Float the Style super-group to the far right of the toolbar so the
+     leftover horizontal room (which used to sit empty between Insert
+     and the right edge) is absorbed BEFORE the Style block, not after.
+     Result: the toolbar visually fills the modal width, the font
+     picker on the far left has more breathing room before pushing
+     anything around, and the Style group is naturally aligned with
+     the modal's right edge. */
+  margin-left: auto;
+}
 .rt-sg--style .rt-sg-row { gap: 3px; }
 
 .rt-style-btn {
