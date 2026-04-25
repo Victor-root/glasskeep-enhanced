@@ -33,6 +33,7 @@ import alignCenterSvg     from "./tabler/align-center.svg?raw";
 import alignRightSvg      from "./tabler/align-right.svg?raw";
 import alignJustifiedSvg  from "./tabler/align-justified.svg?raw";
 import typographySvg      from "./tabler/typography.svg?raw";
+import textColorSvg       from "./tabler/text-color.svg?raw";
 import highlightSvg       from "./tabler/highlight.svg?raw";
 import textIncreaseSvg    from "./tabler/text-increase.svg?raw";
 import textDecreaseSvg    from "./tabler/text-decrease.svg?raw";
@@ -105,6 +106,7 @@ export const TI = {
   AlignRight:      (p) => <TablerIcon svg={alignRightSvg} {...p} />,
   AlignJustified:  (p) => <TablerIcon svg={alignJustifiedSvg} {...p} />,
   Typography:      (p) => <TablerIcon svg={typographySvg} {...p} />,
+  TextColor:       (p) => <TablerIcon svg={textColorSvg} {...p} />,
   Highlight:       (p) => <TablerIcon svg={highlightSvg} {...p} />,
   TextIncrease:    (p) => <TablerIcon svg={textIncreaseSvg} {...p} />,
   TextDecrease:    (p) => <TablerIcon svg={textDecreaseSvg} {...p} />,

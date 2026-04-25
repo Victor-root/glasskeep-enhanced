@@ -5,6 +5,7 @@ import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
 import Popover from "../common/Popover.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
 import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon } from "../../icons/index.jsx";
+import TI from "../../icons/editor/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 import { t } from "../../i18n";
 
@@ -438,13 +439,7 @@ export default function ModalFooter({
             data-tooltip={t("formatting")}
             aria-pressed={showModalFmt ? "true" : "false"}
           >
-            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 7h6" />
-              <path d="M4 12h10" />
-              <path d="M4 17h7" />
-              <path d="M14 7l6 6" />
-              <path d="M20 7l-6 6" />
-            </svg>
+            <TI.TextColor />
           </button>
         )}
 

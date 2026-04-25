@@ -615,13 +615,53 @@ html.dark .modal-footer-toolbar {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-/* Inside the sheet the toolbar reflows to a comfortable mobile layout —
-   no horizontal scrolling, super-groups stack as needed. */
+/* Inside the sheet, the toolbar reflows into a stacked, well-cadré layout:
+     - super-groups become full-width sections separated by a hairline,
+     - their internal rows centre and wrap so nothing overflows on the
+       narrowest phone (no horizontal scroll bar),
+     - the desktop vertical separators are hidden — they were meant for
+       a side-by-side ribbon and read as random orphan rules on mobile,
+     - the wide font picker and the fixed-width style buttons relax to
+       flexible, percentage-based widths so 3-up rows fit on 320 px. */
 .mobile-fmt-sheet-content .rt-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
   margin: 0;
-  padding: 8px 8px 10px;
+  padding: 4px 8px 10px;
   border-top: none;
   border-bottom: none;
+  row-gap: 0;
+  background: transparent;
+}
+.mobile-fmt-sheet-content .rt-sep { display: none; }
+.mobile-fmt-sheet-content .rt-sg {
+  width: 100%;
+  flex: 0 0 auto;
+  flex-direction: column;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rt-divider);
+}
+.mobile-fmt-sheet-content .rt-sg:last-of-type { border-bottom: none; }
+.mobile-fmt-sheet-content .rt-sg-row {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+.mobile-fmt-sheet-content .rt-btn--wide {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 110px;
+  max-width: 60%;
+}
+.mobile-fmt-sheet-content .rt-btn--narrow {
+  margin-left: 0;
+}
+.mobile-fmt-sheet-content .rt-style-btn {
+  flex: 1 1 calc(33.333% - 6px);
+  width: auto;
+  min-width: 0;
+  max-width: 120px;
 }
 
 /* Mobile-only "Mise en forme" footer toggle styling — flag the active
