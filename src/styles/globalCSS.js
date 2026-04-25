@@ -1234,22 +1234,52 @@ html.dark .rt-editor-content p.is-editor-empty:first-child::before { color: #6b7
 .rt-editor-content blockquote,
 .note-content--dense blockquote,
 .note-content blockquote {
-  /* "Bookmark-tab" geometry: the coloured bar sits flush on the left
-     (sharp corners) while the right side rounds — the bar reads as
-     deliberately attached to the quote rather than a stray rule. */
-  border-left: 4px solid rgba(var(--rt-accent), 0.75);
-  padding: 0.35rem 0.95rem;
-  margin: 0.5rem 0;
+  /* "Otro-blockquote" inspired layout — chunky coloured bar on the
+     left, italic body, and a big curly opening quote glyph rendered
+     via ::before sitting inside the padded gutter. Themed with the
+     indigo accent so it stays consistent with the rest of GlassKeep
+     instead of the upstream teal. */
+  position: relative;
+  font-style: italic;
+  border-left: 8px solid rgba(var(--rt-accent), 0.85);
+  background: rgba(var(--rt-accent), 0.07);
+  padding: 0.9rem 1.1rem 0.9rem 2.6rem;
+  margin: 0.6rem 0;
+  line-height: 1.6;
   color: inherit;
-  opacity: 0.94;
-  background: rgba(var(--rt-accent), 0.06);
-  border-radius: 0 6px 6px 0;
-  box-shadow: 0 1px 2px rgba(99, 102, 241, 0.06);
+  border-radius: 0 8px 8px 0;
   /* Hug the content: a 1-word quote stays narrow, a multi-line one
      wraps inside the modal width. Only the highlighted "card" shrinks
      — vertical stacking with siblings is preserved. */
   width: fit-content;
   max-width: 100%;
+}
+.rt-editor-content blockquote::before,
+.note-content--dense blockquote::before,
+.note-content blockquote::before {
+  content: "“";
+  position: absolute;
+  left: 0.45rem;
+  top: -0.25rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: normal;
+  font-size: 3.4rem;
+  line-height: 1;
+  color: rgba(var(--rt-accent), 0.55);
+  pointer-events: none;
+  user-select: none;
+}
+/* Author/citation line — Tiptap doesn't auto-generate this, but if a
+   user manually adds <span>…</span> at the end of their quote (paste,
+   raw HTML) we render it as a small bold attribution under the body. */
+.rt-editor-content blockquote span,
+.note-content--dense blockquote span,
+.note-content blockquote span {
+  display: block;
+  font-style: normal;
+  font-weight: 600;
+  margin-top: 0.6rem;
+  opacity: 0.85;
 }
 html.dark .rt-editor-content blockquote,
 html.dark .note-content--dense blockquote,
@@ -1260,7 +1290,11 @@ html.dark .note-content blockquote {
      readable as a quote. */
   border-left-color: rgb(165, 180, 252);
   background: rgba(165, 180, 252, 0.13);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+html.dark .rt-editor-content blockquote::before,
+html.dark .note-content--dense blockquote::before,
+html.dark .note-content blockquote::before {
+  color: rgba(165, 180, 252, 0.6);
 }
 .rt-editor-content pre {
   background: rgba(0, 0, 0, 0.06);
