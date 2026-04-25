@@ -3447,27 +3447,25 @@ export default function App() {
         const nid = String(activeId);
         const nowIso = new Date().toISOString();
         const leaseId = acquireLocalLease(nid);
+        // Hard delete — sending an empty note to trash would clutter it for
+        // no reason (the user emptied it deliberately, the only sensible
+        // action is to remove it). Mirrors the trash-view "permanently
+        // delete" path: tombstone + idbDeleteNote + permanentDelete enqueue.
         addDeleteTombstone(nid);
         (async () => {
           try {
-            const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-            if (existing) {
-              await idbPutNote(
-                { ...existing, trashed: true, client_updated_at: nowIso },
-                currentUser?.id,
-                sessionId,
-              );
-            }
+            await idbDeleteNote(nid, currentUser?.id, sessionId);
           } catch (e) {}
         })();
         invalidateNotesCache();
+        invalidateTrashedNotesCache();
         setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
         enqueueWithLease(
           nid,
-          { type: "trash", noteId: nid, payload: { client_updated_at: nowIso } },
+          { type: "permanentDelete", noteId: nid, payload: { client_updated_at: nowIso } },
           leaseId,
         );
-        if (mType === "draw") showToast(t("emptyDrawNoteDeleted"), "info");
+        showToast(t("emptyNoteDeleted"), "info");
         freshlyCreatedNoteRef.current = null;
 
         setIsModalClosing(true);

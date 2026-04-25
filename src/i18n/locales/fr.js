@@ -442,6 +442,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   removeAndDeleteForThem: "Retirer sans laisser de copie",
   noteRestoredFromTrash: "Note restaurée",
   notePermanentlyDeleted: "Note supprimée définitivement",
+  emptyNoteDeleted: "Note vide supprimée",
   failedMoveToTrash: "Échec du déplacement vers la corbeille",
   failedRestoreNote: "Échec de la restauration de la note",
   failedPermanentlyDelete: "Échec de la suppression définitive",
