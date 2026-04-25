@@ -615,14 +615,17 @@ html.dark .modal-footer-toolbar {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-/* Inside the sheet, the toolbar reflows into a stacked, well-cadré layout:
-     - super-groups become full-width sections separated by a hairline,
-     - their internal rows centre and wrap so nothing overflows on the
-       narrowest phone (no horizontal scroll bar),
-     - the desktop vertical separators are hidden — they were meant for
-       a side-by-side ribbon and read as random orphan rules on mobile,
-     - the wide font picker and the fixed-width style buttons relax to
-       flexible, percentage-based widths so 3-up rows fit on 320 px. */
+/* Inside the sheet, the toolbar reflows into a vertically-stacked grid:
+   the FOUR super-groups remain stacked one above the other (the desktop
+   ribbon collapsed onto a column), but inside each super-group every
+   button flows on a SINGLE wrapping line — no more artificial 2-sub-row
+   centring that left big gaps on phones. .rt-sg-row collapses to
+   "display: contents" so its children promote up to the super-group's
+   flex context, and .rt-sg becomes flex-wrap row with center-justify.
+   Wraps only happen when there are genuinely too many buttons for the
+   width. The .rt-sep vertical dividers are hidden — they were ribbon-
+   specific. The fixed-width font picker / Size / Style buttons relax
+   to natural widths so the row packs tight. */
 .mobile-fmt-sheet-content .rt-toolbar {
   flex-direction: column;
   align-items: stretch;
@@ -638,30 +641,27 @@ html.dark .modal-footer-toolbar {
 .mobile-fmt-sheet-content .rt-sg {
   width: 100%;
   flex: 0 0 auto;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
   padding: 6px 0;
   border-bottom: 1px solid var(--rt-divider);
 }
 .mobile-fmt-sheet-content .rt-sg:last-of-type { border-bottom: none; }
-.mobile-fmt-sheet-content .rt-sg-row {
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px;
-}
+.mobile-fmt-sheet-content .rt-sg-row { display: contents; }
 .mobile-fmt-sheet-content .rt-btn--wide {
   width: auto;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 110px;
-  max-width: 60%;
+  max-width: 50%;
 }
-.mobile-fmt-sheet-content .rt-btn--narrow {
-  margin-left: 0;
-}
+.mobile-fmt-sheet-content .rt-btn--narrow { margin-left: 0; }
 .mobile-fmt-sheet-content .rt-style-btn {
-  flex: 1 1 calc(33.333% - 6px);
-  width: auto;
-  min-width: 0;
-  max-width: 120px;
+  flex: 0 0 auto;
+  width: 80px;
+  max-width: 30%;
 }
 
 /* Mobile-only "Mise en forme" footer toggle styling — flag the active
