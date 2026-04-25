@@ -1423,15 +1423,30 @@ html.dark .rt-toolbar {
    icon AND a "www" label so the row matches the visual length of row
    1 (CodeBlock / Code / Quote). The icon is shrunk to 16 px and the
    gap to 2 px so the pair reads as one tight "icon + caption" unit;
-   no always-on background is applied — the indigo accent is reserved
-   for the standard rt-btn :hover / .is-active states like every other
-   button on the toolbar. */
+   a thin underline drawn via ::after spans both elements so they
+   visually belong to the same glyph — like a hyperlink — instead of
+   reading as two stacked controls. The accent indigo is reserved for
+   :hover / .is-active states like every other button on the toolbar. */
 .rt-btn--link {
+  position: relative;
   width: 68px;
   flex: 0 0 68px;
-  padding: 0 6px;
+  padding: 0 6px 4px;
   gap: 2px;
   justify-content: center;
+}
+.rt-btn--link::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  width: 40px;
+  height: 1.5px;
+  transform: translateX(-50%);
+  background: currentColor;
+  border-radius: 1px;
+  opacity: 0.85;
+  pointer-events: none;
 }
 .rt-btn--link .tabler-icon { width: 16px; height: 16px; }
 .rt-btn--link .tabler-icon > svg { width: 100%; height: 100%; }
