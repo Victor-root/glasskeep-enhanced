@@ -91,13 +91,44 @@ const PRESET_UNDERLINE_COLORS = [
 // that re-resolve automatically on theme change, so no JS tracking is
 // required.)
 
-// Ubuntu is self-hosted via @fontsource/ubuntu (see src/main.jsx) — no cloud.
+// 28 web-safe + open-source webfonts vendored locally via @fontsource
+// (see src/main.jsx). Listed in a familiar Sans / Serif / Mono / Display
+// order so the popover reads as a tidy gallery.
 const FONT_FAMILIES = [
+  // System default (no fontFamily mark applied)
   { label: "Sans", value: "" },
-  { label: "Serif", value: 'Georgia, "Times New Roman", serif' },
-  { label: "Mono", value: "ui-monospace, SFMono-Regular, Menlo, monospace" },
-  { label: "Display", value: '"Trebuchet MS", Verdana, sans-serif' },
-  { label: "Ubuntu", value: 'Ubuntu, "Ubuntu Sans", sans-serif' },
+  // --- Sans-serif ---
+  { label: "Inter",            value: 'Inter, sans-serif' },
+  { label: "Roboto",           value: 'Roboto, sans-serif' },
+  { label: "Open Sans",        value: '"Open Sans", sans-serif' },
+  { label: "Lato",             value: 'Lato, sans-serif' },
+  { label: "Source Sans",      value: '"Source Sans 3", sans-serif' },
+  { label: "Noto Sans",        value: '"Noto Sans", sans-serif' },
+  { label: "Nunito",           value: 'Nunito, sans-serif' },
+  { label: "Poppins",          value: 'Poppins, sans-serif' },
+  { label: "Montserrat",       value: 'Montserrat, sans-serif' },
+  { label: "Raleway",          value: 'Raleway, sans-serif' },
+  { label: "Work Sans",        value: '"Work Sans", sans-serif' },
+  { label: "Ubuntu",           value: 'Ubuntu, sans-serif' },
+  // --- Serif ---
+  { label: "Merriweather",     value: 'Merriweather, serif' },
+  { label: "Lora",             value: 'Lora, serif' },
+  { label: "PT Serif",         value: '"PT Serif", serif' },
+  { label: "Playfair Display", value: '"Playfair Display", serif' },
+  { label: "EB Garamond",      value: '"EB Garamond", serif' },
+  { label: "Source Serif",     value: '"Source Serif 4", serif' },
+  // --- Monospace ---
+  { label: "JetBrains Mono",   value: '"JetBrains Mono", monospace' },
+  { label: "Fira Code",        value: '"Fira Code", monospace' },
+  { label: "Source Code Pro",  value: '"Source Code Pro", monospace' },
+  { label: "IBM Plex Mono",    value: '"IBM Plex Mono", monospace' },
+  { label: "Roboto Mono",      value: '"Roboto Mono", monospace' },
+  // --- Display / decorative ---
+  { label: "Bebas Neue",       value: '"Bebas Neue", sans-serif' },
+  { label: "Oswald",           value: 'Oswald, sans-serif' },
+  { label: "Pacifico",         value: 'Pacifico, cursive' },
+  { label: "Dancing Script",   value: '"Dancing Script", cursive' },
+  { label: "Caveat",           value: 'Caveat, cursive' },
 ];
 const FONT_SIZES = ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px"];
 const DEFAULT_FONT_SIZE = "16px";
