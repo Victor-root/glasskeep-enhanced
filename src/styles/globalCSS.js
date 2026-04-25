@@ -583,21 +583,36 @@ html.dark .modal-footer-toolbar {
   display: flex;
   flex-direction: column;
 }
-/* Drag-handle pill, the same affordance Android / iOS bottom sheets
-   use to signal "this surface is dismissible". Lives as the first
-   flex child via the ::before pseudo-element so the toolbar starts
-   right under it. Pure visual cue — closing happens by re-tapping
-   the "Mise en forme" footer toggle. */
-.mobile-fmt-sheet::before {
-  content: "";
+/* Drag-handle bar, the same affordance Android / iOS bottom sheets use
+   to signal "this surface is dismissible". A real DOM element so we
+   can attach pointer events for swipe-to-close — the visible pill is
+   painted by ::after centred inside it. The strip is taller than the
+   pill itself so the touch target stays comfortable on mobile. */
+.mobile-fmt-sheet-grabber {
   flex-shrink: 0;
-  align-self: center;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.mobile-fmt-sheet-grabber::after {
+  content: "";
   width: 42px;
   height: 4px;
-  margin: 8px 0 6px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.28);
+  transition: background 0.12s ease, transform 0.12s ease;
 }
+.mobile-fmt-sheet-grabber:active { cursor: grabbing; }
+.mobile-fmt-sheet-grabber:active::after {
+  background: rgba(0, 0, 0, 0.45);
+  transform: scaleX(1.15);
+}
+.mobile-fmt-sheet--dark .mobile-fmt-sheet-grabber::after { background: rgba(255, 255, 255, 0.32); }
+.mobile-fmt-sheet--dark .mobile-fmt-sheet-grabber:active::after { background: rgba(255, 255, 255, 0.5); }
 .mobile-fmt-sheet.is-open {
   max-height: min(58vh, 460px);
   opacity: 1;

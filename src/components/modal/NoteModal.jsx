@@ -209,6 +209,50 @@ export default function NoteModal({
   const isDesktopLayout = windowWidth >= 768 && !isLandscapeMobile && !isWebView;
   const toolbarMount = isDesktopLayout ? toolbarSlot : mobileToolbarSlot;
 
+  /* ── Mobile fmt-sheet swipe-to-close ──
+     The grabber bar at the top of the sheet captures pointer events so
+     the user can drag the panel down a few dozen pixels and let go to
+     dismiss it (in addition to re-tapping the "Mise en forme" footer
+     toggle). During the drag we manipulate the sheet's transform
+     directly via a ref so the gesture stays at 60 fps without the cost
+     of a React state update on every move. */
+  const fmtSheetRef = React.useRef(null);
+  const fmtDragRef = React.useRef({ active: false, startY: 0, currentY: 0 });
+  const FMT_CLOSE_THRESHOLD = 60; // px
+
+  const handleFmtGrabberDown = (e) => {
+    if (e.button != null && e.button !== 0) return;
+    fmtDragRef.current = { active: true, startY: e.clientY, currentY: 0 };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    if (fmtSheetRef.current) {
+      // Disable the sheet's own max-height/opacity transition during the
+      // drag so the translate follows the finger 1:1.
+      fmtSheetRef.current.style.transition = "none";
+    }
+  };
+  const handleFmtGrabberMove = (e) => {
+    if (!fmtDragRef.current.active) return;
+    const dy = Math.max(0, e.clientY - fmtDragRef.current.startY);
+    fmtDragRef.current.currentY = dy;
+    if (fmtSheetRef.current) {
+      fmtSheetRef.current.style.transform = `translateY(${dy}px)`;
+    }
+  };
+  const handleFmtGrabberUp = (e) => {
+    if (!fmtDragRef.current.active) return;
+    const dy = fmtDragRef.current.currentY;
+    fmtDragRef.current.active = false;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+    const sheet = fmtSheetRef.current;
+    if (sheet) {
+      sheet.style.transition = "";
+      sheet.style.transform = "";
+    }
+    if (dy > FMT_CLOSE_THRESHOLD) {
+      setShowModalFmt(false);
+    }
+  };
+
   /* Set draw mode when modal opens (reset to view, or honour initialDrawMode) */
   React.useEffect(() => {
     if (open) {
@@ -505,12 +549,23 @@ export default function NoteModal({
               edit mode. */}
           {!isDesktopLayout && mType !== "checklist" && !viewMode && !(mType === 'draw' && drawMode === 'draw') && (
             <div
+              ref={fmtSheetRef}
               className={`mobile-fmt-sheet${showModalFmt ? " is-open" : ""}${dark ? " mobile-fmt-sheet--dark" : ""}`}
               role="dialog"
               aria-label={t("formatting")}
               aria-hidden={showModalFmt ? "false" : "true"}
               style={{ backgroundColor: modalBgFor(mColor, dark) }}
             >
+              <div
+                className="mobile-fmt-sheet-grabber"
+                role="button"
+                tabIndex={-1}
+                aria-label={t("close")}
+                onPointerDown={handleFmtGrabberDown}
+                onPointerMove={handleFmtGrabberMove}
+                onPointerUp={handleFmtGrabberUp}
+                onPointerCancel={handleFmtGrabberUp}
+              />
               <div ref={setMobileToolbarSlot} className="mobile-fmt-sheet-content" />
             </div>
           )}
