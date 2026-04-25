@@ -616,9 +616,10 @@ export default function RichTextToolbar({ editor, compact = false }) {
       <span className="rt-sep" aria-hidden="true" />
 
       {/* Super-group C — Insert / content elements.
-          Row 1 clusters "code"-ish content together (code block, inline
-          code, link); row 2 groups the remaining block/inline inserts
-          (quote, HR, sub, sup). */}
+          Row 1: code block, inline code, quote.
+          Row 2: HR, link (with "www" label so the link button visually
+                 fills the row's leftover space and balances the
+                 group's two-row geometry). */}
       <div className="rt-sg" data-sg="insert">
         <div className="rt-sg-row">
           <ToolbarButton
@@ -631,24 +632,29 @@ export default function RichTextToolbar({ editor, compact = false }) {
           <ToolbarButton active={isActive("code")} title={t("fmtInlineCode")} onClick={() => chain().toggleCode().run()}>
             <RichIcons.Code />
           </ToolbarButton>
-          <div className="rt-pop-wrap" ref={linkBtnRef}>
-            <ToolbarButton
-              active={isActive("link") || openMenu === "link"}
-              title={t("fmtLink")}
-              onClick={() => toggleMenu("link")}
-            >
-              <RichIcons.Link />
-            </ToolbarButton>
-            <LinkPopover editor={editor} anchorRef={linkBtnRef} open={openMenu === "link"} onClose={closeMenu} />
-          </div>
-        </div>
-        <div className="rt-sg-row">
           <ToolbarButton active={isActive("blockquote")} title={t("fmtQuote")} onClick={() => chain().toggleBlockquote().run()}>
             <RichIcons.Quote />
           </ToolbarButton>
+        </div>
+        <div className="rt-sg-row">
           <ToolbarButton title={t("fmtSeparator")} onClick={() => chain().setHorizontalRule().run()}>
             <RichIcons.HR />
           </ToolbarButton>
+          <div className="rt-pop-wrap rt-pop-wrap--link" ref={linkBtnRef}>
+            <button
+              type="button"
+              className={`rt-btn rt-btn--link${isActive("link") || openMenu === "link" ? " is-active" : ""}`}
+              data-tooltip={t("fmtLink")}
+              aria-label={t("fmtLink")}
+              aria-pressed={isActive("link") ? "true" : undefined}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => toggleMenu("link")}
+            >
+              <RichIcons.Link />
+              <span className="rt-btn-label">www</span>
+            </button>
+            <LinkPopover editor={editor} anchorRef={linkBtnRef} open={openMenu === "link"} onClose={closeMenu} />
+          </div>
         </div>
       </div>
 

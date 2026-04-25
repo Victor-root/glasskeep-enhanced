@@ -1406,9 +1406,26 @@ html.dark .rt-toolbar {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.rt-btn--narrow { min-width: 46px; justify-content: space-between; }
+.rt-btn--narrow { min-width: 64px; justify-content: space-between; }
 .rt-btn--chevron { min-width: 20px; padding: 0 3px; }
 .rt-btn--swatch { padding: 0 6px; min-width: 34px; }
+/* Link button — sits in SG C row 2 next to the HR button. Carries an
+   icon AND a "www" label so the row matches the visual length of row
+   1 (CodeBlock / Code / Quote) and the super-group reads as a tidy
+   2x balanced block instead of leaving a hole on the right. */
+.rt-btn--link {
+  width: 68px;
+  flex: 0 0 68px;
+  padding: 0 8px;
+  gap: 4px;
+  justify-content: center;
+}
+.rt-btn--link .rt-btn-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
 .rt-btn-label {
   font-size: 0.88rem;
   font-weight: 500;
@@ -1535,10 +1552,16 @@ html.dark .rt-block-badge {
 .rt-style-btn:active:not(:disabled) { transform: translateY(0.5px); }
 
 .rt-style-btn-sample {
-  line-height: 1;
+  /* line-height bumped to 1.3 so descenders (g, p in "Paragraphe")
+     have room below the baseline and don't get clipped by the button's
+     overflow: hidden + ellipsis stack. */
+  line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* Slight vertical breathing room — clears the bottom of g / p
+     when align-items: center pulls the line box upward. */
+  padding-block: 1px 3px;
   /* Inherit the note's typography so the preview actually MATCHES what
      the user will see once the style is applied — font family, italic /
      oblique, colour, all carry through to the sample. The per-block
@@ -1806,18 +1829,33 @@ html.dark .rt-swatch.is-current {
     0 0 0 2px rgba(var(--rt-accent), 0.9);
 }
 .rt-pop-clear {
+  /* Same indigo→violet gradient as the rest of GlassKeep's primary
+     actions (LoginView, ChangePasswordModal, Typography modal reset)
+     so the "Par défaut" / "Default" pills feel like deliberate
+     theme buttons instead of neutral border boxes. */
   margin-top: 8px;
   width: 100%;
   padding: 6px 10px;
   border-radius: 6px;
-  border: 1px solid var(--rt-divider);
-  background: transparent;
-  color: inherit;
+  border: 1px solid transparent;
+  background: linear-gradient(to right, rgb(99, 102, 241), rgb(124, 58, 237));
+  color: #ffffff;
   font-size: 0.8rem;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
+  box-shadow: 0 4px 12px -2px rgba(99, 102, 241, 0.4);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 }
-.rt-pop-clear:hover { background: var(--rt-btn-hover); }
+.rt-pop-clear:hover {
+  background: linear-gradient(to right, rgb(79, 82, 221), rgb(109, 40, 217));
+  box-shadow: 0 6px 14px -2px rgba(99, 102, 241, 0.55);
+  transform: scale(1.02);
+}
+.rt-pop-clear:active {
+  transform: scale(0.98);
+}
+html.dark .rt-pop-clear { box-shadow: none; }
+html.dark .rt-pop-clear:hover { box-shadow: none; }
 .rt-pop-clear--danger {
   margin-top: 6px;
   color: #dc2626;
