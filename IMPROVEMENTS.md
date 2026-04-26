@@ -149,6 +149,7 @@ The fork also includes a broad layer of visual and ergonomic polish.
 - improved modal presentation
 - stronger overall visual consistency
 - many adjustments across spacing, alignment, buttons, previews, and UI states
+- settings panel rebuilt with a Tabler icon on every section / option, a single-column icon alignment, a wider drawer on tablet / desktop, and stacked right-controls on mobile so longer translations no longer crush the description (see also section **23**)
 
 ### Goal
 Keep the spirit of the original project while making it feel cleaner, more readable, and more finished.
@@ -205,6 +206,7 @@ The fork also reworked how note creation behaves.
 - empty notes are no longer materialized too early
 - closing without any meaningful action no longer pollutes the app with blank notes
 - cleaner behavior between draft state, actual save, and sync
+- a note that ends up **100% empty** on close (no title, no body / items / drawing strokes — but images keep it alive) is now auto-trashed instead of leaving a blank shell on disk and on the server (see section **21** for details on the per-type body check)
 
 ### Why it matters
 This is exactly the kind of product detail that has a large impact on how polished the app feels in daily use.
@@ -330,10 +332,11 @@ Migration and recovery tooling was also consolidated.
 ### Present in the fork
 - JSON export
 - JSON import
-- Google Keep import
+- Google Keep import (raw Takeout `.zip`, see section **22**)
 - Markdown import
 - downloadable recovery secret key
 - dedicated logic in hooks / utilities
+- server-side **deduplication** on every import path so re-importing the same export doesn't multiply notes (see section **22**)
 
 ---
 
@@ -365,15 +368,109 @@ Documentation was reworked significantly.
 
 ---
 
+## ✏️ 21) Rich-text editor (live formatting)
+
+The biggest single change of this branch — text notes are now edited through a real WYSIWYG editor instead of a Markdown `<textarea>`.
+
+### Engine
+- Tiptap / ProseMirror under the hood
+- versioned JSON envelope `{ "v": 1, "format": "tiptap", "doc": { … } }` stored in the existing `notes.content` column — opaque to the server, IDB and sync layers, so no schema change was required
+- legacy Markdown notes are detected on load and migrated to the rich envelope on first save
+
+### Marks and blocks
+- bold / italic / strike / sub / sup / inline code
+- underline with **four variants** (simple, double, dotted, dashed, wavy) plus an optional underline colour
+- text colour and highlight via 8-slot themed palettes (CSS variables that auto-resolve to the dark / light variant on theme switch)
+- bullet & ordered lists with **per-item indent** (the `<li>` carries the indent attribute, so bumping puce 2 never moves puce 1)
+- code blocks (with smart selection-carve), blockquote (otro-style with a curly quote glyph in the gutter), horizontal separator, links
+- alignment, paragraph + H1..H5
+
+### Typography presets
+- 3 switchable profiles per user
+- per-block (Paragraph + H1..H5) size / weight / colour / italic / underline
+- exposed as CSS variables on `:root`, so the editor + read view + card previews all share the same rendering rules
+- synced cross-device through `/user/settings`
+- on read, sizes snap to the closest preset entry — auto-migrates older non-preset defaults (e.g. `1.35rem`) so the dropdown never "lies" with stale values
+
+### Fonts
+- 28 self-hosted webfonts via `@fontsource` (Inter, Roboto, Open Sans, Lato, Source Sans, Noto Sans, Nunito, Poppins, Montserrat, Raleway, Work Sans, Ubuntu, Merriweather, Lora, PT Serif, Playfair Display, EB Garamond, Source Serif, JetBrains Mono, Fira Code, Source Code Pro, IBM Plex Mono, Roboto Mono, Bebas Neue, Oswald, Pacifico, Dancing Script, Caveat) — no CDN, lazy `woff2` fetch only when the user actually picks a family
+
+### Mobile UX
+- the desktop ribbon was unusable on phones; replaced by a **"Mise en forme" footer toggle** that opens a bottom sheet hosting the same toolbar
+- drag-handle pill, swipe-down gesture dismisses the sheet
+- virtual keyboard suppressed (`inputmode="none"`) while the sheet is open so the user can long-press text to select without the keyboard taking over
+- chrome (background tinted to the modal's note colour, subtle top gradient) follows the same visual language as the modal it lives in
+
+### Edit ↔ read parity
+- the read view preserves blank lines authored in the editor — empty `<p></p>` get a `:empty::before` non-breaking space so the line stays visible
+- `<hr>` and `<pre>` margins synced between modes so visible spacing matches in both
+
+### Empty notes auto-trash on close
+- a note that ends up 100% empty (no title, no per-type body, no images) is **hard-deleted** when the modal closes (queued `trash` → `permanentDelete` to respect the server's must-be-trashed-first contract)
+- toast confirms the deletion
+- guarded so durable user gestures (pin, archive, explicit save) clear the freshly-created marker
+
+### Keyboard
+- Tab from the title focuses the body (`commands.focus("end", { scrollIntoView: false })`)
+- Shift+Tab from the body returns to the title
+- standard Tiptap shortcuts (Ctrl/⌘+B/I/U, headings, lists, undo / redo) work everywhere
+
+---
+
+## 📥 22) Smarter import flows
+
+Building on the existing import / export hooks, the fork now handles real-world export bundles much more gracefully.
+
+### Google Keep / Takeout
+- accepts the **raw `.zip`** straight out of Google Takeout — no need to hand-pick the `.json` files
+- JSZip-based extraction, with non-Keep JSONs (Drive, Calendar, …) silently filtered out
+- imports the original colour (mapped to the closest GlassKeep swatch — RED → red, ORANGE → peach, TEAL → mint, …), the **image attachments** (data-URL embedded), labels, items and titles
+- single line breaks (`\n`) and blank lines (`\n\n`) from the original `textContent` are preserved by going through a dedicated plain-text → Tiptap converter (no `marked()` detour, which would have collapsed both)
+- inline help link in the settings to Google Takeout's documentation so the user knows where to grab the archive
+
+### Cross-device deduplication
+- the server-side `/api/notes/import` endpoint computes a fingerprint of the importing user's existing notes (`type | trimmed-title | body | images-hash`) and skips any incoming note that already matches
+- checklist items are normalised (id-stripped) before hashing, so re-imports of an export don't multiply their content because of fresh per-item ids
+- image-only Keep notes (no title, no body — typical Takeout case) hash uniquely thanks to a SHA-1 short digest of `(name, src)` per image
+- the response now reports `imported / skipped`, surfaced in the success toast: *"X note(s) imported, Y duplicate(s) skipped"* / *"No notes imported — Y duplicates already present"*
+- applies to GlassKeep `.json`, Markdown imports and Takeout `.zip` alike — single endpoint, single fingerprint logic
+
+### ID-collision robustness
+- the import endpoint now checks **every** note id in the `notes` table, not just the importing user's, so a `.zip` exported by user A and re-imported into user B's account no longer hits the global PRIMARY KEY constraint
+
+---
+
+## 🎨 23) Settings panel revamp + duplicate note + safe-area polish
+
+### Settings drawer
+- every section header and every option carries a Tabler icon for at-a-glance navigation; all icons line up in a single vertical column
+- desktop drawer widened (`sm:w-[28rem]` / `lg:w-[32rem]`) so longer descriptions and right-side controls breathe
+- on mobile, segmented choices and CTA buttons stack right-aligned **under** their label so future i18n with longer button text never crushes the description; toggles stay inline (small enough to keep on a single line)
+- explicit horizontal separators between sections (gradient hairline) so the visual grouping holds at a glance
+- each setting label answers "what does this do" with a short description directly in the row instead of relying on tooltips
+
+### Modal kebab — Duplicate note
+- new "Dupliquer la note" entry that clones the open note from its in-memory state (so unsaved edits are also captured)
+- fresh ids on every checklist item / image so a future autosave on either copy never collides
+- " (copie)" / " (copy)" suffix on the title; the duplicate appears at the top of the grid
+
+### Typography modal
+- safe-area-aware on Android edge-to-edge (`max(32px, env(safe-area-inset-top) + 12px)` on the header, `max(16px, env(safe-area-inset-bottom))` on the body, `100dvh`-based panel height)
+- the Android back gesture closes the typography sub-modal — state lifted into the centralised overlay back-button stack in App.jsx
+- mobile header layout stacks the title + description + profile tabs above a dedicated row for the reset CTA, with the close `×` pinned to the top-right at the same y as the title
+
+---
+
 ## 📌 Global summary
 
-In practice, this fork mainly moves Glass Keep further in six big directions:
+In practice, this fork mainly moves Glass Keep further in seven big directions:
 
 1. **local-first / offline / sync reliability**
 2. **mobile quality and UI/UX polish**
 3. **safer note lifecycle with Trash and better account handling**
 4. **cleaner and more extensible i18n**
-5. **much easier self-hosting**
-6. **ecosystem expansion with better Docker support and a native Android companion app**
+5. **a real WYSIWYG / live-formatting editor** with cross-device typography presets and a phone-friendly bottom sheet
+6. **much easier self-hosting**
+7. **ecosystem expansion with better Docker support and a native Android companion app**
 
-So this is not really a “new separate project”, but rather a substantial evolution built on top of a base I genuinely liked from the beginning.
+So this is not really a "new separate project", but rather a substantial evolution built on top of a base I genuinely liked from the beginning.
