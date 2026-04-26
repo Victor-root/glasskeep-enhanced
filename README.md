@@ -109,7 +109,7 @@ Compared to the original project, this fork puts more emphasis on:
 - bullet & ordered lists with independent indent / outdent, alignment, headings (Paragraph + H1 to H5)
 - 28 self-hosted webfonts (Inter, Roboto, Lato, Playfair, JetBrains Mono, …) — no CDN
 - per-block typography presets (size, weight, colour, italic, underline) configurable from the settings, with three switchable profiles and cross-device sync
-- mobile: dedicated "Mise en forme" bottom sheet with swipe-to-close drag handle, replaces the cramped desktop ribbon on phones
+- mobile: dedicated "Formatting" bottom sheet with swipe-to-close drag handle, replaces the cramped desktop ribbon on phones
 - Tab from the title focuses the body; Shift+Tab from the body returns to the title
 - empty notes are auto-removed on close (per-type aware: text body, checklist items, drawing strokes — images keep the note alive)
 

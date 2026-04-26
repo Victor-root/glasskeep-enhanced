@@ -396,7 +396,7 @@ The biggest single change of this branch — text notes are now edited through a
 - 28 self-hosted webfonts via `@fontsource` (Inter, Roboto, Open Sans, Lato, Source Sans, Noto Sans, Nunito, Poppins, Montserrat, Raleway, Work Sans, Ubuntu, Merriweather, Lora, PT Serif, Playfair Display, EB Garamond, Source Serif, JetBrains Mono, Fira Code, Source Code Pro, IBM Plex Mono, Roboto Mono, Bebas Neue, Oswald, Pacifico, Dancing Script, Caveat) — no CDN, lazy `woff2` fetch only when the user actually picks a family
 
 ### Mobile UX
-- the desktop ribbon was unusable on phones; replaced by a **"Mise en forme" footer toggle** that opens a bottom sheet hosting the same toolbar
+- the desktop ribbon was unusable on phones; replaced by a **"Formatting" footer toggle** that opens a bottom sheet hosting the same toolbar
 - drag-handle pill, swipe-down gesture dismisses the sheet
 - virtual keyboard suppressed (`inputmode="none"`) while the sheet is open so the user can long-press text to select without the keyboard taking over
 - chrome (background tinted to the modal's note colour, subtle top gradient) follows the same visual language as the modal it lives in
@@ -436,9 +436,9 @@ Google doesn't offer a download button from the Keep web app — Keep notes ship
    - **File size**: leave the default unless your Keep data is huge — Takeout only splits the archive past the chosen threshold
 6. Click **"Create export"** and wait for Google to package it (usually a few minutes; you'll get an email when it's ready)
 7. Download the `.zip` from the link in the email (or directly from the Takeout page)
-8. In GlassKeep, open **Settings → "Importer des notes Google Keep (.zip Takeout)"** and drop the `.zip` straight in — no need to extract it first; the importer reads the archive natively
+8. In GlassKeep, open **Settings → "Import Google Keep notes (Takeout .zip)"** and drop the `.zip` straight in — no need to extract it first; the importer reads the archive natively
 
-> The "Comment exporter ?" / "How to export?" inline link in the settings panel points to Google's own Takeout documentation if you want to see Google's screenshots while you go through the wizard.
+> The "How to export?" inline link in the settings panel points to Google's own Takeout documentation if you want to see Google's screenshots while you go through the wizard.
 
 ### Google Keep / Takeout (engine)
 - accepts the **raw `.zip`** straight out of Google Takeout — no need to hand-pick the `.json` files
@@ -469,9 +469,9 @@ Google doesn't offer a download button from the Keep web app — Keep notes ship
 - each setting label answers "what does this do" with a short description directly in the row instead of relying on tooltips
 
 ### Modal kebab — Duplicate note
-- new "Dupliquer la note" entry that clones the open note from its in-memory state (so unsaved edits are also captured)
+- new "Duplicate note" entry that clones the open note from its in-memory state (so unsaved edits are also captured)
 - fresh ids on every checklist item / image so a future autosave on either copy never collides
-- " (copie)" / " (copy)" suffix on the title; the duplicate appears at the top of the grid
+- " (copy)" suffix on the title; the duplicate appears at the top of the grid
 
 ### Typography modal
 - safe-area-aware on Android edge-to-edge (`max(32px, env(safe-area-inset-top) + 12px)` on the header, `max(16px, env(safe-area-inset-bottom))` on the body, `100dvh`-based panel height)
