@@ -56,6 +56,7 @@ Compared to the original project, this fork puts more emphasis on:
 - **🔄 local-first usage and offline support**
 - **🗑️ safer note deletion with Trash / restore**
 - **📱 better mobile usability**
+- **✏️ a real WYSIWYG / live-formatting editor for text notes**
 - **🤖 a native Android companion app**
 - **🌍 a cleaner and more extensible i18n foundation**
 - **🛠️ simpler self-hosting**
@@ -87,6 +88,7 @@ Compared to the original project, this fork puts more emphasis on:
 - more direct note creation flow
 - better handling of text overflow and previews
 - clickable phone numbers in full note view on mobile
+- formatting bottom sheet (swipe-to-close, drag handle) for the rich-text editor on phones
 - more polish around touch interactions and small-screen usage
 - native Android wrapper for self-hosted instances
 - first-launch server URL setup
@@ -100,6 +102,27 @@ Compared to the original project, this fork puts more emphasis on:
 - English and French already implemented
 - English fallback when a key is missing
 - cleaner base for adding more languages later
+
+### ✏️ Rich-text editor (live formatting)
+- full WYSIWYG editor (Tiptap) for text notes — replaces the legacy Markdown textarea
+- bold / italic / underline (4 variants + colour) / strike, sub / sup, inline code, code blocks, blockquote, separator, links
+- bullet & ordered lists with independent indent / outdent, alignment, headings (Paragraph + H1 to H5)
+- 28 self-hosted webfonts (Inter, Roboto, Lato, Playfair, JetBrains Mono, …) — no CDN
+- per-block typography presets (size, weight, colour, italic, underline) configurable from the settings, with three switchable profiles and cross-device sync
+- mobile: dedicated "Mise en forme" bottom sheet with swipe-to-close drag handle, replaces the cramped desktop ribbon on phones
+- Tab from the title focuses the body; Shift+Tab from the body returns to the title
+- empty notes are auto-removed on close (per-type aware: text body, checklist items, drawing strokes — images keep the note alive)
+
+### 📥 Smarter Google Keep import
+- drop the **raw Google Takeout `.zip`** directly — no need to hand-pick the .json files
+- titles, bodies, lists, labels, **colours** (mapped to the closest GlassKeep swatch) and **image attachments** all imported
+- single line breaks and blank lines from the original textContent are preserved (no marked() detour)
+- **server-side deduplication** (fingerprint on title + body + items + images) so re-importing the same export doesn't multiply notes — applies to GlassKeep .json, Markdown imports and Takeout .zip alike
+
+### 🎨 Settings panel revamp
+- every section header and every option now carries a Tabler icon for at-a-glance navigation
+- wider drawer on tablet / desktop, controls right-aligned and stacked under labels on mobile so longer translations never crush the description
+- duplicate the open note in one click from the modal kebab menu
 
 ### 🛠️ Easier self-hosting
 - native install script for Debian / Ubuntu / Proxmox LXC
@@ -129,8 +152,8 @@ This fork also keeps the main capabilities that already made the original projec
 - 🗝️ secret recovery key login
 - 📝 Markdown notes, checklists, drawings, and images
 - 👥 real-time collaboration on notes
-- 📦 import / export
-- 📥 Google Keep import
+- 📦 import / export with cross-device duplicate detection
+- 📥 Google Keep import (Takeout `.zip` — full colour, images, line breaks)
 - 🧠 optional local AI assistant
 - 📲 PWA support
 
@@ -228,10 +251,9 @@ Missing keys will automatically fall back to English.
 - Server-side encryption to better protect data in case the server or its drives are stolen
 - More translations with better RTL language support
 - Make the Android app available on **F-Droid**
-- Rich Text / Live Formatting Editor
 
 ### 💭 Under consideration
-- Explore an edit flow closer to Google Keep
+- *(open — suggestions welcome)*
 
 ---
 
