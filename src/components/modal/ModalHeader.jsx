@@ -46,6 +46,9 @@ export default function ModalHeader({
   onToggleDrawMode,
   // keyboard: Tab from title → body (skip the toolbar buttons)
   onTitleTab,
+  // External ref to the title <textarea> so the parent can focus it
+  // from the body editor (e.g. Shift+Tab returns to the title).
+  titleInputRef,
   // Rich-text editor toolbar is portaled into this slot (a ref to the
   // div we render below the header row, inside the sticky wrapper).
   toolbarSlotRef,
@@ -58,6 +61,17 @@ export default function ModalHeader({
     onTitleTab();
   };
   const mobileTitleRef = useRef(null);
+  // Fan a single textarea ref out to BOTH the local mobileTitleRef
+  // (used for auto-resize on content change) and the optional
+  // titleInputRef the parent passes in (used for Shift+Tab focus
+  // hand-back from the rich-text editor).
+  const setTitleRef = useCallback((node) => {
+    mobileTitleRef.current = node;
+    if (titleInputRef) {
+      if (typeof titleInputRef === "function") titleInputRef(node);
+      else titleInputRef.current = node;
+    }
+  }, [titleInputRef]);
   const isDesktop = windowWidth >= 768 && !isLandscapeMobile && !isWebView;
   const isPinned = !!notes.find((n) => String(n.id) === String(activeId))?.pinned;
   const showPinBtn = tagFilter !== "ARCHIVED" && tagFilter !== "TRASHED";
@@ -126,7 +140,7 @@ export default function ModalHeader({
               </div>
             ) : (
               <textarea
-                ref={mobileTitleRef}
+                ref={setTitleRef}
                 className="flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 pr-2 order-first bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden"
                 rows={1}
                 value={mTitle}
@@ -200,7 +214,7 @@ export default function ModalHeader({
             </div>
           ) : (
             <textarea
-              ref={mobileTitleRef}
+              ref={setTitleRef}
               className="w-full bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden"
               style={{ fontSize: "1.15rem", lineHeight: 1.3 }}
               rows={1}

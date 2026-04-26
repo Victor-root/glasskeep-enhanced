@@ -201,6 +201,20 @@ export default function NoteModal({
   // portaled. Using useState-as-ref so the RichTextEditor re-renders once
   // the slot actually mounts (a useRef wouldn't trigger the re-render).
   const [toolbarSlot, setToolbarSlot] = React.useState(null);
+  // Refs used for the Tab / Shift+Tab focus dance between the title
+  // textarea and the rich-text editor body.
+  const modalTitleInputRef = React.useRef(null);
+  const richEditorRef = React.useRef(null);
+  const focusModalTitle = React.useCallback(() => {
+    const el = modalTitleInputRef.current;
+    if (!el) return;
+    el.focus();
+    // Drop the caret at the end so typing continues the existing title.
+    if (typeof el.value === "string") {
+      const len = el.value.length;
+      try { el.setSelectionRange(len, len); } catch {}
+    }
+  }, []);
   // Mobile-only: the rich-text toolbar moves out of the sticky header
   // (which is too cramped on phone widths) and lives inside a bottom
   // sheet the user opens via the "Mise en forme" footer button. The
@@ -460,6 +474,7 @@ export default function NoteModal({
               drawToolbarMount={setDrawToolbarEl}
               onToggleDrawMode={() => setDrawMode((m) => m === "view" ? "draw" : "view")}
               toolbarSlotRef={setToolbarSlot}
+              titleInputRef={modalTitleInputRef}
               // keyboard: Tab from title → body, skipping the toolbar buttons
               onTitleTab={() => {
                 if (mType === "checklist") {
@@ -467,6 +482,14 @@ export default function NoteModal({
                     '[data-checklist-list] textarea, [data-checklist-list] input[type="text"]'
                   );
                   if (first) first.focus();
+                  return;
+                }
+                // Text / draw note body is the Tiptap editor — focus
+                // it via its imperative API. Falls back to the legacy
+                // textarea ref if the editor isn't ready yet.
+                const ed = richEditorRef.current;
+                if (ed && typeof ed.commands?.focus === "function") {
+                  ed.commands.focus("end", { scrollIntoView: false });
                   return;
                 }
                 mBodyRef.current?.focus();
@@ -506,6 +529,8 @@ export default function NoteModal({
                       autoFocus={!mTitle}
                       minHeightClass="min-h-[160px]"
                       toolbarContainer={toolbarMount}
+                      onReady={(ed) => { richEditorRef.current = ed; }}
+                      onShiftTabExit={focusModalTitle}
                     />
                   </div>
                 )
@@ -561,7 +586,9 @@ export default function NoteModal({
                     placeholder={t("writeYourNoteEllipsis")}
                     dark={dark}
                     minHeightClass="min-h-[80px]"
-                    toolbarContainer={toolbarSlot}
+                    toolbarContainer={toolbarMount}
+                    onReady={(ed) => { richEditorRef.current = ed; }}
+                    onShiftTabExit={focusModalTitle}
                   />
                   <DrawingCanvas
                     data={mDrawingData}

@@ -47,6 +47,11 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     minHeightClass = "min-h-[160px]",
     showToolbar = true,
     onEnterBottom,
+    // Shift+Tab inside the editor calls this so the parent can hand
+    // focus back to whatever sits "before" the editor (the title
+    // textarea, in NoteModal's case). Returning truthy from the
+    // callback prevents the default Tab handling.
+    onShiftTabExit,
     // When provided, the toolbar is portaled into this DOM element instead of
     // rendered inline above the editor. This lets the host (NoteModal) mount
     // the toolbar inside its sticky header so it stays pinned while the note
@@ -92,6 +97,21 @@ const RichTextEditor = forwardRef(function RichTextEditor(
         spellcheck: "true",
       },
       handleKeyDown: (_, event) => {
+        // Shift+Tab → hand focus back to the parent (title input).
+        // Plain Tab is left to ProseMirror so list / code-block tab
+        // semantics keep working.
+        if (
+          event.key === "Tab" &&
+          event.shiftKey &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          onShiftTabExit
+        ) {
+          event.preventDefault();
+          onShiftTabExit();
+          return true;
+        }
         if (!onEnterBottom) return false;
         if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
           onEnterBottom();
