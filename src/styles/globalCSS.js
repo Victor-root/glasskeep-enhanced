@@ -662,7 +662,14 @@ html.dark .modal-footer-toolbar {
 .mobile-fmt-sheet-content {
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* Hide the scrollbar visually in every browser. Touch-scroll still
+     works if the toolbar ever overflows, but the bar would otherwise
+     flash on the right edge during the open / close max-height
+     animations and during the swipe-to-close drag. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.mobile-fmt-sheet-content::-webkit-scrollbar { display: none; }
 /* Inside the sheet, the toolbar reflows into a vertically-stacked grid:
    the FOUR super-groups remain stacked one above the other (the desktop
    ribbon collapsed onto a column), but inside each super-group every
