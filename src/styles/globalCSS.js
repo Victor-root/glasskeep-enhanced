@@ -2491,8 +2491,11 @@ html.dark .typo-modal {
      -top) so on Android WebViews where the scrim padding alone
      doesn't push the modal far enough (env() reporting 0 etc.) the
      header content is still pushed below the status bar from the
-     inside. The max() keeps the desktop look unchanged. */
-  padding: max(16px, env(safe-area-inset-top)) 20px 14px;
+     inside. The 32 px floor matches the scrim fallback so a typical
+     Android status bar (24–30 px) is cleared even when env()
+     returns 0 — desktop is unaffected because the modal centres
+     mid-viewport and the header has plenty of clearance there. */
+  padding: max(32px, env(safe-area-inset-top)) 20px 14px;
   border-bottom: 1px solid var(--rt-divider);
 }
 .typo-modal-header-main {
