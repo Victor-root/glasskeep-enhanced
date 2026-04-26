@@ -67,9 +67,37 @@ const BLOCKS = ["p", "h1", "h2", "h3", "h4", "h5"];
 
 const COLOR_RE = /^(#[0-9a-fA-F]{3,8}|rgb|hsl|inherit|transparent)/;
 
+/**
+ * Snap a size string to the nearest entry in TYPOGRAPHY_SIZE_PRESETS.
+ * The dropdown only offers preset values, so any stored value that
+ * isn't in the list (older defaults like "1.35rem" / "1.15rem" / …)
+ * would surface as the dropdown showing its first option ("14") while
+ * the inline preview rendered the saved size — visually contradicting
+ * itself. Snapping on read normalises old data without losing intent.
+ */
+function nearestPresetSize(value) {
+  if (typeof value !== "string") return null;
+  const m = value.match(/^([\d.]+)\s*rem$/i);
+  if (!m) return null;
+  const target = parseFloat(m[1]);
+  if (!Number.isFinite(target)) return null;
+  let best = TYPOGRAPHY_SIZE_PRESETS[0];
+  let bestDiff = Math.abs(parseFloat(best.value) - target);
+  for (const p of TYPOGRAPHY_SIZE_PRESETS) {
+    const d = Math.abs(parseFloat(p.value) - target);
+    if (d < bestDiff) { best = p; bestDiff = d; }
+  }
+  return best.value;
+}
+
 function sanitizeBlock(value, fallback) {
   if (!value || typeof value !== "object") return { ...fallback };
-  const size = typeof value.size === "string" ? value.size : fallback.size;
+  let size = typeof value.size === "string" ? value.size : fallback.size;
+  // Migrate non-preset sizes to the nearest preset entry.
+  if (!TYPOGRAPHY_SIZE_PRESETS.some((s) => s.value === size)) {
+    const snapped = nearestPresetSize(size);
+    if (snapped) size = snapped;
+  }
   const weightNum = Number(value.weight);
   const weight = Number.isFinite(weightNum) && weightNum >= 100 && weightNum <= 900
     ? weightNum
