@@ -47,6 +47,24 @@ import h3Svg               from "./tabler/h-3.svg?raw";
 import h4Svg               from "./tabler/h-4.svg?raw";
 import h5Svg               from "./tabler/h-5.svg?raw";
 
+// Settings-panel icons (vendored same place as the editor icons —
+// the loader is just a generic Tabler-icon registry).
+import userCircleSvg       from "./tabler/user-circle.svg?raw";
+import databaseSvg         from "./tabler/database.svg?raw";
+import adjustmentsHSvg     from "./tabler/adjustments-horizontal.svg?raw";
+import listCheckSvg        from "./tabler/list-check.svg?raw";
+import eyeSvg              from "./tabler/eye.svg?raw";
+import keySvg              from "./tabler/key.svg?raw";
+import downloadSvg         from "./tabler/download.svg?raw";
+import uploadSvg           from "./tabler/upload.svg?raw";
+import brandGoogleSvg      from "./tabler/brand-google.svg?raw";
+import fileTextSvg         from "./tabler/file-text.svg?raw";
+import arrowsSortSvg       from "./tabler/arrows-sort.svg?raw";
+import sparklesSvg         from "./tabler/sparkles.svg?raw";
+import layoutSidebarSvg    from "./tabler/layout-sidebar.svg?raw";
+import brainSvg            from "./tabler/brain.svg?raw";
+import deviceMobileRotSvg  from "./tabler/device-mobile-rotated.svg?raw";
+
 // Cache of sanitised markup keyed by the raw SVG string. The transformation
 // only depends on the SVG source, so each icon is processed exactly once.
 const markupCache = new Map();
@@ -119,6 +137,22 @@ export const TI = {
   H3:              (p) => <TablerIcon svg={h3Svg} {...p} />,
   H4:              (p) => <TablerIcon svg={h4Svg} {...p} />,
   H5:              (p) => <TablerIcon svg={h5Svg} {...p} />,
+  // Settings panel
+  UserCircle:           (p) => <TablerIcon svg={userCircleSvg} {...p} />,
+  Database:             (p) => <TablerIcon svg={databaseSvg} {...p} />,
+  AdjustmentsHorizontal:(p) => <TablerIcon svg={adjustmentsHSvg} {...p} />,
+  ListCheck:            (p) => <TablerIcon svg={listCheckSvg} {...p} />,
+  Eye:                  (p) => <TablerIcon svg={eyeSvg} {...p} />,
+  Key:                  (p) => <TablerIcon svg={keySvg} {...p} />,
+  Download:             (p) => <TablerIcon svg={downloadSvg} {...p} />,
+  Upload:               (p) => <TablerIcon svg={uploadSvg} {...p} />,
+  BrandGoogle:          (p) => <TablerIcon svg={brandGoogleSvg} {...p} />,
+  FileText:             (p) => <TablerIcon svg={fileTextSvg} {...p} />,
+  ArrowsSort:           (p) => <TablerIcon svg={arrowsSortSvg} {...p} />,
+  Sparkles:             (p) => <TablerIcon svg={sparklesSvg} {...p} />,
+  LayoutSidebar:        (p) => <TablerIcon svg={layoutSidebarSvg} {...p} />,
+  Brain:                (p) => <TablerIcon svg={brainSvg} {...p} />,
+  DeviceMobileRotated:  (p) => <TablerIcon svg={deviceMobileRotSvg} {...p} />,
 };
 
 export default TI;

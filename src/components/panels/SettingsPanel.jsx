@@ -3,8 +3,28 @@ import { t } from "../../i18n";
 import { api } from "../../utils/api.js";
 import UserAvatar from "../common/UserAvatar.jsx";
 import { SunIcon, MoonIcon, FloatingCardsIcon, SettingsIcon, CloseIcon } from "../../icons/index.jsx";
+import TI from "../../icons/editor/index.jsx";
 import { fileToCompressedDataURL } from "../../utils/helpers.js";
 import TypographyModal from "./TypographyModal.jsx";
+
+// Tiny presentational helper: a leading icon column used in front of every
+// row / button in the settings panel. Keeps the markup tidy and the
+// icon size + tint consistent across the file.
+function RowIcon({ icon: Icon }) {
+  return (
+    <span className="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300">
+      <Icon className="tabler-icon w-5 h-5" />
+    </span>
+  );
+}
+// Same idea but bigger / louder, used in front of section headers.
+function SectionHeaderIcon({ icon: Icon }) {
+  return (
+    <span className="text-indigo-500 dark:text-indigo-300 shrink-0">
+      <Icon className="tabler-icon w-5 h-5" />
+    </span>
+  );
+}
 
 export default function SettingsPanel({
   open,
@@ -142,7 +162,10 @@ export default function SettingsPanel({
         <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
           {/* Profile Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">{t("profileSettings")}</h4>
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-2">
+              <SectionHeaderIcon icon={TI.UserCircle} />
+              {t("profileSettings")}
+            </h4>
             <div className="flex items-center gap-4 mb-4">
               <div className="relative group">
                 <UserAvatar
@@ -191,9 +214,12 @@ export default function SettingsPanel({
                 )}
               </div>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <div className="font-medium">{t("showOnLogin")}</div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <RowIcon icon={TI.Eye} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("showOnLogin")}</div>
+                </div>
               </div>
               <button
                 className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
@@ -209,111 +235,141 @@ export default function SettingsPanel({
               </button>
             </div>
             <button
-              className={`mt-3 block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+              className={`mt-3 flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
               onClick={() => {
                 onClose();
                 onChangePassword?.();
               }}
             >
-              <div className="font-medium">{t("changePassword")}</div>
-              <div className="text-sm text-gray-500">{t("changePasswordDesc")}</div>
+              <RowIcon icon={TI.Key} />
+              <div className="min-w-0">
+                <div className="font-medium">{t("changePassword")}</div>
+                <div className="text-sm text-gray-500">{t("changePasswordDesc")}</div>
+              </div>
             </button>
           </div>
 
           {/* Data Management Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">{t("dataManagement")}</h4>
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-2">
+              <SectionHeaderIcon icon={TI.Database} />
+              {t("dataManagement")}
+            </h4>
             <div className="space-y-3">
               <button
-                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onExportAll?.();
                 }}
               >
-                <div className="font-medium">{t("exportAllNotesJson")}</div>
-                <div className="text-sm text-gray-500">{t("downloadAllNotesJson")}</div>
+                <RowIcon icon={TI.Download} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("exportAllNotesJson")}</div>
+                  <div className="text-sm text-gray-500">{t("downloadAllNotesJson")}</div>
+                </div>
               </button>
 
               <button
-                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onImportAll?.();
                 }}
               >
-                <div className="font-medium">{t("importNotesJson")}</div>
-                <div className="text-sm text-gray-500">{t("importNotesFromJsonFile")}</div>
+                <RowIcon icon={TI.Upload} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("importNotesJson")}</div>
+                  <div className="text-sm text-gray-500">{t("importNotesFromJsonFile")}</div>
+                </div>
               </button>
 
               <button
-                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onImportGKeep?.();
                 }}
               >
-                <div className="font-medium">{t("importGoogleKeepNotes")}</div>
-                <div className="text-sm text-gray-500">
-                  {t("importNotesFromGoogleKeepExport")}{" "}
-                  {/* Inline help link to Google's Takeout instructions.
-                      stopPropagation so clicking the link doesn't also
-                      trigger the parent button's file-picker open. */}
-                  <a
-                    href="https://support.google.com/accounts/answer/3024190?hl=en-AM&utm"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-indigo-500 hover:text-indigo-600 dark:text-indigo-300 dark:hover:text-indigo-200 underline underline-offset-2"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {t("howToExportGoogleKeep")}
-                  </a>
+                <RowIcon icon={TI.BrandGoogle} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("importGoogleKeepNotes")}</div>
+                  <div className="text-sm text-gray-500">
+                    {t("importNotesFromGoogleKeepExport")}{" "}
+                    {/* Inline help link to Google's Takeout instructions.
+                        stopPropagation so clicking the link doesn't also
+                        trigger the parent button's file-picker open. */}
+                    <a
+                      href="https://support.google.com/accounts/answer/3024190?hl=en-AM&utm"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-500 hover:text-indigo-600 dark:text-indigo-300 dark:hover:text-indigo-200 underline underline-offset-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {t("howToExportGoogleKeep")}
+                    </a>
+                  </div>
                 </div>
               </button>
 
               <button
-                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onImportMd?.();
                 }}
               >
-                <div className="font-medium">{t("importMarkdownFilesMd")}</div>
-                <div className="text-sm text-gray-500">{t("importNotesFromMarkdownFiles")}</div>
+                <RowIcon icon={TI.FileText} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("importMarkdownFilesMd")}</div>
+                  <div className="text-sm text-gray-500">{t("importNotesFromMarkdownFiles")}</div>
+                </div>
               </button>
 
               <button
-                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onDownloadSecretKey?.();
                 }}
               >
-                <div className="font-medium">{t("downloadSecretKeyTxt")}</div>
-                <div className="text-sm text-gray-500">{t("downloadEncryptionKeyBackup")}</div>
+                <RowIcon icon={TI.Key} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("downloadSecretKeyTxt")}</div>
+                  <div className="text-sm text-gray-500">{t("downloadEncryptionKeyBackup")}</div>
+                </div>
               </button>
 
               <button
-                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   setOverridePositions(true);
                   setResetDialogOpen(true);
                 }}
               >
-                <div className="font-medium">{t("resetNoteOrder")}</div>
-                <div className="text-sm text-gray-500">{t("resetNoteOrderDesc")}</div>
+                <RowIcon icon={TI.ArrowsSort} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("resetNoteOrder")}</div>
+                  <div className="text-sm text-gray-500">{t("resetNoteOrderDesc")}</div>
+                </div>
               </button>
             </div>
           </div>
 
           {/* UI Preferences Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">{t("uiPreferences")}</h4>
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-2">
+              <SectionHeaderIcon icon={TI.AdjustmentsHorizontal} />
+              {t("uiPreferences")}
+            </h4>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium">{t("localAiAssistant")}</div>
-                  <div className="text-sm text-gray-500">{t("askQuestionsAboutNotes")}</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Brain} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("localAiAssistant")}</div>
+                    <div className="text-sm text-gray-500">{t("askQuestionsAboutNotes")}</div>
+                  </div>
                 </div>
                 <button
                   className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
@@ -354,10 +410,13 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium">{t("alwaysShowSidebarWide")}</div>
-                  <div className="text-sm text-gray-500">{t("keepTagsPanelVisible")}</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.LayoutSidebar} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("alwaysShowSidebarWide")}</div>
+                    <div className="text-sm text-gray-500">{t("keepTagsPanelVisible")}</div>
+                  </div>
                 </div>
                 <button
                   className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
@@ -379,10 +438,13 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium">{t("enableAnimationsMobile")}</div>
-                  <div className="text-sm text-gray-500">{t("enableAnimationsMobileDesc")}</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Sparkles} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("enableAnimationsMobile")}</div>
+                    <div className="text-sm text-gray-500">{t("enableAnimationsMobileDesc")}</div>
+                  </div>
                 </div>
                 <button
                   className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
@@ -400,10 +462,13 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium">{t("edgeToEdgeLandscape")}</div>
-                  <div className="text-sm text-gray-500">{t("edgeToEdgeLandscapeDesc")}</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.DeviceMobileRotated} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("edgeToEdgeLandscape")}</div>
+                    <div className="text-sm text-gray-500">{t("edgeToEdgeLandscapeDesc")}</div>
+                  </div>
                 </div>
                 <button
                   className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
@@ -425,10 +490,13 @@ export default function SettingsPanel({
                   full-viewport modal so the 6 block cards have enough
                   room to show size / weight / colour / italic / underline
                   controls without being cut off on the narrow side sheet. */}
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium">{t("typographyTitle")}</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">{t("typographyDesc")}</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Typography} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("typographyTitle")}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">{t("typographyDesc")}</div>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -444,12 +512,18 @@ export default function SettingsPanel({
 
           {/* Checklist Settings Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">{t("checklistSettings")}</h4>
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-2">
+              <SectionHeaderIcon icon={TI.ListCheck} />
+              {t("checklistSettings")}
+            </h4>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium">{t("checklistInsertPosition")}</div>
-                  <div className="text-sm text-gray-500">{t("checklistInsertPositionDesc")}</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.IndentIncrease} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("checklistInsertPosition")}</div>
+                    <div className="text-sm text-gray-500">{t("checklistInsertPositionDesc")}</div>
+                  </div>
                 </div>
                 <div className="ml-3 flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
                   <button
@@ -475,10 +549,13 @@ export default function SettingsPanel({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium">{t("checklistRemoveSection")}</div>
-                  <div className="text-sm text-gray-500">{t("checklistRemoveSectionDesc")}</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.ClearFormatting} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("checklistRemoveSection")}</div>
+                    <div className="text-sm text-gray-500">{t("checklistRemoveSectionDesc")}</div>
+                  </div>
                 </div>
                 <div className="ml-3 flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
                   <button
