@@ -65,6 +65,7 @@ import layoutSidebarSvg    from "./tabler/layout-sidebar.svg?raw";
 import brainSvg            from "./tabler/brain.svg?raw";
 import deviceMobileRotSvg  from "./tabler/device-mobile-rotated.svg?raw";
 import eraserSvg           from "./tabler/eraser.svg?raw";
+import filter2QuestionSvg  from "./tabler/filter-2-question.svg?raw";
 
 // Cache of sanitised markup keyed by the raw SVG string. The transformation
 // only depends on the SVG source, so each icon is processed exactly once.
@@ -155,6 +156,7 @@ export const TI = {
   Brain:                (p) => <TablerIcon svg={brainSvg} {...p} />,
   DeviceMobileRotated:  (p) => <TablerIcon svg={deviceMobileRotSvg} {...p} />,
   Eraser:               (p) => <TablerIcon svg={eraserSvg} {...p} />,
+  Filter2Question:      (p) => <TablerIcon svg={filter2QuestionSvg} {...p} />,
 };
 
 export default TI;
