@@ -1834,30 +1834,71 @@ app.post("/api/notes/import", auth, (req, res) => {
 
   // Deduplication: re-importing the same .json (typical case: a user
   // re-imports their own GlassKeep export, or pulls Google Takeout
-  // twice) used to multiply every note. Build a fingerprint
-  // (type | trimmed title | body or items JSON) of the importing
-  // user's existing notes — text and checklist branches diverge
-  // because checklist content lives in items_json, not content. Any
-  // incoming note whose fingerprint matches an existing one (or a
-  // sibling earlier in the same batch) is skipped.
+  // twice) used to multiply every note. Build a fingerprint of the
+  // importing user's existing notes and skip any incoming note whose
+  // fingerprint matches an existing one (or a sibling earlier in the
+  // same batch).
+  //
+  // The fingerprint normalises two things that would otherwise look
+  // different across re-imports of the same content:
+  //
+  //   - checklist items: each import allocates fresh per-item ids
+  //     (uid()), so the raw items_json shifts every time. Strip ids
+  //     and keep only { text, done } for the hash.
+  //   - images: same story for image ids, but the src data-URLs are
+  //     huge — running them through SHA-1 (crypto is already imported
+  //     above) yields a short stable digest. Without this an
+  //     image-only note (no title, no body) had an empty fingerprint
+  //     `text||` and only the FIRST one survived — typical Google
+  //     Keep import case.
   const userRows = db.prepare(
-    "SELECT type, title, content, items_json FROM notes WHERE user_id = ?",
+    "SELECT type, title, content, items_json, images_json FROM notes WHERE user_id = ?",
   ).all(req.user.id);
+  const sha1Short = (s) =>
+    crypto.createHash("sha1").update(s || "").digest("base64").slice(0, 22);
+  const normItems = (jsonOrArr) => {
+    let arr;
+    if (typeof jsonOrArr === "string") {
+      try { arr = JSON.parse(jsonOrArr); } catch { arr = []; }
+    } else {
+      arr = Array.isArray(jsonOrArr) ? jsonOrArr : [];
+    }
+    return JSON.stringify(
+      arr.map((it) => ({ text: String(it?.text || ""), done: !!it?.done })),
+    );
+  };
+  const normImagesHash = (jsonOrArr) => {
+    let arr;
+    if (typeof jsonOrArr === "string") {
+      try { arr = JSON.parse(jsonOrArr); } catch { arr = []; }
+    } else {
+      arr = Array.isArray(jsonOrArr) ? jsonOrArr : [];
+    }
+    if (!arr.length) return "";
+    // Hash the concatenation of (name, src) per image so two notes
+    // with the same images get identical fingerprints regardless of
+    // image-id ordering / per-import id reallocation.
+    return sha1Short(
+      arr
+        .map((im) => `${String(im?.name || "")}${String(im?.src || "")}`)
+        .join(""),
+    );
+  };
   const fingerprintFromRow = (r) => {
     const title = String(r.title || "").trim();
     const type = r.type === "checklist" ? "checklist"
               : r.type === "draw" ? "draw" : "text";
-    if (type === "checklist") return `cl|${title}|${r.items_json || "[]"}`;
-    return `${type}|${title}|${r.content || ""}`;
+    const imgs = normImagesHash(r.images_json);
+    if (type === "checklist") return `cl|${title}|${normItems(r.items_json)}|${imgs}`;
+    return `${type}|${title}|${r.content || ""}|${imgs}`;
   };
   const fingerprintFromIncoming = (n) => {
     const title = String(n.title || "").trim();
     const type = n.type === "checklist" ? "checklist"
               : n.type === "draw" ? "draw" : "text";
-    if (type === "checklist") {
-      return `cl|${title}|${JSON.stringify(Array.isArray(n.items) ? n.items : [])}`;
-    }
-    return `${type}|${title}|${String(n.content || "")}`;
+    const imgs = normImagesHash(n.images);
+    if (type === "checklist") return `cl|${title}|${normItems(n.items)}|${imgs}`;
+    return `${type}|${title}|${String(n.content || "")}|${imgs}`;
   };
   const seenFingerprints = new Set(userRows.map(fingerprintFromRow));
 
