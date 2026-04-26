@@ -5,6 +5,7 @@ import { t } from "../i18n";
 import {
   isRichContent,
   legacyMarkdownToRichDoc,
+  plainTextToRichDoc,
   serializeRichContent,
 } from "../utils/richText.js";
 
@@ -217,9 +218,13 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
                 done: !!it?.isChecked,
               }))
             : [];
+          // Google Keep's textContent is always plain text, never
+          // Markdown — using marked() here would join single \n line
+          // breaks and collapse \n\n blank-line separators. The
+          // dedicated plain-text converter preserves both.
           const content = hasChecklist
             ? ""
-            : serializeRichContent(legacyMarkdownToRichDoc(String(obj.textContent || "")));
+            : serializeRichContent(plainTextToRichDoc(String(obj.textContent || "")));
           const usec = Number(
             obj.userEditedTimestampUsec || obj.createdTimestampUsec || 0,
           );

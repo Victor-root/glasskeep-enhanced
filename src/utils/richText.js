@@ -151,6 +151,36 @@ export function richDocToPlain(doc) {
 }
 
 /**
+ * Convert raw plain text to a Tiptap doc, preserving the user's line
+ * breaks. Used for content sources that are guaranteed plain text
+ * (e.g. Google Keep's textContent), where running marked() loses
+ * single \n line breaks (joined as space) and double \n\n separators
+ * (collapsed to paragraph break with no empty paragraph in between).
+ *
+ *   single "\n"   → hardBreak inside the current paragraph,
+ *   double "\n\n" → an empty paragraph between the two real ones,
+ *                   so the dense view (which renders empty paragraphs
+ *                   via :empty::before) keeps the visible blank line.
+ */
+export function plainTextToRichDoc(text) {
+  const src = typeof text === "string" ? text : "";
+  if (!src) return emptyRichDoc();
+  const blocks = src.split(/\n\s*\n/);
+  const content = [];
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const lines = blocks[bi].split("\n");
+    const inline = [];
+    for (let li = 0; li < lines.length; li++) {
+      if (lines[li]) inline.push({ type: "text", text: lines[li] });
+      if (li < lines.length - 1) inline.push({ type: "hardBreak" });
+    }
+    content.push(inline.length ? { type: "paragraph", content: inline } : { type: "paragraph" });
+    if (bi < blocks.length - 1) content.push({ type: "paragraph" });
+  }
+  return { type: "doc", content: content.length ? content : [{ type: "paragraph" }] };
+}
+
+/**
  * Convert legacy Markdown content (or anything else treated as plain text)
  * into a Tiptap doc. Pipeline: Markdown → HTML (marked) → DOMPurify → Tiptap
  * JSON (generateJSON). Empty input yields an empty doc.
