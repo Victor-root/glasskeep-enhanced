@@ -13,7 +13,7 @@ import TypographyModal from "./TypographyModal.jsx";
 // regardless of whether it sits next to an h4 title or a row label.
 function RowIcon({ icon: Icon }) {
   return (
-    <span className="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300">
+    <span className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300">
       <Icon className="tabler-icon w-5 h-5" />
     </span>
   );
@@ -205,7 +205,7 @@ export default function SettingsPanel({
                 )}
               </div>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
+            <div className="flex items-center justify-between gap-3 px-3">
               <div className="flex items-center gap-3 min-w-0">
                 <RowIcon icon={TI.Eye} />
                 <div className="min-w-0">
@@ -226,7 +226,7 @@ export default function SettingsPanel({
               </button>
             </div>
             <button
-              className={`mt-3 flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+              className={`mt-3 flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
               onClick={() => {
                 onClose();
                 onChangePassword?.();
@@ -242,13 +242,13 @@ export default function SettingsPanel({
 
           {/* Data Management Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-4">
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
               <SectionHeaderIcon icon={TI.Database} />
               {t("dataManagement")}
             </h4>
             <div className="space-y-3">
               <button
-                className={`flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onExportAll?.();
@@ -262,7 +262,7 @@ export default function SettingsPanel({
               </button>
 
               <button
-                className={`flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onImportAll?.();
@@ -276,7 +276,7 @@ export default function SettingsPanel({
               </button>
 
               <button
-                className={`flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onImportGKeep?.();
@@ -304,7 +304,7 @@ export default function SettingsPanel({
               </button>
 
               <button
-                className={`flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onImportMd?.();
@@ -318,7 +318,7 @@ export default function SettingsPanel({
               </button>
 
               <button
-                className={`flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onDownloadSecretKey?.();
@@ -332,7 +332,7 @@ export default function SettingsPanel({
               </button>
 
               <button
-                className={`flex items-center gap-3 w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   setOverridePositions(true);
                   setResetDialogOpen(true);
@@ -349,12 +349,12 @@ export default function SettingsPanel({
 
           {/* UI Preferences Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-4">
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
               <SectionHeaderIcon icon={TI.AdjustmentsHorizontal} />
               {t("uiPreferences")}
             </h4>
             <div className="space-y-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
+              <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.Brain} />
                   <div className="min-w-0">
@@ -401,7 +401,7 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
+              <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.LayoutSidebar} />
                   <div className="min-w-0">
@@ -429,7 +429,7 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
+              <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.Sparkles} />
                   <div className="min-w-0">
@@ -453,7 +453,7 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
+              <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.DeviceMobileRotated} />
                   <div className="min-w-0">
@@ -481,7 +481,7 @@ export default function SettingsPanel({
                   full-viewport modal so the 6 block cards have enough
                   room to show size / weight / colour / italic / underline
                   controls without being cut off on the narrow side sheet. */}
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.Typography} />
                   <div className="min-w-0">
@@ -503,12 +503,12 @@ export default function SettingsPanel({
 
           {/* Checklist Settings Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-4">
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
               <SectionHeaderIcon icon={TI.ListCheck} />
               {t("checklistSettings")}
             </h4>
             <div className="space-y-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.IndentIncrease} />
                   <div className="min-w-0">
@@ -540,7 +540,7 @@ export default function SettingsPanel({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.ClearFormatting} />
                   <div className="min-w-0">
