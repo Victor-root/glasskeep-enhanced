@@ -2772,8 +2772,12 @@ html.dark .typo-modal-toggle {
     align-self: flex-end;
   }
   .typo-modal-header-actions .typo-modal-close {
+    /* Pin top-right but anchor at the same y as the title so the ×
+       and the "Typographie de l'éditeur" line read as one row.
+       The 32 / env+12 floors mirror the header's own padding-top so
+       the × clears the status bar on edge-to-edge Android. */
     position: absolute;
-    top: max(8px, env(safe-area-inset-top));
+    top: max(32px, calc(env(safe-area-inset-top) + 12px));
     right: 12px;
   }
   .typo-modal-body {
