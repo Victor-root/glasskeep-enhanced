@@ -240,6 +240,8 @@ export default function SettingsPanel({
             </button>
           </div>
 
+          <hr className="border-t border-[var(--border-light)] my-6" />
+
           {/* Data Management Section */}
           <div className="mb-8">
             <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
@@ -346,6 +348,8 @@ export default function SettingsPanel({
               </button>
             </div>
           </div>
+
+          <hr className="border-t border-[var(--border-light)] my-6" />
 
           {/* UI Preferences Section */}
           <div className="mb-8">
@@ -501,6 +505,8 @@ export default function SettingsPanel({
             </div>
           </div>
 
+          <hr className="border-t border-[var(--border-light)] my-6" />
+
           {/* Checklist Settings Section */}
           <div className="mb-8">
             <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
@@ -542,7 +548,7 @@ export default function SettingsPanel({
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <RowIcon icon={TI.ClearFormatting} />
+                  <RowIcon icon={TI.Eraser} />
                   <div className="min-w-0">
                     <div className="font-medium">{t("checklistRemoveSection")}</div>
                     <div className="text-sm text-gray-500">{t("checklistRemoveSectionDesc")}</div>
