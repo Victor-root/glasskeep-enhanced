@@ -3437,10 +3437,11 @@ export default function App() {
     // envelope (which is never an empty STRING even when the doc is empty)
     // collapses to its actual user-visible text before the trim test.
     //
-    // Only TITLE and BODY count. Tags get auto-inherited from the sidebar
-    // filter (a fresh note opened from inside a tag would never qualify for
-    // deletion otherwise), and a colour / images alone aren't enough signal
-    // that the user wants to keep an otherwise-blank shell.
+    // Tags don't count — a fresh note opened from inside a tag filter
+    // auto-inherits the tag and would otherwise never qualify. Images
+    // DO count as content though: a note that only carries pictures
+    // (typical of Google Keep imports) is just as valid as a text-only
+    // one and must NOT be auto-deleted on close.
     if (activeId) {
       const drawPaths = mType === "draw"
         ? (mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []))
@@ -3454,7 +3455,8 @@ export default function App() {
           ? !Array.isArray(mItems) || mItems.length === 0
           : !mBody?.trim() && drawPaths.length === 0;
       const titleEmpty = !mTitle?.trim();
-      if (titleEmpty && bodyEmpty) {
+      const noImages = !Array.isArray(mImages) || mImages.length === 0;
+      if (titleEmpty && bodyEmpty && noImages) {
         const nid = String(activeId);
         const nowIso = new Date().toISOString();
         // Server contract: a note must be trashed before it can be
