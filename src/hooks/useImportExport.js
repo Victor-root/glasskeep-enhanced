@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { api } from "../utils/api.js";
-import { uid, sanitizeFilename, downloadText } from "../utils/helpers.js";
+import { uid, sanitizeFilename, downloadText, fileToCompressedDataURL } from "../utils/helpers.js";
 import { t } from "../i18n";
 import {
   isRichContent,
@@ -16,6 +16,26 @@ function ensureRichContent(raw) {
   if (isRichContent(raw)) return raw;
   return serializeRichContent(legacyMarkdownToRichDoc(raw));
 }
+
+// Google Keep persists colours as a fixed enum; GlassKeep uses its own
+// palette. Map each enum to the closest swatch we ship so the imported
+// note keeps its colour identity. Anything we don't recognise falls
+// back to "default".
+const GKEEP_COLOR_MAP = {
+  DEFAULT: "default",
+  WHITE:   "default",
+  RED:     "red",
+  ORANGE:  "peach",
+  YELLOW:  "yellow",
+  GREEN:   "green",
+  TEAL:    "mint",
+  BLUE:    "blue",
+  GRAY:    "default",
+  CERULEAN:"sky",
+  PURPLE:  "purple",
+  PINK:    "mauve",
+  BROWN:   "sand",
+};
 
 /**
  * Hook encapsulating import/export actions and secret key download.
@@ -85,19 +105,45 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
     }
   };
 
-  /** Import Google Keep single-note JSON files (multiple) */
+  /** Import Google Keep single-note JSON files (multiple).
+   *  Accepts both the .json metadata files AND the image attachments
+   *  side by side — Google Keep exports them flat in the same folder
+   *  so the user can pick everything in one shot. JSON files are
+   *  parsed into notes; image files are matched to attachment
+   *  filePaths and embedded as compressed data URLs. */
   const importGKeep = async (fileList) => {
     try {
       const files = Array.from(fileList || []);
       if (!files.length) return;
+
+      const isJson = (f) =>
+        f.name.toLowerCase().endsWith(".json") ||
+        (f.type || "").includes("json");
+      const isImage = (f) =>
+        (f.type || "").startsWith("image/") ||
+        /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(f.name);
+      const jsonFiles = files.filter(isJson);
+      const imageFiles = files.filter(isImage);
+      if (!jsonFiles.length) {
+        alert(t("noValidGoogleKeepNotesFound"));
+        return;
+      }
+      // Filename → File lookup so attachment.filePath references in
+      // each .json can resolve to a real Blob. Lower-cased for
+      // case-insensitive matches across filesystems.
+      const imageByName = new Map();
+      for (const img of imageFiles) {
+        imageByName.set(img.name.toLowerCase(), img);
+      }
+
       const texts = await Promise.all(
-        files.map((f) => f.text().catch(() => null)),
+        jsonFiles.map((f) => f.text().catch(() => null)),
       );
       const notesArr = [];
-      for (const t of texts) {
-        if (!t) continue;
+      for (const txt of texts) {
+        if (!txt) continue;
         try {
-          const obj = JSON.parse(t);
+          const obj = JSON.parse(txt);
           if (!obj || typeof obj !== "object") continue;
           const title = String(obj.title || "");
           const hasChecklist =
@@ -126,6 +172,30 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
                 .map((l) => (typeof l?.name === "string" ? l.name.trim() : ""))
                 .filter(Boolean)
             : [];
+          // Resolve attachments → embedded data URLs. The .json only
+          // references images by filePath; we look each up in the
+          // image-file lookup the user provided in the same selection.
+          const images = [];
+          if (Array.isArray(obj.attachments)) {
+            for (const att of obj.attachments) {
+              const path = typeof att?.filePath === "string" ? att.filePath : "";
+              if (!path) continue;
+              const img = imageByName.get(path.toLowerCase());
+              if (!img) continue;
+              try {
+                const src = await fileToCompressedDataURL(img);
+                images.push({ id: uid(), src, name: img.name });
+              } catch (e) {
+                console.warn("[gkeep] image compress failed", path, e?.message);
+              }
+            }
+          }
+          // Map Google Keep's colour enum to the closest GlassKeep
+          // swatch (UPPERCASE-insensitive on the input).
+          const color =
+            typeof obj.color === "string"
+              ? GKEEP_COLOR_MAP[obj.color.toUpperCase()] || "default"
+              : "default";
           notesArr.push({
             id: uid(),
             type: hasChecklist ? "checklist" : "text",
@@ -133,8 +203,8 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
             content,
             items,
             tags,
-            images: [],
-            color: "default",
+            images,
+            color,
             pinned: !!obj.isPinned,
             position: ms,
             timestamp,
