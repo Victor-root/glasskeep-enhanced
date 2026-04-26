@@ -2452,8 +2452,12 @@ html.dark .settings-type-toggle {
   align-items: center;
   justify-content: center;
   /* Respect Android / iOS safe areas so the modal never tucks under
-     the status bar or the gesture handle on edge-to-edge devices. */
-  padding: max(16px, env(safe-area-inset-top))
+     the status bar or the gesture handle on edge-to-edge devices.
+     The 32 px top fallback covers the case where some Android
+     WebViews report env(safe-area-inset-top) as 0 even with
+     viewport-fit=cover — typical status-bar heights are 24–30 px,
+     notched displays 36–45 px. */
+  padding: max(32px, env(safe-area-inset-top))
            max(16px, env(safe-area-inset-right))
            max(16px, env(safe-area-inset-bottom))
            max(16px, env(safe-area-inset-left));
@@ -2483,7 +2487,12 @@ html.dark .typo-modal {
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  padding: 16px 20px 14px;
+  /* Belt-and-suspenders: also pad the header by env(safe-area-inset
+     -top) so on Android WebViews where the scrim padding alone
+     doesn't push the modal far enough (env() reporting 0 etc.) the
+     header content is still pushed below the status bar from the
+     inside. The max() keeps the desktop look unchanged. */
+  padding: max(16px, env(safe-area-inset-top)) 20px 14px;
   border-bottom: 1px solid var(--rt-divider);
 }
 .typo-modal-header-main {
