@@ -94,6 +94,15 @@ html.dark header.multi-select-bar {
   box-shadow: 0 4px 24px rgba(139, 92, 246, 0.22), inset 0 0 0 1px rgba(139, 92, 246, 0.1);
 }
 .note-content { -webkit-user-select: text; user-select: text; }
+/* Text cursor on the modal's note body (both edit AND view mode) so the
+   user sees the selection cursor when hovering the text — useful for
+   copy-paste in read mode. Scoped with .note-modal-anim so the closed-
+   note cards in the grid keep their pointer cursor (clicking a card
+   opens the modal). */
+.note-modal-anim .note-content,
+.note-modal-anim .note-content--dense {
+  cursor: text;
+}
 /* Block margins are zeroed so that vertical spacing is driven solely by the
    blank lines the user typed — mirroring the textarea in edit mode.  Spacer
    elements are injected by renderSafeMarkdown() (see markdown.jsx). */
@@ -103,6 +112,8 @@ html.dark header.multi-select-bar {
 .note-content h1 { font-size: 1.5rem; line-height: 1.5; }
 .note-content h2 { font-size: 1.25rem; line-height: 1.5; }
 .note-content h3 { font-size: 1.125rem; line-height: 1.5; }
+.note-content h4 { font-size: 1rem;    line-height: 1.5; }
+.note-content h5 { font-size: 0.9rem;  line-height: 1.5; }
 .note-content .md-blank-line { display: block; height: 1lh; }
 /* Fallback for engines without the lh unit: approximate 1.5x font-size */
 @supports not (height: 1lh) {
@@ -140,6 +151,43 @@ html.dark header.multi-select-bar {
 .note-content--dense li > p { margin: 0; }
 .note-content--dense li ul, .note-content--dense li ol { margin: 0.1rem 0 0; padding-left: 1rem; }
 
+/* --------------------------------------------------------------------
+   Continuous numbering for ordered lists.
+
+   Problem: when the user types an ordered list, a code block (or any
+   other non-list block) and another ordered list, ProseMirror emits
+   two separate <ol> elements. Each <ol> natively restarts at 1, which
+   was confusing the user ("mon 2. est redevenu 1. après un bloc de
+   code").
+
+   Fix: a named CSS counter (gk-ol) scoped to the editor / view
+   container, surfaced via ::marker so the NATIVE <ol> layout is kept
+   untouched (no padding/indent change — only the digits displayed are
+   replaced). Nested ordered lists (inside an <li>) explicitly reset
+   the counter so sub-lists still start at 1.
+   -------------------------------------------------------------------- */
+.rt-editor-content,
+.note-content--dense,
+.note-content {
+  counter-reset: gk-ol;
+}
+.rt-editor-content li ol,
+.note-content--dense li ol,
+.note-content li ol {
+  counter-reset: gk-ol;
+}
+.rt-editor-content ol > li,
+.note-content--dense ol > li,
+.note-content ol > li {
+  counter-increment: gk-ol;
+}
+.rt-editor-content ol > li::marker,
+.note-content--dense ol > li::marker,
+.note-content ol > li::marker {
+  content: counter(gk-ol) ". ";
+  font-variant-numeric: tabular-nums;
+}
+
 /* Fix: marked outputs \n between block elements; with white-space:pre-wrap on
    the container these render as visible ~24px anonymous blocks.  Set normal on
    the wrapper so inter-block \n collapses, then restore pre-wrap on leaf text
@@ -151,8 +199,21 @@ html.dark header.multi-select-bar {
 .note-content--dense h4, .note-content--dense h5, .note-content--dense h6,
 .note-content--dense td, .note-content--dense th { white-space: pre-wrap; }
 .note-content--dense p { margin: 0; }
-.note-content--dense pre { margin: 0.4rem 0; }
-.note-content--dense hr { margin: 0; }
+/* Empty paragraphs in the editor render as one visible line (cursor +
+   line-height); after serialisation they end up as bare <p></p> nodes
+   that, with margin:0, collapse to zero height in the dense read view.
+   That's what makes a deliberately-inserted blank line between two
+   blocks (especially between a paragraph and a heading) disappear in
+   lecture mode. Inject a non-breaking space via ::before so an empty
+   <p> reserves one line of vertical space again. */
+.note-content--dense p:empty::before {
+  content: " ";
+}
+/* Match the rich-text editor's spacing (.rt-editor-content hr / pre)
+   so the separator-to-block gap reads identically in lecture and
+   édition mode. */
+.note-content--dense pre { margin: 1rem 0; }
+.note-content--dense hr { margin: 0.85rem 0; }
 
 /* Hyperlinks in view mode */
 .note-content a {
@@ -164,6 +225,19 @@ html.dark .note-content a {
 }
 .note-card .note-content a {
   pointer-events: none;
+}
+
+/* Closed-note size: body text in the card preview renders at 14 px so
+   a card shows more of the note at a glance. Only applies to the CARD
+   (.note-card). The modal's edit and view modes keep their configured
+   rendering (default 16 px / the user's typography-preset size). */
+.note-card .note-content,
+.note-card .note-content--dense {
+  font-size: 0.875rem;
+}
+.note-card .note-content--dense p {
+  font-size: 0.875rem;
+  font-weight: var(--gk-type-p-weight, 400);
 }
 
 /* Inline code and fenced code styling */
@@ -481,6 +555,189 @@ html.dark .modal-footer-toolbar {
   background: rgba(0, 0, 0, 0.15);
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.2);
 }
+
+/* Mobile-only formatting bottom sheet. Lives as a flex child of the modal
+   panel between the scroll container and the footer; collapses to 0 height
+   when closed, expands to its natural height (capped) when open, so the
+   editor area shrinks instead of being overlaid. The sheet stays mounted
+   while the modal is open so the rich-text toolbar's portal target is
+   stable across opens — visibility is driven by max-height + opacity on
+   the .is-open class. */
+.mobile-fmt-sheet {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  background-color: #ffffff;
+  /* Flat darkening wash on top of the inline-styled modal color so
+     the sheet sits a shade darker than the modal it lives in. The
+     inline backgroundColor (modalBgFor) provides the note-tinted base,
+     and this background-image lays a uniform alpha tint on top. */
+  background-image: linear-gradient(rgba(0, 0, 0, 0.07), rgba(0, 0, 0, 0.07));
+  /* Subtle hairline frame; the "this is a dismissible sheet"
+     affordance is the Android-style grabber bar
+     (.mobile-fmt-sheet-grabber) plus a darkening gradient painted by
+     the ::before below to make the top edge stand out. No drop
+     shadow above the sheet — the gradient already separates the
+     sheet from the editor cleanly. */
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
+  border-left: 1px solid rgba(0, 0, 0, 0.1);
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px 12px 0 0;
+  /* Smooth iOS-style open / close — a longer duration with a
+     decelerating curve reads as fluid where the previous "ease"
+     felt jerky. will-change + contain promote the sheet onto its
+     own layer so changing max-height doesn't relayout / repaint
+     the rest of the modal. */
+  transition:
+    max-height 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity    0.22s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: max-height, opacity;
+  contain: layout paint style;
+  display: flex;
+  flex-direction: column;
+}
+/* Top "shadow header" — a soft darker band that fades to transparent
+   over the first ~28 px of the sheet so the panel reads as a clearly
+   distinct surface rising out of the editor. pointer-events: none so
+   it never intercepts the grabber's pointer events. */
+.mobile-fmt-sheet::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 16px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0));
+  border-radius: 12px 12px 0 0;
+  z-index: 1;
+}
+.mobile-fmt-sheet--dark::before {
+  /* Dark mode: a flat 10 % white wash on top reads better than a
+     gradient against an already-dark panel. */
+  background: rgb(255 255 255 / 10%);
+}
+/* Lift the grabber and the toolbar above the gradient so they remain
+   crisp on top of the darkening overlay. */
+.mobile-fmt-sheet-grabber,
+.mobile-fmt-sheet-content { position: relative; z-index: 2; }
+/* Drag-handle bar, the same affordance Android / iOS bottom sheets use
+   to signal "this surface is dismissible". A real DOM element so we
+   can attach pointer events for swipe-to-close — the visible pill is
+   painted by ::after centred inside it. The strip is taller than the
+   pill itself so the touch target stays comfortable on mobile. */
+.mobile-fmt-sheet-grabber {
+  flex-shrink: 0;
+  height: 10px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.mobile-fmt-sheet-grabber::after {
+  content: "";
+  width: 42px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+.mobile-fmt-sheet-grabber:active { cursor: grabbing; }
+.mobile-fmt-sheet-grabber:active::after {
+  background: rgba(0, 0, 0, 0.45);
+  transform: scaleX(1.15);
+}
+.mobile-fmt-sheet--dark .mobile-fmt-sheet-grabber::after { background: rgba(255, 255, 255, 0.32); }
+.mobile-fmt-sheet--dark .mobile-fmt-sheet-grabber:active::after { background: rgba(255, 255, 255, 0.5); }
+.mobile-fmt-sheet.is-open {
+  max-height: min(58vh, 460px);
+  opacity: 1;
+}
+.mobile-fmt-sheet--dark {
+  background-color: #1f2937;
+  /* Stronger overlay in dark mode — pure black at 0.07 on a dark
+     modal barely shifts; bump to 0.18 so the sheet still reads as
+     "a notch deeper" than the modal underneath. */
+  background-image: linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18));
+  border-top-color: rgba(255, 255, 255, 0.14);
+  border-left-color: rgba(255, 255, 255, 0.08);
+  border-right-color: rgba(255, 255, 255, 0.08);
+}
+.mobile-fmt-sheet--dark::before { background: rgba(255, 255, 255, 0.32); }
+.mobile-fmt-sheet-content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Hide the scrollbar visually in every browser. Touch-scroll still
+     works if the toolbar ever overflows, but the bar would otherwise
+     flash on the right edge during the open / close max-height
+     animations and during the swipe-to-close drag. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.mobile-fmt-sheet-content::-webkit-scrollbar { display: none; }
+/* Inside the sheet, the toolbar reflows into a vertically-stacked grid:
+   the FOUR super-groups remain stacked one above the other (the desktop
+   ribbon collapsed onto a column), but inside each super-group every
+   button flows on a SINGLE wrapping line — no more artificial 2-sub-row
+   centring that left big gaps on phones. .rt-sg-row collapses to
+   "display: contents" so its children promote up to the super-group's
+   flex context, and .rt-sg becomes flex-wrap row with center-justify.
+   Wraps only happen when there are genuinely too many buttons for the
+   width. The .rt-sep vertical dividers are hidden — they were ribbon-
+   specific. The fixed-width font picker / Size / Style buttons relax
+   to natural widths so the row packs tight. */
+.mobile-fmt-sheet-content .rt-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  margin: 0;
+  padding: 4px 8px 10px;
+  border-top: none;
+  border-bottom: none;
+  row-gap: 0;
+  background: transparent;
+}
+.mobile-fmt-sheet-content .rt-sep { display: none; }
+.mobile-fmt-sheet-content .rt-sg {
+  width: 100%;
+  flex: 0 0 auto;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rt-divider);
+}
+.mobile-fmt-sheet-content .rt-sg:last-of-type { border-bottom: none; }
+.mobile-fmt-sheet-content .rt-sg-row { display: contents; }
+.mobile-fmt-sheet-content .rt-btn--wide {
+  width: auto;
+  flex: 0 1 auto;
+  min-width: 110px;
+  max-width: 50%;
+}
+.mobile-fmt-sheet-content .rt-btn--narrow { margin-left: 0; }
+.mobile-fmt-sheet-content .rt-style-btn {
+  flex: 0 0 auto;
+  width: 80px;
+  max-width: 30%;
+}
+
+/* Mobile-only "Mise en forme" footer toggle styling — flag the active
+   state with the same indigo accent the toolbar already uses. */
+.modal-footer-btn--fmt.is-active {
+  background: rgba(99, 102, 241, 0.14);
+  color: rgb(99, 102, 241);
+}
+html.dark .modal-footer-btn--fmt.is-active {
+  background: rgba(129, 140, 248, 0.22);
+  color: rgb(165, 180, 252);
+}
 .modal-footer-btn {
   position: relative;
   display: inline-flex;
@@ -797,7 +1054,13 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
 }
 @keyframes scrimFadeIn  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scrimFadeOut { from { opacity: 1; } to { opacity: 0; } }
-.note-modal-anim         { animation: noteModalIn  200ms ease-out both; }
+/* Intentionally NOT using "both" for the open animation — retaining the
+   "transform: scale(1) translateY(0)" after the keyframes ends turns the
+   modal card into a containing block, which in turn broke "position: sticky"
+   (toolbar stops following scroll) and "position: fixed" (popovers landed
+   in the middle of the modal). Ending the animation returns the card to
+   its declared no-transform state, which is visually identical. */
+.note-modal-anim         { animation: noteModalIn  200ms ease-out; }
 .note-modal-anim.closing { animation: noteModalOut 180ms ease-in  both; }
 .note-scrim-anim         { animation: scrimFadeIn  200ms ease-out both; }
 .note-scrim-anim.closing { animation: scrimFadeOut 180ms ease-in  both; }
@@ -807,7 +1070,10 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.modal-content-fade { animation: modalContentFade 200ms ease-out both; }
+/* No "both" — same reason as .note-modal-anim. Keeping a transform on an
+   ancestor of the rich-text toolbar prevented position: sticky from binding
+   to the real modal scroll container. */
+.modal-content-fade { animation: modalContentFade 200ms ease-out; }
 
 /* Smooth expand/collapse when entering/leaving draw canvas mode */
 @media (min-width: 640px) {
@@ -998,5 +1264,1561 @@ html.dark .login-deco-card {
   background: var(--text-light);
   opacity: 0.15;
   margin-bottom: 7px;
+}
+
+/* ================================================================
+   Rich-text editor (Tiptap) — refined GlassKeep look
+   ================================================================ */
+:root {
+  --gk-type-p-size: 1rem;
+  --gk-type-p-weight: 400;
+  --gk-type-h1-size: 1.5rem;
+  --gk-type-h1-weight: 600;
+  --gk-type-h2-size: 1.25rem;
+  --gk-type-h2-weight: 600;
+  --gk-type-h3-size: 1.125rem;
+  --gk-type-h3-weight: 600;
+  --gk-type-h4-size: 1rem;
+  --gk-type-h4-weight: 600;
+  --gk-type-h5-size: 0.9rem;
+  --gk-type-h5-weight: 600;
+
+  --rt-accent: 99, 102, 241;  /* indigo-500 */
+  --rt-divider: rgba(0, 0, 0, 0.08);
+  --rt-divider-strong: rgba(0, 0, 0, 0.14);
+  --rt-btn-hover: rgba(0, 0, 0, 0.055);
+  --rt-btn-active-bg: rgba(var(--rt-accent), 0.14);
+  --rt-btn-active-text: rgb(var(--rt-accent));
+  --rt-pop-bg: #ffffff;
+  --rt-pop-border: rgba(0, 0, 0, 0.1);
+  --rt-pop-shadow: 0 12px 32px -6px rgba(17, 24, 39, 0.28), 0 2px 8px rgba(17, 24, 39, 0.1);
+
+  /* Highlight palette — 8 THEMED slots. The editor stores the variable
+     REFERENCE in the mark's style (background-color: var(--rt-hl-N))
+     instead of a concrete hex, so switching theme re-resolves the
+     variable and the highlight automatically swaps to the light /
+     dark variant that stays readable. */
+  --rt-hl-1: #fde047; /* yellow */
+  --rt-hl-2: #fdba74; /* orange */
+  --rt-hl-3: #fca5a5; /* red */
+  --rt-hl-4: #f9a8d4; /* pink */
+  --rt-hl-5: #c4b5fd; /* violet */
+  --rt-hl-6: #93c5fd; /* blue */
+  --rt-hl-7: #86efac; /* green */
+  --rt-hl-8: #d1d5db; /* gray */
+}
+html.dark {
+  --rt-divider: rgba(255, 255, 255, 0.1);
+  --rt-divider-strong: rgba(255, 255, 255, 0.18);
+  --rt-btn-hover: rgba(255, 255, 255, 0.08);
+  --rt-btn-active-bg: rgba(var(--rt-accent), 0.26);
+  --rt-btn-active-text: rgb(165, 180, 252);
+  --rt-hl-1: #b45309;
+  --rt-hl-2: #c2410c;
+  --rt-hl-3: #b91c1c;
+  --rt-hl-4: #be185d;
+  --rt-hl-5: #6d28d9;
+  --rt-hl-6: #1d4ed8;
+  --rt-hl-7: #047857;
+  --rt-hl-8: #4b5563;
+}
+
+/* Defensive fallback: Tiptap's Highlight mark stores the variable
+   string both as inline style AND as data-color. If the sanitizer
+   strips var() from the inline style during view-mode rendering, these
+   rules rescue the highlight via the data-color attribute — which is
+   always kept. Comparison is a literal string match, so the stored
+   data-color must be EXACTLY "var(--rt-hl-N)" (which is what the
+   highlight popover writes). */
+mark[data-color="var(--rt-hl-1)"] { background-color: var(--rt-hl-1); color: inherit; }
+mark[data-color="var(--rt-hl-2)"] { background-color: var(--rt-hl-2); color: inherit; }
+mark[data-color="var(--rt-hl-3)"] { background-color: var(--rt-hl-3); color: inherit; }
+mark[data-color="var(--rt-hl-4)"] { background-color: var(--rt-hl-4); color: inherit; }
+mark[data-color="var(--rt-hl-5)"] { background-color: var(--rt-hl-5); color: inherit; }
+mark[data-color="var(--rt-hl-6)"] { background-color: var(--rt-hl-6); color: inherit; }
+mark[data-color="var(--rt-hl-7)"] { background-color: var(--rt-hl-7); color: inherit; }
+mark[data-color="var(--rt-hl-8)"] { background-color: var(--rt-hl-8); color: inherit; }
+html.dark {
+  --rt-pop-bg: #1f2937;
+  --rt-pop-border: rgba(255, 255, 255, 0.12);
+  --rt-pop-shadow: 0 12px 32px -6px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Editor surface ---------- */
+/* Block layout (not flex) so the sticky toolbar has a clean containing
+   block. In a flex column the sticky element's "stick area" depends on the
+   flex sizing pass, which led to the toolbar occasionally ignoring scroll. */
+.rt-editor { display: block; }
+.rt-toolbar + .rt-editor-content,
+.rt-toolbar + .ProseMirror {
+  margin-top: 0.4rem;
+}
+.rt-editor-content {
+  outline: none;
+  cursor: text;
+  padding: 0.15rem 0.1rem;
+  line-height: 1.55;
+}
+.rt-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+html.dark .rt-editor-content p.is-editor-empty:first-child::before { color: #6b7280; }
+
+/* Typography driven by user presets (applied on :root). Covers BOTH the
+   rich editor and the read-only view mode, so the preferred rendering is
+   consistent between edit and display. */
+.rt-editor-content p,
+.note-content--dense p {
+  font-size: var(--gk-type-p-size);
+  font-weight: var(--gk-type-p-weight);
+}
+/* Every block style reads from the --gk-type-{key}-* family of CSS
+   variables so edit-mode, rich view-mode and legacy markdown view-mode
+   all share exactly the same rendering rules. An inline text-colour
+   mark (textStyle.color) keeps priority over this baseline because the
+   inline span wins specificity-wise. */
+.rt-editor-content h1,
+.note-content--dense h1,
+.note-content h1 {
+  font-size: var(--gk-type-h1-size);
+  font-weight: var(--gk-type-h1-weight);
+  color: var(--gk-type-h1-color, inherit);
+  font-style: var(--gk-type-h1-italic, normal);
+  text-decoration: var(--gk-type-h1-underline, none);
+}
+.rt-editor-content h2,
+.note-content--dense h2,
+.note-content h2 {
+  font-size: var(--gk-type-h2-size);
+  font-weight: var(--gk-type-h2-weight);
+  color: var(--gk-type-h2-color, inherit);
+  font-style: var(--gk-type-h2-italic, normal);
+  text-decoration: var(--gk-type-h2-underline, none);
+}
+.rt-editor-content h3,
+.note-content--dense h3,
+.note-content h3 {
+  font-size: var(--gk-type-h3-size);
+  font-weight: var(--gk-type-h3-weight);
+  color: var(--gk-type-h3-color, inherit);
+  font-style: var(--gk-type-h3-italic, normal);
+  text-decoration: var(--gk-type-h3-underline, none);
+}
+.rt-editor-content h4,
+.note-content--dense h4,
+.note-content h4 {
+  font-size: var(--gk-type-h4-size);
+  font-weight: var(--gk-type-h4-weight);
+  color: var(--gk-type-h4-color, inherit);
+  font-style: var(--gk-type-h4-italic, normal);
+  text-decoration: var(--gk-type-h4-underline, none);
+}
+.rt-editor-content h5,
+.note-content--dense h5,
+.note-content h5 {
+  font-size: var(--gk-type-h5-size);
+  font-weight: var(--gk-type-h5-weight);
+  color: var(--gk-type-h5-color, inherit);
+  font-style: var(--gk-type-h5-italic, normal);
+  text-decoration: var(--gk-type-h5-underline, none);
+}
+
+.rt-editor-content blockquote,
+.note-content--dense blockquote,
+.note-content blockquote {
+  /* "Otro-blockquote" inspired layout — chunky coloured bar on the
+     left, italic body, and a big curly opening quote glyph rendered
+     via ::before sitting inside the padded gutter. Themed with the
+     indigo accent so it stays consistent with the rest of GlassKeep
+     instead of the upstream teal. */
+  position: relative;
+  font-style: italic;
+  border-left: 8px solid rgba(var(--rt-accent), 0.85);
+  background: rgba(var(--rt-accent), 0.07);
+  padding: 0.9rem 1.1rem 0.9rem 2.6rem;
+  margin: 0.6rem 0;
+  line-height: 1.6;
+  color: inherit;
+  border-radius: 0 8px 8px 0;
+  /* Hug the content: a 1-word quote stays narrow, a multi-line one
+     wraps inside the modal width. Only the highlighted "card" shrinks
+     — vertical stacking with siblings is preserved. */
+  width: fit-content;
+  max-width: 100%;
+}
+.rt-editor-content blockquote::before,
+.note-content--dense blockquote::before,
+.note-content blockquote::before {
+  content: "“";
+  position: absolute;
+  left: 0.45rem;
+  top: -0.25rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: normal;
+  font-size: 3.4rem;
+  line-height: 1;
+  color: rgba(var(--rt-accent), 0.55);
+  pointer-events: none;
+  user-select: none;
+}
+/* Author/citation line — Tiptap doesn't auto-generate this, but if a
+   user manually adds <span>…</span> at the end of their quote (paste,
+   raw HTML) we render it as a small bold attribution under the body. */
+.rt-editor-content blockquote span,
+.note-content--dense blockquote span,
+.note-content blockquote span {
+  display: block;
+  font-style: normal;
+  font-weight: 600;
+  margin-top: 0.6rem;
+  opacity: 0.85;
+}
+html.dark .rt-editor-content blockquote,
+html.dark .note-content--dense blockquote,
+html.dark .note-content blockquote {
+  /* Dark mode: the indigo-500 accent bar drowns against the dark
+     surface, so we swap to the brighter indigo-300 (165 180 252)
+     and crank the background tint up so the card is clearly
+     readable as a quote. */
+  border-left-color: rgb(165, 180, 252);
+  background: rgba(165, 180, 252, 0.13);
+}
+html.dark .rt-editor-content blockquote::before,
+html.dark .note-content--dense blockquote::before,
+html.dark .note-content blockquote::before {
+  color: rgba(165, 180, 252, 0.6);
+}
+.rt-editor-content pre {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  border: 1px solid var(--rt-divider);
+  /* Explicit 1 rem (the browser default for <pre>) so the dense read
+     view can mirror the same value and the gap between, e.g., a
+     separator and the code block reads identically in edit and
+     lecture mode. */
+  margin: 1rem 0;
+}
+html.dark .rt-editor-content pre {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--rt-divider);
+}
+.rt-editor-content code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.08em 0.32em;
+  border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+html.dark .rt-editor-content code { background: rgba(255, 255, 255, 0.08); }
+.rt-editor-content pre code { background: transparent; padding: 0; border: 0; }
+.rt-editor-content hr {
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+  margin: 0.85rem 0;
+}
+html.dark .rt-editor-content hr { border-top-color: rgba(255, 255, 255, 0.2); }
+.rt-editor-content a { color: #2563eb; text-decoration: underline; }
+html.dark .rt-editor-content a { color: #93c5fd; }
+.rt-editor-content mark { border-radius: 2px; padding: 0 2px; }
+.rt-editor-content ul[data-type="taskList"] { list-style: none; padding-left: 0; }
+
+/* ---------- Toolbar ---------- */
+.rt-toolbar-slot {
+  /* Slot inside the ModalHeader sticky container that receives the rich
+     text toolbar via a React portal. Empty when no text note is being
+     edited — collapses to no height. */
+  display: contents;
+}
+.rt-toolbar {
+  /* Word-style ribbon. Each "super-group" (.rt-sg) is a 2-row internal
+     column; super-groups sit side by side, separated by a full-height
+     vertical divider. When the viewport is too narrow for all
+     super-groups on one ribbon row, a super-group wraps as a whole
+     block — it never spills its own items across different rows of
+     the toolbar, matching the reference screenshot. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  column-gap: 0;
+  row-gap: 6px;
+  /* Horizontal padding stays on the toolbar so buttons breathe, but we
+     deliberately drop horizontal MARGIN + border-radius: the top border
+     below is now a flat line spanning the full sticky-header width
+     (no rounded corners clipping its ends). The negative top margin
+     pulls the toolbar up toward the close/pin/save row, giving more
+     vertical room to the note body in edit mode. */
+  padding: 4px 10px 6px;
+  margin: -6px 0 0;
+  border-radius: 0;
+  background: transparent;
+  /* Two flush dividers framing the toolbar: one above (between the
+     close/pin/save row and the toolbar) and one below (between the
+     toolbar and the note body). Same hairline as the existing top
+     separator so the two read as a matched pair. */
+  border-top: 1px solid var(--rt-divider);
+  border-bottom: 1px solid var(--rt-divider);
+}
+html.dark .rt-toolbar {
+  border-top-color: rgba(255, 255, 255, 0.1);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+.rt-toolbar--compact { padding: 2px 8px 4px; }
+
+/* Super-group — two vertically stacked rows of flush buttons. */
+.rt-sg {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2px;
+}
+
+/* Sub-row inside a super-group — buttons flush, no gap between them. */
+.rt-sg-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: nowrap;
+}
+
+.rt-btn {
+  position: relative;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 7px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font-size: 0.92rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.1s ease;
+  user-select: none;
+}
+.rt-btn:hover:not(:disabled) { background: var(--rt-btn-hover); }
+.rt-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--rt-accent), 0.55);
+}
+.rt-btn.is-active {
+  background: var(--rt-btn-active-bg);
+  color: var(--rt-btn-active-text);
+}
+.rt-btn[disabled] { opacity: 0.38; cursor: not-allowed; }
+.rt-btn:active:not(:disabled) { transform: translateY(0.5px); }
+.rt-btn--menu { padding: 0 8px; gap: 4px; }
+.rt-btn--block { min-width: 50px; }
+.rt-btn--wide {
+  /* Font picker button. FIXED width — no min/max, no flex grow/shrink —
+     so picking ANY font (even "Source Code Pro" rendered in its own
+     wide mono glyphs) never resizes the button and therefore never
+     reflows the rest of the toolbar. The label inside clips with
+     ellipsis when the chosen name doesn't fit. 130 px matches the
+     natural button size when Bebas Neue is the active font, which
+     the user confirmed as the visually perfect toolbar layout. */
+  width: 130px;
+  flex: 0 0 130px;
+  justify-content: space-between;
+  /* Prevent the chevron from being pushed out by an outsized label. */
+  overflow: hidden;
+  /* Always wear the accent background — gives the picker a visible
+     "filled" look so it never reads as empty / faded next to the
+     other controls, and matches the active-state vocabulary used
+     throughout the toolbar. */
+  background: var(--rt-btn-active-bg);
+  color: var(--rt-btn-active-text);
+  border-color: rgba(var(--rt-accent), 0.35);
+}
+.rt-btn--wide:hover:not(:disabled) {
+  background: rgba(var(--rt-accent), 0.24);
+}
+.rt-btn--wide .rt-btn-label {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Size button — ALWAYS sits next to the Font button (which wears a
+   permanent indigo "active" background). Adding margin-left here pushes
+   the Size button a few pixels right so its OWN active outline never
+   overlaps the Font button's edge when a non-default size is picked.
+   The room is borrowed from the empty space SG A had between the
+   Clear-formatting button and the right separator. */
+.rt-btn--narrow {
+  min-width: 64px;
+  justify-content: space-between;
+  margin-left: 6px;
+}
+.rt-btn--chevron { min-width: 20px; padding: 0 3px; }
+.rt-btn--swatch { padding: 0 6px; min-width: 34px; }
+/* Link button — sits in SG C row 2 next to the HR button. Carries an
+   icon AND a "www" label so the row matches the visual length of row
+   1 (CodeBlock / Code / Quote). The icon is shrunk to 16 px and the
+   gap to 2 px so the pair reads as one tight "icon + caption" unit;
+   a thin underline drawn via ::after spans both elements so they
+   visually belong to the same glyph — like a hyperlink — instead of
+   reading as two stacked controls. The accent indigo is reserved for
+   :hover / .is-active states like every other button on the toolbar. */
+.rt-btn--link {
+  position: relative;
+  width: 68px;
+  flex: 0 0 68px;
+  padding: 0 6px 2px;
+  gap: 0;
+  justify-content: center;
+}
+.rt-btn--link::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 7px;
+  width: 39px;
+  height: 1.5px;
+  transform: translateX(-45%);
+  background: #2563eb;
+  border-radius: 1px;
+  pointer-events: none;
+}
+.rt-btn--link .tabler-icon { width: 16px; height: 16px; }
+.rt-btn--link .tabler-icon > svg { width: 100%; height: 100%; }
+.rt-btn--link .rt-btn-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  /* Pull the label flush against the icon so the pair reads as a
+     single "icon + caption" unit, not two side-by-side controls. */
+  margin-left: 0;
+}
+.rt-btn-label {
+  font-size: 0.88rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.rt-btn-inner { display: inline-flex; align-items: center; justify-content: center; }
+
+/* Tabler icons are rendered inline via <span dangerouslySetInnerHTML>. The
+   wrapping span acts as the sizing box; the inner <svg> fills it. Using
+   stroke-width: 1.75 nudges the Tabler stroke a touch lighter so the
+   toolbar doesn't feel heavy at 20 px. */
+.tabler-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  line-height: 0;
+  color: inherit;
+  flex-shrink: 0;
+}
+.tabler-icon > svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+.tabler-icon--chevron,
+.tabler-icon--chevron > svg { width: 12px; height: 12px; stroke-width: 2; opacity: 0.75; }
+
+/* Legacy .rt-btn svg rules kept for anything still rendering a bare SVG
+   (Underline variant, text-only marks). Tabler-backed spans are sized
+   by .tabler-icon above and ignore this rule. */
+.rt-btn svg { width: 20px; height: 20px; }
+.rt-btn--chevron svg { width: 12px; height: 12px; }
+
+/* Chevron appended INSIDE a .rt-btn (colour / highlight buttons) — small
+   so it signals "dropdown" without competing with the swatch. */
+.rt-btn--has-chevron { gap: 2px; }
+.rt-btn--has-chevron > .tabler-icon--chevron { opacity: 0.7; }
+
+/* Block-type button — typographic badge that stands visually apart
+   from the line-based icons of the rest of the toolbar. */
+.rt-block-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1;
+  background: rgba(99, 102, 241, 0.12);
+  color: rgb(99, 102, 241);
+  letter-spacing: 0.02em;
+}
+.rt-block-badge--p   { font-size: 1.15rem; }
+.rt-block-badge--h1  { font-size: 0.92rem; }
+.rt-block-badge--h2  { font-size: 0.88rem; }
+.rt-block-badge--h3  { font-size: 0.82rem; }
+html.dark .rt-block-badge {
+  background: rgba(129, 140, 248, 0.18);
+  color: rgb(165, 180, 252);
+}
+.rt-btn.is-active .rt-block-badge {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Block-style gallery (Paragraph / H1 / H2 / H3) — four preview buttons
+   arranged 2x2 inside their own super-group at the right of the toolbar. */
+.rt-sg--style {
+  gap: 3px;
+  /* Style super-group sits at the END of the toolbar but no margin-
+     left: auto: the giant gap that used to appear between SG C's
+     separator and the Style block (when the toolbar didn't fully
+     fill the modal width) was visually unbalanced. Adjacent to the
+     last separator now — empty room, if any, sits at the right
+     edge of the modal where it reads as natural padding. */
+}
+.rt-sg--style .rt-sg-row { gap: 3px; }
+
+.rt-style-btn {
+  /* Fixed width — all six buttons render at the same exact size so
+     the gallery reads as a uniform 2x3 grid. Labels that don't fit
+     ("Paragraphe" at the longer end) clip with ellipsis via the
+     .rt-style-btn-sample rules. */
+  width: 84px;
+  flex: 0 0 84px;
+  height: 32px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--rt-divider);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.1s ease;
+  user-select: none;
+  overflow: hidden;
+}
+.rt-style-btn:hover:not(:disabled) {
+  background: var(--rt-btn-hover);
+  border-color: var(--rt-divider-strong);
+}
+.rt-style-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--rt-accent), 0.55);
+}
+.rt-style-btn.is-active {
+  background: var(--rt-btn-active-bg);
+  color: var(--rt-btn-active-text);
+  border-color: rgba(var(--rt-accent), 0.45);
+}
+.rt-style-btn:active:not(:disabled) { transform: translateY(0.5px); }
+
+.rt-style-btn-sample {
+  /* line-height bumped to 1.3 so descenders (g, p in "Paragraphe")
+     have room below the baseline and don't get clipped by the button's
+     overflow: hidden + ellipsis stack. */
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Slight vertical breathing room — clears the bottom of g / p
+     when align-items: center pulls the line box upward. */
+  padding-block: 1px 3px;
+  /* Inherit the note's typography so the preview actually MATCHES what
+     the user will see once the style is applied — font family, italic /
+     oblique, colour, all carry through to the sample. The per-block
+     font-size / weight come from the --gk-type-* variables the
+     typography-presets panel drives, scaled to fit the button. */
+  font-family: inherit;
+  font-style: inherit;
+  color: inherit;
+}
+/* Per-block preview: font-size is the user's configured value * 0.7
+   (scaled so the H1 preview fits in the 32-px button), capped by min()
+   so extreme values still sit inside the row. font-weight is the raw
+   configured weight — keeping that exact preserves the visual impact
+   of Bold vs Medium vs Regular in the preview. */
+/* Per-block sample. font-size is the user's configured value scaled
+   down (* 0.7) AND capped via min() so even with aggressive presets
+   the label fits inside the 84-px button without overflowing.
+   font-weight stays exact so "Bold" looks bold and "Normal" looks
+   normal in the preview. */
+.rt-style-btn--p  .rt-style-btn-sample {
+  font-size: min(calc(var(--gk-type-p-size,  1rem)    * 0.7), 0.78rem);
+  font-weight: var(--gk-type-p-weight, 400);
+  color: var(--gk-type-p-color, inherit);
+  font-style: var(--gk-type-p-italic, normal);
+  text-decoration: var(--gk-type-p-underline, none);
+}
+.rt-style-btn--h1 .rt-style-btn-sample {
+  font-size: min(calc(var(--gk-type-h1-size, 1.5rem)  * 0.7), 1.1rem);
+  font-weight: var(--gk-type-h1-weight, 600);
+  color: var(--gk-type-h1-color, inherit);
+  font-style: var(--gk-type-h1-italic, normal);
+  text-decoration: var(--gk-type-h1-underline, none);
+}
+.rt-style-btn--h2 .rt-style-btn-sample {
+  font-size: min(calc(var(--gk-type-h2-size, 1.25rem) * 0.7), 1rem);
+  font-weight: var(--gk-type-h2-weight, 600);
+  color: var(--gk-type-h2-color, inherit);
+  font-style: var(--gk-type-h2-italic, normal);
+  text-decoration: var(--gk-type-h2-underline, none);
+}
+.rt-style-btn--h3 .rt-style-btn-sample {
+  font-size: min(calc(var(--gk-type-h3-size, 1.125rem) * 0.7), 0.9rem);
+  font-weight: var(--gk-type-h3-weight, 600);
+  color: var(--gk-type-h3-color, inherit);
+  font-style: var(--gk-type-h3-italic, normal);
+  text-decoration: var(--gk-type-h3-underline, none);
+}
+.rt-style-btn--h4 .rt-style-btn-sample {
+  font-size: min(calc(var(--gk-type-h4-size, 1rem)    * 0.7), 0.82rem);
+  font-weight: var(--gk-type-h4-weight, 600);
+  color: var(--gk-type-h4-color, inherit);
+  font-style: var(--gk-type-h4-italic, normal);
+  text-decoration: var(--gk-type-h4-underline, none);
+}
+.rt-style-btn--h5 .rt-style-btn-sample {
+  font-size: min(calc(var(--gk-type-h5-size, 0.9rem)  * 0.7), 0.78rem);
+  font-weight: var(--gk-type-h5-weight, 600);
+  color: var(--gk-type-h5-color, inherit);
+  font-style: var(--gk-type-h5-italic, normal);
+  text-decoration: var(--gk-type-h5-underline, none);
+}
+/* When the button is active (current block matches), the indigo active
+   colour wins over the preset colour so the selection state stays
+   readable against the active-background tint. */
+.rt-style-btn.is-active .rt-style-btn-sample { color: inherit; }
+
+.rt-splitbtn {
+  display: inline-flex;
+  align-items: stretch;
+  position: relative;
+  border-radius: 6px;
+}
+.rt-splitbtn > .rt-btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 3px; }
+.rt-splitbtn > .rt-btn--chevron { border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 2px; }
+
+/* Separator spans the full super-group height (both sub-rows) so the
+   visual break between groups reads unambiguously in the Word-ribbon
+   layout. 6 px horizontal margin matches the ribbon padding rhythm. */
+.rt-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--rt-divider-strong);
+  margin: 2px 6px;
+  display: inline-block;
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+/* Inline swatch markers on the text-colour / highlight buttons. The Tabler
+   typography/highlight glyph stacks on top of a colour bar that shows the
+   currently picked colour — matches Word's "A + bar" pattern. */
+.rt-icon-swatch {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  line-height: 0;
+}
+.rt-icon-swatch .tabler-icon { width: 18px; height: 18px; }
+.rt-icon-swatch-bar {
+  display: block;
+  width: 16px;
+  height: 3px;
+  border-radius: 1px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+html.dark .rt-icon-swatch-bar { border-color: rgba(255, 255, 255, 0.12); }
+
+/* ---------- Popovers ---------- */
+.rt-pop-wrap { position: relative; display: inline-flex; }
+.rt-pop {
+  /* Fixed positioning: coordinates come from usePopoverPosition so the
+     popover never extends the parent's scroll area (previously, opening a
+     popover near the modal's right edge pushed a horizontal scrollbar). */
+  position: fixed;
+  z-index: 9999;
+  min-width: 180px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--rt-pop-bg);
+  border: 1px solid var(--rt-pop-border);
+  box-shadow: var(--rt-pop-shadow);
+  /* Fully opaque — no backdrop blur. Popovers now look like proper menus. */
+  animation: rt-pop-in 0.12s ease-out;
+}
+@keyframes rt-pop-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.rt-pop-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+  margin-bottom: 4px;
+}
+.rt-pop-label--spaced { margin-top: 8px; }
+
+.rt-pop--blocks, .rt-pop--font, .rt-pop--fontsize, .rt-pop--more {
+  min-width: 180px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.rt-menu-item--action .rt-menu-item-icon,
+.rt-menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+}
+.rt-menu-item--action .rt-menu-item-icon svg,
+.rt-menu-item-icon .tabler-icon,
+.rt-menu-item-icon .tabler-icon svg { width: 18px; height: 18px; }
+.rt-menu-item--action .rt-menu-item-label { flex: 1; font-weight: 500; font-size: 0.85rem; }
+
+/* Menu rows (block types, fonts) */
+.rt-menu-item, .rt-font-row, .rt-size-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.rt-menu-item:hover, .rt-font-row:hover, .rt-size-row:hover { background: var(--rt-btn-hover); }
+.rt-menu-item.is-current, .rt-font-row.is-current, .rt-size-row.is-current {
+  background: var(--rt-btn-active-bg);
+  color: var(--rt-btn-active-text);
+}
+.rt-menu-item-sample {
+  font-weight: 700;
+  min-width: 28px;
+  text-align: center;
+}
+.rt-menu-item--h1 .rt-menu-item-sample { font-size: 1.15rem; }
+.rt-menu-item--h2 .rt-menu-item-sample { font-size: 1.05rem; }
+.rt-menu-item--h3 .rt-menu-item-sample { font-size: 1rem; }
+.rt-menu-item--p  .rt-menu-item-sample { font-weight: 500; opacity: 0.8; }
+.rt-menu-item-label { flex: 1; font-weight: 500; }
+
+/* Font-size popover — default row gets the ghost "Default" label after the
+   number so the numeric size still reads cleanly. */
+.rt-size-row { justify-content: space-between; }
+.rt-size-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 26px;
+  text-align: right;
+}
+.rt-size-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+/* "par défaut" badge on the 16-row — small chip on the right side so
+   the list stays a single ordered sequence (12, 14, 16, 18 …) without a
+   duplicated row at the top. */
+.rt-size-default-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.14);
+  color: rgb(99, 102, 241);
+  line-height: 1;
+}
+html.dark .rt-size-default-badge {
+  background: rgba(129, 140, 248, 0.22);
+  color: rgb(165, 180, 252);
+}
+.rt-size-row--is-default {
+  font-weight: 700;
+}
+
+/* Colour popovers */
+.rt-pop--color, .rt-pop--highlight, .rt-pop--underline { min-width: 208px; }
+.rt-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+}
+.rt-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  /* Inner ring keeps pale highlight swatches visible against the opaque
+     popover background; outer border gives a clean outline. */
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.08);
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.08s ease, box-shadow 0.12s ease;
+}
+.rt-swatch:hover { transform: scale(1.1); }
+.rt-swatch.is-current {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.2),
+    0 0 0 2px rgba(var(--rt-accent), 0.9);
+}
+html.dark .rt-swatch {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+html.dark .rt-swatch.is-current {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.25),
+    0 0 0 2px rgba(var(--rt-accent), 0.9);
+}
+.rt-pop-clear {
+  /* Same indigo→violet "Personnaliser" pill as the typography settings
+     button (and LoginView / ChangePasswordModal). Mirrors Tailwind's
+     "from-indigo-500 to-violet-600 text-white shadow-md
+      shadow-indigo-300/40 hover:from-indigo-600 hover:to-violet-700
+      hover:shadow-lg hover:shadow-indigo-300/50 hover:scale-[1.03]
+      active:scale-[0.98] transition-all duration-200 btn-gradient"
+     so the "Par défaut" pills feel like deliberate theme buttons
+     instead of neutral border boxes — and use the same shimmer
+     sweep on hover for parity. */
+  position: relative;
+  overflow: hidden;
+  margin-top: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: linear-gradient(to right, rgb(99, 102, 241), rgb(124, 58, 237));
+  color: #ffffff;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-weight: 600;
+  box-shadow:
+    0 4px 6px -1px rgba(165, 180, 252, 0.4),
+    0 2px 4px -2px rgba(165, 180, 252, 0.4);
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.rt-pop-clear::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 35%,
+    rgba(255, 255, 255, 0.25) 45%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0.25) 55%,
+    transparent 65%,
+    transparent 100%
+  );
+  transform: translateX(-100%) skewX(-15deg);
+  pointer-events: none;
+}
+.rt-pop-clear:hover {
+  background: linear-gradient(to right, rgb(79, 70, 229), rgb(109, 40, 217));
+  box-shadow:
+    0 10px 15px -3px rgba(165, 180, 252, 0.5),
+    0 4px 6px -4px rgba(165, 180, 252, 0.5);
+  transform: scale(1.03);
+}
+.rt-pop-clear:hover::after {
+  animation: btn-shimmer 0.7s ease-in-out;
+}
+.rt-pop-clear:active {
+  transform: scale(0.98);
+}
+html.dark .rt-pop-clear { box-shadow: none; }
+html.dark .rt-pop-clear:hover { box-shadow: none; }
+.rt-pop-clear--danger {
+  /* Danger variant overrides the gradient — it's a "remove" action,
+     not a primary CTA, so it reads as a flat red link button. */
+  margin-top: 6px;
+  background: transparent;
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.28);
+  box-shadow: none;
+  font-weight: 500;
+}
+.rt-pop-clear--danger::after { display: none; }
+.rt-pop-clear--danger:hover {
+  background: rgba(220, 38, 38, 0.08);
+  box-shadow: none;
+  transform: none;
+}
+html.dark .rt-pop-clear--danger { color: #f87171; border-color: rgba(248, 113, 113, 0.32); }
+
+/* Underline variants popover */
+.rt-ul-styles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.rt-ul-style {
+  height: 36px;
+  border-radius: 6px;
+  border: 1px solid var(--rt-divider);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+}
+.rt-ul-style:hover { background: var(--rt-btn-hover); }
+.rt-ul-style.is-current {
+  background: var(--rt-btn-active-bg);
+  border-color: rgba(var(--rt-accent), 0.45);
+  color: var(--rt-btn-active-text);
+}
+
+/* Link popover */
+.rt-pop--link {
+  min-width: 280px;
+  padding: 10px;
+}
+.rt-link-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--rt-divider);
+  background: transparent;
+  color: inherit;
+  font-size: 0.88rem;
+  outline: none;
+}
+.rt-link-input:focus {
+  border-color: rgba(var(--rt-accent), 0.5);
+  box-shadow: 0 0 0 3px rgba(var(--rt-accent), 0.18);
+}
+.rt-link-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.rt-link-btn {
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--rt-divider);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.rt-link-btn:hover { background: var(--rt-btn-hover); }
+.rt-link-btn--primary {
+  /* Same Personnaliser theme as the typography settings button:
+     indigo→violet gradient, indigo-300 shadows, hover scale 1.03,
+     200 ms transition, plus the shared btn-shimmer ::after sweep. */
+  position: relative;
+  overflow: hidden;
+  flex: 1 1 auto;
+  background: linear-gradient(to right, rgb(99, 102, 241), rgb(124, 58, 237));
+  color: #fff;
+  border-color: transparent;
+  font-weight: 600;
+  box-shadow:
+    0 4px 6px -1px rgba(165, 180, 252, 0.4),
+    0 2px 4px -2px rgba(165, 180, 252, 0.4);
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.rt-link-btn--primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 35%,
+    rgba(255, 255, 255, 0.25) 45%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0.25) 55%,
+    transparent 65%,
+    transparent 100%
+  );
+  transform: translateX(-100%) skewX(-15deg);
+  pointer-events: none;
+}
+.rt-link-btn--primary:hover:not(:disabled) {
+  background: linear-gradient(to right, rgb(79, 70, 229), rgb(109, 40, 217));
+  box-shadow:
+    0 10px 15px -3px rgba(165, 180, 252, 0.5),
+    0 4px 6px -4px rgba(165, 180, 252, 0.5);
+  transform: scale(1.03);
+}
+.rt-link-btn--primary:hover:not(:disabled)::after {
+  animation: btn-shimmer 0.7s ease-in-out;
+}
+.rt-link-btn--primary:active:not(:disabled) { transform: scale(0.98); }
+.rt-link-btn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+html.dark .rt-link-btn--primary { box-shadow: none; }
+html.dark .rt-link-btn--primary:hover:not(:disabled) { box-shadow: none; }
+.rt-link-btn--danger {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.28);
+}
+html.dark .rt-link-btn--danger { color: #f87171; border-color: rgba(248, 113, 113, 0.32); }
+.rt-link-btn--icon {
+  width: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.rt-link-btn--icon svg { width: 16px; height: 16px; }
+
+/* ---------- Settings — typography preview grid ---------- */
+.settings-type-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+/* Per-block card. Preview sits at the top, controls flow below in a
+   flexible grid that wraps gracefully — settings panels are narrow
+   (side sheet on desktop, full-width on mobile) so a single horizontal
+   row of controls can't fit and would get cut off. */
+.settings-type-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--rt-divider);
+}
+html.dark .settings-type-row { background: rgba(255, 255, 255, 0.04); }
+.settings-type-preview {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 0;
+  border-bottom: 1px dashed var(--rt-divider);
+}
+.settings-type-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: flex-end;
+}
+.settings-type-field {
+  display: inline-flex;
+  flex-direction: column;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.72;
+  gap: 2px;
+}
+.settings-type-field-label { font-weight: 600; }
+.settings-type-field select {
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--rt-divider);
+  background: rgba(255, 255, 255, 0.6);
+  color: inherit;
+  font-size: 0.85rem;
+}
+html.dark .settings-type-field select {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Colour swatches in the typography settings panel — one row per block.
+   A "none" chip (diagonal slash) resets the colour to inherit. */
+.settings-type-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  max-width: 100%;
+}
+.settings-type-color {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.08s ease, box-shadow 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.settings-type-color:hover { transform: scale(1.12); }
+.settings-type-color.is-current {
+  box-shadow: 0 0 0 2px rgba(var(--rt-accent), 0.85);
+  border-color: transparent;
+}
+html.dark .settings-type-color { border-color: rgba(255, 255, 255, 0.18); }
+.settings-type-color--none {
+  background: #ffffff;
+  color: rgba(0, 0, 0, 0.35);
+}
+html.dark .settings-type-color--none {
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Italic / underline toggle pair — small pill buttons showing the style. */
+.settings-type-field--inline .settings-type-field-label { margin-bottom: 2px; }
+.settings-type-toggles { display: inline-flex; gap: 4px; }
+.settings-type-toggle {
+  width: 28px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--rt-divider);
+  background: rgba(255, 255, 255, 0.6);
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: Georgia, "Times New Roman", serif;
+  padding: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.settings-type-toggle:hover { background: var(--rt-btn-hover); }
+.settings-type-toggle.is-current {
+  background: var(--rt-btn-active-bg);
+  color: var(--rt-btn-active-text);
+  border-color: rgba(var(--rt-accent), 0.45);
+}
+html.dark .settings-type-toggle {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ================================================================
+   Typography customisation modal — dedicated full-viewport surface
+   for size / weight / colour / italic / underline per block type.
+   ================================================================ */
+.typo-modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(17, 24, 39, 0.48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Respect Android / iOS safe areas so the modal never tucks under
+     the status bar or the gesture handle on edge-to-edge devices.
+     The 32 px top fallback covers the case where some Android
+     WebViews report env(safe-area-inset-top) as 0 even with
+     viewport-fit=cover — typical status-bar heights are 24–30 px,
+     notched displays 36–45 px. */
+  padding: max(32px, env(safe-area-inset-top))
+           max(16px, env(safe-area-inset-right))
+           max(16px, env(safe-area-inset-bottom))
+           max(16px, env(safe-area-inset-left));
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.typo-modal-scrim--dark { background: rgba(0, 0, 0, 0.62); }
+
+.typo-modal {
+  width: min(820px, 100%);
+  max-height: min(92vh, 960px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 16px 44px -6px rgba(17, 24, 39, 0.35), 0 4px 12px rgba(17, 24, 39, 0.12);
+  overflow: hidden;
+  color: inherit;
+}
+html.dark .typo-modal {
+  background: #1f2937;
+  box-shadow: 0 16px 44px -6px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.typo-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  /* Pad below the safe-area inset AND give an explicit 12 px of
+     breathing room above the title — without the calc the title
+     sat exactly at the inset boundary, which on a real Android
+     device read as "touching the status bar". The max() fallback
+     of 32 px covers WebViews that report env() as 0. */
+  padding: max(32px, calc(env(safe-area-inset-top) + 12px)) 20px 14px;
+  border-bottom: 1px solid var(--rt-divider);
+}
+.typo-modal-header-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.typo-modal-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.typo-modal-desc {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+/* Profile tabs — segmented control under the title so the user can
+   switch which profile they're editing without leaving the modal. */
+.typo-modal-profiles {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 3px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  border: 1px solid var(--rt-divider);
+}
+html.dark .typo-modal-profiles {
+  background: rgba(255, 255, 255, 0.06);
+}
+.typo-modal-profile {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, transform 0.08s ease;
+}
+.typo-modal-profile:hover:not(.is-active) {
+  background: var(--rt-btn-hover);
+}
+.typo-modal-profile.is-active {
+  background: #ffffff;
+  color: rgb(var(--rt-accent));
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.12);
+}
+html.dark .typo-modal-profile.is-active {
+  background: rgba(99, 102, 241, 0.22);
+  color: rgb(196, 181, 253);
+  box-shadow: none;
+}
+
+.typo-modal-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.typo-modal-reset {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--rt-divider);
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.typo-modal-reset:hover { background: var(--rt-btn-hover); }
+.typo-modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.typo-modal-close:hover { background: var(--rt-btn-hover); }
+
+.typo-modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 14px 16px 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.typo-modal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--rt-divider);
+}
+html.dark .typo-modal-card { background: rgba(255, 255, 255, 0.04); }
+
+.typo-modal-card-preview {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 0 6px;
+  border-bottom: 1px dashed var(--rt-divider);
+}
+.typo-modal-card-hint {
+  font-size: 0.72rem;
+  opacity: 0.6;
+  line-height: 1.3;
+}
+
+.typo-modal-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+.typo-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.75;
+}
+.typo-modal-field--wide { grid-column: 1 / -1; }
+.typo-modal-field-label { font-weight: 600; }
+.typo-modal-field select {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--rt-divider);
+  background: rgba(255, 255, 255, 0.6);
+  color: inherit;
+  font-size: 0.85rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+html.dark .typo-modal-field select {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.typo-modal-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.typo-modal-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.08s ease, box-shadow 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.typo-modal-color:hover { transform: scale(1.1); }
+.typo-modal-color.is-current {
+  box-shadow: 0 0 0 2px rgba(var(--rt-accent), 0.85);
+  border-color: transparent;
+}
+html.dark .typo-modal-color { border-color: rgba(255, 255, 255, 0.18); }
+.typo-modal-color--none {
+  background: #ffffff;
+  color: rgba(0, 0, 0, 0.4);
+}
+html.dark .typo-modal-color--none {
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.5);
+}
+.typo-modal-color-custom {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px dashed var(--rt-divider);
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  background: linear-gradient(135deg, #ef4444, #eab308, #22c55e, #0ea5e9, #a855f7);
+}
+.typo-modal-color-custom input[type="color"] {
+  position: absolute;
+  inset: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.typo-modal-toggles { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.typo-modal-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--rt-divider);
+  background: rgba(255, 255, 255, 0.55);
+  color: inherit;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.typo-modal-toggle:hover { background: var(--rt-btn-hover); }
+.typo-modal-toggle.is-current {
+  background: var(--rt-btn-active-bg);
+  color: var(--rt-btn-active-text);
+  border-color: rgba(var(--rt-accent), 0.45);
+}
+html.dark .typo-modal-toggle {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.typo-modal-toggle-sample {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1;
+  min-width: 14px;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Tabler icons used inside the italic / underline toggles — same look
+   as the note-modal toolbar for visual consistency. */
+.typo-modal-toggle-sample .tabler-icon { width: 18px; height: 18px; }
+.typo-modal-toggle-sample .tabler-icon svg { width: 18px; height: 18px; }
+.typo-modal-toggle-label { font-size: 0.78rem; font-weight: 500; }
+
+@media (max-width: 560px) {
+  .typo-modal {
+    /* Mobile: the panel goes full-screen — make it tall enough to
+       cover the dynamic-viewport unit so the gesture nav doesn't
+       eat into the visible area. */
+    max-height: 100dvh;
+    height: 100dvh;
+    border-radius: 0;
+  }
+  .typo-modal-scrim { padding: 0; }
+  /* On mobile the wide "Réinitialiser ce profil" CTA was sitting
+     to the right of the description and crushing it. Stack the
+     header vertically so the title + desc + tabs use the full
+     width on top and the reset CTA drops to its own row below.
+     The close × stays pinned to the top-right corner via absolute
+     positioning so it doesn't hitch a ride down with the CTA. */
+  .typo-modal-header {
+    position: relative;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .typo-modal-header-actions {
+    align-self: flex-end;
+  }
+  .typo-modal-header-actions .typo-modal-close {
+    /* Pin top-right but anchor at the same y as the title so the ×
+       and the "Typographie de l'éditeur" line read as one row.
+       The 32 / env+12 floors mirror the header's own padding-top so
+       the × clears the status bar on edge-to-edge Android. */
+    position: absolute;
+    top: max(32px, calc(env(safe-area-inset-top) + 12px));
+    right: 12px;
+  }
+  .typo-modal-body {
+    grid-template-columns: 1fr;
+    /* Bottom padding follows the same pattern as SettingsPanel:
+       env(safe-area-inset-bottom) with a 16 px floor so the last
+       card is never hidden under the Android gesture nav bar. */
+    padding: 12px
+             max(12px, env(safe-area-inset-right))
+             max(16px, env(safe-area-inset-bottom))
+             max(12px, env(safe-area-inset-left));
+  }
+}
+
+/* Mobile squeeze: the toolbar stays on one or two lines and each row uses
+   the horizontal scroll container instead of wrapping aggressively on tiny
+   screens. Groups stay grouped visually via the separators. */
+@media (max-width: 640px) {
+  .rt-toolbar {
+    flex-wrap: wrap;
+    padding: 4px 6px 6px;
+    margin: 2px 6px 6px;
+    row-gap: 4px;
+  }
+  /* Touch-friendly minimum size on mobile, matching the enlarged desktop
+     density. */
+  .rt-btn { min-width: 36px; height: 36px; padding: 0 7px; }
+  .rt-btn--wide { width: 110px; flex: 0 0 110px; }
+  .rt-btn--block { min-width: 50px; }
+  .rt-btn svg { width: 20px; height: 20px; }
+  .rt-pop { min-width: 220px; }
+  .rt-sep { margin: 0 4px; height: 26px; }
+  .rt-style-btn { width: 80px; flex: 0 0 80px; height: 34px; padding: 0 6px; }
+}
+
+/* Read-only note-content renderings (cards + modal view) should ALSO honour
+   typography presets AND the per-block indent marker so edit↔view stays
+   visually identical even before the user edits a legacy note. */
+.note-content [data-indent],
+.rt-editor-content [data-indent] {
+  /* Inline style handles the actual margin; this hook just lets us attach
+     responsive overrides if ever needed. */
 }
 `;

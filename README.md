@@ -14,11 +14,11 @@
     <td><img src="https://github.com/user-attachments/assets/d870ea4a-2413-4b4d-9553-1eb5110baab0" width="100%" /></td>
   </tr>
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/fdbb102d-c8a4-4456-84a1-1aadea6cab0f" width="100%" /></td>
-    <td><img src="https://github.com/user-attachments/assets/d6101ee3-93f3-40f2-9c85-91374a9a583d" width="100%" /></td>
+    <td><img src="https://github.com/user-attachments/assets/97e8935d-e9dd-4cfa-b501-101c3d36c67e"" width="100%" /></td>
+    <td><img src="https://github.com/user-attachments/assets/9d10b4ad-f432-4d9d-a5ba-2fe86ea11c6d" width="100%" /></td>
   </tr>
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/36bfd2af-679b-481b-8c32-7337c5bf7685" width="100%" /></td>
+    <td><img src="https://github.com/user-attachments/assets/2f737586-31b8-48ae-8e2a-91b8fb2e069a" width="100%" /></td>
     <td><img src="https://github.com/user-attachments/assets/9a3ca927-e3ce-4b58-bf85-eec243912de1" width="100%" /></td>
   </tr>
   <tr>
@@ -28,8 +28,8 @@
 
 <table align="center">
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/0126f452-e273-45ab-b30c-2d14a9af7c10" width="240" /></td>
-    <td><img src="https://github.com/user-attachments/assets/9de00d64-6dc3-4228-85f5-711a5877aeb3" width="240" /></td>
+    <td><img src="https://github.com/user-attachments/assets/ac5b70c7-5577-4deb-88ee-8bcf2b81eb98" width="240" /></td>
+    <td><img src="https://github.com/user-attachments/assets/e4fbff5b-c154-4b12-b0dc-d96fac9d1eb3" width="240" /></td>
     <td><img src="https://github.com/user-attachments/assets/422068dc-4d0b-408e-b950-9c6df9a3044b" width="240" /></td>
   </tr>
 </table>
@@ -56,6 +56,7 @@ Compared to the original project, this fork puts more emphasis on:
 - **🔄 local-first usage and offline support**
 - **🗑️ safer note deletion with Trash / restore**
 - **📱 better mobile usability**
+- **✏️ a real WYSIWYG / live-formatting editor for text notes**
 - **🤖 a native Android companion app**
 - **🌍 a cleaner and more extensible i18n foundation**
 - **🛠️ simpler self-hosting**
@@ -87,6 +88,7 @@ Compared to the original project, this fork puts more emphasis on:
 - more direct note creation flow
 - better handling of text overflow and previews
 - clickable phone numbers in full note view on mobile
+- formatting bottom sheet (swipe-to-close, drag handle) for the rich-text editor on phones
 - more polish around touch interactions and small-screen usage
 - native Android wrapper for self-hosted instances
 - first-launch server URL setup
@@ -100,6 +102,29 @@ Compared to the original project, this fork puts more emphasis on:
 - English and French already implemented
 - English fallback when a key is missing
 - cleaner base for adding more languages later
+
+### ✏️ Rich-text editor (live formatting)
+- full WYSIWYG editor (Tiptap) for text notes — replaces the legacy Markdown textarea
+- bold / italic / underline (4 variants + colour) / strike, sub / sup, inline code, code blocks, blockquote, separator, links
+- bullet & ordered lists with independent indent / outdent, alignment, headings (Paragraph + H1 to H5)
+- 28 self-hosted webfonts (Inter, Roboto, Lato, Playfair, JetBrains Mono, …) — no CDN
+- per-block typography presets (size, weight, colour, italic, underline) configurable from the settings, with three switchable profiles and cross-device sync
+- mobile: dedicated "Formatting" bottom sheet with swipe-to-close drag handle, replaces the cramped desktop ribbon on phones
+- Tab from the title focuses the body; Shift+Tab from the body returns to the title
+- empty notes are auto-removed on close (per-type aware: text body, checklist items, drawing strokes — images keep the note alive)
+
+### 📥 Smarter Google Keep import
+- drop the **raw Google Takeout `.zip`** directly — no need to hand-pick the .json files
+- titles, bodies, lists, labels, **colours** (mapped to the closest GlassKeep swatch) and **image attachments** all imported
+- single line breaks and blank lines from the original textContent are preserved (no marked() detour)
+- **server-side deduplication** (fingerprint on title + body + items + images) so re-importing the same export doesn't multiply notes — applies to GlassKeep .json, Markdown imports and Takeout .zip alike
+
+> 📘 Need help generating that `.zip` ? See the step-by-step Google Takeout walkthrough → [`IMPROVEMENTS.md` › How to export your Google Keep notes](./IMPROVEMENTS.md#how-to-export-your-google-keep-notes)
+
+### 🎨 Settings panel revamp
+- every section header and every option now carries a Tabler icon for at-a-glance navigation
+- wider drawer on tablet / desktop, controls right-aligned and stacked under labels on mobile so longer translations never crush the description
+- duplicate the open note in one click from the modal kebab menu
 
 ### 🛠️ Easier self-hosting
 - native install script for Debian / Ubuntu / Proxmox LXC
@@ -129,8 +154,8 @@ This fork also keeps the main capabilities that already made the original projec
 - 🗝️ secret recovery key login
 - 📝 Markdown notes, checklists, drawings, and images
 - 👥 real-time collaboration on notes
-- 📦 import / export
-- 📥 Google Keep import
+- 📦 import / export with cross-device duplicate detection
+- 📥 Google Keep import (Takeout `.zip` — full colour, images, line breaks)
 - 🧠 optional local AI assistant
 - 📲 PWA support
 
@@ -228,10 +253,12 @@ Missing keys will automatically fall back to English.
 - Server-side encryption to better protect data in case the server or its drives are stolen
 - More translations with better RTL language support
 - Make the Android app available on **F-Droid**
-- Rich Text / Live Formatting Editor
+- **In-app update notifications** when a new release is available, so a self-hosted instance prompts the user to refresh / pull instead of staying silent
+- **Card footer on closed notes** surfacing the tags directly on the card, plus a new optional **note "logo" image** — a small uploaded picture used purely as a visual identifier (e.g. dropping the Spotify logo on a "favourite playlists" note so it stands out at a glance in the grid). The logo lives in the card footer and is independent of the regular image attachments that already render inside the note body
+- **Side-by-side note view** to open two notes at the same time for comparison and cross-referencing
 
 ### 💭 Under consideration
-- Explore an edit flow closer to Google Keep
+- *(open — suggestions welcome)*
 
 ---
 

@@ -4,7 +4,8 @@ import PaletteColorIcon from "../common/PaletteColorIcon.jsx";
 import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
 import Popover from "../common/Popover.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
-import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, FormatIcon, Kebab, TextNoteIcon, ChecklistIcon } from "../../icons/index.jsx";
+import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon } from "../../icons/index.jsx";
+import TI from "../../icons/editor/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 import { t } from "../../i18n";
 
@@ -80,6 +81,8 @@ export default function ModalFooter({
   canRedo,
   // note type conversion (text <-> checklist)
   onConvertNoteType,
+  // Duplicate the active note (kebab → "Dupliquer la note").
+  onDuplicateNote,
 }) {
   const isDesktop = windowWidth >= 768 && !isLandscapeMobile && !isWebView;
   const isTrashed = tagFilter === "TRASHED";
@@ -424,23 +427,26 @@ export default function ModalFooter({
         </button>
         )}
 
-        {/* Spacer */}
-        <div className="flex-1 modal-footer-spacer" />
-
-        {/* ── Formatting (mobile edit mode only — replaces collab in this position) ── */}
-        {!isDesktop && mType === "text" && !viewMode && (
+        {/* Mobile-only formatting button — opens the rich-text toolbar
+            in a bottom sheet. The desktop ribbon stays in the sticky
+            header (handled by NoteModal), so this button is hidden
+            there. Available for text notes (always) and draw notes
+            when not in canvas mode (their inline text body still uses
+            the same rich editor). View mode hides it. */}
+        {!isDesktop && !viewMode && (mType === "text" || (mType === "draw" && drawMode !== "draw")) && (
           <button
             ref={modalFmtBtnRef}
-            className="modal-footer-btn focus:outline-none"
+            className={`modal-footer-btn modal-footer-btn--fmt focus:outline-none${showModalFmt ? " is-active" : ""}`}
+            onClick={() => setShowModalFmt((v) => !v)}
             data-tooltip={t("formatting")}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowModalFmt((v) => !v);
-            }}
+            aria-pressed={showModalFmt ? "true" : "false"}
           >
-            <FormatIcon />
+            <TI.TextColor />
           </button>
         )}
+
+        {/* Spacer */}
+        <div className="flex-1 modal-footer-spacer" />
 
         {/* ── Collaborate (hidden on mobile text edit mode & draw edit mode — moved to kebab) ── */}
         {(isDesktop || viewMode || mType !== "text") && !(mType === "draw" && drawMode !== "draw" && !viewMode) && (() => {
@@ -547,6 +553,22 @@ export default function ModalFooter({
               >
                 {mType === "text" ? <ChecklistIcon /> : <TextNoteIcon />}
                 {mType === "text" ? t("convertToChecklist") : t("convertToText")}
+              </button>
+            )}
+            {/* Duplicate — hidden in trash. Two-overlapping-squares
+                glyph kept inline (one-shot icon, not worth a vendored
+                file). */}
+            {!isTrashed && onDuplicateNote && (
+              <button
+                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                style={{ color: dark ? "#67e8f9" : "#0891b2" }}
+                onClick={() => { onDuplicateNote(); setModalKebabOpen(false); }}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="9" y="9" width="11" height="11" rx="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                {t("duplicateNote")}
               </button>
             )}
             {/* Download */}

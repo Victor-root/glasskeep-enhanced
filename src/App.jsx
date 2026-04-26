@@ -28,6 +28,13 @@ import { api, getAuth, setAuth, AUTH_KEY } from "./utils/api.js";
 import { mdForDownload } from "./utils/markdown.jsx";
 import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, fileToCompressedDataURL, setThemeColor } from "./utils/helpers.js";
 import { textToChecklistItems, checklistItemsToText } from "./utils/noteConversion.js";
+import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRichDoc } from "./utils/richText.js";
+import {
+  DEFAULT_TYPOGRAPHY_PRESETS,
+  TYPOGRAPHY_STORAGE_KEY,
+  applyTypographyPresets,
+  normalizeTypographyPresets,
+} from "./utils/typographyPresets.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES } from "./utils/constants.js";
 import { ColorDot } from "./components/common/ColorDot.jsx";
@@ -188,6 +195,18 @@ export default function App() {
       return true;
     }
   });
+  const [typographyPresets, setTypographyPresets] = useState(() => {
+    try {
+      const stored = localStorage.getItem(TYPOGRAPHY_STORAGE_KEY);
+      if (stored) return normalizeTypographyPresets(JSON.parse(stored));
+    } catch (e) {}
+    return { ...DEFAULT_TYPOGRAPHY_PRESETS };
+  });
+  // Push the current presets onto :root as CSS variables whenever they change
+  // so the editor AND the view-mode / card previews pick them up instantly.
+  useEffect(() => {
+    applyTypographyPresets(typographyPresets);
+  }, [typographyPresets]);
   const [aiResponse, setAiResponse] = useState(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiLoadingProgress, setAiLoadingProgress] = useState(null);
@@ -518,6 +537,11 @@ export default function App() {
           setEdgeToEdgeLandscape(settings.edgeToEdgeLandscape);
           localStorage.setItem("edgeToEdgeLandscape", String(settings.edgeToEdgeLandscape));
         }
+        if (settings?.typographyPresets && typeof settings.typographyPresets === "object") {
+          const normalized = normalizeTypographyPresets(settings.typographyPresets);
+          setTypographyPresets(normalized);
+          try { localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(normalized)); } catch (e) {}
+        }
       } catch (e) {
         // Network error — default to true
         setAlwaysShowSidebarOnWide((prev) => prev === null ? true : prev);
@@ -613,6 +637,19 @@ export default function App() {
       }).catch(() => {});
     }
   }, [edgeToEdgeLandscape]);
+
+  // Typography presets: local-first + server sync, mirroring the other prefs.
+  useEffect(() => {
+    try { localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(typographyPresets)); } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { typographyPresets },
+      }).catch(() => {});
+    }
+  }, [typographyPresets]);
 
   // Window resize listener for responsive sidebar behavior
   useEffect(() => {
@@ -916,6 +953,10 @@ export default function App() {
 
   // Settings panel state
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  // Lifted from SettingsPanel so the centralised overlay back-button
+  // stack (and the safe-area-aware scrim) can react to the typography
+  // sub-modal opening / closing.
+  const [typographyModalOpen, setTypographyModalOpen] = useState(false);
 
   // Sync dropdown state (lifted for back button support)
   const [syncDropdownOpen, setSyncDropdownOpen] = useState(false);
@@ -2751,6 +2792,11 @@ export default function App() {
     if (pendingDraftRef.current && String(noteId) === String(pendingDraftRef.current.id)) {
       materializeDraftIfNeeded();
     }
+    // Archiving is a durable commitment — clear the freshly-created marker
+    // so the empty-on-close auto-trash doesn't undo it for an empty note.
+    if (freshlyCreatedNoteRef.current === String(noteId)) {
+      freshlyCreatedNoteRef.current = null;
+    }
     const nid = String(noteId);
     const leaseId = acquireLocalLease(nid);
     const nowIso = new Date().toISOString();
@@ -2849,7 +2895,7 @@ export default function App() {
     collaborationModalOpen, showModalColorPop, showModalFmt, modalMenuOpen,
     modalKebabOpen, modalTagFocused, syncDropdownOpen, mobileSearchOpen,
     showColorPop, showComposerFmt, headerMenuOpen, multiMode,
-    settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
+    typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
   ].filter(Boolean).length;
   const prevOverlayCountRef = useRef(0);
 
@@ -2904,6 +2950,7 @@ export default function App() {
       if (showComposerFmt) { setShowComposerFmt(false); return; }
       if (headerMenuOpen) { setHeaderMenuOpen(false); return; }
       if (multiMode) { setMultiMode(false); return; }
+      if (typographyModalOpen) { setTypographyModalOpen(false); return; }
       if (settingsPanelOpen) { setSettingsPanelOpen(false); return; }
       if (adminPanelOpen) { setAdminPanelOpen(false); return; }
       if (sidebarOpen) { setSidebarOpen(false); return; }
@@ -2913,7 +2960,7 @@ export default function App() {
   }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
       showModalColorPop, showModalFmt, modalMenuOpen, modalKebabOpen, modalTagFocused,
       syncDropdownOpen, mobileSearchOpen, showColorPop, showComposerFmt,
-      headerMenuOpen, multiMode, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen]);
+      headerMenuOpen, multiMode, typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen]);
 
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
@@ -2973,6 +3020,7 @@ export default function App() {
   // and the closeModal early-exit branch; those are orchestration.
   const {
     pendingDraftRef,
+    freshlyCreatedNoteRef,
     materializeDraftIfNeeded,
     handleDirectText,
     handleDirectChecklist,
@@ -3369,6 +3417,7 @@ export default function App() {
     // the exit animation and drop the pending state — no IDB/queue work.
     if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
       pendingDraftRef.current = null;
+      freshlyCreatedNoteRef.current = null;
       setIsModalClosing(true);
       modalClosingTimerRef.current = setTimeout(() => {
         modalClosingTimerRef.current = null;
@@ -3382,6 +3431,80 @@ export default function App() {
       }, 180);
       return;
     }
+
+    // Auto-trash any note the user emptied before closing — fresh or not.
+    // Body emptiness is checked through contentToPlain so the Tiptap JSON
+    // envelope (which is never an empty STRING even when the doc is empty)
+    // collapses to its actual user-visible text before the trim test.
+    //
+    // Tags don't count — a fresh note opened from inside a tag filter
+    // auto-inherits the tag and would otherwise never qualify. Images
+    // DO count as content though: a note that only carries pictures
+    // (typical of Google Keep imports) is just as valid as a text-only
+    // one and must NOT be auto-deleted on close.
+    if (activeId) {
+      const drawPaths = mType === "draw"
+        ? (mDrawingData?.paths || (Array.isArray(mDrawingData) ? mDrawingData : []))
+        : [];
+      // For each note type, "body" means what the user actually authored —
+      // the rich-text doc for text notes, the items list for checklists,
+      // the drawing strokes (+ optional inline text) for draw notes.
+      const bodyEmpty = mType === "text"
+        ? !contentToPlain(mBody).trim()
+        : mType === "checklist"
+          ? !Array.isArray(mItems) || mItems.length === 0
+          : !mBody?.trim() && drawPaths.length === 0;
+      const titleEmpty = !mTitle?.trim();
+      const noImages = !Array.isArray(mImages) || mImages.length === 0;
+      if (titleEmpty && bodyEmpty && noImages) {
+        const nid = String(activeId);
+        const nowIso = new Date().toISOString();
+        // Server contract: a note must be trashed before it can be
+        // permanently deleted (DELETE /notes/:id/permanent returns 400
+        // otherwise). Locally we still want the note gone immediately
+        // — tombstone + idbDeleteNote handle the UI/storage side. The
+        // queue then plays out in FIFO order: trash THEN permanent
+        // delete, so the server walks through the legal transition
+        // and the note doesn't end up stuck mid-pipeline.
+        addDeleteTombstone(nid);
+        setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
+        invalidateNotesCache();
+        invalidateTrashedNotesCache();
+        showToast(t("emptyNoteDeleted"), "info");
+        freshlyCreatedNoteRef.current = null;
+        (async () => {
+          try {
+            await idbDeleteNote(nid, currentUser?.id, sessionId);
+          } catch (e) {}
+          const trashLease = acquireLocalLease(nid);
+          await enqueueWithLease(
+            nid,
+            { type: "trash", noteId: nid, payload: { client_updated_at: nowIso } },
+            trashLease,
+          );
+          const purgeLease = acquireLocalLease(nid);
+          await enqueueWithLease(
+            nid,
+            { type: "permanentDelete", noteId: nid, payload: { client_updated_at: nowIso } },
+            purgeLease,
+          );
+        })();
+
+        setIsModalClosing(true);
+        modalClosingTimerRef.current = setTimeout(() => {
+          modalClosingTimerRef.current = null;
+          setOpen(false);
+          setActiveId(null);
+          setViewMode(true);
+          setModalMenuOpen(false);
+          setConfirmDeleteOpen(false);
+          setShowModalFmt(false);
+          setIsModalClosing(false);
+        }, 180);
+        return;
+      }
+    }
+    freshlyCreatedNoteRef.current = null;
 
     // Flush any pending drawing debounce before closing.
     // flushPendingDrawingSave restores pendingDrawingSaveRef on failure,
@@ -3487,6 +3610,12 @@ export default function App() {
     if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
       materializeDraftIfNeeded();
     }
+    // Explicit save = user intent to keep this note even if it's empty.
+    // Drop the freshly-created marker so closeModal's auto-trash branch
+    // won't undo the commit.
+    if (freshlyCreatedNoteRef.current === String(activeId)) {
+      freshlyCreatedNoteRef.current = null;
+    }
     setSavingModal(true);
 
     const noteId = String(activeId);
@@ -3578,6 +3707,12 @@ export default function App() {
     if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
       closeModal();
       return;
+    }
+    // The user is explicitly deleting — drop the freshly-created marker so
+    // closeModal's auto-trash branch doesn't enqueue a redundant trash on
+    // top of whatever delete-flow we're about to run.
+    if (freshlyCreatedNoteRef.current === String(activeId)) {
+      freshlyCreatedNoteRef.current = null;
     }
     const note = notes.find((n) => String(n.id) === String(activeId));
     const nid = String(activeId);
@@ -3699,6 +3834,11 @@ export default function App() {
     // create lands in the queue before the pin patch follows.
     if (pendingDraftRef.current && String(id) === String(pendingDraftRef.current.id)) {
       materializeDraftIfNeeded();
+    }
+    // Pinning is a durable commitment — clear the freshly-created marker so
+    // the empty-on-close auto-trash doesn't undo a pinned empty note.
+    if (freshlyCreatedNoteRef.current === String(id)) {
+      freshlyCreatedNoteRef.current = null;
     }
     const nid = String(id);
     const leaseId = acquireLocalLease(nid);
@@ -3958,8 +4098,19 @@ export default function App() {
     const targetType = mType === "text" ? "checklist" : "text";
     const toastKey = targetType === "checklist" ? "convertedToChecklist" : "convertedToText";
 
-    const newItems = targetType === "checklist" ? textToChecklistItems(mBody || "") : [];
-    const newBody = targetType === "text" ? checklistItemsToText(mItems) : "";
+    // Text → checklist: flatten rich JSON (or legacy Markdown) to plain lines
+    // so textToChecklistItems can parse bullets / tasks / headings.
+    // Checklist → text: wrap the generated Markdown in our rich envelope so
+    // the resulting text note opens directly in rich mode (no second-edit
+    // upgrade needed).
+    const textForConversion =
+      mType === "text" && isRichContent(mBody)
+        ? contentToPlain(mBody)
+        : mBody || "";
+    const newItems = targetType === "checklist" ? textToChecklistItems(textForConversion) : [];
+    const newBody = targetType === "text"
+      ? serializeRichContent(legacyMarkdownToRichDoc(checklistItemsToText(mItems)))
+      : "";
 
     // Local state first — keep the UI responsive even if the sync call lags.
     skipNextItemsAutosave.current = true;
@@ -4041,6 +4192,73 @@ export default function App() {
       onConfirm: () => performConvertNoteType(),
     });
     setGenericConfirmOpen(true);
+  };
+
+  /** -------- Duplicate the currently-open note --------
+   *  Builds a fresh note from the modal's in-memory state (so unsaved
+   *  edits are also captured), persists it via the standard create
+   *  pipeline (IDB + setNotes + enqueue "create"), and closes the
+   *  modal so the new card appears at the top of the grid. */
+  const duplicateActiveNote = async () => {
+    if (!activeId) return;
+    if (tagFilter === "TRASHED") return;
+    // If the modal still hosts an unmaterialised draft, materialise it
+    // first so we don't end up with a duplicate of something that the
+    // close flow would later drop as a never-persisted draft.
+    if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
+      materializeDraftIfNeeded();
+    }
+    const newId = uid();
+    const nowIso = new Date().toISOString();
+    const baseTitle = (mTitle || "").trim();
+    const newTitle = baseTitle
+      ? `${baseTitle} ${t("duplicateSuffix")}`
+      : t("duplicateSuffix");
+    const items = Array.isArray(mItems)
+      ? mItems.map((it) => ({ ...it, id: uid() }))
+      : [];
+    const isDraw = mType === "draw";
+    const content = isDraw
+      ? JSON.stringify({
+          paths: mDrawingData?.paths || [],
+          dimensions: mDrawingData?.dimensions || null,
+          text: mBody || "",
+        })
+      : (mBody || "");
+    const newNote = {
+      id: newId,
+      type: mType,
+      title: newTitle,
+      content,
+      items,
+      tags: Array.isArray(mTagList) ? [...mTagList] : [],
+      images: Array.isArray(mImages) ? mImages.map((im) => ({ ...im, id: uid() })) : [],
+      color: mColor || "default",
+      pinned: false,
+      position: Date.now(),
+      timestamp: nowIso,
+      updated_at: nowIso,
+      client_updated_at: nowIso,
+    };
+    const localNote = {
+      ...newNote,
+      user_id: currentUser?.id,
+      archived: false,
+      trashed: false,
+    };
+    const leaseId = acquireLocalLease(newId);
+    try {
+      await idbPutNote(localNote, currentUser?.id, sessionId);
+    } catch (e) {
+      console.error("Duplicate note IDB put failed:", e);
+    }
+    setNotes((prev) =>
+      sortNotesByRecency([localNote, ...(Array.isArray(prev) ? prev : [])]),
+    );
+    invalidateNotesCache();
+    enqueueWithLease(newId, { type: "create", noteId: newId, payload: newNote }, leaseId);
+    showToast(t("noteDuplicated"), "success");
+    closeModal();
   };
 
   // Checklist drag-and-drop is handled by useChecklistDrag inside NoteModal
@@ -4267,6 +4485,7 @@ export default function App() {
       checklistInsertPosition={checklistInsertPosition}
       checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
       onConvertNoteType={convertNoteType}
+      onDuplicateNote={duplicateActiveNote}
       initialDrawMode={initialDrawMode}
       onConsumeInitialDrawMode={() => setInitialDrawMode(null)}
     />
@@ -4427,6 +4646,10 @@ export default function App() {
         setChecklistRemoveSectionBehavior={setChecklistRemoveSectionBehavior}
         edgeToEdgeLandscape={edgeToEdgeLandscape}
         setEdgeToEdgeLandscape={setEdgeToEdgeLandscape}
+        typographyPresets={typographyPresets}
+        setTypographyPresets={(next) => setTypographyPresets(normalizeTypographyPresets(next))}
+        typographyModalOpen={typographyModalOpen}
+        setTypographyModalOpen={setTypographyModalOpen}
         showGenericConfirm={showGenericConfirm}
         showToast={showToast}
         onResetNoteOrder={resetNoteOrder}

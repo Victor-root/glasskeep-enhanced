@@ -3,7 +3,22 @@ import { t } from "../../i18n";
 import { api } from "../../utils/api.js";
 import UserAvatar from "../common/UserAvatar.jsx";
 import { SunIcon, MoonIcon, FloatingCardsIcon, SettingsIcon, CloseIcon } from "../../icons/index.jsx";
+import TI from "../../icons/editor/index.jsx";
 import { fileToCompressedDataURL } from "../../utils/helpers.js";
+import TypographyModal from "./TypographyModal.jsx";
+
+// Single leading-icon component used in front of every section header
+// AND every row / button in the settings panel. Same 36 × 36 indigo
+// chip everywhere so every icon lines up in one clean vertical column
+// regardless of whether it sits next to an h4 title or a row label.
+function RowIcon({ icon: Icon }) {
+  return (
+    <span className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300">
+      <Icon className="tabler-icon w-5 h-5" />
+    </span>
+  );
+}
+const SectionHeaderIcon = RowIcon;
 
 export default function SettingsPanel({
   open,
@@ -26,6 +41,12 @@ export default function SettingsPanel({
   setChecklistRemoveSectionBehavior,
   edgeToEdgeLandscape,
   setEdgeToEdgeLandscape,
+  typographyPresets,
+  setTypographyPresets,
+  // Lifted into App.jsx so the centralised overlay back-button stack
+  // can pop the typography sub-modal on Android back gesture.
+  typographyModalOpen,
+  setTypographyModalOpen,
   showGenericConfirm,
   showToast,
   onResetNoteOrder,
@@ -37,6 +58,9 @@ export default function SettingsPanel({
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [overridePositions, setOverridePositions] = useState(true);
   const [profileShowOnLogin, setProfileShowOnLogin] = useState(true);
+  // typographyModalOpen / setTypographyModalOpen come from App.jsx props
+  // (see destructure above) — lifted to plug into the centralised
+  // overlay back-button stack.
   const avatarFileRef = React.useRef(null);
 
   // Load profile data when panel opens
@@ -107,7 +131,7 @@ export default function SettingsPanel({
         />
       )}
       <div
-        className={`fixed top-0 right-0 z-50 h-full w-full sm:w-96 transition-transform duration-200 ${open ? "translate-x-0 shadow-2xl" : "translate-x-full shadow-none"}`}
+        className={`fixed top-0 right-0 z-50 h-full w-full sm:w-[28rem] lg:w-[32rem] transition-transform duration-200 ${open ? "translate-x-0 shadow-2xl" : "translate-x-full shadow-none"}`}
         style={{
           backgroundColor: dark ? "#222222" : "rgba(255,255,255,0.95)",
           borderLeft: "1px solid var(--border-light)",
@@ -130,9 +154,9 @@ export default function SettingsPanel({
         </div>
 
         <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
-          {/* Profile Section */}
+          {/* Profile Section — header (icon + "Profil" title) intentionally
+              omitted; the avatar block is self-explanatory. */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">{t("profileSettings")}</h4>
             <div className="flex items-center gap-4 mb-4">
               <div className="relative group">
                 <UserAvatar
@@ -181,12 +205,15 @@ export default function SettingsPanel({
                 )}
               </div>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <div className="font-medium">{t("showOnLogin")}</div>
+            <div className="flex items-center justify-between gap-3 px-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <RowIcon icon={TI.Eye} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("showOnLogin")}</div>
+                </div>
               </div>
               <button
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
                   profileShowOnLogin ? "bg-indigo-600" : "bg-gray-300 dark:bg-gray-600"
                 }`}
                 onClick={handleShowOnLoginToggle}
@@ -199,100 +226,148 @@ export default function SettingsPanel({
               </button>
             </div>
             <button
-              className={`mt-3 block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+              className={`mt-3 flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
               onClick={() => {
                 onClose();
                 onChangePassword?.();
               }}
             >
-              <div className="font-medium">{t("changePassword")}</div>
-              <div className="text-sm text-gray-500">{t("changePasswordDesc")}</div>
+              <RowIcon icon={TI.Key} />
+              <div className="min-w-0">
+                <div className="font-medium">{t("changePassword")}</div>
+                <div className="text-sm text-gray-500">{t("changePasswordDesc")}</div>
+              </div>
             </button>
           </div>
 
+          <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
+
           {/* Data Management Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">{t("dataManagement")}</h4>
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
+              <SectionHeaderIcon icon={TI.Database} />
+              {t("dataManagement")}
+            </h4>
             <div className="space-y-3">
               <button
-                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onExportAll?.();
                 }}
               >
-                <div className="font-medium">{t("exportAllNotesJson")}</div>
-                <div className="text-sm text-gray-500">{t("downloadAllNotesJson")}</div>
+                <RowIcon icon={TI.Upload} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("exportAllNotesJson")}</div>
+                  <div className="text-sm text-gray-500">{t("downloadAllNotesJson")}</div>
+                </div>
               </button>
 
               <button
-                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onImportAll?.();
                 }}
               >
-                <div className="font-medium">{t("importNotesJson")}</div>
-                <div className="text-sm text-gray-500">{t("importNotesFromJsonFile")}</div>
+                <RowIcon icon={TI.Download} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("importNotesJson")}</div>
+                  <div className="text-sm text-gray-500">{t("importNotesFromJsonFile")}</div>
+                </div>
               </button>
 
               <button
-                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onImportGKeep?.();
                 }}
               >
-                <div className="font-medium">{t("importGoogleKeepNotes")}</div>
-                <div className="text-sm text-gray-500">{t("importNotesFromGoogleKeepExport")}</div>
+                <RowIcon icon={TI.BrandGoogle} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("importGoogleKeepNotes")}</div>
+                  <div className="text-sm text-gray-500">
+                    {t("importNotesFromGoogleKeepExport")}{" "}
+                    {/* Inline help link to Google's Takeout instructions.
+                        stopPropagation so clicking the link doesn't also
+                        trigger the parent button's file-picker open. */}
+                    <a
+                      href="https://support.google.com/accounts/answer/3024190?hl=en-AM&utm"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-500 hover:text-indigo-600 dark:text-indigo-300 dark:hover:text-indigo-200 underline underline-offset-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {t("howToExportGoogleKeep")}
+                    </a>
+                  </div>
+                </div>
               </button>
 
               <button
-                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onImportMd?.();
                 }}
               >
-                <div className="font-medium">{t("importMarkdownFilesMd")}</div>
-                <div className="text-sm text-gray-500">{t("importNotesFromMarkdownFiles")}</div>
+                <RowIcon icon={TI.FileText} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("importMarkdownFilesMd")}</div>
+                  <div className="text-sm text-gray-500">{t("importNotesFromMarkdownFiles")}</div>
+                </div>
               </button>
 
               <button
-                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   onClose();
                   onDownloadSecretKey?.();
                 }}
               >
-                <div className="font-medium">{t("downloadSecretKeyTxt")}</div>
-                <div className="text-sm text-gray-500">{t("downloadEncryptionKeyBackup")}</div>
+                <RowIcon icon={TI.Key} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("downloadSecretKeyTxt")}</div>
+                  <div className="text-sm text-gray-500">{t("downloadEncryptionKeyBackup")}</div>
+                </div>
               </button>
 
               <button
-                className={`block w-full text-left px-4 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
                 onClick={() => {
                   setOverridePositions(true);
                   setResetDialogOpen(true);
                 }}
               >
-                <div className="font-medium">{t("resetNoteOrder")}</div>
-                <div className="text-sm text-gray-500">{t("resetNoteOrderDesc")}</div>
+                <RowIcon icon={TI.ArrowsSort} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("resetNoteOrder")}</div>
+                  <div className="text-sm text-gray-500">{t("resetNoteOrderDesc")}</div>
+                </div>
               </button>
             </div>
           </div>
 
+          <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
+
           {/* UI Preferences Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">{t("uiPreferences")}</h4>
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
+              <SectionHeaderIcon icon={TI.AdjustmentsHorizontal} />
+              {t("uiPreferences")}
+            </h4>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium">{t("localAiAssistant")}</div>
-                  <div className="text-sm text-gray-500">{t("askQuestionsAboutNotes")}</div>
+              <div className="flex items-center justify-between gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Brain} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("localAiAssistant")}</div>
+                    <div className="text-sm text-gray-500">{t("askQuestionsAboutNotes")}</div>
+                  </div>
                 </div>
                 <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
                     localAiEnabled
                       ? "bg-indigo-600"
                       : "bg-gray-300 dark:bg-gray-600"
@@ -330,13 +405,16 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium">{t("alwaysShowSidebarWide")}</div>
-                  <div className="text-sm text-gray-500">{t("keepTagsPanelVisible")}</div>
+              <div className="flex items-center justify-between gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.LayoutSidebar} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("alwaysShowSidebarWide")}</div>
+                    <div className="text-sm text-gray-500">{t("keepTagsPanelVisible")}</div>
+                  </div>
                 </div>
                 <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
                     alwaysShowSidebarOnWide
                       ? "bg-indigo-600"
                       : "bg-gray-300 dark:bg-gray-600"
@@ -355,13 +433,16 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium">{t("enableAnimationsMobile")}</div>
-                  <div className="text-sm text-gray-500">{t("enableAnimationsMobileDesc")}</div>
+              <div className="flex items-center justify-between gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Sparkles} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("enableAnimationsMobile")}</div>
+                    <div className="text-sm text-gray-500">{t("enableAnimationsMobileDesc")}</div>
+                  </div>
                 </div>
                 <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
                     floatingCardsEnabled
                       ? "bg-indigo-600"
                       : "bg-gray-300 dark:bg-gray-600"
@@ -376,13 +457,16 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium">{t("edgeToEdgeLandscape")}</div>
-                  <div className="text-sm text-gray-500">{t("edgeToEdgeLandscapeDesc")}</div>
+              <div className="flex items-center justify-between gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.DeviceMobileRotated} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("edgeToEdgeLandscape")}</div>
+                    <div className="text-sm text-gray-500">{t("edgeToEdgeLandscapeDesc")}</div>
+                  </div>
                 </div>
                 <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
                     edgeToEdgeLandscape
                       ? "bg-indigo-600"
                       : "bg-gray-300 dark:bg-gray-600"
@@ -397,19 +481,48 @@ export default function SettingsPanel({
                 </button>
               </div>
 
+              {/* Rich-text editor typography presets — opens its own
+                  full-viewport modal so the 6 block cards have enough
+                  room to show size / weight / colour / italic / underline
+                  controls without being cut off on the narrow side sheet. */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Typography} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("typographyTitle")}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">{t("typographyDesc")}</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="shrink-0 self-end sm:self-auto px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                  onClick={() => setTypographyModalOpen(true)}
+                >
+                  {t("typographyOpen")}
+                </button>
+              </div>
+
             </div>
           </div>
 
+          <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
+
           {/* Checklist Settings Section */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">{t("checklistSettings")}</h4>
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
+              <SectionHeaderIcon icon={TI.ListCheck} />
+              {t("checklistSettings")}
+            </h4>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium">{t("checklistInsertPosition")}</div>
-                  <div className="text-sm text-gray-500">{t("checklistInsertPositionDesc")}</div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.IndentIncrease} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("checklistInsertPosition")}</div>
+                    <div className="text-sm text-gray-500">{t("checklistInsertPositionDesc")}</div>
+                  </div>
                 </div>
-                <div className="ml-3 flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+                <div className="flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 self-end sm:self-auto">
                   <button
                     className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
                       checklistInsertPosition === "top"
@@ -433,12 +546,15 @@ export default function SettingsPanel({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium">{t("checklistRemoveSection")}</div>
-                  <div className="text-sm text-gray-500">{t("checklistRemoveSectionDesc")}</div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Filter2Question} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("checklistRemoveSection")}</div>
+                    <div className="text-sm text-gray-500">{t("checklistRemoveSectionDesc")}</div>
+                  </div>
                 </div>
-                <div className="ml-3 flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+                <div className="flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 self-end sm:self-auto">
                   <button
                     className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
                       checklistRemoveSectionBehavior === "cascade"
@@ -516,6 +632,15 @@ export default function SettingsPanel({
           </div>
         </div>
       )}
+
+      {/* Dedicated modal for advanced typography customisation. */}
+      <TypographyModal
+        open={typographyModalOpen}
+        onClose={() => setTypographyModalOpen(false)}
+        presets={typographyPresets}
+        setPresets={setTypographyPresets}
+        dark={dark}
+      />
     </>
   );
 }

@@ -21,7 +21,8 @@ import OfflineCollabBanner from "./OfflineCollabBanner.jsx";
 import ChecklistEditor from "../checklist/ChecklistEditor.jsx";
 import useModalHistory from "../../hooks/useModalHistory.js";
 import { renderSafeMarkdown, linkifyContactsHTML } from "../../utils/markdown.jsx";
-import { handleSmartEnter } from "../common/FormatToolbar.jsx";
+import RichTextEditor from "../richtext/RichTextEditor.jsx";
+import { contentToHTML, serializeRichContent, isRichContent } from "../../utils/richText.js";
 import { modalBgFor, scrollColorsFor, solid, bgFor, toHex } from "../../utils/colors.js";
 import { setThemeColor } from "../../utils/helpers.js";
 
@@ -151,6 +152,7 @@ export default function NoteModal({
   checklistRemoveSectionBehavior,
   // note type conversion (text <-> checklist)
   onConvertNoteType,
+  onDuplicateNote,
   // direct draw mode
   initialDrawMode,
   onConsumeInitialDrawMode,
@@ -172,15 +174,161 @@ export default function NoteModal({
       setDrawTransition('leaving');
     }
   }, [isDrawEdit]);
-  const viewHtml = React.useMemo(
-    () => linkifyContactsHTML(renderSafeMarkdown(mBody)),
-    [mBody],
+  // Rendered HTML for view mode. Rich-format notes render through Tiptap's
+  // generateHTML (also sanitized); legacy Markdown notes keep the old marked
+  // pipeline so they look identical until the user edits and upgrades them.
+  const viewHtml = React.useMemo(() => {
+    if (isRichContent(mBody)) return linkifyContactsHTML(contentToHTML(mBody));
+    return linkifyContactsHTML(renderSafeMarkdown(mBody));
+  }, [mBody]);
+
+  // Serialize a Tiptap doc from the editor back into the string shape that
+  // mBody / autosave / sync expect. Centralised here so the two editor mount
+  // points (text note / draw-note body) stay in lockstep.
+  const handleRichDocChange = React.useCallback(
+    (doc) => {
+      const serialized = serializeRichContent(doc);
+      setMBody(serialized);
+    },
+    [setMBody],
   );
 
   const { undo, redo, canUndo, canRedo } = useModalHistory({
     mTitle, mBody, setMTitle, setMBody,
     open, activeId, mType, viewMode,
   });
+
+  // DOM node of the slot inside ModalHeader where the rich-text toolbar is
+  // portaled. Using useState-as-ref so the RichTextEditor re-renders once
+  // the slot actually mounts (a useRef wouldn't trigger the re-render).
+  const [toolbarSlot, setToolbarSlot] = React.useState(null);
+  // Refs used for the Tab / Shift+Tab focus dance between the title
+  // textarea and the rich-text editor body.
+  const modalTitleInputRef = React.useRef(null);
+  const richEditorRef = React.useRef(null);
+  const focusModalTitle = React.useCallback(() => {
+    const el = modalTitleInputRef.current;
+    if (!el) return;
+    el.focus();
+    // Drop the caret at the end so typing continues the existing title.
+    if (typeof el.value === "string") {
+      const len = el.value.length;
+      try { el.setSelectionRange(len, len); } catch {}
+    }
+  }, []);
+  // Mobile-only: the rich-text toolbar moves out of the sticky header
+  // (which is too cramped on phone widths) and lives inside a bottom
+  // sheet the user opens via the "Mise en forme" footer button. The
+  // sheet's content div is registered here as a portal target.
+  const [mobileToolbarSlot, setMobileToolbarSlot] = React.useState(null);
+  const isDesktopLayout = windowWidth >= 768 && !isLandscapeMobile && !isWebView;
+  const toolbarMount = isDesktopLayout ? toolbarSlot : mobileToolbarSlot;
+
+  /* ── Mobile fmt-sheet swipe-to-close ──
+     The grabber captures pointer events so the user can drag the
+     panel down to dismiss it. We drive the gesture via the sheet's
+     max-height (not transform) for two reasons:
+       1. The sheet is the bottom-anchored flex child of the modal,
+          so shrinking max-height moves its top edge down 1:1 with
+          the finger AND lets the editor above expand into the space
+          the sheet vacates — the user sees their note re-appear
+          progressively while dragging.
+       2. When the user lets go past threshold, we just animate the
+          max-height we already have down to 0 — no transform reset
+          first, so the close stays continuous (no flash where the
+          sheet snaps back to full open before collapsing).
+     Direct DOM mutation via a ref keeps the per-frame work off the
+     React render path. */
+  const fmtSheetRef = React.useRef(null);
+  const fmtDragRef = React.useRef({ active: false, startY: 0, currentY: 0, baseHeight: 0 });
+  const fmtCleanupTimerRef = React.useRef(null);
+  const FMT_CLOSE_THRESHOLD = 60; // px
+
+  const handleFmtGrabberDown = (e) => {
+    if (e.button != null && e.button !== 0) return;
+    const sheet = fmtSheetRef.current;
+    if (fmtCleanupTimerRef.current) {
+      clearTimeout(fmtCleanupTimerRef.current);
+      fmtCleanupTimerRef.current = null;
+    }
+    fmtDragRef.current = {
+      active: true,
+      startY: e.clientY,
+      currentY: 0,
+      baseHeight: sheet ? sheet.getBoundingClientRect().height : 0,
+    };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    if (sheet) {
+      // Disable the sheet's own transitions during the drag so
+      // max-height tracks the finger 1:1.
+      sheet.style.transition = "none";
+    }
+  };
+  const handleFmtGrabberMove = (e) => {
+    if (!fmtDragRef.current.active) return;
+    const dy = Math.max(0, e.clientY - fmtDragRef.current.startY);
+    fmtDragRef.current.currentY = dy;
+    const sheet = fmtSheetRef.current;
+    if (sheet) {
+      const newH = Math.max(0, fmtDragRef.current.baseHeight - dy);
+      sheet.style.maxHeight = `${newH}px`;
+    }
+  };
+  const handleFmtGrabberUp = (e) => {
+    if (!fmtDragRef.current.active) return;
+    const dy = fmtDragRef.current.currentY;
+    fmtDragRef.current.active = false;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+    const sheet = fmtSheetRef.current;
+    if (!sheet) return;
+    // Restore the CSS transition so the next height change animates.
+    sheet.style.transition = "";
+    if (dy > FMT_CLOSE_THRESHOLD) {
+      // Continue the close from the current dragged height down to 0
+      // in one smooth motion — no snap-back to full-open in between.
+      sheet.style.maxHeight = "0px";
+      setShowModalFmt(false);
+      // Once the close animation has finished, drop the inline
+      // max-height so a future re-open returns to the CSS-defined
+      // height via .is-open.
+      fmtCleanupTimerRef.current = setTimeout(() => {
+        fmtCleanupTimerRef.current = null;
+        if (fmtSheetRef.current) fmtSheetRef.current.style.maxHeight = "";
+      }, 360);
+    } else {
+      // Snap back: clearing the inline max-height lets the CSS rule
+      // animate the sheet back to its open height.
+      sheet.style.maxHeight = "";
+    }
+  };
+
+  /* Suppress the mobile virtual keyboard while the formatting sheet
+     is open. The user wants to long-press to select text and apply
+     toolbar formatting without the keyboard popping up over the
+     sheet. Setting inputmode="none" on the ProseMirror DOM element
+     tells the OS not to raise the keyboard on focus; we also blur
+     any active editor so an already-open keyboard dismisses. The
+     attribute is restored when the sheet closes so plain typing
+     works again. Desktop is unaffected. */
+  React.useEffect(() => {
+    if (isDesktopLayout) return undefined;
+    if (!showModalFmt) return undefined;
+    const editors = Array.from(
+      modalScrollRef.current?.querySelectorAll(".rt-editor-content") || [],
+    );
+    if (!editors.length) return undefined;
+    const previous = editors.map((el) => el.getAttribute("inputmode"));
+    editors.forEach((el) => {
+      el.setAttribute("inputmode", "none");
+      if (document.activeElement === el) el.blur();
+    });
+    return () => {
+      editors.forEach((el, i) => {
+        if (previous[i] == null) el.removeAttribute("inputmode");
+        else el.setAttribute("inputmode", previous[i]);
+      });
+    };
+  }, [showModalFmt, isDesktopLayout, viewMode, mType]);
 
   /* Set draw mode when modal opens (reset to view, or honour initialDrawMode) */
   React.useEffect(() => {
@@ -210,18 +358,26 @@ export default function NoteModal({
     setThemeColor(color);
   }, [open, mColor, dark]);
 
-  /* Intercept Ctrl+Z/Y for undo/redo and standard formatting shortcuts.
-     Uses e.code (layout-independent) for digit keys so AZERTY users keep
-     working shortcuts. */
+  /* Intercept Ctrl+Z/Y at the modal level for title-only undo.
+   *
+   * For the text-note body, the rich editor owns its own history and
+   * keyboard shortcuts (bold/italic/strike/code/headings/lists/link/quote
+   * all come from Tiptap's StarterKit keymaps). We deliberately skip those
+   * here to avoid double-handling. The modal-level Ctrl+Z still works for
+   * checklist/draw note title changes and anywhere outside a contenteditable.
+   */
   const handleModalKeyDown = React.useCallback(
     (e) => {
-      if (mType !== "text" || viewMode) return; // let native handle non-text
       const isCtrl = e.ctrlKey || e.metaKey;
       if (!isCtrl) return;
       const shift = e.shiftKey;
       const alt = e.altKey;
 
-      // Undo / redo
+      // If the keystroke originated inside a Tiptap contenteditable we bail
+      // out: the editor handles formatting and undo natively.
+      const active = document.activeElement;
+      if (active && active.isContentEditable) return;
+
       if (e.code === "KeyZ" && !shift && !alt) {
         e.preventDefault();
         undo();
@@ -232,32 +388,8 @@ export default function NoteModal({
         redo();
         return;
       }
-
-      // Formatting shortcuts — only when focus is inside the body textarea
-      const active = document.activeElement;
-      if (!mBodyRef.current || active !== mBodyRef.current) return;
-
-      const apply = (type) => {
-        e.preventDefault();
-        formatModal(type);
-      };
-
-      if (!alt && !shift && e.code === "KeyB") return apply("bold");
-      if (!alt && !shift && e.code === "KeyI") return apply("italic");
-      if (!alt && shift && e.code === "KeyX") return apply("strike");
-      if (!alt && !shift && e.code === "KeyE") return apply("code");
-      if (!alt && shift && e.code === "KeyE") return apply("codeblock");
-      if (!alt && !shift && e.code === "KeyK") return apply("link");
-      // Match on produced character so it works across layouts
-      // (on AZERTY "." is typed via Shift+`;`, so e.code === "Period" never fires)
-      if (!alt && e.key === ".") return apply("quote");
-      if (!alt && shift && e.code === "Digit8") return apply("ul");
-      if (!alt && shift && e.code === "Digit7") return apply("ol");
-      if (alt && !shift && e.code === "Digit1") return apply("h1");
-      if (alt && !shift && e.code === "Digit2") return apply("h2");
-      if (alt && !shift && e.code === "Digit3") return apply("h3");
     },
-    [undo, redo, mType, viewMode, formatModal, mBodyRef],
+    [undo, redo],
   );
 
   // Force mobile layout when running inside Android WebView (tablets)
@@ -342,6 +474,8 @@ export default function NoteModal({
               drawMode={drawMode}
               drawToolbarMount={setDrawToolbarEl}
               onToggleDrawMode={() => setDrawMode((m) => m === "view" ? "draw" : "view")}
+              toolbarSlotRef={setToolbarSlot}
+              titleInputRef={modalTitleInputRef}
               // keyboard: Tab from title → body, skipping the toolbar buttons
               onTitleTab={() => {
                 if (mType === "checklist") {
@@ -349,6 +483,14 @@ export default function NoteModal({
                     '[data-checklist-list] textarea, [data-checklist-list] input[type="text"]'
                   );
                   if (first) first.focus();
+                  return;
+                }
+                // Text / draw note body is the Tiptap editor — focus
+                // it via its imperative API. Falls back to the legacy
+                // textarea ref if the editor isn't ready yet.
+                const ed = richEditorRef.current;
+                if (ed && typeof ed.commands?.focus === "function") {
+                  ed.commands.focus("end", { scrollIntoView: false });
                   return;
                 }
                 mBodyRef.current?.focus();
@@ -379,64 +521,17 @@ export default function NoteModal({
                   <NoteViewContent html={viewHtml} noteViewRef={noteViewRef} />
                 ) : (
                   <div className="relative min-h-[160px]">
-                    <textarea
-                      ref={mBodyRef}
-                      className="w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden min-h-[160px] pb-8"
-                      style={{ scrollBehavior: "unset" }}
+                    <RichTextEditor
+                      key={activeId || "new"}
                       value={mBody}
-                      onChange={(e) => {
-                        setMBody(e.target.value);
-                        resizeModalTextarea();
-                      }}
-                      onKeyDown={(e) => {
-                        if (
-                          e.key === "Enter" &&
-                          !e.shiftKey &&
-                          !e.altKey &&
-                          !e.ctrlKey &&
-                          !e.metaKey
-                        ) {
-                          const el = mBodyRef.current;
-                          const value = mBody;
-                          const start = el.selectionStart ?? value.length;
-                          const end = el.selectionEnd ?? value.length;
-
-                          const lastNewlineIndex = value.lastIndexOf("\n");
-                          const isOnLastLine = start > lastNewlineIndex;
-
-                          const res = handleSmartEnter(value, start, end);
-                          if (res) {
-                            e.preventDefault();
-                            setMBody(res.text);
-                            requestAnimationFrame(() => {
-                              try {
-                                el.setSelectionRange(
-                                  res.range[0],
-                                  res.range[1],
-                                );
-                              } catch (e) {}
-                              resizeModalTextarea();
-
-                              if (isOnLastLine) {
-                                const modalScrollEl = modalScrollRef.current;
-                                if (modalScrollEl) {
-                                  setTimeout(() => {
-                                    modalScrollEl.scrollTop += 30;
-                                  }, 50);
-                                }
-                              }
-                            });
-                          } else if (isOnLastLine) {
-                            setTimeout(() => {
-                              const modalScrollEl = modalScrollRef.current;
-                              if (modalScrollEl) {
-                                modalScrollEl.scrollTop += 30;
-                              }
-                            }, 10);
-                          }
-                        }
-                      }}
+                      onDocChange={handleRichDocChange}
                       placeholder={t("writeYourNoteEllipsis")}
+                      dark={dark}
+                      autoFocus={!mTitle}
+                      minHeightClass="min-h-[160px]"
+                      toolbarContainer={toolbarMount}
+                      onReady={(ed) => { richEditorRef.current = ed; }}
+                      onShiftTabExit={focusModalTitle}
                     />
                   </div>
                 )
@@ -483,17 +578,18 @@ export default function NoteModal({
                   </div>
                 </>
               ) : (
-                /* Edit mode: text body textarea + drawing preview */
+                /* Edit mode: rich text body + drawing preview */
                 <>
-                  <textarea
-                    ref={mBodyRef}
-                    className="w-full bg-transparent placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden min-h-[80px] pb-4"
+                  <RichTextEditor
+                    key={`draw-${activeId || "new"}`}
                     value={mBody}
-                    onChange={(e) => {
-                      setMBody(e.target.value);
-                      resizeModalTextarea();
-                    }}
+                    onDocChange={handleRichDocChange}
                     placeholder={t("writeYourNoteEllipsis")}
+                    dark={dark}
+                    minHeightClass="min-h-[80px]"
+                    toolbarContainer={toolbarMount}
+                    onReady={(ed) => { richEditorRef.current = ed; }}
+                    onShiftTabExit={focusModalTitle}
                   />
                   <DrawingCanvas
                     data={mDrawingData}
@@ -533,6 +629,36 @@ export default function NoteModal({
               </div>
             )}
           </div>
+
+          {/* Mobile-only formatting bottom sheet — hosts the rich-text
+              toolbar via a portal. Always mounted so the editor's toolbar
+              keeps a stable target across open/close; visibility is
+              driven by the "is-open" class. Closed by tapping the
+              "Mise en forme" footer toggle again. Only relevant for
+              text notes (and the inline text body of draw notes) in
+              edit mode. */}
+          {!isDesktopLayout && mType !== "checklist" && !viewMode && !(mType === 'draw' && drawMode === 'draw') && (
+            <div
+              ref={fmtSheetRef}
+              className={`mobile-fmt-sheet${showModalFmt ? " is-open" : ""}${dark ? " mobile-fmt-sheet--dark" : ""}`}
+              role="dialog"
+              aria-label={t("formatting")}
+              aria-hidden={showModalFmt ? "false" : "true"}
+              style={{ backgroundColor: modalBgFor(mColor, dark) }}
+            >
+              <div
+                className="mobile-fmt-sheet-grabber"
+                role="button"
+                tabIndex={-1}
+                aria-label={t("close")}
+                onPointerDown={handleFmtGrabberDown}
+                onPointerMove={handleFmtGrabberMove}
+                onPointerUp={handleFmtGrabberUp}
+                onPointerCancel={handleFmtGrabberUp}
+              />
+              <div ref={setMobileToolbarSlot} className="mobile-fmt-sheet-content" />
+            </div>
+          )}
 
           <ModalFooter
             dark={dark}
@@ -606,6 +732,7 @@ export default function NoteModal({
             canUndo={canUndo}
             canRedo={canRedo}
             onConvertNoteType={onConvertNoteType}
+            onDuplicateNote={onDuplicateNote}
           />
 
           <ConfirmDeleteDialog
