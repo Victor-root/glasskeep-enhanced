@@ -2759,15 +2759,22 @@ html.dark .typo-modal-toggle {
   /* On mobile the wide "Réinitialiser ce profil" CTA was sitting
      to the right of the description and crushing it. Stack the
      header vertically so the title + desc + tabs use the full
-     width on top and the action cluster (reset CTA + close ×)
-     drops to its own row, right-aligned underneath. */
+     width on top and the reset CTA drops to its own row below.
+     The close × stays pinned to the top-right corner via absolute
+     positioning so it doesn't hitch a ride down with the CTA. */
   .typo-modal-header {
+    position: relative;
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
   }
   .typo-modal-header-actions {
     align-self: flex-end;
+  }
+  .typo-modal-header-actions .typo-modal-close {
+    position: absolute;
+    top: max(8px, env(safe-area-inset-top));
+    right: 12px;
   }
   .typo-modal-body {
     grid-template-columns: 1fr;
