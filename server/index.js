@@ -1823,9 +1823,13 @@ app.post("/api/notes/import", auth, (req, res) => {
       : [];
   if (!src.length) return res.status(400).json({ error: "No notes to import." });
 
-  // Check ALL notes (including archived/trashed) to avoid PRIMARY KEY collisions.
-  // listNotes only returns active notes — trashed/archived IDs would be missed.
-  const allRows = db.prepare("SELECT id FROM notes WHERE user_id = ?").all(req.user.id);
+  // Check EVERY note id in the database, not just the importing
+  // user's. notes.id is the global PRIMARY KEY, so an id that's
+  // already in use by ANOTHER user (typical case: same .json
+  // exported from user A and re-imported into user B) would still
+  // collide on insert. Query the whole id column once and let the
+  // existing collision-rewrite logic below handle it transparently.
+  const allRows = db.prepare("SELECT id FROM notes").all();
   const existing = new Set(allRows.map((r) => r.id));
 
   try {
