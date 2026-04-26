@@ -248,6 +248,11 @@ export default function NoteModal({
       // max-height tracks the finger 1:1.
       sheet.style.transition = "none";
     }
+    // Hide the toolbar's own scrollbar during the drag — as the sheet
+    // shrinks the content briefly overflows and would otherwise flash
+    // a vertical scrollbar on the right edge. We're not scrolling
+    // while dragging anyway, so suppress it until release.
+    if (mobileToolbarSlot) mobileToolbarSlot.style.overflowY = "hidden";
   };
   const handleFmtGrabberMove = (e) => {
     if (!fmtDragRef.current.active) return;
@@ -275,15 +280,18 @@ export default function NoteModal({
       setShowModalFmt(false);
       // Once the close animation has finished, drop the inline
       // max-height so a future re-open returns to the CSS-defined
-      // height via .is-open.
+      // height via .is-open. Also restore the toolbar's overflow so
+      // the next open is back to its scroll defaults.
       fmtCleanupTimerRef.current = setTimeout(() => {
         fmtCleanupTimerRef.current = null;
         if (fmtSheetRef.current) fmtSheetRef.current.style.maxHeight = "";
+        if (mobileToolbarSlot) mobileToolbarSlot.style.overflowY = "";
       }, 260);
     } else {
       // Snap back: clearing the inline max-height lets the CSS rule
       // animate the sheet back to its open height.
       sheet.style.maxHeight = "";
+      if (mobileToolbarSlot) mobileToolbarSlot.style.overflowY = "";
     }
   };
 
