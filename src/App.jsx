@@ -4194,6 +4194,73 @@ export default function App() {
     setGenericConfirmOpen(true);
   };
 
+  /** -------- Duplicate the currently-open note --------
+   *  Builds a fresh note from the modal's in-memory state (so unsaved
+   *  edits are also captured), persists it via the standard create
+   *  pipeline (IDB + setNotes + enqueue "create"), and closes the
+   *  modal so the new card appears at the top of the grid. */
+  const duplicateActiveNote = async () => {
+    if (!activeId) return;
+    if (tagFilter === "TRASHED") return;
+    // If the modal still hosts an unmaterialised draft, materialise it
+    // first so we don't end up with a duplicate of something that the
+    // close flow would later drop as a never-persisted draft.
+    if (pendingDraftRef.current && String(activeId) === String(pendingDraftRef.current.id)) {
+      materializeDraftIfNeeded();
+    }
+    const newId = uid();
+    const nowIso = new Date().toISOString();
+    const baseTitle = (mTitle || "").trim();
+    const newTitle = baseTitle
+      ? `${baseTitle} ${t("duplicateSuffix")}`
+      : t("duplicateSuffix");
+    const items = Array.isArray(mItems)
+      ? mItems.map((it) => ({ ...it, id: uid() }))
+      : [];
+    const isDraw = mType === "draw";
+    const content = isDraw
+      ? JSON.stringify({
+          paths: mDrawingData?.paths || [],
+          dimensions: mDrawingData?.dimensions || null,
+          text: mBody || "",
+        })
+      : (mBody || "");
+    const newNote = {
+      id: newId,
+      type: mType,
+      title: newTitle,
+      content,
+      items,
+      tags: Array.isArray(mTagList) ? [...mTagList] : [],
+      images: Array.isArray(mImages) ? mImages.map((im) => ({ ...im, id: uid() })) : [],
+      color: mColor || "default",
+      pinned: false,
+      position: Date.now(),
+      timestamp: nowIso,
+      updated_at: nowIso,
+      client_updated_at: nowIso,
+    };
+    const localNote = {
+      ...newNote,
+      user_id: currentUser?.id,
+      archived: false,
+      trashed: false,
+    };
+    const leaseId = acquireLocalLease(newId);
+    try {
+      await idbPutNote(localNote, currentUser?.id, sessionId);
+    } catch (e) {
+      console.error("Duplicate note IDB put failed:", e);
+    }
+    setNotes((prev) =>
+      sortNotesByRecency([localNote, ...(Array.isArray(prev) ? prev : [])]),
+    );
+    invalidateNotesCache();
+    enqueueWithLease(newId, { type: "create", noteId: newId, payload: newNote }, leaseId);
+    showToast(t("noteDuplicated"), "success");
+    closeModal();
+  };
+
   // Checklist drag-and-drop is handled by useChecklistDrag inside NoteModal
 
   /** -------- Tags list (unique + counts) -------- */
@@ -4418,6 +4485,7 @@ export default function App() {
       checklistInsertPosition={checklistInsertPosition}
       checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
       onConvertNoteType={convertNoteType}
+      onDuplicateNote={duplicateActiveNote}
       initialDrawMode={initialDrawMode}
       onConsumeInitialDrawMode={() => setInitialDrawMode(null)}
     />

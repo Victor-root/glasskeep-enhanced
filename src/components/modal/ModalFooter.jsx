@@ -81,6 +81,8 @@ export default function ModalFooter({
   canRedo,
   // note type conversion (text <-> checklist)
   onConvertNoteType,
+  // Duplicate the active note (kebab → "Dupliquer la note").
+  onDuplicateNote,
 }) {
   const isDesktop = windowWidth >= 768 && !isLandscapeMobile && !isWebView;
   const isTrashed = tagFilter === "TRASHED";
@@ -551,6 +553,22 @@ export default function ModalFooter({
               >
                 {mType === "text" ? <ChecklistIcon /> : <TextNoteIcon />}
                 {mType === "text" ? t("convertToChecklist") : t("convertToText")}
+              </button>
+            )}
+            {/* Duplicate — hidden in trash. Two-overlapping-squares
+                glyph kept inline (one-shot icon, not worth a vendored
+                file). */}
+            {!isTrashed && onDuplicateNote && (
+              <button
+                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                style={{ color: dark ? "#67e8f9" : "#0891b2" }}
+                onClick={() => { onDuplicateNote(); setModalKebabOpen(false); }}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="9" y="9" width="11" height="11" rx="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                {t("duplicateNote")}
               </button>
             )}
             {/* Download */}

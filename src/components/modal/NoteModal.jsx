@@ -152,6 +152,7 @@ export default function NoteModal({
   checklistRemoveSectionBehavior,
   // note type conversion (text <-> checklist)
   onConvertNoteType,
+  onDuplicateNote,
   // direct draw mode
   initialDrawMode,
   onConsumeInitialDrawMode,
@@ -731,6 +732,7 @@ export default function NoteModal({
             canUndo={canUndo}
             canRedo={canRedo}
             onConvertNoteType={onConvertNoteType}
+            onDuplicateNote={onDuplicateNote}
           />
 
           <ConfirmDeleteDialog
