@@ -585,7 +585,16 @@ html.dark .modal-footer-toolbar {
   border-left: 1px solid rgba(0, 0, 0, 0.1);
   border-right: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 12px 12px 0 0;
-  transition: max-height 0.22s ease, opacity 0.18s ease;
+  /* Smooth iOS-style open / close — a longer duration with a
+     decelerating curve reads as fluid where the previous "ease"
+     felt jerky. will-change + contain promote the sheet onto its
+     own layer so changing max-height doesn't relayout / repaint
+     the rest of the modal. */
+  transition:
+    max-height 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity    0.22s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: max-height, opacity;
+  contain: layout paint style;
   display: flex;
   flex-direction: column;
 }

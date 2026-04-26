@@ -279,7 +279,7 @@ export default function NoteModal({
       fmtCleanupTimerRef.current = setTimeout(() => {
         fmtCleanupTimerRef.current = null;
         if (fmtSheetRef.current) fmtSheetRef.current.style.maxHeight = "";
-      }, 260);
+      }, 360);
     } else {
       // Snap back: clearing the inline max-height lets the CSS rule
       // animate the sheet back to its open height.
