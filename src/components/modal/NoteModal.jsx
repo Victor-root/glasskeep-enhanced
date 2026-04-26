@@ -295,6 +295,34 @@ export default function NoteModal({
     }
   };
 
+  /* Suppress the mobile virtual keyboard while the formatting sheet
+     is open. The user wants to long-press to select text and apply
+     toolbar formatting without the keyboard popping up over the
+     sheet. Setting inputmode="none" on the ProseMirror DOM element
+     tells the OS not to raise the keyboard on focus; we also blur
+     any active editor so an already-open keyboard dismisses. The
+     attribute is restored when the sheet closes so plain typing
+     works again. Desktop is unaffected. */
+  React.useEffect(() => {
+    if (isDesktopLayout) return undefined;
+    if (!showModalFmt) return undefined;
+    const editors = Array.from(
+      modalScrollRef.current?.querySelectorAll(".rt-editor-content") || [],
+    );
+    if (!editors.length) return undefined;
+    const previous = editors.map((el) => el.getAttribute("inputmode"));
+    editors.forEach((el) => {
+      el.setAttribute("inputmode", "none");
+      if (document.activeElement === el) el.blur();
+    });
+    return () => {
+      editors.forEach((el, i) => {
+        if (previous[i] == null) el.removeAttribute("inputmode");
+        else el.setAttribute("inputmode", previous[i]);
+      });
+    };
+  }, [showModalFmt, isDesktopLayout, viewMode, mType]);
+
   /* Set draw mode when modal opens (reset to view, or honour initialDrawMode) */
   React.useEffect(() => {
     if (open) {
