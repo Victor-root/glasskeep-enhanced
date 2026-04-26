@@ -400,15 +400,14 @@ export default function NotesHeader({
               }
             }}
           />
-          {/* Hidden Google Keep import input (multiple). Accepts the
-              .json metadata files AND any image attachments — Google
-              Keep ships them flat in the same export folder, so the
-              user can ⌘/Ctrl-A the whole takeout and let importGKeep
-              sort the files by extension on its side. */}
+          {/* Hidden Google Keep import input. Accepts the raw Takeout
+              .zip (recommended), or any combination of the loose .json
+              metadata files and their image attachments — importGKeep
+              expands zips and sorts files by extension on its side. */}
           <input
             ref={gkeepFileRef}
             type="file"
-            accept="application/json,.json,image/*"
+            accept=".zip,application/zip,application/x-zip-compressed,application/json,.json,image/*"
             multiple
             className="hidden"
             onChange={async (e) => {

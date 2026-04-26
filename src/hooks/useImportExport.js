@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { api } from "../utils/api.js";
-import { uid, sanitizeFilename, downloadText, fileToCompressedDataURL } from "../utils/helpers.js";
+import { uid, sanitizeFilename, downloadText, fileToCompressedDataURL, ensureJSZip } from "../utils/helpers.js";
 import { t } from "../i18n";
 import {
   isRichContent,
@@ -36,6 +36,51 @@ const GKEEP_COLOR_MAP = {
   PINK:    "mauve",
   BROWN:   "sand",
 };
+
+const GKEEP_IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i;
+const GKEEP_MIME_FROM_EXT = (lower) =>
+  lower.endsWith(".png")  ? "image/png"  :
+  lower.endsWith(".gif")  ? "image/gif"  :
+  lower.endsWith(".webp") ? "image/webp" :
+  lower.endsWith(".bmp")  ? "image/bmp"  :
+  lower.endsWith(".heic") ? "image/heic" :
+  lower.endsWith(".heif") ? "image/heif" :
+                            "image/jpeg";
+
+/** Expand any .zip files in a flat file list into the JSON / image entries
+ *  they contain. Non-zip files pass through untouched. Tailored to Google
+ *  Takeout structures (entries live under Takeout/Keep/) — filters by
+ *  extension only, so re-zipped Keep folders without the parent path also
+ *  work. JSZip blobs are wrapped back into File objects so the rest of the
+ *  importer can treat them like a native FileList selection. */
+async function expandGkeepZips(files) {
+  const zips = files.filter(
+    (f) => f.name.toLowerCase().endsWith(".zip") || (f.type || "").includes("zip"),
+  );
+  if (!zips.length) return files;
+  const out = files.filter((f) => !zips.includes(f));
+  const JSZip = await ensureJSZip();
+  for (const zf of zips) {
+    try {
+      const zip = await JSZip.loadAsync(zf);
+      const entries = Object.values(zip.files);
+      for (const entry of entries) {
+        if (entry.dir) continue;
+        const lower = entry.name.toLowerCase();
+        const isJsonEntry = lower.endsWith(".json");
+        const isImageEntry = GKEEP_IMAGE_EXT.test(lower);
+        if (!isJsonEntry && !isImageEntry) continue;
+        const baseName = entry.name.split("/").pop() || entry.name;
+        const mime = isJsonEntry ? "application/json" : GKEEP_MIME_FROM_EXT(lower);
+        const blob = await entry.async("blob");
+        out.push(new File([blob], baseName, { type: mime }));
+      }
+    } catch (e) {
+      console.warn("[gkeep] zip expansion failed", zf.name, e?.message);
+    }
+  }
+  return out;
+}
 
 /**
  * Hook encapsulating import/export actions and secret key download.
@@ -105,23 +150,31 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
     }
   };
 
-  /** Import Google Keep single-note JSON files (multiple).
-   *  Accepts both the .json metadata files AND the image attachments
-   *  side by side — Google Keep exports them flat in the same folder
-   *  so the user can pick everything in one shot. JSON files are
-   *  parsed into notes; image files are matched to attachment
-   *  filePaths and embedded as compressed data URLs. */
+  /** Import Google Keep notes.
+   *
+   *  Accepts any combination of:
+   *    - the raw Google Takeout .zip (recommended — drop it as is and
+   *      we expand its Keep/ folder transparently),
+   *    - the loose .json metadata files,
+   *    - the image attachments referenced by those JSONs.
+   *
+   *  JSON files become notes, image files are matched to each note's
+   *  attachment.filePath and embedded as compressed data URLs. */
   const importGKeep = async (fileList) => {
     try {
-      const files = Array.from(fileList || []);
+      let files = Array.from(fileList || []);
       if (!files.length) return;
+
+      // If the user selected one or more Takeout .zips, swap each in
+      // place for the .json + image entries it contains.
+      files = await expandGkeepZips(files);
 
       const isJson = (f) =>
         f.name.toLowerCase().endsWith(".json") ||
         (f.type || "").includes("json");
       const isImage = (f) =>
         (f.type || "").startsWith("image/") ||
-        /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(f.name);
+        GKEEP_IMAGE_EXT.test(f.name);
       const jsonFiles = files.filter(isJson);
       const imageFiles = files.filter(isImage);
       if (!jsonFiles.length) {
@@ -145,6 +198,15 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
         try {
           const obj = JSON.parse(txt);
           if (!obj || typeof obj !== "object") continue;
+          // Soft filter: a Takeout .zip can include non-Keep JSONs from
+          // other products (Drive, Calendar, …). Skip anything that
+          // doesn't look like a Keep note shape.
+          const looksLikeKeepNote =
+            "title" in obj || "textContent" in obj ||
+            "listContent" in obj || "attachments" in obj ||
+            "labels" in obj || "userEditedTimestampUsec" in obj ||
+            "createdTimestampUsec" in obj;
+          if (!looksLikeKeepNote) continue;
           const title = String(obj.title || "");
           const hasChecklist =
             Array.isArray(obj.listContent) && obj.listContent.length > 0;
@@ -180,7 +242,8 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
             for (const att of obj.attachments) {
               const path = typeof att?.filePath === "string" ? att.filePath : "";
               if (!path) continue;
-              const img = imageByName.get(path.toLowerCase());
+              const base = (path.split("/").pop() || path).toLowerCase();
+              const img = imageByName.get(base);
               if (!img) continue;
               try {
                 const src = await fileToCompressedDataURL(img);

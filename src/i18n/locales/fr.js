@@ -133,7 +133,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   downloadAllNotesJson: "Télécharger toutes les notes en fichier JSON",
   downloadSecretKeyTxt: "Télécharger la clé secrète (.txt)",
   downloadEncryptionKeyBackup: "Télécharger votre clé de chiffrement pour sauvegarde",
-  importGoogleKeepNotes: "Importer des notes Google Keep (.json)",
+  importGoogleKeepNotes: "Importer des notes Google Keep (.zip Takeout)",
   importNotesJson: "Importer des notes (.json)",
   importNotesFromGoogleKeepExport: "Importer des notes depuis un export JSON Google Keep",
   importNotesFromJsonFile: "Importer des notes depuis un fichier JSON",
