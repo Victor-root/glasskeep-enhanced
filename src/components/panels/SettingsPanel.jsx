@@ -154,12 +154,9 @@ export default function SettingsPanel({
         </div>
 
         <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
-          {/* Profile Section */}
+          {/* Profile Section — header (icon + "Profil" title) intentionally
+              omitted; the avatar block is self-explanatory. */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-4">
-              <SectionHeaderIcon icon={TI.UserCircle} />
-              {t("profileSettings")}
-            </h4>
             <div className="flex items-center gap-4 mb-4">
               <div className="relative group">
                 <UserAvatar
@@ -208,7 +205,7 @@ export default function SettingsPanel({
                 )}
               </div>
             </div>
-            <div className="flex items-center justify-between gap-3 px-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
               <div className="flex items-center gap-3 min-w-0">
                 <RowIcon icon={TI.Eye} />
                 <div className="min-w-0">
@@ -216,7 +213,7 @@ export default function SettingsPanel({
                 </div>
               </div>
               <button
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
                   profileShowOnLogin ? "bg-indigo-600" : "bg-gray-300 dark:bg-gray-600"
                 }`}
                 onClick={handleShowOnLoginToggle}
@@ -357,7 +354,7 @@ export default function SettingsPanel({
               {t("uiPreferences")}
             </h4>
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 px-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.Brain} />
                   <div className="min-w-0">
@@ -366,7 +363,7 @@ export default function SettingsPanel({
                   </div>
                 </div>
                 <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
                     localAiEnabled
                       ? "bg-indigo-600"
                       : "bg-gray-300 dark:bg-gray-600"
@@ -404,7 +401,7 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex items-center justify-between gap-3 px-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.LayoutSidebar} />
                   <div className="min-w-0">
@@ -413,7 +410,7 @@ export default function SettingsPanel({
                   </div>
                 </div>
                 <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
                     alwaysShowSidebarOnWide
                       ? "bg-indigo-600"
                       : "bg-gray-300 dark:bg-gray-600"
@@ -432,7 +429,7 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex items-center justify-between gap-3 px-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.Sparkles} />
                   <div className="min-w-0">
@@ -441,7 +438,7 @@ export default function SettingsPanel({
                   </div>
                 </div>
                 <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
                     floatingCardsEnabled
                       ? "bg-indigo-600"
                       : "bg-gray-300 dark:bg-gray-600"
@@ -456,7 +453,7 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex items-center justify-between gap-3 px-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.DeviceMobileRotated} />
                   <div className="min-w-0">
@@ -465,7 +462,7 @@ export default function SettingsPanel({
                   </div>
                 </div>
                 <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 ml-3 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
                     edgeToEdgeLandscape
                       ? "bg-indigo-600"
                       : "bg-gray-300 dark:bg-gray-600"
@@ -484,7 +481,7 @@ export default function SettingsPanel({
                   full-viewport modal so the 6 block cards have enough
                   room to show size / weight / colour / italic / underline
                   controls without being cut off on the narrow side sheet. */}
-              <div className="flex items-center justify-between gap-3 px-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.Typography} />
                   <div className="min-w-0">
@@ -494,7 +491,7 @@ export default function SettingsPanel({
                 </div>
                 <button
                   type="button"
-                  className="ml-3 shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                  className="shrink-0 self-start px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                   onClick={() => setTypographyModalOpen(true)}
                 >
                   {t("typographyOpen")}
@@ -511,7 +508,7 @@ export default function SettingsPanel({
               {t("checklistSettings")}
             </h4>
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 px-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.IndentIncrease} />
                   <div className="min-w-0">
@@ -519,7 +516,7 @@ export default function SettingsPanel({
                     <div className="text-sm text-gray-500">{t("checklistInsertPositionDesc")}</div>
                   </div>
                 </div>
-                <div className="ml-3 flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+                <div className="flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 self-start">
                   <button
                     className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
                       checklistInsertPosition === "top"
@@ -543,7 +540,7 @@ export default function SettingsPanel({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-3 px-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.ClearFormatting} />
                   <div className="min-w-0">
@@ -551,7 +548,7 @@ export default function SettingsPanel({
                     <div className="text-sm text-gray-500">{t("checklistRemoveSectionDesc")}</div>
                   </div>
                 </div>
-                <div className="ml-3 flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+                <div className="flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 self-start">
                   <button
                     className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
                       checklistRemoveSectionBehavior === "cascade"
