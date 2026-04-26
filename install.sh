@@ -454,6 +454,20 @@ const tx = db.transaction(() => {
 });
 tx();
 
+// Critical: physically purge plaintext residue. SQLite UPDATE only
+// marks old pages as free without zeroing them; VACUUM rewrites the
+// file dropping freed pages, and we bracket it with two truncating
+// WAL checkpoints so neither the main file nor the WAL keep stale
+// pre-encryption bytes around. Without this an attacker reading the
+// raw .db file can still grep the original note contents.
+try {
+  db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+  db.exec("VACUUM");
+  db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+} catch (e) {
+  process.stderr.write("VACUUM failed: " + e.message + "\n");
+}
+
 // Output exactly: "OK <recoveryKey>" so the bash caller can pluck the
 // key without parsing JSON.
 process.stdout.write("OK " + init.recoveryKey + "\n");

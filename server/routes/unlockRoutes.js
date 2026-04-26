@@ -283,6 +283,35 @@ function attachUnlockRoutes(app, deps) {
         vault.markMigrated(db);
       });
       migrate();
+
+      // Critical: when notes already existed, the migration above only
+      // UPDATE-d the rows. SQLite marks the old (plaintext) pages as
+      // free but does NOT zero them, so a thief reading the raw .db
+      // file could still grep the old contents. WAL mode keeps an
+      // even longer trail.
+      //
+      // Three steps to physically purge:
+      //   1. checkpoint(TRUNCATE) — flush WAL into the main file and
+      //      drop the WAL.
+      //   2. VACUUM — copy live pages to a fresh file, freed pages
+      //      (still containing plaintext) are dropped on the floor.
+      //   3. checkpoint(TRUNCATE) again — VACUUM itself ran through
+      //      the WAL on a still-open connection, so we drain it once
+      //      more. Without this final pass the freshly-purged file
+      //      coexists with a WAL that holds the very pages we just
+      //      tried to discard.
+      // VACUUM cannot run inside a transaction, hence the separate
+      // calls. Failure to clean up is logged but doesn't fail the
+      // activation — better the operator know via journalctl than
+      // surface a partial-success error to the UI.
+      try {
+        db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+        db.exec("VACUUM");
+        db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+        log.info?.("[encrypt] post-activation VACUUM complete (plaintext residue purged)");
+      } catch (e) {
+        log.warn?.(`[encrypt] post-activation cleanup failed: ${e.message}. Run manually after stopping the service: sqlite3 <db> "PRAGMA wal_checkpoint(TRUNCATE); VACUUM;"`);
+      }
     } catch (e) {
       // Roll the runtime + vault flags back so the admin sees a real
       // error rather than a half-encrypted database.
