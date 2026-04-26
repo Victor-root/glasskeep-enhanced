@@ -36,20 +36,39 @@ function isLocalhost(req) {
 // transport encryption. Localhost is exempt because the CLI script and
 // reverse-proxy back-ends all sit on it.
 //
-// req.secure is enough on its own once Express is configured with
-// `trust proxy` (see server/index.js: that's auto-on when TRUST_PROXY
-// is set or when HTTPS_ENABLED=false signals an upstream TLS
-// terminator). We keep an explicit X-Forwarded-Proto fallback for the
-// rare deploy where someone forgot to flip the env var so the unlock
-// flow still works without a head-scratch.
+// Three trust paths:
+//   1. Node itself is doing TLS    → req.secure is true.
+//   2. Operator declared a proxy   → TRUST_PROXY=true or HTTPS_ENABLED=false.
+//      In that mode TLS is the operator's responsibility (Nginx/Caddy/
+//      Traefik with their own cert) and we trust their assertion. The
+//      attacker scenario "bypasses the proxy and hits Node directly"
+//      means they are already on the trusted internal network — which
+//      this feature was never designed to defend against.
+//   3. Common proxy headers say https — we accept the usual variants
+//      (X-Forwarded-Proto, X-Forwarded-Ssl, Front-End-Https,
+//      X-Forwarded-Scheme) so a deploy that forgot to flip TRUST_PROXY
+//      still works without a head-scratch.
+function operatorDeclaredProxy() {
+  return process.env.TRUST_PROXY === "true"
+    || process.env.HTTPS_ENABLED === "false";
+}
+
+function proxyHeaderSaysHttps(req) {
+  const xfp = (req.headers["x-forwarded-proto"] || "").split(",")[0].trim().toLowerCase();
+  if (xfp === "https") return true;
+  const xfs = String(req.headers["x-forwarded-ssl"] || "").trim().toLowerCase();
+  if (xfs === "on") return true;
+  const feh = String(req.headers["front-end-https"] || "").trim().toLowerCase();
+  if (feh === "on") return true;
+  const xfsch = String(req.headers["x-forwarded-scheme"] || "").trim().toLowerCase();
+  if (xfsch === "https") return true;
+  return false;
+}
+
 function isSecureRequest(req) {
   if (req.secure) return true;
-  const xfp = (req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
-  if (xfp === "https" && (
-    process.env.TRUST_PROXY === "true" || process.env.HTTPS_ENABLED === "false"
-  )) {
-    return true;
-  }
+  if (operatorDeclaredProxy()) return true;
+  if (proxyHeaderSaysHttps(req)) return true;
   return false;
 }
 
@@ -95,6 +114,13 @@ function attachUnlockRoutes(app, deps) {
     }
     if (runtime.isUnlocked()) return res.json({ ok: true, alreadyUnlocked: true });
     if (!transportOk(req)) {
+      // One-line diagnostic so the operator can see which signal we
+      // missed when their proxy is set up oddly.
+      log.warn?.(
+        `[unlock] insecure transport refused: ip=${getClientIp(req)} secure=${!!req.secure} `
+        + `trust_proxy_env=${process.env.TRUST_PROXY} https_enabled_env=${process.env.HTTPS_ENABLED} `
+        + `xfp=${req.headers["x-forwarded-proto"] || ""} xfs=${req.headers["x-forwarded-ssl"] || ""}`,
+      );
       return res.status(400).json({
         error: "Refusing to accept unlock secret over plaintext HTTP. Use HTTPS or run from localhost.",
       });
