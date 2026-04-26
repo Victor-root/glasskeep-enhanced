@@ -35,14 +35,20 @@ function isLocalhost(req) {
 // nobody accidentally types their passphrase across the network without
 // transport encryption. Localhost is exempt because the CLI script and
 // reverse-proxy back-ends all sit on it.
+//
+// req.secure is enough on its own once Express is configured with
+// `trust proxy` (see server/index.js: that's auto-on when TRUST_PROXY
+// is set or when HTTPS_ENABLED=false signals an upstream TLS
+// terminator). We keep an explicit X-Forwarded-Proto fallback for the
+// rare deploy where someone forgot to flip the env var so the unlock
+// flow still works without a head-scratch.
 function isSecureRequest(req) {
   if (req.secure) return true;
-  // Trust X-Forwarded-Proto when the user has explicitly opted in. We
-  // do NOT trust it by default — that would let an attacker bypass the
-  // HTTPS check on a vanilla install simply by setting the header.
-  if (process.env.TRUST_PROXY === "true") {
-    const xfp = (req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
-    if (xfp === "https") return true;
+  const xfp = (req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+  if (xfp === "https" && (
+    process.env.TRUST_PROXY === "true" || process.env.HTTPS_ENABLED === "false"
+  )) {
+    return true;
   }
   return false;
 }

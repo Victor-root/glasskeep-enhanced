@@ -538,17 +538,24 @@ apply_ssl_to_env() {
     case "$SSL_MODE" in
         proxy)
             set_env_var "HTTPS_ENABLED" "false" "$ENV_FILE"
+            # Required so req.secure / X-Forwarded-Proto from the
+            # upstream proxy are trusted. Without this the at-rest
+            # unlock endpoint refuses to accept the secret because it
+            # still sees a "plaintext HTTP" socket from Node's POV.
+            set_env_var "TRUST_PROXY"   "true"  "$ENV_FILE"
             ;;
         selfsigned)
             generate_selfsigned_cert
             set_env_var "HTTPS_ENABLED" "true"              "$ENV_FILE"
             set_env_var "SSL_CERT"      "${ssl_dir}/cert.pem" "$ENV_FILE"
             set_env_var "SSL_KEY"       "${ssl_dir}/key.pem"  "$ENV_FILE"
+            set_env_var "TRUST_PROXY"   "false"             "$ENV_FILE"
             ;;
         custom)
             set_env_var "HTTPS_ENABLED" "true"              "$ENV_FILE"
             set_env_var "SSL_CERT"      "$CUSTOM_CERT_PATH" "$ENV_FILE"
             set_env_var "SSL_KEY"       "$CUSTOM_KEY_PATH"  "$ENV_FILE"
+            set_env_var "TRUST_PROXY"   "false"             "$ENV_FILE"
             ;;
     esac
 }
@@ -827,6 +834,7 @@ DB_FILE=${DATA_DIR}/notes.db
 ADMIN_EMAILS=${GLASSKEEP_ADMIN_LOGIN}
 ALLOW_REGISTRATION=false
 HTTPS_ENABLED=$([[ "$SSL_MODE" == "proxy" ]] && echo "false" || echo "true")
+TRUST_PROXY=$([[ "$SSL_MODE" == "proxy" ]] && echo "true" || echo "false")
 EOF
     case "$SSL_MODE" in
         selfsigned) printf 'SSL_CERT=%s/cert.pem\nSSL_KEY=%s/key.pem\n' "$ssl_dir" "$ssl_dir" >> "$ENV_FILE" ;;

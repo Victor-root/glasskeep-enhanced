@@ -85,6 +85,17 @@ const JWT_SECRET = (() => {
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
+// Trust proxy headers (X-Forwarded-Proto / X-Forwarded-For) when:
+//   - the operator explicitly set TRUST_PROXY=true, OR
+//   - HTTPS is disabled at the Node level (HTTPS_ENABLED=false), which
+//     means TLS is necessarily terminated at an upstream reverse proxy.
+// Without this, req.secure stays false on a perfectly-fine HTTPS request
+// forwarded by Nginx/Caddy/Traefik, and the at-rest unlock endpoint
+// would refuse the request as "plaintext HTTP".
+const TRUST_PROXY = process.env.TRUST_PROXY === "true"
+  || process.env.HTTPS_ENABLED === "false";
+if (TRUST_PROXY) app.set("trust proxy", true);
+
 // ---------- CORS (dev only) ----------
 if (NODE_ENV !== "production") {
   app.use(

@@ -278,7 +278,13 @@ function RegenerateRecoverySection({ token, showToast }) {
 
 export default function EncryptionAdminSection({ token, showToast }) {
   const [status, setStatus] = useState(null);
-  const [open, setOpen] = useState({ activate: false, rotate: false, regen: false });
+  // Only the activate form needs controlled state — the rest of the
+  // sub-panels are uncontrolled <details> so the browser owns their
+  // open/close lifecycle. Earlier we kept all of them controlled and
+  // hit a React 19 crash where the synthetic onToggle event's
+  // currentTarget had already been nullified by the time our state
+  // setter ran, blanking the panel.
+  const [activateOpen, setActivateOpen] = useState(false);
 
   const refresh = async () => {
     try {
@@ -337,10 +343,10 @@ export default function EncryptionAdminSection({ token, showToast }) {
 
       {!status?.enabled && (
         <div className="space-y-2">
-          {!open.activate ? (
+          {!activateOpen ? (
             <button
               type="button"
-              onClick={() => setOpen((o) => ({ ...o, activate: true }))}
+              onClick={() => setActivateOpen(true)}
               className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
             >
               {t("encryptionActivateCta")}
@@ -348,7 +354,7 @@ export default function EncryptionAdminSection({ token, showToast }) {
           ) : (
             <ActivationForm
               onActivated={() => {
-                setOpen((o) => ({ ...o, activate: false }));
+                setActivateOpen(false);
                 refresh();
               }}
               showToast={showToast}
@@ -359,22 +365,14 @@ export default function EncryptionAdminSection({ token, showToast }) {
 
       {status?.enabled && (
         <div className="space-y-3">
-          <details
-            open={open.rotate}
-            onToggle={(e) => setOpen((o) => ({ ...o, rotate: e.currentTarget.open }))}
-            className="rounded-md border border-[var(--border-light)] p-3"
-          >
+          <details className="rounded-md border border-[var(--border-light)] p-3">
             <summary className="cursor-pointer text-sm font-medium">{t("encryptionRotatePassphraseCta")}</summary>
             <div className="mt-3">
               <RotatePassphraseForm token={token} showToast={showToast} />
             </div>
           </details>
 
-          <details
-            open={open.regen}
-            onToggle={(e) => setOpen((o) => ({ ...o, regen: e.currentTarget.open }))}
-            className="rounded-md border border-[var(--border-light)] p-3"
-          >
+          <details className="rounded-md border border-[var(--border-light)] p-3">
             <summary className="cursor-pointer text-sm font-medium">{t("encryptionRecoveryRegenCta")}</summary>
             <div className="mt-3">
               <RegenerateRecoverySection token={token} showToast={showToast} />
