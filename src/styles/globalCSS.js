@@ -1555,7 +1555,7 @@ html.dark .rt-editor-content a { color: #93c5fd; }
      (no rounded corners clipping its ends). The negative top margin
      pulls the toolbar up toward the close/pin/save row, giving more
      vertical room to the note body in edit mode. */
-  padding: 4px 10px 6px;
+  padding: 4px 8px 6px;
   margin: -6px 0 0;
   border-radius: 0;
   background: transparent;
