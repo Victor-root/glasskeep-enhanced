@@ -421,7 +421,26 @@ The biggest single change of this branch — text notes are now edited through a
 
 Building on the existing import / export hooks, the fork now handles real-world export bundles much more gracefully.
 
-### Google Keep / Takeout
+### How to export your Google Keep notes
+
+Google doesn't offer a download button from the Keep web app — Keep notes ship through **Google Takeout**, the central data-export portal of every Google account. Here's the exact path:
+
+1. Go to **<https://takeout.google.com/>** and sign in with the Google account you use for Keep
+2. At the top of the product list, click **"Deselect all"** — by default Takeout ticks every single Google product, you only want Keep
+3. Scroll down to **"Keep"** and check its box
+4. Click **"Next step"** at the bottom of the page
+5. Configure the export:
+   - **Destination**: "Send download link via email" is fine in most cases (also available: Drive / Dropbox / OneDrive / Box)
+   - **Frequency**: "Export once"
+   - **File type**: `.zip` (recommended)
+   - **File size**: leave the default unless your Keep data is huge — Takeout only splits the archive past the chosen threshold
+6. Click **"Create export"** and wait for Google to package it (usually a few minutes; you'll get an email when it's ready)
+7. Download the `.zip` from the link in the email (or directly from the Takeout page)
+8. In GlassKeep, open **Settings → "Importer des notes Google Keep (.zip Takeout)"** and drop the `.zip` straight in — no need to extract it first; the importer reads the archive natively
+
+> The "Comment exporter ?" / "How to export?" inline link in the settings panel points to Google's own Takeout documentation if you want to see Google's screenshots while you go through the wizard.
+
+### Google Keep / Takeout (engine)
 - accepts the **raw `.zip`** straight out of Google Takeout — no need to hand-pick the `.json` files
 - JSZip-based extraction, with non-Keep JSONs (Drive, Calendar, …) silently filtered out
 - imports the original colour (mapped to the closest GlassKeep swatch — RED → red, ORANGE → peach, TEAL → mint, …), the **image attachments** (data-URL embedded), labels, items and titles

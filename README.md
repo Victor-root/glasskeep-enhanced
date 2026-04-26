@@ -119,6 +119,8 @@ Compared to the original project, this fork puts more emphasis on:
 - single line breaks and blank lines from the original textContent are preserved (no marked() detour)
 - **server-side deduplication** (fingerprint on title + body + items + images) so re-importing the same export doesn't multiply notes — applies to GlassKeep .json, Markdown imports and Takeout .zip alike
 
+> 📘 Need help generating that `.zip` ? See the step-by-step Google Takeout walkthrough → [`IMPROVEMENTS.md` › How to export your Google Keep notes](./IMPROVEMENTS.md#how-to-export-your-google-keep-notes)
+
 ### 🎨 Settings panel revamp
 - every section header and every option now carries a Tabler icon for at-a-glance navigation
 - wider drawer on tablet / desktop, controls right-aligned and stacked under labels on mobile so longer translations never crush the description
