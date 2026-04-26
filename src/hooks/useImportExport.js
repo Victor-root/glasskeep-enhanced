@@ -18,6 +18,34 @@ function ensureRichContent(raw) {
   return serializeRichContent(legacyMarkdownToRichDoc(raw));
 }
 
+/**
+ * Build the post-import success message based on the server's
+ * imported/skipped breakdown. The server now dedupes by
+ * (type|title|body) so a re-import of the same file won't multiply
+ * notes; surface that to the user via the message variant matching
+ * the situation.
+ *
+ * @param {object} result      server response { imported, skipped }
+ * @param {number} attempted   how many notes the client sent
+ * @param {string} successKey  i18n key used when nothing was skipped
+ *                             ("importedNotesSuccessfully", etc.)
+ */
+function buildImportMessage(result, attempted, successKey) {
+  const imported = Number(result?.imported);
+  const skipped = Number(result?.skipped);
+  const importedSafe = Number.isFinite(imported) ? imported : attempted;
+  const skippedSafe = Number.isFinite(skipped) ? skipped : 0;
+  if (skippedSafe > 0 && importedSafe === 0) {
+    return t("importAllSkipped").replace("{skipped}", String(skippedSafe));
+  }
+  if (skippedSafe > 0) {
+    return t("importedWithSkipped")
+      .replace("{count}", String(importedSafe))
+      .replace("{skipped}", String(skippedSafe));
+  }
+  return t(successKey).replace("{count}", String(importedSafe));
+}
+
 // Google Keep persists colours as a fixed enum; GlassKeep uses its own
 // palette. Map each enum to the closest swatch we ship so the imported
 // note keeps its colour identity. Anything we don't recognise falls
@@ -139,13 +167,13 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
         if (!n || n.type !== "text") return n;
         return { ...n, content: ensureRichContent(n.content) };
       });
-      await api("/notes/import", {
+      const result = await api("/notes/import", {
         method: "POST",
         token,
         body: { notes: upgraded },
       });
       await loadNotes();
-      alert(t("importedNotesSuccessfully").replace("{count}", String(notesArr.length)));
+      alert(buildImportMessage(result, notesArr.length, "importedNotesSuccessfully"));
     } catch (e) {
       alert(e.message || t("importFailed"));
     }
@@ -283,13 +311,13 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
         alert(t("noValidGoogleKeepNotesFound"));
         return;
       }
-      await api("/notes/import", {
+      const result = await api("/notes/import", {
         method: "POST",
         token,
         body: { notes: notesArr },
       });
       await loadNotes();
-      alert(t("importedGoogleKeepNotes").replace("{count}", String(notesArr.length)));
+      alert(buildImportMessage(result, notesArr.length, "importedGoogleKeepNotes"));
     } catch (e) {
       alert(e.message || t("googleKeepImportFailed"));
     }
@@ -348,13 +376,13 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
         return;
       }
 
-      await api("/notes/import", {
+      const result = await api("/notes/import", {
         method: "POST",
         token,
         body: { notes: notesArr },
       });
       await loadNotes();
-      alert(t("importedMarkdownFilesSuccessfully").replace("{count}", String(notesArr.length)));
+      alert(buildImportMessage(result, notesArr.length, "importedMarkdownFilesSuccessfully"));
     } catch (e) {
       alert(e.message || t("markdownImportFailed"));
     }

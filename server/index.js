@@ -1832,9 +1832,46 @@ app.post("/api/notes/import", auth, (req, res) => {
   const allRows = db.prepare("SELECT id FROM notes").all();
   const existing = new Set(allRows.map((r) => r.id));
 
+  // Deduplication: re-importing the same .json (typical case: a user
+  // re-imports their own GlassKeep export, or pulls Google Takeout
+  // twice) used to multiply every note. Build a fingerprint
+  // (type | trimmed title | body or items JSON) of the importing
+  // user's existing notes — text and checklist branches diverge
+  // because checklist content lives in items_json, not content. Any
+  // incoming note whose fingerprint matches an existing one (or a
+  // sibling earlier in the same batch) is skipped.
+  const userRows = db.prepare(
+    "SELECT type, title, content, items_json FROM notes WHERE user_id = ?",
+  ).all(req.user.id);
+  const fingerprintFromRow = (r) => {
+    const title = String(r.title || "").trim();
+    const type = r.type === "checklist" ? "checklist"
+              : r.type === "draw" ? "draw" : "text";
+    if (type === "checklist") return `cl|${title}|${r.items_json || "[]"}`;
+    return `${type}|${title}|${r.content || ""}`;
+  };
+  const fingerprintFromIncoming = (n) => {
+    const title = String(n.title || "").trim();
+    const type = n.type === "checklist" ? "checklist"
+              : n.type === "draw" ? "draw" : "text";
+    if (type === "checklist") {
+      return `cl|${title}|${JSON.stringify(Array.isArray(n.items) ? n.items : [])}`;
+    }
+    return `${type}|${title}|${String(n.content || "")}`;
+  };
+  const seenFingerprints = new Set(userRows.map(fingerprintFromRow));
+
+  let imported = 0;
+  let skipped = 0;
   try {
     const tx = db.transaction((arr) => {
       for (const n of arr) {
+        const fp = fingerprintFromIncoming(n);
+        if (seenFingerprints.has(fp)) {
+          skipped++;
+          continue;
+        }
+        seenFingerprints.add(fp);
         const id = existing.has(String(n.id)) ? uid() : String(n.id);
         existing.add(id);
         const importedTags = JSON.stringify(Array.isArray(n.tags) ? n.tags : []);
@@ -1854,10 +1891,11 @@ app.post("/api/notes/import", auth, (req, res) => {
           client_updated_at: (parseIsoTimestamp(n.client_updated_at || n.timestamp) || {}).iso || nowISO(),
         });
         if (importedTags !== "[]") upsertUserTags.run(id, req.user.id, importedTags);
+        imported++;
       }
     });
     tx(src);
-    res.json({ ok: true, imported: src.length });
+    res.json({ ok: true, imported, skipped });
   } catch (err) {
     console.error("[Import] Failed:", err.message);
     res.status(500).json({ error: `Import failed: ${err.message}` });
