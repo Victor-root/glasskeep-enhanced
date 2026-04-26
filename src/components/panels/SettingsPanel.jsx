@@ -254,7 +254,21 @@ export default function SettingsPanel({
                 }}
               >
                 <div className="font-medium">{t("importGoogleKeepNotes")}</div>
-                <div className="text-sm text-gray-500">{t("importNotesFromGoogleKeepExport")}</div>
+                <div className="text-sm text-gray-500">
+                  {t("importNotesFromGoogleKeepExport")}{" "}
+                  {/* Inline help link to Google's Takeout instructions.
+                      stopPropagation so clicking the link doesn't also
+                      trigger the parent button's file-picker open. */}
+                  <a
+                    href="https://support.google.com/accounts/answer/3024190?hl=en-AM&utm"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-500 hover:text-indigo-600 dark:text-indigo-300 dark:hover:text-indigo-200 underline underline-offset-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {t("howToExportGoogleKeep")}
+                  </a>
+                </div>
               </button>
 
               <button
