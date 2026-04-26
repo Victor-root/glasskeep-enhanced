@@ -251,6 +251,9 @@ Missing keys will automatically fall back to English.
 - Server-side encryption to better protect data in case the server or its drives are stolen
 - More translations with better RTL language support
 - Make the Android app available on **F-Droid**
+- **In-app update notifications** when a new release is available, so a self-hosted instance prompts the user to refresh / pull instead of staying silent
+- **Card footer on closed notes** surfacing the tags directly on the card, plus a new optional **note "logo" image** — a small uploaded picture used purely as a visual identifier (e.g. dropping the Rustdesk logo on a Rustdesk note so it stands out in the grid). The logo lives in the card footer and is independent of the regular image attachments that already render inside the note body
+- **Side-by-side note view** to open two notes at the same time for comparison and cross-referencing
 
 ### 💭 Under consideration
 - *(open — suggestions welcome)*
