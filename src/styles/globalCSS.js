@@ -2747,11 +2747,24 @@ html.dark .typo-modal-toggle {
 .typo-modal-toggle-label { font-size: 0.78rem; font-weight: 500; }
 
 @media (max-width: 560px) {
-  .typo-modal { max-height: 100vh; border-radius: 0; }
+  .typo-modal {
+    /* Mobile: the panel goes full-screen — make it tall enough to
+       cover the dynamic-viewport unit so the gesture nav doesn't
+       eat into the visible area. */
+    max-height: 100dvh;
+    height: 100dvh;
+    border-radius: 0;
+  }
   .typo-modal-scrim { padding: 0; }
   .typo-modal-body {
     grid-template-columns: 1fr;
-    padding: 12px 12px 16px;
+    /* Bottom padding follows the same pattern as SettingsPanel:
+       env(safe-area-inset-bottom) with a 16 px floor so the last
+       card is never hidden under the Android gesture nav bar. */
+    padding: 12px
+             max(12px, env(safe-area-inset-right))
+             max(16px, env(safe-area-inset-bottom))
+             max(12px, env(safe-area-inset-left));
   }
 }
 
