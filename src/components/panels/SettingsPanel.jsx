@@ -7,9 +7,10 @@ import TI from "../../icons/editor/index.jsx";
 import { fileToCompressedDataURL } from "../../utils/helpers.js";
 import TypographyModal from "./TypographyModal.jsx";
 
-// Tiny presentational helper: a leading icon column used in front of every
-// row / button in the settings panel. Keeps the markup tidy and the
-// icon size + tint consistent across the file.
+// Single leading-icon component used in front of every section header
+// AND every row / button in the settings panel. Same 36 × 36 indigo
+// chip everywhere so every icon lines up in one clean vertical column
+// regardless of whether it sits next to an h4 title or a row label.
 function RowIcon({ icon: Icon }) {
   return (
     <span className="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300">
@@ -17,14 +18,7 @@ function RowIcon({ icon: Icon }) {
     </span>
   );
 }
-// Same idea but bigger / louder, used in front of section headers.
-function SectionHeaderIcon({ icon: Icon }) {
-  return (
-    <span className="text-indigo-500 dark:text-indigo-300 shrink-0">
-      <Icon className="tabler-icon w-5 h-5" />
-    </span>
-  );
-}
+const SectionHeaderIcon = RowIcon;
 
 export default function SettingsPanel({
   open,
@@ -263,7 +257,7 @@ export default function SettingsPanel({
                   onExportAll?.();
                 }}
               >
-                <RowIcon icon={TI.Download} />
+                <RowIcon icon={TI.Upload} />
                 <div className="min-w-0">
                   <div className="font-medium">{t("exportAllNotesJson")}</div>
                   <div className="text-sm text-gray-500">{t("downloadAllNotesJson")}</div>
@@ -277,7 +271,7 @@ export default function SettingsPanel({
                   onImportAll?.();
                 }}
               >
-                <RowIcon icon={TI.Upload} />
+                <RowIcon icon={TI.Download} />
                 <div className="min-w-0">
                   <div className="font-medium">{t("importNotesJson")}</div>
                   <div className="text-sm text-gray-500">{t("importNotesFromJsonFile")}</div>
