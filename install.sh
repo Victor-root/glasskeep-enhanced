@@ -137,6 +137,19 @@ setup_i18n() {
         MSG_ERR_OS="Impossible de détecter l'OS. Debian/Ubuntu requis."
         MSG_WARN_OS="OS détecté : %s. Ce script est optimisé pour Debian/Ubuntu."
         MSG_STEP_FAIL="Étape échouée : %s"
+
+        MSG_ENC_TITLE="Chiffrement des données au repos (côté serveur)"
+        MSG_ENC_INTRO="Cette option chiffre le contenu des notes dans la base de données.\n  Protège contre : vol du serveur, du disque, de la base SQLite, des sauvegardes.\n  Ne protège PAS contre : l'administrateur du serveur, ou un serveur déjà déverrouillé qui serait compromis.\n  Après chaque redémarrage, un administrateur devra déverrouiller l'instance avec une passphrase.\n  Si vous perdez à la fois la passphrase ET la recovery key, les notes chiffrées seront irrécupérables."
+        MSG_ENC_PROMPT="Activer la protection des données au repos ? [oui/non] : "
+        MSG_ENC_PASS_PROMPT="Passphrase de l'instance (min. 8 caractères) : "
+        MSG_ENC_PASS_CONFIRM="Confirmer la passphrase : "
+        MSG_ENC_PASS_TOO_SHORT="La passphrase doit contenir au moins 8 caractères."
+        MSG_ENC_PASS_MISMATCH="Les passphrases ne correspondent pas."
+        MSG_ENC_RECOVERY_TITLE="Recovery key (à noter MAINTENANT — affichée une seule fois)"
+        MSG_ENC_RECOVERY_WARN="Cette recovery key permet de déverrouiller l'instance si la passphrase est perdue. Si vous perdez les deux, les notes chiffrées seront irrécupérables."
+        MSG_ENC_RECOVERY_ACK="Saisissez \"oui\" une fois la recovery key sauvegardée : "
+        MSG_ENC_ACTIVATING="Activation du chiffrement au repos"
+        MSG_ENC_DONE="Chiffrement au repos activé."
     else
         # ── English strings (default) ───────────────────────────────────────
         MSG_SUBTITLE="Note Manager"
@@ -236,6 +249,19 @@ setup_i18n() {
         MSG_ERR_OS="Unable to detect OS. Debian/Ubuntu required."
         MSG_WARN_OS="Detected OS: %s. This script is optimized for Debian/Ubuntu."
         MSG_STEP_FAIL="Step failed: %s"
+
+        MSG_ENC_TITLE="At-rest encryption (server-side)"
+        MSG_ENC_INTRO="This option encrypts note contents in the database.\n  Protects against: theft of the server, the disk, the SQLite file, backups.\n  Does NOT protect against: the server administrator, or an already-unlocked, compromised server.\n  After each restart, an administrator must unlock the instance with a passphrase.\n  If you lose BOTH the passphrase AND the recovery key, encrypted notes are unrecoverable."
+        MSG_ENC_PROMPT="Enable at-rest data protection? [yes/no]: "
+        MSG_ENC_PASS_PROMPT="Instance passphrase (min. 8 characters): "
+        MSG_ENC_PASS_CONFIRM="Confirm passphrase: "
+        MSG_ENC_PASS_TOO_SHORT="Passphrase must be at least 8 characters."
+        MSG_ENC_PASS_MISMATCH="Passphrases do not match."
+        MSG_ENC_RECOVERY_TITLE="Recovery key (write this down NOW — shown only once)"
+        MSG_ENC_RECOVERY_WARN="This recovery key lets you unlock the instance if the passphrase is lost. If you lose both, encrypted notes are unrecoverable."
+        MSG_ENC_RECOVERY_ACK="Type \"yes\" once you have saved the recovery key: "
+        MSG_ENC_ACTIVATING="Activating at-rest encryption"
+        MSG_ENC_DONE="At-rest encryption enabled."
     fi
 
     # Export detected lang code for use in .env
@@ -290,6 +316,161 @@ is_installed() {
 SSL_MODE=""          # "proxy" | "selfsigned" | "custom"
 CUSTOM_CERT_PATH=""
 CUSTOM_KEY_PATH=""
+
+# Variables set by ask_encryption_config
+ENC_ENABLE="no"
+ENC_PASSPHRASE=""
+
+ask_encryption_config() {
+    echo ""
+    echo -e "${BOLD}${CYAN}▶ ${MSG_ENC_TITLE}${RESET}"
+    echo -e "  ${MSG_ENC_INTRO}"
+    echo ""
+    local ans
+    while true; do
+        read -rp "$(echo -e "${YELLOW}${MSG_ENC_PROMPT}${RESET}")" ans </dev/tty
+        case "${ans,,}" in
+            y|yes|o|oui)
+                ENC_ENABLE="yes"
+                break ;;
+            n|no|non)
+                ENC_ENABLE="no"
+                return 0 ;;
+            *)
+                warn "$MSG_PROXY_INVALID" ;;
+        esac
+    done
+
+    local pass1 pass2
+    while true; do
+        read -rsp "$(echo -e "${YELLOW}${MSG_ENC_PASS_PROMPT}${RESET}")" pass1 </dev/tty
+        echo ""
+        if [[ ${#pass1} -lt 8 ]]; then
+            warn "$MSG_ENC_PASS_TOO_SHORT"
+            continue
+        fi
+        read -rsp "$(echo -e "${YELLOW}${MSG_ENC_PASS_CONFIRM}${RESET}")" pass2 </dev/tty
+        echo ""
+        if [[ "$pass1" != "$pass2" ]]; then
+            warn "$MSG_ENC_PASS_MISMATCH"
+            continue
+        fi
+        break
+    done
+    ENC_PASSPHRASE="$pass1"
+}
+
+# Initialise the at-rest vault from the install script. Generates the
+# DEK, wraps it under (passphrase, recovery key), encrypts every
+# pre-existing note (typically none on a fresh install), and prints
+# the recovery key once on stdout for the admin to save.
+activate_encryption() {
+    local db_file="$1"
+    local passphrase="$2"
+    local script="${INSTALL_DIR}/server/encryption/_install_activate.js"
+
+    cat > "$script" <<'NODESCRIPT'
+const Database = require("better-sqlite3");
+const vault = require("./instanceVault");
+const noteCipher = require("./noteCipher");
+const runtime = require("./runtimeUnlockState");
+
+const dbFile = process.argv[2];
+const passphrase = process.argv[3];
+if (!dbFile || !passphrase) {
+  console.error("usage: node _install_activate.js <dbFile> <passphrase>");
+  process.exit(1);
+}
+
+const db = new Database(dbFile);
+db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
+// Make sure the notes table has the encryption columns even if this
+// is a brand-new database (in which case there are no rows to encrypt).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS notes (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    items_json TEXT NOT NULL,
+    tags_json TEXT NOT NULL,
+    images_json TEXT NOT NULL,
+    color TEXT NOT NULL,
+    pinned INTEGER NOT NULL DEFAULT 0,
+    position REAL NOT NULL DEFAULT 0,
+    timestamp TEXT NOT NULL,
+    archived INTEGER NOT NULL DEFAULT 0,
+    trashed INTEGER NOT NULL DEFAULT 0,
+    client_updated_at TEXT,
+    updated_at TEXT,
+    last_edited_by TEXT,
+    last_edited_at TEXT
+  )
+`);
+vault.ensureSchema(db);
+
+const init = vault.initialize(db, passphrase);
+runtime.setEnabled(true);
+runtime.unlockWithDek(init.dek);
+
+const tx = db.transaction(() => {
+  const rows = db.prepare("SELECT * FROM notes").all();
+  const upd = db.prepare(`
+    UPDATE notes SET
+      title = @title, content = @content,
+      items_json = @items_json, tags_json = @tags_json,
+      images_json = @images_json, color = @color,
+      is_server_encrypted = @is_server_encrypted,
+      enc_version = @enc_version,
+      enc_payload = @enc_payload
+    WHERE id = @id
+  `);
+  for (const row of rows) {
+    if (row.is_server_encrypted) continue;
+    const prepared = noteCipher.prepareRowForWrite({
+      title: row.title,
+      content: row.content,
+      items_json: row.items_json,
+      tags_json: row.tags_json,
+      images_json: row.images_json,
+      color: row.color,
+    });
+    upd.run({
+      id: row.id,
+      title: prepared.title,
+      content: prepared.content,
+      items_json: prepared.items_json,
+      tags_json: prepared.tags_json,
+      images_json: prepared.images_json,
+      color: prepared.color,
+      is_server_encrypted: prepared.is_server_encrypted,
+      enc_version: prepared.enc_version,
+      enc_payload: prepared.enc_payload,
+    });
+  }
+  vault.markMigrated(db);
+});
+tx();
+
+// Output exactly: "OK <recoveryKey>" so the bash caller can pluck the
+// key without parsing JSON.
+process.stdout.write("OK " + init.recoveryKey + "\n");
+db.close();
+NODESCRIPT
+
+    local out
+    out=$(cd "$INSTALL_DIR" && node "$script" "$db_file" "$passphrase" 2>&1)
+    local code=$?
+    rm -f "$script"
+    if [[ $code -ne 0 ]] || [[ "$out" != OK* ]]; then
+        error "Encryption activation failed: $out"
+        return 1
+    fi
+    GLASSKEEP_RECOVERY_KEY="${out#OK }"
+    return 0
+}
 
 ask_ssl_config() {
     echo ""
@@ -581,6 +762,10 @@ action_install() {
         done
     fi
 
+    # Offer at-rest encryption (asked here so all answers are collected
+    # up-front; activation itself runs after the DB has been created).
+    ask_encryption_config
+
     # Ask SSL config (last question, before installation starts)
     ask_ssl_config
 
@@ -619,6 +804,14 @@ action_install() {
 
     GLASSKEEP_ADMIN_LOGIN=""
     setup_admin "${DATA_DIR}/notes.db" "$admin_name" "$admin_login" "$admin_pass"
+
+    GLASSKEEP_RECOVERY_KEY=""
+    if [[ "$ENC_ENABLE" == "yes" ]]; then
+        step "$MSG_ENC_ACTIVATING" \
+            activate_encryption "${DATA_DIR}/notes.db" "$ENC_PASSPHRASE"
+    fi
+    # Wipe the passphrase from this shell as soon as we're done with it.
+    ENC_PASSPHRASE=""
 
     local jwt_secret
     jwt_secret=$(openssl rand -hex 32 2>/dev/null || cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 64)
@@ -669,6 +862,31 @@ EOF
 
     sleep 2
     if systemctl is-active --quiet "$SERVICE_NAME"; then
+        # If we activated encryption, surface the recovery key now —
+        # before the access-info banner — and force the admin to
+        # acknowledge they have written it down.
+        if [[ -n "$GLASSKEEP_RECOVERY_KEY" ]]; then
+            echo ""
+            echo -e "${YELLOW}${BOLD}╔═══════════════════════════════════════════╗${RESET}"
+            echo -e "${YELLOW}${BOLD}║  ${MSG_ENC_RECOVERY_TITLE}${RESET}"
+            echo -e "${YELLOW}${BOLD}╚═══════════════════════════════════════════╝${RESET}"
+            echo ""
+            echo -e "  ${BOLD}${WHITE}${GLASSKEEP_RECOVERY_KEY}${RESET}"
+            echo ""
+            echo -e "  ${YELLOW}${MSG_ENC_RECOVERY_WARN}${RESET}"
+            echo ""
+            local ack
+            while true; do
+                read -rp "$(echo -e "${YELLOW}${MSG_ENC_RECOVERY_ACK}${RESET}")" ack </dev/tty
+                case "${ack,,}" in
+                    y|yes|o|oui) break ;;
+                esac
+            done
+            success "$MSG_ENC_DONE"
+            # Clear the variable from the shell so the recovery key is
+            # not retrievable from a `set` dump or environment crawl.
+            GLASSKEEP_RECOVERY_KEY=""
+        fi
         show_access_info "$port"
     else
         warn "$MSG_WARN_SERVICE"

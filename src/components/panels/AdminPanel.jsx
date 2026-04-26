@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { t } from "../../i18n";
 import UserAvatar from "../common/UserAvatar.jsx";
 import { CloseIcon } from "../../icons/index.jsx";
+import EncryptionAdminSection from "../lock/EncryptionAdminSection.jsx";
 
 export default function AdminPanel({
   open,
@@ -22,6 +23,7 @@ export default function AdminPanel({
   currentUser,
   showGenericConfirm,
   showToast,
+  authToken,
 }) {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [editUserModalOpen, setEditUserModalOpen] = useState(false);
@@ -263,6 +265,11 @@ export default function AdminPanel({
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* At-rest encryption */}
+          <div className="mb-8">
+            <EncryptionAdminSection token={authToken} showToast={showToast} />
           </div>
 
           {/* Create User Section */}

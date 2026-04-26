@@ -40,6 +40,17 @@ export async function api(path, { method = "GET", body, token } = {}) {
       data = null;
     }
 
+    // Handle "instance locked" — the server is up, encryption is
+    // enabled, but no admin has unlocked the DEK yet. The app reacts
+    // by rendering the unlock screen instead of the normal UI.
+    if (res.status === 423) {
+      window.dispatchEvent(new CustomEvent("instance-locked"));
+      const err = new Error(data?.error || "Instance is locked");
+      err.status = 423;
+      err.isLocked = true;
+      throw err;
+    }
+
     // Handle token expiration (401 Unauthorized)
     if (res.status === 401) {
       // Clear auth from localStorage

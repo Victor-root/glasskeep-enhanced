@@ -63,6 +63,8 @@ import useAdminActions from "./hooks/useAdminActions.js";
 import useImportExport from "./hooks/useImportExport.js";
 import useCollaboration from "./hooks/useCollaboration.js";
 import useFormatting from "./hooks/useFormatting.js";
+import useInstanceLockStatus from "./hooks/useInstanceLockStatus.js";
+import InstanceUnlockScreen from "./components/lock/InstanceUnlockScreen.jsx";
 
 /** ---------- App ---------- */
 export default function App() {
@@ -950,6 +952,12 @@ export default function App() {
   const [allowRegistration, setAllowRegistration] = useState(true);
   const [loginSlogan, setLoginSlogan] = useState("");
   const [loginProfiles, setLoginProfiles] = useState([]);
+
+  // At-rest encryption: when the server reports `enabled && locked`,
+  // the unlock screen takes over the whole app. The `refresh` callback
+  // is passed to the unlock screen so it can flip the UI back without
+  // waiting for the next poll tick.
+  const { status: instanceLockStatus, refresh: refreshLockStatus } = useInstanceLockStatus();
 
   // Settings panel state
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
@@ -4503,6 +4511,19 @@ export default function App() {
   }, [open]);
 
   // ---- Routing ----
+  // Hard gate: if the server reports the instance is locked, no other
+  // route is reachable until an admin unlocks. The lock screen reuses
+  // the AuthShell so the layout matches the rest of the auth flow.
+  if (instanceLockStatus && instanceLockStatus.enabled && instanceLockStatus.locked) {
+    return (
+      <InstanceUnlockScreen
+        dark={dark}
+        onToggleDark={toggleDark}
+        onUnlocked={refreshLockStatus}
+      />
+    );
+  }
+
   if (route === "#/admin") {
     if (!currentUser?.email) {
       return (
@@ -4682,6 +4703,7 @@ export default function App() {
         currentUser={currentUser}
         showGenericConfirm={showGenericConfirm}
         showToast={showToast}
+        authToken={token}
       />
 
       <NotesUI
