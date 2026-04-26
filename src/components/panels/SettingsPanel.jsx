@@ -131,7 +131,7 @@ export default function SettingsPanel({
         />
       )}
       <div
-        className={`fixed top-0 right-0 z-50 h-full w-full sm:w-96 transition-transform duration-200 ${open ? "translate-x-0 shadow-2xl" : "translate-x-full shadow-none"}`}
+        className={`fixed top-0 right-0 z-50 h-full w-full sm:w-[28rem] lg:w-[32rem] transition-transform duration-200 ${open ? "translate-x-0 shadow-2xl" : "translate-x-full shadow-none"}`}
         style={{
           backgroundColor: dark ? "#222222" : "rgba(255,255,255,0.95)",
           borderLeft: "1px solid var(--border-light)",
