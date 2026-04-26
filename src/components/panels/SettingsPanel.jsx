@@ -29,6 +29,10 @@ export default function SettingsPanel({
   setEdgeToEdgeLandscape,
   typographyPresets,
   setTypographyPresets,
+  // Lifted into App.jsx so the centralised overlay back-button stack
+  // can pop the typography sub-modal on Android back gesture.
+  typographyModalOpen,
+  setTypographyModalOpen,
   showGenericConfirm,
   showToast,
   onResetNoteOrder,
@@ -40,7 +44,9 @@ export default function SettingsPanel({
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [overridePositions, setOverridePositions] = useState(true);
   const [profileShowOnLogin, setProfileShowOnLogin] = useState(true);
-  const [typographyModalOpen, setTypographyModalOpen] = useState(false);
+  // typographyModalOpen / setTypographyModalOpen come from App.jsx props
+  // (see destructure above) — lifted to plug into the centralised
+  // overlay back-button stack.
   const avatarFileRef = React.useRef(null);
 
   // Load profile data when panel opens

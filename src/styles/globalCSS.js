@@ -2451,7 +2451,12 @@ html.dark .settings-type-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  /* Respect Android / iOS safe areas so the modal never tucks under
+     the status bar or the gesture handle on edge-to-edge devices. */
+  padding: max(16px, env(safe-area-inset-top))
+           max(16px, env(safe-area-inset-right))
+           max(16px, env(safe-area-inset-bottom))
+           max(16px, env(safe-area-inset-left));
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }

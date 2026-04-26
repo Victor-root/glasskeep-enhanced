@@ -953,6 +953,10 @@ export default function App() {
 
   // Settings panel state
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  // Lifted from SettingsPanel so the centralised overlay back-button
+  // stack (and the safe-area-aware scrim) can react to the typography
+  // sub-modal opening / closing.
+  const [typographyModalOpen, setTypographyModalOpen] = useState(false);
 
   // Sync dropdown state (lifted for back button support)
   const [syncDropdownOpen, setSyncDropdownOpen] = useState(false);
@@ -2891,7 +2895,7 @@ export default function App() {
     collaborationModalOpen, showModalColorPop, showModalFmt, modalMenuOpen,
     modalKebabOpen, modalTagFocused, syncDropdownOpen, mobileSearchOpen,
     showColorPop, showComposerFmt, headerMenuOpen, multiMode,
-    settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
+    typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
   ].filter(Boolean).length;
   const prevOverlayCountRef = useRef(0);
 
@@ -2946,6 +2950,7 @@ export default function App() {
       if (showComposerFmt) { setShowComposerFmt(false); return; }
       if (headerMenuOpen) { setHeaderMenuOpen(false); return; }
       if (multiMode) { setMultiMode(false); return; }
+      if (typographyModalOpen) { setTypographyModalOpen(false); return; }
       if (settingsPanelOpen) { setSettingsPanelOpen(false); return; }
       if (adminPanelOpen) { setAdminPanelOpen(false); return; }
       if (sidebarOpen) { setSidebarOpen(false); return; }
@@ -2955,7 +2960,7 @@ export default function App() {
   }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
       showModalColorPop, showModalFmt, modalMenuOpen, modalKebabOpen, modalTagFocused,
       syncDropdownOpen, mobileSearchOpen, showColorPop, showComposerFmt,
-      headerMenuOpen, multiMode, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen]);
+      headerMenuOpen, multiMode, typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen]);
 
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
@@ -4573,6 +4578,8 @@ export default function App() {
         setEdgeToEdgeLandscape={setEdgeToEdgeLandscape}
         typographyPresets={typographyPresets}
         setTypographyPresets={(next) => setTypographyPresets(normalizeTypographyPresets(next))}
+        typographyModalOpen={typographyModalOpen}
+        setTypographyModalOpen={setTypographyModalOpen}
         showGenericConfirm={showGenericConfirm}
         showToast={showToast}
         onResetNoteOrder={resetNoteOrder}
