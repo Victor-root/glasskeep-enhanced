@@ -2487,15 +2487,12 @@ html.dark .typo-modal {
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  /* Belt-and-suspenders: also pad the header by env(safe-area-inset
-     -top) so on Android WebViews where the scrim padding alone
-     doesn't push the modal far enough (env() reporting 0 etc.) the
-     header content is still pushed below the status bar from the
-     inside. The 32 px floor matches the scrim fallback so a typical
-     Android status bar (24–30 px) is cleared even when env()
-     returns 0 — desktop is unaffected because the modal centres
-     mid-viewport and the header has plenty of clearance there. */
-  padding: max(32px, env(safe-area-inset-top)) 20px 14px;
+  /* Pad below the safe-area inset AND give an explicit 12 px of
+     breathing room above the title — without the calc the title
+     sat exactly at the inset boundary, which on a real Android
+     device read as "touching the status bar". The max() fallback
+     of 32 px covers WebViews that report env() as 0. */
+  padding: max(32px, calc(env(safe-area-inset-top) + 12px)) 20px 14px;
   border-bottom: 1px solid var(--rt-divider);
 }
 .typo-modal-header-main {
