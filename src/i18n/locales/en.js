@@ -574,7 +574,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   unlockFailed: "Unlock failed.",
 
   encryptionSectionTitle: "At-rest encryption (server-side)",
-  encryptionSectionDescription: "Encrypts the contents of every note in the database. Whenever the GlassKeep service restarts (update, server reboot, etc.), an administrator has to unlock the instance with the passphrase or recovery key. Regular users keep signing in normally.",
+  encryptionSectionDescription: "Encrypts the contents of every note in the database. Whenever the GlassKeep service restarts (update, server reboot, etc.), an administrator has to unlock the instance with the passphrase or recovery key. Once the instance is unlocked, regular users sign in as usual.",
   encryptionStatusEnabled: "Enabled — instance is currently unlocked.",
   encryptionStatusDisabled: "Disabled — notes are stored in plain text.",
   encryptionScopeTitle: "Threat model",

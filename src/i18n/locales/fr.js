@@ -574,7 +574,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   unlockFailed: "Échec du déverrouillage.",
 
   encryptionSectionTitle: "Chiffrement des données au repos (côté serveur)",
-  encryptionSectionDescription: "Chiffre le contenu de chaque note dans la base de données. À chaque redémarrage du service GlassKeep (mise à jour, reboot du serveur, etc.), un administrateur doit déverrouiller l'instance avec la passphrase ou la recovery key. Les utilisateurs, eux, se connectent normalement comme d'habitude.",
+  encryptionSectionDescription: "Chiffre le contenu de chaque note dans la base de données. À chaque redémarrage du service GlassKeep (mise à jour, reboot du serveur, etc.), un administrateur doit déverrouiller l'instance avec la passphrase ou la recovery key. Une fois l'instance déverrouillée, les utilisateurs se connectent normalement comme d'habitude.",
   encryptionStatusEnabled: "Activé — l'instance est actuellement déverrouillée.",
   encryptionStatusDisabled: "Désactivé — les notes sont stockées en clair.",
   encryptionScopeTitle: "Modèle de menace",
