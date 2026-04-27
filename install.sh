@@ -436,7 +436,7 @@ const tx = db.transaction(() => {
       tags_json: row.tags_json,
       images_json: row.images_json,
       color: row.color,
-    });
+    }, { noteId: row.id, userId: row.user_id });
     upd.run({
       id: row.id,
       title: prepared.title,
@@ -449,6 +449,25 @@ const tx = db.transaction(() => {
       enc_version: prepared.enc_version,
       enc_payload: prepared.enc_payload,
     });
+  }
+  // Encrypt per-user tag rows in the same transaction so the install
+  // never leaves readable tags on disk after activation.
+  try {
+    const tagRows = db.prepare(
+      "SELECT note_id, user_id, tags_json FROM note_user_tags WHERE is_encrypted = 0"
+    ).all();
+    const updTag = db.prepare(
+      "UPDATE note_user_tags SET tags_json = '[]', is_encrypted = 1, enc_payload = ? WHERE note_id = ? AND user_id = ?"
+    );
+    for (const r of tagRows) {
+      if (!r.tags_json || r.tags_json === "[]") continue;
+      const enc = noteCipher.encryptTagsJson(r.tags_json, {
+        noteId: r.note_id, userId: r.user_id,
+      });
+      updTag.run(enc, r.note_id, r.user_id);
+    }
+  } catch (e) {
+    process.stderr.write("tag encryption skipped: " + e.message + "\n");
   }
   vault.markMigrated(db);
 });

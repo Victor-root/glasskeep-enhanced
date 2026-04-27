@@ -52,21 +52,47 @@ function ensureSchema(db) {
       last_unlocked_at TEXT
     );
   `);
-  // Notes table: extra columns to carry the encrypted payload.
-  const cols = db.prepare(`PRAGMA table_info(notes)`).all();
-  const names = new Set(cols.map((c) => c.name));
-  const tx = db.transaction(() => {
-    if (!names.has("is_server_encrypted")) {
-      db.exec(`ALTER TABLE notes ADD COLUMN is_server_encrypted INTEGER NOT NULL DEFAULT 0`);
-    }
-    if (!names.has("enc_version")) {
-      db.exec(`ALTER TABLE notes ADD COLUMN enc_version INTEGER`);
-    }
-    if (!names.has("enc_payload")) {
-      db.exec(`ALTER TABLE notes ADD COLUMN enc_payload TEXT`);
-    }
-  });
-  tx();
+  // Notes table: extra columns to carry the encrypted payload. We
+  // guard with PRAGMA table_info lookups returning a non-empty list so
+  // callers that invoke ensureSchema before the main app schema is
+  // created (tests, install helpers) don't crash here.
+  function tableExists(name) {
+    return db.prepare(`PRAGMA table_info(${name})`).all().length > 0;
+  }
+
+  if (tableExists("notes")) {
+    const cols = db.prepare(`PRAGMA table_info(notes)`).all();
+    const names = new Set(cols.map((c) => c.name));
+    const tx = db.transaction(() => {
+      if (!names.has("is_server_encrypted")) {
+        db.exec(`ALTER TABLE notes ADD COLUMN is_server_encrypted INTEGER NOT NULL DEFAULT 0`);
+      }
+      if (!names.has("enc_version")) {
+        db.exec(`ALTER TABLE notes ADD COLUMN enc_version INTEGER`);
+      }
+      if (!names.has("enc_payload")) {
+        db.exec(`ALTER TABLE notes ADD COLUMN enc_payload TEXT`);
+      }
+    });
+    tx();
+  }
+
+  // note_user_tags table: extra columns so per-user tag rows can also
+  // be encrypted at rest (otherwise an attacker reading SQLite could
+  // still see every tag name even with notes encrypted).
+  if (tableExists("note_user_tags")) {
+    const tagCols = db.prepare(`PRAGMA table_info(note_user_tags)`).all();
+    const tagNames = new Set(tagCols.map((c) => c.name));
+    const tagTx = db.transaction(() => {
+      if (!tagNames.has("is_encrypted")) {
+        db.exec(`ALTER TABLE note_user_tags ADD COLUMN is_encrypted INTEGER NOT NULL DEFAULT 0`);
+      }
+      if (!tagNames.has("enc_payload")) {
+        db.exec(`ALTER TABLE note_user_tags ADD COLUMN enc_payload TEXT`);
+      }
+    });
+    tagTx();
+  }
 }
 
 function loadRow(db) {

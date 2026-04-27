@@ -586,7 +586,13 @@ const patchNoteSensitiveCollabStmt = db.prepare(`
 // Build a row that's safe to feed to insertNoteStmt: encrypts the
 // sensitive fields if the instance is unlocked, leaves them in the
 // clear with is_server_encrypted=0 otherwise.
-function buildWriteRow(fields) {
+//
+// The AAD context (noteId, ownerUserId) is what binds a v2 ciphertext
+// to its row; without it a thief could swap one note's enc_payload
+// onto another row and the swap would be undetectable. The owner's
+// user_id, NOT the requester's, is used so a collaborator's edit
+// produces a payload that the owner can still read.
+function buildWriteRow(fields, ctx) {
   return noteCipher.prepareRowForWrite({
     title: fields.title ?? "",
     content: fields.content ?? "",
@@ -594,11 +600,11 @@ function buildWriteRow(fields) {
     tags_json: fields.tags_json ?? "[]",
     images_json: fields.images_json ?? "[]",
     color: fields.color ?? "default",
-  });
+  }, ctx);
 }
 
 function runInsertNote(n) {
-  const w = buildWriteRow(n);
+  const w = buildWriteRow(n, { noteId: n.id, userId: n.user_id });
   return insertNoteStmt.run({
     id: n.id,
     user_id: n.user_id,
@@ -619,8 +625,12 @@ function runInsertNote(n) {
   });
 }
 
-function runUpdateNoteFullCollab(updated) {
-  const w = buildWriteRow(updated);
+// `ownerUserId` is the user_id of the row that gets updated, taken
+// from the existing row (NOT from the requester) so a collaborator
+// edit re-encrypts under the owner's AAD and the owner can still
+// read the result.
+function runUpdateNoteFullCollab(updated, ownerUserId) {
+  const w = buildWriteRow(updated, { noteId: updated.id, userId: ownerUserId });
   return updateNoteFullCollabStmt.run({
     id: updated.id,
     user_id: updated.user_id,
@@ -658,7 +668,10 @@ function runPatchNoteSensitiveCollab(id, userId, partial) {
     images_json: partial.images_json != null ? partial.images_json : (existing.images_json ?? "[]"),
     color: partial.color != null ? partial.color : (existing.color ?? "default"),
   };
-  const w = buildWriteRow(merged);
+  // existing.user_id is the OWNER (not the requesting userId, which
+  // can be a collaborator). The AAD must be tied to the owner so the
+  // re-encrypted blob still verifies for the owner on read.
+  const w = buildWriteRow(merged, { noteId: id, userId: existing.user_id });
   return patchNoteSensitiveCollabStmt.run({
     id,
     user_id: userId,
@@ -705,17 +718,58 @@ const updateNoteWithEditor = db.prepare(`
 `);
 
 // Per-user tags
-const getUserTagsForNote = db.prepare(
-  "SELECT tags_json FROM note_user_tags WHERE note_id = ? AND user_id = ?"
+// Schema also carries (is_encrypted, enc_payload) so the rows can be
+// stored encrypted at rest. The plaintext tags_json column is kept as
+// a placeholder ("[]") on encrypted rows to satisfy the NOT NULL
+// default and to keep any reader outside these helpers from seeing
+// real tag names.
+const getUserTagsRowStmt = db.prepare(
+  "SELECT tags_json, is_encrypted, enc_payload FROM note_user_tags WHERE note_id = ? AND user_id = ?"
 );
-const upsertUserTags = db.prepare(
-  `INSERT INTO note_user_tags (note_id, user_id, tags_json) VALUES (?, ?, ?)
-   ON CONFLICT(note_id, user_id) DO UPDATE SET tags_json = excluded.tags_json`
+const upsertUserTagsPlainStmt = db.prepare(
+  `INSERT INTO note_user_tags (note_id, user_id, tags_json, is_encrypted, enc_payload)
+   VALUES (?, ?, ?, 0, NULL)
+   ON CONFLICT(note_id, user_id) DO UPDATE SET
+     tags_json = excluded.tags_json,
+     is_encrypted = 0,
+     enc_payload = NULL`
+);
+const upsertUserTagsEncStmt = db.prepare(
+  `INSERT INTO note_user_tags (note_id, user_id, tags_json, is_encrypted, enc_payload)
+   VALUES (?, ?, '[]', 1, ?)
+   ON CONFLICT(note_id, user_id) DO UPDATE SET
+     tags_json = '[]',
+     is_encrypted = 1,
+     enc_payload = excluded.enc_payload`
 );
 
+// Read the per-user tag list for (noteId, userId) — transparently
+// decrypts when the row is stored encrypted. Returns '[]' when no row
+// exists or when decryption fails (the latter is logged so a corrupted
+// AAD is investigable instead of silently swallowed).
 function getUserTags(noteId, userId) {
-  const row = getUserTagsForNote.get(noteId, userId);
-  return row ? row.tags_json : "[]";
+  const row = getUserTagsRowStmt.get(noteId, userId);
+  if (!row) return "[]";
+  if (!row.is_encrypted) return row.tags_json || "[]";
+  if (!row.enc_payload) return "[]";
+  try {
+    return noteCipher.decryptTagsPayload(row.enc_payload, { noteId, userId });
+  } catch (e) {
+    console.warn(`[encrypt] failed to decrypt tags for note=${noteId} user=${userId}: ${e.message}`);
+    return "[]";
+  }
+}
+
+// Persist the per-user tag list for (noteId, userId). Uses the
+// encrypted statement when the instance is unlocked and encryption is
+// active; falls back to the plaintext statement otherwise.
+function runUpsertUserTags(noteId, userId, tagsJson) {
+  if (noteCipher.isActive()) {
+    const enc = noteCipher.encryptTagsJson(tagsJson, { noteId, userId });
+    upsertUserTagsEncStmt.run(noteId, userId, enc);
+  } else {
+    upsertUserTagsPlainStmt.run(noteId, userId, tagsJson);
+  }
 }
 
 // Per-user position/pinned override for shared notes.
@@ -1236,7 +1290,7 @@ app.post("/api/notes", auth, (req, res) => {
   }
 
   runInsertNote(n);
-  if (userTags !== "[]") upsertUserTags.run(noteId, req.user.id, userTags);
+  if (userTags !== "[]") runUpsertUserTags(noteId, req.user.id, userTags);
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), n.id);
   broadcastNoteUpdated(n.id);
   // Re-read to get updated_at/last_edited_* set by updateNoteWithEditor
@@ -1265,7 +1319,7 @@ app.put("/api/notes/:id", auth, (req, res) => {
 
   // Save tags to per-user table (not on the note itself)
   if (Array.isArray(b.tags)) {
-    upsertUserTags.run(id, req.user.id, JSON.stringify(b.tags));
+    runUpsertUserTags(id, req.user.id, JSON.stringify(b.tags));
   }
   const updated = {
     id,
@@ -1284,7 +1338,9 @@ app.put("/api/notes/:id", auth, (req, res) => {
     timestamp: b.timestamp || existing.timestamp,
     client_updated_at: tsResult.iso,
   };
-  const result = runUpdateNoteFullCollab(updated);
+  // existing.user_id is the note's owner — it doesn't change on edit,
+  // even when the editor is a collaborator. AAD binds to the owner.
+  const result = runUpdateNoteFullCollab(updated, existing.user_id);
 
   if (result.changes === 0) {
     return res.status(404).json({ error: "Note not found or access denied" });
@@ -1342,7 +1398,7 @@ app.patch("/api/notes/:id", auth, (req, res) => {
 
   // Save tags to per-user table (not on the note itself)
   if (Array.isArray(req.body.tags)) {
-    upsertUserTags.run(id, req.user.id, JSON.stringify(req.body.tags));
+    runUpsertUserTags(id, req.user.id, JSON.stringify(req.body.tags));
   }
   const p = {
     id,
@@ -2093,7 +2149,7 @@ app.post("/api/notes/import", auth, (req, res) => {
           timestamp: n.timestamp || nowISO(),
           client_updated_at: (parseIsoTimestamp(n.client_updated_at || n.timestamp) || {}).iso || nowISO(),
         });
-        if (importedTags !== "[]") upsertUserTags.run(id, req.user.id, importedTags);
+        if (importedTags !== "[]") runUpsertUserTags(id, req.user.id, importedTags);
         imported++;
       }
     });

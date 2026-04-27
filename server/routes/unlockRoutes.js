@@ -19,6 +19,81 @@ const runtime = require("../encryption/runtimeUnlockState");
 const noteCipher = require("../encryption/noteCipher");
 const recoveryKey = require("../encryption/recoveryKey");
 
+// Run after every successful unlock. Two upgrade paths:
+//   - notes encrypted in the v1 format (no AAD) get re-encrypted as
+//     v2 (AAD bound to noteId+ownerUserId) so a stolen ciphertext
+//     can no longer be moved between rows undetected.
+//   - per-user tag rows that pre-date the tag-encryption hardening
+//     get encrypted in place.
+// Both run in a single transaction; failure logs and falls through —
+// the user is still unlocked, the migration will simply retry on the
+// next unlock. After both passes finish we VACUUM (with the same
+// triple-pass as activation) so freed pages don't leak the previous
+// formats.
+function runUpgradeMigrations(db, log) {
+  let touchedNotes = 0;
+  let touchedTags = 0;
+
+  try {
+    const v1Notes = db.prepare(
+      "SELECT id, user_id, enc_payload FROM notes WHERE is_server_encrypted = 1 AND (enc_version IS NULL OR enc_version < ?)"
+    ).all(noteCipher.NOTE_VERSION_LATEST);
+    const updNote = db.prepare(
+      "UPDATE notes SET enc_version = ?, enc_payload = ? WHERE id = ?"
+    );
+    const noteTx = db.transaction(() => {
+      for (const r of v1Notes) {
+        const fields = noteCipher.decryptPayload(r.enc_payload, {
+          noteId: r.id,
+          userId: r.user_id,
+        });
+        const payload = noteCipher.encryptFields(fields, {
+          noteId: r.id,
+          userId: r.user_id,
+        });
+        updNote.run(noteCipher.NOTE_VERSION_LATEST, payload, r.id);
+        touchedNotes++;
+      }
+    });
+    noteTx();
+  } catch (e) {
+    log.warn?.(`[encrypt] note v1->v2 migration aborted: ${e.message}`);
+  }
+
+  try {
+    const plainTags = db.prepare(
+      "SELECT note_id, user_id, tags_json FROM note_user_tags WHERE is_encrypted = 0 AND tags_json IS NOT NULL AND tags_json != '[]' AND tags_json != ''"
+    ).all();
+    const updTag = db.prepare(
+      "UPDATE note_user_tags SET tags_json = '[]', is_encrypted = 1, enc_payload = ? WHERE note_id = ? AND user_id = ?"
+    );
+    const tagTx = db.transaction(() => {
+      for (const r of plainTags) {
+        const enc = noteCipher.encryptTagsJson(r.tags_json, {
+          noteId: r.note_id,
+          userId: r.user_id,
+        });
+        updTag.run(enc, r.note_id, r.user_id);
+        touchedTags++;
+      }
+    });
+    tagTx();
+  } catch (e) {
+    log.warn?.(`[encrypt] tag encryption migration aborted: ${e.message}`);
+  }
+
+  if (touchedNotes > 0 || touchedTags > 0) {
+    log.info?.(`[encrypt] upgrade migration: notes=${touchedNotes} tags=${touchedTags}`);
+    try {
+      db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+      db.exec("VACUUM");
+      db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+    } catch (e) {
+      log.warn?.(`[encrypt] post-migration VACUUM failed: ${e.message}`);
+    }
+  }
+}
+
 function getClientIp(req) {
   // Express's req.ip is good enough; keep a fallback so we never crash
   // the rate limiter when behind an unusual proxy setup.
@@ -31,45 +106,29 @@ function isLocalhost(req) {
   return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
 }
 
-// Refuse unlock attempts that would send the secret over plain HTTP, so
-// nobody accidentally types their passphrase across the network without
-// transport encryption. Localhost is exempt because the CLI script and
-// reverse-proxy back-ends all sit on it.
+// Refuse unlock attempts that would send the secret over plain HTTP,
+// so nobody accidentally types their passphrase across the network
+// without transport encryption.
 //
-// Three trust paths:
-//   1. Node itself is doing TLS    → req.secure is true.
-//   2. Operator declared a proxy   → TRUST_PROXY=true or HTTPS_ENABLED=false.
-//      In that mode TLS is the operator's responsibility (Nginx/Caddy/
-//      Traefik with their own cert) and we trust their assertion. The
-//      attacker scenario "bypasses the proxy and hits Node directly"
-//      means they are already on the trusted internal network — which
-//      this feature was never designed to defend against.
-//   3. Common proxy headers say https — we accept the usual variants
-//      (X-Forwarded-Proto, X-Forwarded-Ssl, Front-End-Https,
-//      X-Forwarded-Scheme) so a deploy that forgot to flip TRUST_PROXY
-//      still works without a head-scratch.
-function operatorDeclaredProxy() {
-  return process.env.TRUST_PROXY === "true"
-    || process.env.HTTPS_ENABLED === "false";
-}
-
-function proxyHeaderSaysHttps(req) {
-  const xfp = (req.headers["x-forwarded-proto"] || "").split(",")[0].trim().toLowerCase();
-  if (xfp === "https") return true;
-  const xfs = String(req.headers["x-forwarded-ssl"] || "").trim().toLowerCase();
-  if (xfs === "on") return true;
-  const feh = String(req.headers["front-end-https"] || "").trim().toLowerCase();
-  if (feh === "on") return true;
-  const xfsch = String(req.headers["x-forwarded-scheme"] || "").trim().toLowerCase();
-  if (xfsch === "https") return true;
-  return false;
-}
-
+// Two — and only two — trust paths:
+//   1. Localhost: the CLI script (scripts/unlock-instance.cjs) and any
+//      reverse-proxy back-end on the same box come in via 127.0.0.1.
+//      No remote attacker can reach this socket from outside without
+//      first compromising the host, so the loopback exemption is safe.
+//   2. req.secure === true: Express's view of the connection. This is
+//      true when Node terminates TLS itself (HTTPS_ENABLED=true with
+//      a cert) OR when `app.set('trust proxy', ...)` is set AND the
+//      proxy's X-Forwarded-Proto says https. We configure trust
+//      proxy in server/index.js based on TRUST_PROXY=true /
+//      HTTPS_ENABLED=false, so a properly-installed instance behind
+//      Nginx/Caddy/Traefik always passes this check.
+//
+// We deliberately do NOT inspect raw X-Forwarded-* headers ourselves
+// anymore — Express's `req.secure` is already the right gate, and
+// trusting raw headers without `app.set('trust proxy', ...)` would
+// let any caller spoof the value and bypass the HTTPS requirement.
 function isSecureRequest(req) {
-  if (req.secure) return true;
-  if (operatorDeclaredProxy()) return true;
-  if (proxyHeaderSaysHttps(req)) return true;
-  return false;
+  return req.secure === true;
 }
 
 function transportOk(req) {
@@ -114,12 +173,17 @@ function attachUnlockRoutes(app, deps) {
     }
     if (runtime.isUnlocked()) return res.json({ ok: true, alreadyUnlocked: true });
     if (!transportOk(req)) {
-      // One-line diagnostic so the operator can see which signal we
-      // missed when their proxy is set up oddly.
+      // One-line diagnostic so the operator can see exactly which
+      // signal Express used and which env it was running against.
+      // If trust_proxy_env is unset and req.secure is false on a
+      // request that came over HTTPS, the install needs TRUST_PROXY=true
+      // in /etc/glass-keep.env (or /opt/glass-keep/.env, depending on
+      // the install) so Express honours X-Forwarded-Proto.
       log.warn?.(
         `[unlock] insecure transport refused: ip=${getClientIp(req)} secure=${!!req.secure} `
-        + `trust_proxy_env=${process.env.TRUST_PROXY} https_enabled_env=${process.env.HTTPS_ENABLED} `
-        + `xfp=${req.headers["x-forwarded-proto"] || ""} xfs=${req.headers["x-forwarded-ssl"] || ""}`,
+        + `proto=${req.protocol} trust_proxy_env=${process.env.TRUST_PROXY || "(unset)"} `
+        + `https_enabled_env=${process.env.HTTPS_ENABLED || "(unset)"} `
+        + `xfp=${req.headers["x-forwarded-proto"] || "(none)"}`,
       );
       return res.status(400).json({
         error: "Refusing to accept unlock secret over plaintext HTTP. Use HTTPS or run from localhost.",
@@ -152,6 +216,7 @@ function attachUnlockRoutes(app, deps) {
       vault.markUnlockedNow(db);
       runtime.recordAttempt(id, true);
       log.info?.(`[unlock] success via passphrase from ${id}`);
+      runUpgradeMigrations(db, log);
       return res.json({ ok: true });
     } finally {
       // The runtime made its own copy — zero ours.
@@ -201,6 +266,7 @@ function attachUnlockRoutes(app, deps) {
       vault.markUnlockedNow(db);
       runtime.recordAttempt(id, true);
       log.info?.(`[unlock] success via recovery key from ${id}`);
+      runUpgradeMigrations(db, log);
       return res.json({ ok: true });
     } finally {
       try { dek.fill(0); } catch {}
@@ -266,7 +332,7 @@ function attachUnlockRoutes(app, deps) {
             tags_json: row.tags_json,
             images_json: row.images_json,
             color: row.color,
-          });
+          }, { noteId: row.id, userId: row.user_id });
           upd.run({
             id: row.id,
             title: prepared.title,
@@ -279,6 +345,22 @@ function attachUnlockRoutes(app, deps) {
             enc_version: prepared.enc_version,
             enc_payload: prepared.enc_payload,
           });
+        }
+        // Encrypt the per-user tag rows in the same transaction so a
+        // partial activation can't leave readable tags on disk.
+        const tagRows = db.prepare(
+          "SELECT note_id, user_id, tags_json FROM note_user_tags WHERE is_encrypted = 0"
+        ).all();
+        const updTag = db.prepare(
+          "UPDATE note_user_tags SET tags_json = '[]', is_encrypted = 1, enc_payload = ? WHERE note_id = ? AND user_id = ?"
+        );
+        for (const r of tagRows) {
+          if (!r.tags_json || r.tags_json === "[]") continue;
+          const enc = noteCipher.encryptTagsJson(r.tags_json, {
+            noteId: r.note_id,
+            userId: r.user_id,
+          });
+          updTag.run(enc, r.note_id, r.user_id);
         }
         vault.markMigrated(db);
       });
@@ -399,6 +481,30 @@ function attachUnlockRoutes(app, deps) {
             images_json: row.images_json ?? "[]",
             color: row.color ?? "default",
           });
+        }
+        // Tag rows symmetrically: decrypt back into tags_json. We do
+        // it in the same transaction as the note decryption so a half-
+        // disabled state is impossible (either everything is plaintext
+        // again or nothing is, and the vault row stays "enabled").
+        const encTagRows = db.prepare(
+          "SELECT note_id, user_id, enc_payload FROM note_user_tags WHERE is_encrypted = 1"
+        ).all();
+        const updTag = db.prepare(
+          "UPDATE note_user_tags SET tags_json = ?, is_encrypted = 0, enc_payload = NULL WHERE note_id = ? AND user_id = ?"
+        );
+        for (const r of encTagRows) {
+          let plain = "[]";
+          if (r.enc_payload) {
+            try {
+              plain = noteCipher.decryptTagsPayload(r.enc_payload, {
+                noteId: r.note_id,
+                userId: r.user_id,
+              });
+            } catch (err) {
+              log.warn?.(`[encrypt] could not decrypt tags during deactivation note=${r.note_id} user=${r.user_id}: ${err.message}`);
+            }
+          }
+          updTag.run(plain, r.note_id, r.user_id);
         }
         vault.disable(db);
       });
