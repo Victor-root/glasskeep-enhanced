@@ -94,7 +94,14 @@ app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 // would refuse the request as "plaintext HTTP".
 const TRUST_PROXY = process.env.TRUST_PROXY === "true"
   || process.env.HTTPS_ENABLED === "false";
-if (TRUST_PROXY) app.set("trust proxy", true);
+if (TRUST_PROXY) {
+  app.set("trust proxy", true);
+  console.log(
+    "[boot] trust proxy enabled (TRUST_PROXY=" + (process.env.TRUST_PROXY || "(unset)")
+    + ", HTTPS_ENABLED=" + (process.env.HTTPS_ENABLED || "(unset)")
+    + "); TLS termination is the operator's responsibility upstream of Node.",
+  );
+}
 
 // ---------- CORS (dev only) ----------
 if (NODE_ENV !== "production") {

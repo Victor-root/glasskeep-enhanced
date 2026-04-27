@@ -110,25 +110,42 @@ function isLocalhost(req) {
 // so nobody accidentally types their passphrase across the network
 // without transport encryption.
 //
-// Two — and only two — trust paths:
+// Three trust paths, in order:
 //   1. Localhost: the CLI script (scripts/unlock-instance.cjs) and any
 //      reverse-proxy back-end on the same box come in via 127.0.0.1.
-//      No remote attacker can reach this socket from outside without
-//      first compromising the host, so the loopback exemption is safe.
-//   2. req.secure === true: Express's view of the connection. This is
-//      true when Node terminates TLS itself (HTTPS_ENABLED=true with
-//      a cert) OR when `app.set('trust proxy', ...)` is set AND the
-//      proxy's X-Forwarded-Proto says https. We configure trust
-//      proxy in server/index.js based on TRUST_PROXY=true /
-//      HTTPS_ENABLED=false, so a properly-installed instance behind
-//      Nginx/Caddy/Traefik always passes this check.
+//      Loopback is always exempt.
+//   2. req.secure === true: Express's view of the connection. True
+//      when Node terminates TLS itself (HTTPS_ENABLED=true with a
+//      cert), OR when `app.set('trust proxy', ...)` is set AND the
+//      reverse proxy forwarded `X-Forwarded-Proto: https`. This is
+//      the cleanest signal — when nginx is configured to send XFP, we
+//      can verify the upstream scheme without taking the operator's
+//      word for it.
+//   3. Operator-declared proxy mode: TRUST_PROXY=true (or HTTPS_ENABLED
+//      =false, which install.sh writes when the operator picks
+//      "reverse proxy" SSL mode). This is an explicit assertion from
+//      the operator that TLS is terminated upstream of Node. We trust
+//      it even if the proxy is misconfigured to omit X-Forwarded-Proto
+//      (a very common nginx oversight). The security boundary that
+//      matters is browser ↔ proxy, which the operator owns and has
+//      asserted to be HTTPS — the proxy ↔ Node hop is loopback or a
+//      private LAN where the unencrypted body is no worse than what
+//      already crosses it for every other API call.
 //
-// We deliberately do NOT inspect raw X-Forwarded-* headers ourselves
-// anymore — Express's `req.secure` is already the right gate, and
-// trusting raw headers without `app.set('trust proxy', ...)` would
-// let any caller spoof the value and bypass the HTTPS requirement.
+// What we deliberately do NOT do: inspect raw X-Forwarded-Proto /
+// X-Forwarded-Ssl / Front-End-Https headers without `trust proxy`
+// being configured. Without trust proxy, any client can send those
+// headers and bypass the check. Express's req.secure is the only
+// trustworthy view of "did this come over HTTPS upstream".
+function operatorDeclaredProxy() {
+  return process.env.TRUST_PROXY === "true"
+    || process.env.HTTPS_ENABLED === "false";
+}
+
 function isSecureRequest(req) {
-  return req.secure === true;
+  if (req.secure === true) return true;
+  if (operatorDeclaredProxy()) return true;
+  return false;
 }
 
 function transportOk(req) {
@@ -174,11 +191,16 @@ function attachUnlockRoutes(app, deps) {
     if (runtime.isUnlocked()) return res.json({ ok: true, alreadyUnlocked: true });
     if (!transportOk(req)) {
       // One-line diagnostic so the operator can see exactly which
-      // signal Express used and which env it was running against.
-      // If trust_proxy_env is unset and req.secure is false on a
-      // request that came over HTTPS, the install needs TRUST_PROXY=true
-      // in /etc/glass-keep.env (or /opt/glass-keep/.env, depending on
-      // the install) so Express honours X-Forwarded-Proto.
+      // signals were missing. To accept unlock from a non-loopback
+      // client we need ANY of:
+      //   - req.secure === true  (Node sees HTTPS, possibly via XFP+
+      //     trust proxy)
+      //   - TRUST_PROXY=true     (explicit operator assertion)
+      //   - HTTPS_ENABLED=false  (install.sh's "reverse proxy" mode)
+      // If none of those are present, the request is plain HTTP from a
+      // remote IP and we must refuse. Fix path: add TRUST_PROXY=true
+      // to the env file the systemd unit reads (typically
+      // /etc/glass-keep.env or /opt/glass-keep/.env) and restart.
       log.warn?.(
         `[unlock] insecure transport refused: ip=${getClientIp(req)} secure=${!!req.secure} `
         + `proto=${req.protocol} trust_proxy_env=${process.env.TRUST_PROXY || "(unset)"} `
@@ -186,7 +208,7 @@ function attachUnlockRoutes(app, deps) {
         + `xfp=${req.headers["x-forwarded-proto"] || "(none)"}`,
       );
       return res.status(400).json({
-        error: "Refusing to accept unlock secret over plaintext HTTP. Use HTTPS or run from localhost.",
+        error: "Refusing to accept unlock secret over plaintext HTTP. Use HTTPS, set TRUST_PROXY=true if you have a reverse proxy in front, or run from localhost.",
       });
     }
     const id = clientIdentifier(req);
