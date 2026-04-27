@@ -17,12 +17,27 @@ html.dark {
   --border-light: var(--border-dark);
 }
 button, [role="button"] { cursor: pointer; }
-/* Prevent blinking caret on non-editable elements */
-body { -webkit-user-select: none; user-select: none; caret-color: transparent; }
+/* Selection rules:
+ *  - body allows selection so users can copy titles, error messages,
+ *    slogans, etc. The blinking caret is silenced on body via
+ *    caret-color:transparent and re-enabled on real editing surfaces
+ *    below — selection works everywhere, but the I-beam caret only
+ *    blinks where typing makes sense.
+ *  - input / textarea / contenteditable=true keep their normal
+ *    selection AND get the caret back.
+ *  - Buttons opt back to user-select:none so a click on the label
+ *    doesn't accidentally drag-select it. .note-card defines its own
+ *    user-select:none further down in this file (search "note-card"
+ *    below) — left untouched on purpose. */
+body { -webkit-user-select: text; user-select: text; caret-color: transparent; }
 input, textarea, [contenteditable="true"] {
   -webkit-user-select: text;
   user-select: text;
   caret-color: auto;
+}
+button, [role="button"] {
+  -webkit-user-select: none;
+  user-select: none;
 }
 body {
   background-color: #f0e8ff;
