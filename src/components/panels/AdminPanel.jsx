@@ -404,17 +404,27 @@ export default function AdminPanel({
               <p className="text-xs text-gray-400 dark:text-gray-500">
                 {t("temporaryPasswordHint")}
               </p>
-              <label className="flex items-center gap-2 cursor-pointer text-sm">
-                <input
-                  type="checkbox"
-                  checked={newUserForm.is_admin}
-                  onChange={(e) =>
-                    setNewUserForm((prev) => ({ ...prev, is_admin: e.target.checked }))
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm">{t("makeAdmin")}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setNewUserForm((prev) => ({ ...prev, is_admin: !prev.is_admin }))
                   }
-                  className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span>{t("makeAdmin")}</span>
-              </label>
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                    newUserForm.is_admin
+                      ? "bg-indigo-600"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                  aria-pressed={newUserForm.is_admin}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      newUserForm.is_admin ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
               <button
                 type="submit"
                 disabled={isCreatingUser}
@@ -559,17 +569,27 @@ export default function AdminPanel({
                   {t("resetPasswordHint")}
                 </p>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer text-sm">
-                <input
-                  type="checkbox"
-                  checked={editUserForm.is_admin}
-                  onChange={(e) =>
-                    setEditUserForm((prev) => ({ ...prev, is_admin: e.target.checked }))
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm">{t("makeAdmin")}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditUserForm((prev) => ({ ...prev, is_admin: !prev.is_admin }))
                   }
-                  className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span>{t("makeAdmin")}</span>
-              </label>
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                    editUserForm.is_admin
+                      ? "bg-indigo-600"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                  aria-pressed={editUserForm.is_admin}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      editUserForm.is_admin ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
