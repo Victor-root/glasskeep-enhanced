@@ -67,6 +67,18 @@ import deviceMobileRotSvg  from "./tabler/device-mobile-rotated.svg?raw";
 import eraserSvg           from "./tabler/eraser.svg?raw";
 import filter2QuestionSvg  from "./tabler/filter-2-question.svg?raw";
 
+// Admin panel icons
+import usersSvg           from "./tabler/users.svg?raw";
+import userPlusSvg        from "./tabler/user-plus.svg?raw";
+import userClockSvg       from "./tabler/user-clock.svg?raw";
+import shieldLockSvg      from "./tabler/shield-lock.svg?raw";
+import worldSvg           from "./tabler/world.svg?raw";
+import pencilSvg          from "./tabler/pencil.svg?raw";
+import trashSvg           from "./tabler/trash.svg?raw";
+import checkSvg           from "./tabler/check.svg?raw";
+import xSvg               from "./tabler/x.svg?raw";
+import noteSvg            from "./tabler/note.svg?raw";
+
 // Cache of sanitised markup keyed by the raw SVG string. The transformation
 // only depends on the SVG source, so each icon is processed exactly once.
 const markupCache = new Map();
@@ -157,6 +169,17 @@ export const TI = {
   DeviceMobileRotated:  (p) => <TablerIcon svg={deviceMobileRotSvg} {...p} />,
   Eraser:               (p) => <TablerIcon svg={eraserSvg} {...p} />,
   Filter2Question:      (p) => <TablerIcon svg={filter2QuestionSvg} {...p} />,
+  // Admin panel
+  Users:                (p) => <TablerIcon svg={usersSvg} {...p} />,
+  UserPlus:             (p) => <TablerIcon svg={userPlusSvg} {...p} />,
+  UserClock:            (p) => <TablerIcon svg={userClockSvg} {...p} />,
+  ShieldLock:           (p) => <TablerIcon svg={shieldLockSvg} {...p} />,
+  World:                (p) => <TablerIcon svg={worldSvg} {...p} />,
+  Pencil:               (p) => <TablerIcon svg={pencilSvg} {...p} />,
+  Trash:                (p) => <TablerIcon svg={trashSvg} {...p} />,
+  Check:                (p) => <TablerIcon svg={checkSvg} {...p} />,
+  X:                    (p) => <TablerIcon svg={xSvg} {...p} />,
+  Note:                 (p) => <TablerIcon svg={noteSvg} {...p} />,
 };
 
 export default TI;

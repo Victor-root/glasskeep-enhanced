@@ -386,14 +386,15 @@ export default function EncryptionAdminSection({ token, showToast }) {
     }
   };
 
+  // The parent (AdminPanel) renders the section title + leading icon
+  // via SectionHeaderIcon, so we only emit the body here. Description,
+  // threat-model recap and live status badge stay in this component
+  // because they are tied to the data we fetch.
   return (
     <div className="space-y-4">
-      <div>
-        <h4 className="text-base font-semibold mb-1">{t("encryptionSectionTitle")}</h4>
-        <p className="text-sm text-gray-600 dark:text-gray-300">
-          {t("encryptionSectionDescription")}
-        </p>
-      </div>
+      <p className="text-sm text-gray-600 dark:text-gray-300">
+        {t("encryptionSectionDescription")}
+      </p>
 
       <div className="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 p-3 text-xs text-amber-900 dark:text-amber-200">
         <p className="font-semibold mb-1">{t("encryptionScopeTitle")}</p>
@@ -404,13 +405,15 @@ export default function EncryptionAdminSection({ token, showToast }) {
         </ul>
       </div>
 
-      <div className="text-sm">
-        <span className={status?.enabled
-          ? "text-green-700 dark:text-green-300 font-medium"
-          : "text-gray-600 dark:text-gray-300"}
-        >
-          {status?.enabled ? t("encryptionStatusEnabled") : t("encryptionStatusDisabled")}
-        </span>
+      <div className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-md ${
+        status?.enabled
+          ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+          : "bg-gray-50 text-gray-700 dark:bg-gray-800/60 dark:text-gray-300"
+      }`}>
+        <span className={`inline-block w-2 h-2 rounded-full ${
+          status?.enabled ? "bg-green-500" : "bg-gray-400"
+        }`} />
+        <span>{status?.enabled ? t("encryptionStatusEnabled") : t("encryptionStatusDisabled")}</span>
       </div>
 
       {!status?.enabled && (

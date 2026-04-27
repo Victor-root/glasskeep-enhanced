@@ -88,6 +88,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   aiAssistantThinking: "L'assistant IA réfléchit...",
   allImages: "Toutes les images",
   allowNewAccountCreation: "Autoriser la création de nouveaux comptes",
+  allowNewAccountCreationDesc: "Si désactivé, l'inscription publique est bloquée et seul un admin peut créer des comptes.",
+  siteSettings: "Paramètres du site",
   alwaysShowSidebarWide: "Toujours afficher la barre latérale sur les écrans larges",
   archivedNotes: "Notes archivées",
   askQuestionsAboutNotes: "Posez des questions sur vos notes (modèle côté serveur)",

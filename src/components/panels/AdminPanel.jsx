@@ -1,8 +1,29 @@
 import React, { useState } from "react";
 import { t } from "../../i18n";
 import UserAvatar from "../common/UserAvatar.jsx";
-import { CloseIcon } from "../../icons/index.jsx";
+import { CloseIcon, SettingsIcon } from "../../icons/index.jsx";
+import TI from "../../icons/editor/index.jsx";
 import EncryptionAdminSection from "../lock/EncryptionAdminSection.jsx";
+
+// Same shared chip used in the Settings panel: a 36×36 indigo square
+// holding a Tabler icon. Putting it in front of every section header
+// AND every row keeps icons aligned in a single vertical column.
+function RowIcon({ icon: Icon }) {
+  return (
+    <span className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300">
+      <Icon className="tabler-icon w-5 h-5" />
+    </span>
+  );
+}
+const SectionHeaderIcon = RowIcon;
+
+function formatBytes(bytes) {
+  if (!bytes) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+}
 
 export default function AdminPanel({
   open,
@@ -42,13 +63,12 @@ export default function AdminPanel({
       showToast(t("pleaseFillRequiredFields"), "error");
       return;
     }
-
     setIsCreatingUser(true);
     try {
       await createUser(newUserForm);
       showToast(t("userCreatedSuccessfullyBang"), "success");
-    } catch (e) {
-      // Error already handled in createUser function
+    } catch {
+      // useAdminActions already surfaces the error toast.
     } finally {
       setIsCreatingUser(false);
     }
@@ -71,49 +91,31 @@ export default function AdminPanel({
       showToast(t("nameAndEmailRequired"), "error");
       return;
     }
-
     setIsUpdatingUser(true);
     try {
-      // Only include password if it's not empty
       const updateData = {
         name: editUserForm.name,
         email: editUserForm.email,
         is_admin: editUserForm.is_admin,
       };
-      if (editUserForm.password) {
-        updateData.password = editUserForm.password;
-      }
-
+      if (editUserForm.password) updateData.password = editUserForm.password;
       await updateUser(editingUser.id, updateData);
       showToast(t("userUpdatedSuccessfullyBang"), "success");
       setEditUserModalOpen(false);
       setEditingUser(null);
-    } catch (e) {
-      showToast(e.message || t("failedUpdateUser"), "error");
+    } catch (err) {
+      showToast(err.message || t("failedUpdateUser"), "error");
     } finally {
       setIsUpdatingUser(false);
     }
   };
 
-  const formatBytes = (bytes) => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
-
-  // Prevent body scroll when admin panel is open
+  // Prevent body scroll while the panel is open — same trick as
+  // SettingsPanel.
   React.useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-
-    return () => {
-      document.body.style.overflow = "";
-    };
+    if (open) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => { document.body.style.overflow = ""; };
   }, [open]);
 
   return (
@@ -127,11 +129,9 @@ export default function AdminPanel({
         />
       )}
       <div
-        className={`fixed top-0 right-0 z-50 h-full w-full sm:w-96 transition-transform duration-200 ${open ? "translate-x-0 shadow-2xl" : "translate-x-full shadow-none"}`}
+        className={`fixed top-0 right-0 z-50 h-full w-full sm:w-[28rem] lg:w-[32rem] transition-transform duration-200 ${open ? "translate-x-0 shadow-2xl" : "translate-x-full shadow-none"}`}
         style={{
-          backgroundColor: dark
-            ? "rgba(40,40,40,0.95)"
-            : "rgba(255,255,255,0.95)",
+          backgroundColor: dark ? "#222222" : "rgba(255,255,255,0.95)",
           borderLeft: "1px solid var(--border-light)",
           paddingTop: "env(safe-area-inset-top)",
           paddingBottom: "env(safe-area-inset-bottom)",
@@ -140,7 +140,9 @@ export default function AdminPanel({
         aria-hidden={!open}
       >
         <div className="p-4 flex items-center justify-between border-b border-[var(--border-light)]">
-          <h3 className="text-lg font-semibold">{t("adminPanel")}</h3>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <SettingsIcon />{t("adminPanel")}
+          </h3>
           <button
             className="p-2 rounded hover:bg-black/5 dark:hover:bg-white/10"
             onClick={onClose}
@@ -151,81 +153,101 @@ export default function AdminPanel({
         </div>
 
         <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
-          {/* Pending Registrations Section */}
+          {/* Pending Registrations — rendered first so admins see the
+              actionable items without scrolling. Hidden when the
+              queue is empty. */}
           {pendingUsers && pendingUsers.length > 0 && (
-            <div className="mb-8">
-              <div className="flex items-center gap-2 mb-4">
-                <h4 className="text-md font-semibold">{t("pendingRegistrations")}</h4>
-                <span className="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 rounded-full">
-                  {pendingUsers.length}
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                {t("pendingRegistrationsDesc")}
-              </p>
-              <div className="space-y-3">
-                {pendingUsers.map((p) => (
-                  <div
-                    key={p.id}
-                    className="p-3 border border-amber-300 dark:border-amber-700 rounded-lg bg-amber-50/50 dark:bg-amber-900/20"
-                  >
-                    <div className="mb-2">
-                      <div className="font-medium">{p.name}</div>
-                      <div className="text-sm text-gray-500">{p.email}</div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        {t("requestedOnPrefix")} {new Date(p.created_at).toLocaleString()}
+            <>
+              <div className="mb-8">
+                <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
+                  <SectionHeaderIcon icon={TI.UserClock} />
+                  <span>{t("pendingRegistrations")}</span>
+                  <span className="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 rounded-full">
+                    {pendingUsers.length}
+                  </span>
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 pl-3">
+                  {t("pendingRegistrationsDesc")}
+                </p>
+                <div className="space-y-3">
+                  {pendingUsers.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center gap-3 px-3 py-3 border border-amber-300 dark:border-amber-700 rounded-lg bg-amber-50/50 dark:bg-amber-900/20"
+                    >
+                      <RowIcon icon={TI.UserCircle} />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate">{p.name}</div>
+                        <div className="text-sm text-gray-500 truncate">{p.email}</div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {t("requestedOnPrefix")} {new Date(p.created_at).toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="flex flex-shrink-0 gap-2">
+                        <button
+                          onClick={() => {
+                            showGenericConfirm({
+                              title: t("rejectRegistrationTitle"),
+                              message: t("rejectRegistrationConfirm").replace("{name}", p.name),
+                              confirmText: t("reject"),
+                              danger: true,
+                              onConfirm: async () => {
+                                try {
+                                  await rejectPendingUser(p.id);
+                                  showToast(t("registrationRejected"), "info");
+                                } catch (err) {
+                                  showToast(err.message || t("failedRejectUser"), "error");
+                                }
+                              },
+                            });
+                          }}
+                          className="p-2 rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+                          data-tooltip={t("reject")}
+                          aria-label={t("reject")}
+                        >
+                          <TI.X className="tabler-icon w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await approvePendingUser(p.id);
+                              showToast(t("registrationApproved"), "success");
+                            } catch (err) {
+                              showToast(err.message || t("failedApproveUser"), "error");
+                            }
+                          }}
+                          className="p-2 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
+                          data-tooltip={t("approve")}
+                          aria-label={t("approve")}
+                        >
+                          <TI.Check className="tabler-icon w-5 h-5" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={() => {
-                          showGenericConfirm({
-                            title: t("rejectRegistrationTitle"),
-                            message: t("rejectRegistrationConfirm").replace("{name}", p.name),
-                            confirmText: t("reject"),
-                            danger: true,
-                            onConfirm: async () => {
-                              try {
-                                await rejectPendingUser(p.id);
-                                showToast(t("registrationRejected"), "info");
-                              } catch (e) {
-                                showToast(e.message || t("failedRejectUser"), "error");
-                              }
-                            },
-                          });
-                        }}
-                        className="px-3 py-1.5 text-sm bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
-                      >
-                        {t("reject")}
-                      </button>
-                      <button
-                        onClick={async () => {
-                          try {
-                            await approvePendingUser(p.id);
-                            showToast(t("registrationApproved"), "success");
-                          } catch (e) {
-                            showToast(e.message || t("failedApproveUser"), "error");
-                          }
-                        }}
-                        className="px-3 py-1.5 text-sm font-semibold rounded bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700"
-                      >
-                        {t("approve")}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+              <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
+            </>
           )}
 
-          {/* Settings Section */}
+          {/* Site settings (login slogan, registration toggle) */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">{t("settings")}</h4>
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
+              <SectionHeaderIcon icon={TI.World} />
+              {t("siteSettings")}
+            </h4>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">{t("allowNewAccountCreation")}</span>
+              <div className="flex items-center justify-between gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.UserPlus} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("allowNewAccountCreation")}</div>
+                    <div className="text-sm text-gray-500">{t("allowNewAccountCreationDesc")}</div>
+                  </div>
+                </div>
                 <button
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
                     adminSettings.allowNewAccounts
                       ? "bg-indigo-600"
                       : "bg-gray-300 dark:bg-gray-600"
@@ -238,19 +260,24 @@ export default function AdminPanel({
                 >
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      adminSettings.allowNewAccounts
-                        ? "translate-x-6"
-                        : "translate-x-1"
+                      adminSettings.allowNewAccounts ? "translate-x-6" : "translate-x-1"
                     }`}
                   />
                 </button>
               </div>
-              <div>
-                <label className="text-sm block mb-1">{t("loginSloganLabel")}</label>
+
+              <div className="flex flex-col gap-2 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Note} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("loginSloganLabel")}</div>
+                    <div className="text-sm text-gray-500">{t("loginSlogan")}</div>
+                  </div>
+                </div>
                 <input
                   type="text"
                   maxLength={200}
-                  className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400 text-sm"
+                  className="ml-11 w-[calc(100%-2.75rem)] px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400 text-sm"
                   placeholder={t("loginSloganPlaceholder")}
                   value={adminSettings.loginSlogan || ""}
                   onChange={(e) =>
@@ -260,22 +287,34 @@ export default function AdminPanel({
                     updateAdminSettings({ loginSlogan: adminSettings.loginSlogan || "" })
                   }
                 />
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  {t("loginSlogan")}
-                </p>
               </div>
             </div>
           </div>
 
-          {/* At-rest encryption */}
+          <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
+
+          {/* At-rest encryption — its own section component renders the
+              activate / unlock / rotate / regenerate / lock-now /
+              deactivate flows. */}
           <div className="mb-8">
-            <EncryptionAdminSection token={authToken} showToast={showToast} />
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
+              <SectionHeaderIcon icon={TI.ShieldLock} />
+              {t("encryptionSectionTitle")}
+            </h4>
+            <div className="pl-3">
+              <EncryptionAdminSection token={authToken} showToast={showToast} />
+            </div>
           </div>
 
-          {/* Create User Section */}
+          <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
+
+          {/* Create new user */}
           <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4">{t("createNewUser")}</h4>
-            <form onSubmit={handleCreateUser} className="space-y-3">
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
+              <SectionHeaderIcon icon={TI.UserPlus} />
+              {t("createNewUser")}
+            </h4>
+            <form onSubmit={handleCreateUser} className="space-y-3 pl-3">
               <input
                 type="text"
                 placeholder={t("name")}
@@ -299,31 +338,24 @@ export default function AdminPanel({
                 placeholder={t("temporaryPassword")}
                 value={newUserForm.password}
                 onChange={(e) =>
-                  setNewUserForm((prev) => ({
-                    ...prev,
-                    password: e.target.value,
-                  }))
+                  setNewUserForm((prev) => ({ ...prev, password: e.target.value }))
                 }
                 className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400"
               />
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              <p className="text-xs text-gray-400 dark:text-gray-500">
                 {t("temporaryPasswordHint")}
               </p>
-              <div className="flex items-center">
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
                 <input
                   type="checkbox"
-                  id="is_admin"
                   checked={newUserForm.is_admin}
                   onChange={(e) =>
-                    setNewUserForm((prev) => ({
-                      ...prev,
-                      is_admin: e.target.checked,
-                    }))
+                    setNewUserForm((prev) => ({ ...prev, is_admin: e.target.checked }))
                   }
-                  className="mr-2"
+                  className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                <label htmlFor="is_admin" className="text-sm">{t("makeAdmin")}</label>
-              </div>
+                <span>{t("makeAdmin")}</span>
+              </label>
               <button
                 type="submit"
                 disabled={isCreatingUser}
@@ -334,38 +366,52 @@ export default function AdminPanel({
             </form>
           </div>
 
-          {/* Users List Section */}
-          <div>
-            <h4 className="text-md font-semibold mb-4">{t("allUsers")} ({allUsers.length})
+          <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
+
+          {/* All users — same row pattern as Settings, with avatar in
+              the leading icon slot and edit/delete actions on the right. */}
+          <div className="mb-8">
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
+              <SectionHeaderIcon icon={TI.Users} />
+              <span>{t("allUsers")}</span>
+              <span className="px-2 py-0.5 text-xs font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 rounded-full">
+                {allUsers.length}
+              </span>
             </h4>
             <div className="space-y-3">
               {allUsers.map((user) => (
                 <div
                   key={user.id}
-                  className="p-3 border border-[var(--border-light)] rounded-lg"
+                  className="flex flex-col gap-2 px-3 py-3 border border-[var(--border-light)] rounded-lg"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      <UserAvatar
-                        name={user.name}
-                        email={user.email}
-                        avatarUrl={user.avatar_url}
-                        size="w-9 h-9"
-                        textSize="text-sm"
-                      />
-                      <div>
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-sm text-gray-500">{user.email}</div>
+                  <div className="flex items-center gap-3">
+                    <UserAvatar
+                      name={user.name}
+                      email={user.email}
+                      avatarUrl={user.avatar_url}
+                      size="w-9 h-9"
+                      textSize="text-sm"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium flex items-center gap-2">
+                        <span className="truncate">{user.name}</span>
+                        {user.is_admin && (
+                          <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 rounded uppercase tracking-wide">
+                            {t("admin")}
+                          </span>
+                        )}
                       </div>
+                      <div className="text-sm text-gray-500 truncate">{user.email}</div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {user.is_admin && (
-                        <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 rounded">{t("admin")}</span>
-                      )}
+                    <div className="flex flex-shrink-0 gap-2">
                       <button
                         onClick={() => openEditUserModal(user)}
-                        className="px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded hover:bg-blue-200 dark:hover:bg-blue-800"
-                      >{t("edit")}</button>
+                        className="p-2 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors"
+                        data-tooltip={t("edit")}
+                        aria-label={t("edit")}
+                      >
+                        <TI.Pencil className="tabler-icon w-5 h-5" />
+                      </button>
                       {user.id !== currentUser?.id && (
                         <button
                           onClick={() => {
@@ -377,17 +423,19 @@ export default function AdminPanel({
                               onConfirm: () => deleteUser(user.id),
                             });
                           }}
-                          className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
-                        >{t("delete")}</button>
+                          className="p-2 rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+                          data-tooltip={t("delete")}
+                          aria-label={t("delete")}
+                        >
+                          <TI.Trash className="tabler-icon w-5 h-5" />
+                        </button>
                       )}
                     </div>
                   </div>
-                  <div className="text-xs text-gray-500 space-y-1">
-                    <div>{t("notes")}: {user.notes}</div>
-                    <div>{t("storage")}: {formatBytes(user.storage_bytes ?? 0)}</div>
-                    <div>
-                      {t("joinedPrefix")} {new Date(user.created_at).toLocaleDateString()}
-                    </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 pl-12 text-xs text-gray-500 dark:text-gray-400">
+                    <span>{t("notes")}: {user.notes}</span>
+                    <span>{t("storage")}: {formatBytes(user.storage_bytes ?? 0)}</span>
+                    <span>{t("joinedPrefix")} {new Date(user.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
               ))}
@@ -396,11 +444,22 @@ export default function AdminPanel({
         </div>
       </div>
 
-      {/* Edit User Modal */}
+      {/* Edit user modal — kept identical to before; the panel is just
+          the launcher. */}
       {editUserModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold mb-4">{t("editUser")}</h3>
+        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div
+            className="rounded-xl shadow-2xl w-full max-w-md p-6"
+            style={{
+              backgroundColor: dark
+                ? "rgba(40,40,40,0.98)"
+                : "rgba(255,255,255,0.98)",
+            }}
+          >
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-3">
+              <SectionHeaderIcon icon={TI.Pencil} />
+              {t("editUser")}
+            </h3>
             <form onSubmit={handleUpdateUser} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">{t("name")}</label>
@@ -408,12 +467,9 @@ export default function AdminPanel({
                   type="text"
                   value={editUserForm.name}
                   onChange={(e) =>
-                    setEditUserForm((prev) => ({
-                      ...prev,
-                      name: e.target.value,
-                    }))
+                    setEditUserForm((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400"
+                  className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
                 />
               </div>
@@ -423,12 +479,9 @@ export default function AdminPanel({
                   type="text"
                   value={editUserForm.email}
                   onChange={(e) =>
-                    setEditUserForm((prev) => ({
-                      ...prev,
-                      email: e.target.value,
-                    }))
+                    setEditUserForm((prev) => ({ ...prev, email: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400"
+                  className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
                 />
               </div>
@@ -438,33 +491,26 @@ export default function AdminPanel({
                   type="password"
                   value={editUserForm.password}
                   onChange={(e) =>
-                    setEditUserForm((prev) => ({
-                      ...prev,
-                      password: e.target.value,
-                    }))
+                    setEditUserForm((prev) => ({ ...prev, password: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400"
+                  className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder={t("leaveEmptyKeepCurrentPassword")}
                 />
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                   {t("resetPasswordHint")}
                 </p>
               </div>
-              <div className="flex items-center">
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
                 <input
                   type="checkbox"
-                  id="edit_is_admin"
                   checked={editUserForm.is_admin}
                   onChange={(e) =>
-                    setEditUserForm((prev) => ({
-                      ...prev,
-                      is_admin: e.target.checked,
-                    }))
+                    setEditUserForm((prev) => ({ ...prev, is_admin: e.target.checked }))
                   }
-                  className="mr-2"
+                  className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                <label htmlFor="edit_is_admin" className="text-sm">{t("makeAdmin")}</label>
-              </div>
+                <span>{t("makeAdmin")}</span>
+              </label>
               <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
