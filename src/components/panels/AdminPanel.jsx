@@ -17,6 +17,79 @@ function RowIcon({ icon: Icon }) {
 }
 const SectionHeaderIcon = RowIcon;
 
+// Inline editor for the public login slogan. Keeps a draft state local
+// to the input so we can show an explicit Save button (instead of the
+// silent on-blur save the previous version had — users couldn't tell
+// whether their change had been persisted).
+function LoginSloganRow({ value, onSave, showToast }) {
+  const [draft, setDraft] = useState(value || "");
+  const [busy, setBusy] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  // Sync the draft when the persisted value changes (e.g. another tab
+  // saved a different slogan). We only overwrite the draft if the user
+  // has no pending change to avoid clobbering their typing.
+  React.useEffect(() => {
+    // Keep the draft in sync when the panel re-opens with fresh data,
+    // but don't clobber typing in progress.
+    setDraft((prev) => (prev === (value || "") ? prev : (value || "")));
+  }, [value]);
+
+  const dirty = (draft || "") !== (value || "");
+
+  const save = async () => {
+    if (!dirty) return;
+    setBusy(true);
+    try {
+      await onSave(draft || "");
+      setSavedFlash(true);
+      showToast?.(t("saved"), "success");
+      setTimeout(() => setSavedFlash(false), 1500);
+    } catch (e) {
+      showToast?.(e?.message || "Save failed", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2 px-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <RowIcon icon={TI.Note} />
+        <div className="min-w-0">
+          <div className="font-medium">{t("loginSloganLabel")}</div>
+          <div className="text-sm text-gray-500">{t("loginSlogan")}</div>
+        </div>
+      </div>
+      <div className="ml-11 flex flex-col sm:flex-row gap-2">
+        <input
+          type="text"
+          maxLength={200}
+          className="flex-1 px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400 text-sm"
+          placeholder={t("loginSloganPlaceholder")}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              save();
+            }
+          }}
+          disabled={busy}
+        />
+        <button
+          type="button"
+          onClick={save}
+          disabled={!dirty || busy}
+          className="shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none disabled:hover:scale-100"
+        >
+          {busy ? t("saving") : savedFlash ? t("saved") : t("save")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function formatBytes(bytes) {
   if (!bytes) return "0 B";
   const k = 1024;
@@ -30,7 +103,10 @@ export default function AdminPanel({
   onClose,
   dark,
   adminSettings,
-  setAdminSettings,
+  // setAdminSettings was used by the old on-blur auto-save for the
+  // slogan input. The new LoginSloganRow keeps its own draft state and
+  // only writes to the server through updateAdminSettings, so we no
+  // longer need to mirror typing into the parent state.
   allUsers,
   pendingUsers,
   newUserForm,
@@ -266,28 +342,11 @@ export default function AdminPanel({
                 </button>
               </div>
 
-              <div className="flex flex-col gap-2 px-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <RowIcon icon={TI.Note} />
-                  <div className="min-w-0">
-                    <div className="font-medium">{t("loginSloganLabel")}</div>
-                    <div className="text-sm text-gray-500">{t("loginSlogan")}</div>
-                  </div>
-                </div>
-                <input
-                  type="text"
-                  maxLength={200}
-                  className="ml-11 w-[calc(100%-2.75rem)] px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400 text-sm"
-                  placeholder={t("loginSloganPlaceholder")}
-                  value={adminSettings.loginSlogan || ""}
-                  onChange={(e) =>
-                    setAdminSettings((prev) => ({ ...prev, loginSlogan: e.target.value }))
-                  }
-                  onBlur={() =>
-                    updateAdminSettings({ loginSlogan: adminSettings.loginSlogan || "" })
-                  }
-                />
-              </div>
+              <LoginSloganRow
+                value={adminSettings.loginSlogan}
+                onSave={(slogan) => updateAdminSettings({ loginSlogan: slogan })}
+                showToast={showToast}
+              />
             </div>
           </div>
 
