@@ -339,6 +339,98 @@ function attachUnlockRoutes(app, deps) {
     });
   });
 
+  // ---- Deactivate encryption (admin, unlocked) -------------------------
+  // The reverse of /activate: every encrypted note is decrypted back to
+  // plaintext columns, the wrapped DEKs are wiped from the vault, the
+  // file is VACUUMed to physically purge the encrypted residue, and the
+  // runtime drops the DEK from RAM. Requires re-typing the current
+  // passphrase as a "yes I'm sure" gate (the admin already has read
+  // access at this point, so the passphrase isn't a privilege boundary,
+  // but it forces the operator to acknowledge the destructive nature
+  // of the action).
+  app.post("/api/instance/deactivate", auth, adminOnly, (req, res) => {
+    if (!runtime.isEnabled()) {
+      return res.status(409).json({ error: "Encryption is not enabled" });
+    }
+    if (!runtime.isUnlocked()) {
+      return res.status(423).json({ error: "Unlock the instance first" });
+    }
+    const { passphrase } = req.body || {};
+    if (typeof passphrase !== "string" || !passphrase) {
+      return res.status(400).json({ error: "Current passphrase is required" });
+    }
+    // Verify the passphrase against the vault — using the live DEK
+    // alone wouldn't enforce that the operator actually knows the
+    // secret (the admin session could outlive a lock+unlock cycle).
+    let probeDek;
+    try {
+      probeDek = vault.unlockWithPassphrase(db, passphrase);
+    } catch {
+      return res.status(401).json({ error: "Current passphrase is incorrect" });
+    } finally {
+      // We don't need a second DEK in memory.
+      try { probeDek && probeDek.fill(0); } catch {}
+    }
+
+    try {
+      const migrate = db.transaction(() => {
+        const rows = db.prepare("SELECT * FROM notes WHERE is_server_encrypted = 1").all();
+        const upd = db.prepare(`
+          UPDATE notes SET
+            title = @title, content = @content,
+            items_json = @items_json, tags_json = @tags_json,
+            images_json = @images_json, color = @color,
+            is_server_encrypted = 0,
+            enc_version = NULL,
+            enc_payload = NULL
+          WHERE id = @id
+        `);
+        for (const row of rows) {
+          // decryptRowInPlace mutates row.title / row.content / etc.
+          // back to their plaintext form; we then write them straight
+          // into the canonical columns.
+          noteCipher.decryptRowInPlace(row);
+          upd.run({
+            id: row.id,
+            title: row.title ?? "",
+            content: row.content ?? "",
+            items_json: row.items_json ?? "[]",
+            tags_json: row.tags_json ?? "[]",
+            images_json: row.images_json ?? "[]",
+            color: row.color ?? "default",
+          });
+        }
+        vault.disable(db);
+      });
+      migrate();
+    } catch (e) {
+      log.error?.(`[encrypt] deactivation failed mid-transaction: ${e.message}`);
+      return res.status(500).json({ error: "Deactivation failed: " + e.message });
+    }
+
+    // Drop the DEK from RAM and flip the runtime flag. Must come AFTER
+    // the transaction succeeds — losing the DEK before all notes are
+    // decrypted would leave the database half-encrypted with no way
+    // back in.
+    runtime.lock();
+    runtime.setEnabled(false);
+
+    // Same triple-pass as activation: physically rewrite the file so
+    // the encrypted ciphertext pages don't linger as freed-but-readable
+    // bytes. Symmetric with the activation purge — at-rest contents
+    // before-and-after are both clean.
+    try {
+      db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+      db.exec("VACUUM");
+      db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+      log.info?.("[encrypt] deactivation complete, ciphertext residue purged");
+    } catch (e) {
+      log.warn?.(`[encrypt] post-deactivation cleanup failed: ${e.message}`);
+    }
+
+    res.json({ ok: true, enabled: false, locked: false });
+  });
+
   // ---- Rotate passphrase (admin, unlocked) ------------------------------
   app.post("/api/instance/passphrase", auth, adminOnly, (req, res) => {
     if (!runtime.isUnlocked()) {

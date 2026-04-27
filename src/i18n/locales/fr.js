@@ -599,4 +599,14 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   encryptionLockNowCta: "Verrouiller l'instance maintenant",
   encryptionLockNowExplain: "Efface la clé de chiffrement de la mémoire du serveur. La prochaine requête nécessitera un nouveau déverrouillage.",
   encryptionDisableNotSupportedV1: "La désactivation du chiffrement au repos n'est pas supportée dans cette version. Re-créez l'instance depuis une sauvegarde en clair si vous devez revenir en arrière.",
+
+  encryptionDeactivateCta: "Désactiver le chiffrement au repos",
+  encryptionDeactivateWarnTitle: "Ce que vous allez faire",
+  encryptionDeactivateWarn1: "Toutes les notes vont être déchiffrées et réécrites en clair dans la base.",
+  encryptionDeactivateWarn2: "Quiconque vole le disque, le fichier de base de données ou une sauvegarde après cela pourra lire toutes les notes.",
+  encryptionDeactivateWarn3: "La passphrase et la recovery key cessent de fonctionner — elles sont effacées de la base.",
+  encryptionDeactivateAckLabel: "Je comprends que les données ne seront plus chiffrées au repos après cette action.",
+  encryptionDeactivateAckRequired: "Vous devez cocher la case de confirmation pour continuer.",
+  encryptionDeactivating: "Déchiffrement de vos notes…",
+  encryptionDeactivateDone: "Chiffrement au repos désactivé.",
 };

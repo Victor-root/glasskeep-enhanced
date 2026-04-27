@@ -297,6 +297,30 @@ function markUnlockedNow(db) {
     .run(new Date().toISOString());
 }
 
+// Wipe every cryptographic field from the vault so the row carries no
+// residual ciphertext. The caller is responsible for having decrypted
+// every note first; this only flips the bookkeeping.
+function disable(db) {
+  db.prepare(`
+    UPDATE instance_encryption SET
+      enabled = 0,
+      passphrase_salt = NULL,
+      recovery_salt = NULL,
+      wrapped_dek_pass = NULL,
+      wrapped_dek_pass_iv = NULL,
+      wrapped_dek_pass_tag = NULL,
+      wrapped_dek_recv = NULL,
+      wrapped_dek_recv_iv = NULL,
+      wrapped_dek_recv_tag = NULL,
+      dek_check = NULL,
+      dek_check_iv = NULL,
+      dek_check_tag = NULL,
+      migrated_at = NULL,
+      last_unlocked_at = NULL
+    WHERE id = 1
+  `).run();
+}
+
 module.exports = {
   ensureSchema,
   isInitialized,
@@ -308,5 +332,6 @@ module.exports = {
   regenerateRecoveryKey,
   markMigrated,
   markUnlockedNow,
+  disable,
   SCHEMA_VERSION,
 };
