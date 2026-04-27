@@ -832,7 +832,7 @@ action_install() {
 
     # shellcheck disable=SC2059
     step "$(printf "$MSG_STEP_CLONE" "$INSTALL_DIR")" \
-        git clone --depth=1 "$REPO_URL" "$INSTALL_DIR"
+        git clone --depth=1 --no-single-branch "$REPO_URL" "$INSTALL_DIR"
 
     step "$MSG_STEP_NPM" \
         bash -c "cd '${INSTALL_DIR}' && npm install --silent"
