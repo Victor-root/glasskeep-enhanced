@@ -148,7 +148,7 @@ function ActivationForm({ onActivated, showToast }) {
       <button
         type="submit"
         disabled={busy || !passphrase || !confirm}
-        className="w-full px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+        className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
       >
         {busy ? t("encryptionActivating") : t("encryptionActivateCta")}
       </button>
@@ -422,7 +422,7 @@ export default function EncryptionAdminSection({ token, showToast }) {
             <button
               type="button"
               onClick={() => setActivateOpen(true)}
-              className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
+              className="w-full px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
             >
               {t("encryptionActivateCta")}
             </button>

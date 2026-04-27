@@ -574,7 +574,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   unlockFailed: "Échec du déverrouillage.",
 
   encryptionSectionTitle: "Chiffrement des données au repos (côté serveur)",
-  encryptionSectionDescription: "Chiffre le contenu de chaque note dans la base de données. Après chaque redémarrage, un administrateur doit déverrouiller l'instance avec la passphrase ou la recovery key.",
+  encryptionSectionDescription: "Chiffre le contenu de chaque note dans la base de données. À chaque redémarrage du service GlassKeep (mise à jour, reboot du serveur, etc.), un administrateur doit déverrouiller l'instance avec la passphrase ou la recovery key. Les utilisateurs, eux, se connectent normalement comme d'habitude.",
   encryptionStatusEnabled: "Activé — l'instance est actuellement déverrouillée.",
   encryptionStatusDisabled: "Désactivé — les notes sont stockées en clair.",
   encryptionScopeTitle: "Modèle de menace",
@@ -582,7 +582,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   encryptionScopeNotProtect: "Ne protège pas contre l'administrateur du serveur ni contre un serveur déjà en marche et compromis.",
   encryptionScopeWarn: "Si vous perdez à la fois la passphrase et la recovery key, les notes chiffrées seront irrécupérables.",
   encryptionActivateCta: "Activer le chiffrement au repos",
-  encryptionActivateExplain: "Toutes les notes existantes seront chiffrées pendant une courte fenêtre de maintenance. L'instance reste déverrouillée pour la session en cours — la passphrase ne sera demandée qu'au prochain redémarrage.",
+  encryptionActivateExplain: "Toutes les notes existantes seront chiffrées pendant une courte fenêtre de maintenance. L'instance reste déverrouillée tant que le service GlassKeep tourne — la passphrase ne sera redemandée qu'au prochain redémarrage du service (mise à jour, reboot du serveur, etc.).",
   encryptionPassphraseLabel: "Passphrase de l'instance (min. 8 caractères)",
   encryptionPassphraseConfirmLabel: "Confirmer la passphrase",
   encryptionPassphraseTooShort: "La passphrase doit contenir au moins 8 caractères.",

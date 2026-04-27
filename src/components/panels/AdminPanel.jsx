@@ -201,7 +201,7 @@ export default function AdminPanel({
                               },
                             });
                           }}
-                          className="p-2 rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+                          className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
                           data-tooltip={t("reject")}
                           aria-label={t("reject")}
                         >
@@ -216,7 +216,7 @@ export default function AdminPanel({
                               showToast(err.message || t("failedApproveUser"), "error");
                             }
                           }}
-                          className="p-2 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
+                          className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
                           data-tooltip={t("approve")}
                           aria-label={t("approve")}
                         >
@@ -396,7 +396,7 @@ export default function AdminPanel({
                       <div className="font-medium flex items-center gap-2">
                         <span className="truncate">{user.name}</span>
                         {user.is_admin && (
-                          <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 rounded uppercase tracking-wide">
+                          <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200 rounded uppercase tracking-wide">
                             {t("admin")}
                           </span>
                         )}
@@ -406,7 +406,7 @@ export default function AdminPanel({
                     <div className="flex flex-shrink-0 gap-2">
                       <button
                         onClick={() => openEditUserModal(user)}
-                        className="p-2 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors"
+                        className="w-9 h-9 flex items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors"
                         data-tooltip={t("edit")}
                         aria-label={t("edit")}
                       >
@@ -423,7 +423,7 @@ export default function AdminPanel({
                               onConfirm: () => deleteUser(user.id),
                             });
                           }}
-                          className="p-2 rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+                          className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
                           data-tooltip={t("delete")}
                           aria-label={t("delete")}
                         >

@@ -139,7 +139,7 @@ setup_i18n() {
         MSG_STEP_FAIL="Étape échouée : %s"
 
         MSG_ENC_TITLE="Chiffrement des données au repos (côté serveur)"
-        MSG_ENC_INTRO="Cette option chiffre le contenu des notes dans la base de données.\n  Protège contre : vol du serveur, du disque, de la base SQLite, des sauvegardes.\n  Ne protège PAS contre : l'administrateur du serveur, ou un serveur déjà déverrouillé qui serait compromis.\n  Après chaque redémarrage, un administrateur devra déverrouiller l'instance avec une passphrase.\n  Si vous perdez à la fois la passphrase ET la recovery key, les notes chiffrées seront irrécupérables."
+        MSG_ENC_INTRO="Cette option chiffre le contenu des notes dans la base de données.\n  Protège contre : vol du serveur, du disque, de la base SQLite, des sauvegardes.\n  Ne protège PAS contre : l'administrateur du serveur, ou un serveur déjà déverrouillé qui serait compromis.\n  À chaque redémarrage du service GlassKeep (mise à jour, reboot, etc.), un administrateur devra déverrouiller l'instance avec la passphrase ou la recovery key. Les utilisateurs continuent à se connecter normalement.\n  Si vous perdez à la fois la passphrase ET la recovery key, les notes chiffrées seront irrécupérables."
         MSG_ENC_PROMPT="Activer la protection des données au repos ? [oui/non] : "
         MSG_ENC_PASS_PROMPT="Passphrase de l'instance (min. 8 caractères) : "
         MSG_ENC_PASS_CONFIRM="Confirmer la passphrase : "
@@ -251,7 +251,7 @@ setup_i18n() {
         MSG_STEP_FAIL="Step failed: %s"
 
         MSG_ENC_TITLE="At-rest encryption (server-side)"
-        MSG_ENC_INTRO="This option encrypts note contents in the database.\n  Protects against: theft of the server, the disk, the SQLite file, backups.\n  Does NOT protect against: the server administrator, or an already-unlocked, compromised server.\n  After each restart, an administrator must unlock the instance with a passphrase.\n  If you lose BOTH the passphrase AND the recovery key, encrypted notes are unrecoverable."
+        MSG_ENC_INTRO="This option encrypts note contents in the database.\n  Protects against: theft of the server, the disk, the SQLite file, backups.\n  Does NOT protect against: the server administrator, or an already-unlocked, compromised server.\n  Whenever the GlassKeep service restarts (update, reboot, etc.), an administrator must unlock the instance with the passphrase or recovery key. Regular users keep signing in normally.\n  If you lose BOTH the passphrase AND the recovery key, encrypted notes are unrecoverable."
         MSG_ENC_PROMPT="Enable at-rest data protection? [yes/no]: "
         MSG_ENC_PASS_PROMPT="Instance passphrase (min. 8 characters): "
         MSG_ENC_PASS_CONFIRM="Confirm passphrase: "
