@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { t } from "../../i18n";
 import UserAvatar from "../common/UserAvatar.jsx";
-import { CloseIcon, SettingsIcon } from "../../icons/index.jsx";
+import { CloseIcon, ShieldIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import EncryptionAdminSection from "../lock/EncryptionAdminSection.jsx";
 
@@ -217,7 +217,10 @@ export default function AdminPanel({
       >
         <div className="p-4 flex items-center justify-between border-b border-[var(--border-light)]">
           <h3 className="text-lg font-semibold flex items-center gap-2">
-            <SettingsIcon />{t("adminPanel")}
+            <span className={dark ? "text-red-400" : "text-red-600"}>
+              <ShieldIcon />
+            </span>
+            {t("adminPanel")}
           </h3>
           <button
             className="p-2 rounded hover:bg-black/5 dark:hover:bg-white/10"
