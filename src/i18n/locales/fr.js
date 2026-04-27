@@ -89,7 +89,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   allImages: "Toutes les images",
   allowNewAccountCreation: "Autoriser la création de nouveaux comptes",
   allowNewAccountCreationDesc: "Si désactivé, l'inscription publique est bloquée et seul un admin peut créer des comptes.",
-  siteSettings: "Paramètres du site",
+  siteSettings: "Paramètres de la page de connexion",
   alwaysShowSidebarWide: "Toujours afficher la barre latérale sur les écrans larges",
   archivedNotes: "Notes archivées",
   askQuestionsAboutNotes: "Posez des questions sur vos notes (modèle côté serveur)",
