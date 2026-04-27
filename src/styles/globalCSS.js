@@ -18,8 +18,12 @@ html.dark {
 }
 button, [role="button"] { cursor: pointer; }
 /* Prevent blinking caret on non-editable elements */
-body { -webkit-user-select: none; user-select: none; }
-input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
+body { -webkit-user-select: none; user-select: none; caret-color: transparent; }
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+  caret-color: auto;
+}
 body {
   background-color: #f0e8ff;
   background-image: linear-gradient(135deg, #f0e8ff 0%, #e8f4fd 50%, #fde8f0 100%);
