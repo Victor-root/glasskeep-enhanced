@@ -139,6 +139,7 @@ function NotesUI({
   onToggleFloatingCards,
   // sync
   syncStatus,
+  instanceLocked = false,
   handleSyncNow,
   syncDropdownOpen,
   setSyncDropdownOpen,
@@ -240,6 +241,7 @@ function NotesUI({
         handleSyncNow={handleSyncNow}
         syncDropdownOpen={syncDropdownOpen}
         setSyncDropdownOpen={setSyncDropdownOpen}
+        instanceLocked={instanceLocked}
         onStartMulti={onStartMulti}
         openSettingsPanel={openSettingsPanel}
         openAdminPanel={openAdminPanel}

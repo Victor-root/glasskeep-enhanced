@@ -4664,11 +4664,21 @@ export default function App() {
       {/* Server is at-rest-locked under the user's feet. Render a
           non-intrusive banner instead of yanking them off their
           local cache; they can keep reading and queueing edits, and
-          one click on the CTA opens the full unlock screen. */}
+          one click on the CTA opens the full unlock screen.
+          The banner is rendered in normal flow so it pushes the
+          header down (no overlap) and scrolls away with the page.
+          When the permanent sidebar is pinned we offset the banner
+          by sidebarWidth so it starts at the right edge of the
+          sidebar — same horizontal alignment as the main content. */}
       {isLocked && currentUser?.email && !lockBannerDismissed && !lockOverlayOpen && (
         <LockedBanner
           onUnlock={() => setLockOverlayOpen(true)}
           onDismiss={() => setLockBannerDismissed(true)}
+          sidebarOffset={
+            alwaysShowSidebarOnWide && windowWidth >= 700 && !isMobileDevice && !desktopSidebarHidden
+              ? sidebarWidth
+              : 0
+          }
         />
       )}
       {floatingCardsEnabled && <FloatingCardsBackground />}
@@ -4777,6 +4787,7 @@ export default function App() {
       <NotesUI
         currentUser={currentUser}
         dark={dark}
+        instanceLocked={isLocked}
         toggleDark={toggleDark}
         signOut={signOut}
         search={search}

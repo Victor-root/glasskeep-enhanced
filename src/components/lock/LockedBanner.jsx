@@ -1,15 +1,17 @@
 // src/components/lock/LockedBanner.jsx
-// Top-of-page bar shown when the server is at-rest-locked but the user
-// already has a local-first cache loaded.
+// Top-of-app notice shown when the server is at-rest-locked but the
+// user already has a local-first cache loaded.
 //
-// The banner is:
-//   - position:fixed, top:0, full-width, z-50 — above the sidebar
-//     (z-40) and above the floating-cards background (z-1) so it can
-//     never be hidden behind decorative or chrome layers.
-//   - bordered only on the bottom (no rounded corners) so it reads as
-//     a stacked notice and not a card.
-//   - intentionally prominent — server-side lock under a logged-in
-//     user is rare and the user needs to notice that sync is paused.
+// Positioning rules:
+//   - Rendered in the normal document flow (not position:fixed) so it
+//     pushes the rest of the layout down instead of overlapping the
+//     header. When the user scrolls, it scrolls away with the page —
+//     once they've seen it and started working, it doesn't waste
+//     vertical real-estate.
+//   - On wide screens with the permanent sidebar pinned, the banner
+//     starts where the main content starts (offset by sidebarWidth)
+//     so the sidebar's tag column stays cleanly framed and the bar
+//     doesn't run under it.
 //
 // First-time visitors (no session) are sent to the full unlock screen
 // instead, since they have no local cache to fall back on. That
@@ -18,12 +20,15 @@
 import React from "react";
 import { t } from "../../i18n";
 
-export default function LockedBanner({ onUnlock, onDismiss }) {
+export default function LockedBanner({ onUnlock, onDismiss, sidebarOffset = 0 }) {
   return (
     <div
       role="status"
-      className="fixed top-0 left-0 right-0 z-50 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 bg-amber-100 dark:bg-amber-900/80 border-b-2 border-amber-500 dark:border-amber-600 text-amber-900 dark:text-amber-100 text-sm shadow-md backdrop-blur-sm"
-      style={{ paddingTop: "max(env(safe-area-inset-top), 0.75rem)" }}
+      className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 bg-amber-100 dark:bg-amber-900/80 border-b-2 border-amber-500 dark:border-amber-600 text-amber-900 dark:text-amber-100 text-sm shadow-md"
+      style={{
+        marginLeft: sidebarOffset ? `${sidebarOffset}px` : undefined,
+        paddingTop: "max(env(safe-area-inset-top), 0.75rem)",
+      }}
     >
       <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
         <rect x="5" y="11" width="14" height="9" rx="2" />
