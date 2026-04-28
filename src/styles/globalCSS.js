@@ -17,30 +17,25 @@ html.dark {
   --border-light: var(--border-dark);
 }
 button, [role="button"] { cursor: pointer; }
-/* Selection + caret rules:
+/* Selection rules:
  *  - Body allows text selection so users can copy titles, error
  *    messages, slogans, recovery keys, etc. with the mouse.
- *  - The blinking caret is silenced on EVERY element with the
- *    universal selector (caret-color:transparent), then re-enabled
- *    only on the three real editing surfaces. The * selector is
- *    intentional: without it, any focusable element the browser
- *    decides to flash a caret on (autofill quirk, focused
- *    contenteditable=false from a third-party widget, etc.) would
- *    leak through.
- *  - Buttons opt back to user-select:none so a click on the label
- *    doesn't accidentally drag-select it. .note-card already has
- *    user-select:none defined further down in this file. */
+ *  - Buttons opt back to user-select:none so a click doesn't drag-
+ *    select the label. .note-card already has user-select:none
+ *    defined further down in this file.
+ *  - We deliberately do NOT touch caret-color anymore: browsers only
+ *    paint the blinking caret on real editable elements (input,
+ *    textarea, contenteditable=true), which is exactly the behaviour
+ *    we want. Forcing caret-color: transparent on everything broke
+ *    the Tiptap rich-text editor because caret-color is inherited —
+ *    the rule cascaded into the editor's child <p> elements where
+ *    the caret actually lives, hiding it in edit mode. (Carets on
+ *    non-editable elements via F7 caret-browsing are an explicit
+ *    accessibility opt-in by the user; we don't override it.) */
 body { -webkit-user-select: text; user-select: text; }
-* { caret-color: transparent !important; }
-input,
-textarea,
-[contenteditable="true"],
-[contenteditable=""],
-[contenteditable]:not([contenteditable="false"]),
-.ProseMirror {
+input, textarea, [contenteditable="true"] {
   -webkit-user-select: text;
   user-select: text;
-  caret-color: auto !important;
 }
 button, [role="button"] {
   -webkit-user-select: none;

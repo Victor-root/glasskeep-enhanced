@@ -61,13 +61,13 @@ const WarningIcon = ({ className }) => (
   </svg>
 );
 
-// Small filled-shackle padlock used as a badge overlay on the sync
-// icon when the server is reachable but at-rest-locked. White stroke
-// keeps it readable on the red background regardless of theme.
+// Solid red padlock used both as a badge over the cloud icon and
+// inline in the sync dropdown. We render the body and shackle filled
+// so it stays readable at small sizes without a background ring.
 const LockBadge = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="5" y="11" width="14" height="9" rx="2" fill="currentColor" stroke="none" />
-    <path d="M8 11V8a4 4 0 1 1 8 0v3" />
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="5" y="11" width="14" height="10" rx="2" />
+    <path d="M8 11V8a4 4 0 1 1 8 0v3" fill="none" strokeWidth="2.5" />
   </svg>
 );
 
@@ -258,15 +258,13 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
             {total}
           </span>
         )}
-        {/* Lock badge — server reachable but at-rest-locked. Sits in
-            the same top-right corner as the pending count; we hide
-            the count badge when locked because nothing is going to
-            sync anyway and the operator's attention should go to the
-            lock state. */}
+        {/* Lock badge — server reachable but at-rest-locked. Solid red
+            padlock right at the top-right of the cloud, no ring. We
+            also drop the pending-count badge when locked because
+            nothing's going to sync anyway and the operator's
+            attention should go to the lock state. */}
         {instanceLocked && (
-          <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full bg-red-600 text-white shadow ring-2 ring-white dark:ring-gray-800">
-            <LockBadge className="w-2 h-2" />
-          </span>
+          <LockBadge className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 text-red-600" />
         )}
       </button>
 
@@ -310,9 +308,9 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
                   see at a glance that the server is up AND that the
                   encryption layer is gating writes. */}
               {instanceLocked && (
-                <div className={`mt-1 flex items-center gap-1.5 text-xs ${dark ? "text-red-400" : "text-red-600"}`}>
-                  <LockBadge className="w-3.5 h-3.5" />
-                  <span>{t("syncInstanceLocked")}</span>
+                <div className={`mt-1.5 flex items-start gap-2 text-xs ${dark ? "text-red-400" : "text-red-600"}`}>
+                  <LockBadge className="w-5 h-5 shrink-0 mt-px" />
+                  <span className="leading-snug">{t("syncInstanceLocked")}</span>
                 </div>
               )}
 
