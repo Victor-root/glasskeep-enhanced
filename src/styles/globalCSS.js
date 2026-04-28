@@ -32,7 +32,12 @@ button, [role="button"] { cursor: pointer; }
  *    user-select:none defined further down in this file. */
 body { -webkit-user-select: text; user-select: text; }
 * { caret-color: transparent !important; }
-input, textarea, [contenteditable="true"] {
+input,
+textarea,
+[contenteditable="true"],
+[contenteditable=""],
+[contenteditable]:not([contenteditable="false"]),
+.ProseMirror {
   -webkit-user-select: text;
   user-select: text;
   caret-color: auto !important;

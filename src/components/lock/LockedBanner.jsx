@@ -24,7 +24,7 @@ export default function LockedBanner({ onUnlock, onDismiss, sidebarOffset = 0 })
   return (
     <div
       role="status"
-      className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 bg-amber-100 dark:bg-amber-900/80 border-b-2 border-amber-500 dark:border-amber-600 text-amber-900 dark:text-amber-100 text-sm shadow-md"
+      className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 bg-amber-100 dark:bg-amber-900/80 border-b-2 border-amber-500 dark:border-amber-600 text-amber-900 dark:text-amber-100 text-sm shadow-md"
       style={{
         marginLeft: sidebarOffset ? `${sidebarOffset}px` : undefined,
         paddingTop: "max(env(safe-area-inset-top), 0.75rem)",

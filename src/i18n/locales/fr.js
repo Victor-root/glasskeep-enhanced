@@ -509,7 +509,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   syncErrorsTitle: "Erreurs de synchronisation",
   offlineViewNotLoaded: "Le serveur est injoignable — cette vue n'a pas pu être chargée. Elle se mettra à jour automatiquement quand la connexion sera rétablie.",
   syncServerReachable: "Serveur joignable",
-  syncInstanceLocked: "Instance verrouillée — sync en pause",
+  syncInstanceLocked: "Instance verrouillée — sync en pause, en attente de déverrouillage par un administrateur",
   syncServerReachableErrors: "Serveur joignable",
   syncServerUnreachable: "Serveur injoignable",
   syncErrorBackendDown: "Le proxy répond mais GlassKeep n'est pas accessible",
