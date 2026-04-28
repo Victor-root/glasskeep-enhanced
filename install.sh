@@ -168,6 +168,19 @@ setup_i18n() {
         MSG_ENC_RECOVERY_ACK="Saisissez \"oui\" une fois la recovery key sauvegardée : "
         MSG_ENC_ACTIVATING="Activation du chiffrement au repos"
         MSG_ENC_DONE="Chiffrement au repos activé."
+
+        MSG_SUMMARY_TITLE="Résumé de l'installation"
+        MSG_SUMMARY_NODE="Node.js"
+        MSG_SUMMARY_APP="Application"
+        MSG_SUMMARY_BUNDLE="Bundle web"
+        MSG_SUMMARY_SERVICE="Service systemd"
+        MSG_SUMMARY_ENC="Chiffrement au repos"
+        MSG_SUMMARY_HTTPS="HTTPS"
+        MSG_SUMMARY_ENC_ON="activé"
+        MSG_SUMMARY_ENC_OFF="désactivé"
+        MSG_SUMMARY_HTTPS_PROXY="reverse proxy"
+        MSG_SUMMARY_HTTPS_SELF="certificat auto-signé"
+        MSG_SUMMARY_HTTPS_CUSTOM="certificat personnalisé"
     else
         # ── English strings (default) ───────────────────────────────────────
         MSG_SUBTITLE="Note Manager"
@@ -280,6 +293,19 @@ setup_i18n() {
         MSG_ENC_RECOVERY_ACK="Type \"yes\" once you have saved the recovery key: "
         MSG_ENC_ACTIVATING="Activating at-rest encryption"
         MSG_ENC_DONE="At-rest encryption enabled."
+
+        MSG_SUMMARY_TITLE="Install summary"
+        MSG_SUMMARY_NODE="Node.js"
+        MSG_SUMMARY_APP="Application"
+        MSG_SUMMARY_BUNDLE="Web bundle"
+        MSG_SUMMARY_SERVICE="Systemd service"
+        MSG_SUMMARY_ENC="At-rest encryption"
+        MSG_SUMMARY_HTTPS="HTTPS"
+        MSG_SUMMARY_ENC_ON="enabled"
+        MSG_SUMMARY_ENC_OFF="disabled"
+        MSG_SUMMARY_HTTPS_PROXY="reverse proxy"
+        MSG_SUMMARY_HTTPS_SELF="self-signed certificate"
+        MSG_SUMMARY_HTTPS_CUSTOM="custom certificate"
     fi
 
     # Export detected lang code for use in .env
@@ -303,12 +329,17 @@ error()   { printf "${RED}✗${RESET} %b\n" "$*" >&2; }
 # "→" arrow gets pinked and "GlassKeep" gets violet — keeps the body
 # readable in default colour while the eye-catchy bits pop. Input is
 # expected to use \n for line breaks (echo -e style).
+#
+# Why %b on the final printf: the substitution above injects literal
+# "\033[…]" escape sequences from $PINK / $VIOLET (which were assigned
+# in single quotes, so the backslashes are still raw). %b makes printf
+# interpret them as real ANSI escapes — %s would print the raw codes.
 _print_info_block() {
     local msg
     msg=$(echo -e "$1")
     msg="${msg//→/${PINK}→${RESET}}"
     msg="${msg//GlassKeep/${VIOLET}GlassKeep${RESET}}"
-    printf "%s\n" "$msg"
+    printf "%b\n" "$msg"
 }
 
 die() {
@@ -366,15 +397,67 @@ panel() {
     printf "${color}└${RESET}\n"
 }
 
-# Run a command with a status label, abort on failure.
+# Run a command quietly with an animated braille spinner. The
+# command's stdout + stderr are captured to a temp log; the user only
+# sees a single moving line per step. On success the line collapses to
+# a green ✓; on failure it collapses to a red ✗ and the captured log
+# is dumped so the operator can diagnose what blew up.
+#
+# Falls back to a non-animated "▸ … ✓" pair when stdout isn't a TTY
+# (piped output, CI, log redirection) so the script still produces
+# something sensible in non-interactive contexts.
+#
+# Why background + wait: keeping the spinner inside the foreground
+# would block on the command. We fork the work, animate while
+# `kill -0 $pid` says it's alive, then `wait $pid` to retrieve the
+# real exit code (set -e doesn't kill backgrounded children — that's
+# what makes capturing rc safe).
+SPINNER_FRAMES=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
 step() {
     local label="$1"; shift
-    printf "\n${INDIGO}▸${RESET}  ${BOLD}%s${RESET}\n" "$label"
-    if ! "$@"; then
+    local log; log=$(mktemp)
+    local rc=0
+
+    if [[ -t 1 ]] && [[ "${INSTALL_VERBOSE:-0}" != "1" ]]; then
+        ( "$@" >"$log" 2>&1 ) &
+        local pid=$!
+
+        local i=0
+        while kill -0 "$pid" 2>/dev/null; do
+            printf "\r${VIOLET}%s${RESET}  ${DIM}%s…${RESET}" \
+                "${SPINNER_FRAMES[i]}" "$label"
+            i=$(( (i + 1) % ${#SPINNER_FRAMES[@]} ))
+            sleep 0.08
+        done
+        wait "$pid" || rc=$?
+
+        # \033[2K clears the entire current line; \r returns the cursor
+        # to column 0 so the next printf overwrites the spinner cleanly.
+        if [[ $rc -eq 0 ]]; then
+            printf "\r\033[2K${GREEN}✓${RESET}  %s\n" "$label"
+        else
+            printf "\r\033[2K${RED}✗${RESET}  %s\n" "$label"
+        fi
+    else
+        printf "${INDIGO}▸${RESET}  ${BOLD}%s${RESET}\n" "$label"
+        if "$@" >"$log" 2>&1; then rc=0; else rc=$?; fi
+        if [[ $rc -eq 0 ]]; then
+            printf "${GREEN}✓${RESET}  ${DIM}%s${RESET}\n" "$label"
+        else
+            printf "${RED}✗${RESET}  %s\n" "$label"
+        fi
+    fi
+
+    if [[ $rc -ne 0 ]]; then
+        echo
+        error "Sortie de la commande / Command output:"
+        echo
+        sed -e 's/^/    /' "$log" >&2
+        rm -f "$log"
         # shellcheck disable=SC2059
         die "$(printf "$MSG_STEP_FAIL" "$label")"
     fi
-    printf "${GREEN}✓${RESET}  ${DIM}%s${RESET}\n" "$label"
+    rm -f "$log"
 }
 
 # Inline numbered choice. Used in menus + the SSL choice prompt.
@@ -768,13 +851,15 @@ install_nodejs() {
         return
     fi
 
+    # Wrap the apt + nodesource bootstrap in a single step so it gets
+    # the spinner + log-capture treatment instead of dumping nodesource
+    # script output and apt's package list to the user's terminal.
     # shellcheck disable=SC2059
-    info "$(printf "$MSG_NODE_INSTALLING" "$NODE_MAJOR")"
-    apt-get install -y curl gnupg ca-certificates &>/dev/null
-    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash - &>/dev/null
-    apt-get install -y nodejs &>/dev/null
-    # shellcheck disable=SC2059
-    success "$(printf "$MSG_NODE_DONE" "$(node --version)")"
+    step "$(printf "$MSG_NODE_INSTALLING" "$NODE_MAJOR")" bash -c "
+        apt-get install -y curl gnupg ca-certificates
+        curl -fsSL 'https://deb.nodesource.com/setup_${NODE_MAJOR}.x' | bash -
+        apt-get install -y nodejs
+    "
 }
 
 # ── Admin account setup ───────────────────────────────────────────────────────
@@ -1068,6 +1153,7 @@ EOF
             # not retrievable from a `set` dump or environment crawl.
             GLASSKEEP_RECOVERY_KEY=""
         fi
+        show_install_summary
         show_access_info "$port"
     else
         warn "$MSG_WARN_SERVICE"
@@ -1117,6 +1203,7 @@ action_update() {
 
     sleep 2
     if systemctl is-active --quiet "$SERVICE_NAME"; then
+        show_install_summary
         show_access_info "$port"
     else
         warn "$MSG_WARN_SERVICE"
@@ -1169,6 +1256,75 @@ action_uninstall() {
 
     echo ""
     success "$MSG_UNINSTALL_DONE"
+}
+
+# Single-glance summary of what just got installed/updated. Pulled
+# straight from the live filesystem (Node version, bundle size, git
+# commit) rather than buffered side-channels so it always reflects
+# reality even when re-run on an existing install.
+#
+# Encryption status comes from the SQLite vault (presence of a row in
+# instance_encryption) rather than $ENC_ENABLE — that local flag is
+# only set when the install path turned encryption on, and the summary
+# also runs after `update`, where the flag is empty.
+show_install_summary() {
+    local node_ver bundle commit enc_status https_label
+
+    node_ver=$(node --version 2>/dev/null || echo "—")
+
+    if [[ -d "${INSTALL_DIR}/dist/assets" ]]; then
+        bundle=$(du -sh "${INSTALL_DIR}/dist/assets" 2>/dev/null | awk '{print $1}')
+    else
+        bundle="—"
+    fi
+
+    commit="—"
+    if [[ -d "${INSTALL_DIR}/.git" ]]; then
+        commit=$(git -C "${INSTALL_DIR}" rev-parse --short HEAD 2>/dev/null || echo "—")
+    fi
+
+    enc_status="${GRAY}${MSG_SUMMARY_ENC_OFF}${RESET}"
+    if [[ -f "${DATA_DIR}/notes.db" ]] && [[ -d "${INSTALL_DIR}/node_modules/better-sqlite3" ]]; then
+        local active
+        active=$(node -e "
+            try {
+              const Database = require('${INSTALL_DIR}/node_modules/better-sqlite3');
+              const db = new Database('${DATA_DIR}/notes.db', { readonly: true, fileMustExist: true });
+              const row = db.prepare('SELECT 1 FROM instance_encryption LIMIT 1').get();
+              process.stdout.write(row ? 'yes' : 'no');
+              db.close();
+            } catch(e) { process.stdout.write('no'); }
+        " 2>/dev/null || echo "no")
+        if [[ "$active" == "yes" ]]; then
+            enc_status="${GREEN}${MSG_SUMMARY_ENC_ON}${RESET}"
+        fi
+    fi
+
+    https_label="—"
+    local https_val trust_val
+    https_val=$(grep -E '^HTTPS_ENABLED=' "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+    trust_val=$(grep -E '^TRUST_PROXY='   "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+    if [[ "$https_val" == "false" && "$trust_val" == "true" ]]; then
+        https_label="$MSG_SUMMARY_HTTPS_PROXY"
+    elif [[ "$https_val" == "true" ]]; then
+        # Self-signed certs live under /opt/glass-keep/ssl; anything
+        # else points at a user-supplied path.
+        local cert
+        cert=$(grep -E '^SSL_CERT=' "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+        if [[ "$cert" == /opt/glass-keep/ssl/* ]]; then
+            https_label="$MSG_SUMMARY_HTTPS_SELF"
+        else
+            https_label="$MSG_SUMMARY_HTTPS_CUSTOM"
+        fi
+    fi
+
+    panel "$INDIGO" "$MSG_SUMMARY_TITLE" \
+        "${TEAL}${MSG_SUMMARY_NODE}${RESET}        ${BOLD}${node_ver}${RESET}" \
+        "${TEAL}${MSG_SUMMARY_APP}${RESET}     ${BOLD}${INSTALL_DIR}${RESET} ${GRAY}(${commit})${RESET}" \
+        "${TEAL}${MSG_SUMMARY_BUNDLE}${RESET}      ${BOLD}${bundle}${RESET}" \
+        "${TEAL}${MSG_SUMMARY_SERVICE}${RESET} ${BOLD}${SERVICE_NAME}${RESET}" \
+        "${TEAL}${MSG_SUMMARY_ENC}${RESET} ${enc_status}" \
+        "${TEAL}${MSG_SUMMARY_HTTPS}${RESET}            ${BOLD}${https_label}${RESET}"
 }
 
 show_access_info() {
