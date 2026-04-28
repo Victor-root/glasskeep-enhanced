@@ -11,6 +11,7 @@ import React, { useState } from "react";
 import AuthShell from "../auth/AuthShell.jsx";
 import { api } from "../../utils/api.js";
 import { t } from "../../i18n";
+import { localizeServerError } from "../../utils/serverErrors.js";
 
 export default function InstanceUnlockScreen({ dark, onToggleDark, onUnlocked }) {
   const [mode, setMode] = useState("passphrase"); // "passphrase" | "recovery"
@@ -33,7 +34,7 @@ export default function InstanceUnlockScreen({ dark, onToggleDark, onUnlocked })
       setRecoveryKey("");
       onUnlocked && onUnlocked();
     } catch (e) {
-      setErr(e?.message || t("unlockFailed"));
+      setErr(localizeServerError(e?.message, "unlockFailed"));
     } finally {
       setLoading(false);
     }

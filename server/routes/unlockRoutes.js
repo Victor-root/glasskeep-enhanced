@@ -172,7 +172,7 @@ async function paceFailure(ms) {
 }
 
 function attachUnlockRoutes(app, deps) {
-  const { db, auth, adminOnly, log = console } = deps;
+  const { db, auth, adminOnly, log = console, broadcastToAll } = deps;
 
   app.get("/api/instance/status", (_req, res) => {
     res.json({
@@ -299,6 +299,15 @@ function attachUnlockRoutes(app, deps) {
   app.post("/api/instance/lock", auth, adminOnly, (_req, res) => {
     if (!runtime.isEnabled()) {
       return res.status(409).json({ error: "Encryption is not enabled" });
+    }
+    // Push the event BEFORE actually locking. Once we lock, the SSE
+    // streams' next write would fail (the connections themselves stay
+    // open but downstream listeners might already 423-out on side
+    // effects). Sending first guarantees every still-connected client
+    // receives the heads-up and can redirect to the unlock screen
+    // without waiting for the 30-second status poll.
+    if (typeof broadcastToAll === "function") {
+      try { broadcastToAll({ type: "instance_locked" }); } catch {}
     }
     runtime.lock();
     log.info?.("[unlock] instance manually re-locked");

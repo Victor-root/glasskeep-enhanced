@@ -4,7 +4,7 @@ import { t } from "../../i18n";
 
 export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, loginSlogan, children }) {
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col px-4 relative overflow-hidden">
       {/* Decorative floating note cards */}
       {floatingCardsEnabled && <div aria-hidden="true">
         <div className="login-deco-card" style={{"--rot":"-12deg","--dur":"7s","--delay":"0s",top:"8%",left:"6%",borderTop:"3px solid rgba(99,102,241,0.7)"}}>
@@ -64,7 +64,11 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
           <div className="deco-line" style={{width:"62%"}}/>
         </div>
       </div>}
-      <div className="relative z-10 w-full max-w-md">
+      {/* Centered card area, takes the remaining vertical space so the
+          footer below stays in normal flow and never overlaps the card
+          on small screens. */}
+      <div className="flex-1 w-full flex items-center justify-center py-8">
+        <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-6">
           <img
             src="/pwa-192.png"
@@ -100,13 +104,14 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
             >{t("changeServer")}</button>
           </div>
         )}
+        </div>
       </div>
-    <p className="absolute bottom-4 left-0 right-0 text-center text-xs text-gray-400 dark:text-gray-600 z-10 select-none">
-      Open source project &mdash; original by{" "}
-      <a href="https://github.com/nikunjsingh93" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">nikunjsingh93</a>
-      {" · "}forked by{" "}
-      <a href="https://github.com/Victor-root/glasskeep-enhanced" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">Victor-root</a>
-    </p>
-  </div>
+      <p className="text-center text-xs text-gray-400 dark:text-gray-600 z-10 select-none pb-4 pt-2 relative">
+        Open source project &mdash; original by{" "}
+        <a href="https://github.com/nikunjsingh93" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">nikunjsingh93</a>
+        {" · "}forked by{" "}
+        <a href="https://github.com/Victor-root/glasskeep-enhanced" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">Victor-root</a>
+      </p>
+    </div>
   );
 }

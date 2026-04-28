@@ -17,19 +17,21 @@ html.dark {
   --border-light: var(--border-dark);
 }
 button, [role="button"] { cursor: pointer; }
-/* Selection rules:
- *  - body allows selection so users can copy titles, error messages,
- *    slogans, etc. The blinking caret is silenced on body via
- *    caret-color:transparent and re-enabled on real editing surfaces
- *    below — selection works everywhere, but the I-beam caret only
- *    blinks where typing makes sense.
- *  - input / textarea / contenteditable=true keep their normal
- *    selection AND get the caret back.
+/* Selection + caret rules:
+ *  - Body allows text selection so users can copy titles, error
+ *    messages, slogans, recovery keys, etc. with the mouse.
+ *  - The blinking caret is silenced on EVERY element with the
+ *    universal selector (caret-color:transparent), then re-enabled
+ *    only on the three real editing surfaces. The * selector is
+ *    intentional: without it, any focusable element the browser
+ *    decides to flash a caret on (autofill quirk, focused
+ *    contenteditable=false from a third-party widget, etc.) would
+ *    leak through.
  *  - Buttons opt back to user-select:none so a click on the label
- *    doesn't accidentally drag-select it. .note-card defines its own
- *    user-select:none further down in this file (search "note-card"
- *    below) — left untouched on purpose. */
-body { -webkit-user-select: text; user-select: text; caret-color: transparent; }
+ *    doesn't accidentally drag-select it. .note-card already has
+ *    user-select:none defined further down in this file. */
+body { -webkit-user-select: text; user-select: text; }
+* { caret-color: transparent; }
 input, textarea, [contenteditable="true"] {
   -webkit-user-select: text;
   user-select: text;

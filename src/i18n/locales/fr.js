@@ -611,4 +611,19 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   encryptionDeactivateAckRequired: "Vous devez cocher la case de confirmation pour continuer.",
   encryptionDeactivating: "Déchiffrement de vos notes…",
   encryptionDeactivateDone: "Chiffrement au repos désactivé.",
+
+  // Messages d'erreur renvoyés par le serveur
+  unlockErrorInvalidPassphrase: "Passphrase incorrecte.",
+  unlockErrorInvalidRecoveryKey: "Recovery key invalide.",
+  unlockErrorInvalidRecoveryKeyFormat: "Format de recovery key invalide.",
+  unlockErrorPassphraseRequired: "La passphrase est requise.",
+  unlockErrorRecoveryKeyRequired: "La recovery key est requise.",
+  unlockErrorTooMany: "Trop de tentatives de déverrouillage. Réessayez plus tard.",
+  unlockErrorPlaintextHttp: "Refus du secret de déverrouillage en HTTP non chiffré. Utilisez HTTPS, posez TRUST_PROXY=true si vous avez un reverse proxy, ou déverrouillez depuis localhost.",
+  unlockErrorCurrentPassphrase: "La passphrase actuelle est incorrecte.",
+  unlockErrorEncryptionNotEnabled: "Le chiffrement n'est pas activé.",
+  unlockErrorEncryptionAlreadyEnabled: "Le chiffrement est déjà activé.",
+  unlockErrorUnlockFirst: "Déverrouillez l'instance d'abord.",
+  unlockErrorActivationFailed: "Échec de l'activation.",
+  unlockErrorDeactivationFailed: "Échec de la désactivation.",
 };

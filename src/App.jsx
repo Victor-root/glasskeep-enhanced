@@ -2098,7 +2098,14 @@ export default function App() {
               syncEngineRef.current.notifyServerReachable();
             }
             const msg = JSON.parse(e.data || "{}");
-            if (msg && msg.type === "note_updated" && msg.noteId) {
+            if (msg && msg.type === "instance_locked") {
+              // Another admin (or the CLI) locked the instance. Drop
+              // the user straight onto the unlock screen instead of
+              // waiting for the next status poll. The api wrapper
+              // already fires `instance-locked` on a 423 response;
+              // this just makes the redirect immediate.
+              window.dispatchEvent(new CustomEvent("instance-locked"));
+            } else if (msg && msg.type === "note_updated" && msg.noteId) {
               debouncedPatch(msg.noteId);
             } else if (msg && msg.type === "notes_reordered") {
               // Another session reordered notes — reload the full list once

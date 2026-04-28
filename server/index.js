@@ -920,6 +920,16 @@ function broadcastToAdmins(event) {
   }
 }
 
+// Push an event to every connected SSE client, regardless of user.
+// Used by the lock route so other admins/users who are currently
+// online drop straight to the unlock screen instead of finding out at
+// the next request or the next 30-second status poll.
+function broadcastToAll(event) {
+  for (const userId of sseClients.keys()) {
+    sendEventToUser(userId, event);
+  }
+}
+
 function getCollaboratorUserIdsForNote(noteId) {
   try {
     const rows = getNoteCollaborators.all(noteId) || [];
@@ -944,7 +954,7 @@ function broadcastNoteUpdated(noteId) {
 // middleware can short-circuit everything else with HTTP 423 while
 // still letting unlock attempts and the public lock-status endpoint
 // through. See server/encryption/* and server/routes/unlockRoutes.js.
-attachUnlockRoutes(app, { db, auth, adminOnly, log: console });
+attachUnlockRoutes(app, { db, auth, adminOnly, log: console, broadcastToAll });
 
 const LOCK_ALLOW_PATHS = [
   /^\/api\/instance(\/|$)/,

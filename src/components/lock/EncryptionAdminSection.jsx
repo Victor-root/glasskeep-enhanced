@@ -13,6 +13,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../../utils/api.js";
 import { t } from "../../i18n";
+import { localizeServerError } from "../../utils/serverErrors.js";
 
 function RecoveryKeyBlock({ value, onAck }) {
   const [copied, setCopied] = useState(false);
@@ -106,8 +107,9 @@ function ActivationForm({ onActivated, showToast }) {
       setPassphrase("");
       setConfirm("");
     } catch (e) {
-      setErr(e?.message || "Activation failed");
-      showToast && showToast(e?.message || "Activation failed", "error");
+      const msg = localizeServerError(e?.message, "unlockErrorActivationFailed");
+      setErr(msg);
+      showToast && showToast(msg, "error");
     } finally {
       setBusy(false);
     }
@@ -187,7 +189,7 @@ function RotatePassphraseForm({ token, showToast }) {
       showToast && showToast(t("saved"), "success");
       setTimeout(() => setDone(false), 2500);
     } catch (e) {
-      setErr(e?.message || "Failed");
+      setErr(localizeServerError(e?.message, "unlockFailed"));
     } finally {
       setBusy(false);
     }
@@ -260,7 +262,7 @@ function DeactivationForm({ token, showToast, onDeactivated }) {
       showToast && showToast(t("encryptionDeactivateDone"), "success");
       onDeactivated && onDeactivated();
     } catch (e) {
-      setErr(e?.message || "Failed");
+      setErr(localizeServerError(e?.message, "unlockFailed"));
     } finally {
       setBusy(false);
     }
@@ -317,7 +319,7 @@ function RegenerateRecoverySection({ token, showToast }) {
       const res = await api("/instance/recovery/regenerate", { method: "POST", token });
       if (res?.recoveryKey) setNewKey(res.recoveryKey);
     } catch (e) {
-      showToast && showToast(e?.message || "Failed", "error");
+      showToast && showToast(localizeServerError(e?.message, "unlockFailed"), "error");
     } finally {
       setBusy(false);
     }
@@ -382,7 +384,7 @@ export default function EncryptionAdminSection({ token, showToast }) {
       // immediately drops to the unlock screen.
       window.dispatchEvent(new CustomEvent("instance-locked"));
     } catch (e) {
-      showToast && showToast(e?.message || "Failed to lock", "error");
+      showToast && showToast(localizeServerError(e?.message, "unlockFailed"), "error");
     }
   };
 
