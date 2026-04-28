@@ -264,7 +264,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
             nothing's going to sync anyway and the operator's
             attention should go to the lock state. */}
         {instanceLocked && (
-          <LockBadge className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 text-red-600" />
+          <LockBadge className="absolute top-1 right-1 w-3.5 h-3.5 text-red-600" />
         )}
       </button>
 
@@ -308,8 +308,8 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
                   see at a glance that the server is up AND that the
                   encryption layer is gating writes. */}
               {instanceLocked && (
-                <div className={`mt-1.5 flex items-start gap-2 text-xs ${dark ? "text-red-400" : "text-red-600"}`}>
-                  <LockBadge className="w-5 h-5 shrink-0 mt-px" />
+                <div className={`mt-1.5 flex items-start gap-1.5 text-xs ${dark ? "text-red-400" : "text-red-600"}`}>
+                  <LockBadge className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                   <span className="leading-snug">{t("syncInstanceLocked")}</span>
                 </div>
               )}
