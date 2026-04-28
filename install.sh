@@ -9,15 +9,30 @@
 
 set -euo pipefail
 
-# ── Colors ────────────────────────────────────────────────────────────────────
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
+# ── Visual palette ────────────────────────────────────────────────────────────
+# Semantic colours, kept consistent across the script:
+#   INDIGO/VIOLET → brand accent (matches the app's indigo→violet UI)
+#   GREEN         → success
+#   AMBER         → warning + sensitive info
+#   RED           → error + destructive
+#   GRAY          → muted / secondary text
+#   CYAN          → command snippets the user can copy
+INDIGO='\033[38;5;105m'
+VIOLET='\033[38;5;141m'
+GREEN='\033[38;5;71m'
+AMBER='\033[38;5;214m'
+RED='\033[38;5;203m'
+CYAN='\033[38;5;110m'
+GRAY='\033[38;5;245m'
 WHITE='\033[1;37m'
 BOLD='\033[1m'
+DIM='\033[2m'
+ITALIC='\033[3m'
 RESET='\033[0m'
+# Legacy aliases so older string templates ($BLUE / $YELLOW) keep
+# rendering until they're swept away by the helpers below.
+BLUE=$INDIGO
+YELLOW=$AMBER
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 REPO_URL="https://github.com/Victor-root/glasskeep-enhanced.git"
@@ -269,25 +284,97 @@ setup_i18n() {
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-info()    { echo -e "${BLUE}[INFO]${RESET}  $*"; }
-success() { echo -e "${GREEN}[OK]${RESET}    $*"; }
-warn()    { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
-error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
+# All output flows through these helpers so the script keeps a single
+# visual identity. Glyphs:
+#   ›  info       (gray, dim)
+#   ✓  success    (green)
+#   ⚠  warning    (amber)
+#   ✗  error      (red)
+#   ▸  step start (indigo)
+info()    { printf "${GRAY}›${RESET} %b\n" "$*"; }
+success() { printf "${GREEN}✓${RESET} %b\n" "$*"; }
+warn()    { printf "${AMBER}⚠${RESET} %b\n" "$*"; }
+error()   { printf "${RED}✗${RESET} %b\n" "$*" >&2; }
 
 die() {
     error "$*"
     exit 1
 }
 
-# Run a command with a status label, abort on failure
+# A horizontal rule that adapts to the terminal width (capped at 78
+# cols so the result stays readable on wide terminals too).
+_term_width() {
+    local cols
+    cols=$(tput cols 2>/dev/null || echo 80)
+    [[ -z "$cols" || "$cols" -lt 50 ]] && cols=80
+    [[ "$cols" -gt 78 ]] && cols=78
+    echo "$cols"
+}
+hr() {
+    local color="${1:-$INDIGO}"
+    local cols; cols=$(_term_width)
+    printf "${color}"
+    for ((i=0; i<cols; i++)); do printf "─"; done
+    printf "${RESET}\n"
+}
+
+# Section header — used at the start of each logical phase.
+# Renders as a top rule + an indigo arrow + the title in bold + an
+# optional one-line subtitle in gray.
+section() {
+    local title="$1"
+    local subtitle="${2:-}"
+    echo
+    hr "$INDIGO"
+    printf "  ${BOLD}${INDIGO}▸${RESET}  ${BOLD}%s${RESET}\n" "$title"
+    [[ -n "$subtitle" ]] && printf "     ${GRAY}%s${RESET}\n" "$subtitle"
+    hr "$INDIGO"
+}
+
+# Status panel — left accent bar + lines. Auto-sizes to whatever you
+# put in it, no overflow possible. First arg is the colour (one of
+# $GREEN, $AMBER, $RED, $INDIGO); subsequent args are the body lines.
+panel() {
+    local color="$1"; shift
+    local title="$1"; shift
+    echo
+    printf "${color}┌${RESET} ${BOLD}${color}%s${RESET}\n" "$title"
+    while (( $# )); do
+        printf "${color}│${RESET} %b\n" "$1"
+        shift
+    done
+    printf "${color}└${RESET}\n"
+}
+
+# Run a command with a status label, abort on failure.
 step() {
     local label="$1"; shift
-    echo -e "\n${CYAN}▶ ${label}${RESET}"
+    printf "\n${INDIGO}▸${RESET}  ${BOLD}%s${RESET}\n" "$label"
     if ! "$@"; then
         # shellcheck disable=SC2059
         die "$(printf "$MSG_STEP_FAIL" "$label")"
     fi
-    success "${label}"
+    printf "${GREEN}✓${RESET}  ${DIM}%s${RESET}\n" "$label"
+}
+
+# Inline numbered choice. Used in menus + the SSL choice prompt.
+# Args: <number> <colour> <title> <description>
+menu_item() {
+    local num="$1" color="$2" title="$3" desc="${4:-}"
+    printf "  ${color}${BOLD}%s${RESET}  ${BOLD}%s${RESET}\n" "$num" "$title"
+    [[ -n "$desc" ]] && printf "     ${GRAY}%s${RESET}\n" "$desc"
+}
+
+# Prompt with a leading glyph — produces the string that bash's
+# `read -p` should display. Trims any trailing ' :' / ': ' / ' ' from
+# the message string so it composes cleanly with the trailing › glyph
+# (a lot of MSG_* values were authored with their own ': ' suffix).
+prompt_text() {
+    local s="$1"
+    # Strip trailing whitespace + colons (handles "... : " / "... :" /
+    # "...:" / "... " — every MSG_* shape used in this script).
+    while [[ "$s" =~ [[:space:]:]$ ]]; do s="${s::-1}"; done
+    printf "${BOLD}${INDIGO}❯${RESET} %s ${GRAY}›${RESET} " "$s"
 }
 
 require_root() {
@@ -322,13 +409,11 @@ ENC_ENABLE="no"
 ENC_PASSPHRASE=""
 
 ask_encryption_config() {
-    echo ""
-    echo -e "${BOLD}${CYAN}▶ ${MSG_ENC_TITLE}${RESET}"
-    echo -e "  ${MSG_ENC_INTRO}"
-    echo ""
+    section "$MSG_ENC_TITLE"
+    printf "  %s\n\n" "$(echo -e "$MSG_ENC_INTRO")"
     local ans
     while true; do
-        read -rp "$(echo -e "${YELLOW}${MSG_ENC_PROMPT}${RESET}")" ans </dev/tty
+        read -rp "$(prompt_text "$MSG_ENC_PROMPT")" ans </dev/tty
         # Empty answer (just Enter) defaults to "no" — matches the
         # safer fallback advertised in the prompt and avoids forcing
         # someone unsure into a key-management commitment.
@@ -346,14 +431,14 @@ ask_encryption_config() {
 
     local pass1 pass2
     while true; do
-        read -rsp "$(echo -e "${YELLOW}${MSG_ENC_PASS_PROMPT}${RESET}")" pass1 </dev/tty
-        echo ""
+        read -rsp "$(prompt_text "$MSG_ENC_PASS_PROMPT")" pass1 </dev/tty
+        echo
         if [[ ${#pass1} -lt 8 ]]; then
             warn "$MSG_ENC_PASS_TOO_SHORT"
             continue
         fi
-        read -rsp "$(echo -e "${YELLOW}${MSG_ENC_PASS_CONFIRM}${RESET}")" pass2 </dev/tty
-        echo ""
+        read -rsp "$(prompt_text "$MSG_ENC_PASS_CONFIRM")" pass2 </dev/tty
+        echo
         if [[ "$pass1" != "$pass2" ]]; then
             warn "$MSG_ENC_PASS_MISMATCH"
             continue
@@ -527,43 +612,41 @@ NODESCRIPT
 }
 
 ask_ssl_config() {
-    echo ""
-    echo -e "${BOLD}${CYAN}▶ HTTPS / SSL${RESET}"
-    echo -e "  ${MSG_HTTPS_MENU_TITLE}"
-    echo ""
-    echo -e "  ${GREEN}1)${RESET} ${MSG_HTTPS_OPT1}"
-    echo -e "  ${GREEN}2)${RESET} ${MSG_HTTPS_OPT2}"
-    echo -e "  ${GREEN}3)${RESET} ${MSG_HTTPS_OPT3}"
-    echo ""
+    section "HTTPS / SSL" "$MSG_HTTPS_MENU_TITLE"
+    echo
+    menu_item "1" "$INDIGO" "$MSG_HTTPS_OPT1"
+    menu_item "2" "$INDIGO" "$MSG_HTTPS_OPT2"
+    menu_item "3" "$INDIGO" "$MSG_HTTPS_OPT3"
+    echo
     local choice
     while true; do
-        read -rp "$(echo -e "${YELLOW}${MSG_HTTPS_PROMPT}${RESET}")" choice </dev/tty
+        read -rp "$(prompt_text "$MSG_HTTPS_PROMPT")" choice </dev/tty
         case "$choice" in
             1)
                 SSL_MODE="proxy"
-                echo -e "${MSG_PROXY_YES_INFO}"
+                printf "  ${GRAY}%s${RESET}\n" "$(echo -e "$MSG_PROXY_YES_INFO")"
                 break ;;
             2)
                 SSL_MODE="selfsigned"
-                echo -e "$(echo -e "$MSG_PROXY_NO_INFO")"
+                printf "  ${GRAY}%s${RESET}\n" "$(echo -e "$MSG_PROXY_NO_INFO")"
                 break ;;
             3)
                 SSL_MODE="custom"
                 while true; do
-                    read -rp "$(echo -e "${YELLOW}${MSG_CERT_PATH_PROMPT}${RESET}")" CUSTOM_CERT_PATH </dev/tty
+                    read -rp "$(prompt_text "$MSG_CERT_PATH_PROMPT")" CUSTOM_CERT_PATH </dev/tty
                     CUSTOM_CERT_PATH="${CUSTOM_CERT_PATH/#\~/$HOME}"
                     [[ -f "$CUSTOM_CERT_PATH" ]] && break
                     # shellcheck disable=SC2059
                     warn "$(printf "$MSG_CERT_NOT_FOUND" "$CUSTOM_CERT_PATH")"
                 done
                 while true; do
-                    read -rp "$(echo -e "${YELLOW}${MSG_KEY_PATH_PROMPT}${RESET}")" CUSTOM_KEY_PATH </dev/tty
+                    read -rp "$(prompt_text "$MSG_KEY_PATH_PROMPT")" CUSTOM_KEY_PATH </dev/tty
                     CUSTOM_KEY_PATH="${CUSTOM_KEY_PATH/#\~/$HOME}"
                     [[ -f "$CUSTOM_KEY_PATH" ]] && break
                     # shellcheck disable=SC2059
                     warn "$(printf "$MSG_CERT_NOT_FOUND" "$CUSTOM_KEY_PATH")"
                 done
-                echo -e "$(echo -e "$MSG_HTTPS_OPT3_INFO")"
+                printf "  ${GRAY}%s${RESET}\n" "$(echo -e "$MSG_HTTPS_OPT3_INFO")"
                 break ;;
             *)
                 warn "$MSG_HTTPS_INVALID" ;;
@@ -755,13 +838,11 @@ NODESCRIPT
 
 # ── Actions ───────────────────────────────────────────────────────────────────
 action_install() {
-    echo -e "\n${BOLD}═══════════════════════════════════════${RESET}"
-    echo -e "${BOLD}  ${MSG_HDR_INSTALL}${RESET}"
-    echo -e "${BOLD}═══════════════════════════════════════${RESET}"
+    section "$MSG_HDR_INSTALL"
 
     # Ask port
     local port
-    read -rp "$(echo -e "${YELLOW}${MSG_PROMPT_PORT}${RESET}")" port </dev/tty
+    read -rp "$(prompt_text "$MSG_PROMPT_PORT")" port </dev/tty
     port="${port:-8080}"
 
     if ! [[ "$port" =~ ^[0-9]+$ ]] || [[ "$port" -lt 1 || "$port" -gt 65535 ]]; then
@@ -773,13 +854,12 @@ action_install() {
     local admin_name="" admin_login="" admin_pass=""
 
     if [[ ! -f "${DATA_DIR}/notes.db" ]]; then
-        echo ""
-        echo -e "${BOLD}${CYAN}▶ ${MSG_ADMIN_SETUP_TITLE}${RESET}"
-        echo ""
+        section "$MSG_ADMIN_SETUP_TITLE"
+        echo
 
         local admin_pass2
         while true; do
-            read -rp "$(echo -e "${YELLOW}${MSG_ADMIN_NAME_PROMPT}${RESET}")" admin_name </dev/tty
+            read -rp "$(prompt_text "$MSG_ADMIN_NAME_PROMPT")" admin_name </dev/tty
             admin_name="$(echo -e "${admin_name}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
             if [[ -z "$admin_name" ]]; then
@@ -792,7 +872,7 @@ action_install() {
             fi
 
             # shellcheck disable=SC2059
-            read -rp "$(echo -e "${YELLOW}$(printf "$MSG_ADMIN_LOGIN_PROMPT" "$admin_name")${RESET}")" admin_login </dev/tty
+            read -rp "$(prompt_text "$(printf "$MSG_ADMIN_LOGIN_PROMPT" "$admin_name")")" admin_login </dev/tty
             admin_login="$(echo -e "${admin_login}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
             admin_login="${admin_login:-$admin_name}"
 
@@ -801,10 +881,10 @@ action_install() {
                 continue
             fi
 
-            read -rsp "$(echo -e "${YELLOW}${MSG_ADMIN_PASS_PROMPT}${RESET}")" admin_pass </dev/tty
-            echo ""
-            read -rsp "$(echo -e "${YELLOW}${MSG_ADMIN_PASS_CONFIRM}${RESET}")" admin_pass2 </dev/tty
-            echo ""
+            read -rsp "$(prompt_text "$MSG_ADMIN_PASS_PROMPT")" admin_pass </dev/tty
+            echo
+            read -rsp "$(prompt_text "$MSG_ADMIN_PASS_CONFIRM")" admin_pass2 </dev/tty
+            echo
 
             if [[ -z "$admin_pass" ]]; then
                 warn "$MSG_ADMIN_EMPTY_PASS"
@@ -830,15 +910,14 @@ action_install() {
     # Ask SSL config (last question, before installation starts)
     ask_ssl_config
 
-    echo ""
-    read -rsn1 -p "$(echo -e "${BOLD}${MSG_PRESS_KEY}${RESET}")" </dev/tty
-    echo ""
+    echo
+    read -rsn1 -p "$(printf "${DIM}${MSG_PRESS_KEY}${RESET}")" </dev/tty
+    echo
 
-    echo ""
-    info "${MSG_INFO_DIR}${INSTALL_DIR}"
-    info "${MSG_INFO_PORT}${port}"
-    info "${MSG_INFO_SERVICE}${SERVICE_NAME}"
-    echo ""
+    panel "$INDIGO" "$MSG_HDR_INSTALL" \
+        "${GRAY}${MSG_INFO_DIR}${RESET}${BOLD}${INSTALL_DIR}${RESET}" \
+        "${GRAY}${MSG_INFO_PORT}${RESET}${BOLD}${port}${RESET}" \
+        "${GRAY}${MSG_INFO_SERVICE}${RESET}${BOLD}${SERVICE_NAME}${RESET}"
 
     step "$MSG_STEP_APT"     apt-get update -qq
     step "$MSG_STEP_PREREQ"  apt-get install -y git curl gnupg ca-certificates
@@ -928,18 +1007,14 @@ EOF
         # before the access-info banner — and force the admin to
         # acknowledge they have written it down.
         if [[ -n "$GLASSKEEP_RECOVERY_KEY" ]]; then
-            echo ""
-            echo -e "${YELLOW}${BOLD}╔═══════════════════════════════════════════╗${RESET}"
-            echo -e "${YELLOW}${BOLD}║  ${MSG_ENC_RECOVERY_TITLE}${RESET}"
-            echo -e "${YELLOW}${BOLD}╚═══════════════════════════════════════════╝${RESET}"
-            echo ""
-            echo -e "  ${BOLD}${WHITE}${GLASSKEEP_RECOVERY_KEY}${RESET}"
-            echo ""
-            echo -e "  ${YELLOW}${MSG_ENC_RECOVERY_WARN}${RESET}"
-            echo ""
+            panel "$AMBER" "$MSG_ENC_RECOVERY_TITLE" \
+                "" \
+                "  ${BOLD}${WHITE}${GLASSKEEP_RECOVERY_KEY}${RESET}" \
+                "" \
+                "${AMBER}${MSG_ENC_RECOVERY_WARN}${RESET}"
             local ack
             while true; do
-                read -rp "$(echo -e "${YELLOW}${MSG_ENC_RECOVERY_ACK}${RESET}")" ack </dev/tty
+                read -rp "$(prompt_text "${AMBER}${MSG_ENC_RECOVERY_ACK}${RESET}")" ack </dev/tty
                 case "${ack,,}" in
                     y|yes|o|oui) break ;;
                 esac
@@ -952,14 +1027,12 @@ EOF
         show_access_info "$port"
     else
         warn "$MSG_WARN_SERVICE"
-        echo -e "  ${CYAN}journalctl -u ${SERVICE_NAME} -n 30 --no-pager${RESET}"
+        info "${CYAN}journalctl -u ${SERVICE_NAME} -n 30 --no-pager${RESET}"
     fi
 }
 
 action_update() {
-    echo -e "\n${BOLD}═══════════════════════════════════════${RESET}"
-    echo -e "${BOLD}  ${MSG_HDR_UPDATE}${RESET}"
-    echo -e "${BOLD}═══════════════════════════════════════${RESET}\n"
+    section "$MSG_HDR_UPDATE"
 
     if ! is_installed; then
         # shellcheck disable=SC2059
@@ -974,9 +1047,9 @@ action_update() {
     # Ask SSL config (allow changing the setting)
     ask_ssl_config
 
-    echo ""
-    read -rsn1 -p "$(echo -e "${BOLD}${MSG_PRESS_KEY_UPDATE}${RESET}")" </dev/tty
-    echo ""
+    echo
+    read -rsn1 -p "$(printf "${DIM}${MSG_PRESS_KEY_UPDATE}${RESET}")" </dev/tty
+    echo
 
     # shellcheck disable=SC2059
     step "$(printf "$MSG_STEP_STOP" "$SERVICE_NAME")" \
@@ -1003,27 +1076,24 @@ action_update() {
         show_access_info "$port"
     else
         warn "$MSG_WARN_SERVICE"
-        echo -e "  ${CYAN}journalctl -u ${SERVICE_NAME} -n 30 --no-pager${RESET}"
+        info "${CYAN}journalctl -u ${SERVICE_NAME} -n 30 --no-pager${RESET}"
     fi
 }
 
 action_uninstall() {
-    echo -e "\n${BOLD}═══════════════════════════════════════${RESET}"
-    echo -e "${BOLD}  ${MSG_HDR_UNINSTALL}${RESET}"
-    echo -e "${BOLD}═══════════════════════════════════════${RESET}\n"
+    section "$MSG_HDR_UNINSTALL"
 
     if ! is_installed; then
         warn "$MSG_NOT_INSTALLED_WARN"
     fi
 
-    echo -e "${RED}${BOLD}${MSG_UNINSTALL_WARN}${RESET}"
-    echo -e "  ${MSG_UNINSTALL_SVC}${SERVICE_FILE}"
-    echo -e "  ${MSG_UNINSTALL_APP}${INSTALL_DIR}"
-    echo -e "  ${MSG_UNINSTALL_DATA}${DATA_DIR}"
-    echo -e "  ${MSG_UNINSTALL_CFG}${ENV_FILE}"
-    echo ""
+    panel "$RED" "$MSG_UNINSTALL_WARN" \
+        "${MSG_UNINSTALL_SVC}${BOLD}${SERVICE_FILE}${RESET}" \
+        "${MSG_UNINSTALL_APP}${BOLD}${INSTALL_DIR}${RESET}" \
+        "${MSG_UNINSTALL_DATA}${BOLD}${DATA_DIR}${RESET}" \
+        "${MSG_UNINSTALL_CFG}${BOLD}${ENV_FILE}${RESET}"
     local confirm
-    read -rp "$(echo -e "${YELLOW}${MSG_PROMPT_CONFIRM}${RESET}")" confirm </dev/tty
+    read -rp "$(prompt_text "$MSG_PROMPT_CONFIRM")" confirm </dev/tty
     if [[ "${confirm,,}" != "${MSG_CONFIRM_WORD}" ]]; then
         info "$MSG_UNINSTALL_CANCEL"
         exit 0
@@ -1067,19 +1137,15 @@ show_access_info() {
     https_val=$(grep -E '^HTTPS_ENABLED=' "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
     [[ "$https_val" == "true" ]] && proto="https"
 
-    echo ""
-    echo -e "${GREEN}${BOLD}╔═══════════════════════════════════════════╗${RESET}"
-    echo -e "${GREEN}${BOLD}║   ${MSG_ACCESS_TITLE}${RESET}"
-    echo -e "${GREEN}${BOLD}╚═══════════════════════════════════════════╝${RESET}"
-    echo ""
-    echo -e "  ${BOLD}${MSG_ACCESS_LOCAL}${RESET} ${proto}://localhost:${port}"
-    echo -e "  ${BOLD}${MSG_ACCESS_NET}${RESET} ${proto}://${ip}:${port}"
-    echo ""
-    echo -e "  ${BOLD}${MSG_ACCESS_CREDS}${RESET}"
-    echo ""
-    echo -e "  ${CYAN}${MSG_ACCESS_LOGS}${RESET} journalctl -u ${SERVICE_NAME} -f"
-    echo -e "  ${CYAN}${MSG_ACCESS_STATUS}${RESET} systemctl status ${SERVICE_NAME}"
-    echo ""
+    panel "$GREEN" "$MSG_ACCESS_TITLE" \
+        "" \
+        "${BOLD}${MSG_ACCESS_LOCAL}${RESET} ${CYAN}${proto}://localhost:${port}${RESET}" \
+        "${BOLD}${MSG_ACCESS_NET}${RESET} ${CYAN}${proto}://${ip}:${port}${RESET}" \
+        "" \
+        "${MSG_ACCESS_CREDS}" \
+        "" \
+        "${GRAY}${MSG_ACCESS_LOGS}${RESET}   ${CYAN}journalctl -u ${SERVICE_NAME} -f${RESET}" \
+        "${GRAY}${MSG_ACCESS_STATUS}${RESET}  ${CYAN}systemctl status ${SERVICE_NAME}${RESET}"
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -1088,31 +1154,36 @@ main() {
     require_root
     check_os
 
-    echo ""
-    echo -e "${BOLD}${CYAN}"
+    echo
+    # Logo: GLASS KEEP rendered in indigo→violet for brand cohesion
+    # with the app's gradient buttons. Subtitle in gray for hierarchy.
+    printf "${BOLD}${INDIGO}"
     echo "   ██████╗ ██╗      █████╗ ███████╗███████╗"
     echo "  ██╔════╝ ██║     ██╔══██╗██╔════╝██╔════╝"
     echo "  ██║  ███╗██║     ███████║███████╗███████╗"
+    printf "${BOLD}${VIOLET}"
     echo "  ██║   ██║██║     ██╔══██║╚════██║╚════██║"
     echo "  ╚██████╔╝███████╗██║  ██║███████║███████║"
     echo "   ╚═════╝ ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝"
-    echo -e "           ${BOLD}K E E P${RESET}${CYAN}  —  ${MSG_SUBTITLE}${RESET}"
-    echo ""
+    printf "${RESET}"
+    printf "          ${BOLD}K E E P${RESET}  ${GRAY}·  %s${RESET}\n" "$MSG_SUBTITLE"
+    echo
 
     if is_installed; then
-        info "${MSG_EXISTING} ${INSTALL_DIR}"
+        info "${MSG_EXISTING} ${BOLD}${INSTALL_DIR}${RESET}"
     else
-        info "$MSG_NO_INSTALL"
+        info "${MSG_NO_INSTALL}"
     fi
 
-    echo ""
-    echo -e "${BOLD}${MSG_MENU_TITLE}${RESET}"
-    echo -e "  ${GREEN}1)${RESET} ${MSG_OPT_INSTALL}"
-    echo -e "  ${YELLOW}2)${RESET} ${MSG_OPT_UPDATE}"
-    echo -e "  ${RED}3)${RESET} ${MSG_OPT_UNINSTALL}"
-    echo ""
+    echo
+    printf "${BOLD}%s${RESET}\n" "$MSG_MENU_TITLE"
+    echo
+    menu_item "1" "$GREEN"  "$MSG_OPT_INSTALL"   ""
+    menu_item "2" "$AMBER"  "$MSG_OPT_UPDATE"    ""
+    menu_item "3" "$RED"    "$MSG_OPT_UNINSTALL" ""
+    echo
     local choice
-    read -rp "$(echo -e "${BOLD}${MSG_PROMPT_CHOICE}${RESET}")" choice </dev/tty
+    read -rp "$(prompt_text "$MSG_PROMPT_CHOICE")" choice </dev/tty
 
     case "$choice" in
         1) action_install   ;;
