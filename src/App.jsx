@@ -4566,6 +4566,15 @@ export default function App() {
         dark={dark}
         onToggleDark={toggleDark}
         onUnlocked={() => {
+          // Optimistically hide the banner the moment the unlock
+          // request succeeds. Without this the banner lingers for the
+          // ~500 ms it takes refreshLockStatus to round-trip — long
+          // enough for the user to wonder if anything actually
+          // happened. The next status fetch will reset
+          // lockBannerDismissed back to false in the effect above
+          // (since the server reports locked=false), so the banner
+          // is ready to show again the next time the server locks.
+          setLockBannerDismissed(true);
           setLockOverlayOpen(false);
           refreshLockStatus();
         }}

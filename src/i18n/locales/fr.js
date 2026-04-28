@@ -717,7 +717,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   // Chiffrement au repos — bannière affichée si le serveur se
   // verrouille pendant qu'un utilisateur est connecté (le cache
   // local-first reste accessible).
-  lockedBannerMessage: "Le serveur est maintenant verrouillé. Vos notes restent lisibles depuis cet appareil, mais les modifications ne se synchroniseront qu'après le déverrouillage par un administrateur.",
+  lockedBannerMessage: "Le serveur a été verrouillé (par un administrateur ou suite à un redémarrage du service). Vos notes restent lisibles depuis cet appareil, mais les modifications ne se synchroniseront qu'après le déverrouillage par un administrateur.",
   lockedBannerUnlock: "Déverrouiller",
   dismiss: "Fermer",
 };
