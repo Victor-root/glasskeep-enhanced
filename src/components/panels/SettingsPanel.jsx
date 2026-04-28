@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { t } from "../../i18n";
 import { api } from "../../utils/api.js";
+import { localizeServerError } from "../../utils/serverErrors.js";
 import UserAvatar from "../common/UserAvatar.jsx";
 import { SunIcon, MoonIcon, FloatingCardsIcon, SettingsIcon, CloseIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
@@ -81,7 +82,7 @@ export default function SettingsPanel({
       onProfileUpdated?.({ avatar_url: dataUrl });
       showToast(t("photoUpdated"), "success");
     } catch (err) {
-      showToast(err.message || "Upload failed", "error");
+      showToast(localizeServerError(err.message, "uploadFailed"), "error");
     }
     if (avatarFileRef.current) avatarFileRef.current.value = "";
   };
@@ -92,7 +93,7 @@ export default function SettingsPanel({
       onProfileUpdated?.({ avatar_url: null });
       showToast(t("photoRemoved"), "info");
     } catch (err) {
-      showToast(err.message || "Remove failed", "error");
+      showToast(localizeServerError(err.message, "removeFailed"), "error");
     }
   };
 
@@ -103,7 +104,7 @@ export default function SettingsPanel({
       await api("/user/profile", { method: "PATCH", body: { show_on_login: newVal }, token });
     } catch (err) {
       setProfileShowOnLogin(!newVal); // revert
-      showToast(err.message || "Update failed", "error");
+      showToast(localizeServerError(err.message, "updateFailed"), "error");
     }
   };
 

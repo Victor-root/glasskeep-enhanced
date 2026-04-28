@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { api } from "../utils/api.js";
 import { t } from "../i18n";
+import { localizeServerError } from "../utils/serverErrors.js";
 
 /**
  * Hook encapsulating collaboration state and actions.
@@ -109,7 +110,7 @@ export default function useCollaboration(token, {
       }
       invalidateNotesCache();
     } catch (e) {
-      showToast(e.message || t("failedRemoveCollaborator"), "error");
+      showToast(localizeServerError(e.message, "failedRemoveCollaborator"), "error");
     }
   };
 
@@ -185,7 +186,7 @@ export default function useCollaboration(token, {
         loadNoteCollaborators(activeId);
       }
     } catch (e) {
-      showToast(e.message || t("failedAddCollaborator"), "error");
+      showToast(localizeServerError(e.message, "failedAddCollaborator"), "error");
     }
   };
 

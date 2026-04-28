@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { api } from "../utils/api.js";
 import { uid, sanitizeFilename, downloadText, fileToCompressedDataURL, ensureJSZip } from "../utils/helpers.js";
 import { t } from "../i18n";
+import { localizeServerError } from "../utils/serverErrors.js";
 import {
   isRichContent,
   legacyMarkdownToRichDoc,
@@ -141,7 +142,7 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
         ) + ".json";
       triggerJSONDownload(fname, json);
     } catch (e) {
-      alert(e.message || t("exportFailed"));
+      alert(localizeServerError(e.message, "exportFailed"));
     }
   };
 
@@ -175,7 +176,7 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
       await loadNotes();
       alert(buildImportMessage(result, notesArr.length, "importedNotesSuccessfully"));
     } catch (e) {
-      alert(e.message || t("importFailed"));
+      alert(localizeServerError(e.message, "importFailed"));
     }
   };
 
@@ -319,7 +320,7 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
       await loadNotes();
       alert(buildImportMessage(result, notesArr.length, "importedGoogleKeepNotes"));
     } catch (e) {
-      alert(e.message || t("googleKeepImportFailed"));
+      alert(localizeServerError(e.message, "googleKeepImportFailed"));
     }
   };
 
@@ -384,7 +385,7 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
       await loadNotes();
       alert(buildImportMessage(result, notesArr.length, "importedMarkdownFilesSuccessfully"));
     } catch (e) {
-      alert(e.message || t("markdownImportFailed"));
+      alert(localizeServerError(e.message, "markdownImportFailed"));
     }
   };
 
@@ -406,7 +407,7 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
       downloadText(fname, content);
       alert(t("secretKeyDownloadedSafe"));
     } catch (e) {
-      alert(e.message || t("couldNotGenerateSecretKey"));
+      alert(localizeServerError(e.message, "couldNotGenerateSecretKey"));
     }
   };
 

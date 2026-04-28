@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { t } from "../../i18n";
 import AuthShell from "./AuthShell.jsx";
+import { localizeServerError } from "../../utils/serverErrors.js";
 
 export default function SecretLoginView({ dark, onToggleDark, onLoginWithKey, goLogin, floatingCardsEnabled, loginSlogan }) {
   const [key, setKey] = useState("");
@@ -10,9 +11,9 @@ export default function SecretLoginView({ dark, onToggleDark, onLoginWithKey, go
     e.preventDefault();
     try {
       const res = await onLoginWithKey(key.trim());
-      if (!res.ok) setErr(res.error || t("loginFailed"));
+      if (!res.ok) setErr(localizeServerError(res.error, "loginFailed"));
     } catch (er) {
-      setErr(er.message || t("loginFailed"));
+      setErr(localizeServerError(er.message, "loginFailed"));
     }
   };
 

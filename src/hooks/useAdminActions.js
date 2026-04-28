@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { api } from "../utils/api.js";
 import { t } from "../i18n";
+import { localizeServerError } from "../utils/serverErrors.js";
 
 /**
  * Hook encapsulating admin panel state and API actions.
@@ -44,7 +45,7 @@ export default function useAdminActions(token, { onSettingsUpdated } = {}) {
       if (onSettingsUpdated) onSettingsUpdated(settings);
       return settings;
     } catch (e) {
-      alert(e.message || t("failedUpdateAdminSettings"));
+      alert(localizeServerError(e.message, "failedUpdateAdminSettings"));
     }
   };
 
@@ -70,7 +71,7 @@ export default function useAdminActions(token, { onSettingsUpdated } = {}) {
       setNewUserForm({ name: "", email: "", password: "", is_admin: false });
       return newUser;
     } catch (e) {
-      alert(e.message || t("failedCreateUser"));
+      alert(localizeServerError(e.message, "failedCreateUser"));
       throw e;
     }
   };
@@ -80,7 +81,7 @@ export default function useAdminActions(token, { onSettingsUpdated } = {}) {
       await api(`/admin/users/${userId}`, { method: "DELETE", token });
       setAllUsers((prev) => prev.filter((u) => u.id !== userId));
     } catch (e) {
-      alert(e.message || t("failedDeleteUser"));
+      alert(localizeServerError(e.message, "failedDeleteUser"));
     }
   };
 
@@ -111,7 +112,7 @@ export default function useAdminActions(token, { onSettingsUpdated } = {}) {
       setAllUsers((prev) => [newUser, ...prev]);
       return newUser;
     } catch (e) {
-      alert(e.message || t("failedApproveUser"));
+      alert(localizeServerError(e.message, "failedApproveUser"));
       throw e;
     }
   };
@@ -121,7 +122,7 @@ export default function useAdminActions(token, { onSettingsUpdated } = {}) {
       await api(`/admin/pending-users/${pendingId}/reject`, { method: "POST", token });
       setPendingUsers((prev) => prev.filter((p) => p.id !== pendingId));
     } catch (e) {
-      alert(e.message || t("failedRejectUser"));
+      alert(localizeServerError(e.message, "failedRejectUser"));
       throw e;
     }
   };

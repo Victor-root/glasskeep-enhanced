@@ -4,6 +4,7 @@ import UserAvatar from "../common/UserAvatar.jsx";
 import { CloseIcon, ShieldIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import EncryptionAdminSection from "../lock/EncryptionAdminSection.jsx";
+import { localizeServerError } from "../../utils/serverErrors.js";
 
 // Same shared chip used in the Settings panel: a 36×36 indigo square
 // holding a Tabler icon. Putting it in front of every section header
@@ -46,7 +47,7 @@ function LoginSloganRow({ value, onSave, showToast }) {
       showToast?.(t("saved"), "success");
       setTimeout(() => setSavedFlash(false), 1500);
     } catch (e) {
-      showToast?.(e?.message || "Save failed", "error");
+      showToast?.(localizeServerError(e?.message, "saveFailed"), "error");
     } finally {
       setBusy(false);
     }
@@ -180,7 +181,7 @@ export default function AdminPanel({
       setEditUserModalOpen(false);
       setEditingUser(null);
     } catch (err) {
-      showToast(err.message || t("failedUpdateUser"), "error");
+      showToast(localizeServerError(err.message, "failedUpdateUser"), "error");
     } finally {
       setIsUpdatingUser(false);
     }
@@ -275,7 +276,7 @@ export default function AdminPanel({
                                   await rejectPendingUser(p.id);
                                   showToast(t("registrationRejected"), "info");
                                 } catch (err) {
-                                  showToast(err.message || t("failedRejectUser"), "error");
+                                  showToast(localizeServerError(err.message, "failedRejectUser"), "error");
                                 }
                               },
                             });
@@ -292,7 +293,7 @@ export default function AdminPanel({
                               await approvePendingUser(p.id);
                               showToast(t("registrationApproved"), "success");
                             } catch (err) {
-                              showToast(err.message || t("failedApproveUser"), "error");
+                              showToast(localizeServerError(err.message, "failedApproveUser"), "error");
                             }
                           }}
                           className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"

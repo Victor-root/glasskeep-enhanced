@@ -626,4 +626,91 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   unlockErrorUnlockFirst: "Unlock the instance first.",
   unlockErrorActivationFailed: "Activation failed.",
   unlockErrorDeactivationFailed: "Deactivation failed.",
+
+  // Generic / fallback
+  genericError: "An error occurred.",
+  saveFailed: "Save failed.",
+  uploadFailed: "Upload failed.",
+  removeFailed: "Remove failed.",
+  updateFailed: "Update failed.",
+  registrationFailed: "Registration failed.",
+
+  // Auth
+  errInvalidPassphrase: "Invalid passphrase.",
+  errInvalidRecoveryKey: "Invalid recovery key.",
+  errInvalidRecoveryKeyFormat: "Invalid recovery key format.",
+  errPassphraseRequired: "Passphrase is required.",
+  errRecoveryKeyRequired: "Recovery key is required.",
+  errTooManyUnlock: "Too many unlock attempts. Please try again later.",
+  errPlaintextHttp: "Refusing to send the unlock secret over plaintext HTTP. Use HTTPS, set TRUST_PROXY=true if you have a reverse proxy, or unlock from localhost.",
+  errCurrentPassphrase: "Current passphrase is incorrect.",
+  errCurrentPassphraseRequired: "Current passphrase is required.",
+  errCurrentPassword: "Current password is incorrect.",
+  errIncorrectPassword: "Incorrect password.",
+  errInvalidToken: "Invalid token.",
+  errMissingToken: "Missing authentication token.",
+  errInvalidKey: "Invalid key.",
+  errSecretKeyNotRecognized: "Secret key not recognized.",
+  errNoAccountFound: "No account found with these credentials.",
+  errEmailPasswordRequired: "Email and password are required.",
+  errNameEmailPasswordRequired: "Name, email and password are required.",
+  errNewPasswordTooShort: "New password must be at least 6 characters.",
+
+  // Vault state
+  errEncryptionNotEnabled: "At-rest encryption is not enabled.",
+  errEncryptionAlreadyEnabled: "At-rest encryption is already enabled.",
+  errUnlockFirst: "Unlock the instance first.",
+  errActivationFailed: "Activation failed.",
+  errDeactivationFailed: "Deactivation failed.",
+
+  // Registration / users
+  errRegistrationDisabled: "New account creation is currently disabled.",
+  errEmailAlreadyRegistered: "This email is already registered.",
+  errEmailInUseByAnother: "This email is already in use by another user.",
+  errRegistrationPending: "A registration request for this email is already pending.",
+  errUserAlreadyExists: "A user with this email already exists.",
+  errPendingNotFound: "Pending registration not found.",
+  errCantDeleteLastAdmin: "Cannot delete the last admin.",
+  errCantRemoveLastAdmin: "Cannot remove admin status from the last admin.",
+  errCantDeleteSelf: "You cannot delete yourself.",
+  errUserNotFound: "User not found.",
+  errInvalidUserId: "Invalid user id.",
+  errNoValidFields: "No valid fields to update.",
+
+  // Notes
+  errNoteAccessDenied: "Note not found or access denied.",
+  errNoteNotFound: "Note not found.",
+  errNoteNotInTrash: "The note must be in the trash before being permanently deleted.",
+  errClientUpdatedAtRequired: "Missing client update timestamp.",
+  errClientReorderedAtRequired: "Missing client reorder timestamp.",
+  errReorderForbidden: "The reorder payload contains notes you cannot access.",
+  errInvalidTimestamp: "Invalid timestamp format.",
+  errTimestampFuture: "Timestamp is too far in the future.",
+  errNoNotesToImport: "No notes to import.",
+  errImportFailed: "Import failed.",
+  errInvalidSettings: "Invalid settings.",
+
+  // Collaboration
+  errUsernameRequired: "Username is required.",
+  errCantCollabSelf: "You cannot collaborate with yourself.",
+  errAlreadyCollaborator: "This user is already a collaborator.",
+  errAddCollaboratorFailed: "Failed to add the collaborator.",
+  errCollaboratorNotFound: "Collaborator not found.",
+  errOnlyOwnerCanRemove: "Only the note owner can remove other collaborators.",
+  errOnlyOwnerCanDeleteAll: "Only the owner can delete the note for everyone.",
+
+  // Avatar / profile
+  errAvatarRequired: "An avatar image is required.",
+  errAvatarInvalidFormat: "The avatar must be a PNG, JPEG or WebP data URL.",
+  errAvatarTooLarge: "The avatar image is too large (max ~1.5 MB).",
+  errShowOnLoginBoolean: "show_on_login must be a boolean.",
+
+  // AI
+  errAiInitializing: "The AI Assistant is still initializing or failed to load.",
+  errAiFailed: "AI processing failed on the server.",
+  errAiInitFailed: "Failed to initialize the AI model.",
+  errMissingQuestion: "Missing question.",
+
+  // Generic / authz
+  errAdminOnly: "Admin only.",
 };

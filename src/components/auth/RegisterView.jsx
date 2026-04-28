@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { t } from "../../i18n";
 import AuthShell from "./AuthShell.jsx";
+import { localizeServerError } from "../../utils/serverErrors.js";
 
 export default function RegisterView({ dark, onToggleDark, onRegister, goLogin, floatingCardsEnabled, loginSlogan }) {
   const [name, setName] = useState("");
@@ -20,9 +21,9 @@ export default function RegisterView({ dark, onToggleDark, onRegister, goLogin, 
         setPendingSubmitted(true);
         return;
       }
-      if (!res?.ok) setErr(res?.error || "Registration failed");
+      if (!res?.ok) setErr(localizeServerError(res?.error, "registrationFailed"));
     } catch (er) {
-      setErr(er.message || "Registration failed");
+      setErr(localizeServerError(er.message, "registrationFailed"));
     }
   };
 

@@ -626,4 +626,91 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   unlockErrorUnlockFirst: "Déverrouillez l'instance d'abord.",
   unlockErrorActivationFailed: "Échec de l'activation.",
   unlockErrorDeactivationFailed: "Échec de la désactivation.",
+
+  // Générique / fallbacks
+  genericError: "Une erreur est survenue.",
+  saveFailed: "Échec de l'enregistrement.",
+  uploadFailed: "Échec du téléchargement.",
+  removeFailed: "Échec de la suppression.",
+  updateFailed: "Échec de la mise à jour.",
+  registrationFailed: "Échec de l'inscription.",
+
+  // Auth
+  errInvalidPassphrase: "Passphrase incorrecte.",
+  errInvalidRecoveryKey: "Recovery key invalide.",
+  errInvalidRecoveryKeyFormat: "Format de recovery key invalide.",
+  errPassphraseRequired: "La passphrase est requise.",
+  errRecoveryKeyRequired: "La recovery key est requise.",
+  errTooManyUnlock: "Trop de tentatives de déverrouillage. Réessayez plus tard.",
+  errPlaintextHttp: "Refus d'envoyer le secret de déverrouillage en HTTP non chiffré. Utilisez HTTPS, posez TRUST_PROXY=true si vous avez un reverse proxy, ou déverrouillez depuis localhost.",
+  errCurrentPassphrase: "La passphrase actuelle est incorrecte.",
+  errCurrentPassphraseRequired: "La passphrase actuelle est requise.",
+  errCurrentPassword: "Le mot de passe actuel est incorrect.",
+  errIncorrectPassword: "Mot de passe incorrect.",
+  errInvalidToken: "Jeton invalide.",
+  errMissingToken: "Jeton d'authentification manquant.",
+  errInvalidKey: "Clé invalide.",
+  errSecretKeyNotRecognized: "Clé secrète non reconnue.",
+  errNoAccountFound: "Aucun compte trouvé avec ces identifiants.",
+  errEmailPasswordRequired: "L'e-mail et le mot de passe sont requis.",
+  errNameEmailPasswordRequired: "Le nom, l'e-mail et le mot de passe sont requis.",
+  errNewPasswordTooShort: "Le nouveau mot de passe doit contenir au moins 6 caractères.",
+
+  // État du coffre
+  errEncryptionNotEnabled: "Le chiffrement au repos n'est pas activé.",
+  errEncryptionAlreadyEnabled: "Le chiffrement au repos est déjà activé.",
+  errUnlockFirst: "Déverrouillez l'instance d'abord.",
+  errActivationFailed: "Échec de l'activation.",
+  errDeactivationFailed: "Échec de la désactivation.",
+
+  // Inscriptions / utilisateurs
+  errRegistrationDisabled: "La création de nouveaux comptes est actuellement désactivée.",
+  errEmailAlreadyRegistered: "Cet e-mail est déjà enregistré.",
+  errEmailInUseByAnother: "Cet e-mail est déjà utilisé par un autre utilisateur.",
+  errRegistrationPending: "Une demande d'inscription pour cet e-mail est déjà en attente.",
+  errUserAlreadyExists: "Un utilisateur avec cet e-mail existe déjà.",
+  errPendingNotFound: "Demande d'inscription introuvable.",
+  errCantDeleteLastAdmin: "Impossible de supprimer le dernier administrateur.",
+  errCantRemoveLastAdmin: "Impossible de retirer le statut admin du dernier administrateur.",
+  errCantDeleteSelf: "Vous ne pouvez pas vous supprimer vous-même.",
+  errUserNotFound: "Utilisateur introuvable.",
+  errInvalidUserId: "Identifiant utilisateur invalide.",
+  errNoValidFields: "Aucun champ valide à mettre à jour.",
+
+  // Notes
+  errNoteAccessDenied: "Note introuvable ou accès refusé.",
+  errNoteNotFound: "Note introuvable.",
+  errNoteNotInTrash: "La note doit être dans la corbeille avant d'être supprimée définitivement.",
+  errClientUpdatedAtRequired: "Horodatage de mise à jour client manquant.",
+  errClientReorderedAtRequired: "Horodatage de réorganisation client manquant.",
+  errReorderForbidden: "La réorganisation contient des notes auxquelles vous n'avez pas accès.",
+  errInvalidTimestamp: "Format d'horodatage invalide.",
+  errTimestampFuture: "L'horodatage est trop loin dans le futur.",
+  errNoNotesToImport: "Aucune note à importer.",
+  errImportFailed: "Échec de l'import.",
+  errInvalidSettings: "Paramètres invalides.",
+
+  // Collaboration
+  errUsernameRequired: "Le nom d'utilisateur est requis.",
+  errCantCollabSelf: "Vous ne pouvez pas collaborer avec vous-même.",
+  errAlreadyCollaborator: "Cet utilisateur est déjà collaborateur.",
+  errAddCollaboratorFailed: "Échec de l'ajout du collaborateur.",
+  errCollaboratorNotFound: "Collaborateur introuvable.",
+  errOnlyOwnerCanRemove: "Seul le propriétaire de la note peut retirer d'autres collaborateurs.",
+  errOnlyOwnerCanDeleteAll: "Seul le propriétaire peut supprimer la note pour tout le monde.",
+
+  // Avatar / profil
+  errAvatarRequired: "Une image d'avatar est requise.",
+  errAvatarInvalidFormat: "L'avatar doit être une data URL PNG, JPEG ou WebP.",
+  errAvatarTooLarge: "L'image d'avatar est trop volumineuse (max ~1,5 Mo).",
+  errShowOnLoginBoolean: "show_on_login doit être un booléen.",
+
+  // IA
+  errAiInitializing: "L'assistant IA est en cours d'initialisation ou n'a pas pu se charger.",
+  errAiFailed: "Échec du traitement IA côté serveur.",
+  errAiInitFailed: "Échec de l'initialisation du modèle IA.",
+  errMissingQuestion: "Question manquante.",
+
+  // Authz
+  errAdminOnly: "Réservé aux administrateurs.",
 };

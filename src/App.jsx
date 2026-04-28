@@ -25,6 +25,7 @@ import {
   purgeQueueForNote as idbPurgeQueueForNote,
 } from "./sync/localDb.js";
 import { api, getAuth, setAuth, AUTH_KEY } from "./utils/api.js";
+import { localizeServerError } from "./utils/serverErrors.js";
 import { mdForDownload } from "./utils/markdown.jsx";
 import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, fileToCompressedDataURL, setThemeColor } from "./utils/helpers.js";
 import { textToChecklistItems, checklistItemsToText } from "./utils/noteConversion.js";
@@ -926,7 +927,7 @@ export default function App() {
       const ts = new Date().toISOString().replace(/[:.]/g, "-");
       await triggerBlobDownload(`glass-keep-selected-${ts}.zip`, blob);
     } catch (e) {
-      alert(e.message || t("zipDownloadFailed"));
+      alert(localizeServerError(e.message, "zipDownloadFailed"));
     }
   };
 

@@ -1,35 +1,107 @@
 // src/utils/serverErrors.js
-// Maps the English error messages emitted by the encryption / unlock
-// routes (kept English on the server so they read cleanly in
-// journalctl) to the localized strings used in the UI. Falls back to
-// the raw message if it doesn't match any known pattern, so unknown
-// errors still surface their original text instead of a silent
-// "Failed" placeholder.
+// Maps the English error messages emitted by the server (kept English
+// so journalctl reads cleanly, and so non-localized clients/curl
+// scripts still get something descriptive) to the localized strings
+// shown in the UI. Falls back to the raw message if no pattern matches
+// — that way an unknown error still surfaces its original text instead
+// of being silently turned into a generic "Failed".
+//
+// Convention: include() rather than === so the matcher tolerates the
+// "Activation failed: <reason>" / "Deactivation failed: <reason>"
+// shapes the encryption routes use.
 
 import { t } from "../i18n";
 
-export function localizeServerError(message, fallbackKey = "unlockFailed") {
+const PATTERNS = [
+  // ── Auth / unlock ────────────────────────────────────────────────
+  ["Invalid passphrase",                        "errInvalidPassphrase"],
+  ["Invalid recovery key format",               "errInvalidRecoveryKeyFormat"],
+  ["Invalid recovery key",                      "errInvalidRecoveryKey"],
+  ["Passphrase is required",                    "errPassphraseRequired"],
+  ["Recovery key is required",                  "errRecoveryKeyRequired"],
+  ["Too many unlock attempts",                  "errTooManyUnlock"],
+  ["Refusing to accept",                        "errPlaintextHttp"],
+  ["Current passphrase is incorrect",           "errCurrentPassphrase"],
+  ["Current passphrase is required",            "errCurrentPassphraseRequired"],
+  ["Current password is incorrect",             "errCurrentPassword"],
+  ["Incorrect password",                        "errIncorrectPassword"],
+  ["Invalid token",                             "errInvalidToken"],
+  ["Missing token",                             "errMissingToken"],
+  ["Invalid key.",                              "errInvalidKey"],
+  ["Secret key not recognized",                 "errSecretKeyNotRecognized"],
+  ["No account found",                          "errNoAccountFound"],
+  ["Email and password are required",           "errEmailPasswordRequired"],
+  ["Name, email, and password are required",    "errNameEmailPasswordRequired"],
+  ["New password must be at least",             "errNewPasswordTooShort"],
+
+  // ── Vault state ──────────────────────────────────────────────────
+  ["Encryption is not enabled",                 "errEncryptionNotEnabled"],
+  ["Encryption is already enabled",             "errEncryptionAlreadyEnabled"],
+  ["Unlock the instance first",                 "errUnlockFirst"],
+  ["Instance is locked",                        "instanceLockedTitle"],
+  ["Passphrase confirmation does not match",    "encryptionPassphraseMismatch"],
+  ["Passphrase must be at least 8 characters",  "encryptionPassphraseTooShort"],
+  ["New passphrase must be at least 8 characters", "encryptionPassphraseTooShort"],
+  ["Activation failed",                         "errActivationFailed"],
+  ["Deactivation failed",                       "errDeactivationFailed"],
+
+  // ── Registration / users ─────────────────────────────────────────
+  ["New account creation is currently disabled", "errRegistrationDisabled"],
+  ["Email already registered",                   "errEmailAlreadyRegistered"],
+  ["Email already in use by another user",       "errEmailInUseByAnother"],
+  ["A registration request for this email is already pending", "errRegistrationPending"],
+  ["A user with this email already exists",      "errUserAlreadyExists"],
+  ["Pending registration not found",             "errPendingNotFound"],
+  ["Cannot delete the last admin",               "errCantDeleteLastAdmin"],
+  ["Cannot remove admin status from the last admin", "errCantRemoveLastAdmin"],
+  ["You cannot delete yourself",                 "errCantDeleteSelf"],
+  ["User not found",                             "errUserNotFound"],
+  ["Invalid user id",                            "errInvalidUserId"],
+  ["No valid fields to update",                  "errNoValidFields"],
+
+  // ── Notes ────────────────────────────────────────────────────────
+  ["Note not found or access denied",            "errNoteAccessDenied"],
+  ["Note not found",                             "errNoteNotFound"],
+  ["Note must be in trash to permanently delete", "errNoteNotInTrash"],
+  ["client_updated_at is required",              "errClientUpdatedAtRequired"],
+  ["client_reordered_at is required",            "errClientReorderedAtRequired"],
+  ["Reorder payload contains notes you cannot access", "errReorderForbidden"],
+  ["Invalid timestamp format",                   "errInvalidTimestamp"],
+  ["Timestamp too far in the future",            "errTimestampFuture"],
+  ["No notes to import",                         "errNoNotesToImport"],
+  ["Import failed",                              "errImportFailed"],
+  ["Invalid settings object",                    "errInvalidSettings"],
+
+  // ── Collaboration ────────────────────────────────────────────────
+  ["Username is required",                       "errUsernameRequired"],
+  ["Cannot collaborate with yourself",           "errCantCollabSelf"],
+  ["User is already a collaborator",             "errAlreadyCollaborator"],
+  ["Failed to add collaborator",                 "errAddCollaboratorFailed"],
+  ["Collaborator not found",                     "errCollaboratorNotFound"],
+  ["Only note owner can remove other collaborators", "errOnlyOwnerCanRemove"],
+  ["Only owner can delete for all collaborators", "errOnlyOwnerCanDeleteAll"],
+
+  // ── Avatar / profile ─────────────────────────────────────────────
+  ["avatar_url is required",                     "errAvatarRequired"],
+  ["avatar_url must be a valid image data URL",  "errAvatarInvalidFormat"],
+  ["Avatar image too large",                     "errAvatarTooLarge"],
+  ["show_on_login must be a boolean",            "errShowOnLoginBoolean"],
+
+  // ── AI ───────────────────────────────────────────────────────────
+  ["AI Assistant is still initializing",         "errAiInitializing"],
+  ["AI processing failed on server",             "errAiFailed"],
+  ["Failed to initialize AI model",              "errAiInitFailed"],
+  ["Missing question",                           "errMissingQuestion"],
+
+  // ── Generic ──────────────────────────────────────────────────────
+  ["Admin only",                                 "errAdminOnly"],
+];
+
+export function localizeServerError(message, fallbackKey = "genericError") {
   if (!message) return t(fallbackKey);
   const m = String(message);
-  // Auth / unlock
-  if (m.includes("Invalid passphrase")) return t("unlockErrorInvalidPassphrase");
-  if (m.includes("Invalid recovery key format")) return t("unlockErrorInvalidRecoveryKeyFormat");
-  if (m.includes("Invalid recovery key")) return t("unlockErrorInvalidRecoveryKey");
-  if (m.includes("Passphrase is required")) return t("unlockErrorPassphraseRequired");
-  if (m.includes("Recovery key is required")) return t("unlockErrorRecoveryKeyRequired");
-  if (m.includes("Too many unlock attempts")) return t("unlockErrorTooMany");
-  if (m.includes("Refusing to accept unlock secret")) return t("unlockErrorPlaintextHttp");
-  if (m.includes("Current passphrase is incorrect")) return t("unlockErrorCurrentPassphrase");
-  // Vault state
-  if (m.includes("Encryption is not enabled")) return t("unlockErrorEncryptionNotEnabled");
-  if (m.includes("Encryption is already enabled")) return t("unlockErrorEncryptionAlreadyEnabled");
-  if (m.includes("Unlock the instance first")) return t("unlockErrorUnlockFirst");
-  if (m.includes("Instance is locked")) return t("instanceLockedTitle");
-  // Activation / deactivation / rotation
-  if (m.includes("Passphrase confirmation does not match")) return t("encryptionPassphraseMismatch");
-  if (m.includes("Passphrase must be at least 8 characters")) return t("encryptionPassphraseTooShort");
-  if (m.includes("New passphrase must be at least 8 characters")) return t("encryptionPassphraseTooShort");
-  if (m.startsWith("Activation failed")) return t("unlockErrorActivationFailed");
-  if (m.startsWith("Deactivation failed")) return t("unlockErrorDeactivationFailed");
+  for (const [needle, key] of PATTERNS) {
+    if (m.includes(needle)) return t(key);
+  }
   return m;
 }
