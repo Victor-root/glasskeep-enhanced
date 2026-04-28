@@ -66,6 +66,7 @@ import useCollaboration from "./hooks/useCollaboration.js";
 import useFormatting from "./hooks/useFormatting.js";
 import useInstanceLockStatus from "./hooks/useInstanceLockStatus.js";
 import InstanceUnlockScreen from "./components/lock/InstanceUnlockScreen.jsx";
+import LockedBanner from "./components/lock/LockedBanner.jsx";
 
 /** ---------- App ---------- */
 export default function App() {
@@ -955,10 +956,33 @@ export default function App() {
   const [loginProfiles, setLoginProfiles] = useState([]);
 
   // At-rest encryption: when the server reports `enabled && locked`,
-  // the unlock screen takes over the whole app. The `refresh` callback
-  // is passed to the unlock screen so it can flip the UI back without
-  // waiting for the next poll tick.
+  // an unauthenticated visitor goes to the full unlock screen. An
+  // already-logged-in user gets a non-intrusive banner over their app
+  // instead so they keep reading their local-first cache while sync
+  // is paused; clicking the banner's unlock CTA opens the unlock
+  // screen as an overlay. The `refresh` callback is passed to the
+  // unlock screen so it can flip the UI back without waiting for the
+  // next poll tick.
   const { status: instanceLockStatus, refresh: refreshLockStatus } = useInstanceLockStatus();
+  // Banner-level dismiss flag: starts off as "show banner". The user
+  // can hide it manually; it comes back on every fresh lock event so
+  // they see the heads-up after a service-side re-lock.
+  const [lockBannerDismissed, setLockBannerDismissed] = useState(false);
+  // Overlay flag: when true, render the unlock screen on top of the
+  // logged-in app instead of the banner.
+  const [lockOverlayOpen, setLockOverlayOpen] = useState(false);
+  // Reset banner-dismissed + close overlay whenever the server flips
+  // back to unlocked (e.g. another tab unlocked, or this tab did).
+  useEffect(() => {
+    if (instanceLockStatus && !instanceLockStatus.locked) {
+      setLockBannerDismissed(false);
+      setLockOverlayOpen(false);
+    }
+    // Re-arm the banner when a fresh lock is detected.
+    if (instanceLockStatus && instanceLockStatus.locked) {
+      setLockBannerDismissed(false);
+    }
+  }, [instanceLockStatus?.locked]);
 
   // Settings panel state
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
@@ -4525,15 +4549,26 @@ export default function App() {
   }, [open]);
 
   // ---- Routing ----
-  // Hard gate: if the server reports the instance is locked, no other
-  // route is reachable until an admin unlocks. The lock screen reuses
-  // the AuthShell so the layout matches the rest of the auth flow.
-  if (instanceLockStatus && instanceLockStatus.enabled && instanceLockStatus.locked) {
+  // Lock handling has two flavours:
+  //  - Unauthenticated visitor on a locked server → full unlock
+  //    screen. They have no local cache to fall back on and no
+  //    session to keep.
+  //  - Logged-in user whose server got re-locked under them → keep
+  //    the app rendered with a non-intrusive banner (added later in
+  //    the JSX tree). They can keep reading their local-first cache
+  //    and queue edits; the banner offers a one-click unlock.
+  //  - Logged-in user who explicitly clicked the banner's unlock CTA
+  //    → render the unlock screen as a full overlay (lockOverlayOpen).
+  const isLocked = !!(instanceLockStatus && instanceLockStatus.enabled && instanceLockStatus.locked);
+  if (isLocked && (!currentUser?.email || lockOverlayOpen)) {
     return (
       <InstanceUnlockScreen
         dark={dark}
         onToggleDark={toggleDark}
-        onUnlocked={refreshLockStatus}
+        onUnlocked={() => {
+          setLockOverlayOpen(false);
+          refreshLockStatus();
+        }}
       />
     );
   }
@@ -4617,6 +4652,16 @@ export default function App() {
   return (
     <>
       <TooltipPortal />
+      {/* Server is at-rest-locked under the user's feet. Render a
+          non-intrusive banner instead of yanking them off their
+          local cache; they can keep reading and queueing edits, and
+          one click on the CTA opens the full unlock screen. */}
+      {isLocked && currentUser?.email && !lockBannerDismissed && !lockOverlayOpen && (
+        <LockedBanner
+          onUnlock={() => setLockOverlayOpen(true)}
+          onDismiss={() => setLockBannerDismissed(true)}
+        />
+      )}
       {floatingCardsEnabled && <FloatingCardsBackground />}
       {/* Tag Sidebar / Drawer */}
       <TagSidebar

@@ -713,4 +713,10 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
 
   // Generic / authz
   errAdminOnly: "Admin only.",
+
+  // At-rest encryption — banner shown when the server gets locked
+  // under a logged-in user (local-first cache stays accessible).
+  lockedBannerMessage: "The server is now locked. Your notes stay readable from this device, but changes won't sync until an admin unlocks the instance.",
+  lockedBannerUnlock: "Unlock now",
+  dismiss: "Dismiss",
 };
