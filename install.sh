@@ -157,7 +157,7 @@ setup_i18n() {
         MSG_STEP_FAIL="Étape échouée : %s"
 
         MSG_ENC_TITLE="Chiffrement des données au repos (côté serveur)"
-        MSG_ENC_INTRO="Cette option chiffre le contenu des notes dans la base de données.\n  Protège contre : vol du serveur, du disque, de la base SQLite, des sauvegardes.\n  Ne protège PAS contre : l'administrateur du serveur, ou un serveur déjà déverrouillé qui serait compromis.\n  À chaque redémarrage du service GlassKeep (mise à jour, reboot, etc.), un administrateur devra déverrouiller l'instance avec la passphrase ou la recovery key. Une fois l'instance déverrouillée, les utilisateurs se connectent normalement comme d'habitude.\n  Si vous perdez à la fois la passphrase ET la recovery key, les notes chiffrées seront irrécupérables.\n\n  ${YELLOW}Déconseillé si vous débutez en self-hosting${RESET} : la gestion des secrets (passphrase + recovery key) demande de la rigueur. En cas d'oubli des deux, les données sont définitivement perdues.\n  Vous pouvez répondre ${BOLD}non${RESET} maintenant et activer la protection plus tard depuis l'interface admin (panneau Administration → section \"Chiffrement au repos\")."
+        MSG_ENC_INTRO="Cette option chiffre le contenu des notes dans la base de données.\n  ${BOLD}${TEAL}Protège contre${RESET} : vol du serveur, du disque, de la base SQLite, des sauvegardes.\n  ${BOLD}${AMBER}Ne protège PAS contre${RESET} : l'administrateur du serveur, ou un serveur déjà déverrouillé qui serait compromis.\n  À chaque redémarrage du service GlassKeep (mise à jour, reboot, etc.), un administrateur devra déverrouiller l'instance avec la ${CYAN}passphrase${RESET} ou la ${CYAN}recovery key${RESET}. Une fois l'instance déverrouillée, les utilisateurs se connectent normalement comme d'habitude.\n  Si vous perdez à la fois la ${CYAN}passphrase${RESET} ET la ${CYAN}recovery key${RESET}, les notes chiffrées seront ${BOLD}${RED}irrécupérables${RESET}.\n\n  ${YELLOW}Déconseillé si vous débutez en self-hosting${RESET} : la gestion des secrets (${CYAN}passphrase${RESET} + ${CYAN}recovery key${RESET}) demande de la rigueur. En cas d'oubli des deux, les données sont ${BOLD}${RED}définitivement perdues${RESET}.\n  Vous pouvez répondre ${BOLD}non${RESET} maintenant et activer la protection plus tard depuis l'interface admin (panneau ${BOLD}Administration${RESET} → section \"${BOLD}Chiffrement au repos${RESET}\")."
         MSG_ENC_PROMPT="Activer la protection des données au repos ? [oui/non] (par défaut : non) : "
         MSG_ENC_PASS_PROMPT="Passphrase de l'instance (min. 8 caractères) : "
         MSG_ENC_PASS_CONFIRM="Confirmer la passphrase : "
@@ -269,7 +269,7 @@ setup_i18n() {
         MSG_STEP_FAIL="Step failed: %s"
 
         MSG_ENC_TITLE="At-rest encryption (server-side)"
-        MSG_ENC_INTRO="This option encrypts note contents in the database.\n  Protects against: theft of the server, the disk, the SQLite file, backups.\n  Does NOT protect against: the server administrator, or an already-unlocked, compromised server.\n  Whenever the GlassKeep service restarts (update, reboot, etc.), an administrator must unlock the instance with the passphrase or recovery key. Once the instance is unlocked, regular users sign in as usual.\n  If you lose BOTH the passphrase AND the recovery key, encrypted notes are unrecoverable.\n\n  ${YELLOW}Not recommended if you are new to self-hosting${RESET}: managing the secrets (passphrase + recovery key) requires discipline. If both are ever lost, the data is gone for good.\n  You can answer ${BOLD}no${RESET} now and turn protection on later from the admin UI (Admin panel → \"At-rest encryption\" section)."
+        MSG_ENC_INTRO="This option encrypts note contents in the database.\n  ${BOLD}${TEAL}Protects against${RESET}: theft of the server, the disk, the SQLite file, backups.\n  ${BOLD}${AMBER}Does NOT protect against${RESET}: the server administrator, or an already-unlocked, compromised server.\n  Whenever the GlassKeep service restarts (update, reboot, etc.), an administrator must unlock the instance with the ${CYAN}passphrase${RESET} or ${CYAN}recovery key${RESET}. Once the instance is unlocked, regular users sign in as usual.\n  If you lose BOTH the ${CYAN}passphrase${RESET} AND the ${CYAN}recovery key${RESET}, encrypted notes are ${BOLD}${RED}unrecoverable${RESET}.\n\n  ${YELLOW}Not recommended if you are new to self-hosting${RESET}: managing the secrets (${CYAN}passphrase${RESET} + ${CYAN}recovery key${RESET}) requires discipline. If both are ever lost, the data is ${BOLD}${RED}gone for good${RESET}.\n  You can answer ${BOLD}no${RESET} now and turn protection on later from the admin UI (${BOLD}Admin${RESET} panel → \"${BOLD}At-rest encryption${RESET}\" section)."
         MSG_ENC_PROMPT="Enable at-rest data protection? [yes/no] (default: no): "
         MSG_ENC_PASS_PROMPT="Instance passphrase (min. 8 characters): "
         MSG_ENC_PASS_CONFIRM="Confirm passphrase: "
@@ -298,6 +298,18 @@ info()    { printf "${TEAL}›${RESET} %b\n" "$*"; }
 success() { printf "${GREEN}✓${RESET} %b\n" "$*"; }
 warn()    { printf "${AMBER}⚠${RESET} %b\n" "$*"; }
 error()   { printf "${RED}✗${RESET} %b\n" "$*" >&2; }
+
+# Render a multi-line info block (e.g. the SSL mode echos) where every
+# "→" arrow gets pinked and "GlassKeep" gets violet — keeps the body
+# readable in default colour while the eye-catchy bits pop. Input is
+# expected to use \n for line breaks (echo -e style).
+_print_info_block() {
+    local msg
+    msg=$(echo -e "$1")
+    msg="${msg//→/${PINK}→${RESET}}"
+    msg="${msg//GlassKeep/${VIOLET}GlassKeep${RESET}}"
+    printf "%s\n" "$msg"
+}
 
 die() {
     error "$*"
@@ -331,7 +343,10 @@ section() {
     hr "$INDIGO"
     printf "  ${BOLD}${INDIGO}▸${RESET}  ${BOLD}%s${RESET}\n" "$title"
     if [[ -n "$subtitle" ]]; then
-        printf "     ${GRAY}%s${RESET}\n" "$subtitle"
+        # Cyan instead of gray so the lead-in question feels live, not
+        # like a muted hint. Italic kept off — these subtitles are
+        # actual instructions, not parenthetical asides.
+        printf "     ${CYAN}%s${RESET}\n" "$subtitle"
     fi
     hr "$INDIGO"
 }
@@ -370,7 +385,19 @@ step() {
 # menu after the first item.
 menu_item() {
     local num="$1" color="$2" title="$3" desc="${4:-}"
-    printf "  ${color}${BOLD}%s${RESET}  ${BOLD}%s${RESET}\n" "$num" "$title"
+    # If the title contains an em/en-dash separator (" — "), split it
+    # in two: the part before stays bold (the option name), the part
+    # after renders teal+italic (the supporting explanation). Gives a
+    # clear heading-vs-aside hierarchy without needing a second arg at
+    # every call site. Falls through to the simple bold render when
+    # no separator is found (e.g. main install/update/uninstall menu).
+    if [[ "$title" == *" — "* ]]; then
+        local head="${title% — *}"
+        local tail="${title#* — }"
+        printf "  ${color}${BOLD}%s${RESET}  ${BOLD}%s${RESET} ${GRAY}—${RESET} ${TEAL}${ITALIC}%s${RESET}\n" "$num" "$head" "$tail"
+    else
+        printf "  ${color}${BOLD}%s${RESET}  ${BOLD}%s${RESET}\n" "$num" "$title"
+    fi
     if [[ -n "$desc" ]]; then
         printf "     ${GRAY}%s${RESET}\n" "$desc"
     fi
@@ -641,11 +668,11 @@ ask_ssl_config() {
         case "$choice" in
             1)
                 SSL_MODE="proxy"
-                printf "  ${GRAY}%s${RESET}\n" "$(echo -e "$MSG_PROXY_YES_INFO")"
+                _print_info_block "$MSG_PROXY_YES_INFO"
                 break ;;
             2)
                 SSL_MODE="selfsigned"
-                printf "  ${GRAY}%s${RESET}\n" "$(echo -e "$MSG_PROXY_NO_INFO")"
+                _print_info_block "$MSG_PROXY_NO_INFO"
                 break ;;
             3)
                 SSL_MODE="custom"
@@ -663,7 +690,7 @@ ask_ssl_config() {
                     # shellcheck disable=SC2059
                     warn "$(printf "$MSG_CERT_NOT_FOUND" "$CUSTOM_KEY_PATH")"
                 done
-                printf "  ${GRAY}%s${RESET}\n" "$(echo -e "$MSG_HTTPS_OPT3_INFO")"
+                _print_info_block "$MSG_HTTPS_OPT3_INFO"
                 break ;;
             *)
                 warn "$MSG_HTTPS_INVALID" ;;
@@ -928,13 +955,13 @@ action_install() {
     ask_ssl_config
 
     echo
-    read -rsn1 -p "$(printf "${DIM}${MSG_PRESS_KEY}${RESET}")" </dev/tty
+    read -rsn1 -p "$(printf "${DIM}${CYAN}${MSG_PRESS_KEY}${RESET}")" </dev/tty
     echo
 
     panel "$INDIGO" "$MSG_HDR_INSTALL" \
-        "${GRAY}${MSG_INFO_DIR}${RESET}${BOLD}${INSTALL_DIR}${RESET}" \
-        "${GRAY}${MSG_INFO_PORT}${RESET}${BOLD}${port}${RESET}" \
-        "${GRAY}${MSG_INFO_SERVICE}${RESET}${BOLD}${SERVICE_NAME}${RESET}"
+        "${TEAL}${MSG_INFO_DIR}${RESET}${BOLD}${INSTALL_DIR}${RESET}" \
+        "${TEAL}${MSG_INFO_PORT}${RESET}${BOLD}${port}${RESET}" \
+        "${TEAL}${MSG_INFO_SERVICE}${RESET}${BOLD}${SERVICE_NAME}${RESET}"
 
     step "$MSG_STEP_APT"     apt-get update -qq
     step "$MSG_STEP_PREREQ"  apt-get install -y git curl gnupg ca-certificates
@@ -1065,7 +1092,7 @@ action_update() {
     ask_ssl_config
 
     echo
-    read -rsn1 -p "$(printf "${DIM}${MSG_PRESS_KEY_UPDATE}${RESET}")" </dev/tty
+    read -rsn1 -p "$(printf "${DIM}${CYAN}${MSG_PRESS_KEY_UPDATE}${RESET}")" </dev/tty
     echo
 
     # shellcheck disable=SC2059
