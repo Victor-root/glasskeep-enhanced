@@ -88,6 +88,7 @@ setup_i18n() {
         MSG_WARN_DIR_EXISTS="Le dossier %s existe déjà. Suppression avant réinstallation..."
         MSG_STEP_NPM="Installation des dépendances npm"
         MSG_STEP_BUILD="Build de l'application (Vite)"
+        MSG_HINT_LONG="Cette étape peut prendre plusieurs minutes selon la RAM disponible — c'est normal."
         MSG_ENV_CREATED="Fichier de configuration créé : %s"
         MSG_STEP_SSL="Génération du certificat SSL auto-signé"
         MSG_HTTPS_MENU_TITLE="Comment souhaitez-vous configurer le HTTPS ?"
@@ -103,7 +104,7 @@ setup_i18n() {
         MSG_PRESS_KEY="Appuyez sur une touche pour lancer l'installation..."
         MSG_PRESS_KEY_UPDATE="Appuyez sur une touche pour lancer la mise à jour..."
         MSG_PROXY_YES_INFO="  → HTTPS désactivé côté GlassKeep : votre reverse proxy gère le chiffrement."
-        MSG_PROXY_NO_INFO="  → Un certificat SSL auto-signé va être généré.\n     Ce certificat chiffre les échanges entre votre navigateur et GlassKeep,\n     protégeant vos données (mot de passe, notes) sur le réseau.\n     Votre navigateur affichera un avertissement \"site non sécurisé\" : c'est normal\n     pour un certificat auto-signé, cliquez sur \"Continuer quand même\".\n     Pour modifier ce réglage plus tard, relancez ce script et choisissez\n     \"2) ${MSG_OPT_UPDATE}\"."
+        MSG_PROXY_NO_INFO="  → Un certificat SSL auto-signé va être généré.\n     ${BOLD}${TEAL}La connexion sera bien chiffrée${RESET} (mot de passe, notes\n     protégés sur le réseau) — exactement comme avec un certificat\n     délivré par une autorité reconnue. Le seul point manquant est la\n     vérification d'identité par une autorité de certification.\n     C'est pourquoi votre navigateur affichera \"site non sécurisé\" :\n     ${BOLD}le contenu reste chiffré${RESET}, simplement il ne peut pas\n     certifier que ce serveur est bien le vôtre. Cliquez sur \"Continuer\n     quand même\" — c'est attendu pour un auto-signé.\n     Pour modifier ce réglage plus tard, relancez ce script et choisissez\n     \"2) ${MSG_OPT_UPDATE}\"."
         MSG_HTTPS_OPT3_INFO="  → Votre certificat sera utilisé directement.\n     Assurez-vous que les fichiers restent accessibles par le service.\n     Pour modifier ce réglage plus tard, relancez ce script et choisissez\n     \"2) ${MSG_OPT_UPDATE}\"."
         MSG_STEP_DAEMON="Rechargement de systemd"
         MSG_STEP_SERVICE="Activation et démarrage du service %s"
@@ -213,6 +214,7 @@ setup_i18n() {
         MSG_WARN_DIR_EXISTS="Directory %s already exists. Removing before reinstall..."
         MSG_STEP_NPM="Installing npm dependencies"
         MSG_STEP_BUILD="Building the application (Vite)"
+        MSG_HINT_LONG="This step can take several minutes depending on available RAM — that's normal."
         MSG_ENV_CREATED="Configuration file created: %s"
         MSG_STEP_SSL="Generating self-signed SSL certificate"
         MSG_HTTPS_MENU_TITLE="How do you want to configure HTTPS?"
@@ -228,7 +230,7 @@ setup_i18n() {
         MSG_PRESS_KEY="Press any key to start the installation..."
         MSG_PRESS_KEY_UPDATE="Press any key to start the update..."
         MSG_PROXY_YES_INFO="  → HTTPS disabled on the GlassKeep side: your reverse proxy handles encryption."
-        MSG_PROXY_NO_INFO="  → A self-signed SSL certificate will be generated.\n     This certificate encrypts traffic between your browser and GlassKeep,\n     protecting your data (password, notes) on the network.\n     Your browser will show a \"not secure\" warning: this is normal for\n     a self-signed certificate, just click \"Proceed anyway\".\n     To change this setting later, re-run this script and choose\n     \"2) ${MSG_OPT_UPDATE}\"."
+        MSG_PROXY_NO_INFO="  → A self-signed SSL certificate will be generated.\n     ${BOLD}${TEAL}Your connection will be encrypted${RESET} (password, notes\n     protected on the network) — exactly like with a certificate from\n     a trusted authority. The only missing piece is identity\n     verification by a recognised certificate authority.\n     That's why your browser will show \"not secure\":\n     ${BOLD}the content stays encrypted${RESET}, the browser just can't\n     certify this server is really yours. Click \"Proceed anyway\" —\n     it's expected for a self-signed cert.\n     To change this setting later, re-run this script and choose\n     \"2) ${MSG_OPT_UPDATE}\"."
         MSG_HTTPS_OPT3_INFO="  → Your certificate will be used directly.\n     Make sure these files remain accessible by the service.\n     To change this setting later, re-run this script and choose\n     \"2) ${MSG_OPT_UPDATE}\"."
         MSG_STEP_DAEMON="Reloading systemd"
         MSG_STEP_SERVICE="Enabling and starting service %s"
@@ -1063,9 +1065,11 @@ action_install() {
     step "$(printf "$MSG_STEP_CLONE" "$INSTALL_DIR")" \
         git clone --depth=1 --no-single-branch "$REPO_URL" "$INSTALL_DIR"
 
+    info "${DIM}${MSG_HINT_LONG}${RESET}"
     step "$MSG_STEP_NPM" \
         bash -c "cd '${INSTALL_DIR}' && npm install --silent"
 
+    info "${DIM}${MSG_HINT_LONG}${RESET}"
     step "$MSG_STEP_BUILD" \
         bash -c "cd '${INSTALL_DIR}' && npm run build"
 
@@ -1188,9 +1192,11 @@ action_update() {
     step "$MSG_STEP_PULL" \
         bash -c "cd '${INSTALL_DIR}' && git pull origin main"
 
+    info "${DIM}${MSG_HINT_LONG}${RESET}"
     step "$MSG_STEP_NPM_UPDATE" \
         bash -c "cd '${INSTALL_DIR}' && npm install --silent"
 
+    info "${DIM}${MSG_HINT_LONG}${RESET}"
     step "$MSG_STEP_REBUILD" \
         bash -c "cd '${INSTALL_DIR}' && npm run build"
 
