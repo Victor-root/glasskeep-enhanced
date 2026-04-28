@@ -31,11 +31,11 @@ button, [role="button"] { cursor: pointer; }
  *    doesn't accidentally drag-select it. .note-card already has
  *    user-select:none defined further down in this file. */
 body { -webkit-user-select: text; user-select: text; }
-* { caret-color: transparent; }
+* { caret-color: transparent !important; }
 input, textarea, [contenteditable="true"] {
   -webkit-user-select: text;
   user-select: text;
-  caret-color: auto;
+  caret-color: auto !important;
 }
 button, [role="button"] {
   -webkit-user-select: none;
