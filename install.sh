@@ -19,10 +19,13 @@ set -euo pipefail
 #   CYAN          → command snippets the user can copy
 INDIGO='\033[38;5;105m'
 VIOLET='\033[38;5;141m'
+PINK='\033[38;5;213m'
+TEAL='\033[38;5;79m'
 GREEN='\033[38;5;71m'
+GREEN_BRIGHT='\033[38;5;120m'
 AMBER='\033[38;5;214m'
 RED='\033[38;5;203m'
-CYAN='\033[38;5;110m'
+CYAN='\033[38;5;117m'
 GRAY='\033[38;5;245m'
 WHITE='\033[1;37m'
 BOLD='\033[1m'
@@ -311,26 +314,42 @@ _term_width() {
     echo "$cols"
 }
 hr() {
-    local color="${1:-$INDIGO}"
+    local color="${1:-}"
     local cols; cols=$(_term_width)
-    printf "${color}"
-    for ((i=0; i<cols; i++)); do printf "─"; done
-    printf "${RESET}\n"
+    if [[ -z "$color" ]]; then
+        # Default rule: subtle indigo→violet→pink gradient that mirrors
+        # the GlassKeep button gradient. Three thirds of the line each
+        # in their own colour.
+        local third=$((cols / 3))
+        local rest=$((cols - 2 * third))
+        printf "${INDIGO}"
+        for ((i=0; i<third; i++)); do printf "─"; done
+        printf "${VIOLET}"
+        for ((i=0; i<third; i++)); do printf "─"; done
+        printf "${PINK}"
+        for ((i=0; i<rest; i++)); do printf "─"; done
+        printf "${RESET}\n"
+    else
+        # Solid-colour variant for status-coloured panels.
+        printf "${color}"
+        for ((i=0; i<cols; i++)); do printf "─"; done
+        printf "${RESET}\n"
+    fi
 }
 
 # Section header — used at the start of each logical phase.
-# Renders as a top rule + an indigo arrow + the title in bold + an
-# optional one-line subtitle in gray.
+# Renders as a top gradient rule + a violet arrow + the title in
+# bold white + an optional one-line subtitle in gray.
 section() {
     local title="$1"
     local subtitle="${2:-}"
     echo
-    hr "$INDIGO"
-    printf "  ${BOLD}${INDIGO}▸${RESET}  ${BOLD}%s${RESET}\n" "$title"
+    hr
+    printf "  ${BOLD}${VIOLET}▸${RESET}  ${BOLD}${WHITE}%s${RESET}\n" "$title"
     if [[ -n "$subtitle" ]]; then
         printf "     ${GRAY}%s${RESET}\n" "$subtitle"
     fi
-    hr "$INDIGO"
+    hr
 }
 
 # Status panel — left accent bar + lines. Auto-sizes to whatever you
@@ -349,14 +368,18 @@ panel() {
 }
 
 # Run a command with a status label, abort on failure.
+# The ▸ glyph picks up the brand violet so each step starts with a
+# little burst of theme colour; the trailing ✓ is the brighter green
+# (216 mapped to 256-colour 120) so completed steps pop more than the
+# subdued indigo of plain `info` lines.
 step() {
     local label="$1"; shift
-    printf "\n${INDIGO}▸${RESET}  ${BOLD}%s${RESET}\n" "$label"
+    printf "\n${VIOLET}▸${RESET}  ${BOLD}%s${RESET}\n" "$label"
     if ! "$@"; then
         # shellcheck disable=SC2059
         die "$(printf "$MSG_STEP_FAIL" "$label")"
     fi
-    printf "${GREEN}✓${RESET}  ${DIM}%s${RESET}\n" "$label"
+    printf "${GREEN_BRIGHT}✓${RESET}  ${DIM}%s${RESET}\n" "$label"
 }
 
 # Inline numbered choice. Used in menus + the SSL choice prompt.
@@ -382,7 +405,10 @@ prompt_text() {
     # Strip trailing whitespace + colons (handles "... : " / "... :" /
     # "...:" / "... " — every MSG_* shape used in this script).
     while [[ "$s" =~ [[:space:]:]$ ]]; do s="${s::-1}"; done
-    printf "${BOLD}${INDIGO}❯${RESET} %s ${GRAY}›${RESET} " "$s"
+    # %b (not %s) so any colour codes the caller embedded in the
+    # message string get interpreted — otherwise the user sees the
+    # raw \033[38;5;214m escapes when we composed an AMBER prompt.
+    printf "${BOLD}${INDIGO}❯${RESET} %b ${GRAY}›${RESET} " "$s"
 }
 
 require_root() {
@@ -1163,18 +1189,21 @@ main() {
     check_os
 
     echo
-    # Logo: GLASS KEEP rendered in indigo→violet for brand cohesion
-    # with the app's gradient buttons. Subtitle in gray for hierarchy.
+    # Logo: GLASS KEEP rendered in a tri-tone indigo→violet→pink
+    # gradient that mirrors the app's gradient buttons & the default
+    # `hr()` rule. K E E P picks up the pink terminus to anchor the
+    # brand mark; the subtitle stays gray for hierarchy.
     printf "${BOLD}${INDIGO}"
     echo "   ██████╗ ██╗      █████╗ ███████╗███████╗"
     echo "  ██╔════╝ ██║     ██╔══██╗██╔════╝██╔════╝"
-    echo "  ██║  ███╗██║     ███████║███████╗███████╗"
     printf "${BOLD}${VIOLET}"
+    echo "  ██║  ███╗██║     ███████║███████╗███████╗"
     echo "  ██║   ██║██║     ██╔══██║╚════██║╚════██║"
+    printf "${BOLD}${PINK}"
     echo "  ╚██████╔╝███████╗██║  ██║███████║███████║"
     echo "   ╚═════╝ ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝"
     printf "${RESET}"
-    printf "          ${BOLD}K E E P${RESET}  ${GRAY}·  %s${RESET}\n" "$MSG_SUBTITLE"
+    printf "          ${BOLD}${PINK}K E E P${RESET}  ${GRAY}·  ${TEAL}%s${RESET}\n" "$MSG_SUBTITLE"
     echo
 
     if is_installed; then
