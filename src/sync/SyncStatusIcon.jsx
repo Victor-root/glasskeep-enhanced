@@ -264,7 +264,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
             nothing's going to sync anyway and the operator's
             attention should go to the lock state. */}
         {instanceLocked && (
-          <LockBadge className="absolute top-1 right-1 w-3.5 h-3.5 text-red-600" />
+          <LockBadge className="absolute top-0 right-1 w-3.5 h-3.5 text-red-600" />
         )}
       </button>
 
