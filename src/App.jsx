@@ -3776,13 +3776,19 @@ export default function App() {
       const leaseId = acquireLocalLease(nid);
       await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: new Date().toISOString(), mode: "remove_self" } }, leaseId);
     } else if (!isOwner) {
-      // Collaborator leaves the shared note. Nothing to put in their trash —
-      // they lose access cleanly, matching the original spec.
+      // Collaborator "trash" — symmetric with the owner-leaves-shared
+      // case below: they get a personal copy in their corbeille so
+      // the action is recoverable. Without this, the previous spec
+      // ("leave the collaboration cleanly, no recovery") read like a
+      // permanent delete from the user's POV. The trashed copy is
+      // created server-side and the next /notes/trashed fetch picks
+      // it up.
       try { await idbDeleteNote(nid, currentUser?.id, sessionId); } catch (e) { console.error(e); }
       invalidateNotesCache();
+      invalidateTrashedNotesCache();
       setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
       closeModal();
-      showToast(t("leftCollaboration"), "success");
+      showToast(t("noteMovedToTrash"), "success");
       const leaseId = acquireLocalLease(nid);
       await enqueueWithLease(nid, { type: "trash", noteId: nid, payload: { client_updated_at: new Date().toISOString(), mode: "remove_self" } }, leaseId);
     } else {

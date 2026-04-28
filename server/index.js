@@ -1803,12 +1803,41 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     if (mode === "delete_for_all") {
       return res.status(403).json({ error: "Only owner can delete for all collaborators" });
     }
-    // Collaborator "delete" = leave the collaboration
+    // Collaborator "delete" — mirror the owner branch below: the user
+    // gets a personal, trashed copy of the note in their own corbeille,
+    // and the collaboration row is dropped so the live shared note is
+    // no longer in their active view. Without the personal copy, the
+    // note would just vanish without any restore path — which is what
+    // the user reported as "supprimée définitivement" instead of
+    // "envoyée à la corbeille".
+    const userTagsJson = getUserTags(id, req.user.id);
+    const trashedCopyId = uid();
+    runInsertNote({
+      id: trashedCopyId,
+      user_id: req.user.id,
+      type: collabNote.type,
+      title: collabNote.title,
+      content: collabNote.content,
+      items_json: collabNote.items_json,
+      tags_json: userTagsJson,
+      images_json: collabNote.images_json,
+      color: collabNote.color,
+      pinned: 0,
+      position: collabNote.position,
+      timestamp: collabNote.timestamp,
+      client_updated_at: tsResult.iso,
+    });
+    db.prepare("UPDATE notes SET trashed = 1 WHERE id = ?").run(trashedCopyId);
     db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     broadcastNoteUpdated(id);
-    return res.json({ ok: true, left: true });
+    const trashedCopy = getNoteById.get(trashedCopyId);
+    return res.json({
+      ok: true,
+      left: true,
+      trashedCopy: trashedCopy ? serializeNote(trashedCopy, req.user.id) : null,
+    });
   }
 
   // Owner: check if the note has collaborators
