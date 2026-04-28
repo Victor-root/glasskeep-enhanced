@@ -412,6 +412,18 @@ db.exec(`
     last_edited_at TEXT
   )
 `);
+// note_user_tags is the per-user tag table the encryption layer also
+// touches. Create it here so the activation transaction (which
+// iterates note_user_tags to encrypt any plaintext rows) doesn't
+// blow up on a fresh install where the server hasn't booted yet.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS note_user_tags (
+    note_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    tags_json TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (note_id, user_id)
+  )
+`);
 vault.ensureSchema(db);
 
 const init = vault.initialize(db, passphrase);
@@ -496,15 +508,21 @@ process.stdout.write("OK " + init.recoveryKey + "\n");
 db.close();
 NODESCRIPT
 
+    # Capture both stdout and stderr so any warning shows up in the
+    # error report when something fails. We then extract the recovery
+    # key from anywhere in the output via grep — robust to a stray
+    # stderr line landing before the "OK <key>" stdout marker.
     local out
     out=$(cd "$INSTALL_DIR" && node "$script" "$db_file" "$passphrase" 2>&1)
     local code=$?
     rm -f "$script"
-    if [[ $code -ne 0 ]] || [[ "$out" != OK* ]]; then
+    local key
+    key=$(printf '%s\n' "$out" | grep -oE 'OK GKRV-[A-Z0-9-]+' | tail -1 | sed 's/^OK //')
+    if [[ $code -ne 0 ]] || [[ -z "$key" ]]; then
         error "Encryption activation failed: $out"
         return 1
     fi
-    GLASSKEEP_RECOVERY_KEY="${out#OK }"
+    GLASSKEEP_RECOVERY_KEY="$key"
     return 0
 }
 
