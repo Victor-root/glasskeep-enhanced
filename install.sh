@@ -327,7 +327,9 @@ section() {
     echo
     hr "$INDIGO"
     printf "  ${BOLD}${INDIGO}▸${RESET}  ${BOLD}%s${RESET}\n" "$title"
-    [[ -n "$subtitle" ]] && printf "     ${GRAY}%s${RESET}\n" "$subtitle"
+    if [[ -n "$subtitle" ]]; then
+        printf "     ${GRAY}%s${RESET}\n" "$subtitle"
+    fi
     hr "$INDIGO"
 }
 
@@ -359,10 +361,16 @@ step() {
 
 # Inline numbered choice. Used in menus + the SSL choice prompt.
 # Args: <number> <colour> <title> <description>
+# Note the explicit `if/fi` rather than `[[ -n "$desc" ]] && printf`:
+# under `set -e`, a false `[[ ]]` would make the whole compound
+# statement non-zero and kill the script — silently truncating the
+# menu after the first item.
 menu_item() {
     local num="$1" color="$2" title="$3" desc="${4:-}"
     printf "  ${color}${BOLD}%s${RESET}  ${BOLD}%s${RESET}\n" "$num" "$title"
-    [[ -n "$desc" ]] && printf "     ${GRAY}%s${RESET}\n" "$desc"
+    if [[ -n "$desc" ]]; then
+        printf "     ${GRAY}%s${RESET}\n" "$desc"
+    fi
 }
 
 # Prompt with a leading glyph — produces the string that bash's
