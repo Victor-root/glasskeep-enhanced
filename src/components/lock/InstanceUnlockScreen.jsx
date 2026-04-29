@@ -13,7 +13,12 @@ import { api } from "../../utils/api.js";
 import { t } from "../../i18n";
 import { localizeServerError } from "../../utils/serverErrors.js";
 
-export default function InstanceUnlockScreen({ dark, onToggleDark, onUnlocked }) {
+// onBackToOffline (optional): when set, render a "back to my offline
+// notes" link at the bottom of the screen. App.jsx only passes it when
+// the user already has a session and a local-first cache (i.e. they
+// landed here from the LockedBanner CTA, not from a cold first-visit
+// flow that has no notes to fall back to).
+export default function InstanceUnlockScreen({ dark, onToggleDark, onUnlocked, onBackToOffline }) {
   const [mode, setMode] = useState("passphrase"); // "passphrase" | "recovery"
   const [passphrase, setPassphrase] = useState("");
   const [recoveryKey, setRecoveryKey] = useState("");
@@ -122,6 +127,19 @@ export default function InstanceUnlockScreen({ dark, onToggleDark, onUnlocked })
       <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
         {t("instanceLockedCliHint")}
       </p>
+
+      {onBackToOffline && (
+        <button
+          type="button"
+          onClick={onBackToOffline}
+          className="mt-4 w-full px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border-light)] text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          {t("instanceLockedBackToOffline")}
+        </button>
+      )}
     </AuthShell>
   );
 }

@@ -572,6 +572,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   instanceLockedUnlockCta: "Unlock instance",
   instanceLockedUnlocking: "Unlocking…",
   instanceLockedCliHint: "If the web UI is unreachable, run \"cd /opt/glass-keep/app && npm run unlock-instance\" on the server (Docker users: run the equivalent inside the container).",
+  instanceLockedBackToOffline: "Back to my offline notes",
   unlockFailed: "Unlock failed.",
 
   encryptionSectionTitle: "At-rest encryption (server-side)",

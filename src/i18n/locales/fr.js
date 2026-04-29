@@ -572,6 +572,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   instanceLockedUnlockCta: "Déverrouiller l'instance",
   instanceLockedUnlocking: "Déverrouillage…",
   instanceLockedCliHint: "Si l'interface web est inaccessible, lancez « cd /opt/glass-keep/app && npm run unlock-instance » sur le serveur (utilisateurs Docker : la commande équivalente dans le conteneur).",
+  instanceLockedBackToOffline: "Revenir à mes notes hors-ligne",
   unlockFailed: "Échec du déverrouillage.",
 
   encryptionSectionTitle: "Chiffrement des données au repos (côté serveur)",

@@ -4561,6 +4561,12 @@ export default function App() {
   //    → render the unlock screen as a full overlay (lockOverlayOpen).
   const isLocked = !!(instanceLockStatus && instanceLockStatus.enabled && instanceLockStatus.locked);
   if (isLocked && (!currentUser?.email || lockOverlayOpen)) {
+    // The "back to offline notes" escape hatch only makes sense when
+    // the user has a session AND they reached this screen by clicking
+    // the LockedBanner CTA (lockOverlayOpen). A cold first-visitor who
+    // has no local-first cache lands here with currentUser unset, and
+    // there's no offline state to fall back to in that case.
+    const canGoBackToOffline = !!currentUser?.email && lockOverlayOpen;
     return (
       <InstanceUnlockScreen
         dark={dark}
@@ -4578,6 +4584,7 @@ export default function App() {
           setLockOverlayOpen(false);
           refreshLockStatus();
         }}
+        onBackToOffline={canGoBackToOffline ? () => setLockOverlayOpen(false) : undefined}
       />
     );
   }
