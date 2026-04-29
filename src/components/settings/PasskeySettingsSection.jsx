@@ -193,7 +193,7 @@ export default function PasskeySettingsSection({
           {list.map((p) => (
             <li
               key={p.credentialId}
-              className="rounded-lg border border-[var(--border-light)] p-3 flex flex-col sm:flex-row sm:items-center sm:gap-3 gap-2"
+              className="rounded-lg border border-[var(--border-light)] p-3 flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-start"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -220,7 +220,7 @@ export default function PasskeySettingsSection({
                 )}
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2">
                 {/* Instance-unlock toggle (admins, PRF-capable, unlocked vault) */}
                 {isAdmin && encryptionEnabled && p.prfSupported && (
                   <button
