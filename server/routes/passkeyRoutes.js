@@ -410,7 +410,13 @@ function attachPasskeyRoutes(app, deps) {
           transports: passkey.transports ? JSON.parse(passkey.transports) : undefined,
         }],
         extensions: {
-          prf: { eval: { first: new Uint8Array(salt) } },
+          // @simplewebauthn/server passes extensions through as-is into
+          // the JSON options object. Uint8Array serialises as {"0":…}
+          // which @simplewebauthn/browser cannot decode to an ArrayBuffer.
+          // Passing a base64url string is what the library expects; the
+          // browser SDK converts it back to Uint8Array before calling
+          // navigator.credentials.get().
+          prf: { eval: { first: bufToBase64Url(salt) } },
         },
       });
       const challengeId = challengeStore.issue({
@@ -545,7 +551,7 @@ function attachPasskeyRoutes(app, deps) {
           transports: p.transports ? JSON.parse(p.transports) : undefined,
         })),
         extensions: {
-          prf: { eval: { first: new Uint8Array(salt) } },
+          prf: { eval: { first: bufToBase64Url(salt) } },
         },
       });
       const challengeId = challengeStore.issue({

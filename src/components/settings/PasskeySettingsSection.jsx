@@ -93,7 +93,7 @@ export default function PasskeySettingsSection({
       await refresh();
     } catch (e) {
       const msg = (e && e.message) || "";
-      const cancelled = /NotAllowedError|cancelled|aborted/i.test(msg);
+      const cancelled = e?.name === "NotAllowedError" || /NotAllowedError|cancelled|aborted/i.test(msg);
       if (!cancelled) {
         toast(localizeServerError(msg, "passkeyAddFailed"), "error");
       }
@@ -145,7 +145,7 @@ export default function PasskeySettingsSection({
       await refresh();
     } catch (e) {
       const msg = (e && e.message) || "";
-      const cancelled = /NotAllowedError|cancelled|aborted/i.test(msg);
+      const cancelled = e?.name === "NotAllowedError" || /NotAllowedError|cancelled|aborted/i.test(msg);
       if (!cancelled) {
         toast(localizeServerError(msg, "passkeyToggleFailed"), "error");
       }

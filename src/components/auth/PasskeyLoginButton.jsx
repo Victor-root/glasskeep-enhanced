@@ -42,9 +42,7 @@ export default function PasskeyLoginButton({ onLoggedIn, dark }) {
       // button stays available so they can retry, and the password
       // form is right there.
       const msg = (e && e.message) || "passkeyLoginFailed";
-      // DOMException strings are not in our localization map; fall
-      // back to a generic friendly message.
-      const isCancelled = /NotAllowedError|cancelled|aborted/i.test(msg);
+      const isCancelled = e?.name === "NotAllowedError" || /NotAllowedError|cancelled|aborted/i.test(msg);
       setErr(isCancelled ? t("passkeyLoginCancelled") : localizeServerError(msg, "passkeyLoginFailed"));
     } finally {
       setLoading(false);

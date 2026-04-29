@@ -49,7 +49,7 @@ export default function PasskeyUnlockPanel({ onUnlocked }) {
       }
     } catch (e) {
       const msg = (e && e.message) || "unlockFailed";
-      const isCancelled = /NotAllowedError|cancelled|aborted/i.test(msg);
+      const isCancelled = e?.name === "NotAllowedError" || /NotAllowedError|cancelled|aborted/i.test(msg);
       setErr(isCancelled ? t("passkeyUnlockCancelled") : localizeServerError(msg, "unlockFailed"));
     } finally {
       setLoading(false);

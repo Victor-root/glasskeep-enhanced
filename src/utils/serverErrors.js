@@ -95,6 +95,7 @@ const PATTERNS = [
 
   // ── Generic ──────────────────────────────────────────────────────
   ["Unknown credential",                         "errUnknownCredential"],
+  ["No passkey is authorised",                   "errNoPasskeyAuthorised"],
   ["Admin only",                                 "errAdminOnly"],
 ];
 

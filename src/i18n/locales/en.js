@@ -585,7 +585,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   passkeyAddInProgress: "Adding…",
   passkeyAddedSuccess: "Passkey saved.",
   passkeyAddFailed: "Could not register the passkey.",
-  passkeyNamePrompt: "Passkey name (e.g. \"MacBook\", \"YubiKey\"):",
+  passkeyNamePrompt: "Passkey name (e.g. \"Phone\", \"YubiKey\"):",
   passkeyRenamePrompt: "New name:",
   passkeyDeleteConfirm: "Remove this passkey? If it could unlock the instance, that authorisation will be removed too.",
   passkeyDeleted: "Passkey removed.",
@@ -760,6 +760,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   // Generic / authz
   errAdminOnly: "Admin only.",
   errUnknownCredential: "Unknown passkey. Please sign in with a registered passkey.",
+  errNoPasskeyAuthorised: "No passkey is authorised to unlock this instance.",
 
   // At-rest encryption — banner shown when the server gets locked
   // under a logged-in user (local-first cache stays accessible).

@@ -585,7 +585,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   passkeyAddInProgress: "Ajout en cours…",
   passkeyAddedSuccess: "Clé d'accès enregistrée.",
   passkeyAddFailed: "Échec de l'enregistrement de la clé d'accès.",
-  passkeyNamePrompt: "Nom de la clé d'accès (par ex. \"MacBook\", \"YubiKey\") :",
+  passkeyNamePrompt: "Nom de la clé d'accès (par ex. \"Téléphone\", \"YubiKey\") :",
   passkeyRenamePrompt: "Nouveau nom :",
   passkeyDeleteConfirm: "Supprimer cette clé d'accès ? Si elle servait à déverrouiller l'instance, ce droit sera également supprimé.",
   passkeyDeleted: "Clé d'accès supprimée.",
@@ -760,6 +760,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   // Authz
   errAdminOnly: "Réservé aux administrateurs.",
   errUnknownCredential: "Clé d'accès inconnue. Utilisez une clé d'accès enregistrée.",
+  errNoPasskeyAuthorised: "Aucune clé d'accès n'est autorisée à déverrouiller cette instance.",
 
   // Chiffrement au repos — bannière affichée si le serveur se
   // verrouille pendant qu'un utilisateur est connecté (le cache
