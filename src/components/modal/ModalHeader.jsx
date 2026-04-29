@@ -54,11 +54,32 @@ export default function ModalHeader({
   toolbarSlotRef,
 }) {
   const handleTitleKeyDown = (e) => {
+    // Enter must never insert a newline in the title — titles render
+    // single-line everywhere (note cards, view mode, etc.) and a
+    // newline silently breaks layout. Pressing Enter instead hands
+    // focus down to the body, mirroring how Google Keep treats it.
+    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      if (onTitleTab) onTitleTab();
+      return;
+    }
     if (e.key !== "Tab") return;
     if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
     if (!onTitleTab) return;
     e.preventDefault();
     onTitleTab();
+  };
+  // Defensive sanitiser: anything coming through the textarea (typing,
+  // IME, paste, drag-and-drop) gets its newlines stripped before
+  // landing in mTitle. Keeps the title strictly single-line even if a
+  // user pastes a multi-line block from elsewhere.
+  const handleTitleChange = (e) => {
+    const v = e.target.value;
+    if (v.includes("\n") || v.includes("\r")) {
+      setMTitle(v.replace(/[\r\n]+/g, " "));
+    } else {
+      setMTitle(v);
+    }
   };
   const mobileTitleRef = useRef(null);
   // Fan a single textarea ref out to BOTH the local mobileTitleRef
@@ -129,9 +150,12 @@ export default function ModalHeader({
             <div ref={drawToolbarMount} className="flex-1 min-w-0 overflow-visible py-1 flex justify-center" />
           )}
 
-          {/* Desktop: title inline (hidden in draw edit mode) */}
+          {/* Desktop: title inline (hidden in draw edit mode).
+              Checklist notes have no view/edit toggle — their items are
+              always interactively editable — so the title must stay
+              editable too, regardless of the viewMode flag. */}
           {isDesktop && !isDrawEdit && (
-            viewMode ? (
+            (viewMode && mType !== "checklist") ? (
               <div
                 className="flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 pr-2 order-first font-bold whitespace-pre-wrap break-words select-text"
                 aria-label={t("noteTitle")}
@@ -144,7 +168,7 @@ export default function ModalHeader({
                 className="flex-[1_0_50%] min-w-0 sm:min-w-[240px] shrink-0 pr-2 order-first bg-transparent font-bold placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none resize-none overflow-hidden"
                 rows={1}
                 value={mTitle}
-                onChange={(e) => setMTitle(e.target.value)}
+                onChange={handleTitleChange}
                 onKeyDown={handleTitleKeyDown}
                 placeholder={t("noteTitle")}
               />
@@ -201,10 +225,12 @@ export default function ModalHeader({
         <div ref={toolbarSlotRef || null} className="rt-toolbar-slot" />
       </div>
 
-      {/* ── Mobile title — outside sticky, scrolls with content (hidden in draw edit mode) ── */}
+      {/* ── Mobile title — outside sticky, scrolls with content
+            (hidden in draw edit mode). Same checklist exception as
+            desktop: title stays editable since the body is. ── */}
       {!isDesktop && !(mType === 'draw' && drawMode === 'draw') && (
         <div className="px-5 pt-0 pb-1">
-          {viewMode ? (
+          {(viewMode && mType !== "checklist") ? (
             <div
               className="w-full font-bold whitespace-pre-wrap break-words select-text"
               style={{ fontSize: "1.15rem", lineHeight: 1.3, minHeight: "1.3em" }}
@@ -219,7 +245,7 @@ export default function ModalHeader({
               style={{ fontSize: "1.15rem", lineHeight: 1.3 }}
               rows={1}
               value={mTitle}
-              onChange={(e) => setMTitle(e.target.value)}
+              onChange={handleTitleChange}
               onKeyDown={handleTitleKeyDown}
               placeholder={t("noteTitle")}
             />

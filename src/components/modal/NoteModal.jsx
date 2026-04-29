@@ -194,7 +194,8 @@ export default function NoteModal({
   );
 
   const { undo, redo, canUndo, canRedo } = useModalHistory({
-    mTitle, mBody, setMTitle, setMBody,
+    mTitle, mBody, mItems,
+    setMTitle, setMBody, setMItems,
     open, activeId, mType, viewMode,
   });
 

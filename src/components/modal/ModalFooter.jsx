@@ -393,8 +393,10 @@ export default function ModalFooter({
           })()}
         </div>
 
-        {/* ── Undo (hidden in draw canvas mode & view mode) ── */}
-        {!(mType === 'draw' && drawMode === 'draw') && !viewMode && (
+        {/* ── Undo (hidden in draw canvas mode & in text view mode).
+              Checklist notes are always editable, so the buttons stay
+              visible regardless of the viewMode flag. ── */}
+        {!(mType === 'draw' && drawMode === 'draw') && (mType === "checklist" || !viewMode) && (
         <button
           className={`${btnClass} focus:outline-none ${!canUndo ? "opacity-50 cursor-default" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
@@ -410,8 +412,8 @@ export default function ModalFooter({
         </button>
         )}
 
-        {/* ── Redo (hidden in draw canvas mode & view mode) ── */}
-        {!(mType === 'draw' && drawMode === 'draw') && !viewMode && (
+        {/* ── Redo (same visibility rule as Undo above) ── */}
+        {!(mType === 'draw' && drawMode === 'draw') && (mType === "checklist" || !viewMode) && (
         <button
           className={`${btnClass} focus:outline-none ${!canRedo ? "opacity-50 cursor-default" : ""}`}
           onMouseDown={(e) => e.preventDefault()}
