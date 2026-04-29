@@ -135,6 +135,8 @@ setup_i18n() {
         MSG_ACCESS_TITLE="GlassKeep est opérationnel !"
         MSG_ACCESS_LOCAL="Accès local     : "
         MSG_ACCESS_NET="Accès réseau    : "
+        MSG_ACCESS_WAN="Accès WAN       : "
+        MSG_ACCESS_PORT_FORWARD="N'oubliez pas d'ouvrir le port %s sur votre routeur / pare-feu pour rendre GlassKeep accessible depuis Internet."
         MSG_ADMIN_SETUP_TITLE="Création du compte administrateur"
         MSG_ADMIN_NAME_PROMPT="Nom affiché : "
         MSG_ADMIN_LOGIN_PROMPT="Nom d'utilisateur / login [%s] : "
@@ -261,6 +263,8 @@ setup_i18n() {
         MSG_ACCESS_TITLE="GlassKeep is up and running!"
         MSG_ACCESS_LOCAL="Local access    : "
         MSG_ACCESS_NET="Network access  : "
+        MSG_ACCESS_WAN="External access : "
+        MSG_ACCESS_PORT_FORWARD="Don't forget to open port %s on your router / firewall to expose GlassKeep on the Internet."
         MSG_ADMIN_SETUP_TITLE="Admin account setup"
         MSG_ADMIN_NAME_PROMPT="Display name: "
         MSG_ADMIN_LOGIN_PROMPT="Username / login [%s]: "
@@ -1333,20 +1337,69 @@ show_install_summary() {
         "${TEAL}${MSG_SUMMARY_HTTPS}${RESET}            ${BOLD}${https_label}${RESET}"
 }
 
+# Pull a hostname out of a PEM-encoded certificate. Tries the SAN
+# (Subject Alternative Name) DNS entries first since modern browsers
+# only consult those, then falls back to the legacy CN field if no SAN
+# DNS is present. Returns the first usable hostname or empty string.
+_cert_hostname() {
+    local cert="$1"
+    [[ -f "$cert" ]] || return 1
+    command -v openssl &>/dev/null || return 1
+
+    local san
+    san=$(openssl x509 -in "$cert" -noout -ext subjectAltName 2>/dev/null \
+        | grep -oE 'DNS:[^,[:space:]]+' | head -1 | cut -d: -f2)
+    if [[ -n "$san" ]]; then
+        printf '%s' "$san"
+        return 0
+    fi
+
+    local cn
+    cn=$(openssl x509 -in "$cert" -noout -subject 2>/dev/null \
+        | sed -nE 's/.*CN[[:space:]]*=[[:space:]]*([^,/]+).*/\1/p' \
+        | tr -d '[:space:]')
+    [[ -n "$cn" ]] && printf '%s' "$cn"
+}
+
 show_access_info() {
     local port="$1"
     local ip
     ip=$(get_server_ip)
 
     local proto="http"
-    local https_val
+    local https_val cert_path trust_val
     https_val=$(grep -E '^HTTPS_ENABLED=' "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+    cert_path=$(grep -E '^SSL_CERT='     "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+    trust_val=$(grep -E '^TRUST_PROXY='  "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
     [[ "$https_val" == "true" ]] && proto="https"
+
+    # Detect a custom (user-supplied) certificate: HTTPS is enabled,
+    # not behind a reverse proxy, and the cert is NOT the auto-generated
+    # one we drop under /opt/glass-keep/ssl. In that case pull the
+    # hostname out of the cert and surface a WAN line + a port-forward
+    # reminder, since the typical reason to bring a custom cert is
+    # serving GlassKeep on a public domain.
+    local wan_lines=()
+    if [[ "$https_val" == "true" ]] \
+        && [[ "$trust_val" != "true" ]] \
+        && [[ -n "$cert_path" ]] \
+        && [[ "$cert_path" != /opt/glass-keep/ssl/* ]]; then
+        local cert_host
+        cert_host=$(_cert_hostname "$cert_path" 2>/dev/null || true)
+        if [[ -n "$cert_host" ]]; then
+            wan_lines+=("${BOLD}${MSG_ACCESS_WAN}${RESET} ${CYAN}${proto}://${cert_host}:${port}${RESET}")
+            # shellcheck disable=SC2059
+            wan_lines+=("")
+            # shellcheck disable=SC2059
+            wan_lines+=("${AMBER}⚠ $(printf "$MSG_ACCESS_PORT_FORWARD" "$port")${RESET}")
+        fi
+    fi
 
     panel "$GREEN" "$MSG_ACCESS_TITLE" \
         "" \
         "${BOLD}${MSG_ACCESS_LOCAL}${RESET} ${CYAN}${proto}://localhost:${port}${RESET}" \
         "${BOLD}${MSG_ACCESS_NET}${RESET} ${CYAN}${proto}://${ip}:${port}${RESET}" \
+        "${wan_lines[@]}" \
         "" \
         "${MSG_ACCESS_CREDS}" \
         "" \
