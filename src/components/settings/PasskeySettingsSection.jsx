@@ -11,7 +11,7 @@
 // also why the toggle is gated on `isUnlocked` — without an in-RAM
 // DEK we'd have nothing to wrap.
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { t } from "../../i18n";
 import {
   isWebAuthnSupported,
@@ -41,15 +41,35 @@ export default function PasskeySettingsSection({
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState(null); // credentialId currently mutating
 
+  // Hold showToast in a ref so it doesn't appear in any callback's
+  // dependency list. The parent App.jsx defines showToast as an inline
+  // arrow on every render, so a naive [showToast] dep would invalidate
+  // every callback on every render — a previous version of this file
+  // did exactly that and the user-facing symptom was a tight render
+  // loop where /api/passkeys was hammered after login. The ref keeps
+  // the callbacks stable while still letting handlers reach the live
+  // toast emitter.
+  const showToastRef = useRef(showToast);
+  useEffect(() => { showToastRef.current = showToast; }, [showToast]);
+  const toast = useCallback((msg, type) => {
+    if (showToastRef.current) showToastRef.current(msg, type);
+  }, []);
+
+  // refresh's only real input is `token`. Background fetch failures
+  // do NOT toast — the user is already looking at the panel, so an
+  // empty/stale list speaks for itself, and a failing toast in a
+  // dependency loop was the original culprit. User-driven actions
+  // (add/rename/delete/toggle) still toast on failure since the user
+  // expects feedback there.
   const refresh = useCallback(async () => {
     if (!token) return;
     try {
       const items = await listPasskeys(token);
       setList(items);
     } catch (e) {
-      showToast?.(localizeServerError(e.message, "passkeyListFailed"), "error");
+      console.warn("[passkeys] list failed:", e?.message || e);
     }
-  }, [token, showToast]);
+  }, [token]);
 
   useEffect(() => {
     setSupported(isWebAuthnSupported());
@@ -64,18 +84,18 @@ export default function PasskeySettingsSection({
       // strips and stores null).
       if (label === null) return;
       const r = await registerPasskey(token, label || null);
-      showToast?.(t("passkeyAddedSuccess"), "success");
+      toast(t("passkeyAddedSuccess"), "success");
       if (!r.prfSupported) {
         // Tell the user explicitly so they don't expect the
         // instance-unlock toggle to light up.
-        showToast?.(t("passkeyNoPrfNotice"), "info");
+        toast(t("passkeyNoPrfNotice"), "info");
       }
       await refresh();
     } catch (e) {
       const msg = (e && e.message) || "";
       const cancelled = /NotAllowedError|cancelled|aborted/i.test(msg);
       if (!cancelled) {
-        showToast?.(localizeServerError(msg, "passkeyAddFailed"), "error");
+        toast(localizeServerError(msg, "passkeyAddFailed"), "error");
       }
     } finally {
       setLoading(false);
@@ -92,7 +112,7 @@ export default function PasskeySettingsSection({
       await renamePasskey(token, p.credentialId, trimmed);
       await refresh();
     } catch (e) {
-      showToast?.(localizeServerError(e.message, "passkeyRenameFailed"), "error");
+      toast(localizeServerError(e.message, "passkeyRenameFailed"), "error");
     } finally {
       setBusyId(null);
     }
@@ -104,9 +124,9 @@ export default function PasskeySettingsSection({
     try {
       await deletePasskey(token, p.credentialId);
       await refresh();
-      showToast?.(t("passkeyDeleted"), "success");
+      toast(t("passkeyDeleted"), "success");
     } catch (e) {
-      showToast?.(localizeServerError(e.message, "passkeyDeleteFailed"), "error");
+      toast(localizeServerError(e.message, "passkeyDeleteFailed"), "error");
     } finally {
       setBusyId(null);
     }
@@ -117,17 +137,17 @@ export default function PasskeySettingsSection({
     try {
       if (p.canUnlockInstance) {
         await disableInstanceUnlock(token, p.credentialId);
-        showToast?.(t("passkeyUnlockDisabled"), "success");
+        toast(t("passkeyUnlockDisabled"), "success");
       } else {
         await enableInstanceUnlock(token, p.credentialId);
-        showToast?.(t("passkeyUnlockEnabled"), "success");
+        toast(t("passkeyUnlockEnabled"), "success");
       }
       await refresh();
     } catch (e) {
       const msg = (e && e.message) || "";
       const cancelled = /NotAllowedError|cancelled|aborted/i.test(msg);
       if (!cancelled) {
-        showToast?.(localizeServerError(msg, "passkeyToggleFailed"), "error");
+        toast(localizeServerError(msg, "passkeyToggleFailed"), "error");
       }
     } finally {
       setBusyId(null);

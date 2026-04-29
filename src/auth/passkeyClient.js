@@ -27,6 +27,15 @@ function authHeaders(token) {
   return h;
 }
 
+// Mirror api.js's behaviour on 401: clear the cached auth and fire the
+// auth-expired event so App.jsx's centralised cleanup runs once. Without
+// this, a stale token sitting in localStorage would keep producing 401s
+// every time the settings panel re-fetched the passkey list.
+function _handleAuthExpired() {
+  try { localStorage.removeItem("glass-keep-auth"); } catch {}
+  try { window.dispatchEvent(new CustomEvent("auth-expired")); } catch {}
+}
+
 async function postJSON(path, body, token) {
   const res = await fetch(`${API}${path}`, {
     method: "POST",
@@ -35,6 +44,7 @@ async function postJSON(path, body, token) {
   });
   let data = null;
   try { data = await res.json(); } catch {}
+  if (res.status === 401 && token) _handleAuthExpired();
   if (!res.ok) {
     const e = new Error((data && data.error) || `HTTP ${res.status}`);
     e.status = res.status;
@@ -47,6 +57,7 @@ async function getJSON(path, token) {
   const res = await fetch(`${API}${path}`, { headers: authHeaders(token) });
   let data = null;
   try { data = await res.json(); } catch {}
+  if (res.status === 401 && token) _handleAuthExpired();
   if (!res.ok) {
     const e = new Error((data && data.error) || `HTTP ${res.status}`);
     e.status = res.status;
@@ -132,13 +143,17 @@ export async function registerPasskey(token, label) {
 // ── Login ─────────────────────────────────────────────────────────────
 //
 // Returns { token, user, must_change_password } on success, mirroring
-// /api/login's response shape so App.jsx's existing session-store
-// helper can consume it unchanged.
+// /api/login's response shape so App.jsx's existing completeLogin
+// helper can consume it unchanged. We strip the `ok` field the server
+// adds — it's redundant once we got a 200 back, and leaving it on the
+// payload pollutes the in-memory session object with a stray boolean
+// that downstream code might read.
 export async function loginWithPasskey() {
   const { options, challengeId } = await postJSON("/passkeys/login/options", {});
   const response = await startAuthentication({ optionsJSON: options });
   const verify = await postJSON("/passkeys/login/verify", { response, challengeId });
-  return verify;
+  const { ok: _ok, ...session } = verify || {};
+  return session;
 }
 
 // ── Promote passkey to instance unlock ────────────────────────────────
@@ -186,13 +201,17 @@ export async function unlockInstanceWithPasskey() {
     "/instance/unlock-passkey/options",
     {},
   );
-  if (alreadyUnlocked) return { ok: true, alreadyUnlocked: true };
+  if (alreadyUnlocked) return { alreadyUnlocked: true };
   const response = await startAuthentication({ optionsJSON: options });
   const prfOutput = extractPrfOutput(response);
   if (!prfOutput) {
     throw new Error("This passkey did not return a PRF output. Use passphrase or recovery key.");
   }
-  return await postJSON("/instance/unlock-passkey/verify", {
+  const verify = await postJSON("/instance/unlock-passkey/verify", {
     response, challengeId, prfOutput,
   });
+  // Strip `ok` like loginWithPasskey() does, so App.jsx's completeLogin
+  // sees the same shape as the password login response.
+  const { ok: _ok, ...session } = verify || {};
+  return session;
 }

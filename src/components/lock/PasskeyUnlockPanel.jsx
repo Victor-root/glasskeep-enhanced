@@ -34,16 +34,16 @@ export default function PasskeyUnlockPanel({ onUnlocked }) {
     setErr("");
     setLoading(true);
     try {
-      const r = await unlockInstanceWithPasskey();
-      if (r?.alreadyUnlocked) {
+      const session = await unlockInstanceWithPasskey();
+      if (session?.alreadyUnlocked) {
         onUnlocked?.({ alreadyUnlocked: true });
         return;
       }
-      if (r?.ok && r?.token && r?.user) {
+      if (session?.token && session?.user) {
         // Hand the admin session back. App.jsx installs the JWT,
         // marks the instance unlocked, and falls through to /notes
         // without the user ever typing a passphrase.
-        onUnlocked?.(r);
+        onUnlocked?.(session);
       } else {
         setErr(localizeServerError("Verification failed", "unlockFailed"));
       }

@@ -30,9 +30,9 @@ export default function PasskeyLoginButton({ onLoggedIn, dark }) {
     setErr("");
     setLoading(true);
     try {
-      const r = await loginWithPasskey();
-      if (r && r.token && r.user) {
-        onLoggedIn?.(r);
+      const session = await loginWithPasskey();
+      if (session && session.token && session.user) {
+        onLoggedIn?.(session);
       } else {
         setErr(localizeServerError("Verification failed", "passkeyLoginFailed"));
       }
