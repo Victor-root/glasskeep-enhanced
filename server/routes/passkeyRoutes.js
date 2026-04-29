@@ -512,6 +512,81 @@ function attachPasskeyRoutes(app, deps) {
   });
 
   // ====================================================================
+  //   TEST A SPECIFIC PASSKEY (authenticated user, no side-effects)
+  // ====================================================================
+  //
+  // Lets a logged-in user verify that a credential still works without
+  // having to log out and back in. Runs a full authentication ceremony
+  // targeting the single credential, verifies the response, updates the
+  // counter, and returns {ok: true}. No token is issued.
+
+  app.post("/api/passkeys/:id/test/options", auth, async (req, res) => {
+    const passkey = passkeyVault.getPasskeyForUser(db, req.params.id, req.user.id);
+    if (!passkey) return res.status(404).json({ error: "Passkey not found" });
+    try {
+      const options = await generateAuthenticationOptions({
+        rpID: rpId(req),
+        userVerification: "required",
+        allowCredentials: [{
+          id: passkey.credential_id,
+          transports: passkey.transports ? JSON.parse(passkey.transports) : undefined,
+        }],
+      });
+      const challengeId = challengeStore.issue({
+        challenge: options.challenge,
+        kind: "test",
+        userId: req.user.id,
+        meta: { credentialId: passkey.credential_id },
+      });
+      res.json({ options, challengeId });
+    } catch (e) {
+      log.error?.(`[passkey] test/options failed: ${e.message}`);
+      res.status(500).json({ error: "Failed to start passkey test" });
+    }
+  });
+
+  app.post("/api/passkeys/:id/test/verify", auth, async (req, res) => {
+    const { response, challengeId } = req.body || {};
+    if (!response || !challengeId) return res.status(400).json({ error: "Missing fields" });
+
+    const entry = challengeStore.consume(challengeId);
+    if (!entry
+        || entry.kind !== "test"
+        || entry.userId !== req.user.id
+        || entry.meta?.credentialId !== req.params.id) {
+      return res.status(400).json({ error: "Challenge expired or invalid" });
+    }
+
+    const passkey = passkeyVault.getPasskeyForUser(db, req.params.id, req.user.id);
+    if (!passkey) return res.status(404).json({ error: "Passkey not found" });
+
+    let verification;
+    try {
+      verification = await verifyAuthenticationResponse({
+        response,
+        expectedChallenge: entry.challenge,
+        expectedOrigin: expectedOrigin(req),
+        expectedRPID: rpId(req),
+        credential: {
+          id: passkey.credential_id,
+          publicKey: new Uint8Array(passkey.public_key),
+          counter: passkey.counter,
+          transports: passkey.transports ? JSON.parse(passkey.transports) : undefined,
+        },
+        requireUserVerification: true,
+      });
+    } catch (e) {
+      log.warn?.(`[passkey] test verify failed: ${e.message}`);
+      return res.status(400).json({ error: "Verification failed" });
+    }
+    if (!verification.verified) return res.status(400).json({ error: "Verification failed" });
+
+    passkeyVault.updateCounter(db, passkey.credential_id, verification.authenticationInfo.newCounter);
+    log.info?.(`[passkey] test OK credential=${passkey.credential_id} user=${req.user.id}`);
+    res.json({ ok: true });
+  });
+
+  // ====================================================================
   //   UNLOCK INSTANCE BY PASSKEY (no auth, locked → unlocked + JWT)
   // ====================================================================
 

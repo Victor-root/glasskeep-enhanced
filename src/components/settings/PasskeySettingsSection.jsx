@@ -21,6 +21,7 @@ import {
   deletePasskey,
   enableInstanceUnlock,
   disableInstanceUnlock,
+  testPasskey,
 } from "../../auth/passkeyClient.js";
 import { localizeServerError } from "../../utils/serverErrors.js";
 
@@ -39,7 +40,8 @@ export default function PasskeySettingsSection({
   const [supported, setSupported] = useState(false);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [busyId, setBusyId] = useState(null); // credentialId currently mutating
+  const [busyId, setBusyId] = useState(null);    // credentialId currently mutating (rename/delete/toggle)
+  const [testingId, setTestingId] = useState(null); // credentialId currently being tested
 
   // Hold showToast in a ref so it doesn't appear in any callback's
   // dependency list. The parent App.jsx defines showToast as an inline
@@ -129,6 +131,22 @@ export default function PasskeySettingsSection({
       toast(localizeServerError(e.message, "passkeyDeleteFailed"), "error");
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const handleTest = async (p) => {
+    setTestingId(p.credentialId);
+    try {
+      await testPasskey(token, p.credentialId);
+      toast(t("passkeyTestOk"), "success");
+    } catch (e) {
+      const msg = (e && e.message) || "";
+      const cancelled = e?.name === "NotAllowedError" || /NotAllowedError|cancelled|aborted/i.test(msg);
+      if (!cancelled) {
+        toast(localizeServerError(msg, "passkeyTestFailed"), "error");
+      }
+    } finally {
+      setTestingId(null);
     }
   };
 
@@ -237,6 +255,14 @@ export default function PasskeySettingsSection({
                     {p.canUnlockInstance ? t("passkeyDisableUnlock") : t("passkeyEnableUnlock")}
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => handleTest(p)}
+                  disabled={busyId === p.credentialId || testingId === p.credentialId}
+                  className="px-2.5 py-1 rounded text-xs border border-[var(--border-light)] text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-50"
+                >
+                  {testingId === p.credentialId ? t("passkeyTestInProgress") : t("passkeyTestCta")}
+                </button>
                 <button
                   type="button"
                   onClick={() => handleRename(p)}

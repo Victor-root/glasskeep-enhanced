@@ -239,6 +239,21 @@ export async function enableInstanceUnlock(token, credentialId) {
   );
 }
 
+// ── Test a passkey (no side-effects beyond counter update) ────────────
+export async function testPasskey(token, credentialId) {
+  const { options, challengeId } = await postJSON(
+    `/passkeys/${encodeURIComponent(credentialId)}/test/options`,
+    {},
+    token,
+  );
+  const response = await startAuthentication({ optionsJSON: options });
+  return await postJSON(
+    `/passkeys/${encodeURIComponent(credentialId)}/test/verify`,
+    { response, challengeId },
+    token,
+  );
+}
+
 export async function disableInstanceUnlock(token, credentialId) {
   return await postJSON(
     `/passkeys/${encodeURIComponent(credentialId)}/instance-unlock/disable`,
