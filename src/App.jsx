@@ -3515,7 +3515,7 @@ export default function App() {
         setNotes((prev) => prev.filter((n) => String(n.id) !== nid));
         invalidateNotesCache();
         invalidateTrashedNotesCache();
-        showToast(t("emptyNoteDeleted"), "info");
+        showToast(t("emptyNoteDeleted"), "info", 3000);
         freshlyCreatedNoteRef.current = null;
         (async () => {
           try {
