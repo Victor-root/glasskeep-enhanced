@@ -299,10 +299,10 @@ export default function App() {
 
   // Toast notification system
   const [toasts, setToasts] = useState([]);
+  const toastIdRef = useRef(0);
 
   const showToast = (message, type = "success", duration = 3000) => {
-    console.log("[showToast]", { message, type, duration });
-    const id = Date.now();
+    const id = ++toastIdRef.current;
     const toast = { id, message, type };
     setToasts((prev) => [...prev, toast]);
 
