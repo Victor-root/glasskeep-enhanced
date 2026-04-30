@@ -128,7 +128,7 @@ Compared to the original project, this fork puts more emphasis on:
 - duplicate the open note in one click from the modal kebab menu
 
 ### 🔐 Server-side encryption & passkeys
-- **end-to-end encryption**: notes and settings are encrypted server-side with keys derived from the user's password
+- **end-to-end encryption**: notes and settings are encrypted server-side with keys derived from a dedicated admin passphrase (separate from user login passwords)
 - **passkeys authentication**: register and sign in using WebAuthn passkeys (fingerprint, face, hardware keys) for passwordless login
 - encrypted data persists even if the server is compromised
 - passkey registration and management available in the settings panel
