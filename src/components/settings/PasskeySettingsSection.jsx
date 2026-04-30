@@ -179,7 +179,7 @@ export default function PasskeySettingsSection({
       <div className="text-sm text-gray-500 dark:text-gray-400 space-y-2">
         <p>{t("passkeyWebViewUnavailable")}</p>
         <a
-          href="/"
+          href={window.location.origin}
           target="_blank"
           rel="noopener noreferrer"
           className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium inline-block"
