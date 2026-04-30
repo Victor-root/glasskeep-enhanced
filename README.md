@@ -199,6 +199,7 @@ The script is designed to make installation as simple as possible:
   - **reverse proxy**
   - **self-signed certificate**
   - **custom SSL certificate**
+- it optionally sets up **at-rest encryption** to protect notes in the database (you can enable it later from the admin panel if you prefer)
 
 > This is the main installation method recommended for this fork.
 
