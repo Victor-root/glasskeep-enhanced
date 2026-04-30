@@ -455,6 +455,42 @@ export default function RichTextToolbar({ editor, compact = false, mode = "simpl
       <div className={`rt-toolbar${compact ? " rt-toolbar--compact" : ""}`} role="toolbar" aria-label={t("fmtToolbarLabel")}>
         <div className="rt-sg">
           <div className="rt-sg-row">
+            <button
+              ref={fontBtnRef}
+              type="button"
+              className={`rt-btn rt-btn--menu rt-btn--wide${currentFontFamily ? " is-active" : ""}`}
+              data-tooltip={t("fmtFontFamily")}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => toggleMenu("font")}
+              style={{ fontFamily: currentFontFamily || undefined }}
+            >
+              <span className="rt-btn-label">{fontFamilyLabel}</span>
+              <RichIcons.Chevron />
+            </button>
+            <FontFamilyPopover editor={editor} anchorRef={fontBtnRef} open={openMenu === "font"} onClose={closeMenu} />
+
+            <button
+              ref={sizeBtnRef}
+              type="button"
+              className={`rt-btn rt-btn--menu rt-btn--narrow${currentFontSize ? " is-active" : ""}`}
+              data-tooltip={t("fmtFontSize")}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => toggleMenu("size")}
+            >
+              <span className="rt-btn-label">{fontSizeLabel}</span>
+              <RichIcons.Chevron />
+            </button>
+            <FontSizePopover editor={editor} anchorRef={sizeBtnRef} open={openMenu === "size"} onClose={closeMenu} />
+
+            <ToolbarButton
+              title={t("fmtClearFormatting")}
+              onClick={() => chain().clearNodes().unsetAllMarks().run()}
+            >
+              <RichIcons.Clear />
+            </ToolbarButton>
+
+            <span className="rt-sep" aria-hidden="true" />
+
             <ToolbarButton active={isActive("bold")} title={t("fmtBold")} onClick={() => chain().toggleBold().run()}>
               <RichIcons.Bold />
             </ToolbarButton>
