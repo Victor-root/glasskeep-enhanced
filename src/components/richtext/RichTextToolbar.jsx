@@ -482,13 +482,6 @@ export default function RichTextToolbar({ editor, compact = false, mode = "simpl
             </button>
             <FontSizePopover editor={editor} anchorRef={sizeBtnRef} open={openMenu === "size"} onClose={closeMenu} />
 
-            <ToolbarButton
-              title={t("fmtClearFormatting")}
-              onClick={() => chain().clearNodes().unsetAllMarks().run()}
-            >
-              <RichIcons.Clear />
-            </ToolbarButton>
-
             <span className="rt-sep" aria-hidden="true" />
 
             <ToolbarButton active={isActive("bold")} title={t("fmtBold")} onClick={() => chain().toggleBold().run()}>
@@ -519,6 +512,12 @@ export default function RichTextToolbar({ editor, compact = false, mode = "simpl
             </div>
             <ToolbarButton active={isActive("strike")} title={t("fmtStrike")} onClick={() => chain().toggleStrike().run()}>
               <RichIcons.Strike />
+            </ToolbarButton>
+            <ToolbarButton
+              title={t("fmtClearFormatting")}
+              onClick={() => chain().clearNodes().unsetAllMarks().run()}
+            >
+              <RichIcons.Clear />
             </ToolbarButton>
 
             <span className="rt-sep" aria-hidden="true" />
@@ -588,9 +587,6 @@ export default function RichTextToolbar({ editor, compact = false, mode = "simpl
               </button>
               <LinkPopover editor={editor} anchorRef={linkBtnRef} open={openMenu === "link"} onClose={closeMenu} />
             </div>
-
-            <span className="rt-sep" aria-hidden="true" />
-
             <ToolbarButton title={t("fmtSeparator")} onClick={() => chain().setHorizontalRule().run()}>
               <RichIcons.HR />
             </ToolbarButton>
