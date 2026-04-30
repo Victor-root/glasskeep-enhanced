@@ -221,8 +221,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      ADMIN_EMAIL: "admin"
-      ADMIN_PASSWORD: "admin"
+      ADMIN_EMAIL: "your-admin-username"
+      ADMIN_PASSWORD: "choose-a-strong-password"
     volumes:
       - ./data:/data
 EOF
@@ -231,8 +231,7 @@ docker compose up -d
 
 Then:
 1. open `http://<your-host>:8080`
-2. sign in with `admin` / `admin`
-3. change the admin password immediately from the admin panel
+2. sign in with the admin username and password you chose
 
 #### Update
 
