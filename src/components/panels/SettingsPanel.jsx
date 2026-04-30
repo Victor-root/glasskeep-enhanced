@@ -43,6 +43,8 @@ export default function SettingsPanel({
   setChecklistRemoveSectionBehavior,
   edgeToEdgeLandscape,
   setEdgeToEdgeLandscape,
+  editorToolbarMode,
+  setEditorToolbarMode,
   typographyPresets,
   setTypographyPresets,
   // Lifted into App.jsx so the centralised overlay back-button stack
@@ -507,6 +509,42 @@ export default function SettingsPanel({
                     }`}
                   />
                 </button>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Heading} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("editorToolbarMode")}</div>
+                    <div className="text-sm text-gray-500">
+                      {editorToolbarMode === "simple"
+                        ? t("editorToolbarModeSimpleDesc")
+                        : t("editorToolbarModeAdvancedDesc")}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 self-end sm:self-auto">
+                  <button
+                    className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
+                      editorToolbarMode === "simple"
+                        ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                        : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                    onClick={() => setEditorToolbarMode("simple")}
+                  >
+                    {t("editorToolbarModeSimple")}
+                  </button>
+                  <button
+                    className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
+                      editorToolbarMode === "advanced"
+                        ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                        : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                    onClick={() => setEditorToolbarMode("advanced")}
+                  >
+                    {t("editorToolbarModeAdvanced")}
+                  </button>
+                </div>
               </div>
 
               {/* Rich-text editor typography presets — opens its own

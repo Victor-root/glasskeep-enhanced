@@ -199,6 +199,14 @@ export default function App() {
       return true;
     }
   });
+  const [editorToolbarMode, setEditorToolbarMode] = useState(() => {
+    try {
+      const stored = localStorage.getItem("editorToolbarMode");
+      return stored === "advanced" ? "advanced" : "simple";
+    } catch (e) {
+      return "simple";
+    }
+  });
   const [typographyPresets, setTypographyPresets] = useState(() => {
     try {
       const stored = localStorage.getItem(TYPOGRAPHY_STORAGE_KEY);
@@ -632,6 +640,10 @@ export default function App() {
       }).catch(() => {});
     }
   }, [checklistRemoveSectionBehavior]);
+
+  useEffect(() => {
+    try { localStorage.setItem("editorToolbarMode", editorToolbarMode); } catch (e) {}
+  }, [editorToolbarMode]);
 
   // Edge-to-edge landscape: save + dynamically toggle body padding-left
   useEffect(() => {
@@ -4535,6 +4547,7 @@ export default function App() {
       syncChecklistItems={syncChecklistItems}
       checklistInsertPosition={checklistInsertPosition}
       checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
+      editorToolbarMode={editorToolbarMode}
       onConvertNoteType={convertNoteType}
       onDuplicateNote={duplicateActiveNote}
       initialDrawMode={initialDrawMode}
@@ -4769,6 +4782,8 @@ export default function App() {
         setChecklistRemoveSectionBehavior={setChecklistRemoveSectionBehavior}
         edgeToEdgeLandscape={edgeToEdgeLandscape}
         setEdgeToEdgeLandscape={setEdgeToEdgeLandscape}
+        editorToolbarMode={editorToolbarMode}
+        setEditorToolbarMode={setEditorToolbarMode}
         typographyPresets={typographyPresets}
         setTypographyPresets={(next) => setTypographyPresets(normalizeTypographyPresets(next))}
         typographyModalOpen={typographyModalOpen}

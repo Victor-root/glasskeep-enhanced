@@ -150,6 +150,7 @@ export default function NoteModal({
   syncChecklistItems,
   checklistInsertPosition,
   checklistRemoveSectionBehavior,
+  editorToolbarMode,
   // note type conversion (text <-> checklist)
   onConvertNoteType,
   onDuplicateNote,
@@ -531,6 +532,7 @@ export default function NoteModal({
                       autoFocus={!mTitle}
                       minHeightClass="min-h-[160px]"
                       toolbarContainer={toolbarMount}
+                      toolbarMode={editorToolbarMode}
                       onReady={(ed) => { richEditorRef.current = ed; }}
                       onShiftTabExit={focusModalTitle}
                     />
@@ -589,6 +591,7 @@ export default function NoteModal({
                     dark={dark}
                     minHeightClass="min-h-[80px]"
                     toolbarContainer={toolbarMount}
+                    toolbarMode={editorToolbarMode}
                     onReady={(ed) => { richEditorRef.current = ed; }}
                     onShiftTabExit={focusModalTitle}
                   />

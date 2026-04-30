@@ -774,4 +774,11 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   lockedBannerMessage: "Le serveur a été verrouillé (par un administrateur ou suite à un redémarrage du service). Vos notes restent lisibles depuis cet appareil, mais les modifications ne se synchroniseront qu'après le déverrouillage par un administrateur.",
   lockedBannerUnlock: "Déverrouiller",
   dismiss: "Fermer",
+
+  // Mode de la barre d'outils d'édition
+  editorToolbarMode: "Mode de la barre d'outils d'édition",
+  editorToolbarModeSimple: "Simple",
+  editorToolbarModeSimpleDesc: "Afficher uniquement les outils de mise en forme les plus courants.",
+  editorToolbarModeAdvanced: "Avancé",
+  editorToolbarModeAdvancedDesc: "Afficher tous les outils disponibles.",
 };

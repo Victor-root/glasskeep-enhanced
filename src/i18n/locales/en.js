@@ -773,4 +773,11 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   lockedBannerMessage: "The server has been locked (by an administrator, or following a service restart). Your notes stay readable from this device, but changes won't sync until an admin unlocks the instance.",
   lockedBannerUnlock: "Unlock now",
   dismiss: "Dismiss",
+
+  // Editor toolbar mode
+  editorToolbarMode: "Editor toolbar mode",
+  editorToolbarModeSimple: "Simple",
+  editorToolbarModeSimpleDesc: "Show only the most common formatting tools.",
+  editorToolbarModeAdvanced: "Advanced",
+  editorToolbarModeAdvancedDesc: "Show all available formatting tools.",
 };

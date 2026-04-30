@@ -57,6 +57,9 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     // the toolbar inside its sticky header so it stays pinned while the note
     // scrolls.
     toolbarContainer = null,
+    // "simple" shows only essential formatting tools on one row.
+    // "advanced" shows the full multi-row toolbar (default behaviour).
+    toolbarMode = "simple",
   },
   ref,
 ) {
@@ -191,7 +194,7 @@ const RichTextEditor = forwardRef(function RichTextEditor(
   }, [editor, editable]);
 
   const toolbar = editable && showToolbar && editor
-    ? <RichTextToolbar editor={editor} />
+    ? <RichTextToolbar editor={editor} mode={toolbarMode} />
     : null;
 
   return (

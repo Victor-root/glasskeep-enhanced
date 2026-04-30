@@ -359,7 +359,7 @@ function FontFamilyPopover({ editor, anchorRef, open, onClose }) {
 // (No "More" menu — every tool from the spec stays visible in the main bar
 // in a Word-style dense layout.)
 
-export default function RichTextToolbar({ editor, compact = false }) {
+export default function RichTextToolbar({ editor, compact = false, mode = "simple" }) {
   useEditorSignal(editor);
 
   const [openMenu, setOpenMenu] = useState(null); // name of the open popover
@@ -449,6 +449,116 @@ export default function RichTextToolbar({ editor, compact = false }) {
     ? listItemIndent > 0
     : !!editor.can().outdent?.();
 
+  // ── Simple toolbar — single flat row with essential tools only ──────────
+  if (mode === "simple") {
+    return (
+      <div className={`rt-toolbar${compact ? " rt-toolbar--compact" : ""}`} role="toolbar" aria-label={t("fmtToolbarLabel")}>
+        <div className="rt-sg">
+          <div className="rt-sg-row">
+            <ToolbarButton active={isActive("bold")} title={t("fmtBold")} onClick={() => chain().toggleBold().run()}>
+              <RichIcons.Bold />
+            </ToolbarButton>
+            <ToolbarButton active={isActive("italic")} title={t("fmtItalic")} onClick={() => chain().toggleItalic().run()}>
+              <RichIcons.Italic />
+            </ToolbarButton>
+            <div className="rt-splitbtn">
+              <ToolbarButton
+                active={isActive("underline")}
+                title={t("fmtUnderline")}
+                onClick={() => chain().toggleUnderline({ style: underlineAttrs.style || "simple", color: underlineAttrs.color || null }).run()}
+              >
+                <RichIcons.Underline style={underlineAttrs.style} color={underlineAttrs.color} />
+              </ToolbarButton>
+              <button
+                ref={underlineBtnRef}
+                type="button"
+                className={`rt-btn rt-btn--chevron${openMenu === "underline" ? " is-active" : ""}`}
+                data-tooltip={t("fmtUnderlineOptions")}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => toggleMenu("underline")}
+              >
+                <RichIcons.Chevron />
+              </button>
+              <UnderlinePopover editor={editor} anchorRef={underlineBtnRef} open={openMenu === "underline"} onClose={closeMenu} />
+            </div>
+            <ToolbarButton active={isActive("strike")} title={t("fmtStrike")} onClick={() => chain().toggleStrike().run()}>
+              <RichIcons.Strike />
+            </ToolbarButton>
+
+            <span className="rt-sep" aria-hidden="true" />
+
+            <button
+              ref={colorBtnRef}
+              type="button"
+              className={`rt-btn rt-btn--swatch rt-btn--has-chevron${currentColor ? " is-active" : ""}`}
+              data-tooltip={t("fmtTextColor")}
+              aria-label={t("fmtTextColor")}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => toggleMenu("color")}
+            >
+              <RichIcons.TextColor swatch={currentColor || "#111827"} />
+              <RichIcons.Chevron />
+            </button>
+            <ColorPopover editor={editor} anchorRef={colorBtnRef} open={openMenu === "color"} onClose={closeMenu} />
+            <button
+              ref={hlBtnRef}
+              type="button"
+              className={`rt-btn rt-btn--swatch rt-btn--has-chevron${currentHighlight ? " is-active" : ""}`}
+              data-tooltip={t("fmtHighlight")}
+              aria-label={t("fmtHighlight")}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => toggleMenu("highlight")}
+            >
+              <RichIcons.Highlight swatch={currentHighlight || DEFAULT_HIGHLIGHT_SWATCH} />
+              <RichIcons.Chevron />
+            </button>
+            <HighlightPopover editor={editor} anchorRef={hlBtnRef} open={openMenu === "highlight"} onClose={closeMenu} />
+
+            <span className="rt-sep" aria-hidden="true" />
+
+            <ToolbarButton active={isActive("bulletList")} title={t("fmtBulletList")} onClick={() => chain().toggleBulletList().run()}>
+              <RichIcons.BulletList />
+            </ToolbarButton>
+            <ToolbarButton active={isActive("orderedList")} title={t("fmtOrderedList")} onClick={() => chain().toggleOrderedList().run()}>
+              <RichIcons.OrderedList />
+            </ToolbarButton>
+
+            <span className="rt-sep" aria-hidden="true" />
+
+            <ToolbarButton active={isAlignLeft} title={t("fmtAlignLeft")} onClick={() => chain().setTextAlign("left").run()}>
+              <RichIcons.AlignLeft />
+            </ToolbarButton>
+            <ToolbarButton active={isAlignCenter} title={t("fmtAlignCenter")} onClick={() => chain().setTextAlign("center").run()}>
+              <RichIcons.AlignCenter />
+            </ToolbarButton>
+            <ToolbarButton active={isAlignRight} title={t("fmtAlignRight")} onClick={() => chain().setTextAlign("right").run()}>
+              <RichIcons.AlignRight />
+            </ToolbarButton>
+
+            <span className="rt-sep" aria-hidden="true" />
+
+            <div className="rt-pop-wrap rt-pop-wrap--link" ref={linkBtnRef}>
+              <button
+                type="button"
+                className={`rt-btn rt-btn--link${isActive("link") || openMenu === "link" ? " is-active" : ""}`}
+                data-tooltip={t("fmtLink")}
+                aria-label={t("fmtLink")}
+                aria-pressed={isActive("link") ? "true" : undefined}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => toggleMenu("link")}
+              >
+                <RichIcons.Link />
+                <span className="rt-btn-label">www</span>
+              </button>
+              <LinkPopover editor={editor} anchorRef={linkBtnRef} open={openMenu === "link"} onClose={closeMenu} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Advanced toolbar — full multi-row ribbon (current behaviour) ─────────
   return (
     <div className={`rt-toolbar${compact ? " rt-toolbar--compact" : ""}`} role="toolbar" aria-label={t("fmtToolbarLabel")}>
       {/*
