@@ -486,10 +486,11 @@ A major security addition focused on protecting notes at rest and providing mode
 
 ### End-to-end encryption
 - **server-side encryption**: all user notes, settings, and metadata are encrypted at rest using AES-256-GCM
-- **per-user keys**: encryption keys are derived from the user's password (PBKDF2) so each user's data is independently encrypted
+- **instance-level passphrase**: encryption keys are derived from a dedicated passphrase set by the admin (completely separate from user login passwords) — PBKDF2 key derivation protects against brute force
+- **shared encryption key**: all users' data on the instance is encrypted under the same master key derived from the admin's passphrase
 - **transparent operation**: encryption/decryption happens automatically on the server; the browser sends and receives encrypted payloads
-- **admin configuration**: admins can enable or disable encryption globally from the admin panel
-- **recovery**: if encryption is enabled, the "Recovery Secret Key" serves as a backup access method
+- **admin configuration**: admins can enable or disable encryption globally from the admin panel, set the passphrase during initialization
+- **recovery**: if encryption is enabled, the "Recovery Secret Key" serves as a backup access method (shown once during setup, never stored or re-fetchable)
 
 ### WebAuthn passkeys
 - **passwordless registration & login**: users can register passkeys (biometrics, security keys, synced credentials) directly from the settings panel
@@ -501,10 +502,11 @@ A major security addition focused on protecting notes at rest and providing mode
 ### Implementation details
 
 #### Encryption layer (`server/encryption/`)
-- **key derivation**: PBKDF2 with 310,000 iterations (OWASP current recommendation) to derive encryption keys from passwords
-- **encryption**: AES-256-GCM with per-operation IVs (initialization vectors) ensures even identical plaintext produces different ciphertexts
+- **key derivation**: PBKDF2 with 310,000 iterations (OWASP current recommendation) derives the master encryption key from the admin's instance passphrase
+- **encryption**: AES-256-GCM with per-operation IVs (initialization vectors) ensures even identical plaintext produces different ciphertexts — each note/setting gets a fresh random IV
 - **metadata**: encrypted payloads include a version number and are stored as base64url so they play nicely with JSON APIs and databases
-- **unlocking**: decryption requires the plaintext password; the server compares a hash of the password against a stored hash (not the password itself)
+- **unlocking**: server-side decryption requires the admin passphrase; the server derives the key and unwraps the Data Encryption Key (DEK) stored in the vault
+- **recovery path**: the DEK is also wrapped under a recovery key that the admin generates during setup (shown once, never stored) — admins can always unlock the instance via the recovery key even if the passphrase is forgotten
 
 #### Passkey routes (`server/routes/passkeyRoutes.js`)
 - **registration**: user initiates passkey setup → server generates WebAuthn challenge options → browser collects credential → server verifies and stores
@@ -522,9 +524,10 @@ A major security addition focused on protecting notes at rest and providing mode
 ### Security considerations
 - **HTTPS requirement**: WebAuthn only works over HTTPS (or localhost), enforced by the browser — Docker deployments must use a reverse proxy with HTTPS
 - **RP ID / origin validation**: the server validates that the passkey origin matches the configured domain (`WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` env vars or auto-detected from headers with trust-proxy enabled)
-- **counter attacks**: authenticator counter is checked on each assertion to detect cloning attempts
-- **password strength**: even with passkeys enabled, password-based login remains available; passwords are still hashed (bcrypt) and optional passkeys are additive, not mandatory
-- **recovery key**: users without passkeys must keep the recovery secret key safe — it's the only way to unlock the vault if they lose access
+- **counter attacks**: authenticator counter is checked on each assertion to detect cloned authenticators
+- **passphrase strength**: the encryption passphrase is separate from user login passwords and should be treated as a critical secret — it protects all data on the instance
+- **recovery key**: the recovery key generated during encryption setup is the backup to unlock the vault if the passphrase is lost — it must be stored securely (offline recommended)
+- **password-based login**: user passwords (for login) are independent of encryption — they are still hashed (bcrypt) and authentication remains passwordless-optional via passkeys
 
 ### Configuration for deployments
 
