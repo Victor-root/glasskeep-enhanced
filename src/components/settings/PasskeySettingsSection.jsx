@@ -53,8 +53,8 @@ export default function PasskeySettingsSection({
   // toast emitter.
   const showToastRef = useRef(showToast);
   useEffect(() => { showToastRef.current = showToast; }, [showToast]);
-  const toast = useCallback((msg, type) => {
-    if (showToastRef.current) showToastRef.current(msg, type);
+  const toast = useCallback((msg, type, duration) => {
+    if (showToastRef.current) showToastRef.current(msg, type, duration);
   }, []);
 
   // refresh's only real input is `token`. Background fetch failures
@@ -89,8 +89,9 @@ export default function PasskeySettingsSection({
       toast(t("passkeyAddedSuccess"), "success");
       if (!r.prfSupported) {
         // Tell the user explicitly so they don't expect the
-        // instance-unlock toggle to light up.
-        toast(t("passkeyNoPrfNotice"), "info");
+        // instance-unlock toggle to light up. Long-form notice → 10s
+        // so it can actually be read.
+        toast(t("passkeyNoPrfNotice"), "info", 10000);
       }
       await refresh();
     } catch (e) {
