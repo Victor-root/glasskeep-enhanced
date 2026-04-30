@@ -278,7 +278,7 @@ export default function ModalFooter({
                         }, 200);
                       }}
                       onPaste={handleTagPaste}
-                      placeholder={t("searchOrCreateTag") || "Rechercher ou cr\u00e9er\u2026"}
+                      placeholder={t("searchOrCreateTag")}
                       className="flex-1 bg-transparent text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none min-w-0"
                     />
                   </div>
@@ -288,7 +288,7 @@ export default function ModalFooter({
                 {filtered.length > 0 && (
                   <>
                     <div className="px-3 pt-1 pb-1">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{t("existingTags") || "Tags"}</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{t("existingTags")}</span>
                     </div>
                     <div className="px-1.5 pb-1.5 max-h-52 overflow-y-auto">
                       {filtered.map(({ tag, count }) => {
@@ -330,7 +330,7 @@ export default function ModalFooter({
                 )}
 
                 {filtered.length === 0 && !isNew && (
-                  <div className="px-3 py-3 text-sm text-gray-400 dark:text-gray-500 text-center">{t("noTagsFound") || "Aucun tag trouv\u00e9"}</div>
+                  <div className="px-3 py-3 text-sm text-gray-400 dark:text-gray-500 text-center">{t("noTagsFound")}</div>
                 )}
 
                 {isNew && (
@@ -352,7 +352,7 @@ export default function ModalFooter({
                             <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
                           </svg>
                         </span>
-                        <span className="font-medium text-emerald-600 dark:text-emerald-400">{t("createTag") || "Cr\u00e9er"} "<span className="font-semibold">{trimmed}</span>"</span>
+                        <span className="font-medium text-emerald-600 dark:text-emerald-400">{t("createTag")} "<span className="font-semibold">{trimmed}</span>"</span>
                       </button>
                     </div>
                   </>
