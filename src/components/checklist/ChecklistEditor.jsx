@@ -268,7 +268,7 @@ export default function ChecklistEditor({
   );
 
   return (
-    <div className="space-y-4 md:space-y-2 max-sm:-mx-4">
+    <div className="space-y-4 md:space-y-3 max-sm:-mx-4">
       {items.length > 0 ? (
         <div className="space-y-6 md:space-y-4">
           {sections.map((section) => {
@@ -289,9 +289,9 @@ export default function ChecklistEditor({
 
             if (isDefault) {
               return (
-                <div key={section.id} data-section-block={section.id} className="space-y-2 md:space-y-1">
+                <div key={section.id} data-section-block={section.id} className="space-y-3 md:space-y-1">
                   {insertPosition === "top" && topAddRow}
-                  <div className="space-y-2">{uncheckedInSection.map(renderItemRow)}</div>
+                  <div className="space-y-3">{uncheckedInSection.map(renderItemRow)}</div>
                   {insertPosition === "bottom" && topAddRow}
                 </div>
               );
@@ -331,7 +331,7 @@ export default function ChecklistEditor({
                     />
                   </div>
                   {!isCollapsed && uncheckedInSection.length > 0 && (
-                    <div className="pl-3 space-y-2 pt-1 pb-2" style={itemsAreaStyle}>
+                    <div className="pl-3 space-y-3 pt-1 pb-2" style={itemsAreaStyle}>
                       {uncheckedInSection.map(renderItemRow)}
                     </div>
                   )}
