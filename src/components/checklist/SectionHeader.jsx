@@ -20,28 +20,10 @@ export function hexAlpha(hex, alpha) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-function ColorPicker({ colorKey, onChange, onClose, triggerRef }) {
-  const ref = React.useRef(null);
-
-  React.useEffect(() => {
-    const handler = (e) => {
-      if (ref.current?.contains(e.target)) return;
-      if (triggerRef?.current?.contains(e.target)) return;
-      // Prevent keyboard opening on mobile when closing picker by tapping an input
-      if (e.target.matches('input, textarea, [contenteditable="true"]')) {
-        e.preventDefault();
-      }
-      onClose();
-    };
-    document.addEventListener("pointerdown", handler, true);
-    return () => document.removeEventListener("pointerdown", handler, true);
-  }, [onClose, triggerRef]);
-
+function ColorPicker({ colorKey, onChange, onClose }) {
   return (
-    <div
-      ref={ref}
-      className="absolute z-50 top-full left-0 mt-1 p-1.5 rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-[var(--border-light)] flex gap-1"
-    >
+    <div className="absolute z-50 top-full left-0 mt-1 p-1.5 rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-[var(--border-light)] flex gap-1">
+
       {/* No-color option */}
       <button
         type="button"
@@ -96,7 +78,6 @@ export default function SectionHeader({
   const inputRef = React.useRef(null);
   const confirmTimerRef = React.useRef(null);
   const enterPressedRef = React.useRef(false);
-  const colorTriggerRef = React.useRef(null);
 
   const colorKey = section.color || DEFAULT_SECTION_COLOR;
   const colorHex = SECTION_COLORS.find((c) => c.key === colorKey)?.hex ?? null;
@@ -185,11 +166,17 @@ export default function SectionHeader({
       {/* Color picker trigger */}
       {onColorChange && (
         <div className="relative flex-shrink-0">
+          {/* Backdrop: absorbs all pointer events outside the picker so nothing behind gets clicked/focused */}
+          {pickerOpen && (
+            <div
+              className="fixed inset-0 z-40"
+              onPointerDown={(e) => { e.preventDefault(); setPickerOpen(false); }}
+            />
+          )}
           <button
-            ref={colorTriggerRef}
             type="button"
             onClick={() => setPickerOpen((o) => !o)}
-            className={`w-3.5 h-3.5 rounded-full transition-transform hover:scale-110 focus:outline-none flex-shrink-0 flex items-center justify-center${colorHex ? "" : " border-2 border-gray-300 dark:border-gray-500"}`}
+            className={`relative z-[41] w-3.5 h-3.5 rounded-full transition-transform hover:scale-110 focus:outline-none flex-shrink-0 flex items-center justify-center${colorHex ? "" : " border-2 border-gray-300 dark:border-gray-500"}`}
             style={colorHex ? { background: colorHex } : undefined}
             aria-label={t("sectionColor")}
             data-tooltip={t("sectionColor")}
@@ -205,7 +192,6 @@ export default function SectionHeader({
               colorKey={colorKey}
               onChange={onColorChange}
               onClose={() => setPickerOpen(false)}
-              triggerRef={colorTriggerRef}
             />
           )}
         </div>
