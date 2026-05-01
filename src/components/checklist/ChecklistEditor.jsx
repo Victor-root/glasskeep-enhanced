@@ -368,10 +368,6 @@ export default function ChecklistEditor({
                 type="button"
                 onClick={() => setDoneCollapsed((c) => !c)}
                 className="flex items-center gap-1.5 w-full text-left px-2 py-1.5 -mx-2 rounded-sm mb-3 transition-colors"
-                style={{
-                  background: hexAlpha("#64748b", 0.08),
-                  borderBottom: `1px solid ${hexAlpha("#64748b", 0.18)}`,
-                }}
               >
                 <svg
                   className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 text-gray-400 dark:text-gray-500${doneCollapsed ? " -rotate-90" : ""}`}
