@@ -250,37 +250,34 @@ export default function ChecklistEditor({
             const uncheckedInSection = section.items.filter((it) => !it.done);
             const isDefault = section.id === DEFAULT_SECTION_ID;
             const isCollapsed = !isDefault && collapsedSections.has(section.id);
-            // Zebra: alternate a very light tint on the header row only.
-            const zebraHeaderBg = !isDefault && sectionIndex % 2 === 1
-              ? "bg-black/[2%] dark:bg-white/[2.5%]"
-              : "";
             const sectionAddBtn = !isDefault ? (
               <button
                 type="button"
                 data-checklist-row
-                className="flex items-center gap-2 pl-8 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                className="flex items-center gap-2 pl-4 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
                 onClick={() => addItemToSection(section.id)}
               >
                 <span className="leading-none">+</span>
                 <span>{t("addToSectionEllipsis")}</span>
               </button>
             ) : null;
-            // The default section hosts the global "+ list item" button
-            // (the escape hatch for unsectioned items). We render it
-            // even when empty so the button stays anchored where the
-            // new item will actually appear.
             const addBtn = isDefault ? topAddRow : sectionAddBtn;
             return (
               <div
                 key={section.id}
                 data-section-block={section.id}
-                className="space-y-2 md:space-y-1"
+                className={
+                  isDefault
+                    ? "space-y-2 md:space-y-1"
+                    // Left bar: the main visual differentiator for named sections.
+                    // Change border-indigo-400/60 or border-l-[3px] to adjust color/thickness.
+                    : "space-y-1 border-l-[3px] border-indigo-400/60 dark:border-indigo-400/40 pl-3"
+                }
               >
                 {!isDefault && (
                   <div
                     data-checklist-row
                     data-section-header={section.id}
-                    className={zebraHeaderBg}
                   >
                     <SectionHeader
                       section={section}
@@ -300,7 +297,7 @@ export default function ChecklistEditor({
                 {!isCollapsed && (
                   <>
                     {insertPosition === "top" && addBtn}
-                    <div className={!isDefault ? "pl-4" : ""}>
+                    <div className={!isDefault ? "pl-3" : ""}>
                       {uncheckedInSection.map(renderItemRow)}
                     </div>
                     {insertPosition === "bottom" && addBtn}

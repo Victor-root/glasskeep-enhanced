@@ -131,7 +131,7 @@ export default function SectionHeader({
         />
       ) : (
         <h4
-          className="flex-1 text-sm font-semibold text-gray-600 dark:text-gray-300 cursor-text py-0.5"
+          className="flex-1 text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-text py-0.5"
           onClick={() => setEditing(true)}
         >
           {section.title || t("sectionTitlePlaceholder")}
