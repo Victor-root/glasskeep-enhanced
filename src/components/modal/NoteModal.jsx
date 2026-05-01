@@ -14,14 +14,13 @@ import DrawingCanvas from "../../DrawingCanvas";
 import ModalHeader from "./ModalHeader.jsx";
 import ModalFooter from "./ModalFooter.jsx";
 import ModalImagesGrid from "./ModalImagesGrid.jsx";
-import NoteIconEditor from "./NoteIconEditor.jsx";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog.jsx";
 import CollaborationModal from "./CollaborationModal.jsx";
 import FullscreenImageViewer from "./FullscreenImageViewer.jsx";
 import OfflineCollabBanner from "./OfflineCollabBanner.jsx";
 import ChecklistEditor from "../checklist/ChecklistEditor.jsx";
 import useModalHistory from "../../hooks/useModalHistory.js";
-import { getNoteIcon, getContentImages } from "../../utils/noteIcon.js";
+import { getContentImages } from "../../utils/noteIcon.js";
 import { renderSafeMarkdown, linkifyContactsHTML } from "../../utils/markdown.jsx";
 import RichTextEditor from "../richtext/RichTextEditor.jsx";
 import { contentToHTML, serializeRichContent, isRichContent } from "../../utils/richText.js";
@@ -505,23 +504,16 @@ export default function NoteModal({
             />
 
             {!isDrawEdit && (
-              <>
-                {/* Content images only — the optional note icon (logo
-                    badge) lives in mImages with role:"icon" but is
-                    rendered separately by NoteIconEditor below. */}
-                <ModalImagesGrid
-                  images={getContentImages(mImages)}
-                  onOpenViewer={openImageViewer}
-                  onRemoveImage={(id) => setMImages((prev) => prev.filter((x) => x.id !== id))}
-                  canRemove={mType === "checklist" || !viewMode}
-                />
-                <NoteIconEditor
-                  icon={getNoteIcon(mImages)}
-                  canEdit={mType === "checklist" || !viewMode}
-                  onReplace={() => modalIconFileRef?.current?.click()}
-                  onRemove={() => removeNoteIcon && removeNoteIcon()}
-                />
-              </>
+              /* Content images only — the optional note icon (logo
+                 badge) lives in mImages with role:"icon" and is
+                 managed exclusively through the footer "Image"
+                 sub-menu, never as an inline modal block. */
+              <ModalImagesGrid
+                images={getContentImages(mImages)}
+                onOpenViewer={openImageViewer}
+                onRemoveImage={(id) => setMImages((prev) => prev.filter((x) => x.id !== id))}
+                canRemove={mType === "checklist" || !viewMode}
+              />
             )}
 
             <OfflineCollabBanner visible={isCollaborativeNote(activeId) && syncState === "offline"} />

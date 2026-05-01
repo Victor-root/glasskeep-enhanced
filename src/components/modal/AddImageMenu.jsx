@@ -30,6 +30,7 @@ export default function AddImageMenu({
       >
         <button
           className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+          style={{ color: dark ? "#7dd3fc" : "#0284c7" }}
           onClick={() => { onAddImage(); onClose?.(); }}
         >
           <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -43,10 +44,14 @@ export default function AddImageMenu({
           style={{ color: dark ? "#c4b5fd" : "#7c3aed" }}
           onClick={() => { onAddIcon(); onClose?.(); }}
         >
-          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="4" y="4" width="16" height="16" rx="3" />
-            <circle cx="12" cy="11" r="2.2" fill="currentColor" stroke="none" />
-            <path d="M7 17l3-3 2 2 3-4 2 3" />
+          {/* Tabler · photo-circle-plus */}
+          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" />
+            <path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l3.5 3.5" />
+            <path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0" />
+            <path d="M16 19h6" />
+            <path d="M19 16v6" />
+            <path d="M12.5 7.5l.01 0" />
           </svg>
           <span>{hasIcon ? t("replaceLogo") : t("addLogo")}</span>
         </button>
