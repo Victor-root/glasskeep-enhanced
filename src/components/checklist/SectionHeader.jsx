@@ -20,9 +20,22 @@ export function hexAlpha(hex, alpha) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-function ColorPicker({ colorKey, onChange, onClose }) {
+function ColorPicker({ colorKey, onChange, onClose, onOutsideClose, triggerRef }) {
+  const ref = React.useRef(null);
+
+  React.useEffect(() => {
+    const onPointerDown = (e) => {
+      if (ref.current?.contains(e.target)) return;
+      if (triggerRef?.current?.contains(e.target)) return;
+      e.preventDefault();
+      onOutsideClose();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [onOutsideClose, triggerRef]);
+
   return (
-    <div className="absolute z-50 top-full left-0 mt-1 p-1.5 rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-[var(--border-light)] flex gap-1">
+    <div ref={ref} className="absolute z-50 top-full left-0 mt-1 p-1.5 rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-[var(--border-light)] flex gap-1">
 
       {/* No-color option */}
       <button
@@ -78,6 +91,21 @@ export default function SectionHeader({
   const inputRef = React.useRef(null);
   const confirmTimerRef = React.useRef(null);
   const enterPressedRef = React.useRef(false);
+  const triggerBtnRef = React.useRef(null);
+  const suppressNextClickRef = React.useRef(false);
+
+  // Persistent click suppressor — stays active as long as SectionHeader is mounted,
+  // so it catches the click that fires after ColorPicker unmounts on outside-close.
+  React.useEffect(() => {
+    const handler = (e) => {
+      if (!suppressNextClickRef.current) return;
+      suppressNextClickRef.current = false;
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    document.addEventListener("click", handler, true);
+    return () => document.removeEventListener("click", handler, true);
+  }, []);
 
   const colorKey = section.color || DEFAULT_SECTION_COLOR;
   const colorHex = SECTION_COLORS.find((c) => c.key === colorKey)?.hex ?? null;
@@ -166,17 +194,11 @@ export default function SectionHeader({
       {/* Color picker trigger */}
       {onColorChange && (
         <div className="relative flex-shrink-0">
-          {/* Backdrop: absorbs all pointer events outside the picker so nothing behind gets clicked/focused */}
-          {pickerOpen && (
-            <div
-              className="fixed inset-0 z-40"
-              onPointerDown={(e) => { e.preventDefault(); setPickerOpen(false); }}
-            />
-          )}
           <button
+            ref={triggerBtnRef}
             type="button"
             onClick={() => setPickerOpen((o) => !o)}
-            className={`relative z-[41] w-3.5 h-3.5 rounded-full transition-transform hover:scale-110 focus:outline-none flex-shrink-0 flex items-center justify-center${colorHex ? "" : " border-2 border-gray-300 dark:border-gray-500"}`}
+            className={`w-3.5 h-3.5 rounded-full transition-transform hover:scale-110 focus:outline-none flex-shrink-0 flex items-center justify-center${colorHex ? "" : " border-2 border-gray-300 dark:border-gray-500"}`}
             style={colorHex ? { background: colorHex } : undefined}
             aria-label={t("sectionColor")}
             data-tooltip={t("sectionColor")}
@@ -192,6 +214,8 @@ export default function SectionHeader({
               colorKey={colorKey}
               onChange={onColorChange}
               onClose={() => setPickerOpen(false)}
+              onOutsideClose={() => { suppressNextClickRef.current = true; setPickerOpen(false); }}
+              triggerRef={triggerBtnRef}
             />
           )}
         </div>
