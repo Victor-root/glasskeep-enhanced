@@ -281,7 +281,12 @@ export default function ChecklistEditor({
               ? (SECTION_COLORS.find((c) => c.key === colorKey) || SECTION_COLORS[1]).hex
               : null;
             const accentBorder = colorHex
-              ? { borderLeft: `3px solid ${hexAlpha(colorHex, 0.6)}`, paddingLeft: "0.75rem" }
+              ? {
+                  borderLeft: `3px solid ${hexAlpha(colorHex, 0.6)}`,
+                  paddingLeft: "0.75rem",
+                  background: hexAlpha(colorHex, 0.04),
+                  borderRadius: "0 0.375rem 0.375rem 0",
+                }
               : undefined;
 
             if (isDefault) {
@@ -303,7 +308,20 @@ export default function ChecklistEditor({
                       section={section}
                       onRename={(title) => renameSection(section.id, title)}
                       onRemove={() => removeSection(section.id)}
-                      onEnter={() => addItemToSection(section.id)}
+                      onEnter={(pendingTitle) => {
+                        // Atomically apply a pending title rename (from Enter key) + add item
+                        // so both changes share one setEntries call and neither overwrites the other.
+                        const base = pendingTitle !== undefined
+                          ? updateEntry(items, section.id, { title: pendingTitle })
+                          : items;
+                        const newItem = makeItem("", false);
+                        const next = insertPosition === "top"
+                          ? insertAtSectionStart(base, section.id, newItem)
+                          : insertAtSectionEnd(base, section.id, newItem);
+                        setEntries(next);
+                        syncEntries(next);
+                        requestFocus(newItem.id, "end");
+                      }}
                       onColorChange={(colorKey) => changeColor(section.id, colorKey)}
                       onHandlePointerDown={handleSectionPointerDown}
                       onHandlePointerMove={handleSectionPointerMove}

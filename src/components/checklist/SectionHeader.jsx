@@ -75,6 +75,7 @@ export default function SectionHeader({
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const inputRef = React.useRef(null);
   const confirmTimerRef = React.useRef(null);
+  const enterPressedRef = React.useRef(false);
 
   const colorKey = section.color || DEFAULT_SECTION_COLOR;
   const colorHex = (SECTION_COLORS.find((c) => c.key === colorKey) || SECTION_COLORS[1]).hex;
@@ -107,8 +108,8 @@ export default function SectionHeader({
   };
 
   const headerStyle = {
-    background: hexAlpha(colorHex, 0.08),
-    borderBottom: `1px solid ${hexAlpha(colorHex, 0.18)}`,
+    background: hexAlpha(colorHex, 0.12),
+    borderBottom: `1px solid ${hexAlpha(colorHex, 0.2)}`,
   };
 
   const countStyle = {
@@ -186,10 +187,21 @@ export default function SectionHeader({
           defaultValue={section.title}
           className="flex-1 bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-200 focus:outline-none border-0 border-b border-[var(--border-light)] px-0 py-0"
           placeholder={t("sectionTitlePlaceholder")}
-          onBlur={(e) => commit(e.target.value)}
+          onBlur={(e) => {
+            if (enterPressedRef.current) { enterPressedRef.current = false; return; }
+            commit(e.target.value);
+          }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); commit(e.currentTarget.value); onEnter?.(); }
-            else if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
+            if (e.key === "Enter") {
+              e.preventDefault();
+              const val = (e.currentTarget.value ?? "").trim();
+              enterPressedRef.current = true;
+              setEditing(false);
+              onEnter?.(val);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              setEditing(false);
+            }
           }}
         />
       ) : (
