@@ -300,7 +300,7 @@ export default function ChecklistEditor({
             return (
               <div key={section.id} data-section-block={section.id} className="space-y-1">
                 {/* Left-bordered wrapper: header + items only (not add button) */}
-                <div style={accentBorder} className="space-y-1">
+                <div style={accentBorder}>
                   <div data-checklist-row data-section-header={section.id}>
                     <SectionHeader
                       section={section}
