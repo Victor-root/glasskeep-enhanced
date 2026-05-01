@@ -153,7 +153,7 @@ export default function ChecklistRow({
 
       {(showRemove || !readOnly) && (
         <button
-          className={`${removeVisibility} transition-opacity text-gray-500 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 rounded-full border border-[var(--border-light)] flex items-center justify-center cursor-pointer ${removeSize}`}
+          className={`${removeVisibility} -translate-x-2 transition-opacity text-gray-500 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 rounded-full flex items-center justify-center cursor-pointer ${removeSize}`}
           data-tooltip={t("removeItem")}
           onClick={onRemove}
         >
