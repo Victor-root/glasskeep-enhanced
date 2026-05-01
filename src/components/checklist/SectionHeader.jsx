@@ -127,9 +127,12 @@ export default function SectionHeader({
   } : {};
 
   const countStyle = colorHex ? {
-    background: hexAlpha(colorHex, 0.14),
+    background: hexAlpha(colorHex, 0.3),
     color: colorHex,
-  } : {};
+  } : {
+    background: "rgba(0,0,0,0.08)",
+    color: "rgba(0,0,0,0.45)",
+  };
 
   return (
     <div
