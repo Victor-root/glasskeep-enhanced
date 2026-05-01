@@ -54,6 +54,16 @@ export default function ChecklistEditor({
   const [focusItemId, setFocusItemId] = React.useState(null);
   const [focusCaret, setFocusCaret] = React.useState("end");
   const [doneCollapsed, setDoneCollapsed] = React.useState(false);
+  const [collapsedSections, setCollapsedSections] = React.useState(new Set());
+
+  const toggleSectionCollapse = React.useCallback((id) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
   const requestFocus = React.useCallback((id, caret = "end") => {
     setFocusItemId(id);
     setFocusCaret(caret);
@@ -235,10 +245,15 @@ export default function ChecklistEditor({
   return (
     <div className="space-y-4 md:space-y-2 max-sm:-mx-4">
       {items.length > 0 ? (
-        <div className="space-y-4 md:space-y-2">
-          {sections.map((section) => {
+        <div className="space-y-6 md:space-y-4">
+          {sections.map((section, sectionIndex) => {
             const uncheckedInSection = section.items.filter((it) => !it.done);
             const isDefault = section.id === DEFAULT_SECTION_ID;
+            const isCollapsed = !isDefault && collapsedSections.has(section.id);
+            // Zebra: alternate a very light tint on odd-indexed named sections.
+            const zebraBg = !isDefault && sectionIndex % 2 === 1
+              ? "bg-black/[1.8%] dark:bg-white/[2.5%]"
+              : "";
             const sectionAddBtn = !isDefault ? (
               <button
                 type="button"
@@ -259,7 +274,7 @@ export default function ChecklistEditor({
               <div
                 key={section.id}
                 data-section-block={section.id}
-                className="space-y-4 md:space-y-2"
+                className={`space-y-2 md:space-y-1 ${zebraBg}`}
               >
                 {!isDefault && (
                   <div data-checklist-row data-section-header={section.id}>
@@ -272,12 +287,21 @@ export default function ChecklistEditor({
                       onHandlePointerMove={handleSectionPointerMove}
                       onHandlePointerUp={handleSectionPointerUp}
                       onHandlePointerCancel={handleSectionPointerCancel}
+                      collapsed={isCollapsed}
+                      onToggleCollapse={() => toggleSectionCollapse(section.id)}
+                      count={section.items.length}
                     />
                   </div>
                 )}
-                {insertPosition === "top" && addBtn}
-                {uncheckedInSection.map(renderItemRow)}
-                {insertPosition === "bottom" && addBtn}
+                {!isCollapsed && (
+                  <>
+                    {insertPosition === "top" && addBtn}
+                    <div className={!isDefault ? "pl-4" : ""}>
+                      {uncheckedInSection.map(renderItemRow)}
+                    </div>
+                    {insertPosition === "bottom" && addBtn}
+                  </>
+                )}
               </div>
             );
           })}

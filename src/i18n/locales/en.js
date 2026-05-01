@@ -780,4 +780,8 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   editorToolbarModeSimpleDesc: "Show only the most common formatting tools.",
   editorToolbarModeAdvanced: "Advanced",
   editorToolbarModeAdvancedDesc: "Show all available formatting tools.",
+
+  // Checklist section
+  collapseSection: "Collapse section",
+  expandSection: "Expand section",
 };

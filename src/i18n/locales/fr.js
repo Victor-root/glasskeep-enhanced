@@ -781,4 +781,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   editorToolbarModeSimpleDesc: "Afficher uniquement les outils de mise en forme les plus courants.",
   editorToolbarModeAdvanced: "Avancé",
   editorToolbarModeAdvancedDesc: "Afficher tous les outils disponibles.",
+
+  // Section checklist
+  collapseSection: "Replier la section",
+  expandSection: "Déplier la section",
 };
