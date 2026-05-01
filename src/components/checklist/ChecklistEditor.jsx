@@ -278,7 +278,7 @@ export default function ChecklistEditor({
 
             const colorKey = !isDefault ? (section.color || DEFAULT_SECTION_COLOR) : null;
             const colorHex = colorKey
-              ? (SECTION_COLORS.find((c) => c.key === colorKey) || SECTION_COLORS[1]).hex
+              ? (SECTION_COLORS.find((c) => c.key === colorKey)?.hex ?? null)
               : null;
             const accentBorder = colorHex
               ? { borderLeft: `3px solid ${hexAlpha(colorHex, 0.6)}` }
@@ -291,7 +291,7 @@ export default function ChecklistEditor({
               return (
                 <div key={section.id} data-section-block={section.id} className="space-y-2 md:space-y-1">
                   {insertPosition === "top" && topAddRow}
-                  <div>{uncheckedInSection.map(renderItemRow)}</div>
+                  <div className="space-y-0.5">{uncheckedInSection.map(renderItemRow)}</div>
                   {insertPosition === "bottom" && topAddRow}
                 </div>
               );
@@ -331,7 +331,7 @@ export default function ChecklistEditor({
                     />
                   </div>
                   {!isCollapsed && uncheckedInSection.length > 0 && (
-                    <div className="pl-3 space-y-1 pt-1 pb-2" style={itemsAreaStyle}>
+                    <div className="pl-3 space-y-0.5 pt-1 pb-2" style={itemsAreaStyle}>
                       {uncheckedInSection.map(renderItemRow)}
                     </div>
                   )}
