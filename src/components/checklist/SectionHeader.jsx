@@ -35,7 +35,7 @@ function ColorPicker({ colorKey, onChange, onClose, onOutsideClose, triggerRef }
   }, [onOutsideClose, triggerRef]);
 
   return (
-    <div ref={ref} className="absolute z-50 top-full left-0 mt-1 p-2 sm:p-1.5 rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-[var(--border-light)] flex gap-2 sm:gap-1">
+    <div ref={ref} className="absolute z-50 top-full left-0 mt-1 p-2 sm:p-1.5 rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-[var(--border-light)] flex flex-wrap gap-2 sm:gap-1 sm:flex-nowrap" style={{ maxWidth: "calc(100vw - 1.5rem)" }}>
 
       {/* No-color option */}
       <button
@@ -210,7 +210,7 @@ export default function SectionHeader({
             ref={triggerBtnRef}
             type="button"
             onClick={() => setPickerOpen((o) => !o)}
-            className={`w-5 h-5 sm:w-3.5 sm:h-3.5 rounded-full transition-transform hover:scale-110 focus:outline-none flex-shrink-0 flex items-center justify-center${colorHex ? "" : " border-2 border-gray-300 dark:border-gray-500"}`}
+            className={`w-4 h-4 sm:w-3.5 sm:h-3.5 rounded-full transition-transform hover:scale-110 focus:outline-none flex-shrink-0 flex items-center justify-center${colorHex ? "" : " border-2 border-gray-300 dark:border-gray-500"}`}
             style={colorHex ? { background: colorHex } : undefined}
             aria-label={t("sectionColor")}
             data-tooltip={t("sectionColor")}
