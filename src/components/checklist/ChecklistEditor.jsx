@@ -1,7 +1,7 @@
 import React from "react";
 import { t } from "../../i18n";
 import ChecklistRow from "../common/ChecklistRow.jsx";
-import SectionHeader, { SECTION_COLORS, DEFAULT_SECTION_COLOR, hexAlpha } from "./SectionHeader.jsx";
+import SectionHeader, { SECTION_COLORS, DEFAULT_SECTION_COLOR, hexAlpha, useDark } from "./SectionHeader.jsx";
 import useChecklistDrag from "../../hooks/useChecklistDrag.js";
 import {
   DEFAULT_SECTION_ID,
@@ -52,6 +52,7 @@ export default function ChecklistEditor({
 
   // Focus request: incremented every time we want to move focus.
   const [focusToken, setFocusToken] = React.useState(0);
+  const dark = useDark();
   const [focusItemId, setFocusItemId] = React.useState(null);
   const [focusCaret, setFocusCaret] = React.useState("end");
 
@@ -281,10 +282,10 @@ export default function ChecklistEditor({
               ? (SECTION_COLORS.find((c) => c.key === colorKey)?.hex ?? null)
               : null;
             const accentBorder = colorHex
-              ? { borderLeft: `3px solid ${hexAlpha(colorHex, 0.6)}` }
+              ? { borderLeft: `3px solid ${hexAlpha(colorHex, dark ? 0.80 : 0.6)}` }
               : undefined;
             const itemsAreaStyle = colorHex
-              ? { background: hexAlpha(colorHex, 0.04) }
+              ? { background: hexAlpha(colorHex, dark ? 0.09 : 0.04) }
               : undefined;
 
             if (isDefault) {

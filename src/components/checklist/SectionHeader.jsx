@@ -2,6 +2,16 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { t } from "../../i18n";
 
+export function useDark() {
+  const [dark, setDark] = React.useState(() => document.documentElement.classList.contains("dark"));
+  React.useEffect(() => {
+    const obs = new MutationObserver(() => setDark(document.documentElement.classList.contains("dark")));
+    obs.observe(document.documentElement, { attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return dark;
+}
+
 export const SECTION_COLORS = [
   { key: "slate",   hex: "#64748b" },
   { key: "indigo",  hex: "#6366f1" },
@@ -132,6 +142,7 @@ export default function SectionHeader({
     return () => document.removeEventListener("click", handler, true);
   }, []);
 
+  const dark = useDark();
   const colorKey = section.color ?? "none";
   const colorHex = SECTION_COLORS.find((c) => c.key === colorKey)?.hex ?? null;
 
@@ -175,8 +186,8 @@ export default function SectionHeader({
   };
 
   const headerStyle = colorHex ? {
-    background: hexAlpha(colorHex, 0.12),
-    borderBottom: `1px solid ${hexAlpha(colorHex, 0.2)}`,
+    background: hexAlpha(colorHex, dark ? 0.22 : 0.12),
+    borderBottom: `1px solid ${hexAlpha(colorHex, dark ? 0.35 : 0.2)}`,
   } : {};
 
   const countStyle = colorHex ? {
