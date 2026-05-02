@@ -10,6 +10,7 @@ import useNoteTouchDrag from "../../hooks/useNoteTouchDrag.js";
 import { getSections, isItem, countItems, countChecked, DEFAULT_SECTION_ID } from "../../utils/checklist.js";
 import { getNoteIcon, getContentImages } from "../../utils/noteIcon.js";
 import NoteCardFooter from "./NoteCardFooter.jsx";
+import { SECTION_COLORS, hexAlpha } from "../checklist/SectionHeader.jsx";
 
 export default function NoteCard({
   n,
@@ -310,11 +311,21 @@ export default function NoteCard({
         <div className="space-y-2">
           {previewSections.map((s) => (
             <div key={s.id} className="space-y-1">
-              {hasAnyTitledSection && s.id !== DEFAULT_SECTION_ID && s.title && (
-                <div className="text-xs font-semibold tracking-wide text-gray-600 dark:text-gray-300 mt-2">
-                  {s.title}
-                </div>
-              )}
+              {hasAnyTitledSection && s.id !== DEFAULT_SECTION_ID && s.title && (() => {
+                const colorHex = SECTION_COLORS.find((c) => c.key === s.color)?.hex ?? null;
+                return (
+                  <div
+                    className="text-xs font-semibold tracking-wide mt-2 px-1.5 py-0.5 rounded"
+                    style={colorHex ? {
+                      color: colorHex,
+                      background: hexAlpha(colorHex, dark ? 0.18 : 0.10),
+                      borderLeft: `2px solid ${hexAlpha(colorHex, dark ? 0.5 : 0.35)}`,
+                    } : {}}
+                  >
+                    {s.title}
+                  </div>
+                );
+              })()}
               {s.items.map((it) => (
                 <ChecklistRow
                   key={it.id}
