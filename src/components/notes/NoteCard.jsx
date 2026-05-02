@@ -173,7 +173,7 @@ export default function NoteCard({
           button is genuinely invisible (not just covered) when tucked
           below — even if the card surface is semi-transparent.
           OnePlus 7 Pro pop-up camera vibe. */}
-      {!multiMode && !disablePin && noteIcon ? (
+      {!multiMode && !disablePin && (
         <div
           className="note-pin-popup absolute right-3 bottom-full w-10 h-14 overflow-hidden z-0 pointer-events-none group-hover:pointer-events-auto"
         >
@@ -192,7 +192,7 @@ export default function NoteCard({
             {n.pinned ? <PinFilled /> : <PinOutline />}
           </button>
         </div>
-      ) : null}
+      )}
 
       {/* Card surface — the actual visible note. Higher z-index keeps it
           in front of the pin popup. */}
@@ -240,27 +240,8 @@ export default function NoteCard({
           </div>
         </div>
       )}
-      {/* Original pin button — only when no logo icon */}
-      {!multiMode && !disablePin && !noteIcon && (
-        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-          <button
-            aria-label={n.pinned ? t("unpinNote") : t("pinNote")}
-            onClick={(e) => {
-              if (disablePin) return;
-              e.stopPropagation();
-              togglePin(n.id, !n.pinned);
-            }}
-            className="flex items-center justify-center w-8 h-8 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 opacity-70 hover:opacity-100"
-            style={{ backgroundColor: bgFor(n.color, dark) }}
-            data-tooltip={n.pinned ? t("unpin") : t("pin")}
-            disabled={!!disablePin}
-          >
-            {n.pinned ? <PinFilled /> : <PinOutline />}
-          </button>
-        </div>
-      )}
 
-      {/* Note icon — top-right corner, hidden in multi-select mode */}
+{/* Note icon — top-right corner, hidden in multi-select mode */}
       {noteIcon && !multiMode && (
         <div
           className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center overflow-hidden"
