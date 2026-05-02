@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import { t } from "../../i18n";
 import { bgFor, solid } from "../../utils/colors.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
@@ -76,12 +76,21 @@ export default function NoteCard({
 
   const total = countItems(n.items);
   const done = countChecked(n.items);
-  // Collapsed section ids — read the same localStorage key that ChecklistEditor writes.
-  const collapsedSections = useMemo(() => {
+  // Collapsed section ids — mirrors what ChecklistEditor writes to localStorage.
+  // useState so it updates in real-time when the modal dispatches checklist-collapse-change.
+  const [collapsedSections, setCollapsedSections] = useState(() => {
     try {
       const stored = localStorage.getItem(`ck-sec-${n.id}`);
       return stored ? new Set(JSON.parse(stored)) : new Set();
     } catch { return new Set(); }
+  });
+  useEffect(() => {
+    const onCollapse = (e) => {
+      if (e.detail?.noteId !== n.id) return;
+      setCollapsedSections(new Set(e.detail.ids));
+    };
+    window.addEventListener("checklist-collapse-change", onCollapse);
+    return () => window.removeEventListener("checklist-collapse-change", onCollapse);
   }, [n.id]);
 
   // Preview: walk sections in order, emit unchecked items first, then
@@ -343,16 +352,27 @@ export default function NoteCard({
                   </div>
                 );
               })()}
-              {s.items.map((it) => (
-                <ChecklistRow
-                  key={it.id}
-                  item={it}
-                  size="md"
-                  readOnly={true}
-                  showRemove={false}
-                  preview={true}
-                />
-              ))}
+              {s.items.length > 0 && (() => {
+                const colorHex2 = SECTION_COLORS.find((c) => c.key === s.color)?.hex ?? null;
+                const itemsStyle = colorHex2 ? {
+                  background: hexAlpha(colorHex2, dark ? 0.09 : 0.04),
+                  borderLeft: `3px solid ${hexAlpha(colorHex2, dark ? 0.8 : 0.6)}`,
+                } : undefined;
+                return (
+                  <div style={itemsStyle} className={itemsStyle ? "pl-2 space-y-1" : "space-y-1"}>
+                    {s.items.map((it) => (
+                      <ChecklistRow
+                        key={it.id}
+                        item={it}
+                        size="md"
+                        readOnly={true}
+                        showRemove={false}
+                        preview={true}
+                      />
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           ))}
           {extraCount > 0 && (

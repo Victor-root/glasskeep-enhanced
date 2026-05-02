@@ -75,7 +75,9 @@ export default function ChecklistEditor({
 
   React.useEffect(() => {
     if (!noteId) return;
-    try { localStorage.setItem(`ck-sec-${noteId}`, JSON.stringify([...collapsedSections])); } catch {}
+    const ids = [...collapsedSections];
+    try { localStorage.setItem(`ck-sec-${noteId}`, JSON.stringify(ids)); } catch {}
+    window.dispatchEvent(new CustomEvent("checklist-collapse-change", { detail: { noteId, ids } }));
   }, [collapsedSections, noteId]);
 
   const toggleSectionCollapse = React.useCallback((id) => {
