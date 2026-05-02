@@ -68,31 +68,28 @@ export default function NoteCardFooter({
           <div className="flex items-center min-w-0">
             {hasCollabs && (
               <div
-                className="flex items-center -space-x-1.5"
+                className="inline-flex items-center -space-x-1.5 rounded-full bg-white/60 dark:bg-white/10 ring-1 ring-black/10 dark:ring-white/15 px-1 py-0.5"
                 data-tooltip={collabTooltip}
               >
-                {/* Collab "person" glyph circle — same icon as the modal
-                    collaborate button, framed in a soft indigo bubble. */}
-                <span className="relative z-10 w-6 h-6 rounded-full flex items-center justify-center bg-indigo-100 dark:bg-indigo-900/50 ring-2 ring-white dark:ring-gray-800 text-indigo-600 dark:text-indigo-300">
-                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <span className="relative z-10 w-5 h-5 rounded-full flex items-center justify-center bg-indigo-100 dark:bg-indigo-900/70 ring-1 ring-white dark:ring-gray-800 text-indigo-600 dark:text-indigo-300">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
                   </svg>
                 </span>
-                {/* Collaborator avatars (up to 2) overlap the glyph. */}
                 {collabs.slice(0, 2).map((c) => (
                   <UserAvatar
                     key={typeof c === "string" ? c : c.id}
                     name={typeof c === "string" ? c : c.name}
                     email={typeof c === "string" ? undefined : c.email}
                     avatarUrl={typeof c === "string" ? undefined : c.avatar_url}
-                    size="w-6 h-6"
-                    textSize="text-[9px]"
+                    size="w-5 h-5"
+                    textSize="text-[8px]"
                     dark={dark}
-                    className="ring-2 ring-white dark:ring-gray-800"
+                    className="ring-1 ring-white dark:ring-gray-800"
                   />
                 ))}
                 {collabs.length > 2 && (
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-600 text-[9px] font-bold text-gray-600 dark:text-gray-300 ring-2 ring-white dark:ring-gray-800">
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-600 text-[8px] font-bold text-gray-600 dark:text-gray-300 ring-1 ring-white dark:ring-gray-800">
                     +{collabs.length - 2}
                   </span>
                 )}
