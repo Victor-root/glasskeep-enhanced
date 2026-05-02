@@ -77,15 +77,23 @@ html.dark body {
   content-visibility: visible;
   contain: layout style;
 }
-/* Drag & drop reorder styles */
-.note-card.dragging {
+/* Drag & drop reorder styles
+   Classes are added by the drag handlers to the .note-card-wrapper
+   (since `draggable` and the touch listeners live on the wrapper),
+   but the visual treatment is applied to the inner .note-card so the
+   pin popup container isn't scaled along with it. We support the
+   wrapper form (current) and a bare form for backward compat. */
+.note-card.dragging,
+.note-card-wrapper.dragging > .note-card {
   opacity: 0.35;
   transform: scale(0.97);
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
-.note-card.drag-over {
+.note-card.drag-over,
+.note-card-wrapper.drag-over > .note-card {
   outline: 2.5px dashed #6366f1;
   outline-offset: 4px;
-  transition: outline-offset 0.15s ease;
+  transition: outline-offset 0.15s ease, outline-color 0.15s ease;
 }
 @keyframes noteAppear {
   from { opacity: 0; }
