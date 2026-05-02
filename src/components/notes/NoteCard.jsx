@@ -143,7 +143,7 @@ export default function NoteCard({
         }
       }}
       onContextMenu={(e) => e.preventDefault()}
-      className="note-card-wrapper mb-2 sm:mb-3 relative group"
+      className="note-card-wrapper mb-2 sm:mb-3 relative z-0 hover:z-30 group"
       data-id={n.id}
       data-group={group}
     >
@@ -155,7 +155,7 @@ export default function NoteCard({
           overlaps the card body. OnePlus 7 Pro pop-up camera vibe. */}
       {!multiMode && !disablePin && (
         <div
-          className="absolute top-0 right-3 translate-y-full group-hover:-translate-y-2/3 transition-transform duration-300 ease-out z-0 pointer-events-none group-hover:pointer-events-auto"
+          className="absolute top-0 right-3 translate-y-full group-hover:-translate-y-[88%] transition-transform duration-300 ease-out z-0 pointer-events-none group-hover:pointer-events-auto"
         >
           <button
             aria-label={n.pinned ? t("unpinNote") : t("pinNote")}
