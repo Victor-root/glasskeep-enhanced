@@ -188,12 +188,29 @@ export default function NoteCard({
           </div>
         </div>
       )}
-      {!multiMode && !disablePin && (
-        <div className="absolute top-3 right-3 h-8 opacity-0 group-hover:opacity-100 transition-opacity">
-          <div
-            className="absolute inset-0 rounded-full"
-            style={{ backgroundColor: bgFor(n.color, dark) }}
+      {/* Note icon — top-right corner, hidden in multi-select mode */}
+      {noteIcon && !multiMode && (
+        <div
+          className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center overflow-hidden"
+          aria-label={noteIcon.name || t("noteIcon")}
+        >
+          <img
+            src={noteIcon.src}
+            alt={noteIcon.name || t("noteIcon")}
+            className="w-full h-full"
+            style={{ objectFit: "contain" }}
+            draggable={false}
           />
+        </div>
+      )}
+
+      {/* Pin popup — slides up from the bottom of the card on hover,
+          like the OnePlus 7 Pro pop-up camera. The card's overflow:hidden
+          acts as the "body" that hides it when at rest. */}
+      {!multiMode && !disablePin && (
+        <div
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out z-20 pointer-events-none group-hover:pointer-events-auto"
+        >
           <button
             aria-label={n.pinned ? t("unpinNote") : t("pinNote")}
             onClick={(e) => {
@@ -201,7 +218,8 @@ export default function NoteCard({
               e.stopPropagation();
               togglePin(n.id, !n.pinned);
             }}
-            className="relative rounded-full p-2 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="flex items-center justify-center px-4 py-2 rounded-t-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-[0_-3px_10px_rgba(0,0,0,0.13)]"
+            style={{ backgroundColor: bgFor(n.color, dark) }}
             data-tooltip={n.pinned ? t("unpin") : t("pin")}
             disabled={!!disablePin}
           >
@@ -211,7 +229,7 @@ export default function NoteCard({
       )}
 
       {n.title && (
-        <h3 className="font-bold text-sm sm:text-lg mb-2 break-words">{n.title}</h3>
+        <h3 className={`font-bold text-sm sm:text-lg mb-2 break-words${noteIcon && !multiMode ? " pr-8" : ""}`}>{n.title}</h3>
       )}
 
       {imgs.length > 0 && (

@@ -7,17 +7,14 @@ import UserAvatar from "../common/UserAvatar.jsx";
  *
  * Layout:
  *   Row 1: tag chips (full width).
- *   Row 2: collab indicator (bottom-left) + note icon / logo (bottom-right).
+ *   Row 2: collab indicator (left-aligned), only when note is shared.
  *
- * The collab indicator mirrors the look of the modal "collaborate" button
- * when collaborators are active: a small circle holding the collab
- * person glyph, followed by the collaborator avatars overlapping it.
- *
- * Renders nothing when the note has none of these.
+ * The note icon/logo is no longer rendered here — it lives at the
+ * top-right corner of the card (absolute positioned in NoteCard).
  */
 export default function NoteCardFooter({
   tags = [],
-  icon = null,
+  icon = null,  // kept in signature for backward compat, no longer rendered
   maxChips = 3,
   collabs = [],
   isCollab = false,
@@ -25,10 +22,9 @@ export default function NoteCardFooter({
 }) {
   const safeTags = Array.isArray(tags) ? tags : [];
   const hasTags = safeTags.length > 0;
-  const hasIcon = !!(icon && icon.src);
   const hasCollabs = isCollab;
 
-  if (!hasTags && !hasIcon && !hasCollabs) return null;
+  if (!hasTags && !hasCollabs) return null;
 
   const visible = safeTags.slice(0, maxChips);
   const overflow = safeTags.length - visible.length;
@@ -62,51 +58,30 @@ export default function NoteCardFooter({
         </div>
       )}
 
-      {/* Row 2: note icon (left) + collab indicator (right) */}
-      {(hasCollabs || hasIcon) && (
-        <div className="flex items-center justify-between gap-2">
-          {hasIcon ? (
-            <div
-              className="note-card-icon shrink-0 flex items-center justify-center overflow-hidden"
-              style={{ width: 28, height: 28 }}
-              aria-label={icon.name || t("noteIcon")}
-            >
-              <img
-                src={icon.src}
-                alt={icon.name || t("noteIcon")}
-                className="w-full h-full"
-                style={{ objectFit: "contain" }}
-                loading="lazy"
-                draggable={false}
+      {/* Row 2: collab indicator */}
+      {hasCollabs && (
+        <div className="inline-flex items-center" data-tooltip={collabTooltip}>
+          <svg className="w-4 h-4 shrink-0 text-indigo-500 dark:text-indigo-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
+          </svg>
+          <div className="flex items-center -space-x-1.5">
+            {collabs.slice(0, 2).map((c) => (
+              <UserAvatar
+                key={typeof c === "string" ? c : c.id}
+                name={typeof c === "string" ? c : c.name}
+                email={typeof c === "string" ? undefined : c.email}
+                avatarUrl={typeof c === "string" ? undefined : c.avatar_url}
+                size="w-6 h-6"
+                textSize="text-[8px]"
+                dark={dark}
               />
-            </div>
-          ) : <div />}
-
-          {hasCollabs && (
-            <div className="inline-flex items-center" data-tooltip={collabTooltip}>
-              <svg className="w-4 h-4 shrink-0 text-indigo-500 dark:text-indigo-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-              </svg>
-              <div className="flex items-center -space-x-1.5">
-                {collabs.slice(0, 2).map((c) => (
-                  <UserAvatar
-                    key={typeof c === "string" ? c : c.id}
-                    name={typeof c === "string" ? c : c.name}
-                    email={typeof c === "string" ? undefined : c.email}
-                    avatarUrl={typeof c === "string" ? undefined : c.avatar_url}
-                    size="w-6 h-6"
-                    textSize="text-[8px]"
-                    dark={dark}
-                  />
-                ))}
-                {collabs.length > 2 && (
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-600 text-[8px] font-bold text-gray-600 dark:text-gray-300">
-                    +{collabs.length - 2}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
+            ))}
+            {collabs.length > 2 && (
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-600 text-[8px] font-bold text-gray-600 dark:text-gray-300">
+                +{collabs.length - 2}
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>
