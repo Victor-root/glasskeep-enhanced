@@ -31,7 +31,8 @@ import {
  * headers; ordering in the array is the logical ordering.
  *
  * Keyboard:
- *   - Enter            → insert a new empty item right after the current one
+ *   - Enter (caret at 0) → insert a new empty item ABOVE the current one
+ *   - Enter (elsewhere) → insert respecting global insert position (top/bottom)
  *   - Shift+Enter      → native newline (handled by textarea)
  *   - Backspace (empty, caret at 0) → delete and focus previous item
  *

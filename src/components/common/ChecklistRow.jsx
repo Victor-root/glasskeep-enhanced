@@ -85,7 +85,10 @@ export default function ChecklistRow({
     : "opacity-0 group-hover:opacity-100";
 
   const handleKeyDown = (e) => {
-    // Enter without modifiers — create a new item below.
+    // Enter without modifiers — create a new item. If the caret is at the
+    // very start of the text, the item is inserted ABOVE the current one
+    // (natural "push down" reflex). Otherwise, respects the global insert
+    // preference (top/bottom).
     if (
       e.key === "Enter" &&
       !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey &&
