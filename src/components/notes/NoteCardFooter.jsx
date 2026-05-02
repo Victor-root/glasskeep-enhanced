@@ -67,7 +67,7 @@ export default function NoteCardFooter({
         <div className="flex items-center justify-between gap-2">
           {hasIcon ? (
             <div
-              className="note-card-icon shrink-0 flex items-center justify-center rounded-md overflow-hidden bg-white/60 dark:bg-black/20 ring-1 ring-black/5 dark:ring-white/10"
+              className="note-card-icon shrink-0 flex items-center justify-center overflow-hidden"
               style={{ width: 28, height: 28 }}
               aria-label={icon.name || t("noteIcon")}
             >

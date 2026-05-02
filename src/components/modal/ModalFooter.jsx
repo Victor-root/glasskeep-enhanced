@@ -217,7 +217,7 @@ export default function ModalFooter({
               <AddImageIcon />
               {isDesktop && <span>{t("image")}</span>}
               {currentNoteIcon && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center rounded-full overflow-hidden bg-white/90 dark:bg-gray-800/90 ring-1 ring-black/10 dark:ring-white/20">
+                <span className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center rounded-full overflow-hidden">
                   <img
                     src={currentNoteIcon.src}
                     alt=""
