@@ -39,7 +39,7 @@ import {
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES } from "./utils/constants.js";
 import { setNoteIcon } from "./utils/noteIcon.js";
-import { loadLogoLibrary, addToLogoLibrary, removeFromLogoLibrary, seedLogoLibraryFromNotes } from "./utils/logoLibrary.js";
+import { fetchLogoLibrary, createLogo, deleteLogo as apiDeleteLogo } from "./utils/logoLibrary.js";
 import { ColorDot } from "./components/common/ColorDot.jsx";
 import { handleSmartEnter } from "./components/common/FormatToolbar.jsx";
 import DrawingPreview from "./components/common/DrawingPreview.jsx";
@@ -3035,51 +3035,81 @@ export default function App() {
     if (results.length) setter((prev) => [...prev, ...results]);
   };
 
-  // Persistent per-user logo library (lives in localStorage). Logos here
-  // are independent of any note — uploading a logo adds it to the
-  // library, deleting one removes it from the library only (notes that
-  // already use it keep their copy).
+  // Persistent per-user logo library — server-backed (same list across
+  // all devices/sessions of the same user). Logos here are independent
+  // of any note: uploading a logo adds it to the library, deleting one
+  // removes it from the library only (notes that already use it keep
+  // their embedded copy).
   const [logoLibrary, setLogoLibrary] = useState([]);
   useEffect(() => {
-    if (!currentUser?.id) return;
-    setLogoLibrary(loadLogoLibrary(currentUser.id));
+    const token = getAuth()?.token;
+    if (!currentUser?.id || !token) {
+      setLogoLibrary([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await fetchLogoLibrary(token);
+        if (!cancelled) setLogoLibrary(rows);
+      } catch (e) {
+        console.error("[logoLibrary] load failed", e);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [currentUser?.id]);
-  // Seed once from existing notes so users with pre-existing logos
-  // don't appear to "lose" them when the library system rolls out.
-  useEffect(() => {
-    if (!currentUser?.id) return;
-    if (!Array.isArray(notes) || notes.length === 0) return;
-    setLogoLibrary(seedLogoLibraryFromNotes(currentUser.id, notes));
-  }, [currentUser?.id, notes]);
 
-  const addLogoToLibrary = useCallback((logo) => {
-    if (!currentUser?.id) return;
-    setLogoLibrary(addToLogoLibrary(currentUser.id, logo));
-  }, [currentUser?.id]);
+  const addLogoToLibrary = useCallback(async ({ src, name }) => {
+    const token = getAuth()?.token;
+    if (!token || !src) return null;
+    try {
+      const saved = await createLogo(token, { src, name });
+      if (saved) {
+        setLogoLibrary((prev) => {
+          if (prev.some((l) => l.id === saved.id)) return prev;
+          return [...prev, saved];
+        });
+      }
+      return saved;
+    } catch (e) {
+      console.error("[logoLibrary] create failed", e);
+      return null;
+    }
+  }, []);
 
-  const deleteLogoFromLibrary = useCallback((id) => {
-    if (!currentUser?.id) return;
-    setLogoLibrary(removeFromLogoLibrary(currentUser.id, id));
-  }, [currentUser?.id]);
+  const deleteLogoFromLibrary = useCallback(async (id) => {
+    const token = getAuth()?.token;
+    if (!token || !id) return;
+    // Optimistic remove — restore on failure.
+    let removed = null;
+    setLogoLibrary((prev) => {
+      removed = prev.find((l) => l.id === id) || null;
+      return prev.filter((l) => l.id !== id);
+    });
+    try {
+      await apiDeleteLogo(token, id);
+    } catch (e) {
+      console.error("[logoLibrary] delete failed", e);
+      if (removed) setLogoLibrary((prev) => [...prev, removed]);
+    }
+  }, []);
 
   // Note icon (logo badge) — reuses the regular image compression
   // pipeline, then stamps role:"icon" via setNoteIcon helper. Stored
   // in the same `images` array so the existing sync / encryption /
   // offline-queue paths handle it for free. Uploaded logos are also
-  // persisted to the user's logo library.
+  // persisted to the user's logo library on the server.
   const setNoteIconFromFile = useCallback(async (file) => {
     if (!file) return;
     try {
       const src = await fileToCompressedDataURL(file);
       const iconEntry = { id: uid(), src, name: file.name };
       setMImages((prev) => setNoteIcon(prev, iconEntry));
-      if (currentUser?.id) {
-        setLogoLibrary(addToLogoLibrary(currentUser.id, { src, name: file.name }));
-      }
+      addLogoToLibrary({ src, name: file.name });
     } catch (e) {
       console.error("Note icon load failed", e);
     }
-  }, [setMImages, currentUser?.id]);
+  }, [setMImages, addLogoToLibrary]);
 
   const removeNoteIcon = useCallback(() => {
     setMImages((prev) => setNoteIcon(prev, null));
