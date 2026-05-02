@@ -163,7 +163,8 @@ export default function NoteCard({
         }
       }}
       onContextMenu={(e) => e.preventDefault()}
-      className="note-card-wrapper mb-2 sm:mb-3 relative z-0 hover:z-30 group"
+      className="note-card-wrapper mb-2 sm:mb-3 relative z-0 hover:z-30 group select-none"
+      style={{ WebkitTouchCallout: "none" }}
       data-id={n.id}
       data-group={group}
     >

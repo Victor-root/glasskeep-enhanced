@@ -63,6 +63,8 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
       startX = touch.clientX;
       startY = touch.clientY;
       gotMove = false;
+      // 300 ms: fires before Android's native ~350 ms text-selection threshold
+      // while still feeling intentional to the user.
       timer = setTimeout(() => {
         setActive(true);
         lastTouchY = startY;
@@ -71,7 +73,7 @@ export default function useNoteTouchDrag(cardRef, { canDrag, multiMode, noteId, 
         noMoveTimer = setTimeout(() => { if (isActive() && !gotMove) cleanup(); }, 600);
         failsafeTimer = setTimeout(cleanup, 3000);
         scrollRaf = requestAnimationFrame(autoScroll);
-      }, 400);
+      }, 300);
     };
 
     const onTouchMove = (e) => {
