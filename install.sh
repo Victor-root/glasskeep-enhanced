@@ -44,7 +44,7 @@ DATA_DIR="/opt/glass-keep/data"
 ENV_FILE="/opt/glass-keep/.env"
 SERVICE_NAME="glass-keep"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
-NODE_MAJOR=20
+NODE_MAJOR=24
 
 # ── Language detection ────────────────────────────────────────────────────────
 detect_lang() {

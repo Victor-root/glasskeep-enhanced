@@ -6,7 +6,7 @@
 # =============================================================================
 
 # ─────────────────────────── Stage 1: build ──────────────────────────────────
-FROM node:20-bookworm-slim AS builder
+FROM node:24-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -40,7 +40,7 @@ RUN node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package
  && npm prune --omit=dev --no-audit --no-fund
 
 # ─────────────────────────── Stage 2: runtime ────────────────────────────────
-FROM node:20-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 
 WORKDIR /app
 
