@@ -155,7 +155,7 @@ export default function NoteCard({
           overlaps the card body. OnePlus 7 Pro pop-up camera vibe. */}
       {!multiMode && !disablePin && (
         <div
-          className="absolute top-0 right-3 translate-y-full group-hover:-translate-y-[88%] transition-transform duration-300 ease-out z-0 pointer-events-none group-hover:pointer-events-auto"
+          className="absolute top-0 right-3 translate-y-full group-hover:-translate-y-[78%] transition-transform duration-300 ease-out z-0 pointer-events-none group-hover:pointer-events-auto"
         >
           <button
             aria-label={n.pinned ? t("unpinNote") : t("pinNote")}
@@ -164,7 +164,7 @@ export default function NoteCard({
               e.stopPropagation();
               togglePin(n.id, !n.pinned);
             }}
-            className="flex items-center justify-center px-3 py-2 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-[0_3px_10px_rgba(0,0,0,0.18)]"
+            className="flex items-start justify-center w-10 h-14 pt-2 rounded-t-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-[0_3px_10px_rgba(0,0,0,0.18)]"
             style={{ backgroundColor: bgFor(n.color, dark) }}
             data-tooltip={n.pinned ? t("unpin") : t("pin")}
             disabled={!!disablePin}
