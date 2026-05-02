@@ -62,41 +62,10 @@ export default function NoteCardFooter({
         </div>
       )}
 
-      {/* Row 2: collab indicator (left) + note icon (right) */}
+      {/* Row 2: note icon (left) + collab indicator (right) */}
       {(hasCollabs || hasIcon) && (
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center min-w-0">
-            {hasCollabs && (
-              <div
-                className="inline-flex items-center"
-                data-tooltip={collabTooltip}
-              >
-                <svg className="w-4 h-4 shrink-0 text-indigo-500 dark:text-indigo-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-                </svg>
-                <div className="flex items-center -space-x-1.5">
-                  {collabs.slice(0, 2).map((c) => (
-                    <UserAvatar
-                      key={typeof c === "string" ? c : c.id}
-                      name={typeof c === "string" ? c : c.name}
-                      email={typeof c === "string" ? undefined : c.email}
-                      avatarUrl={typeof c === "string" ? undefined : c.avatar_url}
-                      size="w-6 h-6"
-                      textSize="text-[8px]"
-                      dark={dark}
-                    />
-                  ))}
-                  {collabs.length > 2 && (
-                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-600 text-[8px] font-bold text-gray-600 dark:text-gray-300">
-                      +{collabs.length - 2}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {hasIcon && (
+          {hasIcon ? (
             <div
               className="note-card-icon shrink-0 flex items-center justify-center rounded-md overflow-hidden bg-white/60 dark:bg-black/20 ring-1 ring-black/5 dark:ring-white/10"
               style={{ width: 28, height: 28 }}
@@ -110,6 +79,32 @@ export default function NoteCardFooter({
                 loading="lazy"
                 draggable={false}
               />
+            </div>
+          ) : <div />}
+
+          {hasCollabs && (
+            <div className="inline-flex items-center" data-tooltip={collabTooltip}>
+              <svg className="w-4 h-4 shrink-0 text-indigo-500 dark:text-indigo-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
+              </svg>
+              <div className="flex items-center -space-x-1.5">
+                {collabs.slice(0, 2).map((c) => (
+                  <UserAvatar
+                    key={typeof c === "string" ? c : c.id}
+                    name={typeof c === "string" ? c : c.name}
+                    email={typeof c === "string" ? undefined : c.email}
+                    avatarUrl={typeof c === "string" ? undefined : c.avatar_url}
+                    size="w-6 h-6"
+                    textSize="text-[8px]"
+                    dark={dark}
+                  />
+                ))}
+                {collabs.length > 2 && (
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-600 text-[8px] font-bold text-gray-600 dark:text-gray-300">
+                    +{collabs.length - 2}
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>
