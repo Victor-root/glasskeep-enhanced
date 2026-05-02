@@ -68,7 +68,7 @@ export default function NoteCardFooter({
           <div className="flex items-center min-w-0">
             {hasCollabs && (
               <div
-                className="inline-flex items-center h-6 rounded-full bg-white/60 dark:bg-white/10 ring-1 ring-black/10 dark:ring-white/15 pl-1.5 pr-0 overflow-hidden"
+                className="inline-flex items-center"
                 data-tooltip={collabTooltip}
               >
                 <svg className="w-4 h-4 shrink-0 text-indigo-500 dark:text-indigo-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
