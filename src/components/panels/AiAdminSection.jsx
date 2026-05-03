@@ -43,6 +43,15 @@ export default function AiAdminSection({ token, showToast }) {
   // user about whether they're about to clear an existing key.
   const baselineRef = useRef(null);
 
+  // Keep showToast in a ref so the load effect below doesn't re-run on
+  // every parent render (the parent recreates the function each time —
+  // depending on it would refetch the saved settings every few hundred
+  // ms and clobber whatever the admin is typing).
+  const showToastRef = useRef(showToast);
+  useEffect(() => {
+    showToastRef.current = showToast;
+  }, [showToast]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -64,7 +73,7 @@ export default function AiAdminSection({ token, showToast }) {
         baselineRef.current = data;
       } catch (err) {
         if (!cancelled) {
-          showToast?.(
+          showToastRef.current?.(
             localizeServerError(err?.message, "genericError"),
             "error",
           );
@@ -76,7 +85,7 @@ export default function AiAdminSection({ token, showToast }) {
     return () => {
       cancelled = true;
     };
-  }, [token, showToast]);
+  }, [token]);
 
   const buildPatch = (overrides = {}) => {
     const patch = {
