@@ -85,6 +85,7 @@ export async function askAI(question, notes, onProgress) {
       id: n.id != null ? String(n.id) : "",
       title: (n.title || "").toString(),
       content: noteToPlainText(n),
+      tags: Array.isArray(n.tags) ? n.tags.map(String) : [],
     }))
     .filter((n) => n.id && (n.title.trim() || n.content.trim()));
 

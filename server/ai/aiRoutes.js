@@ -55,23 +55,41 @@ function normalize(s) {
     .replace(/[̀-ͯ]/g, "");
 }
 
-// Score notes against the question's tokens, with stop-word filtering
-// and per-token IDF weighting so a generic word that matches every
-// note ("note", "le", …) doesn't drown the rare, informative ones
-// (project names, identifiers). Title matches still get a small
-// boost over body matches.
+// Conservative plural/singular expansion.
+// Only strips the most common suffixes so "wallets" matches "wallet",
+// "cryptos" matches "crypto", "entries" matches "entry", etc.
+// Kept intentionally narrow — no Levenshtein, no phonetics.
+function expandTokenVariants(tok) {
+  const v = new Set([tok]);
+  if (tok.length > 4 && tok.endsWith("ies")) {
+    v.add(tok.slice(0, -3) + "y");   // entries → entry, batteries → battery
+  } else if (tok.length > 3 && tok.endsWith("s") && !tok.endsWith("ss")) {
+    v.add(tok.slice(0, -1));         // wallets → wallet, cryptos → crypto, notes → note
+  }
+  return v;
+}
+
+// Score notes against the question's tokens.
+// Scoring weights: title match ×3, tag match ×2, body match ×1.
+// Plural variants (wallets/wallet) are expanded at query time so the
+// best-matching variant is used without double-counting.
+// IDF keeps rare domain words (e.g. "rustdesk") dominant over common ones.
+// Tags are indexed separately and carry a title-equivalent bonus so a
+// note tagged "crypto" surfaces when the user asks about "crypto" even
+// if the word doesn't appear in the title or body.
 function pickRelevantNotes(notes, question, limit) {
   if (!Array.isArray(notes) || notes.length === 0) return [];
 
   const rawTokens = Array.from(new Set(tokenize(question)));
   const queryTokens = rawTokens.filter((t) => !STOP_WORDS.has(t));
-  // If everything was filtered out (very short generic question), fall
-  // back to the unfiltered set so we still pick *something* relevant.
   const tokens = queryTokens.length > 0 ? queryTokens : rawTokens;
-  // No usable tokens at all → caller will short-circuit with the
-  // localized "no relevant notes" reply rather than dumping arbitrary
-  // notes into the model's context (which led to hallucinated answers).
   if (tokens.length === 0) return [];
+
+  // Pre-expand each query token into its variant set once.
+  const tokenVariants = new Map();
+  for (const tok of tokens) {
+    tokenVariants.set(tok, expandTokenVariants(tok));
+  }
 
   // Pre-normalize each note's haystacks once.
   const docs = [];
@@ -79,29 +97,32 @@ function pickRelevantNotes(notes, question, limit) {
     if (!n) continue;
     const title = String(n.title || "");
     const content = String(n.content || "");
-    if (!title.trim() && !content.trim()) continue;
+    const tagStr = Array.isArray(n.tags) ? n.tags.map(String).join(" ") : "";
+    if (!title.trim() && !content.trim() && !tagStr.trim()) continue;
     docs.push({
       note: n,
       hayTitle: normalize(title),
+      hayTags: normalize(tagStr),
       hayBody: normalize(content),
     });
   }
   if (docs.length === 0) return [];
 
-  // Document frequency per token (any occurrence in title or body counts).
+  // IDF: count docs where ANY variant of the token appears in title, tags, or body.
   const N = docs.length;
   const df = new Map();
   for (const tok of tokens) {
+    const variants = tokenVariants.get(tok);
     let count = 0;
     for (const d of docs) {
-      if (d.hayTitle.includes(tok) || d.hayBody.includes(tok)) count += 1;
+      const hit = [...variants].some(
+        (v) => d.hayTitle.includes(v) || d.hayTags.includes(v) || d.hayBody.includes(v),
+      );
+      if (hit) count += 1;
     }
     df.set(tok, count);
   }
 
-  // Weight rare tokens much more than common ones (classic IDF).
-  // log((N+1)/(df+1)) keeps the value positive and ≈ 0 when the token
-  // is in nearly every note (e.g. "note" itself).
   const idf = new Map();
   for (const tok of tokens) {
     idf.set(tok, Math.log((N + 1) / ((df.get(tok) || 0) + 1)));
@@ -113,16 +134,29 @@ function pickRelevantNotes(notes, question, limit) {
     for (const tok of tokens) {
       const w = idf.get(tok) || 0;
       if (w <= 0) continue;
-      if (d.hayTitle.includes(tok)) score += 3 * w;
-      let idx = 0;
-      let hits = 0;
-      while (hits < 5) {
-        const found = d.hayBody.indexOf(tok, idx);
-        if (found === -1) break;
-        hits += 1;
-        idx = found + tok.length;
+      const variants = tokenVariants.get(tok);
+      const vArr = [...variants];
+
+      // Title match (×3) — one bonus per token regardless of variant count.
+      if (vArr.some((v) => d.hayTitle.includes(v))) score += 3 * w;
+
+      // Tag match (×2) — close to title strength.
+      if (vArr.some((v) => d.hayTags.includes(v))) score += 2 * w;
+
+      // Body match — count hits for the best-matching variant (capped at 5).
+      let bodyHits = 0;
+      for (const v of vArr) {
+        let idx = 0;
+        let hits = 0;
+        while (hits < 5) {
+          const found = d.hayBody.indexOf(v, idx);
+          if (found === -1) break;
+          hits++;
+          idx = found + v.length;
+        }
+        if (hits > bodyHits) bodyHits = hits;
       }
-      score += hits * w;
+      score += bodyHits * w;
     }
     if (score > 0) scored.push({ note: d.note, score });
   }
@@ -132,10 +166,6 @@ function pickRelevantNotes(notes, question, limit) {
     return scored.slice(0, limit).map((s) => s.note);
   }
 
-  // No note actually matched the (filtered) tokens. Returning [] makes
-  // the chat handler short-circuit with the localized "not found"
-  // reply — never feed arbitrary notes to the model, which would let
-  // it answer from external knowledge or hallucinate.
   return [];
 }
 
@@ -363,7 +393,7 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
       } else if (typeof body.question === "string" && body.question.trim()) {
         const question = body.question.trim();
         const allNotes = Array.isArray(body.notes) ? body.notes : [];
-        const picked = pickRelevantNotes(allNotes, question, 8);
+        const picked = pickRelevantNotes(allNotes, question, 12);
 
         // No relevant note → don't call the provider at all. Returning
         // the localized "not found" string here is what the strict
@@ -383,8 +413,18 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
           .map((n) => {
             const id = (n?.id || "").toString();
             const title = (n?.title || "").toString();
+            const tagsList =
+              Array.isArray(n?.tags) && n.tags.length > 0
+                ? n.tags.map(String).join(", ")
+                : null;
             const content = (n?.content || "").toString().slice(0, 2000);
-            return `[${id}] TITLE: ${title}\nCONTENT: ${content}`;
+            return [
+              `[${id}] TITLE: ${title}`,
+              tagsList ? `TAGS: ${tagsList}` : null,
+              `CONTENT: ${content}`,
+            ]
+              .filter(Boolean)
+              .join("\n");
           })
           .join("\n\n---\n\n");
 
