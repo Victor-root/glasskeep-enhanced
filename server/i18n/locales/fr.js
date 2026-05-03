@@ -22,12 +22,16 @@ module.exports = {
   aiSystemPromptContextLabel: "Contexte des notes",
   aiSystemPromptNoContext: "(aucune note disponible)",
   aiSystemPromptListHint:
-    "L'utilisateur cherche une liste ou un inventaire d'informations présentes dans ses notes.\n" +
-    "Ne donne pas seulement quelques exemples.\n" +
-    "Extrais toutes les entrées pertinentes présentes dans le contexte fourni.\n" +
+    "L'utilisateur cherche une liste, un inventaire ou une synthèse d'informations présentes dans ses notes.\n" +
+    "Analyse toutes les notes fournies dans le contexte.\n" +
+    "Ne te limite pas à quelques exemples.\n" +
+    "Extrais toutes les entrées pertinentes présentes dans le contexte.\n" +
     "Si une même note contient plusieurs éléments pertinents, liste-les tous.\n" +
-    "Regroupe la réponse par note quand c'est utile.\n" +
-    "Cite toujours le titre exact de chaque note utilisée.\n" +
-    "Ne complète pas avec des connaissances externes.",
+    "Regroupe les résultats par note quand c'est utile.\n" +
+    "Inclus les détails utiles présents dans les notes, comme adresses, noms, montants, dates, labels ou informations associées.\n" +
+    "Ne complète jamais avec des connaissances externes.\n" +
+    "Si une information n'est pas visible dans le contexte, ne l'invente pas.\n" +
+    "Cite toujours les titres exacts des notes utilisées.\n" +
+    "Ajoute le marqueur [[NOTES:id1,id2]] à la fin avec les IDs des notes réellement utilisées.",
   aiNoRelevantNotes: "Je n'ai pas trouvé d'information pertinente dans les notes.",
 };

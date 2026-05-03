@@ -195,21 +195,26 @@ function extractCompact(content, allVariants, opts) {
   });
 }
 
-// Inventory mode: keep every paragraph (block separated by blank lines)
-// that contains at least one matched line. This preserves the natural
-// structure of inventory notes where each entry has a heading line
-// ("Monero wallet") and several attribute lines under it ("adresse: …",
-// "hauteur de bloc: …"), all of which the user expects to see together.
-// Non-contiguous blocks are joined with an "…" separator. The output
-// preserves original line breaks within each block.
+// Inventory mode: send the full content of the matched note. The whole
+// point of this mode is to let the model see every entry the user
+// could be asking about — wallet lists, credentials, inventories — so
+// snippet/block extraction would defeat the purpose. Truncation only
+// happens when the note is genuinely larger than the per-note budget,
+// and even then we prefer block-based fallback over a hard mid-sentence
+// cut so the relevant zones survive.
 function extractInventory(content, allVariants, opts) {
-  const maxChars = opts.maxChars || 4000;
-  const headFallback = opts.headFallback || Math.min(maxChars, 2000);
+  const maxChars = opts.maxChars || 8000;
+  const trimmed = String(content || "").trim();
+  if (!trimmed) return [];
 
-  const lines = content.split(/\r?\n/);
+  // The note fits whole → send the entire body, no editing.
+  if (trimmed.length <= maxChars) return [trimmed];
 
-  // Split into blocks: contiguous runs of non-blank lines.
-  const blocks = []; // [{ start, end, lines, hasMatch }]
+  // Note is too long: fall back to block-aware truncation. Keep every
+  // paragraph (blank-line-separated block) that contains a matched
+  // line. Better than slicing the middle of a wallet entry.
+  const lines = trimmed.split(/\r?\n/);
+  const blocks = []; // { start, end, lines, hasMatch }
   let cur = null;
   for (let i = 0; i < lines.length; i++) {
     const blank = !lines[i].trim();
@@ -235,11 +240,9 @@ function extractInventory(content, allVariants, opts) {
 
   const matchedBlocks = blocks.filter((b) => b.hasMatch);
   if (matchedBlocks.length === 0) {
-    const head = content.slice(0, headFallback).trim();
-    return head ? [head] : [];
+    return [trimmed.slice(0, maxChars).replace(/\s+\S*$/, "") + "…"];
   }
 
-  // Emit blocks in original order, with "…" between non-contiguous ones.
   const out = [];
   let prevEnd = -2;
   for (const b of matchedBlocks) {
@@ -389,12 +392,14 @@ function pickRelevantNotes(notes, question, opts = {}) {
 
   // Per-note budget defaults: compact mode keeps the old 1.2 KB cap so
   // narrow Q&A doesn't bloat the prompt; inventory mode opens it up to
-  // 4 KB so long notes (lists of wallets, credentials, …) fit fully.
+  // 8 KB so long inventory notes (lists of wallets, credentials, …)
+  // fit whole — the model needs the full content to enumerate every
+  // entry, snippets defeat the purpose of an inventory query.
   const noteCap =
     typeof perNoteMaxChars === "number"
       ? perNoteMaxChars
       : mode === "inventory"
-      ? 4000
+      ? 8000
       : 1200;
   const snippetOpts = { mode, maxChars: noteCap };
 
@@ -428,7 +433,7 @@ function buildContextBlock(picked, opts = {}) {
   const bodyLabel = mode === "inventory" ? "CONTENT" : "SNIPPET";
   // Cap is just a safety net here — the snippet was already trimmed by
   // the retriever to the per-note budget that matches `mode`.
-  const cap = mode === "inventory" ? 4000 : 1200;
+  const cap = mode === "inventory" ? 8000 : 1200;
 
   const lines = [`[${id}] TITLE: ${title}`];
   if (tags) lines.push(`TAGS: ${tags}`);

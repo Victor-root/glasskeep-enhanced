@@ -280,14 +280,16 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
           .map((p) => String(p.note?.id || ""))
           .filter(Boolean);
 
-        // Inventory mode is permitted to grow the context up to ~32 KB
-        // total (12 notes × 4 KB worst case = 48 KB → trimmed to 32 KB).
-        // Compact mode keeps the lean ~16 KB ceiling. Top-scored notes
-        // are added first; if the budget is exhausted, the lower-ranked
-        // ones get truncated or dropped — never silently dumped at full
-        // size, since long contexts are what made models hallucinate
-        // when they couldn't fit reliably.
-        const maxTotalChars = listIntent ? 32000 : 16000;
+        // Inventory mode gets a generous ~60 KB budget so the model
+        // sees the full content of the picked notes — list/inventory
+        // queries fail when notes are chopped into snippets. Compact
+        // mode keeps the lean ~16 KB ceiling for narrow Q&A.
+        // Top-scored notes are added first; if the budget runs out
+        // the lower-ranked ones are dropped rather than silently
+        // truncated, since a half-note is a worse signal to the model
+        // than a missing one. Per the spec: 6 nearly-complete notes
+        // beat 12 amputated ones.
+        const maxTotalChars = listIntent ? 60000 : 16000;
         const blocks = [];
         let total = 0;
         for (const p of picked) {

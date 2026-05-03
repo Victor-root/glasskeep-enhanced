@@ -175,11 +175,10 @@ console.log("\n[snippet extraction — compact]");
   assert("compact picks short snippets", note1.snippet.length < 800);
 }
 
-console.log("\n[snippet extraction — inventory]");
+console.log("\n[snippet extraction — inventory short note]");
 {
-  // Realistic inventory note: the word "wallet" appears on each entry
-  // line, so compact mode can only keep 3 entries while inventory mode
-  // keeps every matched line plus its neighborhood.
+  // Inventory mode must send the note's full content when it fits in
+  // the per-note budget (8 KB). No block-based extraction, no ellipses.
   const inventoryCorpus = [
     {
       id: "10",
@@ -189,6 +188,7 @@ console.log("\n[snippet extraction — inventory]");
         "Bitcoin wallet",
         "  adresse: bc1qxy2k...",
         "  label: cold storage",
+        "  unrelated extra line that doesn't mention the keyword",
         "",
         "Ethereum wallet",
         "  adresse: 0xAbC123...",
@@ -202,34 +202,84 @@ console.log("\n[snippet extraction — inventory]");
         "Solana wallet",
         "  adresse: SoLA1...",
         "  label: phantom",
+        "",
+        "Random note with no wallet mention at all but still in the file.",
       ].join("\n"),
     },
   ];
-  const inv = r.pickRelevantNotes(inventoryCorpus, "liste mes wallets crypto", {
-    mode: "inventory",
-  });
-  const cmp = r.pickRelevantNotes(inventoryCorpus, "liste mes wallets crypto", {
-    mode: "compact",
-  });
+  const inv = r.pickRelevantNotes(
+    inventoryCorpus,
+    "liste mes wallets crypto",
+    { mode: "inventory" },
+  );
+  const cmp = r.pickRelevantNotes(
+    inventoryCorpus,
+    "liste mes wallets crypto",
+    { mode: "compact" },
+  );
   console.log("  inventory length:", inv[0].snippet.length);
   console.log("  compact   length:", cmp[0].snippet.length);
+
   assert("inventory > compact", inv[0].snippet.length > cmp[0].snippet.length);
   assert("inventory keeps Bitcoin", /Bitcoin/.test(inv[0].snippet));
   assert("inventory keeps Ethereum", /Ethereum/.test(inv[0].snippet));
   assert("inventory keeps Monero", /Monero/.test(inv[0].snippet));
   assert("inventory keeps Solana", /Solana/.test(inv[0].snippet));
   assert(
-    "inventory keeps the hauteur de bloc detail",
+    "inventory keeps hauteur de bloc",
     /hauteur de bloc/.test(inv[0].snippet),
   );
   assert(
-    "inventory keeps the public address detail",
+    "inventory keeps adresse publique",
     /adresse publique/.test(inv[0].snippet),
   );
-  // Compact must drop something — with 4 wallet entries and a
-  // 3-snippet cap, at least one shouldn't make the cut.
+  // Full content includes the unrelated random line and the orphan
+  // line at the bottom — proves no snippet/block filtering happened.
+  assert(
+    "inventory keeps unrelated extra line",
+    /unrelated extra line/.test(inv[0].snippet),
+  );
+  assert(
+    "inventory keeps trailing orphan paragraph",
+    /Random note with no wallet/.test(inv[0].snippet),
+  );
+  assert("inventory has no truncation marker", !inv[0].snippet.endsWith("…"));
+  // Compact still picks only top-3 matched lines, so it can't see all 4 wallets.
   const compactWalletCount = (cmp[0].snippet.match(/wallet/g) || []).length;
   assert("compact drops some entries", compactWalletCount < 4);
+}
+
+console.log("\n[snippet extraction — inventory truncation fallback]");
+{
+  // Build a note longer than the 8 KB per-note budget. The block-based
+  // fallback must keep the matched paragraphs and drop the surrounding
+  // padding rather than slicing the middle of an entry.
+  const padBlock = "Lorem ipsum padding text. ".repeat(40); // ~1 KB
+  const blocks = [];
+  for (let i = 0; i < 12; i++) {
+    blocks.push(padBlock);                      // unrelated padding
+    blocks.push(`wallet entry #${i}\n  address: addr-${i}\n  label: lbl-${i}`);
+  }
+  const longCorpus = [{
+    id: "11",
+    title: "Huge wallet log",
+    tags: ["wallet"],
+    content: blocks.join("\n\n"),
+  }];
+  const inv = r.pickRelevantNotes(longCorpus, "wallet", { mode: "inventory" });
+  console.log("  raw content length:", longCorpus[0].content.length);
+  console.log("  inventory snippet length:", inv[0].snippet.length);
+  assert("oversized note is truncated under 8.1 KB", inv[0].snippet.length <= 8200);
+  // Block-based fallback should keep the matched wallet entries and
+  // drop the unrelated padding blocks.
+  assert(
+    "fallback keeps wallet entry #0",
+    /wallet entry #0/.test(inv[0].snippet),
+  );
+  assert(
+    "fallback drops Lorem padding",
+    !/Lorem ipsum/.test(inv[0].snippet),
+  );
 }
 
 console.log("\n[context block format — compact]");
