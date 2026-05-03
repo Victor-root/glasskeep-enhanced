@@ -34,4 +34,8 @@ module.exports = {
     "Cite toujours les titres exacts des notes utilisées.\n" +
     "Ajoute le marqueur [[NOTES:id1,id2]] à la fin avec les IDs des notes réellement utilisées.",
   aiNoRelevantNotes: "Je n'ai pas trouvé d'information pertinente dans les notes.",
+  aiCitationFallback:
+    "J'ai trouvé des notes pertinentes, mais l'IA n'a pas cité correctement ses sources. Ouvrez les notes utilisées pour vérifier.",
+  aiCitationRetryReminder:
+    "Ta réponse précédente n'incluait pas le marqueur de citation requis. Réécris la même réponse en ajoutant à la toute fin le marqueur exact [[NOTES:id1,id2]] avec uniquement les IDs des notes que tu as réellement utilisées.",
 };

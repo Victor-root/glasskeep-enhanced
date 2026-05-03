@@ -34,4 +34,8 @@ module.exports = {
     "Always cite the exact titles of the notes used.\n" +
     "Add the [[NOTES:id1,id2]] marker at the end with the IDs of the notes actually used.",
   aiNoRelevantNotes: "I couldn't find relevant information in the notes.",
+  aiCitationFallback:
+    "I found relevant notes, but the AI did not cite its sources correctly. Open the used notes to verify.",
+  aiCitationRetryReminder:
+    "Your previous answer did not include the required citation marker. Rewrite the same answer adding at the very end the exact marker [[NOTES:id1,id2]] with only the IDs of the notes you actually used.",
 };

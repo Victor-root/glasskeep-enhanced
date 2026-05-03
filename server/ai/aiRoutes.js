@@ -230,6 +230,8 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
       const debugRequested = body.debug === true;
 
       let pickedIds = [];
+      let picked = [];
+      let debugMeta = null;
 
       if (Array.isArray(body.messages) && body.messages.length > 0) {
         messages = body.messages
@@ -253,7 +255,7 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
         const listIntent = retrieval.detectListIntent(question);
         const mode = listIntent ? "inventory" : "compact";
 
-        const picked = retrieval.pickRelevantNotes(allNotes, question, {
+        picked = retrieval.pickRelevantNotes(allNotes, question, {
           limit: 12,
           mode,
         });
@@ -318,7 +320,7 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
         // Build debug metadata now (before the provider call) so it's
         // available on every response path below.
         if (debugRequested) {
-          body._debugMeta = {
+          debugMeta = {
             receivedNotesCount: allNotes.length,
             question,
             lang,
@@ -352,45 +354,124 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
         return res.status(400).json({ error: "Missing messages or question." });
       }
 
-      const result = await provider.chatCompletion(cfg, { messages });
-      const raw = (result.content || "").trim();
-      // Pull the [[NOTES:id1,id2]] marker out of the answer (case
+      // Pull the [[NOTES:id1,id2]] marker out of an answer (case
       // tolerant; brackets occasionally drift to single). Whatever the
       // model emits, we only keep IDs that were actually in the
       // selected context — never trust the model to invent IDs.
       const markerRe = /\[\[?\s*NOTES\s*:\s*([^\]]*?)\s*\]?\]/i;
-      const match = raw.match(markerRe);
       const allowed = new Set(pickedIds);
-      let citedNoteIds = [];
-      const rawCitedIds = [];
-      if (match) {
-        match[1]
-          .split(/[,\s]+/)
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .forEach((s) => {
-            rawCitedIds.push(s);
-            if (allowed.has(s)) citedNoteIds.push(s);
+      const parseMarker = (text) => {
+        const m = text.match(markerRe);
+        const rawIds = [];
+        const validIds = [];
+        if (m) {
+          m[1]
+            .split(/[,\s]+/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .forEach((s) => {
+              rawIds.push(s);
+              if (allowed.has(s)) validIds.push(s);
+            });
+        }
+        return { match: m, rawCitedIds: rawIds, validCitedIds: validIds };
+      };
+
+      const result = await provider.chatCompletion(cfg, { messages });
+      let raw = (result.content || "").trim();
+      let parsed = parseMarker(raw);
+      let finishReason = result.finishReason || null;
+      let retryAttempted = false;
+      let retryMarkerFound = false;
+
+      // The model frequently forgets the [[NOTES:…]] marker even when
+      // it answered correctly from the context. Before treating this
+      // as a hallucination, give it one chance to add the marker —
+      // same conversation, just a short reminder turn appended.
+      if (pickedIds.length > 0 && parsed.validCitedIds.length === 0) {
+        retryAttempted = true;
+        try {
+          const reminderMessages = [
+            ...messages,
+            { role: "assistant", content: raw },
+            { role: "user", content: t(lang, "aiCitationRetryReminder") },
+          ];
+          const retryResult = await provider.chatCompletion(cfg, {
+            messages: reminderMessages,
           });
+          const retryRaw = (retryResult.content || "").trim();
+          const retryParsed = parseMarker(retryRaw);
+          if (retryParsed.validCitedIds.length > 0) {
+            retryMarkerFound = true;
+            raw = retryRaw;
+            parsed = retryParsed;
+            finishReason = retryResult.finishReason || "citation_retry";
+          }
+        } catch (retryErr) {
+          console.warn("[ai] citation retry failed:", retryErr?.message);
+        }
       }
-      // If we sent notes to the model but it didn't cite a single
-      // valid one (no marker, empty marker, or invented IDs), the
-      // answer can't be verified against any note we control. Treat it
-      // as unreliable and replace it with the localized "not found"
-      // string instead of leaking external-knowledge text to the user.
-      if (pickedIds.length > 0 && citedNoteIds.length === 0) {
+
+      // Still no valid citation after retry: try the fallback path
+      // before rejecting outright. Sending a real, useful answer to
+      // the user is better than masking it as "not found" when the
+      // retrieval clearly identified relevant notes.
+      if (pickedIds.length > 0 && parsed.validCitedIds.length === 0) {
+        const top = picked[0];
+        const topMatchedCount = Array.isArray(top?.matched)
+          ? top.matched.length
+          : 0;
+        const eligibleForFallback =
+          (typeof top?.score === "number" && top.score >= 5) ||
+          topMatchedCount >= 2 ||
+          picked.length === 1;
+
+        if (eligibleForFallback) {
+          // Surface up to 3 of the highest-scoring notes so the user
+          // can verify manually. Cap at 3 to keep the UI tidy.
+          const fallbackIds = picked
+            .slice(0, 3)
+            .map((p) => String(p.note?.id || ""))
+            .filter(Boolean);
+
+          const resp = {
+            answer: t(lang, "aiCitationFallback"),
+            citedNoteIds: fallbackIds,
+            finishReason: "citation_fallback",
+          };
+          if (debugRequested && debugMeta) {
+            resp.debug = {
+              ...debugMeta,
+              finishReason: "citation_fallback",
+              markerFound: !!parsed.match,
+              rawCitedIds: parsed.rawCitedIds,
+              validCitedIds: fallbackIds,
+              rawAnswerLength: raw.length,
+              retryAttempted,
+              retryMarkerFound,
+              fallbackCitationUsed: true,
+            };
+          }
+          return res.json(resp);
+        }
+
+        // No fallback eligibility — reject as before.
         const resp = {
           answer: t(lang, "aiNoRelevantNotes"),
           citedNoteIds: [],
           finishReason: "no_valid_citation",
         };
-        if (debugRequested && body._debugMeta) {
+        if (debugRequested && debugMeta) {
           resp.debug = {
-            ...body._debugMeta,
-            finishReason: result.finishReason || null,
-            markerFound: !!match,
-            rawCitedIds,
+            ...debugMeta,
+            finishReason: "no_valid_citation",
+            markerFound: !!parsed.match,
+            rawCitedIds: parsed.rawCitedIds,
             validCitedIds: [],
+            rawAnswerLength: raw.length,
+            retryAttempted,
+            retryMarkerFound,
+            fallbackCitationUsed: false,
             rejectionReason: "no_valid_citation",
           };
         }
@@ -400,16 +481,20 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
       const answer = raw.replace(markerRe, "").trim();
       const resp = {
         answer,
-        citedNoteIds,
-        finishReason: result.finishReason || null,
+        citedNoteIds: parsed.validCitedIds,
+        finishReason,
       };
-      if (debugRequested && body._debugMeta) {
+      if (debugRequested && debugMeta) {
         resp.debug = {
-          ...body._debugMeta,
-          finishReason: result.finishReason || null,
-          markerFound: !!match,
-          rawCitedIds,
-          validCitedIds: citedNoteIds,
+          ...debugMeta,
+          finishReason,
+          markerFound: !!parsed.match,
+          rawCitedIds: parsed.rawCitedIds,
+          validCitedIds: parsed.validCitedIds,
+          rawAnswerLength: raw.length,
+          retryAttempted,
+          retryMarkerFound,
+          fallbackCitationUsed: false,
         };
       }
       res.json(resp);
