@@ -10,36 +10,10 @@ const Database = require("better-sqlite3");
 const cors = require("cors");
 const crypto = require("crypto");
 
-// Transformers.js for server-side AI
-let pipeline;
-let env;
-let aiGenerator = null;
-
-async function initServerAI() {
-  if (aiGenerator) return;
-  try {
-    // Dynamic import since transformers is ESM and this is CJS
-    const transformers = await import('@huggingface/transformers');
-    pipeline = transformers.pipeline;
-    env = transformers.env;
-
-    // Configure env for server
-    env.allowLocalModels = false;
-    // Cache directory for AI models
-    env.cacheDir = path.join(__dirname, '..', 'data', 'ai-cache');
-
-    console.log("Loading high-stability AI model (Llama-3.2-1B)...");
-    // Llama-3.2-1B-Instruct-ONNX is highly compatible and excels at instruction following
-    aiGenerator = await pipeline('text-generation', 'onnx-community/Llama-3.2-1B-Instruct-ONNX', {
-      dtype: 'q4', // 4-bit quantization (~0.7GB RAM)
-    });
-    console.log("Llama AI model loaded on server.");
-  } catch (err) {
-    console.error("Failed to load AI on server:", err);
-  }
-}
-// Start loading AI in background (disabled by default - will load on first use)
-// initServerAI().catch(console.error);
+// AI provider — OpenAI-compatible HTTP layer (Ollama, Open WebUI,
+// LiteLLM, OpenAI, OpenRouter, …). The server itself no longer ships
+// an embedded model.
+const { attachAiRoutes } = require("./ai/aiRoutes");
 
 const app = express();
 const PORT = Number(process.env.API_PORT || process.env.PORT || 8080);
@@ -2584,89 +2558,9 @@ app.patch("/api/admin/users/:id", auth, adminOnly, (req, res) => {
 });
 
 
-// ---------- AI Assistant (Server side) ----------
-// Check AI status
-app.get("/api/ai/status", auth, (req, res) => {
-  res.json({
-    initialized: !!aiGenerator,
-    modelSize: "~700MB",
-    modelName: "Llama-3.2-1B-Instruct-ONNX"
-  });
-});
-
-// Initialize AI (on-demand)
-app.post("/api/ai/initialize", auth, async (req, res) => {
-  try {
-    if (aiGenerator) {
-      return res.json({ ok: true, message: "AI already initialized" });
-    }
-
-    await initServerAI();
-
-    if (!aiGenerator) {
-      return res.status(500).json({ error: "Failed to initialize AI model" });
-    }
-
-    res.json({ ok: true, message: "AI initialized successfully" });
-  } catch (err) {
-    console.error("AI initialization error:", err);
-    res.status(500).json({ error: "Failed to initialize AI model" });
-  }
-});
-
-app.post("/api/ai/ask", auth, async (req, res) => {
-  const { question, notes } = req.body || {};
-  if (!question) return res.status(400).json({ error: "Missing question" });
-
-  try {
-    if (!aiGenerator) {
-      // Try to init if not ready
-      await initServerAI();
-      if (!aiGenerator) {
-        return res.status(503).json({ error: "AI Assistant is still initializing or failed to load." });
-      }
-    }
-
-    // Limit context strictly - better search logic
-    const relevantNotes = (notes || []).filter(n => {
-      const q = question.toLowerCase().replace(/[^\w\s]/g, ' '); // Strip punctuation for searching
-      const words = q.split(/\s+/).filter(w => w.length >= 2); // At least 2 chars
-      const t = (n.title || "").toLowerCase();
-      const c = (n.content || "").toLowerCase();
-
-      return words.some(word => t.includes(word) || c.includes(word) || word.includes(t) && t.length > 2);
-    }).slice(0, 5); // Take up to 5 relevant notes
-
-    const notesToUse = relevantNotes.length > 0 ? relevantNotes : (notes || []).slice(0, 4);
-    const context = notesToUse
-      .map(n => `TITLE: ${n.title}\nCONTENT: ${n.content.substring(0, 1500)}`)
-      .join('\n\n---\n\n');
-
-    const prompt = `<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-You are a private assistant for the Glass Keep notes app.
-Use ONLY the provided Note Context to answer the user. 
-If the answer is not in the notes, say "I couldn't find any information about that in your notes."
-Be direct, helpful, and concise.
-
-Note Context:
-${context}<|eot_id|><|start_header_id|>user<|end_header_id|>
-${question}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-`;
-
-    const output = await aiGenerator(prompt, {
-      max_new_tokens: 300,
-      temperature: 0.1,
-      repetition_penalty: 1.1,
-      do_sample: false,
-      return_full_text: false,
-    });
-
-    res.json({ answer: output[0].generated_text.trim() });
-  } catch (err) {
-    console.error("Server AI Error:", err);
-    res.status(500).json({ error: "AI processing failed on server." });
-  }
-});
+// ---------- AI Assistant (OpenAI-compatible provider) ----------
+// All AI endpoints (admin settings + user chat) live in server/ai/.
+attachAiRoutes(app, { db, auth, adminOnly });
 
 // ---------- Health ----------
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "glasskeep", env: NODE_ENV }));

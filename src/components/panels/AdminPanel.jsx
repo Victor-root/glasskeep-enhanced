@@ -4,6 +4,7 @@ import UserAvatar from "../common/UserAvatar.jsx";
 import { CloseIcon, ShieldIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import EncryptionAdminSection from "../lock/EncryptionAdminSection.jsx";
+import AiAdminSection from "./AiAdminSection.jsx";
 import { localizeServerError } from "../../utils/serverErrors.js";
 
 // Same shared chip used in the Settings panel: a 36×36 indigo square
@@ -366,6 +367,21 @@ export default function AdminPanel({
             </h4>
             <div className="pl-3">
               <EncryptionAdminSection token={authToken} showToast={showToast} />
+            </div>
+          </div>
+
+          <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
+
+          {/* AI provider — OpenAI-compatible endpoint (Ollama, Open
+              WebUI, LiteLLM, OpenAI, …). Configuration is admin-only;
+              the API key never leaves the server in plain form. */}
+          <div className="mb-8">
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
+              <SectionHeaderIcon icon={TI.Sparkles} />
+              {t("aiSectionTitle")}
+            </h4>
+            <div className="pl-3">
+              <AiAdminSection token={authToken} showToast={showToast} />
             </div>
           </div>
 

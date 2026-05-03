@@ -22,22 +22,14 @@ RUN npm ci --no-audit --no-fund
 # Copy sources.
 COPY . .
 
-# Build the front-end (outputs to /app/dist). @huggingface/transformers is
-# only imported by the server, never by the front-end, so this succeeds
-# regardless of what we do with server-side AI below.
+# Build the front-end (outputs to /app/dist).
 RUN npm run build
 
-# Docker image ships without server-side AI. @huggingface/transformers and
-# its transitive deps (onnxruntime, sharp...) add ~250 MB for a feature
-# that's already disabled by default in server/index.js (the initServerAI
-# call is commented out). The server imports it lazily inside a try/catch,
-# so dropping the package requires no code change.
-#
-# We edit package.json *in the builder layer only* — the repo on disk is
-# untouched — then prune so transitive deps get cleaned up too. The native
-# install path (install.sh) keeps the AI features.
-RUN node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json')); delete p.dependencies['@huggingface/transformers']; fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'\n');" \
- && npm prune --omit=dev --no-audit --no-fund
+# Drop devDependencies — production runtime only needs the server code
+# and its prod deps. The embedded local AI model (and its 250 MB of
+# transitive deps) is gone; AI now talks to an external OpenAI-compatible
+# endpoint over HTTP, so no extra trim step is needed here.
+RUN npm prune --omit=dev --no-audit --no-fund
 
 # ─────────────────────────── Stage 2: runtime ────────────────────────────────
 FROM node:24-bookworm-slim AS runtime

@@ -390,10 +390,10 @@ export default function SettingsPanel({
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <RowIcon icon={TI.Brain} />
+                  <RowIcon icon={TI.Sparkles} />
                   <div className="min-w-0">
-                    <div className="font-medium">{t("localAiAssistant")}</div>
-                    <div className="text-sm text-gray-500">{t("askQuestionsAboutNotes")}</div>
+                    <div className="font-medium">{t("aiAssistantToggle")}</div>
+                    <div className="text-sm text-gray-500">{t("aiAssistantToggleDesc")}</div>
                   </div>
                 </div>
                 <button
@@ -403,28 +403,12 @@ export default function SettingsPanel({
                       : "bg-gray-300 dark:bg-gray-600"
                   }`}
                   onClick={() => {
-                    if (!localAiEnabled) {
-                      // Show confirmation dialog when enabling
-                      showGenericConfirm({
-                        title: t("enableAiAssistantQuestion"),
-                        message:
-                          t("enableAiAssistantWarning"),
-                        confirmText: t("enableAi"),
-                        cancelText: t("cancel"),
-                        danger: false,
-                        onConfirm: async () => {
-                          setLocalAiEnabled(true);
-                          showToast(
-                            t("aiAssistantEnabledModelDownload"),
-                            "success",
-                          );
-                        },
-                      });
-                    } else {
-                      // Disable without confirmation
-                      setLocalAiEnabled(false);
-                      showToast(t("aiAssistantDisabled"), "info");
-                    }
+                    const next = !localAiEnabled;
+                    setLocalAiEnabled(next);
+                    showToast(
+                      next ? t("aiAssistantEnabled") : t("aiAssistantDisabled"),
+                      "info",
+                    );
                   }}
                 >
                   <span

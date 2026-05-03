@@ -88,10 +88,13 @@ const PATTERNS = [
   ["show_on_login must be a boolean",            "errShowOnLoginBoolean"],
 
   // ── AI ───────────────────────────────────────────────────────────
-  ["AI Assistant is still initializing",         "errAiInitializing"],
-  ["AI processing failed on server",             "errAiFailed"],
-  ["Failed to initialize AI model",              "errAiInitFailed"],
-  ["Missing question",                           "errMissingQuestion"],
+  ["AI is disabled",                             "errAiDisabled"],
+  ["AI is not configured",                       "errAiNotConfigured"],
+  ["AI base URL is not set",                     "errAiBaseUrlMissing"],
+  ["AI model is not set",                        "errAiModelMissing"],
+  ["Failed to reach AI provider",                "errAiUnreachable"],
+  ["AI provider error",                          "errAiProvider"],
+  ["Missing messages or question",               "errAiMissingPrompt"],
 
   // ── Generic ──────────────────────────────────────────────────────
   ["Unknown credential",                         "errUnknownCredential"],

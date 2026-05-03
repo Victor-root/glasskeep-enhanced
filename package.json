@@ -49,7 +49,6 @@
     "@fontsource/source-serif-4": "^5.2.9",
     "@fontsource/ubuntu": "^5.2.8",
     "@fontsource/work-sans": "^5.2.8",
-    "@huggingface/transformers": "^3.8.1",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.0",
     "@tailwindcss/vite": "^4.1.11",

@@ -164,7 +164,7 @@ This fork also keeps the main capabilities that already made the original projec
 - 👥 real-time collaboration on notes
 - 📦 import / export with cross-device duplicate detection
 - 📥 Google Keep import (Takeout `.zip` — full colour, images, line breaks)
-- 🧠 optional local AI assistant
+- 🤖 optional AI assistant via any OpenAI-compatible endpoint (Ollama, Open WebUI, LiteLLM, OpenAI, …)
 - 📲 PWA support
 
 ---
@@ -240,6 +240,37 @@ cd ~/glasskeep && docker compose pull && docker compose up -d
 ```
 
 Your data stays preserved in the `./data` directory.
+
+---
+
+## 🤖 AI assistant (OpenAI-compatible)
+
+GlassKeep no longer ships an embedded local model. Instead, it talks to any **OpenAI-compatible** chat endpoint over HTTP, so you can pick whatever fits your setup:
+
+- **fully local & private** — [Ollama](https://ollama.com/), [Open WebUI](https://github.com/open-webui/open-webui), [LiteLLM](https://github.com/BerriAI/litellm), [LM Studio](https://lmstudio.ai/), …
+- **remote** — OpenAI, OpenRouter, or anything else that exposes `/v1/chat/completions`
+
+Configuration lives in the **Admin** panel → **AI provider** section. The API key is stored on the server and never sent back to the browser.
+
+> ⚠️ Notes sent to a remote provider leave your GlassKeep instance. To keep everything local, point GlassKeep at a self-hosted endpoint such as Ollama or Open WebUI on your LAN/LXC.
+
+### Example — Ollama on the same host
+
+```
+Base URL: http://localhost:11434/v1
+API key:  (leave blank, or anything like "ollama")
+Model:    llama3.1:8b
+```
+
+### Example — OpenAI / OpenRouter
+
+```
+Base URL: https://api.openai.com/v1
+API key:  sk-...
+Model:    gpt-4o-mini
+```
+
+Hit **Test connection** to verify the setup, then **Save**.
 
 ---
 

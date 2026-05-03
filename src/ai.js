@@ -1,69 +1,52 @@
 /**
- * AI Assistant Module (Server-side implementation)
- * This calls the backend AI endpoint instead of running inference in the browser.
+ * AI Assistant Module (client-side wrapper).
+ *
+ * Calls the server's /api/ai/chat endpoint, which proxies the request
+ * to the configured OpenAI-compatible provider (Ollama, Open WebUI,
+ * LiteLLM, OpenAI, …). The server holds the API key and the base URL.
  */
 
-const API_BASE = "/api";
-const AUTH_KEY = "glass-keep-auth";
+import { api, getAuth } from "./utils/api.js";
 
-const getAuthToken = () => {
-  try {
-    const auth = JSON.parse(localStorage.getItem(AUTH_KEY) || "null");
-    return auth?.token;
-  } catch (e) {
-    return null;
-  }
-};
-
+/**
+ * No-op kept for backward compatibility — the server no longer needs
+ * any client-driven initialization.
+ */
 export async function initAI(onProgress) {
-  // No-op for server-side AI as server handles initialization
-  if (onProgress) onProgress({ status: 'ready' });
+  if (onProgress) onProgress({ status: "ready" });
   return Promise.resolve();
 }
 
 /**
- * Ask the AI assistant a question.
- * @param {string} question 
- * @param {Array} notes 
- * @param {Function} onProgress 
+ * Ask the AI assistant a question with optional note context.
+ *
+ * @param {string} question
+ * @param {Array<{title: string, content: string}>} notes
+ * @param {Function} [onProgress]
+ * @returns {Promise<string>} the assistant's answer
  */
 export async function askAI(question, notes, onProgress) {
-  const token = getAuthToken();
+  const auth = getAuth();
+  const token = auth?.token;
   if (!token) {
     throw new Error("You must be logged in to use the AI Assistant.");
   }
 
-  // We can still simulate "starting" if we want, or just call the API
-  if (onProgress) onProgress({ status: 'init' });
+  if (onProgress) onProgress({ status: "init" });
 
-  try {
-    const response = await fetch(`${API_BASE}/ai/ask`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        question,
-        notes: notes.map(n => ({
-          title: n.title,
-          content: n.content
-        }))
-      })
-    });
+  const data = await api("/ai/chat", {
+    method: "POST",
+    token,
+    body: {
+      question,
+      notes: (notes || []).map((n) => ({
+        title: n?.title || "",
+        content: n?.content || "",
+      })),
+    },
+  });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `Server responded with ${response.status}`);
-    }
+  if (onProgress) onProgress({ status: "ready" });
 
-    const data = await response.json();
-
-    if (onProgress) onProgress({ status: 'ready' });
-
-    return data.answer;
-  } catch (err) {
-    console.error("AI Assistant API Error:", err);
-    throw err;
-  }
+  return data?.answer || "";
 }
