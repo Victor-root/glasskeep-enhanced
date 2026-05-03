@@ -1,16 +1,36 @@
 // server/ai/aiRoutes.js
 // Express routes for the OpenAI-compatible AI integration.
 //
-// Two surfaces:
+// Three surfaces:
 //   - /api/admin/ai/* — admin-only configuration and connectivity test.
-//   - /api/ai/chat    — authenticated user-facing chat endpoint.
+//   - /api/user/ai/*  — per-user preferences (mode + optional custom config).
+//   - /api/ai/chat    — chat endpoint, resolves to admin or user config.
 //
-// The admin GET endpoint never exposes the stored API key — only a
-// `hasApiKey` flag. PUT supports replace/clear semantics so the UI can
-// rotate or wipe the secret without ever round-tripping it.
+// Neither admin nor user API keys are ever returned in plain form. The
+// admin UI exposes `hasApiKey`, the user UI exposes its own `hasApiKey`,
+// and the chat endpoint never echoes either back.
 
 const aiSettings = require("./aiSettings");
 const provider = require("./openaiCompatibleProvider");
+
+function buildOverride(saved, body) {
+  const cfg = {
+    enabled: true,
+    provider: aiSettings.PROVIDER_OPENAI_COMPATIBLE,
+    baseUrl:
+      typeof body.baseUrl === "string" ? body.baseUrl.trim() : saved.baseUrl,
+    model: typeof body.model === "string" ? body.model.trim() : saved.model,
+    apiKey:
+      typeof body.apiKey === "string" ? body.apiKey.trim() : saved.apiKey,
+    temperature:
+      typeof body.temperature === "number"
+        ? body.temperature
+        : saved.temperature,
+    maxTokens:
+      typeof body.maxTokens === "number" ? body.maxTokens : saved.maxTokens,
+  };
+  return cfg;
+}
 
 function attachAiRoutes(app, { db, auth, adminOnly }) {
   aiSettings.ensureSchema(db);
@@ -18,24 +38,79 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
   // ── Admin: read current settings (no API key in payload) ────────────
   app.get("/api/admin/ai/settings", auth, adminOnly, (_req, res) => {
     try {
-      res.json(aiSettings.getPublicConfig(db));
+      res.json(aiSettings.getAdminPublicConfig(db));
     } catch (err) {
-      console.error("[ai] failed to read settings:", err?.message);
+      console.error("[ai] failed to read admin settings:", err?.message);
       res.status(500).json({ error: "Failed to read AI settings." });
     }
   });
 
   // ── Admin: update settings ─────────────────────────────────────────
-  // The body shape mirrors the public config plus optional `apiKey`:
-  //   - apiKey omitted     -> keep the existing key
-  //   - apiKey === ""      -> clear the key
-  //   - apiKey === "..."   -> replace the key
   app.put("/api/admin/ai/settings", auth, adminOnly, (req, res) => {
     try {
-      const { enabled, baseUrl, model, temperature, maxTokens, apiKey } =
-        req.body || {};
-      const updated = aiSettings.updateConfig(db, {
+      const {
         enabled,
+        baseUrl,
+        model,
+        temperature,
+        maxTokens,
+        apiKey,
+        allowServerAiForUsers,
+      } = req.body || {};
+      const updated = aiSettings.updateAdminConfig(db, {
+        enabled,
+        baseUrl,
+        model,
+        temperature,
+        maxTokens,
+        apiKey,
+        allowServerAiForUsers,
+      });
+      res.json(updated);
+    } catch (err) {
+      console.error("[ai] failed to update admin settings:", err?.message);
+      res.status(500).json({ error: "Failed to update AI settings." });
+    }
+  });
+
+  // ── Admin: test the configured (or override) provider ──────────────
+  app.post("/api/admin/ai/test", auth, adminOnly, async (req, res) => {
+    try {
+      const saved = aiSettings.getAdminConfig(db);
+      const cfg = buildOverride(saved, req.body || {});
+      const result = await provider.testConnection(cfg);
+      res.json({
+        ok: true,
+        reply: (result.content || "").trim().slice(0, 200),
+      });
+    } catch (err) {
+      const status = err instanceof provider.AIProviderError ? err.status : 500;
+      const message = err?.message || "AI test failed.";
+      console.warn("[ai] admin test failed:", message);
+      res.status(status).json({ ok: false, error: message });
+    }
+  });
+
+  // ── User: read own settings ────────────────────────────────────────
+  app.get("/api/user/ai/settings", auth, (req, res) => {
+    try {
+      res.json(aiSettings.getUserPublicConfig(db, req.user.id));
+    } catch (err) {
+      console.error("[ai] failed to read user settings:", err?.message);
+      res.status(500).json({ error: "Failed to read AI settings." });
+    }
+  });
+
+  // ── User: update own settings ──────────────────────────────────────
+  // Same apiKey semantics as the admin route (omitted/keep, ""/clear,
+  // value/replace).
+  app.put("/api/user/ai/settings", auth, (req, res) => {
+    try {
+      const { enabled, mode, baseUrl, model, temperature, maxTokens, apiKey } =
+        req.body || {};
+      const updated = aiSettings.updateUserConfig(db, req.user.id, {
+        enabled,
+        mode,
         baseUrl,
         model,
         temperature,
@@ -44,37 +119,66 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
       });
       res.json(updated);
     } catch (err) {
-      console.error("[ai] failed to update settings:", err?.message);
+      console.error("[ai] failed to update user settings:", err?.message);
       res.status(500).json({ error: "Failed to update AI settings." });
     }
   });
 
-  // ── Admin: test the configured (or override) provider ──────────────
-  // Body may contain a partial config. Whatever isn't supplied falls
-  // back to the saved settings — including the API key, which stays
-  // server-side. Sending `apiKey: ""` explicitly tests with no key.
-  app.post("/api/admin/ai/test", auth, adminOnly, async (req, res) => {
+  // ── User: test their effective (or override) config ────────────────
+  // Body fields:
+  //   mode: "server" | "custom" — override the saved mode for this test
+  //   baseUrl, model, apiKey, temperature, maxTokens — custom-mode overrides
+  // When mode is "server", the admin config is used (and the user must
+  // have permission). When omitted, falls back to the user's saved
+  // config — which itself goes through resolveEffectiveConfig and its
+  // permission checks.
+  app.post("/api/user/ai/test", auth, async (req, res) => {
     try {
-      const saved = aiSettings.getConfig(db);
       const body = req.body || {};
-      const cfg = {
-        enabled: true, // explicit test always enabled, even if globally disabled
-        provider: aiSettings.PROVIDER_OPENAI_COMPATIBLE,
-        baseUrl:
-          typeof body.baseUrl === "string"
-            ? body.baseUrl.trim()
-            : saved.baseUrl,
-        model:
-          typeof body.model === "string" ? body.model.trim() : saved.model,
-        apiKey:
-          typeof body.apiKey === "string" ? body.apiKey.trim() : saved.apiKey,
-        temperature:
-          typeof body.temperature === "number"
-            ? body.temperature
-            : saved.temperature,
-        maxTokens:
-          typeof body.maxTokens === "number" ? body.maxTokens : saved.maxTokens,
-      };
+      const requestedMode =
+        body.mode === "server" || body.mode === "custom" ? body.mode : null;
+
+      let cfg;
+      if (requestedMode === "server") {
+        const adminCfg = aiSettings.getAdminConfig(db);
+        if (
+          !adminCfg.enabled ||
+          !adminCfg.allowServerAiForUsers ||
+          !adminCfg.baseUrl ||
+          !adminCfg.model
+        ) {
+          return res
+            .status(503)
+            .json({ ok: false, error: "Server AI is not available." });
+        }
+        cfg = {
+          enabled: true,
+          provider: aiSettings.PROVIDER_OPENAI_COMPATIBLE,
+          baseUrl: adminCfg.baseUrl,
+          apiKey: adminCfg.apiKey,
+          model: adminCfg.model,
+          temperature: adminCfg.temperature,
+          maxTokens: adminCfg.maxTokens,
+        };
+      } else if (requestedMode === "custom") {
+        const saved = aiSettings.getUserConfig(db, req.user.id);
+        cfg = buildOverride(saved, body);
+        if (!cfg.baseUrl || !cfg.model) {
+          return res
+            .status(400)
+            .json({ ok: false, error: "Custom AI is not configured." });
+        }
+      } else {
+        // No explicit mode — use whatever resolves for this user right now.
+        try {
+          cfg = aiSettings.resolveEffectiveConfig(db, req.user.id);
+        } catch (resolveErr) {
+          return res.status(resolveErr.status || 400).json({
+            ok: false,
+            error: resolveErr.message || "AI is not configured.",
+          });
+        }
+      }
 
       const result = await provider.testConnection(cfg);
       res.json({
@@ -84,29 +188,26 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
     } catch (err) {
       const status = err instanceof provider.AIProviderError ? err.status : 500;
       const message = err?.message || "AI test failed.";
-      // Never log the full prompt or the API key. The provider helper
-      // already redacts; we just surface the friendly message here.
-      console.warn("[ai] test connection failed:", message);
+      console.warn("[ai] user test failed:", message);
       res.status(status).json({ ok: false, error: message });
     }
   });
 
   // ── User: chat completion ──────────────────────────────────────────
-  // Accepts either:
-  //   { messages: [{role, content}, ...] }                 // raw chat
-  //   { question: "...", notes: [{title, content}, ...] }  // legacy "ask AI"
+  // Resolves the effective config for this user (server vs. custom)
+  // before forwarding to the provider. The choice — and the underlying
+  // base URL / API key — never leaves the server.
   app.post("/api/ai/chat", auth, async (req, res) => {
+    let cfg;
     try {
-      const cfg = aiSettings.getConfig(db);
-      if (!cfg.enabled) {
-        return res.status(503).json({ error: "AI is disabled." });
-      }
-      if (!cfg.baseUrl || !cfg.model) {
-        return res
-          .status(503)
-          .json({ error: "AI is not configured. Ask an administrator." });
-      }
+      cfg = aiSettings.resolveEffectiveConfig(db, req.user.id);
+    } catch (resolveErr) {
+      return res
+        .status(resolveErr.status || 400)
+        .json({ error: resolveErr.message || "AI is not available." });
+    }
 
+    try {
       const body = req.body || {};
       let messages = null;
 

@@ -125,7 +125,7 @@ function NotesUI({
   // Settings panel
   openSettingsPanel,
   // AI props
-  localAiEnabled,
+  aiAssistantEnabled,
   aiResponse,
   setAiResponse,
   isAiLoading,
@@ -231,7 +231,7 @@ function NotesUI({
         mobileSearchRef={mobileSearchRef}
         search={search}
         setSearch={setSearch}
-        localAiEnabled={localAiEnabled}
+        aiAssistantEnabled={aiAssistantEnabled}
         onAiSearch={onAiSearch}
         isOnline={isOnline}
         listView={listView}
@@ -328,7 +328,7 @@ function NotesUI({
         colorBtnRef={colorBtnRef}
         showColorPop={showColorPop}
         setShowColorPop={setShowColorPop}
-        localAiEnabled={localAiEnabled}
+        aiAssistantEnabled={aiAssistantEnabled}
         aiResponse={aiResponse}
         setAiResponse={setAiResponse}
         isAiLoading={isAiLoading}

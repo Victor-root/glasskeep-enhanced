@@ -15,7 +15,7 @@ export default function NotesHeader({
   mobileSearchRef,
   search,
   setSearch,
-  localAiEnabled,
+  aiAssistantEnabled,
   onAiSearch,
   isOnline,
   listView,
@@ -118,14 +118,14 @@ export default function NotesHeader({
           <div className="relative w-full max-w-lg">
             <input
               type="text"
-              placeholder={localAiEnabled ? t("searchOrAskAi") : t("search")}
-              className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-4 ${localAiEnabled ? "pr-14" : "pr-8"} py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
+              placeholder={aiAssistantEnabled ? t("searchOrAskAi") : t("search")}
+              className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-4 ${aiAssistantEnabled ? "pr-14" : "pr-8"} py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
                 if (
                   e.key === "Enter" &&
-                  localAiEnabled &&
+                  aiAssistantEnabled &&
                   search.trim().length > 0
                 ) {
                   onAiSearch?.(search);
@@ -133,7 +133,7 @@ export default function NotesHeader({
               }}
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              {localAiEnabled && search.trim().length > 0 && (
+              {aiAssistantEnabled && search.trim().length > 0 && (
                 <button
                   type="button"
                   data-tooltip={t("askAi")}
@@ -187,8 +187,8 @@ export default function NotesHeader({
               <input
                 ref={mobileSearchRef}
                 type="text"
-                placeholder={localAiEnabled ? t("searchOrAskAi") : t("search")}
-                className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-3 ${localAiEnabled ? "pr-12" : "pr-8"} py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
+                placeholder={aiAssistantEnabled ? t("searchOrAskAi") : t("search")}
+                className={`w-full bg-transparent border border-[var(--border-light)] rounded-lg pl-3 ${aiAssistantEnabled ? "pr-12" : "pr-8"} py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-500 dark:placeholder-gray-400`}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
@@ -201,7 +201,7 @@ export default function NotesHeader({
                   }
                   if (
                     e.key === "Enter" &&
-                    localAiEnabled &&
+                    aiAssistantEnabled &&
                     search.trim().length > 0
                   ) {
                     onAiSearch?.(search);
@@ -209,7 +209,7 @@ export default function NotesHeader({
                 }}
               />
               <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                {localAiEnabled && search.trim().length > 0 && (
+                {aiAssistantEnabled && search.trim().length > 0 && (
                   <button
                     type="button"
                     className="h-6 w-6 rounded-full flex items-center justify-center text-indigo-600 hover:bg-indigo-600/10 transition-colors"

@@ -30,6 +30,7 @@ export default function AiAdminSection({ token, showToast }) {
   const [testResult, setTestResult] = useState(null); // { ok, message }
 
   const [enabled, setEnabled] = useState(false);
+  const [allowServerAiForUsers, setAllowServerAiForUsers] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
   const [model, setModel] = useState("");
   const [apiKeyDraft, setApiKeyDraft] = useState("");
@@ -60,6 +61,7 @@ export default function AiAdminSection({ token, showToast }) {
         const data = await api("/admin/ai/settings", { token });
         if (cancelled) return;
         setEnabled(!!data.enabled);
+        setAllowServerAiForUsers(!!data.allowServerAiForUsers);
         setBaseUrl(data.baseUrl || "");
         setModel(data.model || "");
         setHasApiKey(!!data.hasApiKey);
@@ -90,6 +92,7 @@ export default function AiAdminSection({ token, showToast }) {
   const buildPatch = (overrides = {}) => {
     const patch = {
       enabled,
+      allowServerAiForUsers,
       baseUrl: baseUrl.trim(),
       model: model.trim(),
       temperature: Number(temperature),
@@ -115,6 +118,7 @@ export default function AiAdminSection({ token, showToast }) {
         body: buildPatch(),
       });
       setEnabled(!!data.enabled);
+      setAllowServerAiForUsers(!!data.allowServerAiForUsers);
       setBaseUrl(data.baseUrl || "");
       setModel(data.model || "");
       setHasApiKey(!!data.hasApiKey);
@@ -208,6 +212,33 @@ export default function AiAdminSection({ token, showToast }) {
           <span
             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
               enabled ? "translate-x-6" : "translate-x-1"
+            }`}
+          />
+        </button>
+      </div>
+
+      {/* Share with users toggle */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-medium">{t("aiAllowServerAiForUsersLabel")}</div>
+          <div className="text-sm text-gray-500">{t("aiAllowServerAiForUsersDesc")}</div>
+        </div>
+        <button
+          type="button"
+          disabled={loading || !enabled}
+          onClick={() => setAllowServerAiForUsers((v) => !v)}
+          className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+            allowServerAiForUsers && enabled
+              ? "bg-indigo-600"
+              : "bg-gray-300 dark:bg-gray-600"
+          } disabled:opacity-50`}
+          aria-pressed={allowServerAiForUsers}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              allowServerAiForUsers && enabled
+                ? "translate-x-6"
+                : "translate-x-1"
             }`}
           />
         </button>

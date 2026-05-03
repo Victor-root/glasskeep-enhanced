@@ -8,6 +8,7 @@ import TI from "../../icons/editor/index.jsx";
 import { fileToCompressedDataURL } from "../../utils/helpers.js";
 import TypographyModal from "./TypographyModal.jsx";
 import PasskeySettingsSection from "../settings/PasskeySettingsSection.jsx";
+import UserAiSettingsSection from "../settings/UserAiSettingsSection.jsx";
 
 // Single leading-icon component used in front of every section header
 // AND every row / button in the settings panel. Same 36 × 36 indigo
@@ -33,8 +34,8 @@ export default function SettingsPanel({
   onDownloadSecretKey,
   alwaysShowSidebarOnWide,
   setAlwaysShowSidebarOnWide,
-  localAiEnabled,
-  setLocalAiEnabled,
+  aiAssistantEnabled,
+  setAiAssistantEnabled,
   floatingCardsEnabled,
   setFloatingCardsEnabled,
   checklistInsertPosition,
@@ -381,6 +382,26 @@ export default function SettingsPanel({
 
           <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
 
+          {/* AI Assistant Section — per-user preferences. Mode picker
+              (server vs. custom) and an optional personal OpenAI-
+              compatible config. Never receives the admin's API key,
+              base URL or model. */}
+          <div className="mb-8">
+            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
+              <SectionHeaderIcon icon={TI.Sparkles} />
+              {t("aiSectionTitle")}
+            </h4>
+            <div className="pl-3">
+              <UserAiSettingsSection
+                token={token}
+                showToast={showToast}
+                onEnabledChange={setAiAssistantEnabled}
+              />
+            </div>
+          </div>
+
+          <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
+
           {/* UI Preferences Section */}
           <div className="mb-8">
             <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
@@ -388,37 +409,6 @@ export default function SettingsPanel({
               {t("uiPreferences")}
             </h4>
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 px-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <RowIcon icon={TI.Sparkles} />
-                  <div className="min-w-0">
-                    <div className="font-medium">{t("aiAssistantToggle")}</div>
-                    <div className="text-sm text-gray-500">{t("aiAssistantToggleDesc")}</div>
-                  </div>
-                </div>
-                <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
-                    localAiEnabled
-                      ? "bg-indigo-600"
-                      : "bg-gray-300 dark:bg-gray-600"
-                  }`}
-                  onClick={() => {
-                    const next = !localAiEnabled;
-                    setLocalAiEnabled(next);
-                    showToast(
-                      next ? t("aiAssistantEnabled") : t("aiAssistantDisabled"),
-                      "info",
-                    );
-                  }}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      localAiEnabled ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-
               <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.LayoutSidebar} />

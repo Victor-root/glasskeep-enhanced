@@ -54,7 +54,7 @@ export default function NotesComposer({
   colorBtnRef,
   showColorPop,
   setShowColorPop,
-  localAiEnabled,
+  aiAssistantEnabled,
   aiResponse,
   setAiResponse,
   isAiLoading,
@@ -67,7 +67,7 @@ export default function NotesComposer({
   return (
     <>
       {/* AI Response Box */}
-      {localAiEnabled && (aiResponse || isAiLoading) && (
+      {aiAssistantEnabled && (aiResponse || isAiLoading) && (
         <div className="px-4 sm:px-6 md:px-8 lg:px-12 mb-6">
           <div className="max-w-2xl mx-auto glass-card rounded-xl shadow-lg p-5 border border-indigo-500/30 relative bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/30 dark:to-purple-950/30 z-[50]">
             {isAiLoading && (

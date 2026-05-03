@@ -164,15 +164,10 @@ export default function App() {
     });
   }, []);
 
-  // Local AI
-  const [localAiEnabled, setLocalAiEnabled] = useState(() => {
-    try {
-      const stored = localStorage.getItem("localAiEnabled");
-      return stored === null ? false : stored === "true";
-    } catch (e) {
-      return false;
-    }
-  });
+  // AI assistant — visibility flag mirrored from the server. The
+  // authoritative state lives in user_ai_settings (loaded by
+  // UserAiSettingsSection, which calls back via setAiAssistantEnabled).
+  const [aiAssistantEnabled, setAiAssistantEnabled] = useState(false);
   // Checklist insert position: "top" or "bottom"
   const [checklistInsertPosition, setChecklistInsertPosition] = useState(() => {
     try {
@@ -609,11 +604,27 @@ export default function App() {
   }, [sidebarWidth]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("localAiEnabled", String(localAiEnabled));
-    } catch (e) {}
-    if (!localAiEnabled) setAiResponse(null);
-  }, [localAiEnabled]);
+    if (!aiAssistantEnabled) setAiResponse(null);
+  }, [aiAssistantEnabled]);
+
+  // Mirror the server-side AI preference into the local visibility flag
+  // as soon as the session is authenticated. The Settings panel does
+  // the same on open (and writes back), but this hydrates the search-
+  // bar AI icon immediately on app start.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    api("/user/ai/settings", { token })
+      .then((data) => {
+        if (!cancelled && data && typeof data.enabled === "boolean") {
+          setAiAssistantEnabled(data.enabled);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   useEffect(() => {
     try {
@@ -4867,8 +4878,8 @@ export default function App() {
         onDownloadSecretKey={downloadSecretKey}
         alwaysShowSidebarOnWide={alwaysShowSidebarOnWide}
         setAlwaysShowSidebarOnWide={setAlwaysShowSidebarOnWide}
-        localAiEnabled={localAiEnabled}
-        setLocalAiEnabled={setLocalAiEnabled}
+        aiAssistantEnabled={aiAssistantEnabled}
+        setAiAssistantEnabled={setAiAssistantEnabled}
         floatingCardsEnabled={floatingCardsEnabled}
         setFloatingCardsEnabled={setFloatingCardsEnabled}
         checklistInsertPosition={checklistInsertPosition}
@@ -4995,7 +5006,7 @@ export default function App() {
         sidebarPermanent={alwaysShowSidebarOnWide && windowWidth >= 700 && !isMobileDevice && !desktopSidebarHidden}
         sidebarWidth={sidebarWidth}
         // AI props
-        localAiEnabled={localAiEnabled}
+        aiAssistantEnabled={aiAssistantEnabled}
         aiResponse={aiResponse}
         setAiResponse={setAiResponse}
         isAiLoading={isAiLoading}
