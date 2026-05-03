@@ -12,6 +12,7 @@
 
 const aiSettings = require("./aiSettings");
 const provider = require("./openaiCompatibleProvider");
+const { t } = require("../i18n");
 
 // Generic words that match in almost every note and would otherwise
 // dominate the score. Mostly French + English filler — keep tight on
@@ -152,30 +153,13 @@ function buildOverride(saved, body) {
   return cfg;
 }
 
-const SYSTEM_PROMPTS = {
-  en: (context) =>
-    "You are an assistant for the GlassKeep notes app. " +
-    "Answer the user's question using ONLY the Note Context below. " +
-    "If you find a relevant note, quote its title and the relevant excerpt. " +
-    "If nothing in the context matches, say you couldn't find it. " +
-    "Be direct and concise." +
-    (context
-      ? `\n\nNote Context:\n${context}`
-      : "\n\nNote Context: (no notes available)"),
-  fr: (context) =>
-    "Tu es un assistant pour l'application de notes GlassKeep. " +
-    "Réponds à la question de l'utilisateur en te basant UNIQUEMENT sur le Contexte des notes ci-dessous. " +
-    "Si tu trouves une note pertinente, cite son titre et l'extrait correspondant. " +
-    "Si rien dans le contexte ne correspond, dis que tu n'as pas trouvé. " +
-    "Sois direct et concis." +
-    (context
-      ? `\n\nContexte des notes :\n${context}`
-      : "\n\nContexte des notes : (aucune note disponible)"),
-};
-
 function buildSystemPrompt(lang, context) {
-  const builder = SYSTEM_PROMPTS[lang] || SYSTEM_PROMPTS.en;
-  return builder(context);
+  const base = t(lang, "aiSystemPromptBase");
+  const label = t(lang, "aiSystemPromptContextLabel");
+  const noCtx = t(lang, "aiSystemPromptNoContext");
+  return context
+    ? `${base}\n\n${label}:\n${context}`
+    : `${base}\n\n${label}: ${noCtx}`;
 }
 
 function attachAiRoutes(app, { db, auth, adminOnly }) {
