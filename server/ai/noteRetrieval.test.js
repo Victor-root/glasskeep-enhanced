@@ -304,6 +304,116 @@ console.log("\n[context block format — inventory]");
   assert("inventory uses CONTENT:", /CONTENT:/.test(block));
 }
 
+// ── Short-token exact-match (no `vm` inside `lvm`) ───────────────────
+console.log("\n[short-token exact match]");
+{
+  const corpus2 = [
+    {
+      id: "100",
+      title: "Kill VM",
+      tags: ["proxmox"],
+      content: "rm /var/lock/qemu-server/lock-101.conf",
+    },
+    {
+      id: "101",
+      title: "Cloner partition vers local-lvm",
+      tags: ["proxmox", "stockage"],
+      content: "dd if=/dev/sda of=/dev/lvm/blah",
+    },
+    {
+      id: "102",
+      title: "Creer un RAID1 avec mdadm",
+      tags: ["raid"],
+      content: "mdadm --create /dev/md0 --level=1 ...",
+    },
+  ];
+  const picked = r.pickRelevantNotes(corpus2, "je cherche a kill une vm");
+  const ids = picked.map((p) => p.note.id);
+  console.log("  picked:", ids);
+  assert("kill vm finds Kill VM", ids.includes("100"));
+  assert("kill vm does NOT match local-lvm via substring", !ids.includes("101"));
+  assert("kill vm drops unrelated RAID note", !ids.includes("102"));
+}
+
+// ── Pruning: top dominates -> only top kept ──────────────────────────
+console.log("\n[pruning — obvious top]");
+{
+  const metrics = {};
+  const corpus3 = [
+    {
+      id: "200",
+      title: "Kill VM",
+      tags: ["proxmox"],
+      content: "rm /var/lock/qemu-server/lock-101.conf",
+    },
+    {
+      id: "201",
+      title: "Notes diverses proxmox",
+      tags: ["proxmox"],
+      content: "tu peux kill un process avec kill -9 PID.",
+    },
+    {
+      id: "202",
+      title: "Random",
+      tags: [],
+      content: "rien a voir avec la requete.",
+    },
+  ];
+  const picked = r.pickRelevantNotes(corpus3, "je cherche a kill une vm", {
+    metricsOut: metrics,
+  });
+  const ids = picked.map((p) => p.note.id);
+  console.log("  picked:", ids);
+  console.log("  metrics:", metrics);
+  assert(
+    "only Kill VM survives pruning",
+    ids.length === 1 && ids[0] === "200",
+  );
+  assert(
+    "metrics report beforePruningCount > afterPruningCount",
+    metrics.beforePruningCount > metrics.afterPruningCount,
+  );
+  assert("metrics flag topIsObvious", metrics.topIsObvious === true);
+  assert(
+    "dropped notes carry reason",
+    Array.isArray(metrics.dropped) &&
+      metrics.dropped.length > 0 &&
+      metrics.dropped[0].reason === "weak-match",
+  );
+}
+
+// ── Pruning preserves broad multi-note inventory queries ─────────────
+console.log("\n[pruning — broad inventory query]");
+{
+  const picked = r.pickRelevantNotes(corpus, "je cherche mes wallets crypto", {
+    mode: "inventory",
+  });
+  const ids = picked.map((p) => p.note.id);
+  console.log("  picked:", ids);
+  assert("inventory keeps Wallet Bitcoin", ids.includes("1"));
+  assert("inventory keeps Wallet Ethereum", ids.includes("2"));
+  assert("inventory drops Liste de courses", !ids.includes("3"));
+}
+
+// ── Stopwords: "je", "comment", "veux"… should be filtered ───────────
+console.log("\n[extended stopwords]");
+{
+  eq(
+    "'je veux comment faire' -> []",
+    r.pickRelevantNotes(corpus, "je veux comment faire"),
+    [],
+  );
+  const picked = r.pickRelevantNotes(
+    corpus,
+    "je veux comment trouver mon wallet",
+  );
+  const ids = picked.map((p) => p.note.id);
+  assert(
+    "'... wallet' still finds wallets",
+    ids.includes("1") || ids.includes("2"),
+  );
+}
+
 console.log("\n────────────────────────────");
 if (failures === 0) {
   console.log("All retrieval tests passed.");

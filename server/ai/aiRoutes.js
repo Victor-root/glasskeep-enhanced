@@ -229,7 +229,12 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
       const lang = body.lang === "fr" ? "fr" : "en";
       const debugRequested = body.debug === true;
 
+      // pickedIds tracks ALL retrieval results; allowedCitationIds
+      // narrows to only the notes whose context block actually fit in
+      // the prompt budget — that's the set the model is allowed to
+      // cite. Citing a note we didn't send to the model is a fabrication.
       let pickedIds = [];
+      let allowedCitationIds = [];
       let picked = [];
       let debugMeta = null;
 
@@ -255,9 +260,11 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
         const listIntent = retrieval.detectListIntent(question);
         const mode = listIntent ? "inventory" : "compact";
 
+        const retrievalMetrics = {};
         picked = retrieval.pickRelevantNotes(allNotes, question, {
           limit: 12,
           mode,
+          metricsOut: retrievalMetrics,
         });
 
         retrieval.debugRetrieval({
@@ -284,8 +291,15 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
               lang,
               listIntent,
               mode,
+              beforePruningCount: retrievalMetrics.beforePruningCount || 0,
+              afterPruningCount: 0,
+              topScore: retrievalMetrics.topScore || 0,
+              topIsObvious: retrievalMetrics.topIsObvious || false,
+              droppedNotes: retrievalMetrics.dropped || [],
               pickedCount: 0,
               pickedNotes: [],
+              contextNoteIds: [],
+              allowedCitationIds: [],
               rejectionReason: "no_context",
             };
           }
@@ -307,15 +321,25 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
         // beat 12 amputated ones.
         const maxTotalChars = listIntent ? 60000 : 16000;
         const blocks = [];
+        const includedNotes = []; // picked items whose block fit in budget
         let total = 0;
         for (const p of picked) {
           const block = retrieval.buildContextBlock(p, { mode });
           // +5 accounts for the "\n\n---\n\n" separator we add later.
           if (total + block.length + 5 > maxTotalChars) break;
           blocks.push(block);
+          includedNotes.push(p);
           total += block.length + 5;
         }
         const context = blocks.join("\n\n---\n\n");
+
+        // Citations are only validated against notes whose block was
+        // actually sent to the model — IDs we picked but dropped for
+        // budget reasons aren't in the prompt and the model has no
+        // basis to cite them. Treat such IDs as fabricated.
+        allowedCitationIds = includedNotes
+          .map((p) => String(p.note?.id || ""))
+          .filter(Boolean);
 
         // Build debug metadata now (before the provider call) so it's
         // available on every response path below.
@@ -326,16 +350,28 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
             lang,
             listIntent,
             mode,
+            beforePruningCount: retrievalMetrics.beforePruningCount || 0,
+            afterPruningCount: retrievalMetrics.afterPruningCount || picked.length,
+            topScore: retrievalMetrics.topScore || (picked[0]?.score || 0),
+            topIsObvious: retrievalMetrics.topIsObvious || false,
+            droppedNotes: retrievalMetrics.dropped || [],
             pickedCount: picked.length,
             pickedNotes: picked.map((p, i) => ({
               id: p.note?.id,
               title: p.note?.title,
               score: p.score,
               matched: p.matched,
+              matchedTokenCount: p.matchedTokenCount,
+              titleMatchCount: p.titleMatchCount,
+              tagMatchCount: p.tagMatchCount,
+              bodyMatchCount: p.bodyMatchCount,
               contentLength: (p.note?.content || "").length,
               contextBlockLength: blocks[i] !== undefined ? blocks[i].length : 0,
+              includedInContext: i < includedNotes.length,
             })),
             pickedIds,
+            contextNoteIds: allowedCitationIds.slice(),
+            allowedCitationIds: allowedCitationIds.slice(),
             contextLength: context.length,
             maxTotalChars,
           };
@@ -356,10 +392,12 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
 
       // Pull the [[NOTES:id1,id2]] marker out of an answer (case
       // tolerant; brackets occasionally drift to single). Whatever the
-      // model emits, we only keep IDs that were actually in the
-      // selected context — never trust the model to invent IDs.
+      // model emits, we only keep IDs whose block was actually
+      // included in the prompt — never trust the model to invent IDs,
+      // and never accept IDs that were dropped before the model saw
+      // them (e.g. squeezed out by the context budget).
       const markerRe = /\[\[?\s*NOTES\s*:\s*([^\]]*?)\s*\]?\]/i;
-      const allowed = new Set(pickedIds);
+      const allowed = new Set(allowedCitationIds);
       const parseMarker = (text) => {
         const m = text.match(markerRe);
         const rawIds = [];
@@ -388,7 +426,7 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
       // it answered correctly from the context. Before treating this
       // as a hallucination, give it one chance to add the marker —
       // same conversation, just a short reminder turn appended.
-      if (pickedIds.length > 0 && parsed.validCitedIds.length === 0) {
+      if (allowedCitationIds.length > 0 && parsed.validCitedIds.length === 0) {
         retryAttempted = true;
         try {
           const reminderMessages = [
@@ -416,7 +454,7 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
       // before rejecting outright. Sending a real, useful answer to
       // the user is better than masking it as "not found" when the
       // retrieval clearly identified relevant notes.
-      if (pickedIds.length > 0 && parsed.validCitedIds.length === 0) {
+      if (allowedCitationIds.length > 0 && parsed.validCitedIds.length === 0) {
         const top = picked[0];
         const topMatchedCount = Array.isArray(top?.matched)
           ? top.matched.length
@@ -427,12 +465,14 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
           picked.length === 1;
 
         if (eligibleForFallback) {
-          // Surface up to 3 of the highest-scoring notes so the user
-          // can verify manually. Cap at 3 to keep the UI tidy.
+          // Surface up to 3 of the highest-scoring notes the model
+          // actually saw so the user can verify manually. Cap at 3 to
+          // keep the UI tidy and only cite notes that were sent.
+          const allowedSet = new Set(allowedCitationIds);
           const fallbackIds = picked
-            .slice(0, 3)
             .map((p) => String(p.note?.id || ""))
-            .filter(Boolean);
+            .filter((id) => id && allowedSet.has(id))
+            .slice(0, 3);
 
           const resp = {
             answer: t(lang, "aiCitationFallback"),

@@ -32,6 +32,7 @@ const STOP_WORDS = new Set([
   "their","do","does","did","done","have","has","had","can","could","will",
   "would","should","may","might","what","when","where","which","who","why",
   "how","find","search","note","notes","please","tell","show","give","get",
+  "want","wants","wanted","need","needs","needed",
   // French
   "le","la","les","un","une","des","du","de","au","aux","et","ou","ne",
   "pas","plus","tres","sur","sous","dans","par","pour","avec","sans","entre",
@@ -43,6 +44,7 @@ const STOP_WORDS = new Set([
   "trouve","trouver","cherche","chercher","montre","montrer","dis","donne",
   "donner","ouvre","ouvrir","quelle","quel","quelles","quels","liste",
   "lister","afficher",
+  "je","veux","voudrais","besoin","comment","peux","peut","a",
 ]);
 
 // ── Synonyms ───────────────────────────────────────────────────────────
@@ -131,16 +133,64 @@ function detectListIntent(question) {
 
 // ── Haystack preparation ───────────────────────────────────────────────
 
+// Tokenize a normalized field into a Set of distinct words. Unlike the
+// query-side `tokenize` we keep length-1 entries too — they're harmless
+// inside a Set lookup and let exact-match work for very short user
+// tokens. Source string is expected to be already normalized.
+function fieldTokenize(normStr) {
+  return new Set(
+    String(normStr || "")
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean),
+  );
+}
+
 function noteToHaystacks(n) {
   const title = String(n?.title || "");
   const content = String(n?.content || "");
   const tagStr = Array.isArray(n?.tags) ? n.tags.map(String).join(" ") : "";
+  const titleNorm = normalize(title);
+  const tagsNorm = normalize(tagStr);
+  const bodyNorm = normalize(content);
   return {
-    title: normalize(title),
-    tags: normalize(tagStr),
-    body: normalize(content),
+    title: titleNorm,
+    tags: tagsNorm,
+    body: bodyNorm,
     rawContent: content,
+    titleTokenSet: fieldTokenize(titleNorm),
+    tagTokenSet: fieldTokenize(tagsNorm),
+    bodyTokenSet: fieldTokenize(bodyNorm),
   };
+}
+
+// Match strategy depends on variant length. Short variants (≤3 chars
+// like "vm", "ssh", "cle", "mdp") use exact token match against a Set,
+// otherwise "vm" matches inside "lvm" / "kvm" / "vmware" via substring
+// and creates lots of false positives. Longer variants keep substring
+// matching so plurals, compound words and inflections still match.
+function variantInField(variant, fieldStr, fieldTokenSet) {
+  if (!variant) return false;
+  if (variant.length <= 3) return fieldTokenSet.has(variant);
+  return fieldStr.includes(variant);
+}
+
+function countVariantInBody(variant, bodyStr, bodyTokenSet) {
+  if (!variant) return 0;
+  if (variant.length <= 3) {
+    if (!bodyTokenSet.has(variant)) return 0;
+    const re = new RegExp(`(?:^|[^a-z0-9])${variant}(?:[^a-z0-9]|$)`, "g");
+    const matches = bodyStr.match(re);
+    return matches ? matches.length : 0;
+  }
+  let idx = 0;
+  let hits = 0;
+  while (true) {
+    const found = bodyStr.indexOf(variant, idx);
+    if (found === -1) break;
+    hits++;
+    idx = found + variant.length;
+  }
+  return hits;
 }
 
 // ── Snippet extraction ─────────────────────────────────────────────────
@@ -267,43 +317,51 @@ function scoreNote(haystacks, queryEntries, normalizedQuestion) {
   let score = 0;
   const matched = new Set();
   let matchedTokenCount = 0;
+  let titleMatchCount = 0;
+  let tagMatchCount = 0;
+  let bodyMatchCount = 0;
 
   for (const entry of queryEntries) {
     const w = entry.idf;
     const vArr = entry.variantsArr;
 
     let tokenMatched = false;
+    let inTitle = false;
+    let inTags = false;
+    let inBody = false;
 
-    if (vArr.some((v) => haystacks.title.includes(v))) {
+    if (vArr.some((v) => variantInField(v, haystacks.title, haystacks.titleTokenSet))) {
       score += 3 * w;
       matched.add(entry.original);
       tokenMatched = true;
+      inTitle = true;
     }
-    if (vArr.some((v) => haystacks.tags.includes(v))) {
+    if (vArr.some((v) => variantInField(v, haystacks.tags, haystacks.tagTokenSet))) {
       score += 2 * w;
       matched.add(entry.original);
       tokenMatched = true;
+      inTags = true;
     }
 
     let bestBodyHits = 0;
     for (const v of vArr) {
-      let idx = 0;
-      let hits = 0;
-      while (hits < 5) {
-        const found = haystacks.body.indexOf(v, idx);
-        if (found === -1) break;
-        hits++;
-        idx = found + v.length;
-      }
+      const hits = Math.min(
+        countVariantInBody(v, haystacks.body, haystacks.bodyTokenSet),
+        5,
+      );
       if (hits > bestBodyHits) bestBodyHits = hits;
     }
     if (bestBodyHits > 0) {
       score += bestBodyHits * w;
       matched.add(entry.original);
       tokenMatched = true;
+      inBody = true;
     }
 
     if (tokenMatched) matchedTokenCount++;
+    if (inTitle) titleMatchCount++;
+    if (inTags) tagMatchCount++;
+    if (inBody) bodyMatchCount++;
   }
 
   // Phrase bonus: full normalized question appears verbatim somewhere.
@@ -320,7 +378,96 @@ function scoreNote(haystacks, queryEntries, normalizedQuestion) {
     score *= 1 + 0.35 * (matchedTokenCount - 1);
   }
 
-  return { score, matched: [...matched] };
+  return {
+    score,
+    matched: [...matched],
+    matchedTokenCount,
+    titleMatchCount,
+    tagMatchCount,
+    bodyMatchCount,
+  };
+}
+
+// ── Pruning ────────────────────────────────────────────────────────────
+// After scoring we drop the long tail of weak matches before the model
+// ever sees them. A note isn't kept just because its score is > 0 —
+// that's how 12 unrelated notes used to leak into the context. The top
+// note is always kept; everything else has to clear at least one of:
+//   - score within a fraction of the top score
+//   - matches ≥2 useful tokens AND lands in title or tags
+//   - title contains ≥2 useful query tokens
+//   - tags contain ≥2 useful query tokens
+//   - single-useful-token query with the token in title or tags
+// `topIsObvious` means the best note clearly dominates the rest (multi-
+// token title hit and ≥1.5× the runner-up); in that case the score-
+// ratio threshold tightens so we collapse to just that note.
+
+function pruneScoredNotes(scored, opts = {}) {
+  if (!Array.isArray(scored) || scored.length === 0) {
+    return { kept: [], dropped: [], topScore: 0, topIsObvious: false };
+  }
+  const top = scored[0];
+  const topScore = top.score;
+  const second = scored[1];
+  const usefulTokenCount = opts.usefulTokenCount || 0;
+  const mode = opts.mode === "inventory" ? "inventory" : "compact";
+
+  const topIsObvious =
+    top.matchedTokenCount >= 2 &&
+    top.titleMatchCount >= 1 &&
+    (!second || topScore >= (second.score || 0) * 1.5);
+
+  let ratioThreshold;
+  if (topIsObvious) ratioThreshold = 0.7;
+  else if (mode === "inventory") ratioThreshold = 0.3;
+  else ratioThreshold = 0.45;
+
+  const minRatioScore = topScore * ratioThreshold;
+
+  const kept = [];
+  const dropped = [];
+
+  for (const s of scored) {
+    if (s === top) {
+      kept.push(s);
+      continue;
+    }
+
+    const passes = [];
+    if (s.score >= minRatioScore) passes.push("score-ratio");
+    if (
+      s.matchedTokenCount >= 2 &&
+      (s.titleMatchCount > 0 || s.tagMatchCount > 0)
+    ) {
+      passes.push("multi-token-field");
+    }
+    if (s.titleMatchCount >= 2) passes.push("strong-title");
+    if (s.tagMatchCount >= 2) passes.push("strong-tag");
+    if (
+      usefulTokenCount === 1 &&
+      (s.titleMatchCount > 0 || s.tagMatchCount > 0)
+    ) {
+      passes.push("single-token-field");
+    }
+
+    if (passes.length > 0) {
+      kept.push(s);
+    } else {
+      dropped.push({
+        id: s.note?.id != null ? String(s.note.id) : "",
+        title: String(s.note?.title || "").slice(0, 80),
+        score: Number(s.score.toFixed(3)),
+        matched: s.matched,
+        matchedTokenCount: s.matchedTokenCount,
+        titleMatchCount: s.titleMatchCount,
+        tagMatchCount: s.tagMatchCount,
+        bodyMatchCount: s.bodyMatchCount,
+        reason: "weak-match",
+      });
+    }
+  }
+
+  return { kept, dropped, topScore, topIsObvious };
 }
 
 // ── Public: pickRelevantNotes ──────────────────────────────────────────
@@ -329,6 +476,9 @@ function pickRelevantNotes(notes, question, opts = {}) {
   const limit = opts.limit || 12;
   const mode = opts.mode === "inventory" ? "inventory" : "compact";
   const perNoteMaxChars = opts.perNoteMaxChars;
+  const metricsOut = opts.metricsOut && typeof opts.metricsOut === "object"
+    ? opts.metricsOut
+    : null;
   if (!Array.isArray(notes) || notes.length === 0) return [];
 
   const rawTokens = Array.from(new Set(tokenize(question)));
@@ -363,12 +513,17 @@ function pickRelevantNotes(notes, question, opts = {}) {
 
   // IDF: doc frequency = docs where ANY variant is present in any field.
   // Floor of 1 keeps common words contributing to the score (no tower).
+  // Uses the same length-aware matching as scoring so short tokens
+  // don't inflate df via false-positive substring hits.
   const N = docs.length;
   for (const entry of queryEntries) {
     let dfCount = 0;
     for (const d of docs) {
       const present = entry.variantsArr.some(
-        (v) => d.hay.title.includes(v) || d.hay.tags.includes(v) || d.hay.body.includes(v),
+        (v) =>
+          variantInField(v, d.hay.title, d.hay.titleTokenSet) ||
+          variantInField(v, d.hay.tags, d.hay.tagTokenSet) ||
+          variantInField(v, d.hay.body, d.hay.bodyTokenSet),
       );
       if (present) dfCount++;
     }
@@ -378,15 +533,53 @@ function pickRelevantNotes(notes, question, opts = {}) {
   const normalizedQuestion = normalize(question).trim();
   const scored = [];
   for (const d of docs) {
-    const { score, matched } = scoreNote(d.hay, queryEntries, normalizedQuestion);
-    if (score > 0) scored.push({ note: d.note, hay: d.hay, score, matched });
+    const result = scoreNote(d.hay, queryEntries, normalizedQuestion);
+    if (result.score > 0) {
+      scored.push({
+        note: d.note,
+        hay: d.hay,
+        score: result.score,
+        matched: result.matched,
+        matchedTokenCount: result.matchedTokenCount,
+        titleMatchCount: result.titleMatchCount,
+        tagMatchCount: result.tagMatchCount,
+        bodyMatchCount: result.bodyMatchCount,
+      });
+    }
   }
-  if (scored.length === 0) return [];
+  if (scored.length === 0) {
+    if (metricsOut) {
+      metricsOut.beforePruningCount = 0;
+      metricsOut.afterPruningCount = 0;
+      metricsOut.topScore = 0;
+      metricsOut.topIsObvious = false;
+      metricsOut.dropped = [];
+      metricsOut.usefulTokenCount = tokens.length;
+    }
+    return [];
+  }
 
   scored.sort((a, b) => b.score - a.score);
 
+  // Prune the long tail of weak matches.
+  const { kept, dropped, topScore, topIsObvious } = pruneScoredNotes(scored, {
+    mode,
+    usefulTokenCount: tokens.length,
+  });
+
+  if (metricsOut) {
+    metricsOut.beforePruningCount = scored.length;
+    metricsOut.afterPruningCount = kept.length;
+    metricsOut.topScore = topScore;
+    metricsOut.topIsObvious = topIsObvious;
+    metricsOut.dropped = dropped;
+    metricsOut.usefulTokenCount = tokens.length;
+  }
+
+  if (kept.length === 0) return [];
+
   // Compute snippets only for the top-K we'll actually return.
-  const top = scored.slice(0, limit);
+  const top = kept.slice(0, limit);
   const allVariants = new Set();
   for (const e of queryEntries) for (const v of e.variantsArr) allVariants.add(v);
 
@@ -407,6 +600,10 @@ function pickRelevantNotes(notes, question, opts = {}) {
     note: s.note,
     score: s.score,
     matched: s.matched,
+    matchedTokenCount: s.matchedTokenCount,
+    titleMatchCount: s.titleMatchCount,
+    tagMatchCount: s.tagMatchCount,
+    bodyMatchCount: s.bodyMatchCount,
     snippet: extractSnippets(s.hay.rawContent, allVariants, snippetOpts).join(
       "\n",
     ),
@@ -478,6 +675,9 @@ module.exports = {
     expandPluralVariants,
     expandToken,
     extractSnippets,
+    pruneScoredNotes,
+    variantInField,
+    countVariantInBody,
     STOP_WORDS,
     SYNONYMS,
   },
