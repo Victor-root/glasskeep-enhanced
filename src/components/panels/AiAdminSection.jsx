@@ -213,6 +213,7 @@ export default function AiAdminSection({ token, showToast }) {
       const data = await api("/admin/ai/test", {
         method: "POST",
         token,
+        timeoutMs: 60000,
         body,
       });
       setTestResult({

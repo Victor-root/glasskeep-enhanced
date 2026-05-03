@@ -15,13 +15,19 @@ export const setAuth = (obj) => {
   if (obj) localStorage.setItem(AUTH_KEY, JSON.stringify(obj));
   else localStorage.removeItem(AUTH_KEY);
 };
-export async function api(path, { method = "GET", body, token } = {}) {
+export async function api(path, { method = "GET", body, token, timeoutMs } = {}) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
 
+  // Default to 6s — enough for the local-LAN note/sync endpoints. AI
+  // chat requests pass an explicit, much larger timeout because real
+  // model inference can easily exceed several seconds.
+  const effectiveTimeout =
+    typeof timeoutMs === "number" && timeoutMs > 0 ? timeoutMs : 6000;
+
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout (self-hosted LAN)
+    const timeoutId = setTimeout(() => controller.abort(), effectiveTimeout);
 
     const res = await fetch(`${API_BASE}${path}`, {
       method,

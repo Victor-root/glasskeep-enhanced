@@ -34,9 +34,12 @@ export async function askAI(question, notes, onProgress) {
 
   if (onProgress) onProgress({ status: "init" });
 
+  // Real model inference can take well over the 6 s default timeout
+  // baked into api(); allow up to 2 minutes for the chat round-trip.
   const data = await api("/ai/chat", {
     method: "POST",
     token,
+    timeoutMs: 120000,
     body: {
       question,
       notes: (notes || []).map((n) => ({

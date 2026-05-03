@@ -188,6 +188,7 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
       const data = await api("/user/ai/test", {
         method: "POST",
         token,
+        timeoutMs: 60000,
         body,
       });
       setTestResult({
