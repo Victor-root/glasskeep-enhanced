@@ -66,8 +66,8 @@ export default function NoteAiChatPanel({
         dark ? "border-white/10" : "border-[var(--border-light)]"
       }`}
       style={{
-        width: "min(420px, 32vw)",
-        maxWidth: "420px",
+        width: "min(520px, 40vw)",
+        maxWidth: "520px",
         height: "95vh",
         flexShrink: 0,
         // Match the note modal's exact background — same colour key,
@@ -90,7 +90,7 @@ export default function NoteAiChatPanel({
           <h3 className="font-semibold text-indigo-700 dark:text-indigo-300 truncate">
             {t("noteAiChatTitle")}
           </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+          <p className="text-xs text-gray-500 dark:text-gray-200 truncate">
             {t("noteAiChatSubtitle")}
           </p>
         </div>
@@ -112,7 +112,7 @@ export default function NoteAiChatPanel({
       >
         {messages.length === 0 && !loading && !error && (
           <div className="flex flex-col gap-3">
-            <div className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+            <div className="text-sm text-gray-500 dark:text-gray-200 leading-relaxed">
               {t("noteAiChatEmpty")}
             </div>
             {/* Quick actions — only visible while the conversation is
@@ -124,11 +124,7 @@ export default function NoteAiChatPanel({
                 type="button"
                 disabled={loading}
                 onClick={() => onSend?.(t("noteAiChatQuickSummarizePrompt"))}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  dark
-                    ? "border-indigo-400/30 text-indigo-300 hover:bg-indigo-500/10"
-                    : "border-indigo-500/30 text-indigo-700 hover:bg-indigo-500/10"
-                }`}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t("noteAiChatQuickSummarize")}
               </button>
@@ -136,11 +132,7 @@ export default function NoteAiChatPanel({
                 type="button"
                 disabled={loading}
                 onClick={() => onSend?.(t("noteAiChatQuickExplainPrompt"))}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  dark
-                    ? "border-indigo-400/30 text-indigo-300 hover:bg-indigo-500/10"
-                    : "border-indigo-500/30 text-indigo-700 hover:bg-indigo-500/10"
-                }`}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t("noteAiChatQuickExplain")}
               </button>
@@ -161,7 +153,7 @@ export default function NoteAiChatPanel({
                   m.role === "user"
                     ? "bg-indigo-600 text-white"
                     : dark
-                    ? "bg-white/10 text-gray-100"
+                    ? "bg-white/10 text-white"
                     : "bg-gray-100 text-gray-800"
                 }`}
               >
@@ -173,7 +165,7 @@ export default function NoteAiChatPanel({
             <li className="flex justify-start">
               <div
                 className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${
-                  dark ? "bg-white/10 text-gray-300" : "bg-gray-100 text-gray-600"
+                  dark ? "bg-white/10 text-white" : "bg-gray-100 text-gray-600"
                 }`}
               >
                 <span className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" />
@@ -217,7 +209,7 @@ export default function NoteAiChatPanel({
             type="button"
             onClick={submit}
             disabled={loading || !draft.trim()}
-            className="shrink-0 px-3 py-2 rounded-lg font-semibold text-sm bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="shrink-0 px-3 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t("noteAiChatSend")}
           </button>

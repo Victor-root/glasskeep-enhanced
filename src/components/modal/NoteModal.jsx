@@ -441,7 +441,7 @@ export default function NoteModal({
             mobileLayout ? ''
             : isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen sm:!rounded-none'
             : noteAiPanelVisible
-              ? 'sm:w-11/12 sm:max-w-3xl sm:h-[95vh] sm:rounded-xl'
+              ? 'sm:w-11/12 sm:max-w-2xl sm:h-[95vh] sm:rounded-xl'
               : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl'
           }${drawTransition === 'entering' ? ' draw-expand' : drawTransition === 'leaving' ? ' draw-collapse' : ''} flex flex-col relative overflow-hidden`}
           style={{
