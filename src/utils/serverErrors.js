@@ -96,6 +96,28 @@ const PATTERNS = [
   ["AI provider error",                          "errAiProvider"],
   ["Missing messages or question",               "errAiMissingPrompt"],
 
+  // ── Passkeys / unlock ────────────────────────────────────────────
+  // Order matters: more specific needles first because PATTERNS uses
+  // includes() and the first match wins.
+  ["This passkey is not authorised to unlock the instance", "errPasskeyNotAuthorisedUnlock"],
+  ["Only admin passkeys can unlock the instance",           "errPasskeyOnlyAdminUnlock"],
+  ["Unlock wrap missing for this passkey",                  "errPasskeyUnlockWrapMissing"],
+  ["Could not unwrap DEK with this passkey",                "errPasskeyUnwrapDekFailed"],
+  ["Could not save unlock wrap",                            "errPasskeyUnlockWrapSaveFailed"],
+  ["Could not save passkey",                                "errPasskeySaveFailed"],
+  ["Failed to start passkey registration",                  "errPasskeyRegStartFailed"],
+  ["Failed to start passkey login",                         "errPasskeyLoginStartFailed"],
+  ["Failed to start promotion ceremony",                    "errPasskeyPromotionFailed"],
+  ["Passkey does not support PRF",                          "errPasskeyNoPrf"],
+  ["Passkey not found",                                     "errPasskeyNotFound"],
+  ["PRF output too short",                                  "errPasskeyPrfTooShort"],
+  ["Instance no longer unlocked",                           "errInstanceNoLongerUnlocked"],
+  ["Challenge expired or invalid",                          "errChallengeExpired"],
+  ["Verification failed",                                   "errVerificationFailed"],
+  ["User no longer exists",                                 "errPasskeyUserGone"],
+  ["Name required",                                         "errPasskeyNameRequired"],
+  ["Missing fields",                                        "errMissingFields"],
+
   // ── Generic ──────────────────────────────────────────────────────
   ["Unknown credential",                         "errUnknownCredential"],
   ["No passkey is authorised",                   "errNoPasskeyAuthorised"],

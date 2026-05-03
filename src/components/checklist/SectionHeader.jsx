@@ -72,7 +72,7 @@ function ColorPicker({ colorKey, onChange, onClose, onOutsideClose, triggerRef }
         {/* No-color option */}
         <button
           type="button"
-          aria-label="No color"
+          aria-label={t("noColor")}
           onClick={() => { onChange("none"); onClose(); }}
           className="w-8 h-8 rounded-full flex items-center justify-center transition-transform hover:scale-110 focus:outline-none"
           style={{

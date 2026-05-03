@@ -833,4 +833,29 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   collapseSection: "Replier la section",
   expandSection: "Déplier la section",
   sectionColor: "Couleur de la section",
+  noColor: "Aucune couleur",
+
+  // Erreurs serveur clés d'accès / déverrouillage — passent par serverErrors.js
+  errMissingFields: "Champs requis manquants.",
+  errChallengeExpired: "Défi expiré ou invalide. Réessayez.",
+  errVerificationFailed: "Échec de la vérification.",
+  errPasskeyRegStartFailed: "Impossible de démarrer l'enregistrement de la clé d'accès.",
+  errPasskeyLoginStartFailed: "Impossible de démarrer la connexion par clé d'accès.",
+  errPasskeySaveFailed: "Impossible d'enregistrer la clé d'accès.",
+  errPasskeyNameRequired: "Le nom de la clé d'accès est requis.",
+  errPasskeyNotFound: "Clé d'accès introuvable.",
+  errPasskeyNoPrf: "Cette clé d'accès ne prend pas en charge PRF (chiffrement).",
+  errPasskeyUserGone: "Le compte utilisateur n'existe plus.",
+  errPasskeyNotAuthorisedUnlock: "Cette clé d'accès n'est pas autorisée à déverrouiller l'instance.",
+  errPasskeyOnlyAdminUnlock: "Seules les clés d'accès administrateur peuvent déverrouiller l'instance.",
+  errPasskeyUnlockWrapMissing: "Wrap de déverrouillage manquant pour cette clé d'accès.",
+  errPasskeyUnwrapDekFailed: "Impossible de déverrouiller avec cette clé d'accès.",
+  errPasskeyPromotionFailed: "Impossible de démarrer la cérémonie de promotion.",
+  errPasskeyPrfTooShort: "La sortie PRF de la clé d'accès est trop courte.",
+  errPasskeyUnlockWrapSaveFailed: "Impossible d'enregistrer le wrap de déverrouillage.",
+  errInstanceNoLongerUnlocked: "L'instance n'est plus déverrouillée.",
+
+  // Vue administrateur
+  manageUsersDescription: "Gérez les utilisateurs enregistrés. Vous pouvez les supprimer (leurs notes seront également supprimées).",
+  loading: "Chargement…",
 };

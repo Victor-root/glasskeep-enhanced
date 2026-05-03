@@ -196,6 +196,12 @@ export default function AdminPanel({
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
+  // Non-admins should never see this panel — also avoids mounting the
+  // admin-only sections (AiAdminSection, EncryptionAdminSection …) which
+  // immediately fetch admin endpoints on mount and would surface a
+  // spurious "Admin only" toast right after login.
+  if (!currentUser?.is_admin) return null;
+
   return (
     <>
       {open && (

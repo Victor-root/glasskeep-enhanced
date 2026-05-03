@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { t } from "../../i18n";
 import { api, getAuth, API_BASE } from "../../utils/api.js";
+import { localizeServerError } from "../../utils/serverErrors.js";
 
 export default function AdminView({ dark, showGenericConfirm }) {
   const [users, setUsers] = useState([]);
@@ -23,10 +24,10 @@ export default function AdminView({ dark, showGenericConfirm }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to load users");
+      if (!res.ok) throw new Error(data?.error || "");
       setUsers(Array.isArray(data) ? data : []);
     } catch (e) {
-      alert(e.message || t("failedLoadAdminData"));
+      alert(localizeServerError(e.message, "failedLoadAdminData"));
       setUsers([]);
     } finally {
       setLoading(false);
@@ -40,10 +41,10 @@ export default function AdminView({ dark, showGenericConfirm }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "Delete failed");
+      if (!res.ok) throw new Error(data?.error || "");
       setUsers((prev) => prev.filter((u) => u.id !== id));
     } catch (e) {
-      alert(e.message || t("deleteFailed"));
+      alert(localizeServerError(e.message, "deleteFailed"));
     }
   }
 
@@ -56,8 +57,7 @@ export default function AdminView({ dark, showGenericConfirm }) {
       <div className="max-w-5xl mx-auto">
         <h1 className="text-2xl sm:text-3xl font-bold mb-4">{t("admin")}</h1>
         <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-          Manage registered users. You can remove users (this also deletes their
-          notes).
+          {t("manageUsersDescription")}
         </p>
 
         <div className="glass-card rounded-xl p-4 shadow-lg overflow-x-auto">
@@ -139,7 +139,7 @@ export default function AdminView({ dark, showGenericConfirm }) {
 
           {loading && (
             <div className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-              Loading…
+              {t("loading")}
             </div>
           )}
         </div>
