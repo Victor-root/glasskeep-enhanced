@@ -6,7 +6,7 @@ import Popover from "../common/Popover.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
 import AddImageMenu from "./AddImageMenu.jsx";
 import LogoPickerPopover from "./LogoPickerPopover.jsx";
-import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon } from "../../icons/index.jsx";
+import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon, Sparkles } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 import { getNoteIcon, setNoteIcon } from "../../utils/noteIcon.js";
@@ -97,6 +97,9 @@ export default function ModalFooter({
   onConvertNoteType,
   // Duplicate the active note (kebab → "Dupliquer la note").
   onDuplicateNote,
+  // Per-note AI chat panel — kebab entry only when desktop + AI on.
+  noteAiAvailable,
+  onOpenNoteAi,
 }) {
   const isDesktop = windowWidth >= 768 && !isLandscapeMobile && !isWebView;
   const isTrashed = tagFilter === "TRASHED";
@@ -661,6 +664,18 @@ export default function ModalFooter({
             >
               <DownloadIcon />{t("downloadMd")}
             </button>
+            {/* Chat with AI — desktop-only side panel scoped to this note.
+                Hidden when the user has no AI configured / on small screens. */}
+            {!isTrashed && noteAiAvailable && onOpenNoteAi && (
+              <button
+                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                style={{ color: dark ? "#a5b4fc" : "#4f46e5" }}
+                onClick={() => { onOpenNoteAi(); setModalKebabOpen(false); }}
+              >
+                <Sparkles />
+                {t("noteAiChatMenuItem")}
+              </button>
+            )}
             {/* Collaborate — shown in kebab on mobile text edit mode & draw edit mode */}
             {((!isDesktop && mType === "text" && !viewMode) || (mType === "draw" && drawMode !== "draw" && !viewMode)) && (
               <button

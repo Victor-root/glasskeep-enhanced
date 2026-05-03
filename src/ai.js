@@ -143,3 +143,55 @@ export async function askAI(question, notes, onProgress) {
     citedNoteIds: Array.isArray(data?.citedNoteIds) ? data.citedNoteIds : [],
   };
 }
+
+/**
+ * Per-note chat: ask the AI a question scoped to a single open note.
+ * The note acts as the only context; the temporary message history lives
+ * on the client (panel state) and is forwarded each turn so the model
+ * can keep a coherent conversation without anything being persisted.
+ *
+ * @param {Object} params
+ * @param {Object} params.note     { id, title, content, tags } of the open note
+ * @param {Array}  params.messages prior turns: [{ role: 'user'|'assistant', content }]
+ * @param {string} params.question the latest user question
+ * @returns {Promise<{answer: string, finishReason: string|null}>}
+ */
+export async function askNoteAI({ note, messages, question }) {
+  const auth = getAuth();
+  const token = auth?.token;
+  if (!token) {
+    throw new Error("You must be logged in to use the AI Assistant.");
+  }
+  if (!note) throw new Error("Missing note context.");
+  if (!question || !String(question).trim()) {
+    throw new Error("Missing question.");
+  }
+
+  // Flatten the note the same way as global chat — text/checklist/draw
+  // notes need their human-readable body, not the raw Tiptap envelope.
+  const flatNote = {
+    id: note.id != null ? String(note.id) : "",
+    title: (note.title || "").toString(),
+    content: noteToPlainText(note),
+    tags: Array.isArray(note.tags) ? note.tags.map(String) : [],
+  };
+
+  const lang = detectLang();
+
+  const data = await api("/ai/note-chat", {
+    method: "POST",
+    token,
+    timeoutMs: 120000,
+    body: {
+      note: flatNote,
+      messages: Array.isArray(messages) ? messages : [],
+      question: String(question),
+      lang,
+    },
+  });
+
+  return {
+    answer: data?.answer || "",
+    finishReason: data?.finishReason || null,
+  };
+}

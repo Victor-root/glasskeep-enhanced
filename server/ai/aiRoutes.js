@@ -583,6 +583,110 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
       res.status(status).json({ error: message });
     }
   });
+
+  // ── Per-note chat ──────────────────────────────────────────────────
+  // A separate, simpler surface that scopes the AI to a single user-
+  // opened note. No retrieval, no scoring, no pruning, no citation
+  // marker — the context is one explicit note plus a temporary chat
+  // history that lives only on the client. Reuses the same effective
+  // config as /api/ai/chat so the user never reconfigures the AI.
+  app.post("/api/ai/note-chat", auth, async (req, res) => {
+    let cfg;
+    try {
+      cfg = aiSettings.resolveEffectiveConfig(db, req.user.id);
+    } catch (resolveErr) {
+      return res
+        .status(resolveErr.status || 400)
+        .json({ error: resolveErr.message || "AI is not available." });
+    }
+
+    try {
+      const body = req.body || {};
+      const lang = body.lang === "fr" ? "fr" : "en";
+      const note = body.note && typeof body.note === "object" ? body.note : null;
+      const question =
+        typeof body.question === "string" ? body.question.trim() : "";
+
+      if (!note) {
+        return res.status(400).json({ error: t(lang, "aiNoteChatMissingNote") });
+      }
+      if (!question) {
+        return res
+          .status(400)
+          .json({ error: t(lang, "aiNoteChatMissingQuestion") });
+      }
+
+      // Sanitize the conversation history. Only role + non-empty string
+      // content survives; anything else is discarded to keep the prompt
+      // shape predictable. Cap at 32 turns to bound prompt size — that's
+      // already a longer-than-realistic per-note discussion.
+      const history = Array.isArray(body.messages)
+        ? body.messages
+            .filter(
+              (m) =>
+                m &&
+                typeof m.role === "string" &&
+                (m.role === "user" || m.role === "assistant") &&
+                typeof m.content === "string" &&
+                m.content.trim().length > 0,
+            )
+            .slice(-32)
+            .map((m) => ({ role: m.role, content: m.content }))
+        : [];
+
+      // Format the single-note context block. Title / tags / content
+      // labels come from i18n so the note section header reads naturally
+      // in French and English. Body content is sent verbatim — this is
+      // the user's own note, not a retrieved excerpt.
+      const titleLabel = t(lang, "aiNoteChatTitleLabel");
+      const tagsLabel = t(lang, "aiNoteChatTagsLabel");
+      const contentLabel = t(lang, "aiNoteChatContentLabel");
+      const noteLabel = t(lang, "aiNoteChatNoteLabel");
+
+      const titleStr = String(note.title || "").trim();
+      const tagsArr = Array.isArray(note.tags) ? note.tags.map(String) : [];
+      const contentStr = String(note.content || "").trim();
+
+      // Cap the note content fed to the model. 24 KB is generous enough
+      // for any realistic single note while staying well under typical
+      // context windows once the system prompt and history are added.
+      const MAX_NOTE_CHARS = 24000;
+      const trimmedContent =
+        contentStr.length > MAX_NOTE_CHARS
+          ? contentStr.slice(0, MAX_NOTE_CHARS) + "…"
+          : contentStr;
+
+      const noteBlockLines = [`${noteLabel}:`];
+      if (titleStr) noteBlockLines.push(`${titleLabel}: ${titleStr}`);
+      if (tagsArr.length > 0) {
+        noteBlockLines.push(`${tagsLabel}: ${tagsArr.join(", ")}`);
+      }
+      noteBlockLines.push(`${contentLabel}:`);
+      noteBlockLines.push(trimmedContent || "(empty)");
+      const noteBlock = noteBlockLines.join("\n");
+
+      const systemPrompt =
+        t(lang, "aiNoteChatSystemPromptBase") + "\n\n" + noteBlock;
+
+      const messages = [
+        { role: "system", content: systemPrompt },
+        ...history,
+        { role: "user", content: question },
+      ];
+
+      const result = await provider.chatCompletion(cfg, { messages });
+      const answer = (result.content || "").trim();
+      res.json({
+        answer,
+        finishReason: result.finishReason || null,
+      });
+    } catch (err) {
+      const status = err instanceof provider.AIProviderError ? err.status : 500;
+      const message = err?.message || "AI request failed.";
+      console.warn("[ai] note-chat failed:", message);
+      res.status(status).json({ error: message });
+    }
+  });
 }
 
 module.exports = { attachAiRoutes };

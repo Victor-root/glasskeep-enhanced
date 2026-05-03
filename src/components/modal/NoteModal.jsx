@@ -13,6 +13,7 @@ const NoteViewContent = memo(function NoteViewContent({ html, noteViewRef }) {
 import DrawingCanvas from "../../DrawingCanvas";
 import ModalHeader from "./ModalHeader.jsx";
 import ModalFooter from "./ModalFooter.jsx";
+import NoteAiChatPanel from "../notes/NoteAiChatPanel.jsx";
 import ModalImagesGrid from "./ModalImagesGrid.jsx";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog.jsx";
 import CollaborationModal from "./CollaborationModal.jsx";
@@ -164,6 +165,15 @@ export default function NoteModal({
   // direct draw mode
   initialDrawMode,
   onConsumeInitialDrawMode,
+  // per-note AI chat panel — owned by App, presentational here
+  aiAssistantEnabled,
+  noteAiOpen,
+  noteAiMessages,
+  noteAiLoading,
+  noteAiError,
+  onOpenNoteAi,
+  onCloseNoteAi,
+  onSendNoteAiMessage,
 }) {
   const [drawMode, setDrawMode] = React.useState("view");
   const [drawToolbarEl, setDrawToolbarEl] = React.useState(null);
@@ -404,12 +414,18 @@ export default function NoteModal({
   // Force mobile layout when running inside Android WebView (tablets)
   const mobileLayout = windowWidth < 640 || isLandscapeMobile || isWebView;
 
+  // Per-note AI side panel — desktop-only V1. ≥1024px gives enough
+  // horizontal room for the modal (max-w-3xl ≈ 768px when the panel is
+  // open) plus a 420 px panel without the combo exceeding ~94vw.
+  const noteAiAvailable = aiAssistantEnabled && !mobileLayout && windowWidth >= 1024;
+  const noteAiPanelVisible = noteAiAvailable && noteAiOpen && !isDrawEdit && !isModalClosing;
+
   if (!open && !isModalClosing) return null;
 
   return (
     <>
       <div
-        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 ${mobileLayout ? 'bg-black' : 'bg-black/40 max-sm:bg-black'} z-40 flex items-center justify-center overscroll-contain`}
+        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 ${mobileLayout ? 'bg-black' : 'bg-black/40 max-sm:bg-black'} z-40 flex items-center justify-center ${noteAiPanelVisible ? 'gap-2' : ''} overscroll-contain`}
         onMouseDown={(e) => {
           scrimClickStartRef.current = e.target === e.currentTarget;
         }}
@@ -424,7 +440,9 @@ export default function NoteModal({
           className={`note-modal-anim${isModalClosing ? ' closing' : ''} glass-card rounded-none shadow-none w-full max-w-none ${
             mobileLayout ? ''
             : isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen sm:!rounded-none'
-            : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl'
+            : noteAiPanelVisible
+              ? 'sm:w-11/12 sm:max-w-3xl sm:h-[95vh] sm:rounded-xl'
+              : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl'
           }${drawTransition === 'entering' ? ' draw-expand' : drawTransition === 'leaving' ? ' draw-collapse' : ''} flex flex-col relative overflow-hidden`}
           style={{
             backgroundColor: modalBgFor(mColor, dark),
@@ -756,6 +774,11 @@ export default function NoteModal({
             canRedo={canRedo}
             onConvertNoteType={onConvertNoteType}
             onDuplicateNote={onDuplicateNote}
+            // Per-note AI chat — kebab entry only when the panel is
+            // available on this viewport (desktop ≥ 1024 px) and the user
+            // has the AI assistant turned on.
+            noteAiAvailable={noteAiAvailable}
+            onOpenNoteAi={onOpenNoteAi}
           />
 
           <ConfirmDeleteDialog
@@ -797,6 +820,18 @@ export default function NoteModal({
             updateDropdownPosition={updateDropdownPosition}
           />
         </div>
+        {/* Per-note AI panel — flex-sibling of the modal card so it sits
+            visually attached to the right edge while the scrim re-centers
+            the combined block. Hidden on mobile / draw-edit / closing. */}
+        <NoteAiChatPanel
+          dark={dark}
+          open={noteAiPanelVisible}
+          messages={noteAiMessages || []}
+          loading={!!noteAiLoading}
+          error={noteAiError}
+          onSend={onSendNoteAiMessage}
+          onClose={onCloseNoteAi}
+        />
       </div>
 
       {/* Fullscreen Image Viewer — content images only; the icon is

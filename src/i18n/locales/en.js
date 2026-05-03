@@ -857,4 +857,16 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   // Admin view
   manageUsersDescription: "Manage registered users. You can remove users (this also deletes their notes).",
   loading: "Loading…",
+
+  // Per-note AI chat panel (kebab entry + side panel UI)
+  noteAiChatMenuItem: "Chat with AI",
+  noteAiChatTitle: "AI Assistant",
+  noteAiChatSubtitle: "About this note only",
+  noteAiChatEmpty:
+    "Ask a question about this note, request an explanation, a rewrite, or an adaptation.",
+  noteAiChatPlaceholder: "Ask a question about this note…",
+  noteAiChatSend: "Send",
+  noteAiChatThinking: "Thinking…",
+  noteAiChatClose: "Close AI panel",
+  noteAiChatGenericError: "AI request failed.",
 };

@@ -6,7 +6,7 @@ import React, {
   useLayoutEffect,
   useCallback,
 } from "react";
-import { askAI } from "./ai";
+import { askAI, askNoteAI } from "./ai";
 import { t } from "./i18n";
 import Masonry from "react-masonry-css";
 import SyncStatusIcon from "./sync/SyncStatusIcon.jsx";
@@ -168,6 +168,15 @@ export default function App() {
   // authoritative state lives in user_ai_settings (loaded by
   // UserAiSettingsSection, which calls back via setAiAssistantEnabled).
   const [aiAssistantEnabled, setAiAssistantEnabled] = useState(false);
+
+  // Per-note AI chat panel — temporary, in-memory only. Lives next to
+  // the open note and is cleared whenever the note or the panel closes.
+  // Nothing here is persisted, synced, or written to the database; the
+  // whole point is a throwaway "explain / rewrite this note" surface.
+  const [noteAiOpen, setNoteAiOpen] = useState(false);
+  const [noteAiMessages, setNoteAiMessages] = useState([]);
+  const [noteAiLoading, setNoteAiLoading] = useState(false);
+  const [noteAiError, setNoteAiError] = useState(null);
   // Checklist insert position: "top" or "bottom"
   const [checklistInsertPosition, setChecklistInsertPosition] = useState(() => {
     try {
@@ -1458,6 +1467,90 @@ export default function App() {
       });
     } catch {
       return Array.isArray(arr) ? arr : [];
+    }
+  };
+
+  // When the note modal closes, the per-note AI panel must close too —
+  // its conversation only exists in the context of an open note. Reset
+  // every related piece of state so reopening the same note starts
+  // fresh, as the spec requires.
+  useEffect(() => {
+    if (!open) {
+      setNoteAiOpen(false);
+      setNoteAiMessages([]);
+      setNoteAiError(null);
+      setNoteAiLoading(false);
+    }
+  }, [open]);
+
+  // Per-note AI chat — open/close/send handlers. Conversation state is
+  // entirely client-side (see noteAi* state above) and is wiped on
+  // every close. Sending is a single round-trip to /api/ai/note-chat
+  // with the open note as fixed context.
+  const openNoteAi = () => {
+    setNoteAiOpen(true);
+    setNoteAiError(null);
+  };
+  const closeNoteAi = () => {
+    setNoteAiOpen(false);
+    setNoteAiMessages([]);
+    setNoteAiError(null);
+    setNoteAiLoading(false);
+  };
+  const sendNoteAiMessage = async (question) => {
+    const q = (question || "").trim();
+    if (!q || noteAiLoading) return;
+
+    // Snapshot the open note from the editor state (mTitle/mBody/…) so
+    // unsaved local edits are part of the AI context. The user expects
+    // "Chat with AI" to operate on what they currently see, not the
+    // last-saved version. Each note type uses different storage fields,
+    // so we follow the same envelope noteToPlainText() reads on the
+    // client side: content for text/draw notes, items for checklists.
+    const noteSnapshot = {
+      id: activeId,
+      title: mTitle || "",
+      type: mType,
+      tags: Array.isArray(mTagList) ? mTagList : [],
+      ...(mType === "checklist"
+        ? { items: Array.isArray(mItems) ? mItems : [] }
+        : mType === "draw"
+        ? {
+            content:
+              typeof mDrawingData === "string"
+                ? mDrawingData
+                : JSON.stringify(mDrawingData || {}),
+          }
+        : { content: mBody || "" }),
+    };
+
+    const userMsg = { role: "user", content: q };
+    const historyForRequest = noteAiMessages;
+    setNoteAiMessages((prev) => [...prev, userMsg]);
+    setNoteAiError(null);
+    setNoteAiLoading(true);
+    try {
+      const result = await askNoteAI({
+        note: noteSnapshot,
+        messages: historyForRequest,
+        question: q,
+      });
+      const answer = (result?.answer || "").trim();
+      if (!answer) {
+        setNoteAiError(t("noteAiChatGenericError"));
+      } else {
+        setNoteAiMessages((prev) => [...prev, { role: "assistant", content: answer }]);
+      }
+    } catch (err) {
+      console.error("Note AI error:", err);
+      const fallback = t("noteAiChatGenericError");
+      setNoteAiError(
+        typeof err?.message === "string" && err.message
+          ? localizeServerError(err.message, "noteAiChatGenericError")
+          : fallback,
+      );
+    } finally {
+      setNoteAiLoading(false);
     }
   };
 
@@ -4665,6 +4758,15 @@ export default function App() {
       onDuplicateNote={duplicateActiveNote}
       initialDrawMode={initialDrawMode}
       onConsumeInitialDrawMode={() => setInitialDrawMode(null)}
+      // Per-note AI chat — kebab entry, panel state, send/close handlers
+      aiAssistantEnabled={aiAssistantEnabled}
+      noteAiOpen={noteAiOpen}
+      noteAiMessages={noteAiMessages}
+      noteAiLoading={noteAiLoading}
+      noteAiError={noteAiError}
+      onOpenNoteAi={openNoteAi}
+      onCloseNoteAi={closeNoteAi}
+      onSendNoteAiMessage={sendNoteAiMessage}
     />
   );
 
