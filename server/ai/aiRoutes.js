@@ -417,6 +417,19 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
           .map((s) => s.trim())
           .filter((s) => s && allowed.has(s));
       }
+      // If we sent notes to the model but it didn't cite a single
+      // valid one (no marker, empty marker, or invented IDs), the
+      // answer can't be verified against any note we control. Treat it
+      // as unreliable and replace it with the localized "not found"
+      // string instead of leaking external-knowledge text to the user.
+      if (pickedIds.length > 0 && citedNoteIds.length === 0) {
+        return res.json({
+          answer: t(lang, "aiNoRelevantNotes"),
+          citedNoteIds: [],
+          finishReason: "no_valid_citation",
+        });
+      }
+
       const answer = raw.replace(markerRe, "").trim();
       res.json({
         answer,
