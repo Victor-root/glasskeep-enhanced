@@ -68,7 +68,10 @@ function pickRelevantNotes(notes, question, limit) {
   // If everything was filtered out (very short generic question), fall
   // back to the unfiltered set so we still pick *something* relevant.
   const tokens = queryTokens.length > 0 ? queryTokens : rawTokens;
-  if (tokens.length === 0) return notes.slice(0, limit);
+  // No usable tokens at all → caller will short-circuit with the
+  // localized "no relevant notes" reply rather than dumping arbitrary
+  // notes into the model's context (which led to hallucinated answers).
+  if (tokens.length === 0) return [];
 
   // Pre-normalize each note's haystacks once.
   const docs = [];
@@ -129,9 +132,11 @@ function pickRelevantNotes(notes, question, limit) {
     return scored.slice(0, limit).map((s) => s.note);
   }
 
-  // Nothing matched the (filtered) tokens — give the model the first N
-  // so it can answer general questions (e.g. "list my notes").
-  return notes.slice(0, limit);
+  // No note actually matched the (filtered) tokens. Returning [] makes
+  // the chat handler short-circuit with the localized "not found"
+  // reply — never feed arbitrary notes to the model, which would let
+  // it answer from external knowledge or hallucinate.
+  return [];
 }
 
 function buildOverride(saved, body) {
@@ -359,6 +364,20 @@ function attachAiRoutes(app, { db, auth, adminOnly }) {
         const question = body.question.trim();
         const allNotes = Array.isArray(body.notes) ? body.notes : [];
         const picked = pickRelevantNotes(allNotes, question, 8);
+
+        // No relevant note → don't call the provider at all. Returning
+        // the localized "not found" string here is what the strict
+        // prompt would produce anyway, but it also prevents the model
+        // from drifting onto external knowledge when the context is
+        // weak or empty.
+        if (picked.length === 0) {
+          return res.json({
+            answer: t(lang, "aiNoRelevantNotes"),
+            citedNoteIds: [],
+            finishReason: "no_context",
+          });
+        }
+
         pickedIds = picked.map((n) => String(n?.id || "")).filter(Boolean);
         const context = picked
           .map((n) => {
