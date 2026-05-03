@@ -262,6 +262,16 @@ API key:  (leave blank, or anything like "ollama")
 Model:    llama3.1:8b
 ```
 
+### Example — Open WebUI
+
+GlassKeep appends `/chat/completions` to the base URL on its own. Open WebUI documents the full endpoint as `https://your-openwebui-domain.example/api/chat/completions`, so in GlassKeep enter only the prefix — otherwise the path is duplicated.
+
+```
+Base URL: https://your-openwebui-domain.example/api
+API key:  your Open WebUI API key
+Model:    the exact model name shown by Open WebUI
+```
+
 ### Example — OpenAI / OpenRouter
 
 ```

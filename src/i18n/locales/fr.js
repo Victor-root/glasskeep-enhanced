@@ -374,7 +374,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   aiProviderHint: "Compatible avec tout endpoint exposant /v1/chat/completions : Ollama, Open WebUI, LiteLLM, LM Studio, OpenAI, OpenRouter, …",
   aiBaseUrlLabel: "URL de base",
   aiBaseUrlPlaceholder: "http://localhost:11434/v1",
-  aiBaseUrlHint: "Exemples : http://localhost:11434/v1 (Ollama), https://api.openai.com/v1, https://openrouter.ai/api/v1.",
+  aiBaseUrlHint: "GlassKeep ajoute automatiquement /chat/completions, ne le mettez donc pas. Exemples : http://localhost:11434/v1 (Ollama), https://votre-openwebui.example/api (Open WebUI), https://api.openai.com/v1, https://openrouter.ai/api/v1.",
   aiModelLabel: "Modèle",
   aiModelPlaceholder: "llama3.1:8b",
   aiModelHint: "Doit correspondre à un modèle disponible chez le fournisseur (ex. llama3.1:8b, qwen2.5:7b, gpt-4o-mini).",
