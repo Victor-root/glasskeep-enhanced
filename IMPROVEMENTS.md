@@ -543,6 +543,40 @@ A major security addition focused on protecting notes at rest and providing mode
 
 ---
 
+## 🤖 25) AI Assistant
+
+GlassKeep removed its small embedded local AI and replaced it with a flexible, provider-agnostic architecture.
+
+### What changed
+- **Removed**: the old embedded local model (too weak to be genuinely useful)
+- **Added**: OpenAI-compatible chat endpoint support — Ollama, Open WebUI, LiteLLM, OpenAI, OpenRouter, or any provider exposing `/v1/chat/completions`
+- **Architecture**: thin HTTP client on the server; API keys are never sent to the browser; admin configures the provider once, optionally shares it with users or lets each user bring their own
+
+### Two AI features
+1. **Global AI search**: ask questions across notes from the search bar; backend pre-selects relevant notes before calling the model to avoid context bloat and ensure cited sources actually exist in the context
+2. **Per-note assistant**: discuss the current note with AI; conversations are temporary by default with an optional save button to persist them per note (stored locally on the device until explicitly deleted)
+
+### Admin & user configuration
+- **Admin level**: can disable AI entirely, configure a server-side provider (optionally shared with users), or require users to bring their own endpoint
+- **User level**: can enable the feature, choose between server AI (if admin allows) or custom endpoint, set temperature/max tokens, and manage passkeys for authentication
+
+### Implementation
+- `server/ai/` — OpenAI-compatible HTTP client, request/response handling, prompt engineering for source attribution
+- `src/components/notes/NoteAiChatPanel.jsx` — per-note chat UI with message history, save/delete controls, error handling
+- `src/components/modal/ModalHeader.jsx` — AI toggle button in note header
+- Admin & user settings panels — configurable endpoint, API key management, model selection
+- `src/i18n/locales/{en,fr}.js` — full i18n coverage for all AI UI strings
+
+### Why this approach
+The embedded model was a source of bloat and poor UX — shipping dozens of MB of model weights that could never match real-world AI use. By switching to provider-agnostic OpenAI-compatible endpoints, GlassKeep:
+- stays lightweight (the app itself)
+- lets each user/instance choose what fits their hardware and privacy requirements
+- works with local private models (Ollama on LAN) or remote providers (your choice)
+- keeps API keys server-side and secure
+- scales: as better models emerge, users just switch without updating the app
+
+---
+
 ## 📌 Global summary
 
 In practice, this fork mainly moves Glass Keep further in seven big directions:
