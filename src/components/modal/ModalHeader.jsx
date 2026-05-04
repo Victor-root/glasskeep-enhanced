@@ -215,8 +215,9 @@ export default function ModalHeader({
             </div>
 
             {/* AI toggle separated from pin/save — mobile/non-sidebar only.
-                Only shown when the panel is currently open (quick close button). */}
-            {!isDesktop && !isDrawEdit && noteAiAvailable && !noteAiSidebarLayout && noteAiOpen && (
+                Shown whenever there's an active conversation (until explicitly
+                closed with X). Lets user switch between note and panel easily. */}
+            {!isDesktop && !isDrawEdit && noteAiAvailable && !noteAiSidebarLayout && noteAiHasMessages && (
               <>
                 <div className="w-px h-4 bg-gray-300 dark:bg-gray-600 mx-1" />
                 <button
