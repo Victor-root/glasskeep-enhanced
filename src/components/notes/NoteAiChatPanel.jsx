@@ -145,7 +145,7 @@ export default function NoteAiChatPanel({
     >
       {/* Header */}
       <div
-        className={`flex items-center gap-2 px-4 py-3 border-b ${
+        className={`flex items-center gap-2 ${isMobile ? "px-2 py-1.5" : "px-4 py-3"} border-b ${
           dark ? "border-white/10" : "border-[var(--border-light)]"
         }`}
       >
