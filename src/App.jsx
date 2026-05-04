@@ -3839,6 +3839,13 @@ export default function App() {
         setConfirmDeleteOpen(false);
         setShowModalFmt(false);
         setIsModalClosing(false);
+        // Reset AI panel state so the header toggle doesn't reappear
+        // when re-opening a note. Saved conversations stay in localStorage
+        // and will be restored on the next openNoteAi call.
+        setNoteAiHasBeenOpened(false);
+        setNoteAiMessages([]);
+        setNoteAiSaved(false);
+        setNoteAiError(null);
       }, MODAL_FADE_DURATION);
     };
     if (noteAiOpen) {
