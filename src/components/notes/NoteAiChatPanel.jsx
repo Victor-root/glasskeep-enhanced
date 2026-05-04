@@ -206,17 +206,17 @@ export default function NoteAiChatPanel({
                 <button
                   type="button"
                   onClick={() => sendQuick(t("noteAiChatQuickSummarizePrompt"))}
-                  className="flex flex-col items-center gap-2.5 py-5 px-3 rounded-xl font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                  className="flex flex-col items-center gap-1.5 py-3 px-3 rounded-xl font-semibold text-xs transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                 >
-                  <TI.FileText className="tabler-icon" style={{ width: 28, height: 28 }} />
+                  <TI.FileText className="tabler-icon" style={{ width: 20, height: 20 }} />
                   {t("noteAiChatQuickSummarize")}
                 </button>
                 <button
                   type="button"
                   onClick={() => sendQuick(t("noteAiChatQuickExplainPrompt"))}
-                  className="flex flex-col items-center gap-2.5 py-5 px-3 rounded-xl font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                  className="flex flex-col items-center gap-1.5 py-3 px-3 rounded-xl font-semibold text-xs transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                 >
-                  <TI.Sparkles className="tabler-icon" style={{ width: 28, height: 28 }} />
+                  <TI.Sparkles className="tabler-icon" style={{ width: 20, height: 20 }} />
                   {t("noteAiChatQuickExplain")}
                 </button>
               </div>
