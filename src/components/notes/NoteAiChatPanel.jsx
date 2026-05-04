@@ -208,7 +208,7 @@ export default function NoteAiChatPanel({
                   onClick={() => sendQuick(t("noteAiChatQuickSummarizePrompt"))}
                   className="flex flex-col items-center gap-1 py-1.5 px-2 rounded-lg font-semibold text-xs transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                 >
-                  <TI.FileTextAi className="tabler-icon" style={{ width: 14, height: 14 }} />
+                  <TI.FileTextAi className="tabler-icon" style={{ width: 20, height: 20 }} />
                   {t("noteAiChatQuickSummarize")}
                 </button>
                 <button
@@ -216,7 +216,7 @@ export default function NoteAiChatPanel({
                   onClick={() => sendQuick(t("noteAiChatQuickExplainPrompt"))}
                   className="flex flex-col items-center gap-1 py-1.5 px-2 rounded-lg font-semibold text-xs transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                 >
-                  <TI.FileTextSpark className="tabler-icon" style={{ width: 14, height: 14 }} />
+                  <TI.FileTextSpark className="tabler-icon" style={{ width: 20, height: 20 }} />
                   {t("noteAiChatQuickExplain")}
                 </button>
               </div>
