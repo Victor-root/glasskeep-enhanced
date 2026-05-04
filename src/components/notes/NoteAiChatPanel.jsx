@@ -170,7 +170,7 @@ export default function NoteAiChatPanel({
             onClick={onSave}
             aria-label={t("noteAiChatSave")}
             data-tooltip={t("noteAiChatSave")}
-            className="p-1.5 rounded-lg transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+            className="w-9 h-9 inline-flex items-center justify-center rounded-lg transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
           >
             <TI.Message2Down className="tabler-icon w-5 h-5" />
           </button>
@@ -181,7 +181,7 @@ export default function NoteAiChatPanel({
             onClick={onReset}
             aria-label={t("noteAiChatReset")}
             data-tooltip={t("noteAiChatReset")}
-            className="p-1.5 rounded-lg transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+            className="w-9 h-9 inline-flex items-center justify-center rounded-lg transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
           >
             <TI.Message2X className="tabler-icon w-5 h-5" />
           </button>

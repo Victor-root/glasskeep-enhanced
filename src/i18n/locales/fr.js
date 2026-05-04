@@ -866,8 +866,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   noteAiChatTitle: "Assistant IA",
   noteAiChatSubtitle: "À propos de cette note",
   noteAiChatEmpty:
-    "Pose une question sur cette note, demande une explication, une reformulation ou une adaptation.",
-  noteAiChatPlaceholder: "Pose une question sur cette note…",
+    "Posez une question sur cette note, demandez une explication, une reformulation ou une adaptation.",
+  noteAiChatPlaceholder: "Posez une question sur cette note…",
   noteAiChatSend: "Envoyer",
   noteAiChatThinking: "Réflexion en cours…",
   noteAiChatClose: "Fermer le panneau IA",
