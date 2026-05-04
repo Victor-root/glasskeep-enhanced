@@ -143,9 +143,8 @@ export default function NoteAiChatPanel({
         dark ? "border-white/10" : "border-[var(--border-light)]"
       }`}
       style={{
-        width: `${panelWidth}px`,
-        height: "95vh",
-        flexShrink: 0,
+        width: "100%",
+        height: "100%",
         backgroundColor: modalBgFor(mColor, dark),
       }}
       onMouseDown={stopBubbling}

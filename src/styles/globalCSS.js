@@ -2867,14 +2867,18 @@ html.dark .typo-modal-toggle {
      responsive overrides if ever needed. */
 }
 
-/* AI chat panel slide-in animation.
-   The note modal shifts left naturally via flex layout; the panel slides in
-   from the right simultaneously. */
+/* AI chat panel push-out animation.
+   The wrapper div (in NoteModal) expands its width 0 → target over ~0.44s,
+   which slides the note modal left via flex reflow. The panel content sits
+   inside that clipped wrapper and plays a separate translate so it appears
+   to push out from behind the note rather than simply being uncovered.
+   The short delay (0.12s) lets the wrapper start expanding first so the
+   "push" motion is clearly sequenced after the note begins sliding. */
 @keyframes noteAiPanelIn {
-  from { opacity: 0; transform: translateX(40px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0.4; transform: translateX(-32px); }
+  to   { opacity: 1;   transform: translateX(0); }
 }
 .note-ai-panel {
-  animation: noteAiPanelIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: noteAiPanelIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
 }
 `;

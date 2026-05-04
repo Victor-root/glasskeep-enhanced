@@ -434,19 +434,19 @@ export default function NoteModal({
   const SIDE_GUTTER = 16;
   const MODAL_GAP = 8;
   const MODAL_WIDTH = 896; // Tailwind max-w-4xl in px
-  const aiPanelWidth = noteAiPanelVisible
-    ? Math.min(
-        MODAL_WIDTH,
-        Math.max(360, windowWidth - MODAL_WIDTH - SIDE_GUTTER * 2 - MODAL_GAP),
-      )
-    : 0;
+  // Always compute the target width when AI is available — the wrapper div
+  // animates between 0 and this value regardless of noteAiPanelVisible, so
+  // we need a stable target even while the panel is collapsed.
+  const aiPanelWidth = noteAiAvailable
+    ? Math.min(MODAL_WIDTH, Math.max(360, windowWidth - MODAL_WIDTH - SIDE_GUTTER * 2 - MODAL_GAP))
+    : 360;
 
   if (!open && !isModalClosing) return null;
 
   return (
     <>
       <div
-        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 ${mobileLayout ? 'bg-black' : 'bg-black/40 max-sm:bg-black'} z-40 flex items-center justify-center ${noteAiPanelVisible ? 'gap-2' : ''} overscroll-contain`}
+        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 ${mobileLayout ? 'bg-black' : 'bg-black/40 max-sm:bg-black'} z-40 flex items-center justify-center ${noteAiAvailable ? 'gap-2' : ''} overscroll-contain`}
         onMouseDown={(e) => {
           scrimClickStartRef.current = e.target === e.currentTarget;
         }}
@@ -839,24 +839,39 @@ export default function NoteModal({
             updateDropdownPosition={updateDropdownPosition}
           />
         </div>
-        {/* Per-note AI panel — flex-sibling of the modal card so it sits
-            visually attached to the right edge while the scrim re-centers
-            the combined block. Hidden on mobile / draw-edit / closing. */}
-        <NoteAiChatPanel
-          dark={dark}
-          mColor={mColor}
-          open={noteAiPanelVisible}
-          messages={noteAiMessages || []}
-          loading={!!noteAiLoading}
-          error={noteAiError}
-          saved={!!noteAiSaved}
-          canSave={!!noteAiCanSave}
-          onSend={onSendNoteAiMessage}
-          onClose={onCloseNoteAi}
-          onSave={onSaveNoteAi}
-          onReset={onResetNoteAi}
-          width={aiPanelWidth}
-        />
+        {/* Per-note AI panel — wrapped in a width-animating div so the
+            modal slides left smoothly via flex reflow (width 0 → target)
+            and the panel content pushes out from behind it. Hidden on
+            mobile / draw-edit / closing. */}
+        {noteAiAvailable && (
+          <div
+            style={{
+              width: noteAiPanelVisible ? aiPanelWidth : 0,
+              flexShrink: 0,
+              overflow: "hidden",
+              height: "95vh",
+              transition: "width 0.44s cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+          >
+            {noteAiPanelVisible && (
+              <NoteAiChatPanel
+                dark={dark}
+                mColor={mColor}
+                open={noteAiPanelVisible}
+                messages={noteAiMessages || []}
+                loading={!!noteAiLoading}
+                error={noteAiError}
+                saved={!!noteAiSaved}
+                canSave={!!noteAiCanSave}
+                onSend={onSendNoteAiMessage}
+                onClose={onCloseNoteAi}
+                onSave={onSaveNoteAi}
+                onReset={onResetNoteAi}
+                width={aiPanelWidth}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Fullscreen Image Viewer — content images only; the icon is
