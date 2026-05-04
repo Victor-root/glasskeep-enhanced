@@ -243,44 +243,26 @@ Your data stays preserved in the `./data` directory.
 
 ---
 
-## 🤖 AI assistant (OpenAI-compatible)
+## 🤖 AI assistant
 
-GlassKeep no longer ships an embedded local model. Instead, it talks to any **OpenAI-compatible** chat endpoint over HTTP, so you can pick whatever fits your setup:
+GlassKeep no longer ships an embedded local model — it was too small to be genuinely useful. Instead, it connects to any **OpenAI-compatible** chat endpoint, so each instance picks what fits its hardware, privacy needs and budget — fully local with [Ollama](https://ollama.com/) / [Open WebUI](https://github.com/open-webui/open-webui), or remote via OpenAI, OpenRouter, …
 
-- **fully local & private** — [Ollama](https://ollama.com/), [Open WebUI](https://github.com/open-webui/open-webui), [LiteLLM](https://github.com/BerriAI/litellm), [LM Studio](https://lmstudio.ai/), …
-- **remote** — OpenAI, OpenRouter, or anything else that exposes `/v1/chat/completions`
+Two AI features are available once configured:
 
-Configuration lives in the **Admin** panel → **AI provider** section. The API key is stored on the server and never sent back to the browser.
+- **🔎 Global AI search** — ask questions across your notes from the search bar. The backend pre-selects relevant notes before calling the model, and only cites notes it actually received (no fabricated sources).
+- **🗒️ Per-note assistant** — discuss the currently opened note with the AI. Conversations are temporary by default; a save button can keep them per note.
 
-> ⚠️ Notes sent to a remote provider leave your GlassKeep instance. To keep everything local, point GlassKeep at a self-hosted endpoint such as Ollama or Open WebUI on your LAN/LXC.
+Admins control AI at the instance level: disable it entirely, configure a **server-side provider** (optionally shared with users so the API key stays hidden), or let each user bring their **own endpoint** in their settings.
 
-### Example — Ollama on the same host
+> ⚠️ Notes sent to a remote provider leave your GlassKeep instance. For sensitive data, prefer a local setup such as **Ollama + Open WebUI** on your LAN/LXC.
 
-```
-Base URL: http://localhost:11434/v1
-API key:  (leave blank, or anything like "ollama")
-Model:    llama3.1:8b
-```
+Recommended starter model (usable on CPU only):
 
-### Example — Open WebUI
-
-GlassKeep appends `/chat/completions` to the base URL on its own. Open WebUI documents the full endpoint as `https://your-openwebui-domain.example/api/chat/completions`, so in GlassKeep enter only the prefix — otherwise the path is duplicated.
-
-```
-Base URL: https://your-openwebui-domain.example/api
-API key:  your Open WebUI API key
-Model:    the exact model name shown by Open WebUI
+```bash
+ollama pull qwen3:4b-instruct-2507-q4_K_M
 ```
 
-### Example — OpenAI / OpenRouter
-
-```
-Base URL: https://api.openai.com/v1
-API key:  sk-...
-Model:    gpt-4o-mini
-```
-
-Hit **Test connection** to verify the setup, then **Save**.
+> 📘 Full setup guide — base-URL gotchas, model recommendations, privacy notes, admin/user config flows → [`AI_CHANGES.md`](./AI_CHANGES.md)
 
 ---
 
