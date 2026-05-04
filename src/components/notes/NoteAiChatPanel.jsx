@@ -150,17 +150,19 @@ export default function NoteAiChatPanel({
         }`}
       >
         {/* Mobile: back arrow returns to note without clearing conversation */}
-        {isMobile && onHide && (
+        {isMobile && onHide ? (
           <button
             type="button"
             onClick={onHide}
             aria-label={t("noteAiChatBackToNote")}
-            className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-indigo-500 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-white shrink-0"
+            className="flex items-center p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-indigo-500 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-white shrink-0"
           >
-            <TI.ChevronLeft className="tabler-icon w-5 h-5" />
+            <TI.ChevronLeft className="tabler-icon w-4 h-4 -mr-0.5" />
+            <TI.MessageSearch className="tabler-icon w-[18px] h-[18px]" />
           </button>
+        ) : (
+          <TI.MessageSearch className="tabler-icon text-indigo-600 dark:text-indigo-400 shrink-0" />
         )}
-        {!isMobile && <TI.MessageSearch className="tabler-icon text-indigo-600 dark:text-indigo-400 shrink-0" />}
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold text-indigo-700 dark:text-indigo-300 truncate">
             {t("noteAiChatTitle")}

@@ -223,7 +223,8 @@ export default function ModalHeader({
                   data-tooltip={t("noteAiChatMenuItem")}
                   aria-pressed={noteAiOpen ? "true" : "false"}
                 >
-                  <TI.ChevronRight className="tabler-icon w-5 h-5" />
+                  <TI.MessageSearch className="tabler-icon w-[18px] h-[18px]" />
+                  <TI.ChevronRight className="tabler-icon w-4 h-4 -ml-0.5" />
                   {noteAiHasMessages && !noteAiOpen && (
                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-indigo-500 ring-[1.5px] ring-white dark:ring-gray-800" />
                   )}
