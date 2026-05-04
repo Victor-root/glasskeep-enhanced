@@ -194,29 +194,29 @@ export default function NoteAiChatPanel({
         <div
           ref={messagesScrollRef}
           onScroll={onScroll}
-          className="absolute inset-0 overflow-y-auto px-4 py-3 modal-scroll-themed"
+          className="absolute inset-0 overflow-y-auto px-4 py-3 modal-scroll-themed flex flex-col"
           style={{ "--sb-thumb": sc.thumb, "--sb-track": sc.track }}
         >
           {messages.length === 0 && !loading && !error && (
-            <div className="flex flex-col gap-3">
-              <div className="text-sm text-gray-500 dark:text-gray-200 leading-relaxed">
+            <div className="flex-1 flex flex-col items-center justify-center gap-6 py-6">
+              <p className="text-sm text-center text-gray-400 dark:text-gray-300 leading-relaxed max-w-[260px]">
                 {t("noteAiChatEmpty")}
-              </div>
-              <div className="flex flex-wrap gap-2">
+              </p>
+              <div className="grid grid-cols-2 gap-3 w-full">
                 <button
                   type="button"
-                  disabled={loading}
                   onClick={() => sendQuick(t("noteAiChatQuickSummarizePrompt"))}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex flex-col items-center gap-2.5 py-5 px-3 rounded-xl font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                 >
+                  <TI.FileText className="tabler-icon" style={{ width: 28, height: 28 }} />
                   {t("noteAiChatQuickSummarize")}
                 </button>
                 <button
                   type="button"
-                  disabled={loading}
                   onClick={() => sendQuick(t("noteAiChatQuickExplainPrompt"))}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex flex-col items-center gap-2.5 py-5 px-3 rounded-xl font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
                 >
+                  <TI.Sparkles className="tabler-icon" style={{ width: 28, height: 28 }} />
                   {t("noteAiChatQuickExplain")}
                 </button>
               </div>
