@@ -419,11 +419,14 @@ export default function NoteModal({
   // Force mobile layout when running inside Android WebView (tablets)
   const mobileLayout = windowWidth < 640 || isLandscapeMobile || isWebView;
 
-  // Per-note AI side panel — desktop-only V1. ≥1024px gives enough
-  // horizontal room for the modal (max-w-3xl ≈ 768px when the panel is
-  // open) plus a 420 px panel without the combo exceeding ~94vw.
-  const noteAiAvailable = aiAssistantEnabled && !mobileLayout && windowWidth >= 1024;
-  const noteAiPanelVisible = noteAiAvailable && noteAiOpen && !isDrawEdit && !isModalClosing;
+  // Per-note AI side panel.
+  //   - Desktop layout (≥1024px non-mobile): the panel sits beside the
+  //     modal as a flex sibling, animating width.
+  //   - Mobile / narrow layout: the panel becomes a full-screen overlay
+  //     that slides in over the modal from the right.
+  const noteAiSidebarLayout = !mobileLayout && windowWidth >= 1024;
+  const noteAiAvailable = aiAssistantEnabled && !isDrawEdit;
+  const noteAiPanelVisible = noteAiAvailable && noteAiOpen && !isModalClosing;
 
   // Adaptive AI-panel width — fills whatever horizontal space is left
   // over after the modal claims its full max-w-4xl (≈ 896 px) plus a
@@ -438,7 +441,7 @@ export default function NoteModal({
   // Always compute the target width when AI is available — the wrapper div
   // animates between 0 and this value regardless of noteAiPanelVisible, so
   // we need a stable target even while the panel is collapsed.
-  const aiPanelWidth = noteAiAvailable
+  const aiPanelWidth = noteAiSidebarLayout
     ? Math.min(MODAL_WIDTH, Math.max(360, windowWidth - MODAL_WIDTH - SIDE_GUTTER * 2 - MODAL_GAP))
     : 360;
 
@@ -491,7 +494,7 @@ export default function NoteModal({
   return (
     <>
       <div
-        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 ${mobileLayout ? 'bg-black' : 'bg-black/40 max-sm:bg-black'} z-40 flex items-center justify-center ${noteAiAvailable ? 'gap-2' : ''} overscroll-contain`}
+        className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 ${mobileLayout ? 'bg-black' : 'bg-black/40 max-sm:bg-black'} z-40 flex items-center justify-center ${noteAiSidebarLayout && noteAiAvailable ? 'gap-2' : ''} overscroll-contain`}
         onMouseDown={(e) => {
           scrimClickStartRef.current = e.target === e.currentTarget;
         }}
@@ -891,7 +894,7 @@ export default function NoteModal({
             back behind the note first, then the wrapper collapses to 0.
             The .closing class adds a transition-delay so the wrapper
             shrink waits for the panel push-back. */}
-        {noteAiAvailable && (
+        {noteAiAvailable && noteAiSidebarLayout && (
           <div
             className={`note-ai-panel-wrapper${isAiClosing ? " closing" : ""}`}
             style={{
@@ -921,6 +924,39 @@ export default function NoteModal({
           </div>
         )}
       </div>
+      {/* Mobile / narrow-layout AI panel — full-screen overlay that
+          slides in from the right above the modal scrim. Mounted as a
+          sibling to the scrim so its z-index can sit above the modal
+          without fighting the scrim's flex layout. */}
+      {noteAiAvailable && !noteAiSidebarLayout && (noteAiPanelVisible || isAiClosing) && (
+        <div
+          className={`note-ai-panel-mobile fixed inset-0 z-50${isAiClosing ? " closing" : ""}`}
+          style={{
+            backgroundColor: modalBgFor(mColor, dark),
+            height: '100dvh',
+            paddingTop: 'env(safe-area-inset-top)',
+            paddingBottom: 'env(safe-area-inset-bottom)',
+            paddingLeft: 'env(safe-area-inset-left)',
+            paddingRight: 'env(safe-area-inset-right)',
+          }}
+        >
+          <NoteAiChatPanel
+            dark={dark}
+            mColor={mColor}
+            open={noteAiPanelVisible}
+            messages={noteAiMessages || []}
+            loading={!!noteAiLoading}
+            error={noteAiError}
+            saved={!!noteAiSaved}
+            canSave={!!noteAiCanSave}
+            onSend={onSendNoteAiMessage}
+            onStop={onStopNoteAi}
+            onClose={onCloseNoteAi}
+            onSave={onSaveNoteAi}
+            onReset={onResetNoteAi}
+          />
+        </div>
+      )}
 
       {/* Fullscreen Image Viewer — content images only; the icon is
           intentionally hidden from the viewer and never indexable. */}

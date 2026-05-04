@@ -664,8 +664,9 @@ export default function ModalFooter({
             >
               <DownloadIcon />{t("downloadMd")}
             </button>
-            {/* Chat with AI — desktop-only side panel scoped to this note.
-                Hidden when the user has no AI configured / on small screens. */}
+            {/* Chat with AI — per-note panel scoped to this note. Renders
+                as a side panel on desktop and as a full-screen overlay
+                on mobile. Hidden when the user has no AI configured. */}
             {!isTrashed && noteAiAvailable && onOpenNoteAi && (
               <button
                 className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}

@@ -202,7 +202,7 @@ export default function NoteAiChatPanel({
               <p className="text-sm text-center text-gray-400 dark:text-gray-300 leading-relaxed max-w-[260px]">
                 {t("noteAiChatEmpty")}
               </p>
-              <div className="grid grid-cols-2 gap-3 w-[35%]">
+              <div className="grid grid-cols-2 gap-3 w-[70%] lg:w-[35%]">
                 <button
                   type="button"
                   onClick={() => sendQuick(t("noteAiChatQuickSummarizePrompt"))}

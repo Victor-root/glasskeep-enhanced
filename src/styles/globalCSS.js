@@ -2898,6 +2898,40 @@ html.dark .typo-modal-toggle {
 .note-ai-panel-wrapper.closing .note-ai-panel {
   animation: noteAiPanelOut 0.32s cubic-bezier(0.55, 0, 0.55, 0.6) both;
 }
+/* Mobile AI panel — full-screen overlay that slides in from the right
+   over the note modal. Mirrors the desktop "panel comes from the side"
+   principle but adapted to a screen with no horizontal slack. The panel
+   covers the modal completely; closing slides it back out to the right
+   to reveal the note. The whole overlay translates as one block since
+   there's no flex reflow to mask. */
+@keyframes noteAiPanelMobileIn {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes noteAiPanelMobileOut {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+.note-ai-panel-mobile {
+  animation: noteAiPanelMobileIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform;
+}
+.note-ai-panel-mobile.closing {
+  animation: noteAiPanelMobileOut 0.28s cubic-bezier(0.55, 0, 0.55, 0.6) both;
+}
+/* Inside the mobile overlay, the inner panel itself shouldn't replay
+   the desktop translate-from-behind animation — the whole overlay is
+   already moving. Reset the noteAiPanelIn keyframes for this case. */
+.note-ai-panel-mobile .note-ai-panel {
+  animation: none;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+  height: 100%;
+}
+.note-ai-panel-mobile.closing .note-ai-panel {
+  animation: none;
+}
 /* Save ↔ Reset button swap animation. Both buttons carry this class so the
    animation re-fires each time React mounts the replacement button. The
    short overshoot (scale 1.25) makes the swap feel decisive even though
