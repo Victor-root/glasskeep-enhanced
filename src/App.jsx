@@ -177,6 +177,7 @@ export default function App() {
   // save button — only then are messages mirrored to localStorage and
   // restored on next open. The default remains throwaway.
   const [noteAiOpen, setNoteAiOpen] = useState(false);
+  const [noteAiHasBeenOpened, setNoteAiHasBeenOpened] = useState(false);
   const [noteAiMessages, setNoteAiMessages] = useState([]);
   const [noteAiLoading, setNoteAiLoading] = useState(false);
   const [noteAiError, setNoteAiError] = useState(null);
@@ -1541,6 +1542,7 @@ export default function App() {
 
   const openNoteAi = () => {
     setNoteAiOpen(true);
+    setNoteAiHasBeenOpened(true);
     setNoteAiError(null);
     // If a conversation is already in memory (e.g. re-opening after a
     // mobile "back to note" hide), keep it intact and don't overwrite.
@@ -1557,6 +1559,7 @@ export default function App() {
   };
   const closeNoteAi = () => {
     setNoteAiOpen(false);
+    setNoteAiHasBeenOpened(false);
     setNoteAiError(null);
     setNoteAiLoading(false);
     // Saved conversations stay in localStorage and in memory so a
@@ -4919,6 +4922,7 @@ export default function App() {
       // Per-note AI chat — kebab entry, panel state, send/close handlers
       aiAssistantEnabled={aiAssistantEnabled}
       noteAiOpen={noteAiOpen}
+      noteAiHasBeenOpened={noteAiHasBeenOpened}
       noteAiMessages={noteAiMessages}
       noteAiLoading={noteAiLoading}
       noteAiError={noteAiError}

@@ -168,6 +168,7 @@ export default function NoteModal({
   // per-note AI chat panel — owned by App, presentational here
   aiAssistantEnabled,
   noteAiOpen,
+  noteAiHasBeenOpened,
   noteAiMessages,
   noteAiLoading,
   noteAiError,
@@ -575,6 +576,7 @@ export default function NoteModal({
               noteAiAvailable={noteAiAvailable}
               noteAiSidebarLayout={noteAiSidebarLayout}
               noteAiOpen={noteAiOpen}
+              noteAiHasBeenOpened={noteAiHasBeenOpened}
               noteAiHasMessages={(noteAiMessages || []).length > 0}
               onOpenNoteAi={onOpenNoteAi}
               onHideNoteAi={onHideNoteAi}
