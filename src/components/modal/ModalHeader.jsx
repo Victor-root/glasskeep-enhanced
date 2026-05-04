@@ -222,14 +222,14 @@ export default function ModalHeader({
               <>
                 <div className="w-px h-4 bg-gray-300 dark:bg-gray-600 mx-1" />
                 <button
-                  className="focus:outline-none relative flex items-center justify-center w-16 h-16 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-950"
+                  className="focus:outline-none relative inline-flex items-center justify-center h-8 px-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
                   style={{ color: "rgb(99,102,241)" }}
                   onClick={() => noteAiOpen ? onHideNoteAi?.() : onOpenNoteAi?.()}
                   data-tooltip={t("noteAiChatMenuItem")}
                   aria-pressed={noteAiOpen ? "true" : "false"}
                 >
-                  <TI.MessageSearch className="tabler-icon w-8 h-8" />
-                  <TI.ChevronRight className="tabler-icon w-8 h-8 -ml-1.5" />
+                  <TI.MessageSearch className="tabler-icon" style={{ width: 26, height: 26 }} />
+                  <TI.ChevronRight className="tabler-icon -ml-1" style={{ width: 26, height: 26 }} />
                   {noteAiHasMessages && !noteAiOpen && (
                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-indigo-500 ring-[1.5px] ring-white dark:ring-gray-800" />
                   )}
