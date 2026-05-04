@@ -215,8 +215,8 @@ export default function ModalHeader({
             </div>
 
             {/* AI toggle separated from pin/save — mobile/non-sidebar only.
-                Larger icons to make the chat functionality prominent. */}
-            {!isDesktop && !isDrawEdit && noteAiAvailable && !noteAiSidebarLayout && (
+                Only shown when the panel is currently open (quick close button). */}
+            {!isDesktop && !isDrawEdit && noteAiAvailable && !noteAiSidebarLayout && noteAiOpen && (
               <>
                 <div className="w-px h-4 bg-gray-300 dark:bg-gray-600 mx-1" />
                 <button
