@@ -63,6 +63,7 @@ Compared to the original project, this fork puts more emphasis on:
 - **🛠️ simpler self-hosting**
 - **✨ a broad polish / stability pass**
 - **🎨 a deeper overhaul of the drawing mode**
+- **💬 configurable AI assistant with local or remote endpoints**
 - **🔐 Server-side encryption & passkeys**
 
 ---
