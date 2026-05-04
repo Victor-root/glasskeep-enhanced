@@ -162,7 +162,7 @@ export default function NoteAiChatPanel({
             <TI.MessageSearch className="tabler-icon" style={{ width: 26, height: 26 }} />
           </button>
         ) : (
-          <TI.MessageSearch className="tabler-icon text-indigo-500 dark:text-indigo-300 shrink-0" />
+          <TI.MessageSearch className="tabler-icon note-ai-panel-icon shrink-0" />
         )}
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold text-indigo-700 dark:text-indigo-300 truncate">

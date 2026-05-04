@@ -432,6 +432,12 @@ html.dark .modal-icon-btn--ai {
   color: rgb(165, 180, 252) !important;
   filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.45));
 }
+.note-ai-panel-icon {
+  color: rgb(99, 102, 241) !important;
+}
+html.dark .note-ai-panel-icon {
+  color: rgb(165, 180, 252) !important;
+}
 
 .modal-icon-btn--mode {
   background: linear-gradient(90deg, #6366f1 0%, #7c3aed 100%) !important;
