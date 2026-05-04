@@ -245,7 +245,6 @@ export default function ModalHeader({
                 <CloseIcon />
               </button>
             )}
-            </div>
           </div>
         </div>
 
