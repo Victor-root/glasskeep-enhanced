@@ -155,8 +155,8 @@ export default function NoteAiChatPanel({
             type="button"
             onClick={onHide}
             aria-label={t("noteAiChatBackToNote")}
-            className="modal-icon-btn focus:outline-none relative shrink-0"
-            style={{ color: "rgb(99,102,241)", width: "auto", paddingLeft: 4, paddingRight: 4 }}
+            className="modal-icon-btn modal-icon-btn--ai focus:outline-none relative shrink-0"
+            style={{ width: "auto", paddingLeft: 4, paddingRight: 4 }}
           >
             <TI.ChevronLeft className="tabler-icon -mr-1" style={{ width: 22, height: 22 }} />
             <TI.MessageSearch className="tabler-icon" style={{ width: 26, height: 26 }} />

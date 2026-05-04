@@ -419,6 +419,19 @@ html.dark .modal-icon-btn:hover {
   color: rgba(255, 255, 255, 0.96);
 }
 
+/* AI toggle button — indigo-500 in light mode, indigo-300 in dark mode
+   (brighter than 400 to stay readable on dark note backgrounds like
+   dark-blue rgba(35,72,165) and dark-purple rgba(82,38,140)).
+   Drop-shadow adds micro-contrast on tricky note colors (light purple,
+   blue, mauve) where the indigo hue can blend with the background. */
+.modal-icon-btn--ai {
+  color: rgb(99, 102, 241) !important;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.18));
+}
+html.dark .modal-icon-btn--ai {
+  color: rgb(165, 180, 252) !important;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.45));
+}
 
 .modal-icon-btn--mode {
   background: linear-gradient(90deg, #6366f1 0%, #7c3aed 100%) !important;

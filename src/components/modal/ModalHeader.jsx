@@ -222,8 +222,8 @@ export default function ModalHeader({
               <>
                 <div className="w-px h-4 bg-gray-300 dark:bg-gray-600 mx-0.5" />
                 <button
-                  className="modal-icon-btn focus:outline-none relative"
-                  style={{ color: "rgb(99,102,241)", width: "auto", paddingLeft: 4, paddingRight: 4 }}
+                  className="modal-icon-btn modal-icon-btn--ai focus:outline-none relative"
+                  style={{ width: "auto", paddingLeft: 4, paddingRight: 4 }}
                   onClick={() => noteAiOpen ? onHideNoteAi?.() : onOpenNoteAi?.()}
                   data-tooltip={t("noteAiChatMenuItem")}
                   aria-pressed={noteAiOpen ? "true" : "false"}
