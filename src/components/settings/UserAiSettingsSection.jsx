@@ -359,7 +359,11 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
                     aria-label={showKey ? t("hide") : t("show")}
                     data-tooltip={showKey ? t("hide") : t("show")}
                   >
-                    <TI.Eye className="tabler-icon w-4 h-4" />
+                    {showKey ? (
+                      <TI.EyeOff className="tabler-icon w-4 h-4" />
+                    ) : (
+                      <TI.Eye className="tabler-icon w-4 h-4" />
+                    )}
                   </button>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">

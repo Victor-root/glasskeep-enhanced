@@ -420,6 +420,22 @@ export default function NoteModal({
   const noteAiAvailable = aiAssistantEnabled && !mobileLayout && windowWidth >= 1024;
   const noteAiPanelVisible = noteAiAvailable && noteAiOpen && !isDrawEdit && !isModalClosing;
 
+  // Adaptive AI-panel width — fills whatever horizontal space is left
+  // over after the modal claims its full max-w-4xl (≈ 896 px) plus a
+  // small gutter on each side. Calibrated so the panel grows with the
+  // viewport (laptop → 4K) without ever asking the modal to shrink:
+  //   panelWidth = viewport − modalWidth − sideGutter*2 − gap
+  // Lower-bounded at 360 px so the panel stays usable on tighter
+  // screens, otherwise unbounded so a 4K monitor can use the room.
+  // Modal's effective width at the lg breakpoint (where the panel is
+  // even rendered) is always the 4xl cap — w-11/12 always exceeds it.
+  const SIDE_GUTTER = 16;
+  const MODAL_GAP = 8;
+  const MODAL_WIDTH = 896; // Tailwind max-w-4xl in px
+  const aiPanelWidth = noteAiPanelVisible
+    ? Math.max(360, windowWidth - MODAL_WIDTH - SIDE_GUTTER * 2 - MODAL_GAP)
+    : 0;
+
   if (!open && !isModalClosing) return null;
 
   return (
@@ -830,6 +846,7 @@ export default function NoteModal({
           error={noteAiError}
           onSend={onSendNoteAiMessage}
           onClose={onCloseNoteAi}
+          width={aiPanelWidth}
         />
       </div>
 

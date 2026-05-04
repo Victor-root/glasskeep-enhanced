@@ -54,6 +54,7 @@ import databaseSvg         from "./tabler/database.svg?raw";
 import adjustmentsHSvg     from "./tabler/adjustments-horizontal.svg?raw";
 import listCheckSvg        from "./tabler/list-check.svg?raw";
 import eyeSvg              from "./tabler/eye.svg?raw";
+import eyeOffSvg           from "./tabler/eye-off.svg?raw";
 import keySvg              from "./tabler/key.svg?raw";
 import downloadSvg         from "./tabler/download.svg?raw";
 import uploadSvg           from "./tabler/upload.svg?raw";
@@ -159,6 +160,7 @@ export const TI = {
   AdjustmentsHorizontal:(p) => <TablerIcon svg={adjustmentsHSvg} {...p} />,
   ListCheck:            (p) => <TablerIcon svg={listCheckSvg} {...p} />,
   Eye:                  (p) => <TablerIcon svg={eyeSvg} {...p} />,
+  EyeOff:               (p) => <TablerIcon svg={eyeOffSvg} {...p} />,
   Key:                  (p) => <TablerIcon svg={keySvg} {...p} />,
   Download:             (p) => <TablerIcon svg={downloadSvg} {...p} />,
   Upload:               (p) => <TablerIcon svg={uploadSvg} {...p} />,
