@@ -441,6 +441,50 @@ export default function NoteModal({
     ? Math.min(MODAL_WIDTH, Math.max(360, windowWidth - MODAL_WIDTH - SIDE_GUTTER * 2 - MODAL_GAP))
     : 360;
 
+  // Mirror of the open animation — when noteAiPanelVisible flips false,
+  // we keep the panel mounted briefly so the inner push-back animation
+  // can play before the wrapper width collapses. The "closing" class on
+  // the wrapper switches the width transition to a delayed variant so
+  // the panel content gets time to slide back behind the note before
+  // the wrapper starts shrinking.
+  //
+  // We compute `startingClose` synchronously during render (via a ref)
+  // so the closing class is applied in the SAME paint where width drops
+  // to 0 — otherwise the browser would apply the no-delay transition
+  // first and the panel would never get to animate out.
+  //
+  // Skipped entirely when the whole modal is closing (isModalClosing) —
+  // in that case the modal's own close animation handles the disappearance.
+  const [aiClosing, setAiClosing] = React.useState(false);
+  const aiCloseTimerRef = React.useRef(null);
+  const prevAiVisibleRef = React.useRef(false);
+  const startingAiClose =
+    prevAiVisibleRef.current && !noteAiPanelVisible && !isModalClosing;
+  const isAiClosing = startingAiClose || aiClosing;
+  React.useEffect(() => {
+    prevAiVisibleRef.current = noteAiPanelVisible;
+    if (startingAiClose) {
+      if (aiCloseTimerRef.current) clearTimeout(aiCloseTimerRef.current);
+      setAiClosing(true);
+      aiCloseTimerRef.current = setTimeout(() => {
+        setAiClosing(false);
+        aiCloseTimerRef.current = null;
+      }, 620);
+    } else if (noteAiPanelVisible && aiClosing) {
+      if (aiCloseTimerRef.current) {
+        clearTimeout(aiCloseTimerRef.current);
+        aiCloseTimerRef.current = null;
+      }
+      setAiClosing(false);
+    }
+  }, [noteAiPanelVisible, startingAiClose, aiClosing]);
+  React.useEffect(
+    () => () => {
+      if (aiCloseTimerRef.current) clearTimeout(aiCloseTimerRef.current);
+    },
+    [],
+  );
+
   if (!open && !isModalClosing) return null;
 
   return (
@@ -840,20 +884,23 @@ export default function NoteModal({
           />
         </div>
         {/* Per-note AI panel — wrapped in a width-animating div so the
-            modal slides left smoothly via flex reflow (width 0 → target)
-            and the panel content pushes out from behind it. Hidden on
-            mobile / draw-edit / closing. */}
+            modal slides left/right smoothly via flex reflow. On open,
+            the wrapper expands 0→target while the panel content pushes
+            out from behind the note. On close, the panel content slides
+            back behind the note first, then the wrapper collapses to 0.
+            The .closing class adds a transition-delay so the wrapper
+            shrink waits for the panel push-back. */}
         {noteAiAvailable && (
           <div
+            className={`note-ai-panel-wrapper${isAiClosing ? " closing" : ""}`}
             style={{
               width: noteAiPanelVisible ? aiPanelWidth : 0,
               flexShrink: 0,
               overflow: "hidden",
               height: "95vh",
-              transition: "width 0.44s cubic-bezier(0.22, 1, 0.36, 1)",
             }}
           >
-            {noteAiPanelVisible && (
+            {(noteAiPanelVisible || isAiClosing) && (
               <NoteAiChatPanel
                 dark={dark}
                 mColor={mColor}

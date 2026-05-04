@@ -2867,18 +2867,35 @@ html.dark .typo-modal-toggle {
      responsive overrides if ever needed. */
 }
 
-/* AI chat panel push-out animation.
-   The wrapper div (in NoteModal) expands its width 0 → target over ~0.44s,
-   which slides the note modal left via flex reflow. The panel content sits
-   inside that clipped wrapper and plays a separate translate so it appears
-   to push out from behind the note rather than simply being uncovered.
-   The short delay (0.12s) lets the wrapper start expanding first so the
-   "push" motion is clearly sequenced after the note begins sliding. */
+/* AI chat panel push-out / push-back animation.
+   The wrapper div (in NoteModal) expands its width 0 → target on open and
+   target → 0 on close, which slides the note modal left/right via flex
+   reflow. The panel content sits inside that clipped wrapper and plays a
+   separate translate so it appears to push out from behind the note (open)
+   or slide back behind it (close), rather than simply being un/covered.
+
+   Sequencing:
+   - Open : wrapper expands first (0–0.44s), panel pushes out (0.12–0.5s).
+   - Close: panel pushes back first (0–0.32s), wrapper collapses (0.14–0.58s)
+            via the transition-delay added by the .closing class. */
+.note-ai-panel-wrapper {
+  transition: width 0.44s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.note-ai-panel-wrapper.closing {
+  transition: width 0.44s cubic-bezier(0.22, 1, 0.36, 1) 0.14s;
+}
 @keyframes noteAiPanelIn {
   from { opacity: 0.4; transform: translateX(-32px); }
   to   { opacity: 1;   transform: translateX(0); }
 }
+@keyframes noteAiPanelOut {
+  from { opacity: 1;   transform: translateX(0); }
+  to   { opacity: 0;   transform: translateX(-32px); }
+}
 .note-ai-panel {
   animation: noteAiPanelIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+}
+.note-ai-panel-wrapper.closing .note-ai-panel {
+  animation: noteAiPanelOut 0.32s cubic-bezier(0.55, 0, 0.55, 0.6) both;
 }
 `;
