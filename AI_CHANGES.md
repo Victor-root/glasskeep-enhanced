@@ -195,6 +195,13 @@ Model    : qwen3:4b-instruct-2507-q4_K_M
 
 For a cleaner setup with API keys and a management UI, **Open WebUI is still recommended**.
 
+### 🐳 Docker note
+
+If GlassKeep and your AI provider (Ollama, Open WebUI, etc.) both run on the same host, `localhost` from inside the container points to the container itself, not the host. Use:
+
+- **Mac / Windows**: `http://host.docker.internal:PORT` (e.g. `http://host.docker.internal:11434/v1`)
+- **Linux**: `http://HOST_IP:PORT` (e.g. `http://192.168.1.50:11434/v1`), or add `--add-host=host.docker.internal:host-gateway` to the container and use the Mac/Windows URL
+
 ---
 
 ## 🧩 Recommended models
