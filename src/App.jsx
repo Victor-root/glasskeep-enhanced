@@ -3553,25 +3553,49 @@ export default function App() {
     setSbsClosingSide(null);
   };
 
-  // Closing the LEFT pane in SBS: existing primary closeModal runs (full
-  // animation/save flush). Once the primary modal has closed, hand the
-  // secondary's note off to the primary slot so the survivor behaves
-  // exactly like a single-note modal opened alone.
-  const onSbsLeftClosed = () => {
-    if (!sbsSecondaryId) return;
-    const remaining = sbsSecondaryId;
-    setSbsSecondaryId(null);
-    setSbsClosingSide(null);
-    setTimeout(() => openModal(String(remaining)), 0);
-  };
+  // SBS animation duration — must match --sbs-anim in globalCSS.
+  const SBS_ANIM_MS = 360;
 
-  // Closing the RIGHT pane in SBS: SecondaryNoteInstance plays its own
-  // close animation, calls back here. The left primary modal stays open
-  // and naturally recenters via CSS.
-  const onSbsRightClosed = () => {
+  // Intercepts the LEFT pane's close button while in SBS mode. The trick
+  // is to NEVER tear down the primary modal here — instead we play a
+  // pure-CSS close animation on the left half, glide the right pane to
+  // centre, then in the SAME render swap the primary's active note from
+  // A → B and unmount the secondary. Because primary's `open` state
+  // never flips, there's no close-then-reopen flicker. The survivor
+  // smoothly takes over the centre slot with full single-note features.
+  const requestCloseLeftPaneSBS = useCallback(() => {
+    if (!sbsSecondaryId || sbsClosingSide) return;
+    const remaining = sbsSecondaryId;
+    setSbsClosingSide("left");
+    setTimeout(() => {
+      // Swap primary to note B in place (openModal doesn't replay the
+      // open animation when the modal is already mounted) and drop SBS
+      // state so split CSS releases its hold.
+      openModal(String(remaining));
+      setSbsSecondaryId(null);
+      setSbsClosingSide(null);
+    }, SBS_ANIM_MS);
+  }, [sbsSecondaryId, sbsClosingSide]); // eslint-disable-line
+
+  // Closing the RIGHT pane: the secondary instance only signals start
+  // (via onRequestClosing) and then sits still while the shell drives
+  // both sides' transitions in lockstep. After the recenter animation
+  // finishes the shell unmounts the secondary and drops sbs-active so
+  // the primary settles into normal single-modal layout at centre.
+  const onSbsRightClosing = useCallback(() => {
+    if (sbsClosingSide) return;
+    setSbsClosingSide("right");
+    setTimeout(() => {
+      setSbsSecondaryId(null);
+      setSbsClosingSide(null);
+    }, SBS_ANIM_MS);
+  }, [sbsClosingSide]);
+  // Kept for backward-compat in case the secondary ever runs its own
+  // exit animation outside SBS — currently a no-op in SBS path.
+  const onSbsRightClosed = useCallback(() => {
     setSbsSecondaryId(null);
     setSbsClosingSide(null);
-  };
+  }, []);
 
   // Check if the note has been modified from initial state
   const hasNoteBeenModified = useCallback(() => {
@@ -4863,30 +4887,29 @@ export default function App() {
   // Side-by-side mode is active whenever a secondary note id is set.
   // Both panes render under a shared scrim overlay (the .sbs-active body
   // class drives split-mode CSS so the two scrims align as flex siblings
-  // and each note panel takes half-width).
+  // and each note panel keeps its native modal dimensions).
   const sbsActive = !!sbsSecondaryId;
-  // Detect transition: primary closed while in SBS → trigger handoff.
-  // Listening on `open` falling edge while `sbsSecondaryId` was still set.
-  const sbsLeftClosingTrackRef = useRef(false);
-  useEffect(() => {
-    if (!sbsActive) return;
-    if (open) {
-      sbsLeftClosingTrackRef.current = true;
-      return;
-    }
-    // open just flipped to false while SBS was active — left pane closed.
-    if (sbsLeftClosingTrackRef.current) {
-      sbsLeftClosingTrackRef.current = false;
-      onSbsLeftClosed();
-    }
-  }, [open, sbsActive]); // eslint-disable-line
 
-  // Apply a body-level class so split-mode CSS scopes cleanly.
+  // Body-level classes that drive split-mode CSS:
+  //   .sbs-active            — both panes are mounted
+  //   .sbs-closing-left      — left is fading out, right glides to centre
+  //   .sbs-closing-right     — right is fading out, left glides to centre
   useEffect(() => {
-    if (sbsActive) document.body.classList.add("sbs-active");
-    else document.body.classList.remove("sbs-active");
-    return () => document.body.classList.remove("sbs-active");
-  }, [sbsActive]);
+    const body = document.body;
+    body.classList.toggle("sbs-active", sbsActive);
+    body.classList.toggle("sbs-closing-left", sbsActive && sbsClosingSide === "left");
+    body.classList.toggle("sbs-closing-right", sbsActive && sbsClosingSide === "right");
+    return () => {
+      body.classList.remove("sbs-active");
+      body.classList.remove("sbs-closing-left");
+      body.classList.remove("sbs-closing-right");
+    };
+  }, [sbsActive, sbsClosingSide]);
+
+  // In SBS mode the left pane's X / scrim click no longer tears down the
+  // primary modal — it just animates the left half out and hands B to
+  // the centre slot. Outside SBS, fall back to the regular closeModal.
+  const primaryCloseModal = sbsActive ? requestCloseLeftPaneSBS : closeModal;
 
   const modal = (
     <NoteModal
@@ -4986,7 +5009,7 @@ export default function App() {
       notes={notes}
       currentUser={currentUser}
       tagFilter={tagFilter}
-      closeModal={closeModal}
+      closeModal={primaryCloseModal}
       saveModal={saveModal}
       deleteModal={deleteModal}
       restoreFromTrash={restoreFromTrash}
@@ -5455,6 +5478,7 @@ export default function App() {
           noteId={sbsSecondaryId}
           splitSide="right"
           splitClosing={sbsClosingSide === "right"}
+          onRequestClosing={onSbsRightClosing}
           onRequestClose={onSbsRightClosed}
           notes={notes}
           setNotes={setNotes}

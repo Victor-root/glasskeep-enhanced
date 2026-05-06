@@ -1159,14 +1159,22 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
 }
 
 /* ───────── Side-by-side mode ─────────
-   When two notes are open at once, both NoteModal instances render
-   their own scrim. We collapse the two scrims into a single visual
-   layer (only the LEFT scrim is visible) and reposition each panel
-   to take half the screen so they sit next to each other under one
-   shared backdrop. Each pane keeps its own scrim element so its
-   click/escape handling stays untouched.                            */
+   Two NoteModal instances render their own scrims simultaneously. Both
+   scrims are full-screen overlays; we keep ONE visible (the left pane's
+   scrim provides the shared backdrop) and route pointer events through
+   the panes. Each pane keeps its NATURAL modal dimensions (same width,
+   height, and border-radius as a single open note) — the two panels
+   simply sit anchored against the viewport center with a configurable
+   gap between them. The surviving pane smoothly translates back to
+   center when its sibling closes.                                       */
+:root {
+  --sbs-gap: 24px;        /* horizontal space between the two panes */
+  --sbs-anim: 360ms;      /* close + recenter duration (must match JS) */
+}
 body.sbs-active .modal-scrim[data-split-mode="true"] {
-  pointer-events: none;
+  pointer-events: none;        /* let clicks reach the pane only */
+  padding: 0;
+  gap: 0;
 }
 body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="right"] {
   background: transparent !important;
@@ -1176,56 +1184,80 @@ body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="right"] {
 body.sbs-active .modal-scrim[data-split-mode="true"] > * {
   pointer-events: auto;
 }
-body.sbs-active .modal-scrim[data-split-mode="true"] {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 16px;
-  gap: 12px;
+/* Left pane: anchor to right of its scrim, just before the centerline,
+   leaving half the gap between the pane and the screen center.        */
+body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="left"] {
+  justify-content: flex-end !important;
+  padding-right: calc(50vw + var(--sbs-gap) / 2) !important;
+  padding-left: 16px !important;
 }
 body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="right"] {
-  justify-content: flex-end;
+  justify-content: flex-start !important;
+  padding-left: calc(50vw + var(--sbs-gap) / 2) !important;
+  padding-right: 16px !important;
 }
+/* Each pane keeps its native modal dimensions — height and border-radius
+   come straight from the standard sm:h-[95vh] sm:rounded-xl classes.
+   The only width tweak is to let the pane fill the scrim's content area
+   (i.e. the viewport half minus the gap), still capped by sm:max-w-4xl
+   from the original modal markup, so on a roomy screen the pane lands
+   at exactly the same width as a single open note. The transform
+   transition lets the surviving pane glide back to centre when its
+   sibling closes.                                                       */
 body.sbs-active .modal-scrim[data-split-mode="true"] > .note-modal-anim {
-  width: calc(50vw - 24px) !important;
-  max-width: calc(50vw - 24px) !important;
-  height: calc(100vh - 32px) !important;
-  border-radius: 16px !important;
+  width: 100% !important;
   transition:
-    width 320ms ease,
-    max-width 320ms ease,
-    transform 320ms ease,
-    opacity 320ms ease;
+    transform var(--sbs-anim) cubic-bezier(.22,.61,.36,1),
+    opacity var(--sbs-anim) ease;
+  will-change: transform;
 }
-/* Pane closing animation — pane shrinks to 0 width and fades, the
-   surviving pane (still at 50%) naturally appears centered. The shared
-   primary scrim is visible across the full screen behind both. */
+/* Pane that is being closed: slide outward off-centre and fade. The
+   sibling (no splitClosing flag) gets translated to centre via the
+   body-level closing class below.                                   */
 body.sbs-active .modal-scrim[data-split-mode="true"][data-split-closing="true"] > .note-modal-anim {
-  width: 0 !important;
-  max-width: 0 !important;
   opacity: 0;
-  transform: scale(0.94);
   pointer-events: none;
 }
-/* When the left pane is closing in SBS, smoothly recenter the right.   */
-body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="left"][data-split-closing="true"] ~ .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim,
-body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="right"][data-split-closing="true"] ~ .modal-scrim[data-split-mode="true"][data-split-side="left"] > .note-modal-anim {
-  /* the survivor stays at 50% while the closing pane shrinks; it visually
-     appears to drift to centre because the closing pane's width is now 0 */
+body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="left"][data-split-closing="true"] > .note-modal-anim {
+  transform: translateX(-32px) scale(0.96);
 }
+body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="right"][data-split-closing="true"] > .note-modal-anim {
+  transform: translateX(32px) scale(0.96);
+}
+/* When the right pane is closing, recenter the left: translate it half
+   the (pane width + gap) to the right so its centre lands at viewport
+   centre. The pane's right edge currently sits at (50vw - gap/2), and
+   target right edge is at (50vw + paneWidth/2). The translate distance
+   is therefore (paneWidth + gap) / 2.
+   We approximate paneWidth via the pane's actual rendered box by using
+   percentages: translating by 50% of the pane itself nudges its centre
+   to where the gap was, then half a gap finishes the alignment.     */
+body.sbs-active.sbs-closing-right .modal-scrim[data-split-mode="true"][data-split-side="left"] > .note-modal-anim {
+  transform: translateX(calc(50% + var(--sbs-gap) / 2));
+}
+body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim {
+  transform: translateX(calc(-50% - var(--sbs-gap) / 2));
+}
+/* Mobile fallback: stack vertically — same height per pane as a normal
+   single modal can't fit two; use 50vh each as a reasonable compromise. */
 @media (max-width: 767px) {
-  /* Mobile fallback: stack the two panes vertically. */
-  body.sbs-active .modal-scrim[data-split-mode="true"] > .note-modal-anim {
-    width: calc(100vw - 24px) !important;
-    max-width: calc(100vw - 24px) !important;
-    height: calc(50vh - 24px) !important;
-  }
-  body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="left"] {
+  body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="left"],
+  body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="right"] {
+    padding: 8px !important;
     align-items: flex-start;
   }
   body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="right"] {
     align-items: flex-end;
-    justify-content: center;
+  }
+  body.sbs-active .modal-scrim[data-split-mode="true"] > .note-modal-anim {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    height: calc(50vh - 16px) !important;
+  }
+  body.sbs-active.sbs-closing-right .modal-scrim[data-split-mode="true"][data-split-side="left"] > .note-modal-anim,
+  body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim {
+    transform: translateY(0);
+    height: calc(100vh - 16px) !important;
   }
 }
 

@@ -34,6 +34,7 @@ export default function SecondaryNoteInstance({
   splitSide = "right",
   splitClosing,
   // shell callbacks
+  onRequestClosing,             // close animation just started → tell shell to flip recenter flag
   onRequestClose,               // pane animation done → unmount + parent state cleanup
   // shared state & helpers (all owned by App.jsx)
   notes, setNotes,
@@ -736,8 +737,17 @@ export default function SecondaryNoteInstance({
   const closeModal = () => {
     if (modalClosingTimerRef.current) return;
     flushBeforeClose();
+    if (onRequestClosing) {
+      // SBS path: shell drives the timeline in lockstep with the LEFT
+      // pane's recenter animation. We just signal "closing started"; the
+      // shell will unmount us via the noteId prop when it's done. No
+      // local exit animation here — the splitClosing CSS rule on the
+      // scrim drives the visible fade-out.
+      onRequestClosing();
+      return;
+    }
     startModalExitAnimation(() => {
-      onRequestClose?.(); // pane is gone — shell handles handoff/cleanup
+      onRequestClose?.();
     });
   };
   closeModalRef.current = closeModal;
