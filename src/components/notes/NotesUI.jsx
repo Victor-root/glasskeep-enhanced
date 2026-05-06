@@ -110,6 +110,7 @@ function NotesUI({
   onBulkColor,
   onBulkDownloadZip,
   onSelectAll,
+  onOpenSideBySide,
   onEmptyTrash,
   // view mode
   listView,
@@ -280,6 +281,7 @@ function NotesUI({
         onBulkArchive={onBulkArchive}
         onSelectAll={onSelectAll}
         onExitMulti={onExitMulti}
+        onOpenSideBySide={onOpenSideBySide}
         headerVisible={headerVisible}
       />
 

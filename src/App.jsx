@@ -60,6 +60,7 @@ import GenericConfirmDialog from "./components/common/GenericConfirmDialog.jsx";
 import ToastContainer from "./components/common/ToastContainer.jsx";
 import FloatingCardsBackground from "./components/common/FloatingCardsBackground.jsx";
 import NoteModal from "./components/modal/NoteModal.jsx";
+import SideBySideNotesView from "./components/notes/SideBySideNotesView.jsx";
 import useModalState from "./hooks/useModalState.js";
 import useDraftNote from "./hooks/useDraftNote.js";
 import useAdminActions from "./hooks/useAdminActions.js";
@@ -513,6 +514,9 @@ export default function App() {
     const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.includes(id));
     setSelectedIds(allSelected ? [] : filteredIds);
   };
+
+  // -------- Side-by-side notes view (exactly two notes open at once) --------
+  const [sideBySidePair, setSideBySidePair] = useState(null);
 
   // -------- View mode: Grid vs List --------
   const [listView, setListView] = useState(() => {
@@ -3530,6 +3534,27 @@ export default function App() {
     }
   };
 
+  // Side-by-side: open two selected notes in the SBS view. Exits multi-select
+  // and ensures the regular single-note modal is closed first.
+  const onOpenSideBySide = (ids) => {
+    if (!Array.isArray(ids) || ids.length !== 2) return;
+    if (open) setOpen(false);
+    setMultiMode(false);
+    setSelectedIds([]);
+    setSidebarOpen(false);
+    setSideBySidePair([String(ids[0]), String(ids[1])]);
+  };
+
+  // Hand off the remaining note to the standard single-note modal so it
+  // behaves exactly as if it had been opened alone from the start.
+  const onSideBySideHandoff = (remainingId) => {
+    setSideBySidePair(null);
+    if (remainingId) {
+      // Defer one tick so the SBS unmount finishes before the modal opens.
+      setTimeout(() => openModal(remainingId), 0);
+    }
+  };
+
   // Check if the note has been modified from initial state
   const hasNoteBeenModified = useCallback(() => {
     if (!initialModalStateRef.current || !activeId) return false;
@@ -5342,6 +5367,7 @@ export default function App() {
         onBulkColor={onBulkColor}
         onBulkDownloadZip={onBulkDownloadZip}
         onSelectAll={onSelectAll}
+        onOpenSideBySide={onOpenSideBySide}
         onEmptyTrash={onEmptyTrash}
         // view mode
         listView={listView}
@@ -5374,6 +5400,17 @@ export default function App() {
         onToggleFloatingCards={toggleFloatingCards}
       />
       {modal}
+
+      {sideBySidePair && (
+        <SideBySideNotesView
+          pair={sideBySidePair}
+          notes={notes}
+          dark={dark}
+          onRequestClose={() => setSideBySidePair(null)}
+          onSavePatch={(id, patch, type) => autoSaveTextNote(id, patch, undefined, type)}
+          onHandoffToSingle={onSideBySideHandoff}
+        />
+      )}
 
       <GenericConfirmDialog
         open={genericConfirmOpen}

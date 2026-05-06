@@ -508,6 +508,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   noTrashedNotes: "La corbeille est vide.",
   selectAll: "Tout sélectionner",
   deselectAll: "Tout désélectionner",
+  openSideBySide: "Ouvrir côte à côte",
+  openInFullEditor: "Ouvrir en plein écran",
   emptyTrash: "Vider la corbeille",
   emptyTrashConfirm: "Supprimer définitivement toutes les notes de la corbeille ? Cette action est irréversible.",
   loadingNotes: "Chargement des notes…",
