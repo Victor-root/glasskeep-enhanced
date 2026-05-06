@@ -1231,20 +1231,21 @@ body.sbs-active.sbs-closing-right .modal-scrim[data-split-mode="true"][data-spli
 body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim {
   --sbs-anchor-x: 0px;
 }
-/* Opening animation for SBS panes.
-   noteModalIn uses translateY which conflicts with the SBS transform:
-   the keyframe animation overrides the CSS transform during its run,
-   so the pane plays its animation from the viewport centre and then
-   jumps to the SBS position when the keyframe finishes. Fix: suppress
-   noteModalIn for both panes and replace with a pure opacity fade so
-   the SBS positioning transform is always in full control.
-   fill-mode: backwards → opacity=0 on first frame even without delay.
-   No 'forwards' fill → opacity returns to CSS default (1) after the
-   animation completes, which lets the splitClosing CSS transition take
-   over later when the user closes one pane.                          */
-@keyframes sbsPaneIn  { from { opacity: 0; } to { opacity: 1; } }
-body.sbs-active .modal-scrim[data-split-mode="true"] > .note-modal-anim {
-  animation: sbsPaneIn 220ms ease-out backwards !important;
+/* Suppress the noteModalIn keyframe entry animation for SBS panes.
+   Reason: noteModalIn animates transform (scale + translateY), which
+   wins over the SBS positioning transform during its run. The pane
+   would play its keyframe from the viewport centre and then snap to
+   the SBS half-position when the keyframe finished.
+   We can't simply override the animation name on a body-class rule
+   that drops when SBS exits — animation-name changes restart the
+   animation, so the surviving pane would replay noteModalIn after
+   the recenter finishes. Instead, we mark the modal element with a
+   persistent class that App.jsx keeps set for the rest of the
+   modal's open lifecycle (sbsTouched). The class disables the entry
+   animation but does not affect .closing → noteModalOut still plays
+   for normal modal close.                                              */
+.note-modal-anim.note-modal-anim--noanim:not(.closing) {
+  animation: none !important;
 }
 /* Mobile: stack vertically with the same transform-only approach. */
 @media (max-width: 767px) {

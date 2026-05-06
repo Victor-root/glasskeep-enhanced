@@ -1136,6 +1136,7 @@ export default function SecondaryNoteInstance({
       splitMode
       splitSide={splitSide}
       splitClosing={splitClosing}
+      suppressEntryAnim
       dark={dark}
       windowWidth={windowWidth}
       isLandscapeMobile={isLandscapeMobile}

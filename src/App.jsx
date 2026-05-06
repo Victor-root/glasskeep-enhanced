@@ -3540,6 +3540,13 @@ export default function App() {
   // survivor recenters.
   const [sbsSecondaryId, setSbsSecondaryId] = useState(null);
   const [sbsClosingSide, setSbsClosingSide] = useState(null); // "left" | "right" | null
+  // Stays true once SBS has been opened during the current primary-modal
+  // open lifecycle. We keep the noanim class on the primary even after SBS
+  // exits — otherwise the noteModalIn animation would replay when the SBS
+  // CSS override drops (animation-name change → CSS animation restart).
+  // Reset to false when the primary modal fully closes (open transitions
+  // to false), so the next open plays its normal entry animation.
+  const [sbsTouched, setSbsTouched] = useState(false);
 
   const onOpenSideBySide = (ids) => {
     if (!Array.isArray(ids) || ids.length !== 2) return;
@@ -3547,10 +3554,14 @@ export default function App() {
     setSelectedIds([]);
     setSidebarOpen(false);
     // Add sbs-active to <body> synchronously before the React render so
-    // the SBS CSS (including the sbsPaneIn animation override) is already
-    // in effect when the new DOM elements are first painted — preventing
-    // the noteModalIn keyframe from conflicting with the SBS transform.
+    // the SBS positioning CSS is already in effect when the new DOM
+    // elements are first painted.
     document.body.classList.add("sbs-active");
+    // Mark the primary modal as "noanim" — suppress the noteModalIn
+    // keyframe (which would conflict with the SBS positioning transform)
+    // and keep it suppressed for the rest of the primary's open lifecycle
+    // so it doesn't replay when SBS exits.
+    setSbsTouched(true);
     // Open the left pane via the existing primary pipeline (full features
     // unchanged). Open the right pane via the SecondaryNoteInstance below.
     openModal(String(ids[0]));
@@ -4923,6 +4934,12 @@ export default function App() {
     };
   }, [sbsActive, sbsClosingSide]);
 
+  // Reset sbsTouched when the primary modal fully closes, so the next
+  // open plays its normal noteModalIn entry animation.
+  useEffect(() => {
+    if (!open && !isModalClosing) setSbsTouched(false);
+  }, [open, isModalClosing]);
+
   // In SBS mode the left pane's X / scrim click no longer tears down the
   // primary modal — it just animates the left half out and hands B to
   // the centre slot. Outside SBS, fall back to the regular closeModal.
@@ -4935,6 +4952,7 @@ export default function App() {
       splitMode={sbsActive}
       splitSide={sbsActive ? "left" : undefined}
       splitClosing={sbsActive && sbsClosingSide === "left"}
+      suppressEntryAnim={sbsTouched}
       dark={dark}
       windowWidth={windowWidth}
       isLandscapeMobile={isLandscapeMobile}
