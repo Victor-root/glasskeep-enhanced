@@ -32,6 +32,13 @@ export default function NoteModal({
   // visibility / animation
   open,
   isModalClosing,
+  // split / side-by-side mode — when true, the outer scrim is suppressed
+  // so a parent shell can host two NoteModal panels side-by-side under
+  // a single shared scrim. The panel positions itself via flex inside
+  // that shell instead of fixed-position fullscreen layout.
+  splitMode,
+  splitSide,    // "left" | "right" | undefined
+  splitClosing, // pane-close animation flag (slide+fade out, sibling recenters)
   // theme & layout
   dark,
   windowWidth,
@@ -497,10 +504,15 @@ export default function NoteModal({
     <>
       <div
         className={`modal-scrim note-scrim-anim${isModalClosing ? ' closing' : ''} fixed inset-0 ${mobileLayout ? 'bg-black' : 'bg-black/40 max-sm:bg-black'} z-40 flex items-center justify-center ${noteAiSidebarLayout && noteAiAvailable ? 'gap-2' : ''} overscroll-contain`}
+        data-split-mode={splitMode ? "true" : undefined}
+        data-split-side={splitMode ? splitSide : undefined}
+        data-split-closing={splitClosing ? "true" : undefined}
         onMouseDown={(e) => {
+          if (splitMode) return; // shell handles scrim clicks
           scrimClickStartRef.current = e.target === e.currentTarget;
         }}
         onClick={(e) => {
+          if (splitMode) return;
           if (scrimClickStartRef.current && e.target === e.currentTarget) {
             closeModal();
           }

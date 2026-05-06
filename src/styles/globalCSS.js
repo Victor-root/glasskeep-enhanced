@@ -1158,6 +1158,77 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
   box-shadow: none !important;
 }
 
+/* ───────── Side-by-side mode ─────────
+   When two notes are open at once, both NoteModal instances render
+   their own scrim. We collapse the two scrims into a single visual
+   layer (only the LEFT scrim is visible) and reposition each panel
+   to take half the screen so they sit next to each other under one
+   shared backdrop. Each pane keeps its own scrim element so its
+   click/escape handling stays untouched.                            */
+body.sbs-active .modal-scrim[data-split-mode="true"] {
+  pointer-events: none;
+}
+body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="right"] {
+  background: transparent !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body.sbs-active .modal-scrim[data-split-mode="true"] > * {
+  pointer-events: auto;
+}
+body.sbs-active .modal-scrim[data-split-mode="true"] {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 16px;
+  gap: 12px;
+}
+body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="right"] {
+  justify-content: flex-end;
+}
+body.sbs-active .modal-scrim[data-split-mode="true"] > .note-modal-anim {
+  width: calc(50vw - 24px) !important;
+  max-width: calc(50vw - 24px) !important;
+  height: calc(100vh - 32px) !important;
+  border-radius: 16px !important;
+  transition:
+    width 320ms ease,
+    max-width 320ms ease,
+    transform 320ms ease,
+    opacity 320ms ease;
+}
+/* Pane closing animation — pane shrinks to 0 width and fades, the
+   surviving pane (still at 50%) naturally appears centered. The shared
+   primary scrim is visible across the full screen behind both. */
+body.sbs-active .modal-scrim[data-split-mode="true"][data-split-closing="true"] > .note-modal-anim {
+  width: 0 !important;
+  max-width: 0 !important;
+  opacity: 0;
+  transform: scale(0.94);
+  pointer-events: none;
+}
+/* When the left pane is closing in SBS, smoothly recenter the right.   */
+body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="left"][data-split-closing="true"] ~ .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim,
+body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="right"][data-split-closing="true"] ~ .modal-scrim[data-split-mode="true"][data-split-side="left"] > .note-modal-anim {
+  /* the survivor stays at 50% while the closing pane shrinks; it visually
+     appears to drift to centre because the closing pane's width is now 0 */
+}
+@media (max-width: 767px) {
+  /* Mobile fallback: stack the two panes vertically. */
+  body.sbs-active .modal-scrim[data-split-mode="true"] > .note-modal-anim {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    height: calc(50vh - 24px) !important;
+  }
+  body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="left"] {
+    align-items: flex-start;
+  }
+  body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="right"] {
+    align-items: flex-end;
+    justify-content: center;
+  }
+}
+
 /* Popover arrow — CSS-only via data-arrow attribute */
 [data-arrow]::after {
   content: "";

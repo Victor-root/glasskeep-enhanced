@@ -60,7 +60,7 @@ import GenericConfirmDialog from "./components/common/GenericConfirmDialog.jsx";
 import ToastContainer from "./components/common/ToastContainer.jsx";
 import FloatingCardsBackground from "./components/common/FloatingCardsBackground.jsx";
 import NoteModal from "./components/modal/NoteModal.jsx";
-import SideBySideNotesView from "./components/notes/SideBySideNotesView.jsx";
+import SecondaryNoteInstance from "./components/modal/SecondaryNoteInstance.jsx";
 import useModalState from "./hooks/useModalState.js";
 import useDraftNote from "./hooks/useDraftNote.js";
 import useAdminActions from "./hooks/useAdminActions.js";
@@ -514,9 +514,6 @@ export default function App() {
     const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.includes(id));
     setSelectedIds(allSelected ? [] : filteredIds);
   };
-
-  // -------- Side-by-side notes view (exactly two notes open at once) --------
-  const [sideBySidePair, setSideBySidePair] = useState(null);
 
   // -------- View mode: Grid vs List --------
   const [listView, setListView] = useState(() => {
@@ -3534,25 +3531,46 @@ export default function App() {
     }
   };
 
-  // Side-by-side: open two selected notes in the SBS view. Exits multi-select
-  // and ensures the regular single-note modal is closed first.
+  // Side-by-side: open two selected notes simultaneously. The PRIMARY (left)
+  // pane is the existing App-hosted modal driven by useModalState/openModal —
+  // it keeps every feature wired through App. The SECONDARY (right) pane is
+  // a self-contained SecondaryNoteInstance that owns its own modal state,
+  // autosave, AI chat, and collaboration handlers. Both panes are real,
+  // independently editable note modals; closing one animates it out and the
+  // survivor recenters.
+  const [sbsSecondaryId, setSbsSecondaryId] = useState(null);
+  const [sbsClosingSide, setSbsClosingSide] = useState(null); // "left" | "right" | null
+
   const onOpenSideBySide = (ids) => {
     if (!Array.isArray(ids) || ids.length !== 2) return;
-    if (open) setOpen(false);
     setMultiMode(false);
     setSelectedIds([]);
     setSidebarOpen(false);
-    setSideBySidePair([String(ids[0]), String(ids[1])]);
+    // Open the left pane via the existing primary pipeline (full features
+    // unchanged). Open the right pane via the SecondaryNoteInstance below.
+    openModal(String(ids[0]));
+    setSbsSecondaryId(String(ids[1]));
+    setSbsClosingSide(null);
   };
 
-  // Hand off the remaining note to the standard single-note modal so it
-  // behaves exactly as if it had been opened alone from the start.
-  const onSideBySideHandoff = (remainingId) => {
-    setSideBySidePair(null);
-    if (remainingId) {
-      // Defer one tick so the SBS unmount finishes before the modal opens.
-      setTimeout(() => openModal(remainingId), 0);
-    }
+  // Closing the LEFT pane in SBS: existing primary closeModal runs (full
+  // animation/save flush). Once the primary modal has closed, hand the
+  // secondary's note off to the primary slot so the survivor behaves
+  // exactly like a single-note modal opened alone.
+  const onSbsLeftClosed = () => {
+    if (!sbsSecondaryId) return;
+    const remaining = sbsSecondaryId;
+    setSbsSecondaryId(null);
+    setSbsClosingSide(null);
+    setTimeout(() => openModal(String(remaining)), 0);
+  };
+
+  // Closing the RIGHT pane in SBS: SecondaryNoteInstance plays its own
+  // close animation, calls back here. The left primary modal stays open
+  // and naturally recenters via CSS.
+  const onSbsRightClosed = () => {
+    setSbsSecondaryId(null);
+    setSbsClosingSide(null);
   };
 
   // Check if the note has been modified from initial state
@@ -4842,10 +4860,41 @@ export default function App() {
   };
 
   /** -------- Modal JSX -------- */
+  // Side-by-side mode is active whenever a secondary note id is set.
+  // Both panes render under a shared scrim overlay (the .sbs-active body
+  // class drives split-mode CSS so the two scrims align as flex siblings
+  // and each note panel takes half-width).
+  const sbsActive = !!sbsSecondaryId;
+  // Detect transition: primary closed while in SBS → trigger handoff.
+  // Listening on `open` falling edge while `sbsSecondaryId` was still set.
+  const sbsLeftClosingTrackRef = useRef(false);
+  useEffect(() => {
+    if (!sbsActive) return;
+    if (open) {
+      sbsLeftClosingTrackRef.current = true;
+      return;
+    }
+    // open just flipped to false while SBS was active — left pane closed.
+    if (sbsLeftClosingTrackRef.current) {
+      sbsLeftClosingTrackRef.current = false;
+      onSbsLeftClosed();
+    }
+  }, [open, sbsActive]); // eslint-disable-line
+
+  // Apply a body-level class so split-mode CSS scopes cleanly.
+  useEffect(() => {
+    if (sbsActive) document.body.classList.add("sbs-active");
+    else document.body.classList.remove("sbs-active");
+    return () => document.body.classList.remove("sbs-active");
+  }, [sbsActive]);
+
   const modal = (
     <NoteModal
       open={open}
       isModalClosing={isModalClosing}
+      splitMode={sbsActive}
+      splitSide={sbsActive ? "left" : undefined}
+      splitClosing={sbsActive && sbsClosingSide === "left"}
       dark={dark}
       windowWidth={windowWidth}
       isLandscapeMobile={isLandscapeMobile}
@@ -5401,14 +5450,49 @@ export default function App() {
       />
       {modal}
 
-      {sideBySidePair && (
-        <SideBySideNotesView
-          pair={sideBySidePair}
+      {sbsSecondaryId && (
+        <SecondaryNoteInstance
+          noteId={sbsSecondaryId}
+          splitSide="right"
+          splitClosing={sbsClosingSide === "right"}
+          onRequestClose={onSbsRightClosed}
           notes={notes}
+          setNotes={setNotes}
+          currentUser={currentUser}
+          sessionId={sessionId}
+          token={token}
           dark={dark}
-          onRequestClose={() => setSideBySidePair(null)}
-          onSavePatch={(id, patch, type) => autoSaveTextNote(id, patch, undefined, type)}
-          onHandoffToSingle={onSideBySideHandoff}
+          windowWidth={windowWidth}
+          isLandscapeMobile={isLandscapeMobile}
+          isWebView={isWebView}
+          edgeToEdgeLandscape={edgeToEdgeLandscape}
+          tagFilter={tagFilter}
+          tagsWithCounts={tagsWithCounts}
+          logoLibrary={logoLibrary}
+          addLogoToLibrary={addLogoToLibrary}
+          deleteLogoFromLibrary={deleteLogoFromLibrary}
+          editorToolbarMode={editorToolbarMode}
+          checklistInsertPosition={checklistInsertPosition}
+          checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
+          aiAssistantEnabled={aiAssistantEnabled}
+          syncState={syncStatus.syncState}
+          acquireLocalLease={acquireLocalLease}
+          releaseLocalLease={releaseLocalLease}
+          releaseLocalLeaseWithPrune={releaseLocalLeaseWithPrune}
+          enqueueAndSync={enqueueAndSync}
+          enqueueWithLease={enqueueWithLease}
+          idbGetNote={idbGetNote}
+          idbPutNote={idbPutNote}
+          idbDeleteNote={idbDeleteNote}
+          invalidateNotesCache={invalidateNotesCache}
+          invalidateArchivedNotesCache={invalidateArchivedNotesCache}
+          invalidateTrashedNotesCache={invalidateTrashedNotesCache}
+          sortNotesByRecency={sortNotesByRecency}
+          addDeleteTombstone={addDeleteTombstone}
+          showToast={showToast}
+          showGenericConfirm={showGenericConfirm}
+          runFormat={runFormat}
+          isCollaborativeNote={isCollaborativeNote}
         />
       )}
 
