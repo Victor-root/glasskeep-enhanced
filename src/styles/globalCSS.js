@@ -145,7 +145,7 @@ html.dark header.glass-card {
      safe-area-inset-top. Header sits at z-40 and the dock at z-35,
      so any minor overlap from a banner row hides cleanly behind
      the header rather than poking through. */
-  top: calc(env(safe-area-inset-top, 0px) + 88px);
+  top: calc(env(safe-area-inset-top, 0px) + 96px);
   bottom: auto;
   z-index: 35;
   pointer-events: none;
@@ -258,7 +258,7 @@ html.dark .multi-select-dock__menu {
 
 @media (max-width: 639px) {
   .multi-select-dock {
-    top: calc(env(safe-area-inset-top, 0px) + 72px);
+    top: calc(env(safe-area-inset-top, 0px) + 80px);
     left: 8px;
     right: 8px;
   }
