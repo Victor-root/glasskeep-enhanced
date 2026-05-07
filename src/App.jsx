@@ -491,8 +491,18 @@ export default function App() {
     setFabOpen(false); // dock lives at bottom; close FAB to avoid overlap
   };
   const onExitMulti = () => {
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
     setMultiMode(false);
     setSelectedIds([]);
+    // Restore scroll: the shim's padding-top disappears on the next paint,
+    // which can shift layout and scroll the page back to the top.
+    requestAnimationFrame(() => {
+      window.scrollTo({ left: scrollX, top: scrollY, behavior: "instant" });
+      requestAnimationFrame(() => {
+        window.scrollTo({ left: scrollX, top: scrollY, behavior: "instant" });
+      });
+    });
   };
   const onToggleSelect = (id, checked) => {
     const sid = String(id);

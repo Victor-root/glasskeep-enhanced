@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../../i18n";
 import { ALL_IMAGES } from "../../utils/constants.js";
 import { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon } from "../../icons/sidebarIcons.jsx";
@@ -158,6 +158,9 @@ function NotesUI({
   setFabOpen,
 }) {
   const mobileSearchRef = useRef(null);
+  const isMobile = windowWidth < 700 || isLandscapeMobile;
+  // Stable array reference for MultiSelectToolbar — avoids rebuilding on every render.
+  const filteredNotesForMulti = useMemo(() => [...pinned, ...others], [pinned, others]);
 
   // Header auto-hide on scroll (mobile only)
   const [headerVisible, setHeaderVisible] = useState(true);
@@ -389,7 +392,7 @@ function NotesUI({
         dark={dark}
         activeTagFilter={activeTagFilter}
         selectedIds={selectedIds}
-        filteredNotes={[...pinned, ...others]}
+        filteredNotes={filteredNotesForMulti}
         onBulkDownloadZip={onBulkDownloadZip}
         onBulkRestore={onBulkRestore}
         onBulkDelete={onBulkDelete}
@@ -405,6 +408,8 @@ function NotesUI({
         onOpenSideBySide={onOpenSideBySide}
         sidebarPermanent={sidebarPermanent}
         sidebarWidth={sidebarWidth}
+        headerVisible={headerVisible}
+        isMobile={isMobile}
       />
     </div>
   );

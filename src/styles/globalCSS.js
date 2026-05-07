@@ -284,7 +284,6 @@ html.dark .multi-select-dock__menu {
 
 @media (max-width: 639px) {
   .multi-select-dock {
-    top: calc(env(safe-area-inset-top, 0px) + 80px);
     left: 8px;
     right: 8px;
   }
@@ -292,6 +291,19 @@ html.dark .multi-select-dock__menu {
     padding: 6px 8px;
     gap: 6px;
     border-radius: 14px;
+  }
+}
+/* Mobile: dock follows the header auto-hide. Transition matches the
+   header slide duration so the two move in lockstep. */
+@media (max-width: 699px) {
+  .multi-select-dock {
+    transition: top 180ms cubic-bezier(.22,.61,.36,1);
+  }
+  .multi-select-dock[data-header-visible="true"] {
+    top: calc(env(safe-area-inset-top, 0px) + 80px);
+  }
+  .multi-select-dock[data-header-visible="false"] {
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
   }
 }
 .note-content { -webkit-user-select: text; user-select: text; }

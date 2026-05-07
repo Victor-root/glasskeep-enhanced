@@ -152,6 +152,9 @@ export default function MultiSelectToolbar({
   // content area, and the ResizeObserver picks up the real budget.
   sidebarPermanent = false,
   sidebarWidth = 0,
+  // Mobile-specific props — skip DOM measurement and header tracking.
+  headerVisible = true,
+  isMobile = false,
 }) {
   // ── Refs ────────────────────────────────────────────────────────
   const containerRef = useRef(null); // outer wrapper — drives the budget
@@ -222,29 +225,35 @@ export default function MultiSelectToolbar({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [showMoreMenu]);
 
-  // ResizeObserver — track the wrapper's available width as a real budget,
-  // not a window.innerWidth shortcut. The wrapper has a max-width and
-  // viewport-relative side insets, so its clientWidth IS the room we have.
+  // ResizeObserver — track the wrapper's available width as a real budget.
+  // On mobile the viewport width is stable (no resize events), so we do a
+  // single read and skip the observer to avoid continuous layout work.
   useEffect(() => {
     if (!shouldRender) return;
     const el = containerRef.current;
     if (!el) return;
+    if (isMobile) {
+      setAvailableWidth(el.clientWidth);
+      return;
+    }
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setAvailableWidth(entry.contentRect.width);
+        const w = Math.round(entry.contentRect.width);
+        setAvailableWidth((prev) => (prev === w ? prev : w));
       }
     });
     ro.observe(el);
     setAvailableWidth(el.clientWidth);
     return () => ro.disconnect();
-  }, [shouldRender]);
+  }, [shouldRender, isMobile]);
 
   // Derived flags
   const isTrash = activeTagFilter === "TRASHED";
   const isArchive = activeTagFilter === "ARCHIVED";
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const allSelected =
     filteredNotes?.length > 0 &&
-    filteredNotes.every((n) => selectedIds.includes(String(n.id)));
+    filteredNotes.every((n) => selectedSet.has(String(n.id)));
   const canSideBySide =
     selectedIds.length === 2 &&
     !isTrash &&
@@ -364,15 +373,25 @@ export default function MultiSelectToolbar({
   // with tooltips (data-tooltip) preserving discoverability. Multiplies
   // the number of actions that can stay in the dock before overflowing
   // into the kebab.
-  const compact = availableWidth > 0 && availableWidth < 700;
+  const compact = isMobile || (availableWidth > 0 && availableWidth < 700);
 
-  // Measure each button via the hidden ghost. Re-runs whenever the action
-  // list shape or labels change (language switch, filter switch, count
-  // hitting/leaving the SBS threshold) OR when compact toggles — the
-  // ghost renders with the same compact flag so widths stay accurate.
+  // Measure each button via the hidden ghost. On mobile, all buttons are
+  // compact 36px squares — no DOM measurement needed; use fixed widths
+  // and only re-run when the ACTION IDs change (filter switch), not on
+  // every label/selectedIds change.
   const actionsKey = actions.map((a) => `${a.id}:${a.label}`).join("|");
+  const mobileActionsKey = actions.map((a) => a.id).join("|");
   useLayoutEffect(() => {
     if (!shouldRender) return;
+    if (isMobile) {
+      // Compact buttons are all 36px — skip ghost DOM queries.
+      const mobileWidths = {};
+      for (const a of actions) mobileWidths[a.id] = 36;
+      setActionWidths(mobileWidths);
+      if (fixedRef.current) setCounterWidth(fixedRef.current.offsetWidth);
+      if (closeRef.current) setCloseWidth(closeRef.current.offsetWidth);
+      return;
+    }
     if (!measureRef.current) return;
     const widths = {};
     measureRef.current.querySelectorAll("[data-action-id]").forEach((b) => {
@@ -381,7 +400,7 @@ export default function MultiSelectToolbar({
     setActionWidths(widths);
     if (fixedRef.current) setCounterWidth(fixedRef.current.offsetWidth);
     if (closeRef.current) setCloseWidth(closeRef.current.offsetWidth);
-  }, [shouldRender, actionsKey, compact]);
+  }, [shouldRender, isMobile ? mobileActionsKey : actionsKey, compact, isMobile]); // eslint-disable-line
 
   // Compute the visible / overflow split based on real measurements.
   // Two passes: first without reserving kebab space; if that overflows,
@@ -562,6 +581,7 @@ export default function MultiSelectToolbar({
       ref={containerRef}
       className={`multi-select-dock${exiting ? " multi-select-dock--exiting" : ""}`}
       style={dockStyle}
+      data-header-visible={headerVisible ? "true" : "false"}
       role="toolbar"
       aria-label={t("multiSelect")}
     >
