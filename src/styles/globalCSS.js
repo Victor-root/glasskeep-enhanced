@@ -1431,13 +1431,19 @@ body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split
     max-width: var(--sbs-pane-w) !important;
   }
 }
-/* Mobile: stack vertically with the same transform-only approach. */
+/* Mobile: stack vertically with the same transform-only approach.
+   Gap is forced to 0 so the two panes touch — the screen is too cramped
+   for breathing space and a flush split reads as a clear divider. The
+   pane height derives from --sbs-gap so changing the gap automatically
+   adjusts the height (with gap=0, height = 50vh, anchors = ±25vh,
+   panes stack edge-to-edge). */
 @media (max-width: 767px) {
   body.sbs-active .modal-scrim[data-split-mode="true"] > .note-modal-anim {
+    --sbs-gap: 0px;
     --sbs-anchor-x: 0px;
     --sbs-anchor-y: 0px;
     transform: translateY(var(--sbs-anchor-y));
-    height: calc(50vh - 12px) !important;
+    height: calc(50vh - var(--sbs-gap) / 2) !important;
   }
   body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="left"] > .note-modal-anim {
     --sbs-anchor-y: calc(-25vh - var(--sbs-gap) / 2);
