@@ -268,6 +268,17 @@ function NotesUI({
         activeTagFilter={activeTagFilter}
       />
 
+      {/* Wrapper that pushes the composer + sections down by the dock's
+          height when multi-select is active. The dock itself stays
+          position:fixed so it follows the user's scroll, but at the top
+          of the page the dock would otherwise overlap the 3 creation
+          buttons (text/checklist/draw). The padding-top transition
+          slides the content down smoothly when entering multiMode and
+          back up on exit. */}
+      <div
+        className="multi-select-content-shim"
+        data-multimode={multiMode ? "true" : undefined}
+      >
       <NotesComposer
         dark={dark}
         activeTagFilter={activeTagFilter}
@@ -362,6 +373,7 @@ function NotesUI({
         windowWidth={windowWidth}
         onEmptyTrash={onEmptyTrash}
       />
+      </div>
 
       {/* Floating multi-select dock — fixed at the bottom of the viewport,
           overlay-style. Lives outside the scrollable content so it doesn't

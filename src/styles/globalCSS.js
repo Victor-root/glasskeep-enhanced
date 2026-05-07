@@ -130,6 +130,25 @@ html.dark header.glass-card {
   border-bottom: 1px solid var(--border-light);
   box-shadow: none;
 }
+/* Shim around composer + sections that yields vertical room for the
+   floating multi-select dock at the top of the page. The dock itself
+   stays position:fixed so it follows scroll, but without this padding
+   the dock would overlap the 3 creation buttons when the user is at
+   scrollTop=0. Padding only kicks in while multi-mode is active and
+   transitions for a smooth in/out. */
+.multi-select-content-shim {
+  padding-top: 0;
+  transition: padding-top 220ms cubic-bezier(.22,.61,.36,1);
+}
+.multi-select-content-shim[data-multimode="true"] {
+  padding-top: 64px;
+}
+@media (max-width: 639px) {
+  .multi-select-content-shim[data-multimode="true"] {
+    padding-top: 56px;
+  }
+}
+
 /* ───────── Multi-select floating dock ─────────
    Premium floating dock anchored at the bottom of the viewport. Fully
    OPAQUE (no backdrop blur / glass) so notes behind never bleed through
