@@ -1478,23 +1478,49 @@ body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split
    adjusts the height (with gap=0, height = 50vh, anchors = ±25vh,
    panes stack edge-to-edge). */
 @media (max-width: 767px) {
+  /* Base rule: vertical stack, no X offset, no height transition (prevents 100dvh flash on open) */
   body.sbs-active .modal-scrim[data-split-mode="true"] > .note-modal-anim {
     --sbs-gap: 0px;
     --sbs-anchor-x: 0px;
     --sbs-anchor-y: 0px;
-    transform: translateY(var(--sbs-anchor-y));
-    height: calc(50vh - var(--sbs-gap) / 2) !important;
+    --sbs-close-y: 0px;
+    transform: translateY(var(--sbs-anchor-y)) translateY(var(--sbs-close-y));
+    height: calc(50dvh - var(--sbs-gap) / 2) !important;
   }
+  /* Per-side anchors; override --note-anim-x so noteModalIn starts at the correct Y position */
   body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="left"] > .note-modal-anim {
-    --sbs-anchor-y: calc(-25vh - var(--sbs-gap) / 2);
+    --sbs-anchor-y: calc(-25dvh - var(--sbs-gap) / 2);
+    --note-anim-x: translateY(calc(-25dvh - var(--sbs-gap) / 2));
   }
   body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim {
-    --sbs-anchor-y: calc(25vh + var(--sbs-gap) / 2);
+    --sbs-anchor-y: calc(25dvh + var(--sbs-gap) / 2);
+    --note-anim-x: translateY(calc(25dvh + var(--sbs-gap) / 2));
   }
-  body.sbs-active.sbs-closing-right .modal-scrim[data-split-mode="true"][data-split-side="left"] > .note-modal-anim,
-  body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim {
+  /* Closing pane: slide up/down and fade out */
+  body.sbs-active.sbs-closing-left
+    .modal-scrim[data-split-mode="true"][data-split-side="left"] > .note-modal-anim {
+    --sbs-close-y: -18px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  body.sbs-active.sbs-closing-right
+    .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim {
+    --sbs-close-y: 18px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* Survivor: recenters and expands to full height in one animation.
+     height transition lives here only, not on the base rule. */
+  body.sbs-active.sbs-closing-left
+    .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim,
+  body.sbs-active.sbs-closing-right
+    .modal-scrim[data-split-mode="true"][data-split-side="left"] > .note-modal-anim {
     --sbs-anchor-y: 0px;
-    height: calc(95vh) !important;
+    height: 100dvh !important;
+    transition:
+      transform var(--sbs-anim) cubic-bezier(.22,.61,.36,1),
+      opacity var(--sbs-anim) ease,
+      height var(--sbs-anim) cubic-bezier(.22,.61,.36,1);
   }
 }
 
