@@ -3469,19 +3469,13 @@ html.dark .typo-modal-toggle {
     visibility: hidden;
     pointer-events: none;
   }
-  /* When the LEFT pane is the hidden one (right-AI open), suppress the
-     left scrim's dark backdrop so it doesn't dim the AI panel now
-     occupying the left half. */
-  body.sbs-active.sbs-ai-right .modal-scrim[data-split-side="left"] {
-    background: transparent !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-  }
   /* AI panel wrapper position in SBS+AI mode. Pulled out of the scrim's
      horizontal flex layout via absolute positioning, anchored to the
      opposite half via left/right + half-pane offset. Width is set inline
      on the element to var(--sbs-pane-w) so the wrapper transition still
-     animates 0 → full-width on open and back on close. */
+     animates 0 → full-width on open and back on close.
+     border-radius + overflow:hidden clip the wrapper from the first frame
+     so the animation never exposes rectangular corners regardless of width. */
   body.sbs-active .modal-scrim[data-ai-panel-side] > .note-ai-panel-wrapper {
     position: absolute;
     top: 50%;
@@ -3489,6 +3483,8 @@ html.dark .typo-modal-toggle {
     height: 95vh;
     pointer-events: auto;
     z-index: 1;
+    border-radius: 0.75rem; /* rounded-xl — matches the note modal */
+    overflow: hidden;
   }
   /* Left pane's AI panel sits in the RIGHT half. */
   body.sbs-active .modal-scrim[data-split-side="left"][data-ai-panel-side="right"] > .note-ai-panel-wrapper {

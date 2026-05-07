@@ -1657,7 +1657,10 @@ export default function App() {
     setNoteAiHasBeenOpened(false);
     setNoteAiError(null);
     setNoteAiLoading(false);
-    if (sbsAiActiveSide === "left") setSbsAiActiveSide(null);
+    // In SBS, keep the body class (and CSS positioning) alive for the
+    // duration of the AI close animation so the panel can slide out before
+    // the opposite note reappears and the wrapper loses its absolute slot.
+    if (sbsAiActiveSide === "left") scheduleSbsAiClear();
     // Saved conversations stay in localStorage and in memory so a
     // later open can resume them. Temporary ones are wiped.
     if (!noteAiSaved) {
@@ -1670,7 +1673,7 @@ export default function App() {
   const hideNoteAi = () => {
     setNoteAiOpen(false);
     setNoteAiError(null);
-    if (sbsAiActiveSide === "left") setSbsAiActiveSide(null);
+    if (sbsAiActiveSide === "left") scheduleSbsAiClear();
   };
   const saveNoteAi = () => {
     if (!activeId) return;
@@ -3653,6 +3656,30 @@ export default function App() {
   // the AI panel takes over the OPPOSITE pane's slot and the opposite
   // note is hidden (kept mounted). Cleared on close/hide and on SBS exit.
   const [sbsAiActiveSide, setSbsAiActiveSide] = useState(null); // null | "left" | "right"
+  // Timer that delays clearing sbsAiActiveSide so the AI close animation
+  // (620ms in NoteModal) can complete before the opposite pane reappears
+  // and the wrapper loses its absolute positioning. Cancelled immediately
+  // when the whole SBS session closes (no need to wait).
+  const sbsAiClearTimerRef = useRef(null);
+  const scheduleSbsAiClear = useCallback(() => {
+    if (sbsAiClearTimerRef.current) clearTimeout(sbsAiClearTimerRef.current);
+    sbsAiClearTimerRef.current = setTimeout(() => {
+      setSbsAiActiveSide(null);
+      sbsAiClearTimerRef.current = null;
+    }, 640); // 620ms (NoteModal aiClosing) + 20ms buffer
+  }, []);
+  // Cancel any pending delayed clear and wipe immediately (used when SBS
+  // closes so there's no zombie state left after teardown).
+  const cancelAndClearSbsAi = useCallback(() => {
+    if (sbsAiClearTimerRef.current) {
+      clearTimeout(sbsAiClearTimerRef.current);
+      sbsAiClearTimerRef.current = null;
+    }
+    setSbsAiActiveSide(null);
+  }, []);
+  useEffect(() => () => {
+    if (sbsAiClearTimerRef.current) clearTimeout(sbsAiClearTimerRef.current);
+  }, []);
 
   const onOpenSideBySide = (ids) => {
     if (!Array.isArray(ids) || ids.length !== 2) return;
@@ -3686,7 +3713,7 @@ export default function App() {
   const requestCloseLeftPaneSBS = useCallback(() => {
     if (!sbsSecondaryId || sbsClosingSide) return;
     const remaining = sbsSecondaryId;
-    setSbsAiActiveSide(null);
+    cancelAndClearSbsAi();
     setSbsClosingSide("left");
     setTimeout(() => {
       // Handoff: snap the primary back to centre WITHOUT transition. The
@@ -3705,7 +3732,7 @@ export default function App() {
         });
       });
     }, SBS_ANIM_MS);
-  }, [sbsSecondaryId, sbsClosingSide]); // eslint-disable-line
+  }, [sbsSecondaryId, sbsClosingSide, cancelAndClearSbsAi]); // eslint-disable-line
 
   // Closing the RIGHT pane: the secondary instance only signals start
   // (via onRequestClosing) and then sits still while the shell drives
@@ -3714,7 +3741,7 @@ export default function App() {
   // the primary settles into normal single-modal layout at centre.
   const onSbsRightClosing = useCallback(() => {
     if (sbsClosingSide) return;
-    setSbsAiActiveSide(null);
+    cancelAndClearSbsAi();
     setSbsClosingSide("right");
     setTimeout(() => {
       // Sticky flag: stays true while the survivor remains mounted, so the
@@ -3724,7 +3751,7 @@ export default function App() {
       setSbsSecondaryId(null);
       setSbsClosingSide(null);
     }, SBS_ANIM_MS);
-  }, [sbsClosingSide]);
+  }, [sbsClosingSide, cancelAndClearSbsAi]);
   // Kept for backward-compat in case the secondary ever runs its own
   // exit animation outside SBS — currently a no-op in SBS path.
   const onSbsRightClosed = useCallback(() => {
@@ -3740,8 +3767,11 @@ export default function App() {
     setSbsAiActiveSide("right");
   }, []);
   const onSecondaryAiClose = useCallback(() => {
-    setSbsAiActiveSide((s) => (s === "right" ? null : s));
-  }, []);
+    // Like closeNoteAi/hideNoteAi for the primary: keep sbsAiActiveSide="right"
+    // alive for the AI close animation duration so the left pane stays hidden
+    // and the wrapper keeps its absolute position at the left half.
+    scheduleSbsAiClear();
+  }, [scheduleSbsAiClear]);
 
   // Backdrop click while in SBS mode: close BOTH notes together.
   // Strict separation of roles:
