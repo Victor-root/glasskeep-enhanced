@@ -1478,6 +1478,15 @@ body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split
    adjusts the height (with gap=0, height = 50vh, anchors = ±25vh,
    panes stack edge-to-edge). */
 @media (max-width: 767px) {
+  /* In vertical SBS, each scrim is a fullscreen layer. The desktop rule already
+     makes the right scrim transparent; extend it to ALL mobile SBS scrims so no
+     scrim background can bleed through any gap between the two note-modal-anim
+     panes during the close animation. */
+  body.sbs-active .modal-scrim[data-split-mode="true"] {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
   /* Base rule: vertical stack, no X offset, no height transition (prevents 100dvh flash on open) */
   body.sbs-active .modal-scrim[data-split-mode="true"] > .note-modal-anim {
     --sbs-gap: 0px;
@@ -1515,28 +1524,32 @@ body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split
     animation: sbsMobilePaneIn 220ms cubic-bezier(.22,.61,.36,1);
   }
   /* Closing pane: stays frozen at its original position, fully opaque, no animation.
-     The survivor slides over it, so backdrop is never exposed during the transition. */
+     The survivor slides over it, so backdrop is never exposed during the transition.
+     opacity: 1 !important neutralises the global data-split-closing { opacity: 0 } rule
+     which has no media-query guard and could otherwise fade the frozen pane. */
   body.sbs-active.sbs-closing-left
     .modal-scrim[data-split-mode="true"][data-split-side="left"] > .note-modal-anim {
     --sbs-anchor-y: calc(-25dvh - var(--sbs-gap) / 2);
     --sbs-close-y: 0px;
+    --sbs-close-x: 0px;
     height: calc(50dvh - var(--sbs-gap) / 2) !important;
-    clip-path: inset(0 0 0 0);
-    opacity: 1;
+    clip-path: inset(0 0 0 0) !important;
+    opacity: 1 !important;
     pointer-events: none;
     overflow: hidden;
-    transition: none;
+    transition: none !important;
   }
   body.sbs-active.sbs-closing-right
     .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim {
     --sbs-anchor-y: calc(25dvh + var(--sbs-gap) / 2);
     --sbs-close-y: 0px;
+    --sbs-close-x: 0px;
     height: calc(50dvh - var(--sbs-gap) / 2) !important;
-    clip-path: inset(0 0 0 0);
-    opacity: 1;
+    clip-path: inset(0 0 0 0) !important;
+    opacity: 1 !important;
     pointer-events: none;
     overflow: hidden;
-    transition: none;
+    transition: none !important;
   }
   /* Survivor is layered above the frozen closing pane and is the only moving element. */
   body.sbs-active.sbs-closing-left
