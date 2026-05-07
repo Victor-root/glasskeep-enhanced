@@ -1509,20 +1509,37 @@ body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split
     > .note-modal-anim:not(.closing) {
     animation: sbsMobilePaneIn 220ms cubic-bezier(.22,.61,.36,1);
   }
-  /* Closing pane: slide up/down and fade out */
+  /* Accordion close — top pane folds upward: anchor moves to -50dvh, height collapses to 0.
+     Top edge stays fixed at 0, bottom edge rises to meet it. */
   body.sbs-active.sbs-closing-left
     .modal-scrim[data-split-mode="true"][data-split-side="left"] > .note-modal-anim {
-    --sbs-close-y: -18px;
+    --sbs-anchor-y: -50dvh;
+    --sbs-close-y: 0px;
+    height: 0dvh !important;
     opacity: 0;
     pointer-events: none;
+    overflow: hidden;
+    transition:
+      transform var(--sbs-anim) cubic-bezier(.22,.61,.36,1),
+      height var(--sbs-anim) cubic-bezier(.22,.61,.36,1),
+      opacity calc(var(--sbs-anim) * .75) ease;
   }
+  /* Accordion close — bottom pane folds downward: anchor moves to 50dvh, height collapses to 0.
+     Bottom edge stays fixed at 100dvh, top edge descends to meet it. */
   body.sbs-active.sbs-closing-right
     .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim {
-    --sbs-close-y: 18px;
+    --sbs-anchor-y: 50dvh;
+    --sbs-close-y: 0px;
+    height: 0dvh !important;
     opacity: 0;
     pointer-events: none;
+    overflow: hidden;
+    transition:
+      transform var(--sbs-anim) cubic-bezier(.22,.61,.36,1),
+      height var(--sbs-anim) cubic-bezier(.22,.61,.36,1),
+      opacity calc(var(--sbs-anim) * .75) ease;
   }
-  /* Survivor: recenters and expands to full height in one animation.
+  /* Survivor: recenters and expands to full height in one accordion movement.
      height transition lives here only, not on the base rule. */
   body.sbs-active.sbs-closing-left
     .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim,
@@ -1532,8 +1549,8 @@ body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split
     height: 100dvh !important;
     transition:
       transform var(--sbs-anim) cubic-bezier(.22,.61,.36,1),
-      opacity var(--sbs-anim) ease,
-      height var(--sbs-anim) cubic-bezier(.22,.61,.36,1);
+      height var(--sbs-anim) cubic-bezier(.22,.61,.36,1),
+      opacity var(--sbs-anim) ease;
   }
 }
 
