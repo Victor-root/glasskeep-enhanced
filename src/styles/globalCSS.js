@@ -1496,6 +1496,19 @@ body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split
     --sbs-anchor-y: calc(25dvh + var(--sbs-gap) / 2);
     --note-anim-x: translateY(calc(25dvh + var(--sbs-gap) / 2));
   }
+  /* Mobile SBS open: pop/zoom at the anchor Y position, no vertical slide.
+     The global noteModalIn keyframe is redefined at <=639px to a translateY(14px)
+     slide; combined with --note-anim-x = translateY(anchor) it would slide both
+     panes up from below. Override with a scale-only keyframe anchored at Y. */
+  @keyframes sbsMobilePaneIn {
+    from { opacity: 0; transform: translateY(var(--sbs-anchor-y)) scale(0.92); }
+    to   { opacity: 1; transform: translateY(var(--sbs-anchor-y)) scale(1);    }
+  }
+  body.sbs-active:not(.sbs-closing-left):not(.sbs-closing-right)
+    .modal-scrim[data-split-mode="true"]:not([data-split-closing="true"])
+    > .note-modal-anim:not(.closing) {
+    animation: sbsMobilePaneIn 220ms cubic-bezier(.22,.61,.36,1);
+  }
   /* Closing pane: slide up/down and fade out */
   body.sbs-active.sbs-closing-left
     .modal-scrim[data-split-mode="true"][data-split-side="left"] > .note-modal-anim {
