@@ -3536,6 +3536,7 @@ export default function App() {
     // note, so the deferred-create path must not fire for it.
     pendingDraftRef.current = null;
     setSidebarOpen(false);
+    setSbsSuppressOpenReplay(false);
     setActiveId(String(id));
     setMType(n.type || "text");
     setMTitle(n.title || "");
@@ -3684,14 +3685,12 @@ export default function App() {
     if (sbsClosingSide) return;
     setSbsClosingSide("right");
     setTimeout(() => {
+      // Sticky flag: stays true while the survivor remains mounted, so the
+      // base .note-modal-anim { animation: noteModalIn } can never replay.
+      // Cleared by openModal / onOpenSideBySide / closeModal — never on a timer.
       setSbsSuppressOpenReplay(true);
       setSbsSecondaryId(null);
       setSbsClosingSide(null);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setSbsSuppressOpenReplay(false);
-        });
-      });
     }, SBS_ANIM_MS);
   }, [sbsClosingSide]);
   // Kept for backward-compat in case the secondary ever runs its own
@@ -4077,6 +4076,9 @@ export default function App() {
   const closeModal = () => {
     // Prevent double-triggering while exit animation is running
     if (modalClosingTimerRef.current) return;
+    // Clear the post-SBS replay-suppression flag so noteModalOut can run
+    // unblocked when the user closes the survivor.
+    setSbsSuppressOpenReplay(false);
 
     // Unmaterialised draft: the user opened a blank note via the creation
     // buttons and never touched it, so nothing was ever persisted. Just run
