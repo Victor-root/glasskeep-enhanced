@@ -52,6 +52,10 @@ const TONE = {
 
 const BTN_BASE =
   "h-9 px-3 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium border transition-colors whitespace-nowrap shrink-0";
+// Compact mode (mobile / very narrow dock): square icon buttons. Tooltip
+// (data-tooltip) carries the label so the action stays discoverable.
+const BTN_COMPACT =
+  "h-9 w-9 inline-flex items-center justify-center rounded-lg text-sm font-medium border transition-colors shrink-0";
 
 // Inline icons not available in /icons.
 const ColorEmoji = () => (
@@ -71,6 +75,22 @@ const RestoreIconSvg = () => (
   >
     <polyline points="3 8 3 14 9 14" />
     <path d="M3 14a9 9 0 1 0 3-7" />
+  </svg>
+);
+const SelectAllIconSvg = ({ allSelected }) => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    {allSelected && <path d="M9 12l2 2 4-4" />}
   </svg>
 );
 const LogoIconSvg = () => (
@@ -313,7 +333,7 @@ export default function MultiSelectToolbar({
       list.push({
         id: "selectAll",
         label: allSelected ? t("deselectAll") : t("selectAll"),
-        icon: null,
+        icon: <SelectAllIconSvg allSelected={allSelected} />,
         onClick: () => onSelectAll?.(filteredNotes),
         tone: "slate",
         menuTone: "slate",
@@ -339,9 +359,17 @@ export default function MultiSelectToolbar({
     logoBtnAttachRef,
   ]);
 
+  // Compact (icon-only) mode kicks in on narrow docks — typically mobile.
+  // Drops every button's text label and turns each into a 36x36 square,
+  // with tooltips (data-tooltip) preserving discoverability. Multiplies
+  // the number of actions that can stay in the dock before overflowing
+  // into the kebab.
+  const compact = availableWidth > 0 && availableWidth < 700;
+
   // Measure each button via the hidden ghost. Re-runs whenever the action
   // list shape or labels change (language switch, filter switch, count
-  // hitting/leaving the SBS threshold).
+  // hitting/leaving the SBS threshold) OR when compact toggles — the
+  // ghost renders with the same compact flag so widths stay accurate.
   const actionsKey = actions.map((a) => `${a.id}:${a.label}`).join("|");
   useLayoutEffect(() => {
     if (!shouldRender) return;
@@ -353,7 +381,7 @@ export default function MultiSelectToolbar({
     setActionWidths(widths);
     if (fixedRef.current) setCounterWidth(fixedRef.current.offsetWidth);
     if (closeRef.current) setCloseWidth(closeRef.current.offsetWidth);
-  }, [shouldRender, actionsKey]);
+  }, [shouldRender, actionsKey, compact]);
 
   // Compute the visible / overflow split based on real measurements.
   // Two passes: first without reserving kebab space; if that overflows,
@@ -419,15 +447,23 @@ export default function MultiSelectToolbar({
   const renderActionButton = (action, opts = {}) => {
     const { ghost = false, menuItem = false, attachRef } = opts;
     const isDisabled = !!action.disabled;
+    // In-dock buttons (visible row + ghost) honour compact mode and drop
+    // their label, becoming square icon-only buttons. Kebab menu items
+    // ALWAYS keep their label — the menu has plenty of room.
+    const dockShowLabel = !compact || menuItem;
+
     if (action.kind === "cta") {
       // CTA (side-by-side): always rendered. When it can't fire (selection
       // count != 2 or trash) it stays in place but greys out via opacity
       // — the user keeps it on screen as an available outcome.
-      const ctaBase =
+      const ctaFull =
         "h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-bold whitespace-nowrap shrink-0 text-white bg-gradient-to-r from-indigo-600 to-violet-700 ring-1 ring-violet-500/30 shadow-md shadow-violet-500/40 transition-all duration-200";
+      const ctaCompact =
+        "h-9 w-9 inline-flex items-center justify-center rounded-lg text-sm font-bold shrink-0 text-white bg-gradient-to-r from-indigo-600 to-violet-700 ring-1 ring-violet-500/30 shadow-md shadow-violet-500/40 transition-all duration-200";
       const ctaActive =
         " hover:from-indigo-700 hover:to-violet-800 hover:shadow-lg hover:shadow-violet-500/50 hover:scale-[1.02] active:scale-[0.98]";
       const ctaDisabled = " opacity-40 cursor-not-allowed grayscale-[0.2]";
+      const ctaBase = compact ? ctaCompact : ctaFull;
       return (
         <button
           key={action.id}
@@ -447,6 +483,8 @@ export default function MultiSelectToolbar({
           }
           tabIndex={ghost ? -1 : 0}
           aria-disabled={isDisabled || undefined}
+          aria-label={action.label}
+          data-tooltip={!menuItem && compact ? action.label : undefined}
           className={
             menuItem
               ? "flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-white/10" +
@@ -460,7 +498,7 @@ export default function MultiSelectToolbar({
           }
         >
           {action.icon}
-          <span>{action.label}</span>
+          {dockShowLabel && <span>{action.label}</span>}
         </button>
       );
     }
@@ -496,11 +534,12 @@ export default function MultiSelectToolbar({
         type="button"
         onClick={action.onClick}
         tabIndex={ghost ? -1 : 0}
+        aria-label={action.label}
         data-tooltip={action.label}
-        className={`${BTN_BASE} ${toneCls}`}
+        className={compact ? `${BTN_COMPACT} ${toneCls}` : `${BTN_BASE} ${toneCls}`}
       >
         {action.icon}
-        <span>{action.label}</span>
+        {dockShowLabel && <span>{action.label}</span>}
       </button>
     );
   };
