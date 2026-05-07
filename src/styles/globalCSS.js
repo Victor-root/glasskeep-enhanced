@@ -139,13 +139,13 @@ html.dark header.glass-card {
   position: fixed;
   left: 12px;
   right: 12px;
-  /* Anchored at the top, sitting just under the page header. The
-     spacing here mirrors what we used to keep at the bottom: a 16px
-     gap above the dock + safe-area-inset-top, plus the header height
-     (~88px desktop / 72px mobile) so the dock floats neatly under
-     NotesHeader without overlapping it. Auto-hide of the header on
-     scroll just frees up empty space above the dock — no overlap. */
-  top: calc(env(safe-area-inset-top, 0px) + 104px);
+  /* Anchored flush against the bottom of NotesHeader (no gap).
+     The header is `sticky top-0` with ~88px desktop / 72px mobile
+     of content height, so the dock's top equals header height +
+     safe-area-inset-top. Header sits at z-40 and the dock at z-35,
+     so any minor overlap from a banner row hides cleanly behind
+     the header rather than poking through. */
+  top: calc(env(safe-area-inset-top, 0px) + 88px);
   bottom: auto;
   z-index: 35;
   pointer-events: none;
@@ -258,7 +258,7 @@ html.dark .multi-select-dock__menu {
 
 @media (max-width: 639px) {
   .multi-select-dock {
-    top: calc(env(safe-area-inset-top, 0px) + 80px);
+    top: calc(env(safe-area-inset-top, 0px) + 72px);
     left: 8px;
     right: 8px;
   }
