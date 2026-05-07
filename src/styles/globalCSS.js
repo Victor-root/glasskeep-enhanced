@@ -1102,19 +1102,24 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
   -webkit-backdrop-filter: blur(12px);
 }
 
-/* Note modal enter / exit animations — only transform+opacity (GPU composited, no layout) */
+/* Note modal enter / exit animations — only transform+opacity (GPU composited, no layout)
+   The var(--note-anim-x, ) lets SBS panes inject a leading translateX
+   into the keyframe transform. The default fallback is empty so single-
+   modal opens are unchanged; in SBS mode the variable is set per-side
+   so the scale+slide animation plays AT the SBS anchor position and
+   ends exactly where the persistent SBS transform takes over (no jump). */
 @keyframes noteModalIn {
-  from { opacity: 0; transform: scale(0.92) translateY(10px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0);    }
+  from { opacity: 0; transform: var(--note-anim-x, ) scale(0.92) translateY(10px); }
+  to   { opacity: 1; transform: var(--note-anim-x, ) scale(1)    translateY(0);    }
 }
 @keyframes noteModalOut {
-  from { opacity: 1; transform: scale(1)    translateY(0);   }
-  to   { opacity: 0; transform: scale(0.97) translateY(6px); }
+  from { opacity: 1; transform: var(--note-anim-x, ) scale(1)    translateY(0);   }
+  to   { opacity: 0; transform: var(--note-anim-x, ) scale(0.97) translateY(6px); }
 }
 /* Mobile: full-screen modal → slide-up only, no scale (avoids jitter on small screens) */
 @media (max-width: 639px) {
-  @keyframes noteModalIn  { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes noteModalOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(14px); } }
+  @keyframes noteModalIn  { from { opacity: 0; transform: var(--note-anim-x, ) translateY(14px); } to { opacity: 1; transform: var(--note-anim-x, ) translateY(0); } }
+  @keyframes noteModalOut { from { opacity: 1; transform: var(--note-anim-x, ) translateY(0); } to { opacity: 0; transform: var(--note-anim-x, ) translateY(14px); } }
 }
 @keyframes scrimFadeIn  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scrimFadeOut { from { opacity: 1; } to { opacity: 0; } }
@@ -1206,9 +1211,11 @@ body.sbs-active .modal-scrim[data-split-mode="true"] > .note-modal-anim {
 }
 body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="left"] > .note-modal-anim {
   --sbs-anchor-x: calc(-50% - var(--sbs-gap) / 2);
+  --note-anim-x: translateX(calc(-50% - var(--sbs-gap) / 2));
 }
 body.sbs-active .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim {
   --sbs-anchor-x: calc(50% + var(--sbs-gap) / 2);
+  --note-anim-x: translateX(calc(50% + var(--sbs-gap) / 2));
 }
 /* Pane that's animating out: small extra offset + fade. The anchor
    stays the same so the pane fades from its current position. */
@@ -1230,22 +1237,6 @@ body.sbs-active.sbs-closing-right .modal-scrim[data-split-mode="true"][data-spli
 }
 body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim {
   --sbs-anchor-x: 0px;
-}
-/* Suppress the noteModalIn keyframe entry animation for SBS panes.
-   Reason: noteModalIn animates transform (scale + translateY), which
-   wins over the SBS positioning transform during its run. The pane
-   would play its keyframe from the viewport centre and then snap to
-   the SBS half-position when the keyframe finished.
-   We can't simply override the animation name on a body-class rule
-   that drops when SBS exits — animation-name changes restart the
-   animation, so the surviving pane would replay noteModalIn after
-   the recenter finishes. Instead, we mark the modal element with a
-   persistent class that App.jsx keeps set for the rest of the
-   modal's open lifecycle (sbsTouched). The class disables the entry
-   animation but does not affect .closing → noteModalOut still plays
-   for normal modal close.                                              */
-.note-modal-anim.note-modal-anim--noanim:not(.closing) {
-  animation: none !important;
 }
 /* Mobile: stack vertically with the same transform-only approach. */
 @media (max-width: 767px) {

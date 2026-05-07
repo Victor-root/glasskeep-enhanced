@@ -101,6 +101,7 @@ function NotesUI({
   onStartMulti,
   onExitMulti,
   onToggleSelect,
+  onCtrlSelect,
   onSelectAllPinned,
   onSelectAllOthers,
   onBulkDelete,
@@ -360,6 +361,7 @@ function NotesUI({
         multiMode={multiMode}
         selectedIds={selectedIds}
         onToggleSelect={onToggleSelect}
+        onCtrlSelect={onCtrlSelect}
         activeTagFilter={activeTagFilter}
         onDragStart={onDragStart}
         onDragOver={onDragOver}

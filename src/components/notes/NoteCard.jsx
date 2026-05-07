@@ -21,6 +21,7 @@ export default function NoteCard({
   multiMode = false,
   selected = false,
   onToggleSelect = () => {},
+  onCtrlSelect = () => {},
   disablePin = false,
   onDragStart,
   onDragOver,
@@ -158,6 +159,12 @@ export default function NoteCard({
         if (multiMode) {
           e.stopPropagation();
           onToggleSelect?.(n.id, !selected);
+        } else if (e.ctrlKey || e.metaKey) {
+          // Ctrl / Cmd + click: enter multi-select and pick this note
+          // (Mac users get the same behaviour via the meta key).
+          e.stopPropagation();
+          e.preventDefault();
+          onCtrlSelect?.(n.id);
         } else {
           openModal(n.id);
         }

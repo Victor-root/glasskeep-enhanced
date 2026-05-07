@@ -12,6 +12,7 @@ export default function NotesSections({
   multiMode,
   selectedIds,
   onToggleSelect,
+  onCtrlSelect,
   activeTagFilter,
   onDragStart,
   onDragOver,
@@ -67,6 +68,7 @@ export default function NotesSections({
                     multiMode={multiMode}
                     selected={selectedIds.includes(String(n.id))}
                     onToggleSelect={onToggleSelect}
+                    onCtrlSelect={onCtrlSelect}
                     disablePin={
                       "ontouchstart" in window ||
                       navigator.maxTouchPoints > 0 ||
@@ -101,6 +103,7 @@ export default function NotesSections({
                     multiMode={multiMode}
                     selected={selectedIds.includes(String(n.id))}
                     onToggleSelect={onToggleSelect}
+                    onCtrlSelect={onCtrlSelect}
                     disablePin={
                       "ontouchstart" in window ||
                       navigator.maxTouchPoints > 0 ||
@@ -149,6 +152,7 @@ export default function NotesSections({
                     multiMode={multiMode}
                     selected={selectedIds.includes(String(n.id))}
                     onToggleSelect={onToggleSelect}
+                    onCtrlSelect={onCtrlSelect}
                     disablePin={
                       "ontouchstart" in window ||
                       navigator.maxTouchPoints > 0 ||
@@ -183,6 +187,7 @@ export default function NotesSections({
                     multiMode={multiMode}
                     selected={selectedIds.includes(String(n.id))}
                     onToggleSelect={onToggleSelect}
+                    onCtrlSelect={onCtrlSelect}
                     disablePin={
                       "ontouchstart" in window ||
                       navigator.maxTouchPoints > 0 ||
