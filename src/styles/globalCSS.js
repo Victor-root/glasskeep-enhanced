@@ -1238,6 +1238,12 @@ body.sbs-active.sbs-closing-right .modal-scrim[data-split-mode="true"][data-spli
 body.sbs-active.sbs-closing-left .modal-scrim[data-split-mode="true"][data-split-side="right"] > .note-modal-anim {
   --sbs-anchor-x: 0px;
 }
+/* Both-close: backdrop (left scrim) fades out alongside both panes.
+   In single-pane close scenarios the scrim stays — backdrop-close is the
+   only case where both sides close and we want the whole overlay to fade. */
+body.sbs-both-closing .modal-scrim[data-split-mode="true"][data-split-side="left"] {
+  animation: scrimFadeOut 360ms ease-in both;
+}
 /* Mobile: stack vertically with the same transform-only approach. */
 @media (max-width: 767px) {
   body.sbs-active .modal-scrim[data-split-mode="true"] > .note-modal-anim {

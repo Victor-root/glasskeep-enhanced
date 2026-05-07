@@ -3551,6 +3551,7 @@ export default function App() {
   // survivor recenters.
   const [sbsSecondaryId, setSbsSecondaryId] = useState(null);
   const [sbsClosingSide, setSbsClosingSide] = useState(null); // "left" | "right" | null
+  const [sbsBothClosing, setSbsBothClosing] = useState(false);
 
   const onOpenSideBySide = (ids) => {
     if (!Array.isArray(ids) || ids.length !== 2) return;
@@ -3570,8 +3571,9 @@ export default function App() {
     setSbsClosingSide(null);
   };
 
-  // SBS animation duration — must match --sbs-anim in globalCSS.
-  const SBS_ANIM_MS = 360;
+  // SBS animation duration — 40ms longer than the CSS --sbs-anim (360ms) so
+  // React cleanup fires after transitions have fully settled.
+  const SBS_ANIM_MS = 400;
 
   // Intercepts the LEFT pane's close button while in SBS mode. The trick
   // is to NEVER tear down the primary modal here — instead we play a
@@ -3616,17 +3618,30 @@ export default function App() {
     setSbsClosingSide(null);
   }, []);
 
-  // Backdrop click while in SBS mode: close both panes at once.
-  // We synchronously remove sbs-active so the primary plays its normal
-  // single-modal close animation (not the SBS left-exit animation).
-  // closeModal is defined later in the component body (TDZ), so we go
-  // through the existing closeModalRef which is wired up below.
+  // Backdrop click while in SBS mode: fade BOTH panes out simultaneously
+  // from their SBS anchor positions, then close silently.
+  // sbsBothClosing=true sets splitClosing=true on both panes so the SBS
+  // CSS transitions drive opacity→0 on each pane from its own position
+  // (left slides left, right slides right) over --sbs-anim (360ms).
+  // After SBS_ANIM_MS both are opacity=0; we close everything at once with
+  // no additional noteModalOut flash.
   const closeBothSBS = useCallback(() => {
-    document.body.classList.remove("sbs-active");
-    setSbsSecondaryId(null);
-    setSbsClosingSide(null);
-    closeModalRef.current?.();
-  }, []);
+    if (sbsBothClosing) return;
+    if (mType === "draw") flushPendingDrawingSave();
+    setSbsBothClosing(true);
+    setTimeout(() => {
+      setSbsSecondaryId(null);
+      setSbsClosingSide(null);
+      setSbsBothClosing(false);
+      setOpen(false);
+      setActiveId(null);
+      setViewMode(true);
+      setModalMenuOpen(false);
+      setConfirmDeleteOpen(false);
+      setShowModalFmt(false);
+      setIsModalClosing(false);
+    }, SBS_ANIM_MS);
+  }, [sbsBothClosing, mType, flushPendingDrawingSave]); // eslint-disable-line
 
   // Check if the note has been modified from initial state
   const hasNoteBeenModified = useCallback(() => {
@@ -4938,12 +4953,14 @@ export default function App() {
     body.classList.toggle("sbs-active", sbsActive);
     body.classList.toggle("sbs-closing-left", sbsActive && sbsClosingSide === "left");
     body.classList.toggle("sbs-closing-right", sbsActive && sbsClosingSide === "right");
+    body.classList.toggle("sbs-both-closing", sbsBothClosing);
     return () => {
       body.classList.remove("sbs-active");
       body.classList.remove("sbs-closing-left");
       body.classList.remove("sbs-closing-right");
+      body.classList.remove("sbs-both-closing");
     };
-  }, [sbsActive, sbsClosingSide]);
+  }, [sbsActive, sbsClosingSide, sbsBothClosing]);
 
   // In SBS mode the left pane's X / scrim click no longer tears down the
   // primary modal — it just animates the left half out and hands B to
@@ -4956,7 +4973,7 @@ export default function App() {
       isModalClosing={isModalClosing}
       splitMode={sbsActive}
       splitSide={sbsActive ? "left" : undefined}
-      splitClosing={sbsActive && sbsClosingSide === "left"}
+      splitClosing={sbsBothClosing || (sbsActive && sbsClosingSide === "left")}
       dark={dark}
       windowWidth={windowWidth}
       isLandscapeMobile={isLandscapeMobile}
@@ -5518,7 +5535,7 @@ export default function App() {
         <SecondaryNoteInstance
           noteId={sbsSecondaryId}
           splitSide="right"
-          splitClosing={sbsClosingSide === "right"}
+          splitClosing={sbsBothClosing || sbsClosingSide === "right"}
           onRequestClosing={onSbsRightClosing}
           onRequestClose={onSbsRightClosed}
           notes={notes}
