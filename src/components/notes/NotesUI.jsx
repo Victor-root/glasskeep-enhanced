@@ -109,6 +109,10 @@ function NotesUI({
   onBulkArchive,
   onBulkRestore,
   onBulkColor,
+  onBulkSetIcon,
+  onBulkAddLogoFromFile,
+  logoLibrary,
+  deleteLogoFromLibrary,
   onBulkDownloadZip,
   onSelectAll,
   onOpenSideBySide,
@@ -390,6 +394,10 @@ function NotesUI({
         onBulkRestore={onBulkRestore}
         onBulkDelete={onBulkDelete}
         onBulkColor={onBulkColor}
+        onBulkSetIcon={onBulkSetIcon}
+        onBulkAddLogoFromFile={onBulkAddLogoFromFile}
+        logoLibrary={logoLibrary}
+        deleteLogoFromLibrary={deleteLogoFromLibrary}
         onBulkPin={onBulkPin}
         onBulkArchive={onBulkArchive}
         onSelectAll={onSelectAll}

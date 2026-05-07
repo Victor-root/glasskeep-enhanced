@@ -9,6 +9,7 @@ import {
   Kebab,
 } from "../../icons/index.jsx";
 import ColorPickerPanel from "../common/ColorPickerPanel.jsx";
+import LogoPickerPopover from "../modal/LogoPickerPopover.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
 
 const EXIT_MS = 200;
@@ -23,6 +24,7 @@ const MENU_COLOR = {
   amber:   { light: "#d97706", dark: "#fbbf24" },
   violet:  { light: "#7c3aed", dark: "#c4b5fd" },
   blue:    { light: "#0284c7", dark: "#7dd3fc" },
+  cyan:    { light: "#0891b2", dark: "#67e8f9" },
   slate:   { light: "#475569", dark: "#cbd5e1" },
   indigo:  { light: "#4f46e5", dark: "#a5b4fc" },
 };
@@ -44,6 +46,8 @@ const TONE = {
     "border-rose-300/80 bg-rose-100 text-rose-700 hover:bg-rose-200 dark:border-rose-400/45 dark:bg-rose-900/55 dark:text-rose-100 dark:hover:bg-rose-800/70",
   green:
     "border-emerald-300/80 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:border-emerald-400/40 dark:bg-emerald-800/55 dark:text-emerald-100 dark:hover:bg-emerald-700/75",
+  cyan:
+    "border-cyan-300/80 bg-cyan-100 text-cyan-800 hover:bg-cyan-200 dark:border-cyan-400/40 dark:bg-cyan-800/55 dark:text-cyan-100 dark:hover:bg-cyan-700/75",
 };
 
 const BTN_BASE =
@@ -67,6 +71,23 @@ const RestoreIconSvg = () => (
   >
     <polyline points="3 8 3 14 9 14" />
     <path d="M3 14a9 9 0 1 0 3-7" />
+  </svg>
+);
+const LogoIconSvg = () => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <rect x="3" y="3" width="18" height="18" rx="3" />
+    <circle cx="8.5" cy="8.5" r="1.7" />
+    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
   </svg>
 );
 const SbsIcon = () => (
@@ -96,6 +117,10 @@ export default function MultiSelectToolbar({
   onBulkRestore,
   onBulkDelete,
   onBulkColor,
+  onBulkSetIcon,
+  onBulkAddLogoFromFile,
+  logoLibrary = [],
+  deleteLogoFromLibrary,
   onBulkPin,
   onBulkArchive,
   onSelectAll,
@@ -114,11 +139,14 @@ export default function MultiSelectToolbar({
   const fixedRef = useRef(null);     // counter cluster — measure
   const closeRef = useRef(null);     // close button — measure
   const multiColorBtnRef = useRef(null); // anchor for the color popover
+  const multiLogoBtnRef = useRef(null);  // anchor for the logo popover
+  const bulkLogoFileRef = useRef(null);  // hidden file input for upload-new
   const moreMenuBtnRef = useRef(null);
   const moreMenuRef = useRef(null);
 
   // ── State ───────────────────────────────────────────────────────
   const [showMultiColorPop, setShowMultiColorPop] = useState(false);
+  const [showLogoPicker, setShowLogoPicker] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [shouldRender, setShouldRender] = useState(multiMode);
   const [exiting, setExiting] = useState(false);
@@ -135,6 +163,12 @@ export default function MultiSelectToolbar({
     // When the menu item unmounts (kebab closes), fall back to the kebab
     // button so the color popover still has a valid anchor.
     multiColorBtnRef.current = el || moreMenuBtnRef.current;
+  }, []);
+  const logoBtnAttachRef = useCallback((el) => {
+    multiLogoBtnRef.current = el;
+  }, []);
+  const logoMenuItemAttachRef = useCallback((el) => {
+    multiLogoBtnRef.current = el || moreMenuBtnRef.current;
   }, []);
 
   // Mount/exit animation lifecycle
@@ -239,6 +273,15 @@ export default function MultiSelectToolbar({
         menuTone: "violet",
         attachRef: colorBtnAttachRef,
       });
+      list.push({
+        id: "logo",
+        label: t("addLogo"),
+        icon: <LogoIconSvg />,
+        onClick: () => setShowLogoPicker((v) => !v),
+        tone: "cyan",
+        menuTone: "cyan",
+        attachRef: logoBtnAttachRef,
+      });
       if (!isArchive) {
         list.push({
           id: "pin",
@@ -293,6 +336,7 @@ export default function MultiSelectToolbar({
     onBulkDownloadZip,
     onSelectAll,
     colorBtnAttachRef,
+    logoBtnAttachRef,
   ]);
 
   // Measure each button via the hidden ghost. Re-runs whenever the action
@@ -528,7 +572,11 @@ export default function MultiSelectToolbar({
                   renderActionButton(action, {
                     menuItem: true,
                     attachRef:
-                      action.id === "color" ? colorMenuItemAttachRef : undefined,
+                      action.id === "color"
+                        ? colorMenuItemAttachRef
+                        : action.id === "logo"
+                          ? logoMenuItemAttachRef
+                          : undefined,
                   })
                 )}
               </div>
@@ -564,6 +612,38 @@ export default function MultiSelectToolbar({
             onBulkColor(name);
           }}
         />
+      )}
+
+      {/* Logo picker popover — same component the modal uses, so the
+          UX is identical: grid of saved logos + dashed "+" upload tile.
+          Hidden file input handles the OS picker for new uploads. */}
+      {!isTrash && (
+        <>
+          <LogoPickerPopover
+            anchorRef={multiLogoBtnRef}
+            open={showLogoPicker}
+            onClose={() => setShowLogoPicker(false)}
+            dark={dark}
+            logos={logoLibrary || []}
+            selectedSrc={undefined}
+            onPickExisting={(logo) => {
+              onBulkSetIcon?.(logo);
+            }}
+            onUploadNew={() => bulkLogoFileRef.current?.click()}
+            onDeleteLogo={deleteLogoFromLibrary}
+          />
+          <input
+            ref={bulkLogoFileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f && onBulkAddLogoFromFile) await onBulkAddLogoFromFile(f);
+            }}
+          />
+        </>
       )}
     </div>
   );

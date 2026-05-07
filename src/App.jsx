@@ -975,6 +975,64 @@ export default function App() {
     }
   };
 
+  // Apply a note-icon (logo) to every selected note. Each note gets its
+  // own fresh image entry (own uid) so they aren't aliasing the same row
+  // — same as the modal's setNoteIconFromFile path.
+  const onBulkSetIcon = async (logo) => {
+    if (!selectedIds.length || !logo?.src) return;
+    const nowIso = new Date().toISOString();
+    const idsSet = new Set(selectedIds.map(String));
+
+    // Compute new images per note synchronously inside the updater so we
+    // can reuse the result for IDB / queue without racing React state.
+    const newImagesByNoteId = {};
+    setNotes((prev) =>
+      prev.map((n) => {
+        const nid = String(n.id);
+        if (!idsSet.has(nid)) return n;
+        const iconEntry = { id: uid(), src: logo.src, name: logo.name };
+        const nextImages = setNoteIcon(n.images, iconEntry);
+        newImagesByNoteId[nid] = nextImages;
+        return { ...n, images: nextImages, updated_at: nowIso, client_updated_at: nowIso };
+      }),
+    );
+
+    for (const id of selectedIds) {
+      const nid = String(id);
+      const newImages = newImagesByNoteId[nid];
+      if (!newImages) continue;
+      const leaseId = acquireLocalLease(nid);
+      try {
+        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
+        if (existing) {
+          await idbPutNote(
+            { ...existing, images: newImages, updated_at: nowIso, client_updated_at: nowIso },
+            currentUser?.id,
+            sessionId,
+          );
+        }
+      } catch (e) { console.error(e); }
+      await enqueueWithLease(
+        nid,
+        { type: "patch", noteId: nid, payload: { images: newImages, client_updated_at: nowIso } },
+        leaseId,
+      );
+    }
+  };
+
+  // Upload a new logo via the OS file picker, register it in the user's
+  // logo library AND apply it to every selected note in one shot.
+  const onBulkAddLogoFromFile = async (file) => {
+    if (!file || !selectedIds.length) return;
+    try {
+      const src = await fileToCompressedDataURL(file);
+      addLogoToLibrary?.({ src, name: file.name });
+      await onBulkSetIcon({ src, name: file.name });
+    } catch (e) {
+      console.error("Bulk logo upload failed", e);
+    }
+  };
+
   const onBulkDownloadZip = async () => {
     try {
       const ids = new Set(selectedIds);
@@ -5514,6 +5572,10 @@ export default function App() {
         onBulkArchive={onBulkArchive}
         onBulkRestore={onBulkRestore}
         onBulkColor={onBulkColor}
+        onBulkSetIcon={onBulkSetIcon}
+        onBulkAddLogoFromFile={onBulkAddLogoFromFile}
+        logoLibrary={logoLibrary}
+        deleteLogoFromLibrary={deleteLogoFromLibrary}
         onBulkDownloadZip={onBulkDownloadZip}
         onSelectAll={onSelectAll}
         onOpenSideBySide={onOpenSideBySide}
