@@ -58,6 +58,7 @@ Compared to the original project, this fork puts more emphasis on:
 - **🗑️ safer note deletion with Trash / restore**
 - **📱 better mobile usability**
 - **✏️ a real WYSIWYG / live-formatting editor for text notes**
+- **🪟 side-by-side note reading and comparison**
 - **🤖 a native Android companion app**
 - **🌍 a cleaner and more extensible i18n foundation**
 - **🛠️ simpler self-hosting**
@@ -286,7 +287,6 @@ Missing keys will automatically fall back to English.
 - More translations with better RTL language support
 - Make the Android app available on **F-Droid**
 - **In-app update notifications** when a new release is available, so a self-hosted instance prompts the user to refresh / pull instead of staying silent
-- **Side-by-side note view** to open two notes at the same time for comparison and cross-referencing
 
 ### 💭 Under consideration
 - *(open — suggestions welcome)*
