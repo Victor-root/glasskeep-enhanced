@@ -886,4 +886,6 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   noteAiChatQuickExplain: "Expliquer",
   noteAiChatQuickSummarizePrompt: "Résume cette note.",
   noteAiChatQuickExplainPrompt: "Explique cette note.",
+  updateAvailable: "disponible",
+  newVersionAvailable: "Nouvelle version disponible : v{version}",
 };

@@ -295,6 +295,7 @@ const noteCipher = require("./encryption/noteCipher");
 const runtimeUnlock = require("./encryption/runtimeUnlockState");
 const { attachUnlockRoutes } = require("./routes/unlockRoutes");
 const { attachPasskeyRoutes } = require("./routes/passkeyRoutes");
+const { attachUpdateRoutes } = require("./routes/updateRoutes");
 const { requireUnlocked } = require("./routes/lockMiddleware");
 
 instanceVault.ensureSchema(db);
@@ -949,6 +950,7 @@ attachUnlockRoutes(app, { db, auth, adminOnly, log: console, broadcastToAll });
 const passkeyVaultModule = require("./encryption/passkeyVault");
 passkeyVaultModule.ensureSchema(db);
 attachPasskeyRoutes(app, { db, auth, adminOnly, signToken, getUserById, log: console });
+attachUpdateRoutes(app, { auth, adminOnly, log: console });
 
 const LOCK_ALLOW_PATHS = [
   /^\/api\/instance(\/|$)/,

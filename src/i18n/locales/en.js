@@ -885,4 +885,6 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   noteAiChatQuickExplain: "Explain",
   noteAiChatQuickSummarizePrompt: "Summarize this note.",
   noteAiChatQuickExplainPrompt: "Explain this note.",
+  updateAvailable: "available",
+  newVersionAvailable: "New version available: v{version}",
 };

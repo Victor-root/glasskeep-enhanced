@@ -9,6 +9,7 @@ import { fileToCompressedDataURL } from "../../utils/helpers.js";
 import TypographyModal from "./TypographyModal.jsx";
 import PasskeySettingsSection from "../settings/PasskeySettingsSection.jsx";
 import UserAiSettingsSection from "../settings/UserAiSettingsSection.jsx";
+import AppVersionLabel from "../common/AppVersionLabel.jsx";
 
 // Single leading-icon component used in front of every section header
 // AND every row / button in the settings panel. Same 36 × 36 indigo
@@ -62,6 +63,7 @@ export default function SettingsPanel({
   onChangePassword,
   encryptionEnabled,
   instanceUnlocked,
+  updateInfo,
 }) {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [overridePositions, setOverridePositions] = useState(true);
@@ -621,9 +623,7 @@ export default function SettingsPanel({
           </div>
 
           <div className="mt-6 pb-1 flex justify-end">
-            <span className="text-xs text-gray-400 dark:text-gray-600 select-none tabular-nums">
-              v{__APP_VERSION__}
-            </span>
+            <AppVersionLabel updateInfo={updateInfo} />
           </div>
         </div>
       </div>
