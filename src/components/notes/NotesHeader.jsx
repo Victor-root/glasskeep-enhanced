@@ -298,7 +298,7 @@ export default function NotesHeader({
                     type="button"
                     onClick={() => openAdminPanel?.()}
                     aria-label={t("newVersionAvailable")}
-                    className={`absolute top-[calc(100%-4px)] left-1/2 -translate-x-1/2 z-20 inline-flex flex-col items-center px-2 whitespace-nowrap cursor-pointer focus:outline-none ${dark ? "text-emerald-400 hover:text-emerald-300" : "text-emerald-600 hover:text-emerald-700"}`}
+                    className={`absolute top-[calc(100%-10px)] left-1/2 -translate-x-1/2 z-20 inline-flex flex-col items-center px-2 whitespace-nowrap cursor-pointer focus:outline-none ${dark ? "text-emerald-400 hover:text-emerald-300" : "text-emerald-600 hover:text-emerald-700"}`}
                   >
                     <svg
                       aria-hidden="true"
@@ -306,7 +306,7 @@ export default function NotesHeader({
                       viewBox="0 0 64 12"
                     >
                       <path
-                        d="M2 10 H28 C29.5 10 30.5 5 32 5 C33.5 5 34.5 10 36 10 H62"
+                        d="M8 10 H28 C29.5 10 30.5 5 32 5 C33.5 5 34.5 10 36 10 H56"
                         stroke="currentColor"
                         fill="none"
                         strokeWidth="1.5"
