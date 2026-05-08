@@ -294,16 +294,22 @@ export default function NotesHeader({
                   )}
                 </button>
                 {hasUpdate && (
-                  <span
+                  <button
+                    type="button"
+                    onClick={() => openAdminPanel?.()}
                     aria-label={t("newVersionAvailable")}
-                    className={`absolute top-full left-1/2 -translate-x-1/2 mt-0.5 z-20 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold leading-none whitespace-nowrap border pointer-events-none ${dark ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-700"}`}
+                    className={`absolute top-full left-1/2 -translate-x-1/2 mt-0.5 z-20 flex flex-col items-center whitespace-nowrap cursor-pointer focus:outline-none ${dark ? "text-emerald-400" : "text-emerald-600"}`}
                   >
-                    <span
-                      aria-hidden="true"
-                      className="absolute -top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-r-[5px] border-b-[5px] border-l-transparent border-r-transparent border-b-emerald-500/30"
-                    />
-                    {t("newVersionAvailable")} !
-                  </span>
+                    {/* line + upward chevron */}
+                    <span aria-hidden="true" className="relative block h-3 w-[200px]">
+                      <span className="absolute left-0 right-[calc(50%+5px)] top-[7px] h-px bg-current opacity-70" />
+                      <span className="absolute left-[calc(50%+5px)] right-0 top-[7px] h-px bg-current opacity-70" />
+                      <span className="absolute left-1/2 top-[2px] w-2.5 h-2.5 -translate-x-1/2 rotate-45 border-l border-t border-current opacity-70" />
+                    </span>
+                    <span className="text-[11px] font-semibold leading-none">
+                      {t("newVersionAvailable")} !
+                    </span>
+                  </button>
                 )}
               </div>
             )}
@@ -415,10 +421,16 @@ export default function NotesHeader({
                           </span>
                         )}
                       </span>
-                      <span className="flex flex-col gap-0.5">
+                      <span className="flex flex-col gap-0">
                         <span>{t("adminPanel")}</span>
                         {hasUpdate && (
-                          <span className={`text-[11px] font-semibold ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
+                          <span className={`flex flex-col text-[11px] font-semibold leading-none ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
+                            {/* line + upward chevron pointing toward "adminPanel" label above */}
+                            <span aria-hidden="true" className="relative block h-3">
+                              <span className="absolute left-0 right-[calc(50%+5px)] top-[7px] h-px bg-current opacity-70" />
+                              <span className="absolute left-[calc(50%+5px)] right-0 top-[7px] h-px bg-current opacity-70" />
+                              <span className="absolute left-1/2 top-[2px] w-2.5 h-2.5 -translate-x-1/2 rotate-45 border-l border-t border-current opacity-70" />
+                            </span>
                             {t("newVersionAvailable")}
                           </span>
                         )}
