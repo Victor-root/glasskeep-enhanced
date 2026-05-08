@@ -300,11 +300,21 @@ export default function NotesHeader({
                     aria-label={t("newVersionAvailable")}
                     className={`absolute top-[calc(100%+2px)] left-1/2 -translate-x-1/2 z-20 inline-flex flex-col items-center px-2 whitespace-nowrap cursor-pointer focus:outline-none ${dark ? "text-emerald-400 hover:text-emerald-300" : "text-emerald-600 hover:text-emerald-700"}`}
                   >
-                    <span aria-hidden="true" className="relative block h-2 w-full mb-0.5 opacity-80">
-                      <span className="absolute left-0 top-[5px] h-px w-[calc(50%-7px)] bg-current" />
-                      <span className="absolute right-0 top-[5px] h-px w-[calc(50%-7px)] bg-current" />
-                      <span className="absolute left-1/2 top-[2px] h-2 w-2 -translate-x-1/2 rotate-45 border-l border-t border-current bg-transparent" />
-                    </span>
+                    <svg
+                      aria-hidden="true"
+                      className="mb-0.5 h-3 w-full overflow-visible opacity-80"
+                      viewBox="0 0 100 12"
+                      preserveAspectRatio="none"
+                    >
+                      <path
+                        d="M1 10 H42 C46 10 47 3 50 3 C53 3 54 10 58 10 H99"
+                        stroke="currentColor"
+                        fill="none"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
                     <span className="text-[11px] font-semibold leading-none">
                       {t("newVersionAvailable")} !
                     </span>
