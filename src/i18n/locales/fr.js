@@ -887,6 +887,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   noteAiChatQuickSummarizePrompt: "Résume cette note.",
   noteAiChatQuickExplainPrompt: "Explique cette note.",
   updateAvailable: "disponible",
+  newVersionAvailable: "Nouvelle version disponible",
   appVersionSectionTitle: "Version de l'application",
   updateUpToDateDescription: "Vous êtes à jour.",
   updateAvailableDescription:

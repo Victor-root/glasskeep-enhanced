@@ -273,36 +273,41 @@ export default function NotesHeader({
             </button>
             <span className={`mx-1 w-px h-5 ${dark ? "bg-gray-600" : "bg-gray-300"}`} />
             {currentUser?.is_admin && (
-              <button
-                onClick={() => openAdminPanel?.()}
-                className={`relative cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
-                  hasUpdate
-                    ? `flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-xl ${dark ? "text-red-400 hover:text-red-300 hover:bg-red-500/15 focus:ring-red-500" : "text-red-600 hover:text-red-700 hover:bg-red-100 focus:ring-red-400"}`
-                    : `p-2 rounded-full ${dark ? "text-red-400 hover:text-red-300 hover:bg-red-500/15 focus:ring-red-500" : "text-red-600 hover:text-red-700 hover:bg-red-100 focus:ring-red-400"}`
-                }`}
-                data-tooltip={hasUpdate ? t("updateAvailable") : t("adminPanel")}
-                aria-label={t("adminPanel")}
-              >
-                <span className="relative inline-flex">
+              <div className="relative flex items-center justify-center">
+                <button
+                  onClick={() => openAdminPanel?.()}
+                  className={`relative p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-red-400 hover:text-red-300 hover:bg-red-500/15 focus:ring-red-500" : "text-red-600 hover:text-red-700 hover:bg-red-100 focus:ring-red-400"}`}
+                  data-tooltip={t("adminPanel")}
+                  aria-label={t("adminPanel")}
+                >
                   <ShieldIcon />
                   {hasUpdate && (
                     <span
                       aria-hidden="true"
-                      className="absolute top-0.5 right-0.5 flex items-center justify-center"
+                      className="absolute top-1 right-1 flex items-center justify-center"
                     >
-                      <span className="absolute inline-flex w-2 h-2 rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                      <span className="absolute inline-flex w-2.5 h-2.5 rounded-full bg-emerald-400 opacity-75 animate-ping" />
                       <span
-                        className={`relative inline-flex w-2 h-2 rounded-full bg-emerald-500 ring-2 ${dark ? "ring-gray-800" : "ring-white"}`}
+                        className={`relative inline-flex w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ${dark ? "ring-gray-800" : "ring-white"}`}
                       />
                     </span>
                   )}
-                </span>
+                </button>
                 {hasUpdate && (
-                  <span className="text-[10px] font-semibold leading-none text-emerald-500 dark:text-emerald-400 whitespace-nowrap">
-                    {t("updateAvailable")}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => openAdminPanel?.()}
+                    className={`absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-20 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold leading-none whitespace-nowrap border cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400 ${dark ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/20"}`}
+                    aria-label={t("newVersionAvailable")}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`absolute -top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-r-[5px] border-b-[5px] border-l-transparent border-r-transparent ${dark ? "border-b-emerald-500/30" : "border-b-emerald-500/30"}`}
+                    />
+                    {t("newVersionAvailable")}
+                  </button>
                 )}
-              </button>
+              </div>
             )}
             <span className="flex items-center gap-2">
               <UserAvatar

@@ -886,6 +886,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   noteAiChatQuickSummarizePrompt: "Summarize this note.",
   noteAiChatQuickExplainPrompt: "Explain this note.",
   updateAvailable: "available",
+  newVersionAvailable: "New version available",
   appVersionSectionTitle: "App version",
   updateUpToDateDescription: "You are running the latest version.",
   updateAvailableDescription:
