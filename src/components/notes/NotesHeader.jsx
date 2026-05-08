@@ -294,11 +294,8 @@ export default function NotesHeader({
                   )}
                 </button>
                 {hasUpdate && (
-                  <button
-                    type="button"
-                    onClick={() => openAdminPanel?.()}
-                    aria-label={t("newVersionAvailable")}
-                    className={`absolute top-[calc(100%-10px)] left-1/2 -translate-x-1/2 z-20 inline-flex flex-col items-center px-2 whitespace-nowrap cursor-pointer focus:outline-none ${dark ? "text-emerald-400 hover:text-emerald-300" : "text-emerald-600 hover:text-emerald-700"}`}
+                  <span
+                    className={`absolute top-[calc(100%-10px)] left-1/2 -translate-x-1/2 z-20 inline-flex flex-col items-center px-2 whitespace-nowrap pointer-events-none ${dark ? "text-emerald-400" : "text-emerald-600"}`}
                   >
                     <svg
                       aria-hidden="true"
@@ -317,7 +314,7 @@ export default function NotesHeader({
                     <span className="text-[11px] font-semibold leading-none">
                       {t("newVersionAvailable")} !
                     </span>
-                  </button>
+                  </span>
                 )}
               </div>
             )}
