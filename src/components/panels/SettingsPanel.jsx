@@ -619,6 +619,12 @@ export default function SettingsPanel({
               </div>
             </div>
           </div>
+
+          <div className="mt-6 pb-1 flex justify-end">
+            <span className="text-xs text-gray-400 dark:text-gray-600 select-none tabular-nums">
+              v{__APP_VERSION__}
+            </span>
+          </div>
         </div>
       </div>
 
