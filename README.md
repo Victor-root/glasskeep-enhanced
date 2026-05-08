@@ -176,7 +176,11 @@ This fork also keeps the main capabilities that already made the original projec
 
 A native Android companion app is available for GlassKeep, making self-hosted mobile usage more convenient.
 
-**Download:** see the [Releases](https://github.com/Victor-root/glasskeep-enhanced/releases) page
+The Android app is a WebView wrapper for GlassKeep Enhanced and does not necessarily change with every project release.
+
+[Download latest Android APK](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.0.0/GlassKeep-v1.0.10.apk)
+
+Current APK version: `1.0.10`
 
 > The Android source code is available in the `android/` directory.
 
