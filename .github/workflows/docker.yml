@@ -2,19 +2,8 @@ name: Build and publish Docker image
 
 on:
   push:
-    branches: [main]
-    tags: ['v*']
-    paths-ignore:
-      - 'README.md'
-      - 'AI_CHANGES.md'
-      - 'IMPROVEMENTS.md'
-      - 'SECURITY.md'
-      - 'CHANGELOG.md'
-      - 'android/**'
-      - 'install.sh'
-      - 'LICENSE'
-      - '.gitignore'
-      - '.editorconfig'
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
 
 concurrency:
@@ -60,11 +49,11 @@ jobs:
         with:
           images: ${{ steps.img.outputs.name }}
           tags: |
-            type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
             type=sha,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Build and push
         uses: docker/build-push-action@v7
