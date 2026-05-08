@@ -294,18 +294,16 @@ export default function NotesHeader({
                   )}
                 </button>
                 {hasUpdate && (
-                  <button
-                    type="button"
-                    onClick={() => openAdminPanel?.()}
-                    className={`absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-20 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold leading-none whitespace-nowrap border cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400 ${dark ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/20"}`}
+                  <span
                     aria-label={t("newVersionAvailable")}
+                    className={`absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-20 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold leading-none whitespace-nowrap border pointer-events-none ${dark ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-700"}`}
                   >
                     <span
                       aria-hidden="true"
-                      className={`absolute -top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-r-[5px] border-b-[5px] border-l-transparent border-r-transparent ${dark ? "border-b-emerald-500/30" : "border-b-emerald-500/30"}`}
+                      className="absolute -top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-r-[5px] border-b-[5px] border-l-transparent border-r-transparent border-b-emerald-500/30"
                     />
                     {t("newVersionAvailable")}
-                  </button>
+                  </span>
                 )}
               </div>
             )}
@@ -338,12 +336,18 @@ export default function NotesHeader({
             <button
               ref={headerBtnRef}
               onClick={() => setHeaderMenuOpen((v) => !v)}
-              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
+              className="relative p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
               data-tooltip={t("menu")}
               aria-haspopup="menu"
               aria-expanded={headerMenuOpen}
             >
               <Kebab />
+              {hasUpdate && currentUser?.is_admin && (
+                <span aria-hidden="true" className="absolute top-1 right-1 flex items-center justify-center">
+                  <span className="absolute inline-flex w-2.5 h-2.5 rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                  <span className={`relative inline-flex w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ${dark ? "ring-gray-800" : "ring-white"}`} />
+                </span>
+              )}
             </button>
 
             {headerMenuOpen && (
@@ -396,13 +400,31 @@ export default function NotesHeader({
                     <span className={dark ? "text-violet-400" : "text-violet-600"}><CheckSquareIcon /></span>{t("multiSelect")}</button>
                   {currentUser?.is_admin && (
                     <button
-                      className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                      className={`flex items-start gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                       onClick={() => {
                         setHeaderMenuOpen(false);
                         openAdminPanel?.();
                       }}
                     >
-                      <span className={dark ? "text-red-400" : "text-red-600"}><ShieldIcon /></span>{t("adminPanel")}</button>
+                      <span className={`relative mt-0.5 shrink-0 ${dark ? "text-red-400" : "text-red-600"}`}>
+                        <ShieldIcon />
+                        {hasUpdate && (
+                          <span aria-hidden="true" className="absolute top-0 right-0 flex items-center justify-center">
+                            <span className="absolute inline-flex w-2 h-2 rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                            <span className={`relative inline-flex w-2 h-2 rounded-full bg-emerald-500 ring-2 ${dark ? "ring-[#222222]" : "ring-white"}`} />
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex flex-col gap-0.5">
+                        <span>{t("adminPanel")}</span>
+                        {hasUpdate && (
+                          <span className={`flex items-center gap-0.5 text-[11px] font-semibold ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
+                            <span aria-hidden="true" className="w-0 h-0 border-t-[4px] border-b-[4px] border-r-[5px] border-t-transparent border-b-transparent border-r-current" />
+                            {t("newVersionAvailable")}
+                          </span>
+                        )}
+                      </span>
+                    </button>
                   )}
                   <button
                     className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
