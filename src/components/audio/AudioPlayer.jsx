@@ -359,9 +359,7 @@ function HeroLayout({
         </div>
 
         {showActionRow && (
-          // flex-wrap so the two pills break onto separate lines on very
-          // narrow screens (≤320px) instead of overflowing the player card.
-          <div className="w-full flex flex-wrap items-center justify-center gap-2">
+          <div className="w-full flex items-center justify-center gap-2">
             {showDownload && audio?.audioDataUrl && (
               <DownloadMenu audio={audio} title={title} />
             )}
@@ -370,11 +368,21 @@ function HeroLayout({
                 type="button"
                 onClick={onAddRecording}
                 aria-label={addRecordingLabel || t("audioAddRecording")}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 bg-white/70 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-black/10 dark:border-white/15 shadow-sm hover:shadow-md hover:scale-[1.03] active:scale-[0.98]"
+                data-tooltip={addRecordingLabel || t("audioAddRecording")}
+                className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full border border-black/10 dark:border-white/15 bg-white/70 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 shadow-sm hover:shadow-md hover:scale-[1.03] active:scale-[0.98] transition focus:outline-none focus:ring-2"
                 style={{ color: `var(--audio-accent, ${FALLBACK_ACCENT})` }}
               >
-                <MicIcon />
-                <span>{addRecordingLabel || t("audioAddRecording")}</span>
+                <span className="relative inline-flex items-center justify-center">
+                  <MicIcon className="w-4 h-4" />
+                  <svg
+                    viewBox="0 0 8 8"
+                    className="absolute -top-2 -right-2 w-3 h-3"
+                    aria-hidden="true"
+                  >
+                    <circle cx="4" cy="4" r="4" fill="currentColor" />
+                    <path d="M4 2v4M2 4h4" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </span>
               </button>
             )}
           </div>
