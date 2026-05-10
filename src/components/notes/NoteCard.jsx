@@ -11,6 +11,8 @@ import { getSections, isItem, countItems, countChecked, DEFAULT_SECTION_ID } fro
 import { getNoteIcon, getContentImages } from "../../utils/noteIcon.js";
 import NoteCardFooter from "./NoteCardFooter.jsx";
 import { SECTION_COLORS, hexAlpha } from "../checklist/SectionHeader.jsx";
+import AudioPlayer from "../audio/AudioPlayer.jsx";
+import { parseAudioContent } from "../../utils/audioNote.js";
 
 export default function NoteCard({
   n,
@@ -37,7 +39,9 @@ export default function NoteCard({
 }) {
   const isChecklist = n.type === "checklist";
   const isDraw = n.type === "draw";
+  const isAudio = n.type === "audio";
   const MAX_CHARS = 350;
+  const audioMeta = useMemo(() => (isAudio ? parseAudioContent(n.content) : null), [isAudio, n.content]);
 
   // Compute the preview HTML for text notes. We first turn whatever is in
   // `content` (rich JSON or legacy Markdown) into plain text for the length
@@ -292,7 +296,15 @@ export default function NoteCard({
         </div>
       )}
 
-      {!isChecklist && !isDraw ? (
+      {isAudio ? (
+        audioMeta ? (
+          <AudioPlayer audio={audioMeta} title={n.title} variant="card" />
+        ) : (
+          <div className="text-xs italic text-gray-500 dark:text-gray-400">
+            {t("audioRecordingEmpty")}
+          </div>
+        )
+      ) : !isChecklist && !isDraw ? (
         <div
           className="text-sm break-words whitespace-pre-wrap overflow-hidden note-content note-content--dense"
           style={{ maxHeight: "280px" }}

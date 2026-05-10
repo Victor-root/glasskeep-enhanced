@@ -39,6 +39,7 @@ export default function NotesComposer({
   onDirectDraw,
   onDirectText,
   onDirectChecklist,
+  onDirectAudio,
   fabOpen,
   setFabOpen,
   isDesktop,
@@ -170,6 +171,7 @@ export default function NotesComposer({
               onCreateText={onDirectText}
               onCreateChecklist={onDirectChecklist}
               onCreateDraw={onDirectDraw}
+              onCreateAudio={onDirectAudio}
             />
           ) : !multiMode ? (
             <MobileCreateFab
@@ -178,6 +180,7 @@ export default function NotesComposer({
               onCreateText={onDirectText}
               onCreateChecklist={onDirectChecklist}
               onCreateDraw={onDirectDraw}
+              onCreateAudio={onDirectAudio}
             />
           ) : null}
         </div>

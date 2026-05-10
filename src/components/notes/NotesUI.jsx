@@ -47,6 +47,7 @@ function NotesUI({
   onDirectDraw,
   onDirectText,
   onDirectChecklist,
+  onDirectAudio,
   pinned,
   others,
   openModal,
@@ -321,6 +322,7 @@ function NotesUI({
         onDirectDraw={onDirectDraw}
         onDirectText={onDirectText}
         onDirectChecklist={onDirectChecklist}
+        onDirectAudio={onDirectAudio}
         fabOpen={fabOpen}
         setFabOpen={setFabOpen}
         isDesktop={windowWidth >= 700 && !isLandscapeMobile}

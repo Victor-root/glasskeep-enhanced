@@ -62,6 +62,8 @@ import ToastContainer from "./components/common/ToastContainer.jsx";
 import FloatingCardsBackground from "./components/common/FloatingCardsBackground.jsx";
 import NoteModal from "./components/modal/NoteModal.jsx";
 import SecondaryNoteInstance from "./components/modal/SecondaryNoteInstance.jsx";
+import AudioRecorderModal from "./components/audio/AudioRecorderModal.jsx";
+import { serializeAudioContent } from "./utils/audioNote.js";
 import useModalState from "./hooks/useModalState.js";
 import useDraftNote from "./hooks/useDraftNote.js";
 import useAdminActions from "./hooks/useAdminActions.js";
@@ -1151,6 +1153,9 @@ export default function App() {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   // FAB open state (lifted for Android back button support)
   const [fabOpen, setFabOpen] = useState(false);
+  // Audio recorder modal — separate flow from the deferred-draft create path
+  // (audio always materialises from a real recording, not a blank modal).
+  const [audioRecorderOpen, setAudioRecorderOpen] = useState(false);
 
 
   useEffect(() => {
@@ -3565,6 +3570,72 @@ export default function App() {
     getInitialTags: getInitialTagsForNewNote,
   });
 
+  // Audio note create flow. Audio doesn't fit the deferred-draft pattern
+  // (no recording → no note), so we materialise the note directly on save
+  // from AudioRecorderModal. Mirrors useDraftNote.materializeDraftIfNeeded
+  // for the persistence steps so sync/IDB/state all stay aligned.
+  const handleDirectAudio = useCallback(() => {
+    setFabOpen(false);
+    setAudioRecorderOpen(true);
+  }, []);
+  const handleSaveAudioNote = useCallback(
+    async ({ title, audioDataUrl, mimeType, duration, size }) => {
+      const id = uid();
+      const nowIso = new Date().toISOString();
+      const initialTags = getInitialTagsForNewNote() || [];
+      const content = serializeAudioContent({
+        audioDataUrl,
+        mimeType,
+        duration,
+        size,
+      });
+      const newNote = {
+        id,
+        type: "audio",
+        title: (title || "").trim(),
+        content,
+        items: [],
+        tags: initialTags,
+        images: [],
+        color: "default",
+        pinned: false,
+        position: Date.now(),
+        timestamp: nowIso,
+        updated_at: nowIso,
+        client_updated_at: nowIso,
+      };
+      const localNote = {
+        ...newNote,
+        user_id: currentUser?.id,
+        archived: false,
+        trashed: false,
+      };
+      const leaseId = acquireLocalLease(String(id));
+      try {
+        await idbPutNote(localNote, currentUser?.id, sessionId);
+      } catch (e) {
+        console.error("IndexedDB put failed for audio note:", e);
+      }
+      setNotes((prev) =>
+        sortNotesByRecency([localNote, ...(Array.isArray(prev) ? prev : [])]),
+      );
+      invalidateNotesCache();
+      await enqueueWithLease(
+        String(id),
+        { type: "create", noteId: id, payload: newNote },
+        leaseId,
+      );
+      setAudioRecorderOpen(false);
+    },
+    [
+      acquireLocalLease,
+      enqueueWithLease,
+      currentUser,
+      sessionId,
+      getInitialTagsForNewNote,
+    ],
+  );
+
   const openModal = (id) => {
     const n = notes.find((x) => String(x.id) === String(id));
     if (!n) return;
@@ -5598,6 +5669,7 @@ export default function App() {
         onDirectDraw={handleDirectDraw}
         onDirectText={handleDirectText}
         onDirectChecklist={handleDirectChecklist}
+        onDirectAudio={handleDirectAudio}
         pinned={pinned}
         others={others}
         openModal={openModal}
@@ -5774,6 +5846,13 @@ export default function App() {
       />
 
       <ToastContainer toasts={toasts} />
+
+      <AudioRecorderModal
+        open={audioRecorderOpen}
+        dark={dark}
+        onClose={() => setAudioRecorderOpen(false)}
+        onSave={handleSaveAudioNote}
+      />
 
       {/* Forced password change (first login with temp password) */}
       {mustChangePassword && (

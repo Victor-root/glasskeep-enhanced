@@ -27,6 +27,8 @@ import RichTextEditor from "../richtext/RichTextEditor.jsx";
 import { contentToHTML, serializeRichContent, isRichContent } from "../../utils/richText.js";
 import { modalBgFor, scrollColorsFor, solid, bgFor, toHex } from "../../utils/colors.js";
 import { setThemeColor } from "../../utils/helpers.js";
+import AudioPlayer from "../audio/AudioPlayer.jsx";
+import { parseAudioContent } from "../../utils/audioNote.js";
 
 export default function NoteModal({
   // visibility / animation
@@ -666,8 +668,10 @@ export default function NoteModal({
               onClick={onModalBodyClick}
             >
 
-              {/* Text, Checklist, or Drawing */}
-              {mType === "text" ? (
+              {/* Text, Checklist, Drawing, or Audio */}
+              {mType === "audio" ? (
+                <AudioNoteBody body={mBody} title={mTitle} />
+              ) : mType === "text" ? (
                 viewMode ? (
                   <NoteViewContent html={viewHtml} noteViewRef={noteViewRef} />
                 ) : (
@@ -1034,5 +1038,21 @@ export default function NoteModal({
         );
       })()}
     </>
+  );
+}
+
+function AudioNoteBody({ body, title }) {
+  const audio = React.useMemo(() => parseAudioContent(body), [body]);
+  if (!audio) {
+    return (
+      <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+        {t("audioRecordingEmpty")}
+      </div>
+    );
+  }
+  return (
+    <div className="py-4">
+      <AudioPlayer audio={audio} title={title} variant="full" />
+    </div>
   );
 }

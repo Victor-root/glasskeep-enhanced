@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { t } from "../../i18n";
-import { TextNoteIcon, ChecklistIcon, BrushIcon } from "../../icons/index.jsx";
+import { TextNoteIcon, ChecklistIcon, BrushIcon, MicIcon } from "../../icons/index.jsx";
 
 export default function MobileCreateFab({
   open,
@@ -8,6 +8,7 @@ export default function MobileCreateFab({
   onCreateText,
   onCreateChecklist,
   onCreateDraw,
+  onCreateAudio,
 }) {
   const containerRef = useRef(null);
 
@@ -70,6 +71,15 @@ export default function MobileCreateFab({
             : "opacity-0 translate-y-3 pointer-events-none"
         }`}
       >
+        <FabDialButton
+          onClick={pick(onCreateAudio)}
+          label={t("audioNote")}
+          title={t("audioNote")}
+          description={t("audioNoteDesc")}
+          icon={<MicIcon />}
+          colorClasses="border-fuchsia-300 bg-gradient-to-br from-fuchsia-200 to-pink-300 text-fuchsia-900 dark:from-fuchsia-800 dark:to-pink-900 dark:border-fuchsia-500 dark:text-fuchsia-50"
+          iconBg="bg-white/85 text-fuchsia-600 dark:bg-fuchsia-950/50 dark:text-fuchsia-100"
+        />
         <FabDialButton
           onClick={pick(onCreateDraw)}
           label={t("drawing")}

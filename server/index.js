@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS notes (
   id TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL,
-  type TEXT NOT NULL,          -- "text" | "checklist"
+  type TEXT NOT NULL,          -- "text" | "checklist" | "draw" | "audio"
   title TEXT NOT NULL,
   content TEXT NOT NULL,       -- for text notes
   items_json TEXT NOT NULL,    -- JSON array for checklist items
@@ -389,6 +389,45 @@ function isNewerOrEqual(incomingMs, storedTs) {
   const storedParsed = parseIsoTimestamp(storedTs);
   if (!storedParsed) return true;   // stored is corrupt → accept to fix it
   return incomingMs >= storedParsed.ms;
+}
+
+// Audio note validation. The audio payload is stored as JSON inside `content`
+// (same shape as drawing notes): { audioDataUrl, mimeType, duration, size, … }.
+// We cap the encoded data URL at 16 MB to keep below the 20 MB body limit
+// and reject MIME types that aren't audio. Returns null if valid, otherwise
+// an error message string for a 400 response.
+const AUDIO_MAX_DATAURL_BYTES = 16 * 1024 * 1024;
+const ALLOWED_AUDIO_MIME_PREFIXES = [
+  "audio/webm",
+  "audio/ogg",
+  "audio/mp4",
+  "audio/mpeg",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/aac",
+];
+function validateAudioContent(raw) {
+  if (typeof raw !== "string" || !raw) return "Audio note has no content";
+  if (raw.length > AUDIO_MAX_DATAURL_BYTES) return "Audio recording is too large";
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return "Audio note content is not valid JSON";
+  }
+  if (!parsed || typeof parsed !== "object") {
+    return "Audio note content is not an object";
+  }
+  const url = parsed.audioDataUrl;
+  if (typeof url !== "string" || !url.startsWith("data:")) {
+    return "Audio note is missing an audio data URL";
+  }
+  const mimeMatch = url.match(/^data:([^;,]+)[;,]/);
+  const mime = (mimeMatch ? mimeMatch[1] : "").toLowerCase();
+  if (!ALLOWED_AUDIO_MIME_PREFIXES.some((p) => mime.startsWith(p))) {
+    return "Unsupported audio MIME type";
+  }
+  return null;
 }
 
 // Serialize a DB row into the canonical JSON note object returned by all endpoints.
@@ -1278,12 +1317,21 @@ app.post("/api/notes", auth, (req, res) => {
   const parsedClientTs = parseIsoTimestamp(rawClientTs);
   const clientTs = parsedClientTs ? parsedClientTs.iso : nowISO();
   const userTags = JSON.stringify(Array.isArray(body.tags) ? body.tags : []);
+  const normalizedType =
+    body.type === "checklist" ? "checklist"
+      : body.type === "draw" ? "draw"
+        : body.type === "audio" ? "audio"
+          : "text";
+  if (normalizedType === "audio") {
+    const err = validateAudioContent(String(body.content || ""));
+    if (err) return res.status(400).json({ error: err });
+  }
   const n = {
     id: noteId,
     user_id: req.user.id,
-    type: body.type === "checklist" ? "checklist" : body.type === "draw" ? "draw" : "text",
+    type: normalizedType,
     title: String(body.title || ""),
-    content: body.type === "checklist" ? "" : String(body.content || ""),
+    content: normalizedType === "checklist" ? "" : String(body.content || ""),
     items_json: JSON.stringify(Array.isArray(body.items) ? body.items : []),
     tags_json: "[]",
     images_json: JSON.stringify(Array.isArray(body.images) ? body.images : []),
@@ -1335,12 +1383,21 @@ app.put("/api/notes/:id", auth, (req, res) => {
   if (Array.isArray(b.tags)) {
     runUpsertUserTags(id, req.user.id, JSON.stringify(b.tags));
   }
+  const updatedType =
+    b.type === "checklist" ? "checklist"
+      : b.type === "draw" ? "draw"
+        : b.type === "audio" ? "audio"
+          : "text";
+  if (updatedType === "audio") {
+    const err = validateAudioContent(String(b.content || ""));
+    if (err) return res.status(400).json({ error: err });
+  }
   const updated = {
     id,
     user_id: req.user.id,
-    type: b.type === "checklist" ? "checklist" : b.type === "draw" ? "draw" : "text",
+    type: updatedType,
     title: String(b.title || ""),
-    content: b.type === "checklist" ? "" : String(b.content || ""),
+    content: updatedType === "checklist" ? "" : String(b.content || ""),
     items_json: JSON.stringify(Array.isArray(b.items) ? b.items : []),
     tags_json: existing.tags_json,
     images_json: JSON.stringify(Array.isArray(b.images) ? b.images : []),
@@ -1413,6 +1470,16 @@ app.patch("/api/notes/:id", auth, (req, res) => {
   // Save tags to per-user table (not on the note itself)
   if (Array.isArray(req.body.tags)) {
     runUpsertUserTags(id, req.user.id, JSON.stringify(req.body.tags));
+  }
+  // Audio content patches must still pass the same shape/size guards as
+  // creates and full updates — otherwise a malicious client could rewrite
+  // the audio_data of an existing audio note with anything.
+  if (
+    typeof req.body.content === "string" &&
+    existing.type === "audio"
+  ) {
+    const err = validateAudioContent(String(req.body.content));
+    if (err) return res.status(400).json({ error: err });
   }
   const p = {
     id,
@@ -2177,12 +2244,21 @@ app.post("/api/notes/import", auth, (req, res) => {
         const id = existing.has(String(n.id)) ? uid() : String(n.id);
         existing.add(id);
         const importedTags = JSON.stringify(Array.isArray(n.tags) ? n.tags : []);
+        const importedType =
+          n.type === "checklist" ? "checklist"
+            : n.type === "draw" ? "draw"
+              : n.type === "audio" ? "audio"
+                : "text";
+        if (importedType === "audio") {
+          const audioErr = validateAudioContent(String(n.content || ""));
+          if (audioErr) { skipped++; continue; }
+        }
         runInsertNote({
           id,
           user_id: req.user.id,
-          type: n.type === "checklist" ? "checklist" : n.type === "draw" ? "draw" : "text",
+          type: importedType,
           title: String(n.title || ""),
-          content: n.type === "checklist" ? "" : String(n.content || ""),
+          content: importedType === "checklist" ? "" : String(n.content || ""),
           items_json: JSON.stringify(Array.isArray(n.items) ? n.items : []),
           tags_json: "[]",
           images_json: JSON.stringify(Array.isArray(n.images) ? n.images : []),
