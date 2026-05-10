@@ -436,21 +436,23 @@ export default function NotesHeader({
                         <span>{t("adminPanel")}</span>
                         {hasUpdate && (
                           <span className={`flex flex-col items-center text-[11px] font-semibold leading-none ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
-                            <svg
-                              aria-hidden="true"
-                              className="h-3 self-stretch opacity-80"
-                              viewBox="0 0 64 12"
-                              preserveAspectRatio="none"
-                            >
-                              <path
-                                d="M2 10 H28 C30 10 31 5 32 5 C33 5 34 10 36 10 H62"
-                                stroke="currentColor"
-                                fill="none"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
+                            <span aria-hidden="true" className="self-stretch flex items-end h-3 opacity-80">
+                              <span className="flex-1 h-px bg-current mb-[1px]" />
+                              <svg
+                                className="h-3 w-2 shrink-0"
+                                viewBox="0 0 8 12"
+                              >
+                                <path
+                                  d="M0 10 C2 10 3 5 4 5 C5 5 6 10 8 10"
+                                  stroke="currentColor"
+                                  fill="none"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                              <span className="flex-1 h-px bg-current mb-[1px]" />
+                            </span>
                             <span>{t("newVersionAvailable")} !</span>
                           </span>
                         )}
