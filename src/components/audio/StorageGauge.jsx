@@ -89,6 +89,10 @@ export default function StorageGauge({
   usedBytes = 0,
   maxBytes = AUDIO_MAX_TOTAL_BYTES,
   live = false,
+  // "ring": compact "Stockage ●" pill used in the modal bottom row.
+  // "bar":  wider linear bar used inside the RecorderPanel where the live
+  //         fill reads better against a vertical stack of timer + status.
+  variant = "ring",
   className = "",
 }) {
   const [open, setOpen] = useState(false);
@@ -99,6 +103,28 @@ export default function StorageGauge({
 
   return (
     <div className={`relative ${className}`}>
+      {variant === "bar" ? (
+        <button
+          ref={btnRef}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((v) => !v);
+          }}
+          className={`w-full group flex items-center gap-2 px-2 py-1 rounded-md transition-colors hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-current/30 ${pct >= 90 ? zone.text : "text-gray-600 dark:text-gray-300"}`}
+          aria-label={t("audioStorageGaugeLabel").replace("{pct}", String(pct))}
+          data-tooltip={t("audioStorageTooltip")}
+        >
+          <span className="text-[11px] font-medium shrink-0">{t("audioStorageLabel")}</span>
+          <div className="flex-1 h-1.5 rounded-full bg-black/10 dark:bg-white/15 overflow-hidden relative">
+            <div
+              className={`h-full rounded-full bg-gradient-to-r transition-[width] duration-300 ease-out ${zone.fill} ${live ? "animate-pulse" : ""}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span className="text-[11px] tabular-nums font-semibold shrink-0">{pct}%</span>
+        </button>
+      ) : (
       <button
         ref={btnRef}
         type="button"
@@ -113,6 +139,7 @@ export default function StorageGauge({
         <span>{t("audioStorageLabel")}</span>
         <CircularRing pct={pct} color={zone.ring} live={live} />
       </button>
+      )}
 
       <Popover anchorRef={btnRef} open={open} onClose={() => setOpen(false)}>
         <div

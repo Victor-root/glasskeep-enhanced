@@ -359,6 +359,7 @@ function RecorderPanel({ onCancel, onSave, existingTotalBytes = 0 }) {
         <StorageGauge
           usedBytes={existingTotalBytes + recorder.currentBytes}
           live={isRecording}
+          variant="bar"
         />
       </div>
 
