@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Disable both cloud backup and device-to-device transfer.
+     GlassKeep stores authentication tokens, cookies, and cached notes
+     in WebView storage and SharedPreferences. Restoring those on a
+     fresh install or a new device leaks the user's session and data
+     in a way that is unexpected coming from a privacy-focused note app. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

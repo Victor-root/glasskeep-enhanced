@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-Android 12 fallback for fullBackupContent. With allowBackup=false
+     this should never be consulted, but we keep an explicit empty rule set
+     so any forced backup tool (adb) sees that nothing is whitelisted. -->
+<full-backup-content>
+    <exclude domain="root" />
+    <exclude domain="file" />
+    <exclude domain="database" />
+    <exclude domain="sharedpref" />
+    <exclude domain="external" />
+</full-backup-content>
