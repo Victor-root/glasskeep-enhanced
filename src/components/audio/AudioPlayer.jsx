@@ -369,19 +369,23 @@ function HeroLayout({
                 onClick={onAddRecording}
                 aria-label={addRecordingLabel || t("audioAddRecording")}
                 data-tooltip={addRecordingLabel || t("audioAddRecording")}
-                className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full border border-black/10 dark:border-white/15 bg-white/70 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 shadow-sm hover:shadow-md hover:scale-[1.03] active:scale-[0.98] transition focus:outline-none focus:ring-2"
+                className="shrink-0 inline-flex items-center justify-center border border-black/10 dark:border-white/15 bg-white/70 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 shadow-sm hover:shadow-md hover:scale-[1.03] active:scale-[0.98] transition focus:outline-none focus:ring-2
+                  w-10 h-10 rounded-full
+                  sm:w-auto sm:h-auto sm:rounded-full sm:px-4 sm:py-2 sm:gap-2"
                 style={{ color: `var(--audio-accent, ${FALLBACK_ACCENT})` }}
               >
-                <span className="relative inline-flex items-center justify-center">
+                {/* Mobile: mic + '+' badge */}
+                <span className="relative inline-flex items-center justify-center sm:hidden">
                   <MicIcon className="w-4 h-4" />
-                  <svg
-                    viewBox="0 0 8 8"
-                    className="absolute -top-2 -right-2 w-3 h-3"
-                    aria-hidden="true"
-                  >
+                  <svg viewBox="0 0 8 8" className="absolute -top-2 -right-2 w-3 h-3" aria-hidden="true">
                     <circle cx="4" cy="4" r="4" fill="currentColor" />
                     <path d="M4 2v4M2 4h4" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
+                </span>
+                {/* Desktop: mic + label */}
+                <MicIcon className="hidden sm:block w-4 h-4" />
+                <span className="hidden sm:block text-sm font-semibold">
+                  {addRecordingLabel || t("audioAddRecording")}
                 </span>
               </button>
             )}
