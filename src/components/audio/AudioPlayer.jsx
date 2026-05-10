@@ -402,13 +402,7 @@ function NavButton({ direction, onClick, disabled, ariaLabel }) {
 }
 
 function PlayGlyph({ large = false }) {
-  // Optical centring inside the circular play button. We avoid `ml-*`
-  // (which alters layout) and use a purely visual translate instead.
-  return (
-    <PlayFilledIcon
-      className={large ? "w-7 h-7 translate-x-0.5" : "w-4 h-4 translate-x-px"}
-    />
-  );
+  return <PlayFilledIcon className={large ? "w-7 h-7" : "w-4 h-4"} />;
 }
 
 function PauseGlyph({ large = false }) {
