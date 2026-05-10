@@ -435,14 +435,25 @@ export default function NotesHeader({
                       <span className="flex flex-col gap-0">
                         <span>{t("adminPanel")}</span>
                         {hasUpdate && (
-                          <span className={`flex flex-col text-[11px] font-semibold leading-none ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
-                            {/* line + upward chevron pointing toward "adminPanel" label above */}
-                            <span aria-hidden="true" className="relative block h-3">
-                              <span className="absolute left-0 right-[calc(50%+5px)] top-[7px] h-px bg-current opacity-70" />
-                              <span className="absolute left-[calc(50%+5px)] right-0 top-[7px] h-px bg-current opacity-70" />
-                              <span className="absolute left-1/2 top-[2px] w-2.5 h-2.5 -translate-x-1/2 rotate-45 border-l border-t border-current opacity-70" />
+                          <span className={`-mt-1 flex flex-col items-center text-[11px] font-semibold leading-none ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
+                            <span aria-hidden="true" className="self-stretch flex items-end h-3 opacity-80">
+                              <span className="flex-1 h-[2px] bg-current mb-[1px]" />
+                              <svg
+                                className="h-3 w-2 shrink-0"
+                                viewBox="0 0 8 12"
+                              >
+                                <path
+                                  d="M0 10 C2 10 3 5 4 5 C5 5 6 10 8 10"
+                                  stroke="currentColor"
+                                  fill="none"
+                                  strokeWidth="2"
+                                  strokeLinecap="butt"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                              <span className="flex-1 h-[2px] bg-current mb-[1px]" />
                             </span>
-                            {t("newVersionAvailable")}
+                            <span>{t("newVersionAvailable")} !</span>
                           </span>
                         )}
                       </span>
