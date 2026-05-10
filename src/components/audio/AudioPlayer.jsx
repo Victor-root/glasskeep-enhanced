@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { t } from "../../i18n";
-import { MicIcon, DownloadIcon } from "../../icons/index.jsx";
+import { MicIcon, DownloadIcon, PlayFilledIcon, PauseFilledIcon, MicrophoneFilledIcon } from "../../icons/index.jsx";
 import Popover from "../common/Popover.jsx";
 import { formatDuration, extensionForMime } from "../../utils/audioNote.js";
 import { canConvertToWav, convertAudioToWav, dataUrlToBlob } from "../../utils/audioConvert.js";
@@ -281,7 +281,7 @@ function HeroLayout({
             className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg"
             style={{ backgroundColor: `var(--audio-accent, ${FALLBACK_ACCENT})` }}
           >
-            <span className="scale-150"><MicIcon /></span>
+            <MicrophoneFilledIcon className="w-7 h-7" />
           </div>
           {showClipNav && clipCount > 1 && (
             <div className="text-[11px] uppercase tracking-wider font-semibold opacity-80" aria-live="polite">
@@ -398,22 +398,13 @@ function NavButton({ direction, onClick, disabled, ariaLabel }) {
 }
 
 function PlayGlyph({ large = false }) {
-  const size = large ? "w-7 h-7 ml-1" : "w-4 h-4 ml-0.5";
-  return (
-    <svg className={size} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M8 5v14l11-7z" />
-    </svg>
-  );
+  // Tiny optical alignment: the play triangle reads as visually
+  // off-centre inside a circular button without a small left nudge.
+  return <PlayFilledIcon className={large ? "w-7 h-7 ml-1" : "w-4 h-4 ml-0.5"} />;
 }
 
 function PauseGlyph({ large = false }) {
-  const size = large ? "w-7 h-7" : "w-4 h-4";
-  return (
-    <svg className={size} viewBox="0 0 24 24" fill="currentColor">
-      <rect x="6" y="5" width="4" height="14" rx="1" />
-      <rect x="14" y="5" width="4" height="14" rx="1" />
-    </svg>
-  );
+  return <PauseFilledIcon className={large ? "w-7 h-7" : "w-4 h-4"} />;
 }
 
 function DownloadMenu({ audio, title }) {

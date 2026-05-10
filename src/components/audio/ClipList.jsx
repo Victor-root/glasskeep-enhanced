@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
-import { Trash, PencilIcon } from "../../icons/index.jsx";
+import { Trash, PencilIcon, PlayFilledIcon, PauseFilledIcon } from "../../icons/index.jsx";
 import { formatDuration } from "../../utils/audioNote.js";
 
 // Playlist-style list of clips in an audio note. Each row shows:
@@ -106,14 +106,9 @@ function ClipRow({ clip, index, isCurrent, isPlaying, onPlay, onRename, onDelete
         aria-hidden="true"
       >
         {isCurrent && isPlaying ? (
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-            <rect x="7" y="5" width="3.5" height="14" rx="0.8" />
-            <rect x="13.5" y="5" width="3.5" height="14" rx="0.8" />
-          </svg>
+          <PauseFilledIcon className="w-3.5 h-3.5" />
         ) : isCurrent ? (
-          <svg className="w-3.5 h-3.5 ml-0.5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z" />
-          </svg>
+          <PlayFilledIcon className="w-3.5 h-3.5 ml-0.5" />
         ) : (
           index + 1
         )}

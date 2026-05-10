@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../../i18n";
-import { MicIcon } from "../../icons/index.jsx";
+import { MicIcon, MicrophoneFilledIcon } from "../../icons/index.jsx";
 import useAudioRecorder, {
   RECORDER_STATE,
   RECORDER_ERROR,
@@ -207,7 +207,7 @@ function EmptyState({ onStart }) {
         className="w-20 h-20 rounded-full flex items-center justify-center text-white shadow-lg"
         style={{ backgroundColor: "var(--audio-accent, #7c3aed)" }}
       >
-        <span className="scale-150"><MicIcon /></span>
+        <MicrophoneFilledIcon className="w-9 h-9" />
       </div>
       <div className="text-sm text-center text-gray-600 dark:text-gray-300 max-w-xs">
         {t("audioNoteEmptyHint")}
@@ -332,7 +332,7 @@ function RecorderPanel({ onCancel, onSave }) {
         style={isFinalizing && !isError && !isPaused && !isRecording ? { backgroundColor: "var(--audio-accent, #7c3aed)" } : undefined}
         aria-label={isRecording ? t("audioRecordingInProgress") : t("audioRecording")}
       >
-        <span className="scale-150"><MicIcon /></span>
+        <MicrophoneFilledIcon className="w-9 h-9" />
       </div>
       <div className="text-3xl font-semibold tabular-nums">
         {formatDuration(recorder.elapsed)}
