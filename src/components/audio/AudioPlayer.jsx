@@ -374,17 +374,16 @@ function HeroLayout({
                   sm:w-auto sm:h-auto sm:rounded-full sm:px-4 sm:py-2 sm:gap-2"
                 style={{ color: `var(--audio-accent, ${FALLBACK_ACCENT})` }}
               >
-                {/* Mobile: mic + '+' badge */}
-                <span className="relative inline-flex items-center justify-center sm:hidden">
+                {/* Mic icon with '+' badge — shown on both mobile and desktop */}
+                <span className="relative inline-flex items-center justify-center">
                   <MicIcon />
                   <svg viewBox="0 0 8 8" className="absolute -top-2 -right-2 w-3 h-3" aria-hidden="true">
                     <circle cx="4" cy="4" r="4" fill="currentColor" />
                     <path d="M4 2v4M2 4h4" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
                 </span>
-                {/* Desktop: mic + label */}
-                <span className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold">
-                  <MicIcon />
+                {/* Label shown on desktop only */}
+                <span className="hidden sm:block text-sm font-semibold">
                   {addRecordingLabel || t("audioAddRecording")}
                 </span>
               </button>
