@@ -11,7 +11,7 @@ android {
         applicationId = "com.glasskeep.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 5
+        versionCode = 4
         versionName = "1.1.0"
     }
 
