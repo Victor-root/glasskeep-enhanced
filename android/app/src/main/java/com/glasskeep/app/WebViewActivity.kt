@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
+import android.webkit.PermissionRequest
 import android.webkit.ServiceWorkerClient
 import android.webkit.ServiceWorkerController
 import android.webkit.URLUtil
@@ -58,6 +59,53 @@ class WebViewActivity : AppCompatActivity() {
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { /* handled */ }
+
+    // Holds the WebView's PermissionRequest while we ask Android for the matching
+    // runtime permission (RECORD_AUDIO / CAMERA). Resolved in the launchers below.
+    private var pendingWebPermissionRequest: PermissionRequest? = null
+    private var pendingWebPermissionResources: Array<String>? = null
+
+    private val recordAudioPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> resolvePendingWebPermission(Manifest.permission.RECORD_AUDIO, granted) }
+
+    private val webCameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> resolvePendingWebPermission(Manifest.permission.CAMERA, granted) }
+
+    private fun resolvePendingWebPermission(perm: String, granted: Boolean) {
+        val req = pendingWebPermissionRequest ?: return
+        val requested = pendingWebPermissionResources ?: req.resources
+        if (!granted) {
+            // User denied — drop the whole request. WebRTC code on the page
+            // will receive a NotAllowedError and can show its own message.
+            req.deny()
+            pendingWebPermissionRequest = null
+            pendingWebPermissionResources = null
+            return
+        }
+        // Granted: re-check all requested resources. If anything else still
+        // needs a runtime grant, chain into that launcher; otherwise resolve.
+        val needsAudio = requested.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE) &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) !=
+                PackageManager.PERMISSION_GRANTED
+        val needsVideo = requested.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE) &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) !=
+                PackageManager.PERMISSION_GRANTED
+        when {
+            needsAudio && perm != Manifest.permission.RECORD_AUDIO -> {
+                recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+            needsVideo && perm != Manifest.permission.CAMERA -> {
+                webCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+            else -> {
+                req.grant(requested)
+                pendingWebPermissionRequest = null
+                pendingWebPermissionResources = null
+            }
+        }
+    }
 
     /** Called from JavaScript for theme-color sync and server change */
     inner class ThemeBridge {
@@ -244,6 +292,61 @@ class WebViewActivity : AppCompatActivity() {
 
                     fileChooserLauncher.launch(params.createIntent())
                     return true
+                }
+
+                // WebView denies all getUserMedia requests by default — without
+                // this override, the audio-notes recorder (and any future
+                // mic/camera feature) silently fails on Android. We grant the
+                // request once the matching runtime permission is held.
+                override fun onPermissionRequest(request: PermissionRequest) {
+                    runOnUiThread {
+                        val supported = request.resources.filter {
+                            it == PermissionRequest.RESOURCE_AUDIO_CAPTURE ||
+                                it == PermissionRequest.RESOURCE_VIDEO_CAPTURE
+                        }.toTypedArray()
+                        if (supported.isEmpty()) {
+                            request.deny()
+                            return@runOnUiThread
+                        }
+                        // Drop any in-flight request — only the latest matters.
+                        pendingWebPermissionRequest?.deny()
+                        pendingWebPermissionRequest = request
+                        pendingWebPermissionResources = supported
+
+                        val needsAudio = supported.contains(
+                            PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                        ) && ContextCompat.checkSelfPermission(
+                            this@WebViewActivity, Manifest.permission.RECORD_AUDIO
+                        ) != PackageManager.PERMISSION_GRANTED
+                        val needsVideo = supported.contains(
+                            PermissionRequest.RESOURCE_VIDEO_CAPTURE
+                        ) && ContextCompat.checkSelfPermission(
+                            this@WebViewActivity, Manifest.permission.CAMERA
+                        ) != PackageManager.PERMISSION_GRANTED
+
+                        when {
+                            needsAudio -> recordAudioPermissionLauncher.launch(
+                                Manifest.permission.RECORD_AUDIO
+                            )
+                            needsVideo -> webCameraPermissionLauncher.launch(
+                                Manifest.permission.CAMERA
+                            )
+                            else -> {
+                                request.grant(supported)
+                                pendingWebPermissionRequest = null
+                                pendingWebPermissionResources = null
+                            }
+                        }
+                    }
+                }
+
+                override fun onPermissionRequestCanceled(request: PermissionRequest) {
+                    runOnUiThread {
+                        if (pendingWebPermissionRequest == request) {
+                            pendingWebPermissionRequest = null
+                            pendingWebPermissionResources = null
+                        }
+                    }
                 }
             }
 
