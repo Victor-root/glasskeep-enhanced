@@ -3,7 +3,13 @@ import { t } from "../../i18n";
 import { MicIcon, DownloadIcon, PlayFilledIcon, PauseFilledIcon, MicrophoneFilledIcon } from "../../icons/index.jsx";
 import Popover from "../common/Popover.jsx";
 import { formatDuration, extensionForMime } from "../../utils/audioNote.js";
-import { canConvertToWav, convertAudioToWav, dataUrlToBlob } from "../../utils/audioConvert.js";
+import {
+  canConvertToMp3,
+  canConvertToWav,
+  convertAudioToMp3,
+  convertAudioToWav,
+  dataUrlToBlob,
+} from "../../utils/audioConvert.js";
 import { sanitizeFilename, triggerBlobDownload } from "../../utils/helpers.js";
 
 // Themed multimedia player for audio notes. Two layouts:
@@ -40,6 +46,11 @@ export default function AudioPlayer({
   // act like Spotify — click a row to start it, click again to pause.
   playToggleKey = 0,
   onPlayingChange,
+  // When provided, the hero footer renders an "Add recording" pill next to
+  // the Download button so the actions sit on a single row, leaving the
+  // playlist below as much room as possible.
+  onAddRecording,
+  addRecordingLabel,
 }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -200,6 +211,8 @@ export default function AudioPlayer({
         clipCount={clipCount}
         onPrevClip={onPrevClip}
         onNextClip={onNextClip}
+        onAddRecording={onAddRecording}
+        addRecordingLabel={addRecordingLabel}
       />
 
       <audio
@@ -264,7 +277,9 @@ function HeroLayout({
   onTrackPointerDown, onTrackPointerMove, onTrackPointerUp, onTrackKeyDown,
   trackRef, showDownload, audio, title,
   showClipNav, clipIndex, clipCount, onPrevClip, onNextClip,
+  onAddRecording, addRecordingLabel,
 }) {
+  const showActionRow = (showDownload && audio?.audioDataUrl) || !!onAddRecording;
   return (
     <div className="relative overflow-hidden rounded-2xl border border-black/15 dark:border-white/15 bg-white/55 dark:bg-black/35 shadow-md backdrop-blur-sm">
       {/* Decorative blurred orbs in the accent color, gives the music-app glow */}
@@ -343,8 +358,26 @@ function HeroLayout({
           </div>
         </div>
 
-        {showDownload && audio?.audioDataUrl && (
-          <DownloadMenu audio={audio} title={title} />
+        {showActionRow && (
+          // flex-wrap so the two pills break onto separate lines on very
+          // narrow screens (≤320px) instead of overflowing the player card.
+          <div className="w-full flex flex-wrap items-center justify-center gap-2">
+            {showDownload && audio?.audioDataUrl && (
+              <DownloadMenu audio={audio} title={title} />
+            )}
+            {onAddRecording && (
+              <button
+                type="button"
+                onClick={onAddRecording}
+                aria-label={addRecordingLabel || t("audioAddRecording")}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 bg-white/70 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-black/10 dark:border-white/15 shadow-sm hover:shadow-md hover:scale-[1.03] active:scale-[0.98]"
+                style={{ color: `var(--audio-accent, ${FALLBACK_ACCENT})` }}
+              >
+                <MicIcon />
+                <span>{addRecordingLabel || t("audioAddRecording")}</span>
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -467,6 +500,25 @@ function DownloadMenu({ audio, title }) {
     }
   };
 
+  const downloadMp3 = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const inputBlob = dataUrlToBlob(audio.audioDataUrl);
+      const mp3 = await convertAudioToMp3(inputBlob);
+      await triggerBlobDownload(`${baseName}.mp3`, mp3);
+    } catch {
+      setError(t("audioDownloadConversionFailed"));
+      try {
+        const blob = dataUrlToBlob(audio.audioDataUrl);
+        const ext = extensionForMime(audio.mimeType || blob.type);
+        await triggerBlobDownload(`${baseName}.${ext}`, blob);
+      } catch { /* ignore */ }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="relative">
       <button
@@ -500,6 +552,20 @@ function DownloadMenu({ audio, title }) {
               <div className="text-[11px] opacity-70 uppercase">.{extensionForMime(audio.mimeType)}</div>
             </div>
           </button>
+          {canConvertToMp3() && (
+            <button
+              type="button"
+              disabled={busy}
+              className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-60 disabled:cursor-wait"
+              onClick={() => { setOpen(false); downloadMp3(); }}
+            >
+              <DownloadIcon />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium">{t("audioDownloadMp3")}</div>
+                <div className="text-[11px] opacity-70 uppercase">.mp3</div>
+              </div>
+            </button>
+          )}
           {canConvertToWav() && (
             <button
               type="button"

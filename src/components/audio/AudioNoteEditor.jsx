@@ -170,6 +170,7 @@ export default function AudioNoteEditor({ body, setBody, title }) {
           onNextClip={goNext}
           playToggleKey={playToggleKey}
           onPlayingChange={setPlayerPlaying}
+          onAddRecording={startRecording}
         />
       </div>
       {/* Playlist: takes the remaining space and scrolls internally so the
@@ -193,19 +194,6 @@ export default function AudioNoteEditor({ body, setBody, title }) {
             onDeleteClip={onDeleteIndex}
           />
         </div>
-      </div>
-      {/* Add-recording button: right-aligned pill, gradient theme only —
-          dimensions match the previous compact CTA, just re-styled. */}
-      <div className="flex justify-end shrink-0 px-1">
-        <button
-          type="button"
-          onClick={startRecording}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
-          aria-label={t("audioAddRecording")}
-        >
-          <MicIcon />
-          <span>{t("audioAddRecording")}</span>
-        </button>
       </div>
       {saveError && (
         <div role="alert" className="text-sm rounded-lg px-3 py-2 bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200 shrink-0">

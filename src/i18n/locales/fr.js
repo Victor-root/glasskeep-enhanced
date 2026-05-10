@@ -923,6 +923,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   audioDownload: "Télécharger l'audio",
   audioDownloadOriginal: "Format d'origine",
   audioDownloadWav: "WAV (non compressé)",
+  audioDownloadMp3: "MP3 (compressé)",
   audioDownloadConverting: "Conversion…",
   audioDownloadConversionFailed: "Échec de la conversion. Téléchargement au format d'origine.",
   audioReRecord: "Réenregistrer",
