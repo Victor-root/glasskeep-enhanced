@@ -172,11 +172,6 @@ export default function AudioNoteEditor({ body, setBody, title }) {
           onPlayingChange={setPlayerPlaying}
         />
       </div>
-      {/* Storage gauge: directly under the player so the user sees, at a
-          glance, how much room is left in the note. Tap to read the limits. */}
-      <div className="shrink-0">
-        <StorageGauge usedBytes={existingTotalBytes} />
-      </div>
       {/* Playlist: takes the remaining space and scrolls internally so the
           modal itself never grows a scrollbar of its own. */}
       <div className="flex-1 min-h-0 overflow-y-auto modal-scroll-themed">

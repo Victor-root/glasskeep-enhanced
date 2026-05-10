@@ -28,6 +28,8 @@ import { contentToHTML, serializeRichContent, isRichContent } from "../../utils/
 import { modalBgFor, scrollColorsFor, solid, bgFor, toHex, audioAccentColor } from "../../utils/colors.js";
 import { setThemeColor } from "../../utils/helpers.js";
 import AudioNoteEditor from "../audio/AudioNoteEditor.jsx";
+import StorageGauge from "../audio/StorageGauge.jsx";
+import { parseAudioContent, totalClipsBytes } from "../../utils/audioNote.js";
 
 export default function NoteModal({
   // visibility / animation
@@ -782,10 +784,32 @@ export default function NoteModal({
                 </>
               )}
 
-              {/* Inline Edited stamp: when scrollable, OR always for audio
-                  notes (the absolute variant overlaps the body's add/delete
-                  buttons since the modal auto-fits content). */}
-              {editedStamp && (modalScrollable || isAudio) && !(mType === 'draw' && drawMode === 'draw') && (
+              {/* Audio bottom bar: storage gauge on the left (mirror of the
+                  "Edited:" stamp on the right). Always rendered so the
+                  user can read the per-note limit even before they start
+                  recording. The popover auto-flips upward since this row
+                  sits at the bottom of the modal. */}
+              {isAudio && !(mType === 'draw' && drawMode === 'draw') && (
+                <div className="mt-6 text-xs text-gray-600 dark:text-gray-300 flex items-center justify-between gap-3">
+                  <StorageGauge usedBytes={totalClipsBytes(parseAudioContent(mBody).clips)} />
+                  {editedStamp && (
+                    <div className="flex items-center gap-1.5">
+                      <span>{t("editedPrefix")} {editedStamp}</span>
+                      {activeId && (
+                        <span
+                          className="opacity-30 hover:opacity-100 cursor-default transition-opacity"
+                          data-tooltip={`Note ID : ${activeId}`}
+                        >ⓘ</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Inline Edited stamp: scrollable non-audio notes. Audio
+                  uses its own bottom row above so the gauge can sit
+                  opposite the stamp. */}
+              {editedStamp && modalScrollable && !isAudio && !(mType === 'draw' && drawMode === 'draw') && (
                 <div className="mt-6 text-xs text-gray-600 dark:text-gray-300 text-right flex items-center justify-end gap-1.5">
                   <span>{t("editedPrefix")} {editedStamp}</span>
                   {activeId && (
