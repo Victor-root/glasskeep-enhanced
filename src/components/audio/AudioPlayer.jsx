@@ -280,15 +280,19 @@ function HeroLayout({
       />
 
       <div className="relative px-5 py-5 sm:px-6 sm:py-6 flex flex-col items-center gap-4">
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-2 w-full">
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg"
             style={{ backgroundColor: `var(--audio-accent, ${FALLBACK_ACCENT})` }}
           >
             <MicrophoneFilledIcon className="w-7 h-7" />
           </div>
+          <ClipTitle
+            audio={audio}
+            clipIndex={clipIndex}
+          />
           {showClipNav && clipCount > 1 && (
-            <div className="text-[11px] uppercase tracking-wider font-semibold opacity-80" aria-live="polite">
+            <div className="text-[11px] uppercase tracking-wider font-semibold opacity-70" aria-live="polite">
               {t("audioClipCounter")
                 .replace("{current}", String(clipIndex + 1))
                 .replace("{total}", String(clipCount))}
@@ -398,6 +402,19 @@ function NavButton({ direction, onClick, disabled, ariaLabel }) {
         {direction === "back" ? <polyline points="15 18 9 12 15 6" /> : <polyline points="9 18 15 12 9 6" />}
       </svg>
     </button>
+  );
+}
+
+function ClipTitle({ audio, clipIndex }) {
+  const fallback = t("audioClipDefaultName").replace("{n}", String((clipIndex || 0) + 1));
+  const name = (audio?.name && audio.name.trim()) || fallback;
+  return (
+    <div
+      className="text-base sm:text-lg font-semibold text-center truncate w-full px-2"
+      title={name}
+    >
+      {name}
+    </div>
   );
 }
 
