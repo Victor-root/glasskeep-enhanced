@@ -622,6 +622,35 @@ This makes GlassKeep more practical for comparison, migration, note cleanup, tec
 
 ---
 
+## 🔔 27) In-app update notifications
+
+GlassKeep Enhanced now surfaces new releases directly in the app instead of leaving self-hosted instances silently behind upstream.
+
+### What was added
+- in-app display of the running app version, baked into the build
+- a dedicated backend route that polls the GitHub Releases API for the latest published release of the project
+- module-scope server-side cache (default TTL: 6 hours) to avoid hitting the GitHub API on every request and to stay well within rate limits
+- semver comparison between the running version and the latest release tag
+- an admin-only frontend hook that calls the backend route once per session
+- a discreet visual notification in the desktop header (small green dot on the admin shield + a centered text callout below the button) when a newer release is detected
+- a matching mobile indicator on the kebab menu and inside the admin entry of the dropdown
+- a dedicated update section at the top of the admin panel, including:
+  - the current version and the latest available version
+  - a direct link to the GitHub release
+  - copy-ready install commands for both the native install script and the Docker setup
+
+### Design choices
+- **admin-only**: regular users are not exposed to update prompts and the network call is never made on their behalf
+- **fail-silent**: any error (network down, GitHub unreachable, parsing failure, timeout) results in a clean "no update" state — never an error toast, never a console error visible to the user
+- **no auto-update**: the system only notifies; upgrading remains an explicit action by the operator
+- **no Android-specific path**: the Android app is a WebView wrapper, so the same notification surfaces inside it without any extra logic
+- **no spam**: the server cache plus per-session frontend deduplication means GitHub is hit at most a few times per day per instance
+
+### Goal
+Make self-hosted GlassKeep instances aware of new releases without forcing operators to manually check the repository, while keeping the system silent, safe, and non-intrusive for non-admin users.
+
+---
+
 ## 🎙️ 28) Audio notes
 
 GlassKeep now supports recording audio directly within the app, turning voice memos into a first-class note type.
@@ -650,35 +679,6 @@ GlassKeep now supports recording audio directly within the app, turning voice me
 
 ### Why it matters
 Audio notes provide a faster, more natural way to capture thoughts, especially on mobile or when hands are busy. Unlike external voice memo apps, everything stays in GlassKeep with full sync and encryption support.
-
----
-
-## 🔔 27) In-app update notifications
-
-GlassKeep Enhanced now surfaces new releases directly in the app instead of leaving self-hosted instances silently behind upstream.
-
-### What was added
-- in-app display of the running app version, baked into the build
-- a dedicated backend route that polls the GitHub Releases API for the latest published release of the project
-- module-scope server-side cache (default TTL: 6 hours) to avoid hitting the GitHub API on every request and to stay well within rate limits
-- semver comparison between the running version and the latest release tag
-- an admin-only frontend hook that calls the backend route once per session
-- a discreet visual notification in the desktop header (small green dot on the admin shield + a centered text callout below the button) when a newer release is detected
-- a matching mobile indicator on the kebab menu and inside the admin entry of the dropdown
-- a dedicated update section at the top of the admin panel, including:
-  - the current version and the latest available version
-  - a direct link to the GitHub release
-  - copy-ready install commands for both the native install script and the Docker setup
-
-### Design choices
-- **admin-only**: regular users are not exposed to update prompts and the network call is never made on their behalf
-- **fail-silent**: any error (network down, GitHub unreachable, parsing failure, timeout) results in a clean "no update" state — never an error toast, never a console error visible to the user
-- **no auto-update**: the system only notifies; upgrading remains an explicit action by the operator
-- **no Android-specific path**: the Android app is a WebView wrapper, so the same notification surfaces inside it without any extra logic
-- **no spam**: the server cache plus per-session frontend deduplication means GitHub is hit at most a few times per day per instance
-
-### Goal
-Make self-hosted GlassKeep instances aware of new releases without forcing operators to manually check the repository, while keeping the system silent, safe, and non-intrusive for non-admin users.
 
 ---
 
