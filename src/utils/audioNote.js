@@ -30,7 +30,11 @@ import { uid } from "./helpers.js";
 // createdAt, text }. parseAudioContent transparently upgrades v1 → v2 on
 // read, so existing notes keep working and re-save in v2 on next edit.
 
-export const AUDIO_MAX_TOTAL_BYTES = 100 * 1024 * 1024; // ~100 MB encoded — leaves headroom under the server 110 MB cap
+// Client-side cap on the sum of raw audio bytes across a note's clips
+// (i.e. clip.size = blob.size from MediaRecorder, not the base64 length).
+// Server's AUDIO_MAX_DATAURL_BYTES is sized to handle this comfortably
+// once base64 inflation (~33%) and JSON wrapping are applied.
+export const AUDIO_MAX_TOTAL_BYTES = 100 * 1024 * 1024;
 
 export const ALLOWED_AUDIO_MIME_PREFIXES = [
   "audio/webm",

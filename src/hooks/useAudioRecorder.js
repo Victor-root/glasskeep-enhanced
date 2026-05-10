@@ -44,6 +44,9 @@ export default function useAudioRecorder() {
     isRecorderSupported() ? null : RECORDER_ERROR.NOT_SUPPORTED,
   );
   const [elapsed, setElapsed] = useState(0); // seconds (whole)
+  // Live byte count of the in-progress recording, updated as MediaRecorder
+  // emits chunks (every 1s). Lets the editor show a real-time storage gauge.
+  const [currentBytes, setCurrentBytes] = useState(0);
   const [result, setResult] = useState(null); // { blob, mimeType, duration, size, url }
 
   const recorderRef = useRef(null);
@@ -93,6 +96,7 @@ export default function useAudioRecorder() {
     pausedAccumRef.current = 0;
     pausedAtRef.current = 0;
     setElapsed(0);
+    setCurrentBytes(0);
     setResult(null);
     setError(null);
     setState(supported ? RECORDER_STATE.IDLE : RECORDER_STATE.ERROR);
@@ -158,8 +162,13 @@ export default function useAudioRecorder() {
     }
 
     chunksRef.current = [];
+    setCurrentBytes(0);
     mr.ondataavailable = (ev) => {
-      if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
+      if (ev.data && ev.data.size > 0) {
+        chunksRef.current.push(ev.data);
+        // Push a fresh total so the editor's live gauge updates each tick.
+        setCurrentBytes((prev) => prev + ev.data.size);
+      }
     };
     mr.onerror = () => {
       setError(RECORDER_ERROR.RECORDING_FAILED);
@@ -272,6 +281,7 @@ export default function useAudioRecorder() {
     state,
     error,
     elapsed,
+    currentBytes,
     result,
     start,
     pause,

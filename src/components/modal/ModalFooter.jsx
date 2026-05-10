@@ -712,14 +712,18 @@ export default function ModalFooter({
                 {t("duplicateNote")}
               </button>
             )}
-            {/* Download */}
-            <button
-              className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-              style={{ color: dark ? "#4ade80" : "#16a34a" }}
-              onClick={() => { handleDownload(); setModalKebabOpen(false); }}
-            >
-              <DownloadIcon />{mType === "audio" ? t("audioDownload") : t("downloadMd")}
-            </button>
+            {/* Download — hidden for audio notes: their hero player has its
+                own dedicated download menu (with format options), so the
+                kebab entry would be redundant noise. */}
+            {mType !== "audio" && (
+              <button
+                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                style={{ color: dark ? "#4ade80" : "#16a34a" }}
+                onClick={() => { handleDownload(); setModalKebabOpen(false); }}
+              >
+                <DownloadIcon />{t("downloadMd")}
+              </button>
+            )}
             {/* Chat with AI — per-note panel scoped to this note. Renders
                 as a side panel on desktop and as a full-screen overlay
                 on mobile. Hidden when the user has no AI configured. */}

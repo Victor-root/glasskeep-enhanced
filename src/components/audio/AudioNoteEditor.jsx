@@ -16,6 +16,7 @@ import {
 } from "../../utils/audioNote.js";
 import AudioPlayer from "./AudioPlayer.jsx";
 import ClipList from "./ClipList.jsx";
+import StorageGauge from "./StorageGauge.jsx";
 
 // AudioNoteEditor — body of an audio note inside the standard NoteModal.
 //
@@ -128,11 +129,16 @@ export default function AudioNoteEditor({ body, setBody, title }) {
     setRecording(false);
   }, []);
 
+  // Total bytes already on disk for this note's clips. Used to drive the
+  // storage gauge (and the live total during recording = existing + chunks).
+  const existingTotalBytes = totalClipsBytes(clips);
+
   if (recording) {
     return (
       <RecorderPanel
         onCancel={cancelRecording}
         onSave={onRecorderSave}
+        existingTotalBytes={existingTotalBytes}
       />
     );
   }
@@ -165,6 +171,11 @@ export default function AudioNoteEditor({ body, setBody, title }) {
           playToggleKey={playToggleKey}
           onPlayingChange={setPlayerPlaying}
         />
+      </div>
+      {/* Storage gauge: directly under the player so the user sees, at a
+          glance, how much room is left in the note. Tap to read the limits. */}
+      <div className="shrink-0">
+        <StorageGauge usedBytes={existingTotalBytes} />
       </div>
       {/* Playlist: takes the remaining space and scrolls internally so the
           modal itself never grows a scrollbar of its own. */}
@@ -202,7 +213,9 @@ export default function AudioNoteEditor({ body, setBody, title }) {
 
 function EmptyState({ onStart }) {
   return (
-    <div className="flex flex-col items-center gap-4 py-6">
+    // flex-1 + justify-center: modal is now a fixed height, so this keeps
+    // the empty CTA optically centred instead of clinging to the top edge.
+    <div className="flex-1 flex flex-col items-center justify-center gap-4 py-6">
       <div
         className="w-20 h-20 rounded-full flex items-center justify-center text-white shadow-lg"
         style={{ backgroundColor: "var(--audio-accent, #7c3aed)" }}
@@ -224,7 +237,7 @@ function EmptyState({ onStart }) {
   );
 }
 
-function RecorderPanel({ onCancel, onSave }) {
+function RecorderPanel({ onCancel, onSave, existingTotalBytes = 0 }) {
   const recorder = useAudioRecorder();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -320,7 +333,9 @@ function RecorderPanel({ onCancel, onSave }) {
   const isFinalizing = isStopping || isReady || saving;
 
   return (
-    <div className="flex flex-col items-center gap-4 py-4">
+    // Same centring trick as EmptyState: modal height is fixed, so the
+    // recorder UI sits in the middle rather than pinned to the top.
+    <div className="flex-1 flex flex-col items-center justify-center gap-4 py-4">
       <div
         className={`w-20 h-20 rounded-full flex items-center justify-center text-white shadow-lg transition-colors ${
           isRecording ? "bg-rose-500 animate-pulse"
@@ -342,6 +357,14 @@ function RecorderPanel({ onCancel, onSave }) {
           : isPaused ? t("audioRecordingPaused")
           : isFinalizing ? t("audioFinalizing")
           : ""}
+      </div>
+      {/* Live storage gauge — pulses while recording so the user can see
+          their note filling up before they hit the cap. */}
+      <div className="w-full max-w-sm px-2">
+        <StorageGauge
+          usedBytes={existingTotalBytes + recorder.currentBytes}
+          live={isRecording}
+        />
       </div>
 
       {errorMessage && (

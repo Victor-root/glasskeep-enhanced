@@ -944,4 +944,13 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   audioRowDelete: "Supprimer cet enregistrement",
   audioRowDeleteConfirm: "Cliquez à nouveau pour confirmer",
   audioRowRename: "Renommer cet enregistrement",
+  audioStorageGaugeLabel: "Stockage utilisé : {pct}%",
+  audioStorageTooltip: "Utilisation du stockage",
+  audioStorageTitle: "Stockage des enregistrements",
+  audioStorageDescription: "Chaque note audio a une taille maximale. La jauge indique le remplissage de cette note.",
+  audioStorageNoteUsage: "Cette note",
+  audioStorageLimitNote: "Limite par note",
+  audioStorageEstimate: "Durée approx.",
+  audioStorageEstimateValue: "~1h40 d'audio",
+  audioStorageHint: "Quand la limite est atteinte, vous ne pouvez plus ajouter d'enregistrement à cette note. Créez-en une nouvelle pour continuer.",
 };

@@ -48,6 +48,12 @@ export default function AudioPlayer({
     Number.isFinite(audio?.duration) && audio.duration > 0 ? audio.duration : null,
   );
   const [scrubRatio, setScrubRatio] = useState(null);
+  // Ref mirror of "is scrubbing in progress?". Needed because pointermove
+  // fires synchronously after pointerdown in the same tick, before React has
+  // applied the scrubRatio state update — so the move handler's closure
+  // would still see scrubRatio == null and bail out, breaking drag-to-seek.
+  // The ref is the source of truth for the gate; scrubRatio is purely visual.
+  const scrubbingRef = useRef(false);
   const trackRef = useRef(null);
 
   useEffect(() => {
@@ -124,18 +130,20 @@ export default function AudioPlayer({
     e.stopPropagation();
     const el = trackRef.current;
     if (!el) return;
-    el.setPointerCapture?.(e.pointerId);
+    try { el.setPointerCapture?.(e.pointerId); } catch { /* ignore */ }
+    scrubbingRef.current = true;
     const r = ratioFromEvent(e.clientX);
     setScrubRatio(r);
   };
   const onPointerMove = (e) => {
-    if (scrubRatio == null) return;
+    if (!scrubbingRef.current) return;
     e.stopPropagation();
     setScrubRatio(ratioFromEvent(e.clientX));
   };
   const onPointerUp = (e) => {
-    if (scrubRatio == null) return;
+    if (!scrubbingRef.current) return;
     e.stopPropagation();
+    scrubbingRef.current = false;
     const final = ratioFromEvent(e.clientX);
     seekToRatio(final);
     setScrubRatio(null);
@@ -156,44 +164,43 @@ export default function AudioPlayer({
     }
   };
 
+  // Card variant lives inside a closed NoteCard. The card's job is to open
+  // the modal on click — so the player must NOT swallow pointer events
+  // (no stopPropagation, no functional play/seek). It's a static visual
+  // indicator; the user opens the note to actually play.
+  if (variant === "card") {
+    return (
+      <div className={`audio-player audio-player--card ${className}`}>
+        <CardLayout duration={duration} />
+      </div>
+    );
+  }
+
   return (
     <div
-      className={variant === "card" ? `audio-player audio-player--card ${className}` : `audio-player audio-player--hero ${className}`}
+      className={`audio-player audio-player--hero ${className}`}
       onClick={(e) => e.stopPropagation()}
     >
-      {variant === "hero" ? (
-        <HeroLayout
-          ratio={ratio}
-          duration={duration}
-          currentTime={scrubRatio != null ? scrubRatio * duration : currentTime}
-          playing={playing}
-          togglePlay={togglePlay}
-          onTrackPointerDown={onPointerDown}
-          onTrackPointerMove={onPointerMove}
-          onTrackPointerUp={onPointerUp}
-          onTrackKeyDown={onTrackKeyDown}
-          trackRef={trackRef}
-          showDownload={showDownload}
-          audio={audio}
-          title={title}
-          showClipNav={showClipNav}
-          clipIndex={clipIndex}
-          clipCount={clipCount}
-          onPrevClip={onPrevClip}
-          onNextClip={onNextClip}
-        />
-      ) : (
-        <CardLayout
-          ratio={ratio}
-          duration={duration}
-          playing={playing}
-          togglePlay={togglePlay}
-          trackRef={trackRef}
-          onTrackPointerDown={onPointerDown}
-          onTrackPointerMove={onPointerMove}
-          onTrackPointerUp={onPointerUp}
-        />
-      )}
+      <HeroLayout
+        ratio={ratio}
+        duration={duration}
+        currentTime={scrubRatio != null ? scrubRatio * duration : currentTime}
+        playing={playing}
+        togglePlay={togglePlay}
+        onTrackPointerDown={onPointerDown}
+        onTrackPointerMove={onPointerMove}
+        onTrackPointerUp={onPointerUp}
+        onTrackKeyDown={onTrackKeyDown}
+        trackRef={trackRef}
+        showDownload={showDownload}
+        audio={audio}
+        title={title}
+        showClipNav={showClipNav}
+        clipIndex={clipIndex}
+        clipCount={clipCount}
+        onPrevClip={onPrevClip}
+        onNextClip={onNextClip}
+      />
 
       <audio
         ref={audioRef}
@@ -219,32 +226,29 @@ export default function AudioPlayer({
   );
 }
 
-function CardLayout({ ratio, duration, playing, togglePlay, trackRef, onTrackPointerDown, onTrackPointerMove, onTrackPointerUp }) {
+function CardLayout({ duration }) {
+  // Static, non-interactive preview. The whole NoteCard is the click target
+  // (it opens the modal); the player is just a visual cue that this is an
+  // audio note. No play handler, no scrubber — everything is `pointer-events:
+  // none` so clicks reach the underlying card.
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-black/15 dark:border-white/15 bg-black/[0.04] dark:bg-white/[0.06] shadow-sm">
-      <button
-        type="button"
-        aria-label={playing ? t("audioPause") : t("audioPlay")}
-        onClick={togglePlay}
-        className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full text-white shadow-md active:scale-95 transition focus:outline-none focus:ring-2 focus:ring-offset-1"
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-black/15 dark:border-white/15 bg-black/[0.04] dark:bg-white/[0.06] shadow-sm pointer-events-none select-none">
+      <div
+        className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full text-white shadow-md"
         style={{ backgroundColor: `var(--audio-accent, ${FALLBACK_ACCENT})` }}
+        aria-hidden="true"
       >
-        {playing ? <PauseGlyph /> : <PlayGlyph />}
-      </button>
+        <PlayGlyph />
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 text-[11px] font-medium opacity-80">
           <MicIcon />
           <span>{t("audioRecording")}</span>
         </div>
-        <div className="mt-1.5">
-          <ProgressTrack
-            ratio={ratio}
-            trackRef={trackRef}
-            onPointerDown={onTrackPointerDown}
-            onPointerMove={onTrackPointerMove}
-            onPointerUp={onTrackPointerUp}
-            onKeyDown={() => {}}
-            compact
+        <div className="mt-1.5 h-1.5 rounded-full bg-black/15 dark:bg-white/20 overflow-hidden">
+          <div
+            className="h-full w-1/4 rounded-full"
+            style={{ backgroundColor: `var(--audio-accent, ${FALLBACK_ACCENT})` }}
           />
         </div>
       </div>
@@ -369,7 +373,7 @@ function ProgressTrack({ ratio, trackRef, onPointerDown, onPointerMove, onPointe
         }}
       />
       <div
-        className={`absolute -top-1.5 ${compact ? "w-3 h-3" : "w-4 h-4"} rounded-full bg-white transition-transform`}
+        className={`absolute -top-1.5 ${compact ? "w-3 h-3" : "w-4 h-4"} rounded-full bg-white transition-transform pointer-events-none`}
         style={{
           left: `calc(${Math.min(100, Math.max(0, ratio * 100))}% - ${compact ? "6px" : "8px"})`,
           boxShadow: `0 0 0 2px ${filledColor}, 0 1px 3px rgba(0,0,0,0.3)`,

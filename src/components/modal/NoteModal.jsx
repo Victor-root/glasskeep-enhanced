@@ -452,7 +452,10 @@ export default function NoteModal({
   //   - Mobile / narrow layout: the panel becomes a full-screen overlay
   //     that slides in over the modal from the right.
   const noteAiSidebarLayout = !mobileLayout && windowWidth >= 1024;
-  const noteAiAvailable = aiAssistantEnabled && !isDrawEdit;
+  // Audio notes deliberately don't expose the AI chat panel — there's
+  // nothing meaningful to ask about a raw audio blob, and the kebab/header
+  // entries shouldn't appear there at all.
+  const noteAiAvailable = aiAssistantEnabled && !isDrawEdit && !isAudio;
   const noteAiPanelVisible = noteAiAvailable && noteAiOpen && !isModalClosing;
 
   // Adaptive AI-panel width — fills whatever horizontal space is left
@@ -556,7 +559,7 @@ export default function NoteModal({
           className={`note-modal-anim${isModalClosing ? ' closing' : ''}${handoffNoTransition ? ' note-modal-anim--sbs-handoff' : ''}${suppressOpenReplay ? ' note-modal-anim--sbs-suppress-open-replay' : ''} glass-card rounded-none shadow-none w-full max-w-none ${
             mobileLayout ? ''
             : isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen sm:!rounded-none'
-            : isAudio ? 'sm:w-[92%] sm:max-w-2xl sm:h-auto sm:max-h-[88vh] sm:rounded-2xl'
+            : isAudio ? 'sm:w-[92%] sm:max-w-2xl sm:h-[80vh] sm:rounded-2xl'
             : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl'
           }${drawTransition === 'entering' ? ' draw-expand' : drawTransition === 'leaving' ? ' draw-collapse' : ''} flex flex-col relative overflow-hidden`}
           style={{
