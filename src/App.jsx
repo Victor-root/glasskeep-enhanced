@@ -63,7 +63,8 @@ import FloatingCardsBackground from "./components/common/FloatingCardsBackground
 import NoteModal from "./components/modal/NoteModal.jsx";
 import SecondaryNoteInstance from "./components/modal/SecondaryNoteInstance.jsx";
 import AudioRecorderModal from "./components/audio/AudioRecorderModal.jsx";
-import { serializeAudioContent } from "./utils/audioNote.js";
+import { serializeAudioContent, parseAudioContent, extensionForMime } from "./utils/audioNote.js";
+import { dataUrlToBlob } from "./utils/audioConvert.js";
 import useModalState from "./hooks/useModalState.js";
 import useDraftNote from "./hooks/useDraftNote.js";
 import useAdminActions from "./hooks/useAdminActions.js";
@@ -3222,8 +3223,23 @@ export default function App() {
     if (contentRef.current) contentRef.current.style.height = "auto";
   };
 
-  /** -------- Download single note .md -------- */
-  const handleDownloadNote = (note) => {
+  /** -------- Download single note .md (or audio file for audio notes) -------- */
+  const handleDownloadNote = async (note) => {
+    if (note?.type === "audio") {
+      const audio = parseAudioContent(note.content);
+      if (audio?.audioDataUrl) {
+        try {
+          const blob = dataUrlToBlob(audio.audioDataUrl);
+          const ext = extensionForMime(audio.mimeType || blob.type);
+          const fname = sanitizeFilename(note.title || `audio-${note.id}`) + "." + ext;
+          await triggerBlobDownload(fname, blob);
+          return;
+        } catch (e) {
+          console.error("Audio download failed:", e);
+        }
+      }
+      return;
+    }
     const md = mdForDownload(note);
     const fname = sanitizeFilename(note.title || `note-${note.id}`) + ".md";
     downloadText(fname, md);

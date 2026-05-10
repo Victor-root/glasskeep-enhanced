@@ -212,6 +212,7 @@ export default function NoteModal({
   const [drawTransition, setDrawTransition] = React.useState(null); // 'entering' | 'leaving' | null
   const isDrawEdit = mType === 'draw' && drawMode === 'draw';
   const isDrawView = mType === 'draw' && drawMode !== 'draw';
+  const isAudio = mType === 'audio';
 
   // Track draw mode transitions for animation
   const prevDrawEditRef = React.useRef(false);
@@ -556,6 +557,7 @@ export default function NoteModal({
           className={`note-modal-anim${isModalClosing ? ' closing' : ''}${handoffNoTransition ? ' note-modal-anim--sbs-handoff' : ''}${suppressOpenReplay ? ' note-modal-anim--sbs-suppress-open-replay' : ''} glass-card rounded-none shadow-none w-full max-w-none ${
             mobileLayout ? ''
             : isDrawEdit ? 'sm:w-screen sm:max-w-none sm:h-screen sm:!rounded-none'
+            : isAudio ? 'sm:w-[92%] sm:max-w-md sm:h-auto sm:max-h-[88vh] sm:rounded-2xl'
             : 'sm:w-11/12 sm:max-w-3xl lg:max-w-4xl sm:h-[95vh] sm:rounded-xl'
           }${drawTransition === 'entering' ? ' draw-expand' : drawTransition === 'leaving' ? ' draw-collapse' : ''} flex flex-col relative overflow-hidden`}
           style={{
@@ -664,7 +666,7 @@ export default function NoteModal({
             {/* Content area */}
             <div
               key={isDrawEdit ? 'draw' : viewMode ? 'view' : 'edit'}
-              className={`${isDrawEdit ? "flex-1 min-h-0 flex flex-col" : isDrawView ? "px-6 pt-3 pb-6 max-sm:px-4 max-sm:pt-1 max-sm:pb-4" : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"} ${!isDrawEdit ? "modal-content-fade" : ""}`}
+              className={`${isDrawEdit ? "flex-1 min-h-0 flex flex-col" : isDrawView ? "px-6 pt-3 pb-6 max-sm:px-4 max-sm:pt-1 max-sm:pb-4" : isAudio ? "px-4 pt-2 pb-4 sm:px-5 sm:pt-3 sm:pb-5" : "px-6 pt-3 pb-12 max-sm:pt-1 max-sm:pb-4"} ${!isDrawEdit ? "modal-content-fade" : ""}`}
               onClick={onModalBodyClick}
             >
 
@@ -1051,8 +1053,8 @@ function AudioNoteBody({ body, title }) {
     );
   }
   return (
-    <div className="py-4">
-      <AudioPlayer audio={audio} title={title} variant="full" />
+    <div className="py-3 sm:py-4">
+      <AudioPlayer audio={audio} title={title} variant="hero" />
     </div>
   );
 }

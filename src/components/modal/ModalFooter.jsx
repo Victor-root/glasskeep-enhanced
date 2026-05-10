@@ -662,7 +662,7 @@ export default function ModalFooter({
               style={{ color: dark ? "#4ade80" : "#16a34a" }}
               onClick={() => { handleDownload(); setModalKebabOpen(false); }}
             >
-              <DownloadIcon />{t("downloadMd")}
+              <DownloadIcon />{mType === "audio" ? t("audioDownload") : t("downloadMd")}
             </button>
             {/* Chat with AI — per-note panel scoped to this note. Renders
                 as a side panel on desktop and as a full-screen overlay

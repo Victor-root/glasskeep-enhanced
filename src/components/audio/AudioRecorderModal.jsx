@@ -197,7 +197,7 @@ function RecorderStage({ recorder, previewAudio, title }) {
         <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold">
           {t("audioReady")}
         </div>
-        <AudioPlayer audio={previewAudio} title={title} variant="full" showDownload={false} />
+        <AudioPlayer audio={previewAudio} title={title} variant="hero" showDownload={false} />
       </div>
     );
   }
