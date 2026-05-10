@@ -435,7 +435,7 @@ export default function NotesHeader({
                       <span className="flex flex-col gap-0">
                         <span>{t("adminPanel")}</span>
                         {hasUpdate && (
-                          <span className={`flex flex-col items-center text-[11px] font-semibold leading-none ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
+                          <span className={`-mt-1 flex flex-col items-center text-[11px] font-semibold leading-none ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
                             <span aria-hidden="true" className="self-stretch flex items-end h-3 opacity-80">
                               <span className="flex-1 h-[2px] bg-current mb-[1px]" />
                               <svg
