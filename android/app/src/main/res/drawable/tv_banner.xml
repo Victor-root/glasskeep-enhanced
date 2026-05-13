@@ -1,14 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Android TV launcher banner — 320x180.
-  Two layers:
-    1. Rounded indigo→violet gradient backdrop (same diagonal sweep
-       as the app's .btn-gradient buttons).
-    2. The original app logo PNG, centered with generous side insets
-       so it reads as a clean badge over the gradient.
-
-  No wordmark inside the banner — the Leanback launcher will display
-  the app label ("GlassKeep") underneath the banner automatically.
+  Android TV launcher banner — 320x180. Three layers:
+    1. Rounded indigo→violet gradient backdrop.
+    2. Original app logo (PNG), centred a bit above the middle to
+       leave room for the wordmark beneath.
+    3. "GlassKeep" wordmark rendered with a real font (DejaVu Sans
+       Bold) at 4x density so it stays crisp on 4K panels.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -24,15 +21,26 @@
         </shape>
     </item>
 
-    <!-- 2. App logo, kept square (~140dp tall) and centered. With a
-            16:9 banner that means roughly 90dp of horizontal inset on
-            each side and 20dp top/bottom — leaves a tasteful ring of
-            gradient around the logo. -->
+    <!-- 2. App logo, 80dp square, centred horizontally and pushed up
+            from the middle so the wordmark fits underneath.
+            (banner 320x180, logo 80x80) → left/right insets 120,
+            top inset 14, bottom inset 86 = 180-14-80. -->
     <item
-        android:left="90dp"
-        android:top="20dp"
-        android:right="90dp"
-        android:bottom="20dp"
+        android:left="120dp"
+        android:top="14dp"
+        android:right="120dp"
+        android:bottom="86dp"
         android:drawable="@drawable/glasskeep_logo" />
+
+    <!-- 3. Wordmark PNG (xxxhdpi 880x140 → ~220x35 dp), positioned
+            below the logo with a small gap. Centred horizontally.
+            (top 108, bottom 38 = 180-108-34 ≈ wordmark height). -->
+    <item
+        android:left="50dp"
+        android:top="108dp"
+        android:right="50dp"
+        android:bottom="38dp"
+        android:drawable="@drawable/tv_banner_wordmark"
+        android:gravity="center" />
 
 </layer-list>
