@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon. Both layers are real drawables now:
+     - background = master with the notepad area inpainted away
+       (gradient is uniform across the entire canvas)
+     - foreground = the notepad ONLY, extracted by HSV mask + soft
+       alpha edges
+     This is the standard adaptive-icon split, so the launcher's
+     zoom/parallax on the foreground reveals the notepad over the
+     full gradient — no synthetic background colour, no liseret. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background" />
+    <background android:drawable="@mipmap/ic_launcher_background" />
     <foreground android:drawable="@mipmap/ic_launcher_foreground" />
 </adaptive-icon>
