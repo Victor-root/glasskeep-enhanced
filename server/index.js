@@ -1100,11 +1100,20 @@ app.post("/api/register", (req, res) => {
 });
 
 app.post("/api/login", (req, res) => {
-  const { email, password, user_id } = req.body || {};
-  // Support login by user_id (profile selection) or by email (manual login)
+  const { email, password, user_id, name } = req.body || {};
+  // Three accepted shapes:
+  //   - { user_id, password }  → profile-picker flow (numeric id from /login/profiles)
+  //   - { email, password }    → manual login by email
+  //   - { name, password }     → manual login by username (TV viewer needs
+  //                              this because phone accounts may not have
+  //                              an email, and the public profile list
+  //                              only exposes users who opted into
+  //                              show_on_login).
   let user;
   if (user_id) {
     user = getUserById.get(user_id);
+  } else if (name) {
+    user = getUserByName.get(name);
   } else {
     user = email ? getUserByEmail.get(email) : null;
   }
