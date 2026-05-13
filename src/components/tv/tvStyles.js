@@ -768,7 +768,10 @@ html[data-tv="1"] .tv-login {
   align-items: center;
   justify-content: center;
   padding: 4vh 4vw;
-  gap: 20px;
+  /* Removed the global gap — every element now uses tight explicit
+     margins so "GlassKeep TV" sits flush under the logo instead of
+     hovering 30-200px away. */
+  gap: 0;
 }
 html[data-tv="1"] .tv-login__card {
   width: 100%;
@@ -791,11 +794,13 @@ html[data-tv="1"] .tv-login__title {
 }
 /* Big rounded logo above the login card, matching mobile AuthShell. */
 html[data-tv="1"] .tv-login__logo {
-  width: 96px;
-  height: 96px;
-  border-radius: 22px;
-  box-shadow: 0 14px 32px -10px rgba(0, 0, 0, 0.55);
-  margin: 0 auto 14px;
+  width: 84px;
+  height: 84px;
+  border-radius: 20px;
+  box-shadow: 0 12px 28px -10px rgba(0, 0, 0, 0.55);
+  /* No bottom margin — the brand title's own padding-top puts it
+     flush under the logo. */
+  margin: 0 auto;
   display: block;
   user-select: none;
   -webkit-user-drag: none;
@@ -805,33 +810,38 @@ html[data-tv="1"] .tv-login__logo {
    "GlassKeep TV" in the indigo→pink gradient, like mobile AuthShell. */
 html[data-tv="1"] .tv-login__brand {
   text-align: center;
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 800;
+  line-height: 1.1;
+  padding-top: 10px;
   background: linear-gradient(90deg, #c4b5fd, #f9a8d4);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  margin-bottom: 4px;
 }
 html[data-tv="1"] .tv-login__subtitle {
   text-align: center;
-  font-size: 14px;
+  font-size: 13px;
   color: #9ca3af;
-  margin-bottom: 16px;
+  margin: 6px 0 18px;
 }
 html[data-tv="1"][data-tv-theme="light"] .tv-login__subtitle { color: #6b7280; }
 /* Glass pill that holds the server's loginSlogan (fetched live from
-   /api/admin/login-slogan). Sits under the card, optional. */
+   /api/admin/login-slogan, falls back to t("loginSlogan")). Sits
+   under the card. block + width:fit-content reliably centers itself
+   inside the flex column even with auto margins disabled. */
 html[data-tv="1"] .tv-login__slogan {
-  margin: 12px auto 0;
-  display: inline-flex;
-  align-items: center;
+  display: block;
+  width: fit-content;
+  max-width: 90%;
+  margin: 18px auto 0;
   padding: 8px 18px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #d1d5db;
   font-size: 13px;
+  text-align: center;
 }
 html[data-tv="1"][data-tv-theme="light"] .tv-login__slogan {
   background: rgba(0, 0, 0, 0.04);
