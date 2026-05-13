@@ -358,11 +358,20 @@ html[data-tv="1"] .tv-card {
 html[data-tv="1"] .tv-card__title {
   font-size: 18px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.4;
+  margin: 0;
   word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  /* IMPORTANT: do NOT use display: -webkit-box + -webkit-line-clamp.
+     On the Shield WebView these get computed as display: flow-root and
+     the rendered height collapses to ~0.4em (~8px at 22px font-size)
+     for single-line titles like "SMS MIRIAD" — combined with the
+     overflow: hidden the title was rendered into a 8px-tall sliver and
+     looked clipped through 80% of its glyph height.
+     Plain block + max-height + overflow: hidden gives the title its
+     natural one-or-two-line height and clips only when it would exceed
+     ~2.8em, with no WebKit special-casing involved. */
+  display: block;
+  max-height: 2.8em;
   overflow: hidden;
 }
 html[data-tv="1"] .tv-card__preview {
