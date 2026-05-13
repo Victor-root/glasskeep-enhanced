@@ -155,20 +155,21 @@ export default function TvApp() {
     setAuth(sessionWithId);
   }, []);
 
-  // Manual login. Phone accounts may have only a username (no email),
-  // so the TV viewer accepts either:
-  //   - "foo@example.com"  → sent as { email }
-  //   - "Victor"           → sent as { name } (server falls back to
-  //                          getUserByName when no email/user_id given)
-  // user_id is reserved for the numeric profile picker — never use it
-  // for free-text input or the server returns "No account found".
+  // Manual login. The phone's LoginView ships its single text field as
+  // `email` regardless of whether the user typed a real email or just
+  // a username — the server's getUserByEmail does a lowercase match
+  // against whatever is in the `email` column, so accounts whose
+  // identifier is "Victor" (no '@') still match. We mirror that exact
+  // behaviour so users who've signed in for months from the phone
+  // don't need to relearn anything on TV.
+  // user_id is reserved for the numeric profile picker.
   const signInManual = useCallback(async (identifier, password) => {
     const id = String(identifier || "").trim();
     if (!id) throw new Error("Identifier required");
-    const body = id.includes("@")
-      ? { email: id, password }
-      : { name: id, password };
-    const res = await api("/login", { method: "POST", body });
+    const res = await api("/login", {
+      method: "POST",
+      body: { email: id, password },
+    });
     completeLogin(res);
   }, [completeLogin]);
 
