@@ -279,7 +279,9 @@ html[data-tv="1"] .tv-masonry__col > .tv-card {
    inside it — the pager owns its own viewport-sized cells, the user
    should never be able to wheel/scroll past them. */
 html[data-tv="1"] .tv-notes-scroll--pager {
-  overflow: hidden;
+  /* overflow: visible so the focus ring (box-shadow) around the
+     leftmost / rightmost card isn't clipped by this container. */
+  overflow: visible;
   padding: 0;
 }
 html[data-tv="1"] .tv-pager {
@@ -289,7 +291,9 @@ html[data-tv="1"] .tv-pager {
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
-  padding: 12px 14px 22px;
+  /* Outer padding so the 3px focus ring on edge cards has room to
+     bloom without touching the bezel. */
+  padding: 10px 18px 26px;
   align-items: stretch;
 }
 html[data-tv="1"] .tv-pager__arrow {
@@ -304,14 +308,19 @@ html[data-tv="1"][data-tv-theme="light"] .tv-pager__arrow { color: #7c3aed; }
 html[data-tv="1"] .tv-pager__page {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  /* Explicit 1fr row — without it the row stretches to fit the
+     tallest card's intrinsic content and height: 100% on the cards
+     becomes circular, blowing past the viewport. */
+  grid-template-rows: 1fr;
   gap: var(--tv-gap);
   align-items: stretch;
   min-width: 0;
   min-height: 0;
-  /* Hard cap on height so cards can't grow past the viewport — the
-     overflow:hidden trims any preview that would exceed the cell. */
   height: 100%;
-  overflow: hidden;
+  /* No overflow: hidden here. The card itself already does overflow:
+     hidden + max-height: 100%, so its content stays clipped while the
+     focus ring (a box-shadow living outside the card box) stays
+     visible on every side. */
 }
 html[data-tv="1"] .tv-pager .tv-card {
   height: 100%;
@@ -329,7 +338,6 @@ html[data-tv="1"] .tv-pager .tv-card.tv-focusable[data-tv-focused="true"] {
   transform: none;
   box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.95);
 }
-html[data-tv="1"] .tv-pager .tv-card__title { font-size: 22px; }
 html[data-tv="1"] .tv-pager .tv-card__preview {
   font-size: 16px;
   max-height: none;
@@ -361,19 +369,24 @@ html[data-tv="1"] .tv-card__title {
   line-height: 1.4 !important;
   margin: 0 !important;
   word-break: break-word;
-  /* The card is a flex column. Without flex-shrink: 0 the flex
-     algorithm can squeeze the title BETWEEN its min and max heights
-     when the rest of the content (preview + images + footer) doesn't
-     fit — that's how "A donner à claude code pour glasskeep" ended up
-     at 52.13px (1.69 lines) instead of the full 61.6px (2 lines),
-     leaving the 2nd-line descenders chopped off.
-     With flex-shrink: 0 the title always claims its preferred height
-     (1 or 2 lines), and the preview yields space instead. */
+  /* flex-shrink: 0 so the flex algorithm doesn't squeeze the title
+     between its min and max heights — the preview yields space
+     instead via its own min-height: 0 + flex: 1 1 auto. */
   flex-shrink: 0 !important;
   display: block !important;
   min-height: 1.4em !important;
-  max-height: 2.8em !important;
+  /* No max-height in the grid view: long titles let the card grow
+     naturally in the masonry layout. The pager's fixed-row layout
+     re-applies a max-height of its own (see below). */
   height: auto !important;
+  overflow: visible !important;
+}
+/* Pager cards live in a fixed-height row, so the title MUST cap at
+   two lines there — otherwise a long title would push the preview
+   and footer past the viewport. */
+html[data-tv="1"] .tv-pager .tv-card__title {
+  font-size: 22px;
+  max-height: 2.8em !important;
   overflow: hidden !important;
 }
 html[data-tv="1"] .tv-card__preview {

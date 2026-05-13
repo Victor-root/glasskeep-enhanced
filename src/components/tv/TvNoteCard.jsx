@@ -84,7 +84,7 @@ function TvNoteCardImpl({ note, variant = "grid", onActivate }) {
       data-note-id={note.id}
       aria-label={note.title || (isChecklist ? t("checklist") : t("note"))}
     >
-      {icon && !isCarousel && (
+      {icon && (
         <img
           src={icon.src}
           alt=""
@@ -93,10 +93,10 @@ function TvNoteCardImpl({ note, variant = "grid", onActivate }) {
           decoding="async"
           style={{
             position: "absolute",
-            top: 6,
-            right: 6,
-            width: 20,
-            height: 20,
+            top: isCarousel ? 10 : 6,
+            right: isCarousel ? 10 : 6,
+            width: isCarousel ? 28 : 20,
+            height: isCarousel ? 28 : 20,
             objectFit: "contain",
             pointerEvents: "none",
           }}
@@ -108,7 +108,7 @@ function TvNoteCardImpl({ note, variant = "grid", onActivate }) {
           className="tv-card__title"
           role="heading"
           aria-level="3"
-          style={{ paddingRight: icon && !isCarousel ? 24 : 0 }}
+          style={{ paddingRight: icon ? (isCarousel ? 34 : 24) : 0 }}
         >
           {note.title}
         </div>
