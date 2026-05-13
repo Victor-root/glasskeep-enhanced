@@ -68,7 +68,7 @@ import '@fontsource/dancing-script/400.css';
 import '@fontsource/dancing-script/700.css';
 import '@fontsource/caveat/400.css';
 import '@fontsource/caveat/700.css';
-import App from './App.jsx';
+import AppRoot from './AppRoot.jsx';
 
 // Register the PWA Service Worker (vite-plugin-pwa)
 registerSW({
@@ -80,6 +80,6 @@ registerSW({
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <AppRoot />
   </StrictMode>
 );

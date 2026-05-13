@@ -10,8 +10,8 @@
 
 <table width="100%">
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/7014fb9b-5f7d-4ba0-8ffe-7a91369c3dd1" width="100%" /></td>
-    <td><img src="https://github.com/user-attachments/assets/d870ea4a-2413-4b4d-9553-1eb5110baab0" width="100%" /></td>
+    <td><img src="https://github.com/user-attachments/assets/e9fa11e1-a91a-4058-b588-673f71f8fcf0" width="100%" /></td>
+    <td><img src="https://github.com/user-attachments/assets/98919346-5fef-4768-9853-a1c1cbc9441c" width="100%" /></td>
   </tr>
   <tr>
     <td><img src="https://github.com/user-attachments/assets/97e8935d-e9dd-4cfa-b501-101c3d36c67e"" width="100%" /></td>
@@ -35,18 +35,21 @@
   </tr>
 </table>
 
-### 📱 Mobile
+### 📱 Mobile 
 
 <table width="100%">
   <tr>
-    <td align="center"><img src="https://github.com/user-attachments/assets/90d91213-d9bc-48e9-951f-4d6905b9f03f" width="185" /></td>
-    <td align="center"><img src="https://github.com/user-attachments/assets/ffbb3584-1f0a-495a-9f3a-d45554050c63" width="185" /></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/18ccfbb3-3137-4656-a899-af3ed3543400" width="185" /></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/a500a8df-ceb8-4b0f-af3a-270abdce8d53" width="185" /></td>
     <td align="center"><img src="https://github.com/user-attachments/assets/dd8df55b-e478-4575-8ab3-1ce1ce5ea4f7" width="185" /></td>
     <td align="center"><img src="https://github.com/user-attachments/assets/678c8c44-da5e-46db-8370-b41a568654e0" width="185" /></td>
-    <td align="center"><img src="https://github.com/user-attachments/assets/ea8c7a3e-5b59-4869-9615-611a34f1373d" width="185" /></td>
-    <td align="center"><img src="https://github.com/user-attachments/assets/d7ab134f-77bf-40a0-8b6f-2b56895ba47c" width="185" /></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/49bf41e2-02f0-4636-aa35-232d0925858f" width="185" /></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/34d79018-dab3-4494-8e42-d36a1a5bb9d9" width="185" /></td>
   </tr>
 </table>
+
+### 📺 TV
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/a27ccb79-3197-42e5-9b7f-bd3583443685" />
 
 ---
 
@@ -60,6 +63,7 @@ Compared to the original project, this fork puts more emphasis on:
 - **✏️ a real WYSIWYG / live-formatting editor for text notes**
 - **🪟 side-by-side note reading and comparison**
 - **🤖 a native Android companion app**
+- **📺 an Android TV layout designed for couch use and remote control**
 - **🌍 a cleaner and more extensible i18n foundation**
 - **🛠️ simpler self-hosting**
 - **✨ a broad polish / stability pass**
@@ -68,6 +72,7 @@ Compared to the original project, this fork puts more emphasis on:
 - **🔐 Server-side encryption & passkeys**
 - **🔔 In-app update notifications**
 - **🎙️ audio notes**
+- **🖼️ refreshed logo and icons across the web app, PWA, favicon, and Android launcher / TV banner**
 
 For a more complete and structured overview of the changes made since the fork, see:
 
@@ -91,15 +96,19 @@ This fork also keeps the main capabilities that already made the original projec
 
 ---
 
-## 📱 Android app
+## 📱 Android app + 📺 Android TV 
 
 A native Android companion app is available for GlassKeep, making self-hosted mobile usage more convenient.
 
 The Android app is a WebView wrapper for GlassKeep Enhanced and does not necessarily change with every project release.
 
+The **same APK also runs on Android TV** — the app detects leanback hardware (or the `?tv=1` URL override) and switches the React frontend to a dedicated TV layout designed for the couch and the D-pad. No separate build, no separate install: phone, tablet and TV all share one codebase. See section **4** of [`IMPROVEMENTS.md`](./IMPROVEMENTS.md) for the full TV layout details.
+
+The launcher icon, the Android TV banner, the PWA install icon, and the favicon have all been redrawn from a single master so the app looks coherent across every surface.
+
 [Download latest Android APK](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.2.0/GlassKeep-v1.1.0.apk)
 
-Current APK version: `1.1.0`
+Current APK version: `1.2.0`
 
 > The Android source code is available in the `android/` directory.
 

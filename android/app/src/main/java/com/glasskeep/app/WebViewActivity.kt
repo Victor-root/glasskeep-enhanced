@@ -124,6 +124,12 @@ class WebViewActivity : AppCompatActivity() {
             runOnUiThread { showChangeServerDialog() }
         }
 
+        /** Tell the webapp it's running inside the Android TV launcher.
+         *  The web layer reads window.__isAndroidTV on boot to swap the
+         *  edit-heavy phone UI for a comfy, focus-driven viewer. */
+        @JavascriptInterface
+        fun isAndroidTV(): Boolean = isTelevision()
+
         @JavascriptInterface
         fun saveBlobFile(base64Data: String, filename: String, mimeType: String) {
             try {
@@ -248,9 +254,36 @@ class WebViewActivity : AppCompatActivity() {
                     }
                 }
 
+                override fun onPageStarted(
+                    view: WebView,
+                    pageUrl: String?,
+                    favicon: android.graphics.Bitmap?
+                ) {
+                    super.onPageStarted(view, pageUrl, favicon)
+                    // Plant window.__isAndroidTV BEFORE React boots so the
+                    // first render already picks the TV layout — otherwise
+                    // we'd flash the phone UI for a few hundred ms while
+                    // the bundle parses, then re-render.
+                    val isTv = isTelevision()
+                    view.evaluateJavascript(
+                        "window.__isAndroidTV=$isTv;", null
+                    )
+                    if (isTv) {
+                        // Pull-to-refresh has no place on a couch: there's
+                        // no touch surface to swipe with, and a stray D-pad
+                        // press shouldn't reload the whole web layer.
+                        swipeRefresh.isEnabled = false
+                    }
+                }
+
                 override fun onPageFinished(view: WebView, pageUrl: String?) {
                     super.onPageFinished(view, pageUrl)
                     swipeRefresh.isRefreshing = false
+                    // Re-assert the TV flag in case the page navigated
+                    // (login → notes) and reset the global.
+                    view.evaluateJavascript(
+                        "window.__isAndroidTV=${isTelevision()};", null
+                    )
                     // Push current system dark mode state to web app on load
                     val isDark = isDarkMode()
                     view.evaluateJavascript(
@@ -440,6 +473,17 @@ class WebViewActivity : AppCompatActivity() {
             }
             return true
         }
+        // "More options" / "Menu" key on most TV remotes (also the same
+        // key that opens the system settings rail in the Android TV
+        // launcher). Forward it to the webapp as a custom event so the
+        // TV viewer can use it to toggle its sidebar — same muscle
+        // memory as native apps.
+        if (keyCode == android.view.KeyEvent.KEYCODE_MENU) {
+            webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('tv-menu-key'));", null
+            )
+            return true
+        }
         return super.onKeyDown(keyCode, event)
     }
 
@@ -460,6 +504,16 @@ class WebViewActivity : AppCompatActivity() {
         return (resources.configuration.uiMode and
                 android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
                 android.content.res.Configuration.UI_MODE_NIGHT_YES
+    }
+
+    /** True when we're running on Android TV / leanback (Nvidia Shield,
+     *  Chromecast w/ Google TV, Mi Box, etc). Used to switch the webapp
+     *  into the read-friendly TV viewer on boot. */
+    private fun isTelevision(): Boolean {
+        val uiMode = resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_TYPE_MASK
+        if (uiMode == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION) return true
+        return packageManager.hasSystemFeature("android.software.leanback")
     }
 
     private fun showChangeServerDialog() {

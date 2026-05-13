@@ -96,6 +96,56 @@ A large part of the effort focused on real-world phone usage.
 ### Result
 The app feels much more credible as a daily mobile tool, where many small details previously made the experience rougher.
 
+### 📺 Android TV layout
+
+The responsive work was then extended all the way to the living room. The **same Android APK** now detects leanback hardware at boot (or the `?tv=1` URL override) and swaps the React frontend for a dedicated TV layout designed for the couch and the D-pad — no separate build, no separate install, no separate codebase to maintain.
+
+#### Detection & routing
+- `useTvMode()` hook combined with a `setTvModeOverride()` localStorage flag — TV mode is picked once at boot, can be forced via `?tv=1` for testing on a regular browser, and can be exited from the user chip popover on non-leanback devices
+- `AppRoot.jsx` picks `TvApp` vs the regular `App` based on that single flag — none of the existing phone / desktop code paths are touched on Android TV, the TV tree is a strict consumer that re-fetches `/api/notes` on mount and on window focus
+- the Android wrapper exposes `window.__isAndroidTV` from `WebViewActivity.kt` so the React side can hide the "Use phone layout" button when it would be a dead end (a TV stick has no touchscreen to fall back to)
+
+#### Dedicated TV tree (`src/components/tv/`)
+- `TvApp.jsx` — TV-mode entry point. Owns its own minimal session + notes-loading state (no sync engine, no IndexedDB queue, no SSE listener — the TV is a strict read-mostly viewer that polls `/api/notes` every 30 seconds and on focus)
+- `TvNotesViewer.jsx` — home screen with a Pinterest-style masonry grid (`react-masonry-css`), an auto-hiding sidebar rail and a header with the user chip
+- `TvNoteCard.jsx` — closed card with a notepad-style background mask, two variants (grid / carousel) sharing one render path
+- `TvNoteDetail.jsx` — fullscreen viewer with a capture-phase keydown handler so D-pad scroll never fights with the global spatial navigator
+- `TvLogin.jsx` — three-mode login: Jellyfin-style **profile grid** (avatar + name, populated from `/login/profiles`), **password prompt** once a profile is picked, and a **manual** identifier + password fallback for accounts that don't show up in the public profile list. Mirrors the phone's `email`-field contract so username-only accounts (no `@`) still sign in
+- `TvSidebar.jsx` — filter rail (All / Tags / Trash / Archive) with lucide icons sized for 10-foot reading
+- `tvStyles.js` — the entire TV stylesheet, injected at runtime once `<html data-tv="1">` is set, so the regular phone / desktop CSS is never affected
+
+#### D-pad spatial navigation (`useSpatialFocus.js`)
+- 2D geometric scoring (the way Android TV's framework does it) instead of tab order — picks the closest focusable in the requested direction by computing `primary + lateral * 2` against every candidate's rect
+- **zone containment** so D-pad navigation stays where it makes sense: up/down stays inside the sidebar / detail viewer, left/right stays inside the header — pressing Right on the rightmost header button no longer teleports focus into a card down in the grid
+- **fallback escape**: if the zone-restricted pool yields nothing (e.g. user is at the top of the sidebar pressing Up), the scan falls back to the global focusable list so the focus can leave the zone vertically instead of being stuck
+- **130 ms throttle on auto-repeat** (`REPEAT_LOCK_MS = 110`) because the CSS focus transition takes longer than the Shield WebView can repaint at native key-repeat speed — taps still go through instantly, only holds are clamped to ~9 moves/sec
+- capture-phase listener so the throttle hits before React's synthetic events
+- `data-tv-focused` attribute swap on previous + next only (never the whole tree) to avoid a CSS recalc storm on every move
+- `scrollIntoView({ block: "nearest" })` without `behavior: "smooth"` — smooth scroll on the Shield's WebView stalls 200-300 ms per row
+- ignores viewport bounds when scanning for candidates, otherwise the user gets stuck on the last visible row (no row below is "visible")
+- emits `tv-focus` events so individual screens can park focus on a sensible element after a mode change (login → password, password → first profile, …)
+
+#### Back-key plumbing
+- the Android `KEYCODE_BACK` is forwarded to `window.history.back()` from `WebViewActivity.kt`, and overlays like the user chip popover push a marker entry onto the history stack so the Back key closes them before unwinding the React tree
+- a `keydown` handler in `useSpatialFocus` also catches `Escape` / `GoBack` / `Backspace` so a hardware keyboard plugged into a TV stick works without any extra wiring
+- `KEYCODE_MENU` dispatches a custom `tv-menu-key` DOM event so the React side can hook into the remote's menu button without needing to peek at native key codes
+
+#### Performance tuning for older hardware (Nvidia Shield, etc.)
+- cheap signature poll (id + updated_at per note) before `setState`, so a no-op `/api/notes` tick doesn't re-render 100+ cards on every cycle (~150 ms saved per tick on older Shields)
+- masonry column count made **independent of sidebar state** — toggling the sidebar no longer forces a full re-bucket of the grid, which previously caused a 3-4 second freeze on Shield
+- `display: none` for the hidden sidebar rather than a CSS `transition` on `grid-template-columns`, which the Shield WebView couldn't keep up with
+- `flex-shrink: 0 !important` on `.tv-card__title` after several iterations chasing a clipped-to-8.4px-height title bug caused by `-webkit-box` collapsing
+- pager mode reserves `overflow: visible` only on the focused page so the focus ring isn't clipped by the carousel's outer overflow clip
+
+#### Android wrapper changes (`android/`)
+- `AndroidManifest.xml` — leanback `<uses-feature>` flags, `LEANBACK_LAUNCHER` intent filter, banner reference
+- `tv_banner.xml` / `drawable-xxxhdpi/tv_banner.png` — the rectangular Android TV banner shown in the leanback launcher
+- `WebViewActivity.kt` — `isTelevision()` helper, KEYCODE_BACK → `history.back()`, KEYCODE_MENU → `tv-menu-key` DOM event
+- `SetupScreen.kt` — a dedicated `TvSetupScreen` Compose variant with leanback-safe spacing and gradient brand text via `TextStyle.brush`, picked at runtime by an `isTelevision()` Compose helper
+
+### Why it matters
+The TV layout reuses the same React engine, the same auth flow, the same notes endpoint and the same Android wrapper — so a user who installs GlassKeep on their TV stick gets the same notes, the same accounts and the same sync behaviour as on their phone, just rendered for the couch. There is no separate "GlassKeep TV" app to maintain.
+
 ---
 
 ## 🤖 5) Native Android companion app

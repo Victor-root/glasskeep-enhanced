@@ -13,6 +13,12 @@
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <!-- TV support: declare leanback as optional and touchscreen as not required so
+         the same APK can be installed on phones, tablets AND Android TV devices
+         (Nvidia Shield, Chromecast with Google TV, etc). -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.faketouch" android:required="false" />
 
     <application
         android:allowBackup="false"
@@ -21,6 +27,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
+        android:banner="@drawable/tv_banner"
         android:supportsRtl="true"
         android:theme="@style/Theme.GlassKeep"
         android:usesCleartextTraffic="true">
@@ -32,6 +39,8 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <!-- Show in the Android TV "Apps" row alongside touch launchers. -->
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
 

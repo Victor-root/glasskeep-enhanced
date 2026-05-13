@@ -611,6 +611,10 @@ export default function App() {
           setEdgeToEdgeLandscape(settings.edgeToEdgeLandscape);
           localStorage.setItem("edgeToEdgeLandscape", String(settings.edgeToEdgeLandscape));
         }
+        if (settings?.editorToolbarMode === "simple" || settings?.editorToolbarMode === "advanced") {
+          setEditorToolbarMode(settings.editorToolbarMode);
+          localStorage.setItem("editorToolbarMode", settings.editorToolbarMode);
+        }
         if (settings?.typographyPresets && typeof settings.typographyPresets === "object") {
           const normalized = normalizeTypographyPresets(settings.typographyPresets);
           setTypographyPresets(normalized);
@@ -723,6 +727,14 @@ export default function App() {
 
   useEffect(() => {
     try { localStorage.setItem("editorToolbarMode", editorToolbarMode); } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { editorToolbarMode },
+      }).catch(() => {});
+    }
   }, [editorToolbarMode]);
 
   // Edge-to-edge landscape: save + dynamically toggle body padding-left

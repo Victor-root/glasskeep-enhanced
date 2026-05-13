@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.3.0 — 2026-05-13
+
+### Added
+- Android TV support: the existing APK detects leanback hardware and switches to a dedicated TV layout (Pinterest-style grid, D-pad spatial navigation, sidebar + detail viewer, profile picker login).
+- Refreshed master logo applied across the favicon (`.ico` + 16/32 PNGs), the PWA icons (192 / 512 / maskable), the Apple touch icon, the Android launcher (5 densities + adaptive foreground), the Android TV banner, and the Compose first-launch setup screen.
+
+### Fixed
+- Minor bug fixes
+
 ## v2.2.0 — 2026-05-10
 
 ### Added

@@ -40,15 +40,18 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.res.Configuration
 import com.glasskeep.app.R
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -191,9 +194,37 @@ private fun FloatingCardsBackground(dark: Boolean) {
     }
 }
 
+/** True on Android TV / leanback devices — matches the logic
+ *  WebViewActivity.kt uses to flip the WebView into TV mode. We rely
+ *  on it to swap the setup screen's theme to a dark-violet 10-foot
+ *  layout (same vibe as the in-app TvLogin) without touching the
+ *  phone / tablet experience. */
+@Composable
+private fun isTelevision(): Boolean {
+    val ctx = LocalContext.current
+    val uiMode = ctx.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
+    if (uiMode == Configuration.UI_MODE_TYPE_TELEVISION) return true
+    return ctx.packageManager.hasSystemFeature("android.software.leanback")
+}
+
+// TV theme — mirrors the in-app TvLogin React component (dark radial
+// gradient backdrop, violet→pink brand title, glass card, gradient
+// submit button). Used only when isTelevision() returns true.
+private val TvBgTop = Color(0xFF1a1530)
+private val TvBgMid = Color(0xFF0b0d12)
+private val TvBgBottom = Color(0xFF06070b)
+private val TvCardBg = Color(0xFF0F1119).copy(alpha = 0.85f)
+private val TvCardBorder = Color(0xFFffffff).copy(alpha = 0.08f)
+private val TvTitleStart = Color(0xFFc4b5fd) // violet-300
+private val TvTitleEnd = Color(0xFFf9a8d4)   // pink-300
+private val TvSubtextColor = Color(0xFF9ca3af)
+private val TvBodyColor = Color(0xFFf9fafb)
+private val TvAccent = Color(0xFFa78bfa) // violet-400 — focus / accent
+
 @Composable
 fun SetupScreen(onConnect: (String) -> Unit) {
     val dark = isSystemInDarkTheme()
+    val isTv = isTelevision()
     var url by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -225,6 +256,20 @@ fun SetupScreen(onConnect: (String) -> Unit) {
                 }.start()
             }
         }
+    }
+
+    // Branch the whole screen for TV — same fields and behaviour, but a
+    // dark-violet glass theme matching the in-app TvLogin so the user
+    // doesn't get jolted between two visual languages.
+    if (isTv) {
+        TvSetupScreen(
+            url = url,
+            onUrlChange = { url = it; error = null },
+            error = error,
+            loading = loading,
+            onConnect = doConnect
+        )
+        return
     }
 
     val bgModifier = if (dark) {
@@ -338,6 +383,140 @@ fun SetupScreen(onConnect: (String) -> Unit) {
                             indication = null,
                             role = Role.Button
                         ) { doConnect() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        stringResource(if (loading) R.string.connecting else R.string.setup_connect),
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        fontSize = 16.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+// TV variant of the setup screen. Same fields and the same doConnect
+// behaviour, but rendered with the dark-violet glass theme that
+// matches the in-app TvLogin React component. No floating cards
+// decoration here — keeps the layout calm at 10-foot distance.
+@Composable
+private fun TvSetupScreen(
+    url: String,
+    onUrlChange: (String) -> Unit,
+    error: String?,
+    loading: Boolean,
+    onConnect: () -> Unit,
+) {
+    val brandBrush = Brush.horizontalGradient(listOf(TvTitleStart, TvTitleEnd))
+    val bgBrush = Brush.radialGradient(
+        colors = listOf(TvBgTop, TvBgMid, TvBgBottom),
+        center = Offset(0.2f, 0f),
+        radius = 1800f
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(bgBrush),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.55f)
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.glasskeep_logo),
+                contentDescription = "GlassKeep",
+                modifier = Modifier
+                    .size(84.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .shadow(12.dp, RoundedCornerShape(20.dp))
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // TextStyle.brush (Compose 1.4+) fills the glyphs with the
+            // gradient — same effect the web brand uses.
+            Text(
+                text = "GlassKeep TV",
+                style = TextStyle(
+                    brush = brandBrush,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = stringResource(R.string.setup_subtitle),
+                fontSize = 13.sp,
+                color = TvSubtextColor
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(TvCardBg)
+                    .padding(24.dp)
+            ) {
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = onUrlChange,
+                    label = { Text(stringResource(R.string.setup_label)) },
+                    placeholder = { Text(stringResource(R.string.setup_placeholder)) },
+                    singleLine = true,
+                    isError = error != null,
+                    supportingText = {
+                        if (error != null) {
+                            Text(error, color = Color(0xFFfca5a5))
+                        } else {
+                            Text(
+                                stringResource(R.string.setup_hint),
+                                color = TvSubtextColor,
+                                fontSize = 12.sp
+                            )
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Uri,
+                        imeAction = ImeAction.Go
+                    ),
+                    keyboardActions = KeyboardActions(onGo = { onConnect() }),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TvBodyColor,
+                        unfocusedTextColor = TvBodyColor,
+                        focusedBorderColor = TvAccent,
+                        unfocusedBorderColor = TvCardBorder,
+                        focusedLabelColor = TvAccent,
+                        unfocusedLabelColor = TvSubtextColor,
+                        focusedPlaceholderColor = TvSubtextColor,
+                        unfocusedPlaceholderColor = TvSubtextColor,
+                        cursorColor = TvAccent
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ButtonGradient)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button
+                        ) { onConnect() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
