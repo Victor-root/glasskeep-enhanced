@@ -361,12 +361,15 @@ html[data-tv="1"] .tv-card__title {
   line-height: 1.4 !important;
   margin: 0 !important;
   word-break: break-word;
-  /* !important + min-height + max-height = no WebView quirk can
-     collapse this. The previous version using -webkit-box +
-     -webkit-line-clamp was rendering at ~0.4em height for short
-     titles on the Shield (verified via DevTools rectHeight: 8.4px).
-     The component now renders as a <div role="heading"> instead of
-     <h3> too, so no user-agent stylesheet on headings can chip in. */
+  /* The card is a flex column. Without flex-shrink: 0 the flex
+     algorithm can squeeze the title BETWEEN its min and max heights
+     when the rest of the content (preview + images + footer) doesn't
+     fit — that's how "A donner à claude code pour glasskeep" ended up
+     at 52.13px (1.69 lines) instead of the full 61.6px (2 lines),
+     leaving the 2nd-line descenders chopped off.
+     With flex-shrink: 0 the title always claims its preferred height
+     (1 or 2 lines), and the preview yields space instead. */
+  flex-shrink: 0 !important;
   display: block !important;
   min-height: 1.4em !important;
   max-height: 2.8em !important;
