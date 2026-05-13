@@ -279,20 +279,26 @@ html[data-tv="1"] .tv-masonry__col > .tv-card {
    inside it — the pager owns its own viewport-sized cells, the user
    should never be able to wheel/scroll past them. */
 html[data-tv="1"] .tv-notes-scroll--pager {
-  /* overflow: visible so the focus ring (box-shadow) around the
-     leftmost / rightmost card isn't clipped by this container. */
-  overflow: visible;
+  /* overflow: hidden again — long-content cards were spilling past
+     the bottom of the viewport. The 18px horizontal / 10px-26px
+     vertical padding on .tv-pager below absorbs the 3px focus ring
+     overflow, so the ring stays visible even with this clip. */
+  overflow: hidden;
   padding: 0;
 }
 html[data-tv="1"] .tv-pager {
   display: grid;
   grid-template-columns: 56px 1fr 56px;
+  /* One explicit row at 1fr — without it the row auto-sizes to the
+     intrinsic max-content of .tv-pager__page (= the tallest card),
+     which pushes the cards past the viewport bottom. */
+  grid-template-rows: 1fr;
   gap: var(--tv-gap);
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
-  /* Outer padding so the 3px focus ring on edge cards has room to
-     bloom without touching the bezel. */
+  /* Padding sized so the box-shadow focus ring (3px) escapes the
+     card and .tv-pager__page comfortably without touching the bezel. */
   padding: 10px 18px 26px;
   align-items: stretch;
 }
