@@ -167,7 +167,12 @@ html[data-tv="1"] .tv-layout {
      instant: snappier perceptually, way less CPU. */
 }
 html[data-tv="1"] .tv-layout--sidebar-hidden {
-  grid-template-columns: 0 1fr;
+  /* Single 1fr track, NOT "0 1fr": display:none drops the sidebar
+     from the flow, leaving the main as the only child — with the old
+     "0 1fr" it would have landed in the 0px-wide first cell, which is
+     exactly what produced the "thin slivers, no cards visible" bug.
+     One track + one child = the main pane takes the whole viewport. */
+  grid-template-columns: 1fr;
   gap: 0;
 }
 html[data-tv="1"] .tv-sidebar {
@@ -179,8 +184,6 @@ html[data-tv="1"] .tv-sidebar {
   min-width: 0;
 }
 html[data-tv="1"] .tv-layout--sidebar-hidden .tv-sidebar {
-  /* display:none kills the slot entirely — no rendering work for a
-     hidden sidebar. Better than visibility/opacity for the Shield. */
   display: none;
 }
 html[data-tv="1"] .tv-sidebar__group-label {
