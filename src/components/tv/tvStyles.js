@@ -45,27 +45,24 @@ html[data-tv="1"] * { scrollbar-width: none; }
 html[data-tv="1"] { user-select: none; -webkit-user-select: none; }
 html[data-tv="1"] .tv-allow-select { user-select: text; -webkit-user-select: text; }
 
-/* ------- Focus ring ------- */
+/* ------- Focus ring -------
+   Single box-shadow (was 3 stacked) and no transform on the cards
+   themselves; older Shields stutter when 100+ cards each have to
+   interpolate a multi-shadow + scale. We rely on a sharp violet
+   outline ring instead, which is one GPU layer per focused element. */
 html[data-tv="1"] *:focus { outline: none; }
 html[data-tv="1"] .tv-focusable {
   position: relative;
-  will-change: transform;
-  transition: transform 130ms ease, box-shadow 130ms ease;
+  transition: box-shadow 90ms ease;
   cursor: default;
-  transform-origin: center center;
 }
 html[data-tv="1"] .tv-focusable:focus,
 html[data-tv="1"] .tv-focusable[data-tv-focused="true"] {
-  transform: scale(1.025);
-  box-shadow:
-    0 0 0 3px rgba(167, 139, 250, 0.95),
-    0 0 14px 2px rgba(124, 58, 237, 0.4),
-    0 10px 22px -8px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.95);
   z-index: 50;
 }
 html[data-tv="1"] .tv-focusable.tv-focusable--flat:focus,
 html[data-tv="1"] .tv-focusable.tv-focusable--flat[data-tv-focused="true"] {
-  transform: none;
   box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.95);
 }
 
@@ -149,6 +146,17 @@ html[data-tv="1"] .tv-header__count {
   border: 1px solid rgba(167, 139, 250, 0.35);
   padding: 4px 12px;
   border-radius: 999px;
+}
+/* The pager page indicator is anchored to the visual centre of the
+   header — not the flex centre — so it stays put regardless of the
+   left/right cluster widths. pointer-events:none so it never blocks
+   D-pad focus on the controls underneath. */
+html[data-tv="1"] .tv-header__pager-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 /* ------- Main split layout ------- */
@@ -308,11 +316,18 @@ html[data-tv="1"] .tv-pager__page {
 html[data-tv="1"] .tv-pager .tv-card {
   height: 100%;
   min-height: 0;
-  /* max-height: 100% + overflow: hidden on the card itself, so a long
-     note never pushes the bottom past the viewport. */
   max-height: 100%;
   overflow: hidden;
   scroll-margin: 0;
+}
+/* In the pager the cards already fill their cell exactly; the
+   default focus scale (1.025) pushed them past the right edge of
+   their cell and clipped the glow. Use a ring-only focus (no scale)
+   for pager cards. */
+html[data-tv="1"] .tv-pager .tv-card.tv-focusable:focus,
+html[data-tv="1"] .tv-pager .tv-card.tv-focusable[data-tv-focused="true"] {
+  transform: none;
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.95);
 }
 html[data-tv="1"] .tv-pager .tv-card__title { font-size: 22px; }
 html[data-tv="1"] .tv-pager .tv-card__preview {
@@ -320,10 +335,8 @@ html[data-tv="1"] .tv-pager .tv-card__preview {
   max-height: none;
   flex: 1 1 auto;
   min-height: 0;
-  /* The mask makes the bottom fade cleanly when content does exceed
-     the card height. */
-  mask-image: linear-gradient(to bottom, #000 88%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 88%, transparent 100%);
+  /* Hard cut via overflow:hidden on the card itself — no mask
+     gradient (composited mask was a Shield bottleneck). */
 }
 html[data-tv="1"] .tv-pager .tv-card__images img { height: 140px; }
 
@@ -341,7 +354,6 @@ html[data-tv="1"] .tv-card {
   overflow: hidden;
   text-align: left;
   scroll-margin: 40px 24px 60px 24px;
-  contain: layout style paint;
 }
 html[data-tv="1"] .tv-card__title {
   font-size: 18px;
@@ -360,8 +372,9 @@ html[data-tv="1"] .tv-card__preview {
   overflow: hidden;
   opacity: 0.92;
   word-break: break-word;
-  mask-image: linear-gradient(to bottom, #000 80%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 80%, transparent 100%);
+  /* No mask-image fade — running a GPU-composited mask on every card
+     in a 100+ note grid was a measurable Shield bottleneck. Clean cut
+     via overflow:hidden is fast and just as readable. */
 }
 html[data-tv="1"] .tv-card__preview > * { margin: 0 0 0.4em !important; }
 html[data-tv="1"] .tv-card__preview > *:last-child { margin-bottom: 0 !important; }

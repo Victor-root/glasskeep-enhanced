@@ -24,21 +24,38 @@ const STORAGE_VIEW = "tv-view-mode";
 const STORAGE_SIDEBAR = "tv-sidebar";
 const STORAGE_THEME = "tv-theme";
 
-function useClock() {
+// Date+time line as its own subtree. The 30s tick used to live on
+// TvNotesViewer, which made the whole tree re-render every half
+// minute — masonry diff + memo bust on every card check. Isolated
+// here it costs literally one text node update per tick.
+function HeaderClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30 * 1000);
     return () => clearInterval(id);
   }, []);
-  return now;
+  const dateStr = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  const timeStr = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return <div className="tv-header__subtitle">{dateStr} · {timeStr}</div>;
 }
 
 function useViewportWidth() {
   const [w, setW] = useState(() => window.innerWidth || 1280);
   useEffect(() => {
-    const onResize = () => setW(window.innerWidth || 1280);
+    // Debounced resize listener. TVs almost never resize once running,
+    // but the launcher / system overlays can fire a few synthetic
+    // resize events at boot; debouncing keeps the masonry recompute
+    // from running multiple times back-to-back.
+    let t = null;
+    const onResize = () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => setW(window.innerWidth || 1280), 200);
+    };
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      if (t) clearTimeout(t);
+    };
   }, []);
   return w;
 }
@@ -154,7 +171,6 @@ export default function TvNotesViewer({
   // Carousel/pager page state lives here so the header can show the
   // "X / N" indicator and the keydown interceptor can paginate.
   const [pagerPage, setPagerPage] = useState(0);
-  const clock = useClock();
   const width = useViewportWidth();
   const detailHistoryRef = useRef(null);
 
@@ -364,9 +380,6 @@ export default function TvNotesViewer({
     return () => window.removeEventListener("tv-menu-key", onMenuKey);
   }, [toggleSidebar]);
 
-  const timeStr = clock.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  const dateStr = clock.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
-
   const filterLabel = (() => {
     if (!filter || filter.type === "all") return t("allNotes") || "All notes";
     if (filter.type === "images") return t("image") || "Images";
@@ -403,14 +416,16 @@ export default function TvNotesViewer({
         </button>
         <div className="tv-header__title-wrap">
           <div className="tv-header__title">GlassKeep</div>
-          <div className="tv-header__subtitle">{dateStr} · {timeStr}</div>
+          <HeaderClock />
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-          {viewMode === "carousel" && pagerTotalPages > 1 && (
-            <span className="tv-header__count" aria-label="Pager page">
+        {viewMode === "carousel" && pagerTotalPages > 1 && (
+          <div className="tv-header__pager-indicator" aria-label="Pager page">
+            <span className="tv-header__count">
               {pagerPage + 1} / {pagerTotalPages}
             </span>
-          )}
+          </div>
+        )}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
           <span className="tv-header__count">{filterLabel} · {visible.length}</span>
           <HeaderUserChip currentUser={currentUser} />
         </div>
