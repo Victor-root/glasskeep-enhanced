@@ -63,7 +63,7 @@ function pickNextFocus(current, direction) {
   const cur = getRect(current);
   let pool = all;
   const curZone = zoneOf(current);
-  // Vertical containment: sidebar and detail viewer keep their own
+  // Vertical containment: sidebar and detail viewer prefer their own
   // up/down loops. Header lets up/down leave (Down goes to cards).
   if (direction === "up" || direction === "down") {
     if (curZone === "sidebar" || curZone === "detail") {
@@ -78,6 +78,18 @@ function pickNextFocus(current, direction) {
       pool = all.filter((el) => zoneOf(el) === curZone);
     }
   }
+  let best = scoreBest(cur, pool, current, direction);
+  // If the zone-restricted pool yielded nothing (e.g. user is at the
+  // top of the sidebar pressing Up — no sidebar candidate higher up),
+  // fall back to the full focusable list so the focus can ESCAPE the
+  // zone vertically. Otherwise the user would be stuck.
+  if (!best && pool !== all) {
+    best = scoreBest(cur, all, current, direction);
+  }
+  return best;
+}
+
+function scoreBest(cur, pool, current, direction) {
   let best = null;
   let bestScore = Infinity;
   for (const el of pool) {
