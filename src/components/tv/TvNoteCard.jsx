@@ -104,9 +104,14 @@ function TvNoteCardImpl({ note, variant = "grid", onActivate }) {
       )}
 
       {note.title && (
-        <h3 className="tv-card__title" style={{ paddingRight: icon && !isCarousel ? 24 : 0 }}>
+        <div
+          className="tv-card__title"
+          role="heading"
+          aria-level="3"
+          style={{ paddingRight: icon && !isCarousel ? 24 : 0 }}
+        >
           {note.title}
-        </h3>
+        </div>
       )}
 
       {imgs.length > 0 && (

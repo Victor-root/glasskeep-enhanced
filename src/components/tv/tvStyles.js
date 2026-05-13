@@ -358,21 +358,20 @@ html[data-tv="1"] .tv-card {
 html[data-tv="1"] .tv-card__title {
   font-size: 18px;
   font-weight: 700;
-  line-height: 1.4;
-  margin: 0;
+  line-height: 1.4 !important;
+  margin: 0 !important;
   word-break: break-word;
-  /* IMPORTANT: do NOT use display: -webkit-box + -webkit-line-clamp.
-     On the Shield WebView these get computed as display: flow-root and
-     the rendered height collapses to ~0.4em (~8px at 22px font-size)
-     for single-line titles like "SMS MIRIAD" — combined with the
-     overflow: hidden the title was rendered into a 8px-tall sliver and
-     looked clipped through 80% of its glyph height.
-     Plain block + max-height + overflow: hidden gives the title its
-     natural one-or-two-line height and clips only when it would exceed
-     ~2.8em, with no WebKit special-casing involved. */
-  display: block;
-  max-height: 2.8em;
-  overflow: hidden;
+  /* !important + min-height + max-height = no WebView quirk can
+     collapse this. The previous version using -webkit-box +
+     -webkit-line-clamp was rendering at ~0.4em height for short
+     titles on the Shield (verified via DevTools rectHeight: 8.4px).
+     The component now renders as a <div role="heading"> instead of
+     <h3> too, so no user-agent stylesheet on headings can chip in. */
+  display: block !important;
+  min-height: 1.4em !important;
+  max-height: 2.8em !important;
+  height: auto !important;
+  overflow: hidden !important;
 }
 html[data-tv="1"] .tv-card__preview {
   font-size: 14px;
