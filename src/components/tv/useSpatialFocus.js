@@ -126,11 +126,13 @@ function focusFirst() {
   if (first) focusElement(first);
 }
 
-export default function useSpatialFocus({ enabled, onBack, onEdgeReached } = {}) {
+export default function useSpatialFocus({ enabled, onBack, onEdgeReached, onZoneChange } = {}) {
   const onBackRef = useRef(onBack);
   onBackRef.current = onBack;
   const onEdgeReachedRef = useRef(onEdgeReached);
   onEdgeReachedRef.current = onEdgeReached;
+  const onZoneChangeRef = useRef(onZoneChange);
+  onZoneChangeRef.current = onZoneChange;
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -167,6 +169,14 @@ export default function useSpatialFocus({ enabled, onBack, onEdgeReached } = {})
         const anchor = active && active.matches?.(FOCUSABLE_SELECTOR) ? active : lastFocusedRef;
         const next = pickNextFocus(anchor, dir);
         if (next) {
+          // Notify the consumer when the move crosses zones (e.g. the
+          // user just left the sidebar going right). That's how the
+          // viewer auto-closes the rail.
+          if (anchor && typeof onZoneChangeRef.current === "function") {
+            const fromZone = zoneOf(anchor);
+            const toZone = zoneOf(next);
+            if (fromZone !== toZone) onZoneChangeRef.current(fromZone, toZone, dir);
+          }
           focusElement(next);
         } else if (typeof onEdgeReachedRef.current === "function") {
           // No candidate in this direction — let the parent decide

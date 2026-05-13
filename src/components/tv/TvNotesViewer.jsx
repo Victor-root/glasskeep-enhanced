@@ -88,56 +88,31 @@ function pickColumnCount(width) {
   return 7;
 }
 
-// Two-cards-at-a-time pager. The user explicitly asked for fixed
-// viewport (no half-cards peeking, no smooth scroll) — just two
-// cards, two arrows, click an arrow and the page flips by 2.
-function TvPager({ notes, onActivate }) {
-  const PAGE_SIZE = 2;
-  const [page, setPage] = useState(0);
-  const totalPages = Math.max(1, Math.ceil(notes.length / PAGE_SIZE));
-  // Clamp the current page back to range when the source list shrinks
-  // (e.g. a filter activated). React state isn't ideal for this — a
-  // single useEffect keeps it cheap and avoids derived-state bugs.
-  useEffect(() => {
-    if (page >= totalPages) setPage(Math.max(0, totalPages - 1));
-  }, [page, totalPages]);
+const PAGER_PAGE_SIZE = 2;
 
-  const start = page * PAGE_SIZE;
-  const slice = notes.slice(start, start + PAGE_SIZE);
-  const canPrev = page > 0;
-  const canNext = page < totalPages - 1;
-
+// Two-cards-at-a-time pager.
+// Arrows are PURELY DECORATIVE (no click target, no focus): the user
+// pages by pressing Right at the last card of the current page or Left
+// at the first one. The intercept handler lives in TvNotesViewer
+// because the page state is lifted up (so the header can show the
+// indicator).
+function TvPager({ slice, hasPrev, hasNext, onActivate }) {
   return (
     <div className="tv-pager">
-      <button
-        type="button"
-        className="tv-pager__arrow tv-focusable tv-focusable--flat"
-        aria-label="Previous page"
-        disabled={!canPrev}
-        onClick={() => canPrev && setPage((p) => Math.max(0, p - 1))}
-      >
-        <ChevronLeft size={32} />
-      </button>
+      <div className="tv-pager__arrow tv-pager__arrow--decorative" aria-hidden="true">
+        {hasPrev && <ChevronLeft size={36} />}
+      </div>
       <div className="tv-pager__page">
         {slice.map((n) => (
           <TvNoteCard key={n.id} note={n} variant="carousel" onActivate={onActivate} />
         ))}
-        {/* Fill empty slot(s) on the last page so the grid keeps two columns. */}
-        {slice.length < PAGE_SIZE && Array.from({ length: PAGE_SIZE - slice.length }).map((_, i) => (
+        {/* Fill any empty slot on the last page so the grid stays 2-column. */}
+        {slice.length < PAGER_PAGE_SIZE && Array.from({ length: PAGER_PAGE_SIZE - slice.length }).map((_, i) => (
           <div key={`pad-${i}`} aria-hidden="true" />
         ))}
       </div>
-      <button
-        type="button"
-        className="tv-pager__arrow tv-focusable tv-focusable--flat"
-        aria-label="Next page"
-        disabled={!canNext}
-        onClick={() => canNext && setPage((p) => Math.min(totalPages - 1, p + 1))}
-      >
-        <ChevronRight size={32} />
-      </button>
-      <div className="tv-pager__indicator" aria-hidden="true">
-        {page + 1} / {totalPages}
+      <div className="tv-pager__arrow tv-pager__arrow--decorative" aria-hidden="true">
+        {hasNext && <ChevronRight size={36} />}
       </div>
     </div>
   );
@@ -176,6 +151,9 @@ export default function TvNotesViewer({
   const sidebarPrefHiddenRef = useRef(loadPref(STORAGE_SIDEBAR, "closed") !== "open");
   const [viewMode, setViewMode] = useState(() => loadPref(STORAGE_VIEW, "grid") === "carousel" ? "carousel" : "grid");
   const [theme, setTheme] = useState(() => loadPref(STORAGE_THEME, "dark") === "light" ? "light" : "dark");
+  // Carousel/pager page state lives here so the header can show the
+  // "X / N" indicator and the keydown interceptor can paginate.
+  const [pagerPage, setPagerPage] = useState(0);
   const clock = useClock();
   const width = useViewportWidth();
   const detailHistoryRef = useRef(null);
@@ -197,6 +175,64 @@ export default function TvNotesViewer({
 
   const visible = useMemo(() => partitionNotes(notes, filter), [notes, filter]);
   const colCount = useMemo(() => pickColumnCount(width), [width]);
+
+  // Pager derived state. Clamp the page index when the visible list
+  // shrinks (filter changed, notes deleted from another device).
+  const pagerTotalPages = Math.max(1, Math.ceil(visible.length / PAGER_PAGE_SIZE));
+  useEffect(() => {
+    if (pagerPage >= pagerTotalPages) setPagerPage(Math.max(0, pagerTotalPages - 1));
+  }, [pagerPage, pagerTotalPages]);
+  useEffect(() => { setPagerPage(0); }, [filter]); // reset on filter change
+  const pagerSlice = useMemo(() => {
+    if (viewMode !== "carousel") return [];
+    const start = pagerPage * PAGER_PAGE_SIZE;
+    return visible.slice(start, start + PAGER_PAGE_SIZE);
+  }, [viewMode, visible, pagerPage]);
+
+  // D-pad page intercept. Runs in capture phase so we win the race
+  // against useSpatialFocus (which is bound on document in bubble
+  // phase). Activated only when focus is on a pager card.
+  useEffect(() => {
+    if (viewMode !== "carousel") return undefined;
+    const onKey = (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const active = document.activeElement;
+      if (!active?.closest?.(".tv-pager__page")) return;
+      const pageEl = active.closest(".tv-pager__page");
+      const cards = Array.from(pageEl.querySelectorAll("[data-note-id]"));
+      const idx = cards.indexOf(active);
+      if (idx < 0) return;
+
+      if (e.key === "ArrowRight" && idx === cards.length - 1) {
+        if (pagerPage < pagerTotalPages - 1) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          setPagerPage((p) => Math.min(pagerTotalPages - 1, p + 1));
+          requestAnimationFrame(() => {
+            const first = document.querySelector(".tv-pager__page [data-note-id]");
+            if (first instanceof HTMLElement) {
+              window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target: first } }));
+            }
+          });
+        }
+      } else if (e.key === "ArrowLeft" && idx === 0) {
+        if (pagerPage > 0) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          setPagerPage((p) => Math.max(0, p - 1));
+          requestAnimationFrame(() => {
+            const els = document.querySelectorAll(".tv-pager__page [data-note-id]");
+            const target = els[els.length - 1];
+            if (target instanceof HTMLElement) {
+              window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target } }));
+            }
+          });
+        }
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [viewMode, pagerPage, pagerTotalPages]);
 
   // Remember the card the user activated so we can drop focus back on
   // it when the detail closes — otherwise the focus loop snaps to the
@@ -262,26 +298,39 @@ export default function TvNotesViewer({
       if (sidebarVisible) setSidebarVisible(false);
     },
     onEdgeReached: (direction, anchor) => {
-      if (direction === "left") {
-        // Left from the leftmost card → pop the rail open.
-        if (!sidebarVisible) revealSidebarFromEdge();
-        return;
+      // Left at the leftmost card → pop the rail open.
+      if (direction === "left" && !anchor?.closest?.(".tv-sidebar") && !sidebarVisible) {
+        revealSidebarFromEdge();
       }
-      if (direction === "right") {
-        const inSidebar = anchor?.closest?.(".tv-sidebar");
-        if (inSidebar && sidebarVisible) hideSidebarFromEdge();
+    },
+    onZoneChange: (from, to, dir) => {
+      // Right from sidebar to main: useSpatialFocus already moved the
+      // focus onto the first card. Close the rail iff the preference
+      // is hidden — otherwise keep it pinned.
+      if (from === "sidebar" && to === "main" && dir === "right" && sidebarPrefHiddenRef.current) {
+        setSidebarVisible(false);
       }
     },
   });
 
   // Hamburger / MENU-key toggle updates BOTH the current state and
   // the stored preference (so the next launch lands on the user's
-  // last explicit choice).
+  // last explicit choice), and re-parks the focus on the side the
+  // user is now on: opening the rail focuses its first item, closing
+  // it drops focus on the first card.
   const toggleSidebar = useCallback(() => {
     setSidebarVisible((v) => {
       const next = !v;
       savePref(STORAGE_SIDEBAR, next ? "open" : "closed");
       sidebarPrefHiddenRef.current = !next;
+      requestAnimationFrame(() => {
+        const target = next
+          ? document.querySelector(".tv-sidebar .tv-focusable")
+          : document.querySelector("[data-note-id]");
+        if (target instanceof HTMLElement) {
+          window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target } }));
+        }
+      });
       return next;
     });
   }, []);
@@ -298,19 +347,9 @@ export default function TvNotesViewer({
     });
   }, []);
 
-  // Right-edge: only auto-hide if the user prefers the rail hidden.
-  // Otherwise leave it open — they've asked for the rail to stay.
-  const hideSidebarFromEdge = useCallback(() => {
-    if (!sidebarPrefHiddenRef.current) return;
-    setSidebarVisible(false);
-    requestAnimationFrame(() => {
-      // Drop focus on the first card so the user lands somewhere useful.
-      const firstCard = document.querySelector("[data-note-id]");
-      if (firstCard instanceof HTMLElement) {
-        window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target: firstCard } }));
-      }
-    });
-  }, []);
+  // Right-edge close-on-leave is handled by the onZoneChange callback
+  // (see useSpatialFocus call below) — useSpatialFocus already focuses
+  // the first card on the way out, so we just need to flip the rail.
   const toggleView = useCallback(() => setViewMode((v) => v === "grid" ? "carousel" : "grid"), []);
   const toggleTheme = useCallback(() => setTheme((t) => t === "dark" ? "light" : "dark"), []);
 
@@ -367,6 +406,11 @@ export default function TvNotesViewer({
           <div className="tv-header__subtitle">{dateStr} · {timeStr}</div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          {viewMode === "carousel" && pagerTotalPages > 1 && (
+            <span className="tv-header__count" aria-label="Pager page">
+              {pagerPage + 1} / {pagerTotalPages}
+            </span>
+          )}
           <span className="tv-header__count">{filterLabel} · {visible.length}</span>
           <HeaderUserChip currentUser={currentUser} />
         </div>
@@ -384,7 +428,7 @@ export default function TvNotesViewer({
           onSignOut={onSignOut}
         />
 
-        <main className="tv-notes-scroll" aria-label={filterLabel}>
+        <main className={`tv-notes-scroll${viewMode === "carousel" ? " tv-notes-scroll--pager" : ""}`} aria-label={filterLabel}>
           {visible.length === 0 ? (
             <div className="tv-empty">
               <div className="tv-empty__title">{t("noNotesYet") || "No notes yet"}</div>
@@ -394,7 +438,12 @@ export default function TvNotesViewer({
               </div>
             </div>
           ) : viewMode === "carousel" ? (
-            <TvPager notes={visible} onActivate={openDetail} />
+            <TvPager
+              slice={pagerSlice}
+              hasPrev={pagerPage > 0}
+              hasNext={pagerPage < pagerTotalPages - 1}
+              onActivate={openDetail}
+            />
           ) : (
             <Masonry
               breakpointCols={colCount}

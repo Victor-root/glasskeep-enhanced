@@ -266,36 +266,33 @@ html[data-tv="1"] .tv-masonry__col > .tv-card {
   margin-bottom: var(--tv-gap);
 }
 
-/* ------- Horizontal pager (two fixed cards + left/right arrows) ------- */
+/* ------- Pager (two fixed cards + decorative arrows) ------- */
+/* The scroll container drops its vertical scroll when the pager is
+   inside it — the pager owns its own viewport-sized cells, the user
+   should never be able to wheel/scroll past them. */
+html[data-tv="1"] .tv-notes-scroll--pager {
+  overflow: hidden;
+  padding: 0;
+}
 html[data-tv="1"] .tv-pager {
   display: grid;
-  grid-template-columns: 64px 1fr 64px;
+  grid-template-columns: 56px 1fr 56px;
   gap: var(--tv-gap);
   flex: 1 1 auto;
   min-height: 0;
-  padding: 14px 16px 30px;
+  height: 100%;
+  padding: 12px 14px 22px;
   align-items: stretch;
 }
 html[data-tv="1"] .tv-pager__arrow {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  color: #e5e7eb;
-  min-height: 100%;
-  font-size: 28px;
-}
-html[data-tv="1"] .tv-pager__arrow[disabled] {
-  opacity: 0.25;
+  color: #c4b5fd;
+  opacity: 0.55;
   pointer-events: none;
 }
-html[data-tv="1"][data-tv-theme="light"] .tv-pager__arrow {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.08);
-  color: #1f2937;
-}
+html[data-tv="1"][data-tv-theme="light"] .tv-pager__arrow { color: #7c3aed; }
 html[data-tv="1"] .tv-pager__page {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -303,35 +300,32 @@ html[data-tv="1"] .tv-pager__page {
   align-items: stretch;
   min-width: 0;
   min-height: 0;
+  /* Hard cap on height so cards can't grow past the viewport — the
+     overflow:hidden trims any preview that would exceed the cell. */
+  height: 100%;
+  overflow: hidden;
 }
-html[data-tv="1"] .tv-pager__indicator {
-  position: absolute;
-  bottom: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 6px;
-  font-size: 12px;
-  color: #9ca3af;
-}
-/* Cards inside the pager fill their cell entirely so the bottom of
-   the card is never empty (the previous flex-basis layout left a big
-   blank strip below the content). */
 html[data-tv="1"] .tv-pager .tv-card {
   height: 100%;
   min-height: 0;
-  max-height: none;
+  /* max-height: 100% + overflow: hidden on the card itself, so a long
+     note never pushes the bottom past the viewport. */
+  max-height: 100%;
+  overflow: hidden;
   scroll-margin: 0;
 }
 html[data-tv="1"] .tv-pager .tv-card__title { font-size: 22px; }
 html[data-tv="1"] .tv-pager .tv-card__preview {
   font-size: 16px;
-  /* Let the preview grow to fill the card — leftover space below
-     content gets the gradient mask instead of an empty area. */
   max-height: none;
   flex: 1 1 auto;
+  min-height: 0;
+  /* The mask makes the bottom fade cleanly when content does exceed
+     the card height. */
+  mask-image: linear-gradient(to bottom, #000 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 88%, transparent 100%);
 }
-html[data-tv="1"] .tv-pager .tv-card__images img { height: 160px; }
+html[data-tv="1"] .tv-pager .tv-card__images img { height: 140px; }
 
 /* ------- Note card (closed) ------- */
 html[data-tv="1"] .tv-card {
