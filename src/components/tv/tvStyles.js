@@ -1,22 +1,18 @@
 // CSS injected when the app boots in Android TV mode.
 //
-// Gated entirely on `<html data-tv="1">` — removing the attribute kills
-// every override at once. Nothing in this sheet should ever apply to the
-// phone or desktop layouts; if a rule needs to leak there it doesn't
-// belong here.
+// Gated entirely on `<html data-tv="1">`.
 
 export const TV_STYLE_ID = "tv-mode-styles";
 
 export const TV_CSS = `
-/* ------- Root layer ------- */
+/* ------- Root ------- */
 :root {
-  /* Tighter safe-area — most modern TVs have no overscan and Nvidia
-     Shield exposes the full panel. We still keep a small inset so the
-     focus glow + scrollbars don't kiss the bezel. */
+  /* Vertical safe area is generous because most consumer TVs still
+     overscan 4-5% top/bottom — the header was being clipped before. */
   --tv-safe-x: 2vw;
-  --tv-safe-y: 2.2vh;
+  --tv-safe-y: 5.5vh;
   --tv-focus-pad: 14px;
-  --tv-gap: 12px;
+  --tv-gap: 14px;
 }
 html[data-tv="1"], html[data-tv="1"] body {
   background: #0b0d12 !important;
@@ -30,8 +26,6 @@ html[data-tv="1"], html[data-tv="1"] body {
   box-sizing: border-box;
 }
 html[data-tv="1"] body {
-  /* Static gradient — radial-gradient is cheap on the GPU, no
-     repaint cost. Backdrop-filter is reserved for the detail overlay. */
   background: radial-gradient(circle at 20% 0%, #1a1530 0%, #0b0d12 55%, #06070b 100%) !important;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
@@ -47,10 +41,8 @@ html[data-tv="1"] .tv-allow-select { user-select: text; -webkit-user-select: tex
 html[data-tv="1"] *:focus { outline: none; }
 html[data-tv="1"] .tv-focusable {
   position: relative;
-  /* Hint the compositor — pre-rasterise the transform so the focus
-     animation stays on the GPU and doesn't repaint the whole grid. */
   will-change: transform;
-  transition: transform 140ms ease, box-shadow 140ms ease;
+  transition: transform 130ms ease, box-shadow 130ms ease;
   cursor: default;
   transform-origin: center center;
 }
@@ -84,23 +76,10 @@ html[data-tv="1"] .tv-header {
   align-items: center;
   gap: 12px;
   padding: var(--tv-safe-y) var(--tv-safe-x) 8px;
-  background: linear-gradient(180deg, rgba(11, 13, 18, 0.92) 0%, rgba(11, 13, 18, 0.0) 100%);
   position: relative;
   z-index: 20;
-  min-height: 0;
 }
-html[data-tv="1"] .tv-header__hamburger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  color: #e5e7eb;
-  flex-shrink: 0;
-}
+html[data-tv="1"] .tv-header__hamburger,
 html[data-tv="1"] .tv-header__viewtoggle {
   display: inline-flex;
   align-items: center;
@@ -153,9 +132,7 @@ html[data-tv="1"] .tv-header__avatar {
   font-size: 12px;
   overflow: hidden;
 }
-html[data-tv="1"] .tv-header__avatar img {
-  width: 100%; height: 100%; object-fit: cover;
-}
+html[data-tv="1"] .tv-header__avatar img { width: 100%; height: 100%; object-fit: cover; }
 html[data-tv="1"] .tv-header__count {
   font-size: 12px;
   color: #c4b5fd;
@@ -168,37 +145,33 @@ html[data-tv="1"] .tv-header__count {
 /* ------- Main split layout ------- */
 html[data-tv="1"] .tv-layout {
   display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 10px;
+  grid-template-columns: 230px 1fr;
+  gap: 12px;
   flex: 1 1 auto;
   min-height: 0;
   padding: 0 var(--tv-safe-x) var(--tv-safe-y);
-  /* transition only the column track — cheap, and the right-hand grid
-     reflows automatically because we use minmax(220px, 1fr) inside. */
-  transition: grid-template-columns 220ms ease;
+  transition: grid-template-columns 200ms ease, gap 200ms ease;
 }
 html[data-tv="1"] .tv-layout--sidebar-hidden {
+  /* gap collapses too — every available pixel goes to the notes pane. */
   grid-template-columns: 0 1fr;
+  gap: 0;
 }
-
 html[data-tv="1"] .tv-sidebar {
   display: flex;
   flex-direction: column;
   gap: 5px;
   overflow-y: auto;
-  /* Padding on the LEFT too so the focus glow has room to bloom
-     without being clipped by the parent's overflow:hidden. The
-     previous "0" left-padding cut the ring on the screen edge. */
   padding: 8px 8px 24px 8px;
   min-width: 0;
   opacity: 1;
-  transition: opacity 200ms ease, visibility 0s 0ms;
+  transition: opacity 180ms ease, visibility 0s 0ms;
 }
 html[data-tv="1"] .tv-layout--sidebar-hidden .tv-sidebar {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 180ms ease, visibility 0s 180ms;
+  transition: opacity 160ms ease, visibility 0s 160ms;
   padding: 0;
 }
 html[data-tv="1"] .tv-sidebar__group-label {
@@ -255,94 +228,84 @@ html[data-tv="1"] .tv-sidebar__item-count {
   text-align: center;
 }
 
-/* ------- Notes scroll + grid ------- */
+/* ------- Notes scroll ------- */
 html[data-tv="1"] .tv-notes-scroll {
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 10px 10px 56px 10px;
+  padding: 10px 10px 40px 10px;
   scroll-behavior: smooth;
   scroll-padding-top: 20px;
-  scroll-padding-bottom: 80px;
+  scroll-padding-bottom: 60px;
   min-width: 0;
 }
-/* Grid view — auto-fills so the row reflows the moment the sidebar
-   collapses (width grows ⇒ more columns appear). Min card width 200px
-   means roughly 6-7 cards at 1080p with the sidebar hidden, 5-6 when
-   it's shown. */
-html[data-tv="1"] .tv-notes-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--tv-gap);
-  /* align-items: start lets each card take its natural height, so the
-     library doesn't look like a wall of identical rectangles any more. */
-  align-items: start;
-  grid-auto-rows: min-content;
-  padding: 2px 2px 8px;
-}
-/* List view — horizontal cards (title left, preview right). One card
-   per row, scrollable vertically. TV space is mostly horizontal, so
-   wide cards make better use of it than tall ones. */
-html[data-tv="1"] .tv-notes-list {
+
+/* ------- Masonry grid (Pinterest-style, no horizontal gaps) ------- */
+html[data-tv="1"] .tv-masonry {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  margin-left: calc(-1 * var(--tv-gap));
+  width: auto;
   padding: 2px 2px 8px;
 }
-html[data-tv="1"] .tv-notes-list .tv-card {
-  flex-direction: row;
-  align-items: stretch;
-  min-height: 0;
-  padding: 12px 18px;
-  gap: 18px;
+html[data-tv="1"] .tv-masonry__col {
+  padding-left: var(--tv-gap);
+  background-clip: padding-box;
 }
-html[data-tv="1"] .tv-notes-list .tv-card__title {
-  -webkit-line-clamp: 1;
-  font-size: 16px;
-  flex-shrink: 0;
-  width: 280px;
-  align-self: center;
-}
-html[data-tv="1"] .tv-notes-list .tv-card__preview {
-  -webkit-line-clamp: 2;
-  flex: 1 1 auto;
-  align-self: center;
-  font-size: 13px;
-}
-html[data-tv="1"] .tv-notes-list .tv-card__images {
-  width: 120px;
-  flex-shrink: 0;
-  align-self: center;
-  margin: 0;
-}
-html[data-tv="1"] .tv-notes-list .tv-card__images img { height: 56px; }
-html[data-tv="1"] .tv-notes-list .tv-card__footer {
-  align-self: center;
-  margin: 0;
-  flex-shrink: 0;
+html[data-tv="1"] .tv-masonry__col > .tv-card {
+  margin-bottom: var(--tv-gap);
 }
 
-/* ------- Note card (closed, grid view) ------- */
+/* ------- Horizontal carousel (one row, scroll horizontally) ------- */
+html[data-tv="1"] .tv-carousel {
+  display: flex;
+  flex-direction: row;
+  gap: var(--tv-gap);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding: 12px 4px 60px;
+  /* Make the row tall enough to fit ~2x the grid card height. */
+  min-height: 460px;
+  align-items: stretch;
+}
+html[data-tv="1"] .tv-carousel .tv-card {
+  /* Each carousel card is roughly 2x a grid card → 3 visible per
+     1080p with the sidebar closed (1844px / 600 ≈ 3). */
+  flex: 0 0 600px;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  min-height: 100%;
+  max-height: none;
+}
+@media (max-width: 1400px) {
+  html[data-tv="1"] .tv-carousel .tv-card { flex-basis: 500px; }
+  html[data-tv="1"] .tv-carousel { min-height: 420px; }
+}
+html[data-tv="1"] .tv-carousel .tv-card__title { font-size: 22px; }
+html[data-tv="1"] .tv-carousel .tv-card__preview {
+  font-size: 16px;
+  max-height: 14em;
+}
+html[data-tv="1"] .tv-carousel .tv-card__images img { height: 130px; }
+
+/* ------- Note card (closed) ------- */
 html[data-tv="1"] .tv-card {
-  border-radius: 12px;
-  padding: 11px 12px 10px;
-  /* No min-height — the card takes the height of its content so the
-     library has actual visual variety. The container's grid still
-     lines up rows; align-items: start gives top alignment. */
+  border-radius: 14px;
+  padding: 16px 16px 14px;
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 7px;
   color: #111827;
   border: 1px solid rgba(255, 255, 255, 0.06);
   position: relative;
   overflow: hidden;
   text-align: left;
   scroll-margin: 40px 24px 60px 24px;
-  /* Hint the GPU — these cards are the busiest layer of the home view. */
   contain: layout style paint;
 }
 html[data-tv="1"] .tv-card__title {
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1.25;
   word-break: break-word;
@@ -352,47 +315,43 @@ html[data-tv="1"] .tv-card__title {
   overflow: hidden;
 }
 html[data-tv="1"] .tv-card__preview {
-  font-size: 12px;
-  line-height: 1.4;
-  /* Hard cap on height (instead of -webkit-line-clamp) so blocks like
-     <pre>, <hr> and code chunks don't render past the visible area. */
-  max-height: 9.6em; /* roughly 8 lines */
+  font-size: 14px;
+  line-height: 1.45;
+  max-height: 12em;
   overflow: hidden;
   opacity: 0.92;
   word-break: break-word;
-  /* Make the bottom of the preview fade out — clean visual cutoff
-     that doesn't look like a clipped element. */
-  mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 80%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 80%, transparent 100%);
 }
-html[data-tv="1"] .tv-card__preview > * {
-  margin: 0 0 0.35em !important;
-}
+html[data-tv="1"] .tv-card__preview > * { margin: 0 0 0.4em !important; }
 html[data-tv="1"] .tv-card__preview > *:last-child { margin-bottom: 0 !important; }
 html[data-tv="1"] .tv-card__preview h1,
 html[data-tv="1"] .tv-card__preview h2,
 html[data-tv="1"] .tv-card__preview h3 {
   font-weight: 700 !important;
-  font-size: 12.5px !important;
-  margin: 0.2em 0 0.35em !important;
+  font-size: 14.5px !important;
+  margin: 0.2em 0 0.4em !important;
 }
 html[data-tv="1"] .tv-card__preview ul,
-html[data-tv="1"] .tv-card__preview ol { padding-left: 1.1em !important; }
+html[data-tv="1"] .tv-card__preview ol { padding-left: 1.15em !important; }
 html[data-tv="1"] .tv-card__preview pre {
   display: block;
   font-family: 'Fira Code', 'JetBrains Mono', monospace !important;
-  font-size: 11px !important;
+  font-size: 13px !important;
   background: rgba(0, 0, 0, 0.18) !important;
-  padding: 5px 8px !important;
-  border-radius: 5px !important;
-  margin: 4px 0 !important;
-  white-space: pre;
+  padding: 6px 9px !important;
+  border-radius: 6px !important;
+  margin: 5px 0 !important;
+  /* Wrap long lines so the preview doesn't silently clip them. */
+  white-space: pre-wrap;
+  word-break: break-word;
   overflow: hidden;
-  max-height: 5.5em;
+  max-height: 7em;
 }
 html[data-tv="1"] .tv-card__preview code {
   font-family: 'Fira Code', 'JetBrains Mono', monospace !important;
-  font-size: 11px !important;
+  font-size: 13px !important;
   background: rgba(0, 0, 0, 0.18) !important;
   padding: 1px 5px !important;
   border-radius: 4px !important;
@@ -405,125 +364,134 @@ html[data-tv="1"] .tv-card__preview hr {
   border: none;
   border-top: 1px solid currentColor;
   opacity: 0.18;
-  margin: 6px 0 !important;
+  margin: 7px 0 !important;
 }
 html[data-tv="1"] .tv-card__preview blockquote {
   border-left: 2px solid currentColor;
-  padding: 1px 8px;
+  padding: 2px 9px;
   opacity: 0.75;
-  margin: 4px 0 !important;
+  margin: 5px 0 !important;
 }
 html[data-tv="1"] .tv-card__preview img {
   max-width: 100%;
   border-radius: 6px;
-  margin: 3px 0 !important;
+  margin: 4px 0 !important;
 }
 html[data-tv="1"] .tv-card--dark { color: #f3f4f6; }
 html[data-tv="1"] .tv-card__footer {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 5px;
-  font-size: 11px;
+  gap: 6px;
+  font-size: 11.5px;
   opacity: 0.7;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 html[data-tv="1"] .tv-card__badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 1px 7px;
+  padding: 2px 8px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.18);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 html[data-tv="1"] .tv-card--dark .tv-card__badge { background: rgba(255, 255, 255, 0.14); }
 html[data-tv="1"] .tv-card__images {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 3px;
-  margin-bottom: 3px;
+  gap: 4px;
+  margin-bottom: 4px;
 }
 html[data-tv="1"] .tv-card__images--multi { grid-template-columns: 1fr 1fr; }
 html[data-tv="1"] .tv-card__images img {
   width: 100%;
-  height: 56px;
+  height: 80px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 7px;
   background: rgba(0,0,0,0.15);
 }
 
-/* ------- Note detail (fullscreen viewer) ------- */
+/* ------- Note detail (FULLSCREEN) ------- */
 html[data-tv="1"] .tv-detail {
   position: fixed;
   inset: 0;
   z-index: 200;
   display: flex;
   align-items: stretch;
-  justify-content: center;
-  /* Solid background (no backdrop-filter blur) — blur kills the
-     compositor on older Shields. We still get the dim-out effect. */
-  background: rgba(6, 7, 11, 0.94);
-  padding: var(--tv-safe-y) calc(var(--tv-safe-x) * 1.4);
-  animation: tv-detail-in 180ms ease-out;
+  justify-content: stretch;
+  /* No padding around the card — true fullscreen viewer. */
+  padding: 0;
+  background: #0b0d12;
+  animation: tv-detail-in 160ms ease-out;
 }
 @keyframes tv-detail-in {
-  from { opacity: 0; transform: scale(0.98); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 html[data-tv="1"] .tv-detail__card {
   width: 100%;
-  max-width: 1200px;
-  border-radius: 18px;
+  max-width: none;
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 18px 48px -16px rgba(0, 0, 0, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: none;
   min-height: 0;
 }
 html[data-tv="1"] .tv-detail__header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 18px 28px 6px;
-  flex-wrap: wrap;
+  gap: 14px;
+  /* Keep the header dense — same vertical rhythm as before, no taller. */
+  padding: calc(var(--tv-safe-y) * 0.5) calc(var(--tv-safe-x) * 1.4) 4px;
+  flex-wrap: nowrap;
 }
 html[data-tv="1"] .tv-detail__title {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
   line-height: 1.15;
   word-break: break-word;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 html[data-tv="1"] .tv-detail__meta {
-  margin-left: auto;
   font-size: 12px;
   opacity: 0.65;
   flex-shrink: 0;
 }
+html[data-tv="1"] .tv-detail__close {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: inherit;
+}
 html[data-tv="1"] .tv-detail__body {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 6px 28px 20px;
-  font-size: 16px;
-  line-height: 1.55;
+  padding: 8px calc(var(--tv-safe-x) * 1.4) var(--tv-safe-y);
+  font-size: 17px;
+  line-height: 1.6;
 }
-html[data-tv="1"] .tv-detail__body * {
-  max-width: 100%;
-  word-break: break-word;
-}
-html[data-tv="1"] .tv-detail__body h1 { font-size: 24px; font-weight: 800; margin: 16px 0 8px; }
-html[data-tv="1"] .tv-detail__body h2 { font-size: 20px; font-weight: 700; margin: 14px 0 8px; }
-html[data-tv="1"] .tv-detail__body h3 { font-size: 18px; font-weight: 700; margin: 12px 0 6px; }
+html[data-tv="1"] .tv-detail__body * { max-width: 100%; word-break: break-word; }
+html[data-tv="1"] .tv-detail__body h1 { font-size: 26px; font-weight: 800; margin: 18px 0 8px; }
+html[data-tv="1"] .tv-detail__body h2 { font-size: 22px; font-weight: 700; margin: 16px 0 8px; }
+html[data-tv="1"] .tv-detail__body h3 { font-size: 19px; font-weight: 700; margin: 14px 0 6px; }
 html[data-tv="1"] .tv-detail__body p { margin: 0 0 8px; }
 html[data-tv="1"] .tv-detail__body ul,
 html[data-tv="1"] .tv-detail__body ol { padding-left: 1.4em; margin: 0 0 10px; }
-html[data-tv="1"] .tv-detail__body li { margin-bottom: 3px; }
+html[data-tv="1"] .tv-detail__body li { margin-bottom: 4px; }
 html[data-tv="1"] .tv-detail__body blockquote {
   border-left: 3px solid currentColor;
-  padding: 3px 12px;
-  margin: 8px 0;
+  padding: 4px 14px;
+  margin: 10px 0;
   opacity: 0.85;
   font-style: italic;
 }
@@ -531,16 +499,22 @@ html[data-tv="1"] .tv-detail__body code {
   background: rgba(255, 255, 255, 0.08);
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 15px;
 }
 html[data-tv="1"] .tv-detail__body pre {
-  background: rgba(0, 0, 0, 0.35);
-  padding: 12px 16px;
-  border-radius: 8px;
-  font-size: 13px;
-  overflow-x: auto;
-  margin: 8px 0;
-  white-space: pre;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 14px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  /* Long lines wrap — better than horizontal scroll on a TV. */
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  margin: 10px 0;
+}
+html[data-tv="1"] .tv-detail__body pre code {
+  white-space: inherit;
+  word-break: inherit;
 }
 html[data-tv="1"] .tv-detail__body hr {
   border: none;
@@ -551,43 +525,43 @@ html[data-tv="1"] .tv-detail__body hr {
 html[data-tv="1"] .tv-detail__body img {
   max-width: 100%;
   border-radius: 10px;
-  margin: 8px 0;
+  margin: 10px 0;
 }
 
 /* Checklist body inside detail */
 html[data-tv="1"] .tv-checklist {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 html[data-tv="1"] .tv-checklist__section-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin: 8px 0 2px;
+  margin: 10px 0 2px;
   opacity: 0.85;
 }
 html[data-tv="1"] .tv-checklist__item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 5px 9px;
-  border-radius: 7px;
+  gap: 12px;
+  padding: 7px 11px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
 }
 html[data-tv="1"] .tv-checklist__item--done { opacity: 0.45; text-decoration: line-through; }
 html[data-tv="1"] .tv-checklist__box {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
-  border-radius: 4px;
+  border-radius: 5px;
   border: 2px solid currentColor;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 2px;
 }
 html[data-tv="1"] .tv-checklist__item--done .tv-checklist__box { background: currentColor; color: rgba(255, 255, 255, 0.95); }
@@ -689,8 +663,6 @@ html[data-tv="1"] .tv-login__error {
   border-radius: 7px;
   font-size: 12px;
 }
-
-/* Hard caps on any fixed-positioned layer. */
 html[data-tv="1"] .tv-detail,
 html[data-tv="1"] .tv-screen { max-width: 100vw; max-height: 100vh; }
 `;

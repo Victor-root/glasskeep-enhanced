@@ -6,7 +6,7 @@ import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { getSections, isItem, DEFAULT_SECTION_ID } from "../../utils/checklist.js";
 import { getContentImages, getNoteIcon } from "../../utils/noteIcon.js";
 import { parseAudioContent, formatDuration } from "../../utils/audioNote.js";
-import { Mic, ArrowLeft } from "lucide-react";
+import { Mic, X } from "lucide-react";
 
 function isColorDark(rgba) {
   const { r, g, b } = parseRGBA(rgba);
@@ -117,7 +117,7 @@ export default function TvNoteDetail({ note, onClose }) {
               src={icon.src}
               alt=""
               aria-hidden="true"
-              style={{ width: 36, height: 36, objectFit: "contain", flexShrink: 0 }}
+              style={{ width: 30, height: 30, objectFit: "contain", flexShrink: 0 }}
             />
           )}
           <h1 className="tv-detail__title">
@@ -129,13 +129,11 @@ export default function TvNoteDetail({ note, onClose }) {
           <button
             ref={closeRef}
             type="button"
-            className="tv-btn tv-focusable tv-focusable--flat"
+            className="tv-detail__close tv-focusable tv-focusable--flat"
             onClick={onClose}
             aria-label={t("close")}
-            style={{ marginLeft: 12 }}
           >
-            <ArrowLeft size={14} />
-            {t("close")}
+            <X size={18} />
           </button>
         </header>
 

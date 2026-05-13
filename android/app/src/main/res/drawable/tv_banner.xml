@@ -1,26 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 320x180 launcher banner for Android TV (Leanback). Required dimensions
-     when an activity exposes LEANBACK_LAUNCHER. Done as a vector layer-list
-     so we avoid shipping a PNG and stay sharp on 4K TVs. -->
+<!-- 320x180 banner for Android TV Leanback launcher.
+     Built as a layer-list so we don't ship a PNG and stay sharp at any
+     density. Three layers:
+       1. Deep gradient background with rounded corners
+       2. Soft violet radial halo behind the logo
+       3. The GlassKeep mark, generously inset -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Gradient background — same indigo/violet that defines the GlassKeep
-         brand on the login screen and the native swap-server dialog. -->
+
+    <!-- 1) Rounded gradient backdrop. Diagonal indigo→violet→deep-purple
+            matches the in-app login title gradient. -->
     <item>
         <shape android:shape="rectangle">
+            <corners android:radius="14dp" />
             <gradient
                 android:type="linear"
-                android:angle="0"
-                android:startColor="#6366f1"
-                android:centerColor="#7c3aed"
-                android:endColor="#a78bfa" />
+                android:angle="135"
+                android:startColor="#0b0d12"
+                android:centerColor="#1a1530"
+                android:endColor="#3b1f7a" />
         </shape>
     </item>
-    <!-- Centered app logo, generously inset to leave breathing room around
-         the artwork the way Material TV banners are expected to look. -->
+
+    <!-- 2) Radial violet halo, slightly off-center so the composition
+            feels less symmetrical / more polished. -->
     <item
-        android:left="110dp"
-        android:top="36dp"
-        android:right="110dp"
-        android:bottom="36dp"
+        android:left="60dp"
+        android:top="18dp"
+        android:right="60dp"
+        android:bottom="18dp">
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="90dp"
+                android:startColor="#9061f0"
+                android:centerColor="#5b21b6"
+                android:endColor="#00000000" />
+        </shape>
+    </item>
+
+    <!-- 3) GlassKeep logo, generously inset to leave breathing room
+            around the mark. -->
+    <item
+        android:left="92dp"
+        android:top="22dp"
+        android:right="92dp"
+        android:bottom="22dp"
         android:drawable="@drawable/glasskeep_logo" />
+
 </layer-list>

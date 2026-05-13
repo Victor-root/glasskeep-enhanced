@@ -1,23 +1,24 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import Masonry from "react-masonry-css";
 import { t } from "../../i18n";
 import TvNoteCard from "./TvNoteCard.jsx";
 import TvNoteDetail from "./TvNoteDetail.jsx";
 import TvSidebar from "./TvSidebar.jsx";
 import useSpatialFocus from "./useSpatialFocus.js";
 import { getContentImages } from "../../utils/noteIcon.js";
-import { Menu, LayoutGrid, Rows } from "lucide-react";
+import { Menu, LayoutGrid, Rows3 } from "lucide-react";
 
-// TV-mode "home" screen. Owns:
-//  - filter state, view mode (grid/list), sidebar visibility
-//  - detail viewer state + Back key wiring via window.history
-//  - spatial focus loop
+// TV-mode "home" screen.
 //
-// Persisted preferences:
-//  - tv-view-mode    : "grid" | "list"
-//  - tv-sidebar      : "open" | "closed"   (defaults to closed)
+// Two layouts:
+//   - "grid": real Pinterest-style masonry (react-masonry-css). Cards
+//     keep their natural height and stack without horizontal gaps,
+//     exactly like the phone and desktop views.
+//   - "carousel": single row, horizontal scroll-snap. Cards are roughly
+//     twice the grid size; 2-3 fit on screen and you flick between them.
 //
-// Sidebar is closed by default — the user is here to read notes, not
-// browse tags. They can pop the rail in any time with the hamburger.
+// Sidebar is closed by default. Both preferences persisted in
+// localStorage so the user lands on the same view next time.
 
 const STORAGE_VIEW = "tv-view-mode";
 const STORAGE_SIDEBAR = "tv-sidebar";
@@ -29,6 +30,16 @@ function useClock() {
     return () => clearInterval(id);
   }, []);
   return now;
+}
+
+function useViewportWidth() {
+  const [w, setW] = useState(() => window.innerWidth || 1280);
+  useEffect(() => {
+    const onResize = () => setW(window.innerWidth || 1280);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return w;
 }
 
 function sortNotes(list) {
@@ -62,6 +73,17 @@ function savePref(key, value) {
   try { localStorage.setItem(key, value); } catch { /* ignore */ }
 }
 
+// Column count depends on available width (sidebar open vs closed
+// matters here — we feed sidebarVisible into the calc).
+function pickColumnCount(width, sidebarOpen) {
+  const usable = sidebarOpen ? width - 260 : width - 60;
+  if (usable < 700) return 2;
+  if (usable < 1100) return 3;
+  if (usable < 1500) return 4;
+  if (usable < 1900) return 5;
+  return 6;
+}
+
 function HeaderUserChip({ currentUser }) {
   const initial = (currentUser?.name?.[0] || currentUser?.email?.[0] || "?").toUpperCase();
   const label = currentUser?.name || currentUser?.email || "";
@@ -88,21 +110,21 @@ export default function TvNotesViewer({
   const [filter, setFilter] = useState({ type: "all" });
   const [openNote, setOpenNote] = useState(null);
   const [sidebarVisible, setSidebarVisible] = useState(() => loadPref(STORAGE_SIDEBAR, "closed") === "open");
-  const [viewMode, setViewMode] = useState(() => loadPref(STORAGE_VIEW, "grid") === "list" ? "list" : "grid");
+  const [viewMode, setViewMode] = useState(() => loadPref(STORAGE_VIEW, "grid") === "carousel" ? "carousel" : "grid");
   const clock = useClock();
+  const width = useViewportWidth();
   const detailHistoryRef = useRef(null);
 
   useEffect(() => { savePref(STORAGE_SIDEBAR, sidebarVisible ? "open" : "closed"); }, [sidebarVisible]);
   useEffect(() => { savePref(STORAGE_VIEW, viewMode); }, [viewMode]);
 
   const visible = useMemo(() => partitionNotes(notes, filter), [notes, filter]);
+  const colCount = useMemo(() => pickColumnCount(width, sidebarVisible), [width, sidebarVisible]);
 
   const closeDetail = useCallback(() => setOpenNote(null), []);
   const openDetail = useCallback((note) => setOpenNote(note), []);
 
-  // Back key (KEYCODE_BACK → window.history.back()). Push a marker on
-  // detail-open and listen popstate to close. The cleanup branch rewinds
-  // the history we pushed so we never leak a phantom entry.
+  // Back key: push a history marker on detail-open, listen popstate.
   useEffect(() => {
     if (!openNote) {
       detailHistoryRef.current = null;
@@ -111,7 +133,6 @@ export default function TvNotesViewer({
     const marker = { tvDetail: openNote.id, ts: Date.now() };
     window.history.pushState(marker, "");
     detailHistoryRef.current = marker;
-
     const onPop = () => {
       detailHistoryRef.current = null;
       setOpenNote(null);
@@ -126,15 +147,11 @@ export default function TvNotesViewer({
     };
   }, [openNote?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Track remote edits to the open note.
   useEffect(() => {
     if (!openNote) return;
     const stillThere = notes.find((n) => n.id === openNote.id);
-    if (!stillThere || stillThere.archived || stillThere.trashed) {
-      closeDetail();
-    } else if (stillThere !== openNote) {
-      setOpenNote(stillThere);
-    }
+    if (!stillThere || stillThere.archived || stillThere.trashed) closeDetail();
+    else if (stillThere !== openNote) setOpenNote(stillThere);
   }, [notes, openNote, closeDetail]);
 
   useSpatialFocus({
@@ -146,7 +163,7 @@ export default function TvNotesViewer({
   });
 
   const toggleSidebar = useCallback(() => setSidebarVisible((v) => !v), []);
-  const toggleView = useCallback(() => setViewMode((v) => v === "grid" ? "list" : "grid"), []);
+  const toggleView = useCallback(() => setViewMode((v) => v === "grid" ? "carousel" : "grid"), []);
 
   const timeStr = clock.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   const dateStr = clock.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
@@ -175,7 +192,7 @@ export default function TvNotesViewer({
           aria-label={t("toggleView") || "Toggle view"}
           onClick={toggleView}
         >
-          {viewMode === "grid" ? <Rows size={18} /> : <LayoutGrid size={18} />}
+          {viewMode === "grid" ? <Rows3 size={18} /> : <LayoutGrid size={18} />}
         </button>
         <div className="tv-header__title-wrap">
           <div className="tv-header__title">GlassKeep</div>
@@ -208,12 +225,22 @@ export default function TvNotesViewer({
                   "Once you create notes from your phone or the web app they'll show up here, ready to read on the big screen."}
               </div>
             </div>
-          ) : (
-            <div className={viewMode === "list" ? "tv-notes-list" : "tv-notes-grid"}>
+          ) : viewMode === "carousel" ? (
+            <div className="tv-carousel">
               {visible.map((n) => (
-                <TvNoteCard key={n.id} note={n} variant={viewMode} onActivate={openDetail} />
+                <TvNoteCard key={n.id} note={n} variant="carousel" onActivate={openDetail} />
               ))}
             </div>
+          ) : (
+            <Masonry
+              breakpointCols={colCount}
+              className="tv-masonry"
+              columnClassName="tv-masonry__col"
+            >
+              {visible.map((n) => (
+                <TvNoteCard key={n.id} note={n} variant="grid" onActivate={openDetail} />
+              ))}
+            </Masonry>
           )}
         </main>
       </div>

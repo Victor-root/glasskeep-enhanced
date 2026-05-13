@@ -42,7 +42,7 @@ function buildPreviewHtml(n) {
 }
 
 function TvNoteCardImpl({ note, variant = "grid", onActivate }) {
-  const isList = variant === "list";
+  const isCarousel = variant === "carousel";
 
   const bg = bgFor(note.color, true);
   const isDark = isColorDark(bg);
@@ -63,12 +63,12 @@ function TvNoteCardImpl({ note, variant = "grid", onActivate }) {
     if (!isChecklist) return null;
     const total = countItems(note.items);
     const done = countChecked(note.items);
-    const limit = isList ? 3 : 5;
+    const limit = isCarousel ? 3 : 5;
     const unchecked = (note.items || [])
       .filter(it => isItem(it) && !it.done)
       .slice(0, limit);
     return { total, done, unchecked };
-  }, [isChecklist, note.items, isList]);
+  }, [isChecklist, note.items, isCarousel]);
 
   const handleActivate = (e) => {
     e?.preventDefault?.();
@@ -84,7 +84,7 @@ function TvNoteCardImpl({ note, variant = "grid", onActivate }) {
       data-note-id={note.id}
       aria-label={note.title || (isChecklist ? t("checklist") : t("note"))}
     >
-      {icon && !isList && (
+      {icon && !isCarousel && (
         <img
           src={icon.src}
           alt=""
@@ -104,14 +104,14 @@ function TvNoteCardImpl({ note, variant = "grid", onActivate }) {
       )}
 
       {note.title && (
-        <h3 className="tv-card__title" style={{ paddingRight: icon && !isList ? 24 : 0 }}>
+        <h3 className="tv-card__title" style={{ paddingRight: icon && !isCarousel ? 24 : 0 }}>
           {note.title}
         </h3>
       )}
 
       {imgs.length > 0 && (
-        <div className={`tv-card__images${imgs.length > 1 && !isList ? " tv-card__images--multi" : ""}`}>
-          {imgs.slice(0, isList ? 1 : 2).map((im) => (
+        <div className={`tv-card__images${imgs.length > 1 && !isCarousel ? " tv-card__images--multi" : ""}`}>
+          {imgs.slice(0, isCarousel ? 1 : 2).map((im) => (
             <img key={im.id} src={im.src} alt={im.name || ""} loading="lazy" decoding="async" />
           ))}
         </div>
