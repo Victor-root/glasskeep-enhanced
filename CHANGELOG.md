@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.3.0 — 2026-05-13
+
+### Added
+- Android TV support: the existing APK detects leanback hardware and switches to a dedicated TV layout (Pinterest-style grid, D-pad spatial navigation, sidebar + detail viewer, profile picker login).
+- TV-only HeaderUserChip with sign-out / exit-TV-mode popover, dismissable via the remote's Back key.
+- `?tv=1` URL override to force the TV layout from any device.
+- Android TV banner, leanback feature flags and `LEANBACK_LAUNCHER` intent in the manifest.
+- Refreshed master logo applied across the favicon (`.ico` + 16/32 PNGs), the PWA icons (192 / 512 / maskable), the Apple touch icon, the Android launcher (5 densities + adaptive foreground), the Android TV banner, and the Compose first-launch setup screen.
+
+### Fixed
+- Login flow rejecting valid username-only accounts on TV (TV manual login now mirrors the phone's `email`-field contract).
+- D-pad navigation getting stuck at the top of the sidebar (zone containment now falls back to the global pool when no candidate exists).
+- Long card titles being clipped to a single line height on the TV grid.
+
 ## v2.2.0 — 2026-05-10
 
 ### Added

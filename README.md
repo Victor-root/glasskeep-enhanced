@@ -60,6 +60,7 @@ Compared to the original project, this fork puts more emphasis on:
 - **✏️ a real WYSIWYG / live-formatting editor for text notes**
 - **🪟 side-by-side note reading and comparison**
 - **🤖 a native Android companion app**
+- **📺 an Android TV layout designed for couch use and remote control**
 - **🌍 a cleaner and more extensible i18n foundation**
 - **🛠️ simpler self-hosting**
 - **✨ a broad polish / stability pass**
@@ -68,6 +69,7 @@ Compared to the original project, this fork puts more emphasis on:
 - **🔐 Server-side encryption & passkeys**
 - **🔔 In-app update notifications**
 - **🎙️ audio notes**
+- **🖼️ refreshed logo and icons across the web app, PWA, favicon, and Android launcher / TV banner**
 
 For a more complete and structured overview of the changes made since the fork, see:
 
@@ -97,9 +99,13 @@ A native Android companion app is available for GlassKeep, making self-hosted mo
 
 The Android app is a WebView wrapper for GlassKeep Enhanced and does not necessarily change with every project release.
 
+The **same APK also runs on Android TV** — the app detects leanback hardware (or the `?tv=1` URL override) and switches the React frontend to a dedicated TV layout designed for the couch and the D-pad. No separate build, no separate install: phone, tablet and TV all share one codebase. See section **4** of [`IMPROVEMENTS.md`](./IMPROVEMENTS.md) for the full TV layout details.
+
+The launcher icon, the Android TV banner, the PWA install icon, and the favicon have all been redrawn from a single master so the app looks coherent across every surface.
+
 [Download latest Android APK](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.2.0/GlassKeep-v1.1.0.apk)
 
-Current APK version: `1.1.0`
+Current APK version: `1.2.0`
 
 > The Android source code is available in the `android/` directory.
 
