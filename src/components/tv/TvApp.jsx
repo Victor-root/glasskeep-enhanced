@@ -51,6 +51,24 @@ export default function TvApp() {
     typeof navigator === "undefined" ? true : navigator.onLine
   );
 
+  // Public login slogan — set by the server admin, refreshed whenever
+  // the login screen is on display. Empty string when unset; TvLogin
+  // hides the slogan pill entirely in that case.
+  const [loginSlogan, setLoginSlogan] = useState("");
+  useEffect(() => {
+    if (token) return; // only fetched while the user is signed out
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api("/admin/login-slogan");
+        if (!cancelled) setLoginSlogan(res?.loginSlogan || "");
+      } catch {
+        if (!cancelled) setLoginSlogan("");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token]);
+
   // Public login profiles (Jellyfin-style avatar list). Lets users sign
   // in by picking their face + typing the password — no email required,
   // which matters because the original phone account may not have one.
@@ -214,6 +232,7 @@ export default function TvApp() {
         profiles={loginProfiles}
         onLoginManual={signInManual}
         onLoginById={signInById}
+        loginSlogan={loginSlogan}
         allowExit={!window.__isAndroidTV}
         onExitTvMode={exitTvMode}
       />

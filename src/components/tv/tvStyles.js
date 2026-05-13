@@ -99,6 +99,18 @@ html[data-tv="1"] .tv-header__themetoggle {
   flex-shrink: 0;
 }
 html[data-tv="1"] .tv-header__title-wrap { min-width: 0; }
+/* Small app logo to the left of the "GlassKeep" wordmark — mirrors
+   the mobile NotesHeader layout. */
+html[data-tv="1"] .tv-header__logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
 html[data-tv="1"] .tv-header__title {
   font-size: 20px;
   font-weight: 800;
@@ -776,6 +788,36 @@ html[data-tv="1"] .tv-login__title {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+/* Big rounded logo above the login card, matching mobile AuthShell. */
+html[data-tv="1"] .tv-login__logo {
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  box-shadow: 0 14px 32px -10px rgba(0, 0, 0, 0.55);
+  margin: 0 auto 6px;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+/* Glass pill that holds the server's loginSlogan (fetched live from
+   /api/admin/login-slogan). Sits under the card, optional. */
+html[data-tv="1"] .tv-login__slogan {
+  margin: 12px auto 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #d1d5db;
+  font-size: 13px;
+}
+html[data-tv="1"][data-tv-theme="light"] .tv-login__slogan {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #374151;
 }
 html[data-tv="1"] .tv-login__row { display: flex; flex-direction: column; gap: 4px; }
 html[data-tv="1"] .tv-login__label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #a78bfa; }

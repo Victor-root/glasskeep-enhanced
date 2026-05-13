@@ -541,6 +541,13 @@ export default function TvNotesViewer({
         >
           {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
         </button>
+        <img
+          src="/favicon-32x32.png"
+          srcSet="/pwa-192.png 2x, /pwa-512.png 3x"
+          alt=""
+          aria-hidden="true"
+          className="tv-header__logo"
+        />
         <div className="tv-header__title-wrap">
           <div className="tv-header__title">GlassKeep</div>
           <HeaderClock />

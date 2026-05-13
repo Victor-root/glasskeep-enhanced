@@ -17,6 +17,7 @@ export default function TvLogin({
   profiles,
   onLoginManual,
   onLoginById,
+  loginSlogan,
   allowExit,
   onExitTvMode,
 }) {
@@ -99,246 +100,255 @@ export default function TvLogin({
     }
   };
 
+  // Shared frame: app logo on top, the mode-specific card in the
+  // middle (the caller renders the card element so it can be a <div>
+  // or a <form>), the dynamic loginSlogan pill at the bottom.
+  const renderShell = (cardEl) => (
+    <div className="tv-screen">
+      <div className="tv-login">
+        <img
+          src="/pwa-192.png"
+          srcSet="/pwa-512.png 2x"
+          alt=""
+          aria-hidden="true"
+          className="tv-login__logo"
+        />
+        {cardEl}
+        {loginSlogan && (
+          <div className="tv-login__slogan">{loginSlogan}</div>
+        )}
+      </div>
+    </div>
+  );
+
   if (mode === "profiles") {
-    return (
-      <div className="tv-screen">
-        <div className="tv-login">
-          <div className="tv-login__card" style={{ maxWidth: 920 }}>
-            <div className="tv-login__title">GlassKeep TV</div>
-            <div style={{ color: "#9ca3af", fontSize: 18 }}>
-              {t("selectProfile") || "Pick your profile"}
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                gap: 18,
-                marginTop: 10,
-              }}
-            >
-              {profiles.map((profile, idx) => (
-                <button
-                  key={profile.id}
-                  ref={idx === 0 ? firstProfileRef : null}
-                  type="button"
-                  className="tv-focusable"
-                  onClick={() => {
-                    setSelectedProfile(profile);
-                    setPassword("");
-                    setError(null);
-                    setMode("password");
-                  }}
-                  style={{
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 18,
-                    padding: "22px 14px",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 12,
-                    color: "#e5e7eb",
-                  }}
-                >
-                  <UserAvatar
-                    name={profile.name}
-                    avatarUrl={profile.avatar_url}
-                    size="w-20 h-20"
-                    textSize="text-3xl"
-                    dark
-                  />
-                  <span
-                    style={{
-                      fontSize: 18,
-                      fontWeight: 600,
-                      maxWidth: "100%",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {profile.name || profile.email || profile.id}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              className="tv-btn tv-focusable tv-focusable--flat"
-              onClick={() => {
-                setMode("manual");
-                setError(null);
-              }}
-              style={{ alignSelf: "center", marginTop: 8 }}
-            >
-              {t("tvManualLogin") || "Sign in with another account"}
-            </button>
-
-            {allowExit && (
-              <button
-                type="button"
-                className="tv-btn tv-focusable tv-focusable--flat"
-                onClick={onExitTvMode}
-                style={{ alignSelf: "center" }}
-              >
-                {t("tvExitButton") || "Use phone layout"}
-              </button>
-            )}
-          </div>
+    return renderShell(
+      <div className="tv-login__card" style={{ maxWidth: 920 }}>
+        <div className="tv-login__title">GlassKeep TV</div>
+        <div style={{ color: "#9ca3af", fontSize: 18 }}>
+          {t("selectProfile") || "Pick your profile"}
         </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+            gap: 18,
+            marginTop: 10,
+          }}
+        >
+          {profiles.map((profile, idx) => (
+            <button
+              key={profile.id}
+              ref={idx === 0 ? firstProfileRef : null}
+              type="button"
+              className="tv-focusable"
+              onClick={() => {
+                setSelectedProfile(profile);
+                setPassword("");
+                setError(null);
+                setMode("password");
+              }}
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 18,
+                padding: "22px 14px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 12,
+                color: "#e5e7eb",
+              }}
+            >
+              <UserAvatar
+                name={profile.name}
+                avatarUrl={profile.avatar_url}
+                size="w-20 h-20"
+                textSize="text-3xl"
+                dark
+              />
+              <span
+                style={{
+                  fontSize: 18,
+                  fontWeight: 600,
+                  maxWidth: "100%",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {profile.name || profile.email || profile.id}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className="tv-btn tv-focusable tv-focusable--flat"
+          onClick={() => {
+            setMode("manual");
+            setError(null);
+          }}
+          style={{ alignSelf: "center", marginTop: 8 }}
+        >
+          {t("tvManualLogin") || "Sign in with another account"}
+        </button>
+
+        {allowExit && (
+          <button
+            type="button"
+            className="tv-btn tv-focusable tv-focusable--flat"
+            onClick={onExitTvMode}
+            style={{ alignSelf: "center" }}
+          >
+            {t("tvExitButton") || "Use phone layout"}
+          </button>
+        )}
       </div>
     );
   }
 
   if (mode === "password") {
-    return (
-      <div className="tv-screen">
-        <div className="tv-login">
-          <form className="tv-login__card" onSubmit={submitProfile}>
-            <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-              <UserAvatar
-                name={selectedProfile?.name}
-                avatarUrl={selectedProfile?.avatar_url}
-                size="w-20 h-20"
-                textSize="text-3xl"
-                dark
-              />
-              <div>
-                <div className="tv-login__title" style={{ fontSize: 30 }}>
-                  {selectedProfile?.name || selectedProfile?.id}
-                </div>
-                <div style={{ color: "#9ca3af", fontSize: 16 }}>
-                  {t("password") || "Password"}
-                </div>
-              </div>
+    return renderShell(
+      <form className="tv-login__card" onSubmit={submitProfile}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          <UserAvatar
+            name={selectedProfile?.name}
+            avatarUrl={selectedProfile?.avatar_url}
+            size="w-20 h-20"
+            textSize="text-3xl"
+            dark
+          />
+          <div>
+            <div className="tv-login__title" style={{ fontSize: 30 }}>
+              {selectedProfile?.name || selectedProfile?.id}
             </div>
-
-            <div className="tv-login__row">
-              <label htmlFor="tv-password" className="tv-login__label">
-                {t("password") || "Password"}
-              </label>
-              <input
-                id="tv-password"
-                ref={passwordRef}
-                type="password"
-                autoComplete="current-password"
-                className="tv-login__input tv-focusable tv-focusable--flat"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoFocus
-                required
-              />
+            <div style={{ color: "#9ca3af", fontSize: 16 }}>
+              {t("password") || "Password"}
             </div>
-
-            {error && <div className="tv-login__error">{error}</div>}
-
-            <button
-              type="submit"
-              className="tv-btn tv-btn--primary tv-login__submit tv-focusable tv-focusable--flat"
-              disabled={busy}
-            >
-              {busy ? (t("signingIn") || "Signing in…") : (t("signIn") || "Sign in")}
-            </button>
-
-            <button
-              type="button"
-              className="tv-btn tv-focusable tv-focusable--flat"
-              onClick={() => {
-                setMode("profiles");
-                setPassword("");
-                setError(null);
-              }}
-              style={{ alignSelf: "center" }}
-            >
-              ← {t("selectProfile") || "Pick another profile"}
-            </button>
-          </form>
+          </div>
         </div>
-      </div>
+
+        <div className="tv-login__row">
+          <label htmlFor="tv-password" className="tv-login__label">
+            {t("password") || "Password"}
+          </label>
+          <input
+            id="tv-password"
+            ref={passwordRef}
+            type="password"
+            autoComplete="current-password"
+            className="tv-login__input tv-focusable tv-focusable--flat"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoFocus
+            required
+          />
+        </div>
+
+        {error && <div className="tv-login__error">{error}</div>}
+
+        <button
+          type="submit"
+          className="tv-btn tv-btn--primary tv-login__submit tv-focusable tv-focusable--flat"
+          disabled={busy}
+        >
+          {busy ? (t("signingIn") || "Signing in…") : (t("signIn") || "Sign in")}
+        </button>
+
+        <button
+          type="button"
+          className="tv-btn tv-focusable tv-focusable--flat"
+          onClick={() => {
+            setMode("profiles");
+            setPassword("");
+            setError(null);
+          }}
+          style={{ alignSelf: "center" }}
+        >
+          ← {t("selectProfile") || "Pick another profile"}
+        </button>
+      </form>
     );
   }
 
   // Manual mode (email OR username).
-  return (
-    <div className="tv-screen">
-      <div className="tv-login">
-        <form className="tv-login__card" onSubmit={submitManual}>
-          <div className="tv-login__title">GlassKeep TV</div>
-          <div style={{ color: "#9ca3af", fontSize: 18 }}>
-            {t("tvLoginHint") || "Sign in once on your TV — your notes will appear, ready to read."}
-          </div>
-
-          <div className="tv-login__row">
-            <label htmlFor="tv-identifier" className="tv-login__label">
-              {t("tvIdentifier") || "Email or username"}
-            </label>
-            <input
-              id="tv-identifier"
-              ref={identifierRef}
-              type="text"
-              autoComplete="username"
-              spellCheck="false"
-              autoCapitalize="off"
-              className="tv-login__input tv-focusable tv-focusable--flat"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="tv-login__row">
-            <label htmlFor="tv-password" className="tv-login__label">
-              {t("password") || "Password"}
-            </label>
-            <input
-              id="tv-password"
-              type="password"
-              autoComplete="current-password"
-              className="tv-login__input tv-focusable tv-focusable--flat"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-
-          {error && <div className="tv-login__error">{error}</div>}
-
-          <button
-            type="submit"
-            className="tv-btn tv-btn--primary tv-login__submit tv-focusable tv-focusable--flat"
-            disabled={busy}
-          >
-            {busy ? (t("signingIn") || "Signing in…") : (t("signIn") || "Sign in")}
-          </button>
-
-          {hasProfiles && (
-            <button
-              type="button"
-              className="tv-btn tv-focusable tv-focusable--flat"
-              onClick={() => {
-                setMode("profiles");
-                setError(null);
-              }}
-              style={{ alignSelf: "center" }}
-            >
-              ← {t("selectProfile") || "Pick a profile"}
-            </button>
-          )}
-
-          {allowExit && (
-            <button
-              type="button"
-              className="tv-btn tv-focusable tv-focusable--flat"
-              onClick={onExitTvMode}
-              style={{ alignSelf: "center" }}
-            >
-              {t("tvExitButton") || "Use phone layout"}
-            </button>
-          )}
-        </form>
+  return renderShell(
+    <form className="tv-login__card" onSubmit={submitManual}>
+      <div className="tv-login__title">GlassKeep TV</div>
+      <div style={{ color: "#9ca3af", fontSize: 18 }}>
+        {t("tvLoginHint") || "Sign in once on your TV — your notes will appear, ready to read."}
       </div>
-    </div>
+
+      <div className="tv-login__row">
+        <label htmlFor="tv-identifier" className="tv-login__label">
+          {t("tvIdentifier") || "Email or username"}
+        </label>
+        <input
+          id="tv-identifier"
+          ref={identifierRef}
+          type="text"
+          autoComplete="username"
+          spellCheck="false"
+          autoCapitalize="off"
+          className="tv-login__input tv-focusable tv-focusable--flat"
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
+          required
+        />
+      </div>
+
+      <div className="tv-login__row">
+        <label htmlFor="tv-password" className="tv-login__label">
+          {t("password") || "Password"}
+        </label>
+        <input
+          id="tv-password"
+          type="password"
+          autoComplete="current-password"
+          className="tv-login__input tv-focusable tv-focusable--flat"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+      </div>
+
+      {error && <div className="tv-login__error">{error}</div>}
+
+      <button
+        type="submit"
+        className="tv-btn tv-btn--primary tv-login__submit tv-focusable tv-focusable--flat"
+        disabled={busy}
+      >
+        {busy ? (t("signingIn") || "Signing in…") : (t("signIn") || "Sign in")}
+      </button>
+
+      {hasProfiles && (
+        <button
+          type="button"
+          className="tv-btn tv-focusable tv-focusable--flat"
+          onClick={() => {
+            setMode("profiles");
+            setError(null);
+          }}
+          style={{ alignSelf: "center" }}
+        >
+          ← {t("selectProfile") || "Pick a profile"}
+        </button>
+      )}
+
+      {allowExit && (
+        <button
+          type="button"
+          className="tv-btn tv-focusable tv-focusable--flat"
+          onClick={onExitTvMode}
+          style={{ alignSelf: "center" }}
+        >
+          {t("tvExitButton") || "Use phone layout"}
+        </button>
+      )}
+    </form>
   );
 }
