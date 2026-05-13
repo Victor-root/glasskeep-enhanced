@@ -41,14 +41,17 @@ function isFocusable(el) {
   return true;
 }
 
-// Return a coarse "zone" label so vertical D-pad nav stays inside its
-// own area (sidebar / detail viewer / main content). Left/Right
-// transitions between zones are still fine — that's how the user
-// crosses from the sidebar to the notes pane in the first place.
+// Return a coarse "zone" label so D-pad nav stays inside its own area
+// where it makes sense:
+//   - vertical (up/down) trapped in sidebar / detail viewer
+//   - horizontal (left/right) trapped in header — otherwise pressing
+//     Right on the rightmost header button jumped focus into a card
+//     down in the grid, which felt like a teleport
 function zoneOf(el) {
   if (!el) return "main";
   if (el.closest(".tv-sidebar")) return "sidebar";
   if (el.closest(".tv-detail")) return "detail";
+  if (el.closest(".tv-header")) return "header";
   return "main";
 }
 
@@ -58,13 +61,20 @@ function pickNextFocus(current, direction) {
   if (!all.length) return null;
   if (!current || !current.isConnected) return all[0];
   const cur = getRect(current);
-  // Vertical nav inside the sidebar / detail stays scoped to that
-  // zone — otherwise reaching the bottom of the tag list used to
-  // jump focus into the notes grid, which felt like a teleport.
   let pool = all;
+  const curZone = zoneOf(current);
+  // Vertical containment: sidebar and detail viewer keep their own
+  // up/down loops. Header lets up/down leave (Down goes to cards).
   if (direction === "up" || direction === "down") {
-    const curZone = zoneOf(current);
     if (curZone === "sidebar" || curZone === "detail") {
+      pool = all.filter((el) => zoneOf(el) === curZone);
+    }
+  }
+  // Horizontal containment: header stays on its own row — the three
+  // left chrome buttons cycle to the user chip on Right and back via
+  // Left, without leaking down into the notes grid.
+  if (direction === "left" || direction === "right") {
+    if (curZone === "header" || curZone === "detail") {
       pool = all.filter((el) => zoneOf(el) === curZone);
     }
   }

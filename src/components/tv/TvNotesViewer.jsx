@@ -158,6 +158,29 @@ function HeaderUserChip({ currentUser, onSignOut }) {
     };
   }, [open]);
 
+  // Close on native Back. The Android wrapper turns KEYCODE_BACK into
+  // window.history.back() — a popstate event, NOT a keydown. We push a
+  // history marker on open and react to popstate to close. The cleanup
+  // branch rewinds the entry if the popover closes by any other means
+  // so we don't leak history entries.
+  useEffect(() => {
+    if (!open) return undefined;
+    const marker = { tvUserMenu: true, ts: Date.now() };
+    window.history.pushState(marker, "");
+    const onPop = () => {
+      setOpen(false);
+      const btn = wrapRef.current?.querySelector(".tv-header__user");
+      if (btn instanceof HTMLElement) {
+        window.dispatchEvent(new CustomEvent("tv-focus", { detail: { target: btn } }));
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      if (window.history.state?.tvUserMenu) window.history.back();
+    };
+  }, [open]);
+
   // Once open, drop focus onto the first menu item so D-pad works.
   useEffect(() => {
     if (!open) return;
