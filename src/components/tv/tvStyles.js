@@ -795,12 +795,31 @@ html[data-tv="1"] .tv-login__logo {
   height: 96px;
   border-radius: 22px;
   box-shadow: 0 14px 32px -10px rgba(0, 0, 0, 0.55);
-  margin: 0 auto 6px;
+  margin: 0 auto 14px;
   display: block;
   user-select: none;
   -webkit-user-drag: none;
   pointer-events: none;
 }
+/* Brand title shown OUTSIDE the card, right under the logo —
+   "GlassKeep TV" in the indigo→pink gradient, like mobile AuthShell. */
+html[data-tv="1"] .tv-login__brand {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 800;
+  background: linear-gradient(90deg, #c4b5fd, #f9a8d4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 4px;
+}
+html[data-tv="1"] .tv-login__subtitle {
+  text-align: center;
+  font-size: 14px;
+  color: #9ca3af;
+  margin-bottom: 16px;
+}
+html[data-tv="1"][data-tv-theme="light"] .tv-login__subtitle { color: #6b7280; }
 /* Glass pill that holds the server's loginSlogan (fetched live from
    /api/admin/login-slogan). Sits under the card, optional. */
 html[data-tv="1"] .tv-login__slogan {

@@ -100,10 +100,10 @@ export default function TvLogin({
     }
   };
 
-  // Shared frame: app logo on top, the mode-specific card in the
-  // middle (the caller renders the card element so it can be a <div>
-  // or a <form>), the dynamic loginSlogan pill at the bottom.
-  const renderShell = (cardEl) => (
+  // Shared frame: app logo + "GlassKeep TV" brand + optional subtitle
+  // ABOVE the mode-specific card; the dynamic loginSlogan pill (with
+  // i18n fallback so there's always one) BELOW it.
+  const renderShell = (cardEl, { subtitle } = {}) => (
     <div className="tv-screen">
       <div className="tv-login">
         <img
@@ -113,10 +113,10 @@ export default function TvLogin({
           aria-hidden="true"
           className="tv-login__logo"
         />
+        <div className="tv-login__brand">GlassKeep TV</div>
+        {subtitle && <div className="tv-login__subtitle">{subtitle}</div>}
         {cardEl}
-        {loginSlogan && (
-          <div className="tv-login__slogan">{loginSlogan}</div>
-        )}
+        <div className="tv-login__slogan">{loginSlogan || t("loginSlogan")}</div>
       </div>
     </div>
   );
@@ -124,11 +124,6 @@ export default function TvLogin({
   if (mode === "profiles") {
     return renderShell(
       <div className="tv-login__card" style={{ maxWidth: 920 }}>
-        <div className="tv-login__title">GlassKeep TV</div>
-        <div style={{ color: "#9ca3af", fontSize: 18 }}>
-          {t("selectProfile") || "Pick your profile"}
-        </div>
-
         <div
           style={{
             display: "grid",
@@ -206,7 +201,8 @@ export default function TvLogin({
             {t("tvExitButton") || "Use phone layout"}
           </button>
         )}
-      </div>
+      </div>,
+      { subtitle: t("selectProfile") || "Pick your profile" }
     );
   }
 
@@ -277,11 +273,6 @@ export default function TvLogin({
   // Manual mode (email OR username).
   return renderShell(
     <form className="tv-login__card" onSubmit={submitManual}>
-      <div className="tv-login__title">GlassKeep TV</div>
-      <div style={{ color: "#9ca3af", fontSize: 18 }}>
-        {t("tvLoginHint") || "Sign in once on your TV — your notes will appear, ready to read."}
-      </div>
-
       <div className="tv-login__row">
         <label htmlFor="tv-identifier" className="tv-login__label">
           {t("tvIdentifier") || "Email or username"}
@@ -349,6 +340,7 @@ export default function TvLogin({
           {t("tvExitButton") || "Use phone layout"}
         </button>
       )}
-    </form>
+    </form>,
+    { subtitle: t("tvLoginHint") || "Sign in once on your TV — your notes will appear, ready to read." }
   );
 }
