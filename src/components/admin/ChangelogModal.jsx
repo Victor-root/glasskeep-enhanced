@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import changelogRaw from "../../../CHANGELOG.md?raw";
 import { t, locale } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
-import { api, getAuth } from "../../utils/api.js";
+import { api, getAuth, API_BASE } from "../../utils/api.js";
 
 // =============================================================================
 //  ChangelogModal
@@ -101,6 +101,10 @@ export default function ChangelogModal() {
     const [translatedRaw, setTranslatedRaw] = useState(null);
     const [translateError, setTranslateError] = useState(null);
     const [showOriginal, setShowOriginal] = useState(false);
+    // Holds the AbortController of an in-flight translation stream so
+    // closing the modal mid-stream tears the upstream request down
+    // (no more tokens wasted after the admin walks away).
+    const translateAbortRef = useRef(null);
 
     useEffect(() => {
         if (readShowFlag()) {
@@ -130,8 +134,14 @@ export default function ChangelogModal() {
     // Whenever the modal closes (or re-opens), drop the local
     // translation state so the next session starts fresh. Keeping
     // the cache on the server means re-translating is instant.
+    // An in-flight stream is aborted so we don't keep spending
+    // tokens after the admin walked away.
     useEffect(() => {
         if (!open) {
+            if (translateAbortRef.current) {
+                try { translateAbortRef.current.abort(); } catch { /* ignore */ }
+                translateAbortRef.current = null;
+            }
             setTranslatedRaw(null);
             setTranslateError(null);
             setShowOriginal(false);
@@ -143,23 +153,99 @@ export default function ChangelogModal() {
         if (translating || !aiAvailable) return;
         setTranslateError(null);
         setTranslating(true);
+        setShowOriginal(false);
+        setTranslatedRaw("");
+
+        const controller = new AbortController();
+        translateAbortRef.current = controller;
+        const token = getAuth()?.token || null;
+        let buf = "";
+        let accumulated = "";
+
         try {
-            const token = getAuth()?.token || null;
-            // 90 s on the client matches the 60 s server-side cap
-            // plus a safety margin for a slow local LLM.
-            const r = await api("/ai/translate-changelog", {
+            const res = await fetch(`${API_BASE}/ai/translate-changelog`, {
                 method: "POST",
-                body: { content: String(changelogRaw || ""), lang: locale },
-                token,
-                timeoutMs: 90_000,
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "text/event-stream",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({
+                    content: String(changelogRaw || ""),
+                    lang: locale,
+                }),
+                signal: controller.signal,
             });
-            const text = r && typeof r.translated === "string" ? r.translated : "";
-            if (!text) throw new Error("empty");
-            setTranslatedRaw(text);
-            setShowOriginal(false);
+            if (!res.ok || !res.body) {
+                // Best-effort attempt to read a JSON error body — the
+                // server only switches to SSE once it has validated the
+                // request, so early failures still come back as JSON.
+                let msg = `HTTP ${res.status}`;
+                try {
+                    const j = await res.json();
+                    if (j?.error) msg = j.error;
+                } catch {
+                    /* ignore — keep the HTTP status */
+                }
+                throw new Error(msg);
+            }
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+
+            // Drain the SSE stream. Events are separated by a blank line
+            // ("\n\n"); within an event each line is `<field>: <value>`.
+            // We only care about `event:` (delta | done | error) and the
+            // first `data:` line, which is JSON.
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buf += decoder.decode(value, { stream: true });
+
+                let sep;
+                while ((sep = buf.indexOf("\n\n")) !== -1) {
+                    const frame = buf.slice(0, sep);
+                    buf = buf.slice(sep + 2);
+                    let evtName = "message";
+                    let dataLine = "";
+                    for (const rawLine of frame.split("\n")) {
+                        const line = rawLine.replace(/\r$/, "");
+                        if (line.startsWith("event:")) {
+                            evtName = line.slice(6).trim();
+                        } else if (line.startsWith("data:")) {
+                            // SSE allows multi-line data; we only emit
+                            // single-line payloads, so the first hit wins.
+                            if (!dataLine) dataLine = line.slice(5).trim();
+                        }
+                    }
+                    if (!dataLine) continue;
+                    let payload;
+                    try {
+                        payload = JSON.parse(dataLine);
+                    } catch {
+                        continue;
+                    }
+                    if (evtName === "delta") {
+                        if (typeof payload.delta === "string") {
+                            accumulated += payload.delta;
+                            setTranslatedRaw(accumulated);
+                        }
+                    } else if (evtName === "error") {
+                        throw new Error(payload.error || "stream error");
+                    }
+                    // "done" needs no action; the loop ends when the
+                    // server closes the stream after emitting it.
+                }
+            }
+            if (!accumulated) throw new Error("empty");
         } catch (e) {
-            setTranslateError(e?.message || t("changelogTranslateFailed"));
+            if (e?.name !== "AbortError") {
+                setTranslateError(e?.message || t("changelogTranslateFailed"));
+                setTranslatedRaw(null);
+            }
         } finally {
+            translateAbortRef.current = null;
             setTranslating(false);
         }
     };
