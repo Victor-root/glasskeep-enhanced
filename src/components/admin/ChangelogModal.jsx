@@ -47,6 +47,18 @@ export function markChangelogToShow() {
     }
 }
 
+// Public helper: opens the modal on demand (used by the "View
+// changelog" link in the admin panel, so admins can re-read the
+// release notes even outside of an update flow).
+const OPEN_EVENT = "glass-keep:open-changelog";
+export function openChangelog() {
+    try {
+        window.dispatchEvent(new CustomEvent(OPEN_EVENT));
+    } catch {
+        /* ignore — best-effort */
+    }
+}
+
 // Compile the markdown once at module load — it is identical for every
 // render and parsing 5 KB of changelog on every mount would be silly.
 const compiledChangelog = (() => {
@@ -69,6 +81,16 @@ export default function ChangelogModal() {
             clearShowFlag();
             setOpen(true);
         }
+    }, []);
+
+    // On-demand opener: any module can dispatch the OPEN_EVENT to
+    // pop the modal (currently the "View changelog" link in the
+    // admin panel). Kept as a custom event so we don't have to lift
+    // open-state up into App.jsx for one button.
+    useEffect(() => {
+        const handler = () => setOpen(true);
+        window.addEventListener(OPEN_EVENT, handler);
+        return () => window.removeEventListener(OPEN_EVENT, handler);
     }, []);
 
     // Lock body scroll while the changelog is open so the underlying

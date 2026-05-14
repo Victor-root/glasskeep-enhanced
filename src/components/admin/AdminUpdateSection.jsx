@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
+import { openChangelog } from "./ChangelogModal.jsx";
 
 const REPO_URL = "https://github.com/Victor-root/glasskeep-enhanced";
 
@@ -263,6 +264,14 @@ export default function AdminUpdateSection({
           {t("openRepo")}
           <TI.ExternalLink className="tabler-icon w-3.5 h-3.5 opacity-70" />
         </a>
+        <button
+          type="button"
+          onClick={() => openChangelog()}
+          className="inline-flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg bg-gray-900 text-white hover:bg-gray-800 dark:bg-white/10 dark:hover:bg-white/15"
+        >
+          <TI.Sparkles className="tabler-icon w-4 h-4" />
+          {t("openChangelog")}
+        </button>
       </div>
     </div>
   );
