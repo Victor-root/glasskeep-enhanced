@@ -155,8 +155,14 @@ export function useSelfUpdate({ token, isAdmin }) {
                             runningVersion === targetVersion);
                     // Resolve the phase explicitly on every mount so a
                     // stale React state from before a logout / refresh
-                    // can't survive into the new session.
-                    if (r.status.inProgress || isActiveState(r.status)) {
+                    // can't survive into the new session. We trust the
+                    // server's inProgress flag — it combines "the
+                    // state name is active" AND "the status file was
+                    // touched recently". A non-terminal state with a
+                    // stale mtime (e.g. the script crashed during a
+                    // build) falls through to idle so the modal does
+                    // not stay stuck forever.
+                    if (r.status.inProgress) {
                         setPhase("running");
                     } else if (alreadyAcknowledged) {
                         setPhase("idle");

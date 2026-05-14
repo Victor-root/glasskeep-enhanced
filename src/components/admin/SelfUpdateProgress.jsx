@@ -134,27 +134,74 @@ function SystemMonitor({ token, active }) {
           ? "text-amber-600 dark:text-amber-300"
           : "text-gray-500 dark:text-gray-400";
 
+    // CPU load. loadavg[0] is the 1-minute load average from the OS.
+    // Normalised by the CPU count it maps to a familiar "0..100% per
+    // core" gauge: 1.0 on a 1-core box = fully busy, 2.0 = overloaded
+    // with one task waiting in the queue. Capped at 200% for display
+    // (the bar itself clips at 100% but the percentage label tells
+    // the truth).
+    const cpuCount = info.cpu?.count || 1;
+    const cpuLoad = info.cpu?.load1 || 0;
+    const cpuPercentRaw = (cpuLoad / cpuCount) * 100;
+    const cpuPercent = Math.min(200, Math.max(0, cpuPercentRaw));
+    const cpuElevated = cpuPercent >= 70;
+    const cpuHigh = cpuPercent >= 100;
+    const cpuBarClass = cpuHigh
+        ? "bg-red-500"
+        : cpuElevated
+          ? "bg-amber-500"
+          : "bg-emerald-500";
+    const cpuLabelClass = cpuHigh
+        ? "text-red-600 dark:text-red-300 font-medium"
+        : cpuElevated
+          ? "text-amber-600 dark:text-amber-300"
+          : "text-gray-500 dark:text-gray-400";
+
     return (
-        <div className="mt-3 text-xs">
-            <div className={`flex items-center justify-between mb-1 ${labelClass}`}>
-                <span className="inline-flex items-center gap-1.5">
-                    <span aria-hidden="true">💾</span>
-                    {t("selfUpdateRamLabel")}
-                    {high && (
-                        <span className="ml-1 font-semibold">
-                            · {t("selfUpdateRamSaturated")}
-                        </span>
-                    )}
-                </span>
-                <span className="tabular-nums">
-                    {formatBytes(info.mem.used)} / {formatBytes(info.mem.total)} ({percent.toFixed(0)}%)
-                </span>
+        <div className="mt-3 space-y-2 text-xs">
+            <div>
+                <div className={`flex items-center justify-between mb-1 ${labelClass}`}>
+                    <span className="inline-flex items-center gap-1.5">
+                        <span aria-hidden="true">💾</span>
+                        {t("selfUpdateRamLabel")}
+                        {high && (
+                            <span className="ml-1 font-semibold">
+                                · {t("selfUpdateRamSaturated")}
+                            </span>
+                        )}
+                    </span>
+                    <span className="tabular-nums">
+                        {formatBytes(info.mem.used)} / {formatBytes(info.mem.total)} ({percent.toFixed(0)}%)
+                    </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden">
+                    <div
+                        className={`h-full transition-[width] duration-500 ${barClass}`}
+                        style={{ width: `${percent}%` }}
+                    />
+                </div>
             </div>
-            <div className="h-1.5 rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden">
-                <div
-                    className={`h-full transition-[width] duration-500 ${barClass}`}
-                    style={{ width: `${percent}%` }}
-                />
+            <div>
+                <div className={`flex items-center justify-between mb-1 ${cpuLabelClass}`}>
+                    <span className="inline-flex items-center gap-1.5">
+                        <span aria-hidden="true">⚙️</span>
+                        {t("selfUpdateCpuLabel")}
+                        {cpuHigh && (
+                            <span className="ml-1 font-semibold">
+                                · {t("selfUpdateCpuSaturated")}
+                            </span>
+                        )}
+                    </span>
+                    <span className="tabular-nums">
+                        {cpuLoad.toFixed(2)} / {cpuCount} {cpuCount > 1 ? t("selfUpdateCpuCores") : t("selfUpdateCpuCore")} ({cpuPercentRaw.toFixed(0)}%)
+                    </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden">
+                    <div
+                        className={`h-full transition-[width] duration-500 ${cpuBarClass}`}
+                        style={{ width: `${Math.min(100, cpuPercent)}%` }}
+                    />
+                </div>
             </div>
         </div>
     );
