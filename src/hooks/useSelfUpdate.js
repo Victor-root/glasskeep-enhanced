@@ -123,23 +123,31 @@ export function useSelfUpdate({ token, isAdmin }) {
                         isTerminal && !!r.status.acknowledgedAt;
                     // The "success" modal must only resurface for an
                     // update that this app actually went through —
-                    // i.e. the running version equals what the
-                    // recorded update targeted. If the operator
-                    // upgraded out-of-band (CLI / docker compose pull)
-                    // the old success record is no longer relevant
-                    // and the modal would lie about who did the work.
-                    const currentVersion =
-                        typeof __APP_VERSION__ !== "undefined"
-                            ? String(__APP_VERSION__).replace(/^v/i, "")
-                            : null;
+                    // i.e. the server's running version equals what
+                    // the recorded update targeted. We compare on the
+                    // SERVER-reported runningVersion (fresh from
+                    // package.json), NOT the bundle's __APP_VERSION__
+                    // which is frozen at build time and therefore
+                    // stale until the user reloads the page.
+                    // If the operator upgraded out-of-band (CLI /
+                    // docker compose pull) the running version will
+                    // be newer than the recorded toVersion and we
+                    // suppress the modal.
+                    const runningVersion = r.status?.runningVersion
+                        ? String(r.status.runningVersion).replace(/^v/i, "")
+                        : null;
                     const targetVersion = r.status?.toVersion
                         ? String(r.status.toVersion).replace(/^v/i, "")
                         : null;
+                    // When the server doesn't expose runningVersion
+                    // (older deploys missing the field), fall back to
+                    // showing the modal — better a slightly stale
+                    // popup than a silently-hidden success.
                     const successFromInAppUpdate =
                         r.status.state === "success" &&
-                        !!currentVersion &&
-                        !!targetVersion &&
-                        currentVersion === targetVersion;
+                        (!runningVersion ||
+                            !targetVersion ||
+                            runningVersion === targetVersion);
                     // Resolve the phase explicitly on every mount so a
                     // stale React state from before a logout / refresh
                     // can't survive into the new session.

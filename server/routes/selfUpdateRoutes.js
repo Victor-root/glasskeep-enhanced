@@ -51,6 +51,14 @@ function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
         return res.json({
             ...s,
             inProgress: orchestrator.isUpdateInProgress(),
+            // Server's own current package.json version. The frontend
+            // uses this (NOT the bundle's __APP_VERSION__) to decide
+            // whether a "success" record is still relevant — the
+            // bundle in the browser is stale until the user reloads,
+            // so comparing the recorded toVersion against the bundle
+            // would suppress the success modal of a completed in-app
+            // update.
+            runningVersion: pkg.version,
         });
     });
 
