@@ -35,7 +35,7 @@ export const fr = {
   requestTimeout: "Délai dépassé. Vérifiez votre connexion.",
   networkError: "Erreur réseau.",
   search: "Rechercher...",
-searchOrAskAi: "Rechercher ou demander à l'IA...",
+  searchOrAskAi: "Rechercher ou demander à l'IA...",
 password: "Mot de passe",
 passwordMin6: "Mot de passe (min 6 caractères)",
 loginFailed: "Échec de la connexion",
@@ -921,6 +921,131 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   copied: "Copié",
   copyCommand: "Copier la commande",
   openRepo: "Ouvrir le dépôt",
+  openChangelog: "Voir le changelog",
+  // ── Mise à jour en un clic ────────────────────────────────────────────────
+  selfUpdateButton: "Mettre à jour maintenant",
+  selfUpdateRunning: "Mise à jour en cours...",
+  selfUpdateButtonHint:
+    "Installe la nouvelle version et redémarre l'application — vos données sont conservées.",
+  selfUpdateManualButton: "Mettre à jour manuellement",
+  selfUpdateConfirmTitle: "Mettre à jour vers la v{version} ?",
+  selfUpdateConfirmMessage:
+    "L'application sera indisponible quelques instants pendant l'installation et le redémarrage. Vos notes et comptes sont conservés. Continuer ?",
+  selfUpdateConfirmButton: "Mettre à jour",
+  selfUpdateHeadlineRunning: "Mise à jour de GlassKeep",
+  selfUpdateHeadlineSuccess: "Mise à jour terminée",
+  selfUpdateHeadlineError: "La mise à jour a échoué",
+  selfUpdateHeadlineRolledBack: "Version précédente restaurée",
+  selfUpdateSubtextRunning:
+    "Veuillez garder cette fenêtre ouverte jusqu'à la fin de la mise à jour.",
+  selfUpdateSubtextWaiting:
+    "L'application redémarre. Patientez — nous nous reconnectons automatiquement.",
+  selfUpdateSubtextSuccess:
+    "GlassKeep a été mis à jour avec succès. Rechargez la page pour utiliser la nouvelle version.",
+  selfUpdateSubtextError:
+    "La mise à jour n'a pas pu aboutir. L'application est peut-être toujours sur l'ancienne version.",
+  selfUpdateSubtextRolledBack:
+    "La mise à jour n'est pas allée au bout. Nous avons restauré l'ancienne version pour que vous puissiez continuer à utiliser l'app.",
+  selfUpdateSubtextRolledBack_oom:
+    "La compilation a manqué de mémoire sur cette machine. L'ancienne version a été restaurée. Pensez à ajouter du swap ou à augmenter la RAM allouée avant de réessayer.",
+  selfUpdateSubtextRolledBack_network:
+    "La mise à jour n'a pas pu joindre le réseau. L'ancienne version a été restaurée. Vérifiez que le serveur a bien accès à Internet et réessayez.",
+  selfUpdateSubtextRolledBack_permissions:
+    "Un problème de droits sur le système de fichiers a bloqué la mise à jour. L'ancienne version a été restaurée. Vérifiez les propriétaires de /opt/glass-keep avant de réessayer.",
+  selfUpdateSubtextRolledBack_disk:
+    "Le disque est plein. L'ancienne version a été restaurée. Libérez de l'espace puis réessayez.",
+  selfUpdateSubtextError_oom:
+    "La compilation a manqué de mémoire sur cette machine. L'app est peut-être dans un état incohérent — restaurez une sauvegarde ou relancez le script d'installation.",
+  selfUpdateSubtextError_network:
+    "La mise à jour n'a pas pu joindre le réseau et la restauration n'a pas pu aboutir. Vérifiez l'accès Internet du serveur, puis relancez le script d'installation manuellement si besoin.",
+  selfUpdateSubtextError_permissions:
+    "Un problème de droits a bloqué la mise à jour et la restauration n'a pas pu aboutir. Vérifiez les propriétaires de /opt/glass-keep, puis relancez le script d'installation manuellement si besoin.",
+  selfUpdateSubtextError_disk:
+    "Le disque est plein. Libérez de l'espace puis relancez le script d'installation manuellement si besoin.",
+  selfUpdateStepQueued: "En attente",
+  selfUpdateStepPreparing: "Préparation",
+  selfUpdateStepStopping: "Arrêt de l'application",
+  selfUpdateStepFetching: "Téléchargement de la nouvelle version",
+  selfUpdateStepRenaming: "Préparation pour la nouvelle version",
+  selfUpdateStepCreating: "Création de la nouvelle instance",
+  selfUpdateStepInstalling: "Installation des dépendances",
+  selfUpdateStepBuilding: "Compilation",
+  selfUpdateStepStarting: "Redémarrage de l'application",
+  selfUpdateStepRollingBack: "Restauration en cours",
+  selfUpdateStepSuccess: "Terminé",
+  selfUpdateStepError: "Échec",
+  selfUpdateStepRolledBack: "Restauré",
+  selfUpdateStepCancelled: "Annulée",
+  selfUpdateHeadlineCancelled: "Mise à jour annulée",
+  selfUpdateHeadlineCancelling: "Annulation de la mise à jour...",
+  selfUpdateSubtextCancelled:
+    "Vous avez annulé la mise à jour. La version précédente a été restaurée et l'application a redémarré.",
+  selfUpdateSubtextCancelling:
+    "On arrête la compilation et on restaure la version précédente. L'application redémarre dans un instant.",
+  selfUpdateCancelButton: "Annuler la mise à jour",
+  selfUpdateCancelConfirmTitle: "Annuler la mise à jour en cours ?",
+  selfUpdateCancelConfirmMessage:
+    "La compilation sera arrêtée, la version précédente restaurée et l'application redémarrera. Cette action ne peut pas être annulée — mais aucune donnée n'est perdue.",
+  selfUpdateCancelConfirmButton: "Annuler la mise à jour",
+  selfUpdateStepWaiting: "En attente du retour du serveur",
+  selfUpdateShowDetails: "Voir les détails",
+  selfUpdateHideDetails: "Masquer les détails",
+  selfUpdateErrorTitle: "Erreur",
+  selfUpdateReload: "Recharger",
+  selfUpdateClose: "Fermer",
+  // ── Panneau de détails (mode expert) ──────────────────────────────────
+  selfUpdateDetailMode: "mode",
+  selfUpdateDetailState: "état",
+  selfUpdateDetailStep: "étape",
+  selfUpdateDetailFromVersion: "version de départ",
+  selfUpdateDetailToVersion: "version cible",
+  selfUpdateDetailMessage: "message",
+  selfUpdateDetailFailedAtStep: "étape échouée",
+  selfUpdateDetailStartedAt: "démarrée à",
+  selfUpdateDetailEndedAt: "terminée à",
+  selfUpdateDetailAcknowledgedAt: "confirmée à",
+  selfUpdateDetailError: "erreur",
+  selfUpdateDetailRolledBack: "restaurée",
+  selfUpdateDetailDuration: "durée",
+  selfUpdateDetailModeNative: "natif (systemd)",
+  selfUpdateDetailModeDocker: "Docker",
+  selfUpdateYes: "oui",
+  selfUpdateNo: "non",
+  selfUpdateEmpty: "—",
+  selfUpdateLogTitle: "Journal technique",
+  selfUpdateLogEmpty: "Pas encore de sortie — le script va commencer à écrire ici dans un instant.",
+  selfUpdateLogFontAssets: "{count} polices web",
+  selfUpdateLogShowFonts: "afficher",
+  selfUpdateLogHideFonts: "masquer",
+  selfUpdateSlowStepHint:
+    "Cette étape peut prendre plusieurs minutes sur des machines avec peu de RAM ou de CPU. Gardez cette fenêtre ouverte.",
+  selfUpdateSlowResponseHint:
+    "Le serveur met plus de temps que d'habitude à répondre, il est probablement surchargé — la mise à jour avance toujours, patientez.",
+  selfUpdateRamLabel: "RAM",
+  selfUpdateRamSaturated: "presque saturée",
+  selfUpdateSwapLabel: "Swap",
+  selfUpdateSwapSaturated: "presque saturé",
+  selfUpdateGaugesStale:
+    "Dernières mesures connues — le serveur est trop occupé pour les rafraîchir.",
+  selfUpdateCpuLabel: "Charge CPU",
+  selfUpdateCpuSaturated: "saturée",
+  selfUpdateCpuCore: "cœur",
+  selfUpdateCpuCores: "cœurs",
+  changelogModalTitle: "Quoi de neuf",
+  changelogModalSubtitle: "Mises à jour et changements au fil des versions",
+  changelogModalClose: "Fermer",
+  changelogTranslateButton: "Traduire avec l'IA",
+  changelogTranslateInProgress: "Traduction en cours...",
+  changelogShowOriginal: "Afficher l'original",
+  changelogShowTranslated: "Afficher la traduction",
+  changelogTranslateUnavailable: "L'IA n'est pas configurée",
+  changelogTranslateFailed: "Échec de la traduction — réessayez plus tard.",
+  selfUpdateKeepOpenHint:
+    "Gardez cette fenêtre ouverte jusqu'à la fin.",
+  selfUpdateDockerHintIntro:
+    "Pour activer la mise à jour en un clic sur Docker, ajoutez cette ligne sous le bloc 'volumes:' de votre docker-compose.yml, puis redémarrez le conteneur une seule fois. Vous n'aurez plus jamais à toucher à ce fichier.",
+  selfUpdateDockerHintFootnote:
+    "Après modification, lancez : docker compose up -d. Le bouton « Mettre à jour maintenant » apparaîtra ensuite ici.",
   audioNote: "Note audio",
   audioNoteDesc: "Mémo vocal au microphone",
   audioRecording: "Enregistrement audio",
@@ -976,4 +1101,20 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   audioStorageEstimate: "Durée approx.",
   audioStorageEstimateValue: "~1h40 d'audio",
   audioStorageHint: "Quand la limite est atteinte, vous ne pouvez plus ajouter d'enregistrement à cette note. Créez-en une nouvelle pour continuer.",
+  // ── Passe de nettoyage i18n — chaînes auparavant en dur dans les composants ─────────
+  confirmActionTitle: "Confirmer l'action",
+  drawingPreviewEmpty: "Vide",
+  aiErrorGeneric:
+    "Désolé, une erreur s'est produite lors du traitement de votre requête.",
+  tvFailedToLoadNotes: "Échec du chargement des notes",
+  aiLoginRequired: "Vous devez être connecté pour utiliser l'assistant IA.",
+  aiMissingNoteContext: "Contexte de note manquant.",
+  aiMissingQuestion: "Question manquante.",
+  passkeyNoPrfOutput:
+    "Cette clé d'accès n'a pas renvoyé de sortie PRF. Utilisez le mot de passe ou la clé de récupération.",
+  audioNotDataUrl: "Ce n'est pas une data URL",
+  audioApiUnsupported: "Web Audio API non supportée",
+  audioReadFailed: "Échec de lecture audio",
+  syncRateLimited: "Limite atteinte (HTTP {status})",
+  syncUnknownError: "Erreur inconnue",
 };

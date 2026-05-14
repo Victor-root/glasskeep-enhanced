@@ -123,9 +123,10 @@ async function chatCompletion(cfg, { messages, temperature, maxTokens, signal } 
 // like the non-streaming path.
 async function* chatCompletionStream(
   cfg,
-  { messages, temperature, maxTokens, signal } = {},
+  { messages, temperature, maxTokens, signal, onDebug } = {},
 ) {
   validateConfig(cfg);
+  const dbg = typeof onDebug === "function" ? onDebug : () => {};
 
   if (!Array.isArray(messages) || messages.length === 0) {
     throw new AIProviderError("Messages array is required.", { status: 400 });
@@ -142,6 +143,7 @@ async function* chatCompletionStream(
     stream: true,
   };
 
+  dbg(`fetch start url=${url} model=${cfg.model}`);
   let res;
   try {
     res = await fetch(url, {
@@ -152,10 +154,12 @@ async function* chatCompletionStream(
     });
   } catch (err) {
     const reason = err?.name === "AbortError" ? "request aborted" : "network error";
+    dbg(`fetch failed: ${err?.message || reason}`);
     throw new AIProviderError(`Failed to reach AI provider (${reason}).`, {
       status: 502,
     });
   }
+  dbg(`fetch resolved status=${res.status} content-type=${res.headers.get("content-type") || "?"}`);
 
   if (!res.ok) {
     let payload = null;
@@ -163,6 +167,7 @@ async function* chatCompletionStream(
     const providerMessage =
       (payload && (payload.error?.message || payload.message)) ||
       `HTTP ${res.status}`;
+    dbg(`fetch !ok: ${providerMessage}`);
     throw new AIProviderError(`AI provider error: ${providerMessage}`, {
       status: 502,
       providerStatus: res.status,
@@ -173,10 +178,19 @@ async function* chatCompletionStream(
   const reader = res.body.getReader();
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
+  let readCount = 0;
   while (true) {
     const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+    readCount += 1;
+    if (done) {
+      dbg(`reader done after ${readCount} read(s), buffer leftover=${buffer.length}b`);
+      break;
+    }
+    const chunkText = decoder.decode(value, { stream: true });
+    buffer += chunkText;
+    if (readCount <= 3) {
+      dbg(`chunk #${readCount} (${value?.byteLength || 0}b) preview=${JSON.stringify(chunkText.slice(0, 200))}`);
+    }
     // SSE frames are separated by a blank line. Process complete frames
     // and keep the trailing partial in the buffer.
     let sep;
@@ -188,7 +202,10 @@ async function* chatCompletionStream(
         if (!line.startsWith("data:")) continue;
         const data = line.slice(5).trim();
         if (!data) continue;
-        if (data === "[DONE]") return;
+        if (data === "[DONE]") {
+          dbg(`[DONE] sentinel after ${readCount} read(s)`);
+          return;
+        }
         let json;
         try { json = JSON.parse(data); } catch { continue; }
         const choice = Array.isArray(json?.choices) ? json.choices[0] : null;

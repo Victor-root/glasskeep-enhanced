@@ -44,6 +44,8 @@ DATA_DIR="/opt/glass-keep/data"
 ENV_FILE="/opt/glass-keep/.env"
 SERVICE_NAME="glass-keep"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+UPDATER_SERVICE_NAME="glass-keep-updater"
+UPDATER_SERVICE_FILE="/etc/systemd/system/${UPDATER_SERVICE_NAME}.service"
 NODE_MAJOR=24
 
 # ── Language detection ────────────────────────────────────────────────────────
@@ -177,6 +179,10 @@ setup_i18n() {
         MSG_SUMMARY_APP="Application"
         MSG_SUMMARY_BUNDLE="Bundle web"
         MSG_SUMMARY_SERVICE="Service systemd"
+        MSG_SUMMARY_UPDATER="Service updater"
+        MSG_SUMMARY_UPDATER_NOTE="déclenchable depuis le panel admin"
+        MSG_SUMMARY_DATA="Données"
+        MSG_SUMMARY_DATA_NOTE="contient notes.db — à sauvegarder régulièrement"
         MSG_SUMMARY_ENC="Chiffrement au repos"
         MSG_SUMMARY_HTTPS="HTTPS"
         MSG_SUMMARY_ENC_ON="activé"
@@ -305,6 +311,10 @@ setup_i18n() {
         MSG_SUMMARY_APP="Application"
         MSG_SUMMARY_BUNDLE="Web bundle"
         MSG_SUMMARY_SERVICE="Systemd service"
+        MSG_SUMMARY_UPDATER="Updater service"
+        MSG_SUMMARY_UPDATER_NOTE="triggered from the admin panel"
+        MSG_SUMMARY_DATA="Data"
+        MSG_SUMMARY_DATA_NOTE="holds notes.db — back this up regularly"
         MSG_SUMMARY_ENC="At-rest encryption"
         MSG_SUMMARY_HTTPS="HTTPS"
         MSG_SUMMARY_ENC_ON="enabled"
@@ -526,6 +536,23 @@ check_os() {
         # shellcheck disable=SC2059
         *) warn "$(printf "$MSG_WARN_OS" "${PRETTY_NAME:-$ID}")" ;;
     esac
+}
+
+# Compute the V8 heap cap (in MB) that `npm run build` should be
+# allowed to use. Same logic as the in-app self-update path so a
+# user with a small VM doesn't hit "JavaScript heap out of memory"
+# during the initial install or the script-driven update. Defaults
+# to 50 % of (RAM + swap), clamped between 512 MB and 1 GB —
+# enough for vite without being wasteful on bigger hosts.
+compute_build_heap_mb() {
+    local mem_kb swap_kb total_mb heap_mb
+    mem_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    swap_kb=$(awk '/^SwapTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    total_mb=$(( (mem_kb + swap_kb) / 1024 ))
+    heap_mb=$(( total_mb * 50 / 100 ))
+    if [[ $heap_mb -lt 512 ]]; then heap_mb=512; fi
+    if [[ $heap_mb -gt 1024 ]]; then heap_mb=1024; fi
+    echo "$heap_mb"
 }
 
 is_installed() {
@@ -1074,8 +1101,10 @@ action_install() {
         bash -c "cd '${INSTALL_DIR}' && npm install --silent"
 
     info "${DIM}${MSG_HINT_LONG}${RESET}"
+    local build_heap_mb
+    build_heap_mb=$(compute_build_heap_mb)
     step "$MSG_STEP_BUILD" \
-        bash -c "cd '${INSTALL_DIR}' && npm run build"
+        bash -c "cd '${INSTALL_DIR}' && NODE_OPTIONS='--max-old-space-size=${build_heap_mb}' npm run build"
 
     mkdir -p "$DATA_DIR"
 
@@ -1105,6 +1134,15 @@ ADMIN_EMAILS=${GLASSKEEP_ADMIN_LOGIN}
 ALLOW_REGISTRATION=false
 HTTPS_ENABLED=$([[ "$SSL_MODE" == "proxy" ]] && echo "false" || echo "true")
 TRUST_PROXY=$([[ "$SSL_MODE" == "proxy" ]] && echo "true" || echo "false")
+# Optional: pull self-updates from a different branch (default: main).
+# Useful for tracking a pre-release branch or a custom fork. Restart the
+# service after changing this. Leave commented for the standard behavior.
+# UPDATE_BRANCH=main
+# Optional: cap Node's V8 heap during the in-app update's vite build.
+# Default is auto-detected from RAM + swap (50 %, between 512 MB and
+# 1 GB). Raise it if your build is unusually large; lower it if your
+# host has very little memory AND no swap.
+# UPDATE_BUILD_HEAP_MB=1024
 EOF
     case "$SSL_MODE" in
         selfsigned) printf 'SSL_CERT=%s/cert.pem\nSSL_KEY=%s/key.pem\n' "$ssl_dir" "$ssl_dir" >> "$ENV_FILE" ;;
@@ -1132,6 +1170,30 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 EOF
+
+    # One-shot unit driven by the admin panel's "Update now" button.
+    # Runs as its own unit so stopping glass-keep.service does NOT kill
+    # the updater half-way through. Type=oneshot keeps systemctl waiting
+    # until the script returns; the main app calls it with --no-block so
+    # the HTTP request returns immediately while the updater works.
+    cat > "$UPDATER_SERVICE_FILE" <<EOF
+[Unit]
+Description=GlassKeep — Self-Update (one-shot)
+
+[Service]
+Type=oneshot
+WorkingDirectory=${INSTALL_DIR}
+EnvironmentFile=-${ENV_FILE}
+Environment=INSTALL_DIR=${INSTALL_DIR}
+Environment=DATA_DIR=${DATA_DIR}
+Environment=SERVICE_NAME=${SERVICE_NAME}
+ExecStart=/usr/bin/env bash ${INSTALL_DIR}/scripts/self-update.sh
+StandardOutput=journal
+StandardError=journal
+EOF
+
+    # The updater script must be executable for systemd to run it.
+    chmod +x "${INSTALL_DIR}/scripts/self-update.sh" 2>/dev/null || true
 
     step "$MSG_STEP_DAEMON" systemctl daemon-reload
     # shellcheck disable=SC2059
@@ -1201,11 +1263,35 @@ action_update() {
         bash -c "cd '${INSTALL_DIR}' && npm install --silent"
 
     info "${DIM}${MSG_HINT_LONG}${RESET}"
+    local build_heap_mb
+    build_heap_mb=$(compute_build_heap_mb)
     step "$MSG_STEP_REBUILD" \
-        bash -c "cd '${INSTALL_DIR}' && npm run build"
+        bash -c "cd '${INSTALL_DIR}' && NODE_OPTIONS='--max-old-space-size=${build_heap_mb}' npm run build"
 
     # Apply HTTPS setting based on user's choice
     apply_ssl_to_env
+
+    # Make sure the one-shot updater unit exists. This is what powers
+    # the "Update now" button in the admin panel. Re-writing the file
+    # on every script-run keeps it in sync with the install paths and
+    # bootstraps it for installs that pre-date this feature.
+    cat > "$UPDATER_SERVICE_FILE" <<EOF
+[Unit]
+Description=GlassKeep — Self-Update (one-shot)
+
+[Service]
+Type=oneshot
+WorkingDirectory=${INSTALL_DIR}
+EnvironmentFile=-${ENV_FILE}
+Environment=INSTALL_DIR=${INSTALL_DIR}
+Environment=DATA_DIR=${DATA_DIR}
+Environment=SERVICE_NAME=${SERVICE_NAME}
+ExecStart=/usr/bin/env bash ${INSTALL_DIR}/scripts/self-update.sh
+StandardOutput=journal
+StandardError=journal
+EOF
+    chmod +x "${INSTALL_DIR}/scripts/self-update.sh" 2>/dev/null || true
+    systemctl daemon-reload
 
     # shellcheck disable=SC2059
     step "$(printf "$MSG_STEP_START" "$SERVICE_NAME")" \
@@ -1230,6 +1316,7 @@ action_uninstall() {
 
     panel "$RED" "$MSG_UNINSTALL_WARN" \
         "${MSG_UNINSTALL_SVC}${BOLD}${SERVICE_FILE}${RESET}" \
+        "${MSG_UNINSTALL_SVC}${BOLD}${UPDATER_SERVICE_FILE}${RESET}" \
         "${MSG_UNINSTALL_APP}${BOLD}${INSTALL_DIR}${RESET}" \
         "${MSG_UNINSTALL_DATA}${BOLD}${DATA_DIR}${RESET}" \
         "${MSG_UNINSTALL_CFG}${BOLD}${ENV_FILE}${RESET}"
@@ -1250,6 +1337,12 @@ action_uninstall() {
         # shellcheck disable=SC2059
         step "$(printf "$MSG_STEP_DISABLE" "$SERVICE_NAME")" \
             systemctl disable "$SERVICE_NAME"
+    fi
+
+    # Best-effort cleanup of the one-shot updater unit.
+    systemctl stop "$UPDATER_SERVICE_NAME" 2>/dev/null || true
+    if [[ -f "$UPDATER_SERVICE_FILE" ]]; then
+        rm -f "$UPDATER_SERVICE_FILE"
     fi
 
     if [[ -f "$SERVICE_FILE" ]]; then
@@ -1328,13 +1421,36 @@ show_install_summary() {
         fi
     fi
 
+    # Compute the label column width so every value's colon lines up,
+    # regardless of how long the translated labels are. Makes the panel
+    # stay readable in any language without per-string manual padding.
+    local labels=(
+        "$MSG_SUMMARY_NODE"
+        "$MSG_SUMMARY_APP"
+        "$MSG_SUMMARY_BUNDLE"
+        "$MSG_SUMMARY_SERVICE"
+        "$MSG_SUMMARY_UPDATER"
+        "$MSG_SUMMARY_DATA"
+        "$MSG_SUMMARY_ENC"
+        "$MSG_SUMMARY_HTTPS"
+    )
+    local label_width=0 lbl
+    for lbl in "${labels[@]}"; do
+        (( ${#lbl} > label_width )) && label_width=${#lbl}
+    done
+    summary_row() {
+        printf "%s%-*s%s : %s" "$TEAL" "$label_width" "$1" "$RESET" "$2"
+    }
+
     panel "$INDIGO" "$MSG_SUMMARY_TITLE" \
-        "${TEAL}${MSG_SUMMARY_NODE}${RESET}        ${BOLD}${node_ver}${RESET}" \
-        "${TEAL}${MSG_SUMMARY_APP}${RESET}     ${BOLD}${INSTALL_DIR}${RESET} ${GRAY}(${commit})${RESET}" \
-        "${TEAL}${MSG_SUMMARY_BUNDLE}${RESET}      ${BOLD}${bundle}${RESET}" \
-        "${TEAL}${MSG_SUMMARY_SERVICE}${RESET} ${BOLD}${SERVICE_NAME}${RESET}" \
-        "${TEAL}${MSG_SUMMARY_ENC}${RESET} ${enc_status}" \
-        "${TEAL}${MSG_SUMMARY_HTTPS}${RESET}            ${BOLD}${https_label}${RESET}"
+        "$(summary_row "$MSG_SUMMARY_NODE"    "${BOLD}${node_ver}${RESET}")" \
+        "$(summary_row "$MSG_SUMMARY_APP"     "${BOLD}${INSTALL_DIR}${RESET} ${GRAY}(${commit})${RESET}")" \
+        "$(summary_row "$MSG_SUMMARY_BUNDLE"  "${BOLD}${bundle}${RESET}")" \
+        "$(summary_row "$MSG_SUMMARY_SERVICE" "${BOLD}${SERVICE_NAME}${RESET}")" \
+        "$(summary_row "$MSG_SUMMARY_UPDATER" "${BOLD}${UPDATER_SERVICE_NAME}${RESET} ${GRAY}(${MSG_SUMMARY_UPDATER_NOTE})${RESET}")" \
+        "$(summary_row "$MSG_SUMMARY_DATA"    "${BOLD}${DATA_DIR}${RESET} ${GRAY}(${MSG_SUMMARY_DATA_NOTE})${RESET}")" \
+        "$(summary_row "$MSG_SUMMARY_ENC"     "$enc_status")" \
+        "$(summary_row "$MSG_SUMMARY_HTTPS"   "${BOLD}${https_label}${RESET}")"
 }
 
 # Pull a hostname out of a PEM-encoded certificate. Tries the SAN

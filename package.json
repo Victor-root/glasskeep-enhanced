@@ -1,7 +1,7 @@
 {
   "name": "glasskeep-enhanced",
   "private": true,
-  "version": "2.3.0",
+  "version": "2.3.5",
   "license": "MIT",
   "type": "module",
   "engines": {

@@ -9,6 +9,7 @@ import {
   getQueueStats,
   purgeQueueForNote,
 } from "./localDb.js";
+import { t } from "../i18n";
 
 const API_BASE = "/api";
 const MAX_RETRIES = 5;
@@ -252,11 +253,11 @@ export class SyncEngine {
           } else if (isRateLimited) {
             // Rate limited (HTTP 429). Server IS reachable, just throttling.
             this._serverReachable = true;
-            this._lastSyncError = `Rate limited (HTTP ${err.status})`;
+            this._lastSyncError = t("syncRateLimited", { status: err.status });
             const nextAttempts = item.attempts + 1;
             await updateQueueItem(item.queueId, {
               status: nextAttempts >= MAX_RETRIES ? "failed" : "retry",
-              lastError: `Rate limited (HTTP ${err.status})`,
+              lastError: t("syncRateLimited", { status: err.status }),
               attempts: nextAttempts,
               lastAttemptAt: Date.now(),
             });
@@ -290,7 +291,7 @@ export class SyncEngine {
             break;
           } else {
             this._serverReachable = true;
-            this._lastSyncError = `${err.message || "Unknown error"} (HTTP ${err.status || "?"})`;
+            this._lastSyncError = `${err.message || t("syncUnknownError")} (HTTP ${err.status || "?"})`;
             const nextAttempts = item.attempts + 1;
             await updateQueueItem(item.queueId, {
               status: nextAttempts >= MAX_RETRIES ? "failed" : "retry",

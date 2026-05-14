@@ -1,5 +1,28 @@
 # Changelog
 
+## v2.3.5 — 2026-05-14
+
+### Added
+- One-click in-app update from the admin panel (native + Docker)
+- "Update manually" toggle for the raw curl / docker compose commands
+- "View changelog" button in the admin panel
+- Live RAM / Swap / CPU gauges during a native update
+- Cancel button with snapshot-based rollback
+- Auto-pop changelog modal after a successful update
+- AI translation of the changelog with live streaming
+- Expert "Show details" panel with the raw update log
+- Smart Node heap sizing using RAM + swap so small hosts don't OOM
+- Friendly failure hints (OOM, network, permissions, disk full)
+- `UPDATE_BRANCH` / `UPDATE_BUILD_HEAP_MB` env vars for advanced setups
+
+### Changed
+- `install.sh` now ships a dedicated `glass-keep-updater.service`
+- `docker-compose.yml` mounts the Docker socket out of the box
+- Update dismissal is now server-side, so the modal doesn't re-pop in private browsing or on another device
+
+### Fixed
+- Various polish and minor bug fixes
+
 ## v2.3.0 — 2026-05-13
 
 ### Added

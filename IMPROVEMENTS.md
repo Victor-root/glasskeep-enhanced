@@ -732,6 +732,65 @@ Audio notes provide a faster, more natural way to capture thoughts, especially o
 
 ---
 
+## 🚀 29) One-click in-app update (with rollback, monitor, cancel)
+
+Section 27's notification stopped at *"hey, a new version is out — here's the command to install it"*. This release closes the loop: the **Update now** button in the admin panel actually runs the update, with a full safety net so a failed build can never brick the install.
+
+### Native install (systemd)
+- a dedicated **one-shot systemd unit** (`glass-keep-updater.service`) is installed alongside the main service so the build can stop and restart `glass-keep` without killing itself
+- the script does `git fetch` → `npm install` → `npm run build` → `systemctl restart` **in that order** (i.e. heavy lifting happens BEFORE the service is taken down), so the modal's poll keeps seeing live progress for most of the run instead of going dark the second the user clicks the button
+- runs with **`nice +10`** and `oom_score_adj=500` so the build stays a courteous citizen on small VMs — the live app keeps a CPU slice, the OOM killer prefers to swat the updater first
+
+### Docker install
+- the running container talks to the host Docker socket (mounted from `docker-compose.yml`), pulls the new image and spawns a tiny **helper container** that swaps the main container out with the same volumes / env / network attachments — `Hostname` and `Domainname` are explicitly NOT inherited so the next self-inspection finds the right container
+- the helper writes to the same `/data/.update.log` so the technical-details panel has the same UX as native
+
+### Backup-driven rollback
+- before any modification, the script **snapshots** `dist/`, `node_modules/`, `package.json` and `package-lock.json` into `/data/.update-backup` using **same-FS hardlinks** (`cp -al`), so the snapshot costs effectively zero disk; falls back to a real copy if the install dir and the data dir live on different mounts
+- the previous git commit is stashed alongside as `PREV_COMMIT`
+- on failure the rollback is a `git reset --hard` + a couple of `mv` operations — no `npm install`, no `npm run build` — which means even an OOM-killed build can be reversed cleanly on the same RAM-starved host that broke it
+- snapshot wiped on success, on failure, and on cancel
+
+### Live system monitor in the modal
+- a `GET /api/admin/self-update/system` endpoint returns the host's RAM (`/proc/meminfo`), swap (same), and a real CPU usage % derived from `/proc/stat` deltas between polls (not the loadavg, which would read 180 % long after the CPU went idle); polled every second
+- three gauges in the modal (RAM, swap, CPU) with traffic-light colours; the swap row hides itself when no swap is configured rather than rendering 0 / 0
+- a "last known readings — the server is too busy to refresh" badge appears after three consecutive failed polls, so a frozen gauge never lies about being current
+- all polls use `no-store` + a fresh `_t` query param + an `AbortController` with a 5 s ceiling so a CPU-starved server can't pin the gauge on its first reading
+
+### Cancel button
+- one-click cancellation: SIGKILL the entire updater cgroup so RAM frees instantly, wait a moment for the kernel to reap, then restore from the snapshot the same way the script's own rollback path does it, write a dedicated `cancelled` status, and bounce `glass-keep` via `systemctl restart --no-block` so the response can flush before the service restarts
+- exposed in the modal footer during any active phase, gated behind a danger-styled confirm dialog with an explicit z-index so it pops above the update modal instead of being trapped under its backdrop
+
+### Smart Node heap sizing
+- `--max-old-space-size` is computed from `RAM + swap` (50 % of the total, clamped between 512 MB and 1 GB) so vite can spill into swap on tiny VMs instead of OOM-ing on V8's internal heap limit (the default is around 250 MB on a 256 MB host — way below what the build needs)
+- `UPDATE_BUILD_HEAP_MB` in `/opt/glass-keep/.env` overrides the auto-detection for unusual hosts
+- the same logic was backported into `install.sh` so the option-1 install and option-2 update paths now build with the same heap cap
+
+### Failure pattern detection
+- the modal scans the latest log text for known error signatures (`Reached heap limit` / `JavaScript heap out of memory`, `Connection refused` / `Could not resolve host`, `Permission denied` / `EACCES`, `No space left on device` / `ENOSPC`) and replaces the generic "couldn't finish" subtext with an actionable hint
+- failure category-specific i18n in both EN and FR so the admin sees the right cause without expanding the details panel
+
+### Expert details panel
+- collapsible "Show details" section shows every status field (mode, state, step, from / to version, started / ended / acknowledged at, duration, error, rolledBack flag), all labels translated
+- live technical log: the same stdout / stderr that systemd writes to `journalctl -u glass-keep-updater` is mirrored into `/data/.update.log`, streamed into the modal, parsed to collapse the dozens of `@fontsource` woff lines into one expandable "+ N font assets" group, and auto-scrolled to the bottom (unless the user scrolls up to read older lines)
+- the modal locks itself to `calc(100dvh - 2rem)` the moment "Show details" is open so the header (with the live system monitor) and the footer (with the action buttons) never drift off-screen on a small laptop
+
+### `UPDATE_BRANCH` override
+- `UPDATE_BRANCH` env var in `/opt/glass-keep/.env` lets the admin track a custom fork or a pre-release branch — defaults to `main`. Useful for testing branches in production without touching the script
+
+### Changelog auto-popup
+- after a successful in-app update + Reload, a dedicated modal opens on the post-reload mount with the FULL `CHANGELOG.md` rendered through `marked` + `DOMPurify`, scoped CSS, an emerald version badge in the header (e.g. `v2.3.5`)
+- closing it persists the dismissal so a manual F5 doesn't re-open it
+- a "View changelog" button in the admin panel re-opens it on demand at any time
+
+### Acknowledgement is server-side
+- the success / error / rolled_back state is stamped with `acknowledgedAt` on the server (via `POST /api/admin/self-update/acknowledge`) when the user clicks Reload or Close, so the modal doesn't re-pop in private browsing, after a hard refresh, on another device, or after a sign-out — exactly the kind of "ghost modal" the localStorage-based approach used to leave behind
+
+### Hard refresh on Reload
+- the Reload button explicitly unregisters every service worker and clears `CacheStorage` before reloading, so the PWA can't serve the just-replaced JS bundle from its cache and trap the user on the old code
+
+---
+
 ## 📌 Global summary
 
 In practice, this fork mainly moves Glass Keep further in seven big directions:
@@ -741,7 +800,7 @@ In practice, this fork mainly moves Glass Keep further in seven big directions:
 3. **safer note lifecycle with Trash and better account handling**
 4. **cleaner and more extensible i18n**
 5. **a real WYSIWYG / live-formatting editor** with cross-device typography presets and a phone-friendly bottom sheet
-6. **much easier self-hosting**
+6. **much easier self-hosting** (one-click in-app update with rollback included)
 7. **ecosystem expansion with better Docker support and a native Android companion app**
 
 So this is not really a "new separate project", but rather a substantial evolution built on top of a base I genuinely liked from the beginning.

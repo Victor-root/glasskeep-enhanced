@@ -80,7 +80,7 @@ export default function TvLogin({
     try {
       await onLoginById(selectedProfile.id, password);
     } catch (err) {
-      setError(err?.message || t("signInError") || "Sign-in failed");
+      setError(err?.message || t("signInError"));
     } finally {
       setBusy(false);
     }
@@ -94,7 +94,7 @@ export default function TvLogin({
     try {
       await onLoginManual(identifier, password);
     } catch (err) {
-      setError(err?.message || t("signInError") || "Sign-in failed");
+      setError(err?.message || t("signInError"));
     } finally {
       setBusy(false);
     }

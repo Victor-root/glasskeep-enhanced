@@ -7,7 +7,7 @@ function detectLanguage() {
   return "en";
 }
 
-const locale = detectLanguage();
+export const locale = detectLanguage();
 document.documentElement.lang = locale;
 const dict = locale === "fr" ? fr : en;
 

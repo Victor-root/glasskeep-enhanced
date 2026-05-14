@@ -9,10 +9,11 @@
 // All conversions return a Blob. Callers can download or re-upload them.
 
 import { Mp3Encoder } from "@breezystack/lamejs";
+import { t } from "../i18n";
 
 export function dataUrlToBlob(dataUrl) {
   if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) {
-    throw new Error("Not a data URL");
+    throw new Error(t("audioNotDataUrl"));
   }
   const [meta, base64] = dataUrl.split(",");
   const mimeMatch = meta.match(/:(.*?);/);
@@ -26,7 +27,7 @@ export function dataUrlToBlob(dataUrl) {
 export async function decodeAudioBuffer(blob) {
   const arrayBuffer = await blob.arrayBuffer();
   const Ctx = window.AudioContext || window.webkitAudioContext;
-  if (!Ctx) throw new Error("Web Audio API not supported");
+  if (!Ctx) throw new Error(t("audioApiUnsupported"));
   const ctx = new Ctx();
   try {
     return await ctx.decodeAudioData(arrayBuffer.slice(0));

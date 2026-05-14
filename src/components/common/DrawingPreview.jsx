@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { renderPaths } from "../../DrawingCanvas";
+import { t } from "../../i18n";
 
 /** ---------- Drawing Preview (HiDPI-aware) ---------- */
 export default function DrawingPreview({ data, width, height, darkMode = false, maxPages = 1 }) {
@@ -86,7 +87,7 @@ export default function DrawingPreview({ data, width, height, darkMode = false, 
       ctx.fillStyle = "#9ca3af";
       ctx.font = "10px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("Empty", emptyW / 2, emptyH / 2 + 3);
+      ctx.fillText(t("drawingPreviewEmpty"), emptyW / 2, emptyH / 2 + 3);
       return;
     }
 

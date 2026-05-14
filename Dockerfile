@@ -44,6 +44,7 @@ RUN apt-get update \
 # Copy only what's needed to run.
 COPY --from=builder /app/dist           ./dist
 COPY --from=builder /app/server         ./server
+COPY --from=builder /app/scripts        ./scripts
 COPY --from=builder /app/node_modules   ./node_modules
 COPY --from=builder /app/package.json   ./package.json
 
@@ -58,10 +59,13 @@ VOLUME ["/data"]
 # Docker image is HTTP-only by design — put it behind a reverse proxy for
 # HTTPS. HTTPS_ENABLED is pinned off so the runtime never tries to read a
 # cert even if SSL_CERT/SSL_KEY leak in from the environment.
+# IN_DOCKER is a hint for the self-update orchestrator so it does not
+# need to guess from /.dockerenv (which is reliable but not contractual).
 ENV NODE_ENV=production \
     API_PORT=8080 \
     DB_FILE=/data/notes.db \
-    HTTPS_ENABLED=false
+    HTTPS_ENABLED=false \
+    IN_DOCKER=1
 
 EXPOSE 8080
 

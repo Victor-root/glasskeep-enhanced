@@ -18,6 +18,7 @@ import {
   browserSupportsWebAuthn,
   platformAuthenticatorIsAvailable,
 } from "@simplewebauthn/browser";
+import { t } from "../i18n";
 
 const API = "/api";
 
@@ -230,7 +231,7 @@ export async function enableInstanceUnlock(token, credentialId) {
   const response = await startAuthentication({ optionsJSON: preparePrfOptions(options) });
   const prfOutput = extractPrfOutput(response);
   if (!prfOutput) {
-    throw new Error("This passkey did not return a PRF output. Use passphrase or recovery key.");
+    throw new Error(t("passkeyNoPrfOutput"));
   }
   return await postJSON(
     `/passkeys/${encodeURIComponent(credentialId)}/instance-unlock/verify`,
@@ -272,7 +273,7 @@ export async function unlockInstanceWithPasskey() {
   const response = await startAuthentication({ optionsJSON: preparePrfOptions(options) });
   const prfOutput = extractPrfOutput(response);
   if (!prfOutput) {
-    throw new Error("This passkey did not return a PRF output. Use passphrase or recovery key.");
+    throw new Error(t("passkeyNoPrfOutput"));
   }
   const verify = await postJSON("/instance/unlock-passkey/verify", {
     response, challengeId, prfOutput,

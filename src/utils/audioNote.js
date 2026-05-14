@@ -1,4 +1,5 @@
 import { uid } from "./helpers.js";
+import { t } from "../i18n";
 
 // Audio note content helpers.
 //
@@ -173,7 +174,7 @@ export function extensionForMime(mime) {
 export async function blobToDataUrl(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(reader.error || new Error("read failed"));
+    reader.onerror = () => reject(reader.error || new Error(t("audioReadFailed")));
     reader.onload = () => resolve(String(reader.result || ""));
     reader.readAsDataURL(blob);
   });
