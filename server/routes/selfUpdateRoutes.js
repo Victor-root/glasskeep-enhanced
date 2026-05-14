@@ -10,6 +10,7 @@
 //  the instance (when encryption is on) before they can update.
 // =============================================================================
 
+const fs = require("fs");
 const os = require("os");
 const orchestrator = require("../services/updateOrchestrator");
 const pkg = require("../../package.json");
@@ -23,15 +24,35 @@ const pkg = require("../../package.json");
 let lastCpuSnap = null;
 const CPU_SNAP_STALE_MS = 30 * 1000;
 
+// Read CPU times directly from /proc/stat instead of going through
+// os.cpus(), which silently drops the iowait / softirq / steal /
+// guest / guest_nice categories. Missing those categories under-
+// counts the total tick window and inflates the resulting "busy"
+// percentage — particularly noticeable inside LXC / Docker where
+// iowait can be a significant slice of the workload.
+//
+// We use the aggregate first line ("cpu  user nice system idle
+// iowait irq softirq steal guest guest_nice") so a single call
+// gives us a system-wide reading that matches what `top` reports.
+// Idle counts both literal idle AND iowait — the CPU is available
+// in both cases, just waiting on a different queue.
 function snapCpuTimes() {
-    const cpus = os.cpus() || [];
-    let total = 0;
-    let idle = 0;
-    for (const c of cpus) {
-        for (const k of Object.keys(c.times)) total += c.times[k];
-        idle += c.times.idle;
+    try {
+        const text = fs.readFileSync("/proc/stat", "utf8");
+        const firstLine = text.split("\n", 1)[0] || "";
+        if (!firstLine.startsWith("cpu ")) return null;
+        const fields = firstLine
+            .trim()
+            .split(/\s+/)
+            .slice(1) // drop the leading "cpu" label
+            .map((n) => parseInt(n, 10) || 0);
+        if (fields.length < 4) return null;
+        const total = fields.reduce((s, n) => s + n, 0);
+        const idle = (fields[3] || 0) + (fields[4] || 0); // idle + iowait
+        return { total, idle, at: Date.now() };
+    } catch {
+        return null;
     }
-    return { total, idle, at: Date.now() };
 }
 
 function parseSemver(v) {
@@ -106,7 +127,7 @@ function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
         // length, not an instantaneous usage).
         const snap = snapCpuTimes();
         let cpuPercent = null;
-        if (lastCpuSnap && snap.at - lastCpuSnap.at < CPU_SNAP_STALE_MS) {
+        if (snap && lastCpuSnap && snap.at - lastCpuSnap.at < CPU_SNAP_STALE_MS) {
             const totalDelta = snap.total - lastCpuSnap.total;
             const idleDelta = snap.idle - lastCpuSnap.idle;
             if (totalDelta > 0) {
@@ -116,7 +137,7 @@ function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
                 );
             }
         }
-        lastCpuSnap = snap;
+        if (snap) lastCpuSnap = snap;
 
         return res.json({
             mem: {
