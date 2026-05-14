@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
 import { API_BASE } from "../../utils/api.js";
 import TI from "../../icons/editor/index.jsx";
@@ -69,6 +69,27 @@ function FontGroup({ count, lines }) {
 
 function TechnicalLog({ token, phase, showDetails }) {
     const [text, setText] = useState("");
+    const scrollRef = useRef(null);
+    // Sticky-bottom auto-scroll. Default true so the panel jumps to
+    // the latest line on first render; flipped to false the moment
+    // the admin scrolls up to read earlier output, restored when
+    // they scroll back to the bottom.
+    const stickToBottomRef = useRef(true);
+
+    const handleScroll = () => {
+        const el = scrollRef.current;
+        if (!el) return;
+        stickToBottomRef.current =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    };
+
+    // After every log update, glue the view to the bottom — but only
+    // if the admin had not scrolled away from it.
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el || !stickToBottomRef.current) return;
+        el.scrollTop = el.scrollHeight;
+    }, [text]);
 
     useEffect(() => {
         if (!showDetails || !token) return;
@@ -114,7 +135,11 @@ function TechnicalLog({ token, phase, showDetails }) {
             <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
                 {t("selfUpdateLogTitle")}
             </div>
-            <div className="max-h-72 overflow-y-auto overflow-x-hidden -mx-1 px-1">
+            <div
+                ref={scrollRef}
+                onScroll={handleScroll}
+                className="max-h-72 overflow-y-auto overflow-x-hidden -mx-1 px-1"
+            >
                 {items.length === 0 ? (
                     <div className="opacity-60 italic">
                         {t("selfUpdateLogEmpty")}
