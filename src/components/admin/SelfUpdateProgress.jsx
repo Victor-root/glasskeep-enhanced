@@ -540,7 +540,7 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
                         <button
                             type="button"
                             onClick={onReload}
-                            className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                            className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-md shadow-emerald-300/40 dark:shadow-none hover:shadow-lg hover:shadow-emerald-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
                         >
                             <TI.Refresh className="tabler-icon w-4 h-4" />
                             {t("selfUpdateReload")}
