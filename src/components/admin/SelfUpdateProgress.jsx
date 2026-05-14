@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
-import { API_BASE } from "../../utils/api.js";
+import { API_BASE, api } from "../../utils/api.js";
 import TI from "../../icons/editor/index.jsx";
 import { markChangelogToShow } from "./ChangelogModal.jsx";
 
@@ -231,7 +231,7 @@ function SystemMonitor({ token, active }) {
             <div>
                 <div className={`flex items-center justify-between mb-1 ${labelClass}`}>
                     <span className="inline-flex items-center gap-1.5">
-                        <TI.Ram className="tabler-icon w-3.5 h-3.5" />
+                        <TI.Ram className="tabler-icon w-3 h-3" />
                         {t("selfUpdateRamLabel")}
                         {high && (
                             <span className="ml-1 font-semibold">
@@ -254,7 +254,7 @@ function SystemMonitor({ token, active }) {
                 <div>
                     <div className={`flex items-center justify-between mb-1 ${swapLabelClass}`}>
                         <span className="inline-flex items-center gap-1.5">
-                            <TI.Swap className="tabler-icon w-3.5 h-3.5" />
+                            <TI.Swap className="tabler-icon w-3 h-3" />
                             {t("selfUpdateSwapLabel")}
                             {swapHigh && (
                                 <span className="ml-1 font-semibold">
@@ -443,6 +443,7 @@ const STEP_LABEL_KEYS = {
     success: "selfUpdateStepSuccess",
     error: "selfUpdateStepError",
     rolled_back: "selfUpdateStepRolledBack",
+    cancelled: "selfUpdateStepCancelled",
 };
 
 function stepLabel(state) {
@@ -562,7 +563,7 @@ function StateIcon({ phase }) {
             </span>
         );
     }
-    if (phase === "error" || phase === "rolled_back") {
+    if (phase === "error" || phase === "rolled_back" || phase === "cancelled") {
         return (
             <span
                 className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
@@ -582,7 +583,11 @@ function StateIcon({ phase }) {
     );
 }
 
-export default function SelfUpdateProgress({ selfUpdate, token }) {
+export default function SelfUpdateProgress({
+    selfUpdate,
+    token,
+    showGenericConfirm,
+}) {
     const {
         phase,
         status,
@@ -591,8 +596,10 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
         acknowledge,
         isActive,
         slowResponse,
+        mode,
     } = selfUpdate;
     const [showDetails, setShowDetails] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
 
     // Sticky-bottom auto-scroll, lifted up to the modal level so the
     // technical log can grow naturally without its own scroll area.
@@ -641,8 +648,50 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
     const success = phase === "success";
     const error = phase === "error";
     const rolledBack = phase === "rolled_back";
-    const terminal = success || error || rolledBack;
+    const cancelled = phase === "cancelled";
+    const terminal = success || error || rolledBack || cancelled;
     const waiting = phase === "waiting_for_server";
+
+    // Cancel is only meaningful on native installs while the update
+    // is actually in flight. We hide the button in any other case
+    // so the admin doesn't think they can interrupt the docker swap
+    // (we don't support that yet) or cancel a finished run.
+    const cancelAvailable =
+        isActive &&
+        !cancelling &&
+        (mode === "native" || (!mode && status?.mode === "native"));
+
+    const requestCancel = () => {
+        if (!cancelAvailable) return;
+        const fire = async () => {
+            setCancelling(true);
+            try {
+                await api("/admin/self-update/cancel", {
+                    method: "POST",
+                    token,
+                    timeoutMs: 15000,
+                });
+            } catch {
+                /* connection probably dropped because the service is
+                 * restarting — that's actually the success path */
+            }
+            // Polling continues; either the new server reports
+            // state="cancelled" and the modal flips to the terminal
+            // view, or the response we just got returns cancelled.
+        };
+        if (typeof showGenericConfirm === "function") {
+            showGenericConfirm({
+                title: t("selfUpdateCancelConfirmTitle"),
+                message: t("selfUpdateCancelConfirmMessage"),
+                confirmText: t("selfUpdateCancelConfirmButton"),
+                cancelText: t("cancel"),
+                variant: "danger",
+                onConfirm: fire,
+            });
+        } else {
+            fire();
+        }
+    };
 
     const headline = success
         ? t("selfUpdateHeadlineSuccess")
@@ -650,7 +699,11 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
           ? t("selfUpdateHeadlineError")
           : rolledBack
             ? t("selfUpdateHeadlineRolledBack")
-            : t("selfUpdateHeadlineRunning");
+            : cancelled
+              ? t("selfUpdateHeadlineCancelled")
+              : cancelling
+                ? t("selfUpdateHeadlineCancelling")
+                : t("selfUpdateHeadlineRunning");
 
     // When the run failed, scan the technical log for a known
     // failure category (OOM, network, perms, full disk) and prefer
@@ -669,9 +722,13 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
             ? failureHint
                 ? t(`selfUpdateSubtextRolledBack_${failureHint}`)
                 : t("selfUpdateSubtextRolledBack")
-            : waiting
-              ? t("selfUpdateSubtextWaiting")
-              : t("selfUpdateSubtextRunning");
+            : cancelled
+              ? t("selfUpdateSubtextCancelled")
+              : cancelling
+                ? t("selfUpdateSubtextCancelling")
+                : waiting
+                  ? t("selfUpdateSubtextWaiting")
+                  : t("selfUpdateSubtextRunning");
 
     const currentStep = waiting
         ? t("selfUpdateStepWaiting")
@@ -741,7 +798,7 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
                 the header off the page. The header (status + progress)
                 and the footer (buttons) stay pinned; the details +
                 technical log scroll inside the middle area. */}
-            <div className="w-full max-w-2xl max-h-[calc(100dvh-2rem)] flex flex-col rounded-2xl border border-[var(--border-light)] bg-white dark:bg-[var(--bg-elevated,#1a1a1f)] shadow-2xl overflow-hidden">
+            <div className={`w-full max-w-2xl ${showDetails ? "h-[calc(100dvh-2rem)]" : "max-h-[calc(100dvh-2rem)]"} flex flex-col rounded-2xl border border-[var(--border-light)] bg-white dark:bg-[var(--bg-elevated,#1a1a1f)] shadow-2xl overflow-hidden`}>
                 <div className="flex-shrink-0 px-6 pt-6 pb-4">
                     <div className="flex items-start gap-4 mb-5">
                         <StateIcon phase={phase} />
@@ -938,7 +995,7 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
                             {t("selfUpdateReload")}
                         </button>
                     )}
-                    {(error || rolledBack) && (
+                    {(error || rolledBack || cancelled) && (
                         <button
                             type="button"
                             onClick={dismiss}
@@ -947,7 +1004,17 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
                             {t("selfUpdateClose")}
                         </button>
                     )}
-                    {isActive && (
+                    {cancelAvailable && (
+                        <button
+                            type="button"
+                            onClick={requestCancel}
+                            className="inline-flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg border border-red-300/60 dark:border-red-500/40 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10"
+                        >
+                            <TI.X className="tabler-icon w-3.5 h-3.5" />
+                            {t("selfUpdateCancelButton")}
+                        </button>
+                    )}
+                    {isActive && !cancelling && (
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                             {t("selfUpdateKeepOpenHint")}
                         </span>

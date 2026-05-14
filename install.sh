@@ -538,6 +538,23 @@ check_os() {
     esac
 }
 
+# Compute the V8 heap cap (in MB) that `npm run build` should be
+# allowed to use. Same logic as the in-app self-update path so a
+# user with a small VM doesn't hit "JavaScript heap out of memory"
+# during the initial install or the script-driven update. Defaults
+# to 50 % of (RAM + swap), clamped between 512 MB and 1 GB —
+# enough for vite without being wasteful on bigger hosts.
+compute_build_heap_mb() {
+    local mem_kb swap_kb total_mb heap_mb
+    mem_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    swap_kb=$(awk '/^SwapTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    total_mb=$(( (mem_kb + swap_kb) / 1024 ))
+    heap_mb=$(( total_mb * 50 / 100 ))
+    if [[ $heap_mb -lt 512 ]]; then heap_mb=512; fi
+    if [[ $heap_mb -gt 1024 ]]; then heap_mb=1024; fi
+    echo "$heap_mb"
+}
+
 is_installed() {
     [[ -d "$INSTALL_DIR" ]] && [[ -f "$SERVICE_FILE" ]]
 }
@@ -1084,8 +1101,10 @@ action_install() {
         bash -c "cd '${INSTALL_DIR}' && npm install --silent"
 
     info "${DIM}${MSG_HINT_LONG}${RESET}"
+    local build_heap_mb
+    build_heap_mb=$(compute_build_heap_mb)
     step "$MSG_STEP_BUILD" \
-        bash -c "cd '${INSTALL_DIR}' && npm run build"
+        bash -c "cd '${INSTALL_DIR}' && NODE_OPTIONS='--max-old-space-size=${build_heap_mb}' npm run build"
 
     mkdir -p "$DATA_DIR"
 
@@ -1244,8 +1263,10 @@ action_update() {
         bash -c "cd '${INSTALL_DIR}' && npm install --silent"
 
     info "${DIM}${MSG_HINT_LONG}${RESET}"
+    local build_heap_mb
+    build_heap_mb=$(compute_build_heap_mb)
     step "$MSG_STEP_REBUILD" \
-        bash -c "cd '${INSTALL_DIR}' && npm run build"
+        bash -c "cd '${INSTALL_DIR}' && NODE_OPTIONS='--max-old-space-size=${build_heap_mb}' npm run build"
 
     # Apply HTTPS setting based on user's choice
     apply_ssl_to_env

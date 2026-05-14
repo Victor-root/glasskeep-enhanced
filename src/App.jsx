@@ -5830,7 +5830,11 @@ export default function App() {
         onClose={() => setGenericConfirmOpen(false)}
       />
 
-      <SelfUpdateProgress selfUpdate={selfUpdate} token={token} />
+      <SelfUpdateProgress
+        selfUpdate={selfUpdate}
+        token={token}
+        showGenericConfirm={showGenericConfirm}
+      />
 
       <ChangelogModal />
 

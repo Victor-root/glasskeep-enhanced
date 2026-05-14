@@ -32,7 +32,12 @@ const ACTIVE_STATES = new Set([
     "rolling_back",
 ]);
 
-const TERMINAL_STATES = new Set(["success", "error", "rolled_back"]);
+const TERMINAL_STATES = new Set([
+    "success",
+    "error",
+    "rolled_back",
+    "cancelled",
+]);
 
 // Acknowledgement lives server-side (status.acknowledgedAt) so the
 // modal does not re-pop in private browsing, after a hard refresh,
@@ -172,6 +177,8 @@ export function useSelfUpdate({ token, isAdmin }) {
                         setPhase("error");
                     } else if (r.status.state === "rolled_back") {
                         setPhase("rolled_back");
+                    } else if (r.status.state === "cancelled") {
+                        setPhase("cancelled");
                     } else {
                         setPhase("idle");
                     }

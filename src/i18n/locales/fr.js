@@ -974,6 +974,18 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   selfUpdateStepSuccess: "Terminé",
   selfUpdateStepError: "Échec",
   selfUpdateStepRolledBack: "Restauré",
+  selfUpdateStepCancelled: "Annulée",
+  selfUpdateHeadlineCancelled: "Mise à jour annulée",
+  selfUpdateHeadlineCancelling: "Annulation de la mise à jour...",
+  selfUpdateSubtextCancelled:
+    "Vous avez annulé la mise à jour. La version précédente a été restaurée et l'application a redémarré.",
+  selfUpdateSubtextCancelling:
+    "On arrête la compilation et on restaure la version précédente. L'application redémarre dans un instant.",
+  selfUpdateCancelButton: "Annuler la mise à jour",
+  selfUpdateCancelConfirmTitle: "Annuler la mise à jour en cours ?",
+  selfUpdateCancelConfirmMessage:
+    "La compilation sera arrêtée, la version précédente restaurée et l'application redémarrera. Cette action ne peut pas être annulée — mais aucune donnée n'est perdue.",
+  selfUpdateCancelConfirmButton: "Annuler la mise à jour",
   selfUpdateStepWaiting: "En attente du retour du serveur",
   selfUpdateShowDetails: "Voir les détails",
   selfUpdateHideDetails: "Masquer les détails",
@@ -1007,7 +1019,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   selfUpdateSlowStepHint:
     "Cette étape peut prendre plusieurs minutes sur des machines avec peu de RAM ou de CPU. Gardez cette fenêtre ouverte.",
   selfUpdateSlowResponseHint:
-    "Le serveur met plus de temps que d'habitude à répondre — la compilation accapare probablement le CPU. La mise à jour avance toujours, patientez.",
+    "Le serveur met plus de temps que d'habitude à répondre, il est probablement surchargé — la mise à jour avance toujours, patientez.",
   selfUpdateRamLabel: "RAM",
   selfUpdateRamSaturated: "presque saturée",
   selfUpdateSwapLabel: "Swap",

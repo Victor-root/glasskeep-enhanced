@@ -170,6 +170,10 @@ take_snapshot() {
     # always matches the dist + node_modules we put back.
     [[ -f "$INSTALL_DIR/package.json" ]] && cp "$INSTALL_DIR/package.json" "$BACKUP_DIR/package.json"
     [[ -f "$INSTALL_DIR/package-lock.json" ]] && cp "$INSTALL_DIR/package-lock.json" "$BACKUP_DIR/package-lock.json"
+    # And the previous git commit so a cancel handler (which doesn't
+    # have access to this script's variables) can git-reset the
+    # working tree back to the pre-update state.
+    echo "$PREV_COMMIT" > "$BACKUP_DIR/PREV_COMMIT"
 }
 
 # Move a directory from the snapshot back into the install dir. Uses

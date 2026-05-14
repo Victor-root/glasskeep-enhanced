@@ -973,6 +973,18 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   selfUpdateStepSuccess: "Done",
   selfUpdateStepError: "Failed",
   selfUpdateStepRolledBack: "Rolled back",
+  selfUpdateStepCancelled: "Cancelled",
+  selfUpdateHeadlineCancelled: "Update cancelled",
+  selfUpdateHeadlineCancelling: "Cancelling update...",
+  selfUpdateSubtextCancelled:
+    "You cancelled the update. The previous version has been restored and the app has restarted.",
+  selfUpdateSubtextCancelling:
+    "Killing the build and rolling the install back to the previous version. The app will restart in a moment.",
+  selfUpdateCancelButton: "Cancel update",
+  selfUpdateCancelConfirmTitle: "Cancel the running update?",
+  selfUpdateCancelConfirmMessage:
+    "The build will be killed, the previous version restored and the app restarted. This action cannot be undone — but no data is lost.",
+  selfUpdateCancelConfirmButton: "Cancel the update",
   selfUpdateStepWaiting: "Waiting for the server to come back",
   selfUpdateShowDetails: "Show details",
   selfUpdateHideDetails: "Hide details",
@@ -1006,7 +1018,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   selfUpdateSlowStepHint:
     "This step can take several minutes on machines with limited RAM or CPU. Keep this window open.",
   selfUpdateSlowResponseHint:
-    "The server is taking longer than usual to respond — the build is probably hogging the CPU. The update is still progressing, hang on.",
+    "The server is taking longer than usual to respond, it is probably overloaded — the update is still progressing, hang on.",
   selfUpdateRamLabel: "RAM",
   selfUpdateRamSaturated: "almost full",
   selfUpdateSwapLabel: "Swap",

@@ -15,7 +15,7 @@
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 
 const pkg = require("../../package.json");
 
@@ -420,6 +420,116 @@ async function startUpdate({ fromVersion, toVersion }) {
     throw err;
 }
 
+// Cancels a running native update: kills every process in the
+// updater service's cgroup (the bash script, npm, vite, node…),
+// restores the install directory from the snapshot taken at start,
+// writes a "cancelled" status, and schedules a glass-keep restart
+// so the cleanly-restored old version takes over. Docker is not
+// supported here yet — the helper container's swap dance has a
+// different rollback path.
+async function cancelUpdate() {
+    const mode = detectMode();
+    if (mode !== "native") {
+        const e = new Error("cancel currently supported only for native installs");
+        e.code = "unsupported";
+        throw e;
+    }
+    const installDir = process.env.INSTALL_DIR || NATIVE_DEFAULTS.installDir;
+    const dataDir = getDataDir();
+    const backupDir = path.join(dataDir, ".update-backup");
+    const serviceName = process.env.SERVICE_NAME || NATIVE_DEFAULTS.serviceName;
+    const updaterUnit = process.env.UPDATER_UNIT || NATIVE_DEFAULTS.updaterService;
+
+    // 1. Kill the whole updater cgroup hard. SIGKILL bypasses any
+    //    trap the script might be in the middle of running; what we
+    //    want here is "everything dies right now so RAM frees up".
+    spawnSync("systemctl", ["kill", "--signal=SIGKILL", updaterUnit], {
+        stdio: "ignore",
+    });
+    // Allow the unit to be started again later.
+    spawnSync("systemctl", ["reset-failed", updaterUnit], { stdio: "ignore" });
+
+    // 2. Give the kernel a second to reap the dead processes and
+    //    release their memory — important when the cancel was
+    //    triggered by RAM pressure.
+    await new Promise((r) => setTimeout(r, 1500));
+
+    // 3. Restore the install dir from the snapshot, exactly the same
+    //    way the script's rollback path would have. PREV_COMMIT was
+    //    written into BACKUP_DIR by take_snapshot so we know which
+    //    commit to reset to.
+    if (fs.existsSync(backupDir)) {
+        try {
+            const prevCommit = fs
+                .readFileSync(path.join(backupDir, "PREV_COMMIT"), "utf8")
+                .trim();
+            if (prevCommit) {
+                spawnSync("git", ["-C", installDir, "reset", "--hard", prevCommit], {
+                    stdio: "ignore",
+                });
+            }
+        } catch {
+            /* no PREV_COMMIT file — leave git alone, the snapshot
+             * dist + node_modules is still useful */
+        }
+
+        for (const sub of ["dist", "node_modules"]) {
+            const src = path.join(backupDir, sub);
+            const dst = path.join(installDir, sub);
+            if (!fs.existsSync(src)) continue;
+            spawnSync("rm", ["-rf", dst], { stdio: "ignore" });
+            try {
+                fs.renameSync(src, dst);
+            } catch {
+                // Cross-FS or rename failed — fall back to copy + delete.
+                spawnSync("cp", ["-a", src, dst], { stdio: "ignore" });
+                spawnSync("rm", ["-rf", src], { stdio: "ignore" });
+            }
+        }
+        for (const f of ["package.json", "package-lock.json"]) {
+            const src = path.join(backupDir, f);
+            const dst = path.join(installDir, f);
+            if (fs.existsSync(src)) {
+                try { fs.copyFileSync(src, dst); } catch { /* ignore */ }
+            }
+        }
+        spawnSync("rm", ["-rf", backupDir], { stdio: "ignore" });
+    }
+
+    // 4. Mark the status file as cancelled BEFORE the restart so the
+    //    new glass-keep instance reports the right state right away.
+    const current = readStatus() || {};
+    const cancelStatus = {
+        mode,
+        state: "cancelled",
+        step: current.step || 0,
+        totalSteps: current.totalSteps || 4,
+        message: "Update cancelled by the administrator.",
+        startedAt: current.startedAt || null,
+        endedAt: new Date().toISOString(),
+        fromVersion: current.fromVersion || null,
+        toVersion: current.toVersion || null,
+        error: null,
+        rolledBack: true,
+    };
+    try {
+        const sp = getStatusFilePath();
+        fs.writeFileSync(sp + ".tmp", JSON.stringify(cancelStatus));
+        fs.renameSync(sp + ".tmp", sp);
+    } catch (e) {
+        // Status write failed — log but proceed. Frontend can still
+        // tell the update is over via the empty/stale status.
+        console.error("[cancelUpdate] status write failed:", e.message);
+    }
+
+    // 5. Bounce glass-keep so the just-restored code takes over.
+    //    --no-block lets this HTTP response flush before systemd
+    //    kills us.
+    spawnSync("systemctl", ["restart", `${serviceName}.service`, "--no-block"], {
+        stdio: "ignore",
+    });
+}
+
 module.exports = {
     detectMode,
     getMode,
@@ -427,6 +537,7 @@ module.exports = {
     readLog,
     isUpdateInProgress,
     startUpdate,
+    cancelUpdate,
     acknowledgeStatus,
     // exposed for tests / introspection
     _internals: {

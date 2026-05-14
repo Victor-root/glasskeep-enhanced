@@ -198,6 +198,22 @@ function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
         return res.type("text/plain").send(r.text);
     });
 
+    // Kill a running update and roll the install back to its
+    // pre-update snapshot. Admin-driven counterpart of /start.
+    app.post("/api/admin/self-update/cancel", auth, adminOnly, async (_req, res) => {
+        try {
+            await orchestrator.cancelUpdate();
+            return res.json({ cancelled: true });
+        } catch (e) {
+            if (log && log.warn) log.warn("self-update/cancel failed:", e.message);
+            const status = e.code === "unsupported" ? 400 : 500;
+            return res.status(status).json({
+                error: e.message || "cancel failed",
+                code: e.code || "internal",
+            });
+        }
+    });
+
     // Mark the current terminal outcome as seen by the admin so the
     // progress modal does not pop again on the next refresh / login.
     // Server-side state (not localStorage) so private browsing,
