@@ -1119,6 +1119,11 @@ TRUST_PROXY=$([[ "$SSL_MODE" == "proxy" ]] && echo "true" || echo "false")
 # Useful for tracking a pre-release branch or a custom fork. Restart the
 # service after changing this. Leave commented for the standard behavior.
 # UPDATE_BRANCH=main
+# Optional: cap Node's V8 heap during the in-app update's vite build.
+# Default is auto-detected from RAM + swap (50 %, between 512 MB and
+# 1 GB). Raise it if your build is unusually large; lower it if your
+# host has very little memory AND no swap.
+# UPDATE_BUILD_HEAP_MB=1024
 EOF
     case "$SSL_MODE" in
         selfsigned) printf 'SSL_CERT=%s/cert.pem\nSSL_KEY=%s/key.pem\n' "$ssl_dir" "$ssl_dir" >> "$ENV_FILE" ;;

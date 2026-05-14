@@ -65,6 +65,37 @@ if [[ -w "/proc/$$/oom_score_adj" ]]; then
     echo 500 > "/proc/$$/oom_score_adj" 2>/dev/null || true
 fi
 
+# ── Node heap cap for the build ──────────────────────────────────────────────
+# V8 has its OWN heap limit, totally separate from the OS-visible
+# RAM + swap. By default Node settles on roughly 250 MB on a small
+# host and then OOMs internally even when the kernel still has
+# plenty of swap to give it. Sizing the cap from the actual usable
+# memory (RAM + swap) means the build can spill into swap on tiny
+# machines instead of crashing on principle.
+#
+# Pick the smaller of "50 % of usable memory" and 1 GB — vite for
+# this project tops out around 300-500 MB heap, so going above 1 GB
+# is wasteful, and going below 512 MB risks crashing even on hosts
+# that DO have enough memory. UPDATE_BUILD_HEAP_MB in /opt/glass-keep/.env
+# overrides the auto-detection for unusual setups.
+compute_build_heap_mb() {
+    if [[ -n "${UPDATE_BUILD_HEAP_MB:-}" ]]; then
+        echo "$UPDATE_BUILD_HEAP_MB"
+        return
+    fi
+    local mem_kb swap_kb total_mb heap_mb
+    mem_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    swap_kb=$(awk '/^SwapTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    total_mb=$(( (mem_kb + swap_kb) / 1024 ))
+    heap_mb=$(( total_mb * 50 / 100 ))
+    if [[ $heap_mb -lt 512 ]]; then heap_mb=512; fi
+    if [[ $heap_mb -gt 1024 ]]; then heap_mb=1024; fi
+    echo "$heap_mb"
+}
+BUILD_HEAP_MB="$(compute_build_heap_mb)"
+export NODE_OPTIONS="--max-old-space-size=${BUILD_HEAP_MB}"
+echo "[self-update] node heap cap: ${BUILD_HEAP_MB} MB (NODE_OPTIONS=$NODE_OPTIONS)"
+
 # ── Status writer (atomic) ───────────────────────────────────────────────────
 # Uses a small node one-liner so we get correct JSON escaping for
 # arbitrary user-facing strings without re-implementing JSON in bash.
