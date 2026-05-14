@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
 import { API_BASE } from "../../utils/api.js";
 import TI from "../../icons/editor/index.jsx";
@@ -109,7 +109,7 @@ function SystemMonitor({ token, active }) {
             } catch {
                 /* keep showing the last value */
             }
-            if (!cancelled) timer = setTimeout(tick, 2000);
+            if (!cancelled) timer = setTimeout(tick, 1000);
         };
         tick();
         return () => {
@@ -211,29 +211,17 @@ function SystemMonitor({ token, active }) {
     );
 }
 
-function TechnicalLog({ token, phase, showDetails }) {
+function TechnicalLog({ token, phase, showDetails, onTextChanged }) {
     const [text, setText] = useState("");
-    const scrollRef = useRef(null);
-    // Sticky-bottom auto-scroll. Default true so the panel jumps to
-    // the latest line on first render; flipped to false the moment
-    // the admin scrolls up to read earlier output, restored when
-    // they scroll back to the bottom.
-    const stickToBottomRef = useRef(true);
 
-    const handleScroll = () => {
-        const el = scrollRef.current;
-        if (!el) return;
-        stickToBottomRef.current =
-            el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-    };
-
-    // After every log update, glue the view to the bottom — but only
-    // if the admin had not scrolled away from it.
+    // Tell the parent every time the log text changes so the modal's
+    // outer scroll container can stick to the bottom. Auto-scrolling
+    // lives at the modal level now — the technical log no longer has
+    // its own scroll area: a long log just grows the modal and the
+    // user scrolls the whole thing.
     useEffect(() => {
-        const el = scrollRef.current;
-        if (!el || !stickToBottomRef.current) return;
-        el.scrollTop = el.scrollHeight;
-    }, [text]);
+        if (typeof onTextChanged === "function") onTextChanged();
+    }, [text, onTextChanged]);
 
     useEffect(() => {
         if (!showDetails || !token) return;
@@ -261,7 +249,7 @@ function TechnicalLog({ token, phase, showDetails }) {
                 phase === "running" ||
                 phase === "waiting_for_server";
             if (!cancelled && active) {
-                timer = setTimeout(fetchOnce, 2000);
+                timer = setTimeout(fetchOnce, 1000);
             }
         };
 
@@ -279,11 +267,7 @@ function TechnicalLog({ token, phase, showDetails }) {
             <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
                 {t("selfUpdateLogTitle")}
             </div>
-            <div
-                ref={scrollRef}
-                onScroll={handleScroll}
-                className="max-h-72 overflow-y-auto overflow-x-hidden -mx-1 px-1"
-            >
+            <div className="-mx-1 px-1">
                 {items.length === 0 ? (
                     <div className="opacity-60 italic">
                         {t("selfUpdateLogEmpty")}
@@ -452,6 +436,30 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
         slowResponse,
     } = selfUpdate;
     const [showDetails, setShowDetails] = useState(false);
+
+    // Sticky-bottom auto-scroll, lifted up to the modal level so the
+    // technical log can grow naturally without its own scroll area.
+    // The middle scrollable section is the one that actually scrolls;
+    // it stays "stuck" to the bottom while new log lines arrive,
+    // releases the moment the admin scrolls up, and re-engages when
+    // they scroll back within 40 px of the end.
+    const scrollRef = useRef(null);
+    const stickToBottomRef = useRef(true);
+    const handleScroll = () => {
+        const el = scrollRef.current;
+        if (!el) return;
+        stickToBottomRef.current =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    };
+    const onLogTextChanged = useCallback(() => {
+        if (!stickToBottomRef.current) return;
+        // Wait for the freshly-rendered lines to be in the DOM
+        // before we measure scrollHeight.
+        requestAnimationFrame(() => {
+            const el = scrollRef.current;
+            if (el) el.scrollTop = el.scrollHeight;
+        });
+    }, []);
 
     // Lock body scroll while the overlay is shown.
     useEffect(() => {
@@ -646,7 +654,11 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
                 {/* Scrollable middle. Holds the (collapsible) details
                     panel and the technical log so the modal never
                     overflows the viewport when both are expanded. */}
-                <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-2">
+                <div
+                    ref={scrollRef}
+                    onScroll={handleScroll}
+                    className="flex-1 min-h-0 overflow-y-auto px-6 pb-2"
+                >
                     <button
                         type="button"
                         onClick={() => setShowDetails((v) => !v)}
@@ -730,6 +742,7 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
                             token={token}
                             phase={phase}
                             showDetails={showDetails}
+                            onTextChanged={onLogTextChanged}
                         />
                     </div>
                 </div>
