@@ -57,7 +57,7 @@ function FontGroup({ count, lines }) {
             {open && (
                 <div className="pl-4 mt-0.5 opacity-70">
                     {lines.map((l, i) => (
-                        <div key={i} className="whitespace-pre">
+                        <div key={i} className="whitespace-pre-wrap break-words">
                             {l}
                         </div>
                     ))}
@@ -114,7 +114,7 @@ function TechnicalLog({ token, phase, showDetails }) {
             <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
                 {t("selfUpdateLogTitle")}
             </div>
-            <div className="max-h-72 overflow-auto -mx-1 px-1">
+            <div className="max-h-72 overflow-y-auto overflow-x-hidden -mx-1 px-1">
                 {items.length === 0 ? (
                     <div className="opacity-60 italic">
                         {t("selfUpdateLogEmpty")}
@@ -128,7 +128,7 @@ function TechnicalLog({ token, phase, showDetails }) {
                                 lines={it.lines}
                             />
                         ) : (
-                            <div key={i} className="whitespace-pre">
+                            <div key={i} className="whitespace-pre-wrap break-words">
                                 {it.text || " "}
                             </div>
                         )
@@ -369,7 +369,7 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
             aria-modal="true"
             aria-labelledby="self-update-headline"
         >
-            <div className="w-full max-w-lg rounded-2xl border border-[var(--border-light)] bg-white dark:bg-[var(--bg-elevated,#1a1a1f)] shadow-2xl p-6">
+            <div className="w-full max-w-2xl rounded-2xl border border-[var(--border-light)] bg-white dark:bg-[var(--bg-elevated,#1a1a1f)] shadow-2xl p-6">
                 <div className="flex items-start gap-4 mb-5">
                     <StateIcon phase={phase} />
                     <div className="min-w-0 flex-1">
