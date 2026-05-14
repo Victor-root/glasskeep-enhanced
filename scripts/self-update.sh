@@ -105,7 +105,9 @@ rollback() {
     (
         cd "$INSTALL_DIR" || exit 1
         git reset --hard "$PREV_COMMIT" || true
-        npm install --silent || true
+        # Same NODE_ENV trick as step 3 — without it the rollback would
+        # rebuild a stripped install and leave the operator stuck.
+        NODE_ENV=development npm install --silent --include=dev || true
         npm run build || true
     )
     systemctl start "$SERVICE_NAME" || true
@@ -170,7 +172,13 @@ CURRENT_ACTION="installing dependencies"
 write_status "installing" "$CURRENT_STEP" "Installing dependencies..." ""
 (
     cd "$INSTALL_DIR"
-    npm install --silent
+    # systemd starts us with NODE_ENV=production (from /opt/glass-keep/.env),
+    # which makes `npm install` strip devDependencies — including vite and
+    # @vitejs/plugin-react, both of which are needed by the next step's
+    # `vite build`. Scope NODE_ENV=development to just this command and
+    # pass --include=dev for belt-and-suspenders so the build that follows
+    # has everything it needs.
+    NODE_ENV=development npm install --silent --include=dev
 )
 
 # ── Step 4: build the front-end ──────────────────────────────────────────────

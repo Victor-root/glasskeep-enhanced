@@ -149,7 +149,7 @@ export default function AdminUpdateSection({
     };
     if (typeof showGenericConfirm === "function") {
       showGenericConfirm({
-        title: t("selfUpdateConfirmTitle"),
+        title: t("selfUpdateConfirmTitle").replace("{version}", latestVersion),
         message: t("selfUpdateConfirmMessage").replace(
           "{version}",
           latestVersion

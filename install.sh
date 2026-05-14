@@ -181,6 +181,8 @@ setup_i18n() {
         MSG_SUMMARY_SERVICE="Service systemd"
         MSG_SUMMARY_UPDATER="Service updater"
         MSG_SUMMARY_UPDATER_NOTE="déclenchable depuis le panel admin"
+        MSG_SUMMARY_DATA="Données"
+        MSG_SUMMARY_DATA_NOTE="contient notes.db — à sauvegarder régulièrement"
         MSG_SUMMARY_ENC="Chiffrement au repos"
         MSG_SUMMARY_HTTPS="HTTPS"
         MSG_SUMMARY_ENC_ON="activé"
@@ -311,6 +313,8 @@ setup_i18n() {
         MSG_SUMMARY_SERVICE="Systemd service"
         MSG_SUMMARY_UPDATER="Updater service"
         MSG_SUMMARY_UPDATER_NOTE="triggered from the admin panel"
+        MSG_SUMMARY_DATA="Data"
+        MSG_SUMMARY_DATA_NOTE="holds notes.db — back this up regularly"
         MSG_SUMMARY_ENC="At-rest encryption"
         MSG_SUMMARY_HTTPS="HTTPS"
         MSG_SUMMARY_ENC_ON="enabled"
@@ -1393,6 +1397,7 @@ show_install_summary() {
         "${TEAL}${MSG_SUMMARY_BUNDLE}${RESET}      ${BOLD}${bundle}${RESET}" \
         "${TEAL}${MSG_SUMMARY_SERVICE}${RESET} ${BOLD}${SERVICE_NAME}${RESET}" \
         "${TEAL}${MSG_SUMMARY_UPDATER}${RESET} ${BOLD}${UPDATER_SERVICE_NAME}${RESET} ${GRAY}(${MSG_SUMMARY_UPDATER_NOTE})${RESET}" \
+        "${TEAL}${MSG_SUMMARY_DATA}${RESET}      ${BOLD}${DATA_DIR}${RESET} ${GRAY}(${MSG_SUMMARY_DATA_NOTE})${RESET}" \
         "${TEAL}${MSG_SUMMARY_ENC}${RESET} ${enc_status}" \
         "${TEAL}${MSG_SUMMARY_HTTPS}${RESET}            ${BOLD}${https_label}${RESET}"
 }
