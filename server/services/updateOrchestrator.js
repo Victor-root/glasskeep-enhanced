@@ -330,6 +330,35 @@ function findDataMount(ownInspect) {
     return null;
 }
 
+// Marks the current terminal status as "seen by the admin" so the
+// progress modal does not pop again on the next refresh / login.
+// Only stamps the file when the recorded endedAt matches the one the
+// client thinks it is acknowledging — protects against acking the
+// wrong outcome if a new update started between the user's click and
+// this call.
+function acknowledgeStatus(endedAt) {
+    const current = readStatus();
+    if (!current) return { ok: false, reason: "no-status" };
+    if (!["success", "error", "rolled_back"].includes(current.state)) {
+        return { ok: false, reason: "not-terminal" };
+    }
+    if (!current.endedAt || current.endedAt !== endedAt) {
+        return { ok: false, reason: "stale" };
+    }
+    if (current.acknowledgedAt) {
+        return { ok: true, reason: "already-acknowledged" };
+    }
+    const next = { ...current, acknowledgedAt: new Date().toISOString() };
+    const p = getStatusFilePath();
+    try {
+        fs.writeFileSync(p + ".tmp", JSON.stringify(next));
+        fs.renameSync(p + ".tmp", p);
+    } catch (e) {
+        return { ok: false, reason: "write-failed", error: e.message };
+    }
+    return { ok: true };
+}
+
 // ── Public: start an update ─────────────────────────────────────────────────
 async function startUpdate({ fromVersion, toVersion }) {
     if (isUpdateInProgress()) {
@@ -362,6 +391,7 @@ module.exports = {
     readStatus,
     isUpdateInProgress,
     startUpdate,
+    acknowledgeStatus,
     // exposed for tests / introspection
     _internals: {
         getStatusFilePath,

@@ -145,11 +145,16 @@ export default function SelfUpdateProgress({ selfUpdate }) {
 
     const errorMessage = startError || status?.error || null;
 
-    const onReload = () => {
+    const onReload = async () => {
         try {
-            // Acknowledge BEFORE reloading so the freshly-mounted hook
-            // sees the ack in localStorage and doesn't re-open the modal.
-            if (typeof acknowledge === "function") acknowledge();
+            // Wait for the server-side acknowledgement so the freshly
+            // mounted hook (post-reload) sees the status as already
+            // seen and skips re-opening the modal.
+            if (typeof acknowledge === "function") await acknowledge();
+        } catch {
+            /* best-effort — reload anyway */
+        }
+        try {
             window.location.reload();
         } catch {
             /* noop */

@@ -34,26 +34,22 @@ const ACTIVE_STATES = new Set([
 
 const TERMINAL_STATES = new Set(["success", "error", "rolled_back"]);
 
-// The server keeps the last update's status file around for history.
-// We track which terminal outcome the user has already seen in
-// localStorage so a page refresh after success/error doesn't pop the
-// modal again. The ack is keyed by the status's endedAt timestamp,
-// so a brand-new update (different endedAt) is shown as expected.
-const ACK_KEY = "glass-keep-self-update-ack";
-
-function readAck() {
+// Acknowledgement lives server-side (status.acknowledgedAt) so the
+// modal does not re-pop in private browsing, after a hard refresh,
+// on another device, or after a sign-out + sign-in. The client just
+// calls this when the admin clicks Reload / Close, then trusts the
+// next status fetch to reflect it.
+async function postAcknowledge(token, endedAt) {
+    if (!endedAt) return;
     try {
-        return localStorage.getItem(ACK_KEY);
+        await api("/admin/self-update/acknowledge", {
+            method: "POST",
+            body: { endedAt },
+            token,
+            timeoutMs: 4000,
+        });
     } catch {
-        return null;
-    }
-}
-
-function writeAck(endedAt) {
-    try {
-        if (endedAt) localStorage.setItem(ACK_KEY, endedAt);
-    } catch {
-        /* localStorage unavailable — fall back to "always show" */
+        /* best-effort — the user can still reload manually */
     }
 }
 
@@ -122,12 +118,9 @@ export function useSelfUpdate({ token, isAdmin }) {
                 if (cancelled) return;
                 if (r.ok && r.status) {
                     setStatus(r.status);
-                    const ack = readAck();
                     const isTerminal = TERMINAL_STATES.has(r.status.state);
                     const alreadyAcknowledged =
-                        isTerminal &&
-                        r.status.endedAt &&
-                        ack === r.status.endedAt;
+                        isTerminal && !!r.status.acknowledgedAt;
                     // Resolve the phase explicitly on every mount so a
                     // stale React state from before a logout / refresh
                     // can't survive into the new session.
@@ -268,21 +261,21 @@ export function useSelfUpdate({ token, isAdmin }) {
         [mode, token]
     );
 
-    const acknowledge = useCallback(() => {
-        // Record that the current terminal outcome has been seen so a
-        // subsequent reload of the page does not re-open the modal.
-        if (status?.endedAt) writeAck(status.endedAt);
-    }, [status]);
+    const acknowledge = useCallback(async () => {
+        // Record server-side that the current terminal outcome has
+        // been seen, so a subsequent reload / login does not re-open
+        // the modal. Awaited so callers can sequence a reload safely.
+        if (status?.endedAt) await postAcknowledge(token, status.endedAt);
+    }, [status, token]);
 
     const dismiss = useCallback(() => {
-        // Used after a terminal state to close the overlay. We deliberately
-        // do NOT clear the status from the server (it stays as the last
-        // run's outcome) — but the local phase resets to idle.
-        if (status?.endedAt) writeAck(status.endedAt);
+        // Used after a terminal state to close the overlay locally and
+        // mark the server-side status as seen.
+        if (status?.endedAt) postAcknowledge(token, status.endedAt);
         stoppedRef.current = true;
         setPhase("idle");
         setStartError(null);
-    }, [status]);
+    }, [status, token]);
 
     return {
         mode,

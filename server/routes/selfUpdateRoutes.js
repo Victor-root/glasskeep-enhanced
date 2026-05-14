@@ -54,6 +54,22 @@ function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
         });
     });
 
+    // Mark the current terminal outcome as seen by the admin so the
+    // progress modal does not pop again on the next refresh / login.
+    // Server-side state (not localStorage) so private browsing,
+    // different devices, and re-logins all converge on the same view.
+    app.post("/api/admin/self-update/acknowledge", auth, adminOnly, (req, res) => {
+        const endedAt = req.body && req.body.endedAt;
+        if (!endedAt || typeof endedAt !== "string") {
+            return res.status(400).json({ error: "missing endedAt" });
+        }
+        const r = orchestrator.acknowledgeStatus(endedAt);
+        if (!r.ok) {
+            return res.status(409).json({ error: r.reason || "cannot acknowledge" });
+        }
+        return res.json({ acknowledged: true });
+    });
+
     // Trigger the update. Body: { latestVersion: "x.y.z" }. We re-check
     // server-side that the target is strictly newer than the running
     // version so a stale browser cannot trigger a pointless rebuild.
