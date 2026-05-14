@@ -944,6 +944,22 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
     "The update could not be completed. The app may still be running on the previous version.",
   selfUpdateSubtextRolledBack:
     "The update did not finish. We rolled back to the previous version so you can keep working.",
+  selfUpdateSubtextRolledBack_oom:
+    "The build ran out of memory on this host. The previous version was restored. Consider adding swap or upgrading the RAM allocation before trying again.",
+  selfUpdateSubtextRolledBack_network:
+    "The update couldn't reach the network. The previous version was restored. Check that the server has Internet access and try again.",
+  selfUpdateSubtextRolledBack_permissions:
+    "The update was blocked by a filesystem permission. The previous version was restored. Check the ownership of /opt/glass-keep before retrying.",
+  selfUpdateSubtextRolledBack_disk:
+    "The disk ran out of space during the update. The previous version was restored. Free some space and retry.",
+  selfUpdateSubtextError_oom:
+    "The build ran out of memory on this host. The app may be in an inconsistent state — restore from a backup or re-run the install script.",
+  selfUpdateSubtextError_network:
+    "The update couldn't reach the network and could not be rolled back. Check the server's Internet access, then run the install script manually if needed.",
+  selfUpdateSubtextError_permissions:
+    "A filesystem permission blocked the update and the rollback could not finish. Check the ownership of /opt/glass-keep, then re-run the install script manually if needed.",
+  selfUpdateSubtextError_disk:
+    "The disk ran out of space during the update. Free some space, then re-run the install script manually if needed.",
   selfUpdateStepQueued: "Queued",
   selfUpdateStepPreparing: "Preparing",
   selfUpdateStepStopping: "Stopping the app",
@@ -970,6 +986,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   selfUpdateDetailFromVersion: "from version",
   selfUpdateDetailToVersion: "to version",
   selfUpdateDetailMessage: "message",
+  selfUpdateDetailFailedAtStep: "failed at step",
   selfUpdateDetailStartedAt: "started at",
   selfUpdateDetailEndedAt: "ended at",
   selfUpdateDetailAcknowledgedAt: "acknowledged at",

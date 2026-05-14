@@ -26,6 +26,11 @@ TARGET_BRANCH="${UPDATE_BRANCH:-main}"
 STATUS_FILE="${UPDATE_STATUS_FILE:-${DATA_DIR}/.update-status.json}"
 LOG_FILE="${UPDATE_LOG_FILE:-${DATA_DIR}/.update.log}"
 LOCK_FILE="${UPDATE_LOCK_FILE:-${DATA_DIR}/.update.lock}"
+# Snapshot of dist/ + node_modules/ taken right before the update
+# starts. On any failure we restore from here instead of re-running
+# npm install + npm run build — a rebuild would just re-hit whatever
+# caused the original failure (OOM on small VMs is the classic case).
+BACKUP_DIR="${UPDATE_BACKUP_DIR:-${DATA_DIR}/.update-backup}"
 
 TOTAL_STEPS=4
 STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -96,8 +101,56 @@ read_version_from_pkg() {
     ' 2>/dev/null || echo ""
 }
 
+# Take a snapshot of the install dir's "built" state (dist/ and
+# node_modules/) so a failed update can be reversed by just moving
+# the snapshot back in place — no second npm install + npm run build
+# pass that would just re-hit whatever caused the original failure
+# (the OOM-during-build case on small VMs being the obvious
+# motivator). Same-filesystem hardlinks are used when possible so
+# the snapshot costs effectively zero disk space; we fall back to a
+# real copy if dist/ or node_modules/ live on a different mount.
+take_snapshot() {
+    rm -rf "$BACKUP_DIR"
+    mkdir -p "$BACKUP_DIR"
+    for sub in dist node_modules; do
+        if [[ -d "$INSTALL_DIR/$sub" ]]; then
+            if cp -al "$INSTALL_DIR/$sub" "$BACKUP_DIR/$sub" 2>/dev/null; then
+                echo "[self-update] snapshot: hardlinked $sub"
+            else
+                echo "[self-update] snapshot: cross-FS fallback, copying $sub"
+                cp -a "$INSTALL_DIR/$sub" "$BACKUP_DIR/$sub"
+            fi
+        fi
+    done
+    # Also stash package.json + lock so the running app's manifest
+    # always matches the dist + node_modules we put back.
+    [[ -f "$INSTALL_DIR/package.json" ]] && cp "$INSTALL_DIR/package.json" "$BACKUP_DIR/package.json"
+    [[ -f "$INSTALL_DIR/package-lock.json" ]] && cp "$INSTALL_DIR/package-lock.json" "$BACKUP_DIR/package-lock.json"
+}
+
+# Move a directory from the snapshot back into the install dir. Uses
+# `mv` on the same filesystem (instant rename) when possible, falls
+# back to a copy + delete if a cross-FS snapshot was made.
+restore_from_snapshot() {
+    local sub="$1"
+    if [[ ! -e "$BACKUP_DIR/$sub" ]]; then
+        return
+    fi
+    rm -rf "$INSTALL_DIR/$sub"
+    if mv "$BACKUP_DIR/$sub" "$INSTALL_DIR/$sub" 2>/dev/null; then
+        echo "[self-update] restored $sub from snapshot"
+    else
+        cp -a "$BACKUP_DIR/$sub" "$INSTALL_DIR/$sub"
+        rm -rf "$BACKUP_DIR/$sub"
+        echo "[self-update] restored $sub from snapshot (cross-FS)"
+    fi
+}
+
 # ── Rollback ─────────────────────────────────────────────────────────────────
-# Restores the working tree to PREV_COMMIT, rebuilds, restarts. Best-effort.
+# Restores the install dir from the pre-update snapshot, restarts the
+# service. Crucially we DO NOT re-run npm install or npm run build —
+# whatever caused the update to fail (OOM, disk pressure, missing
+# tooling…) would just bite us a second time. Best-effort throughout.
 rollback() {
     if [[ -z "$PREV_COMMIT" ]]; then
         echo "[self-update] no previous commit recorded — skipping rollback"
@@ -108,12 +161,19 @@ rollback() {
     (
         cd "$INSTALL_DIR" || exit 1
         git reset --hard "$PREV_COMMIT" || true
-        # Same NODE_ENV trick as the install step — without it the
-        # rollback would rebuild a stripped install and leave the
-        # operator stuck.
-        NODE_ENV=development npm install --silent --include=dev || true
-        npm run build || true
     )
+    # Restore the artifacts from the snapshot. If the snapshot is
+    # incomplete for some reason (rare: someone deleted it, the
+    # snapshot step itself failed silently…) we DON'T rebuild — we
+    # just restart what's there and let the operator deal with it.
+    restore_from_snapshot dist
+    restore_from_snapshot node_modules
+    if [[ -f "$BACKUP_DIR/package.json" ]]; then
+        cp "$BACKUP_DIR/package.json" "$INSTALL_DIR/package.json"
+    fi
+    if [[ -f "$BACKUP_DIR/package-lock.json" ]]; then
+        cp "$BACKUP_DIR/package-lock.json" "$INSTALL_DIR/package-lock.json"
+    fi
     # restart (not start): with the new step order the main service
     # may still be running on the half-updated checkout, so we always
     # bounce it to make sure it's running the restored code.
@@ -152,6 +212,12 @@ fi
 
 PREV_COMMIT="$(cd "$INSTALL_DIR" && git rev-parse HEAD 2>/dev/null || true)"
 echo "[self-update] previous commit: $PREV_COMMIT"
+
+# Snapshot the current built artifacts so a failed update can be
+# undone without rebuilding (the rebuild would just re-hit OOM /
+# whatever caused the original failure). Cheap thanks to hardlinks
+# when the install dir + data dir share a filesystem.
+take_snapshot
 
 # Step order rationale: we do all the "heavy" work (git pull, npm
 # install, npm build) BEFORE stopping the service. The frontend is
@@ -223,6 +289,9 @@ fi
 
 # ── Success ──────────────────────────────────────────────────────────────────
 trap - ERR
+# Update worked — the snapshot served its purpose and is just disk
+# usage at this point. Wipe it.
+rm -rf "$BACKUP_DIR"
 write_status "success" "$TOTAL_STEPS" "Update completed successfully." ""
 echo "[self-update] done."
 exit 0

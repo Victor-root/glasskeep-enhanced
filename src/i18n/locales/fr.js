@@ -945,6 +945,22 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
     "La mise à jour n'a pas pu aboutir. L'application est peut-être toujours sur l'ancienne version.",
   selfUpdateSubtextRolledBack:
     "La mise à jour n'est pas allée au bout. Nous avons restauré l'ancienne version pour que vous puissiez continuer à utiliser l'app.",
+  selfUpdateSubtextRolledBack_oom:
+    "La compilation a manqué de mémoire sur cette machine. L'ancienne version a été restaurée. Pensez à ajouter du swap ou à augmenter la RAM allouée avant de réessayer.",
+  selfUpdateSubtextRolledBack_network:
+    "La mise à jour n'a pas pu joindre le réseau. L'ancienne version a été restaurée. Vérifiez que le serveur a bien accès à Internet et réessayez.",
+  selfUpdateSubtextRolledBack_permissions:
+    "Un problème de droits sur le système de fichiers a bloqué la mise à jour. L'ancienne version a été restaurée. Vérifiez les propriétaires de /opt/glass-keep avant de réessayer.",
+  selfUpdateSubtextRolledBack_disk:
+    "Le disque est plein. L'ancienne version a été restaurée. Libérez de l'espace puis réessayez.",
+  selfUpdateSubtextError_oom:
+    "La compilation a manqué de mémoire sur cette machine. L'app est peut-être dans un état incohérent — restaurez une sauvegarde ou relancez le script d'installation.",
+  selfUpdateSubtextError_network:
+    "La mise à jour n'a pas pu joindre le réseau et la restauration n'a pas pu aboutir. Vérifiez l'accès Internet du serveur, puis relancez le script d'installation manuellement si besoin.",
+  selfUpdateSubtextError_permissions:
+    "Un problème de droits a bloqué la mise à jour et la restauration n'a pas pu aboutir. Vérifiez les propriétaires de /opt/glass-keep, puis relancez le script d'installation manuellement si besoin.",
+  selfUpdateSubtextError_disk:
+    "Le disque est plein. Libérez de l'espace puis relancez le script d'installation manuellement si besoin.",
   selfUpdateStepQueued: "En attente",
   selfUpdateStepPreparing: "Préparation",
   selfUpdateStepStopping: "Arrêt de l'application",
@@ -971,6 +987,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   selfUpdateDetailFromVersion: "version de départ",
   selfUpdateDetailToVersion: "version cible",
   selfUpdateDetailMessage: "message",
+  selfUpdateDetailFailedAtStep: "étape échouée",
   selfUpdateDetailStartedAt: "démarrée à",
   selfUpdateDetailEndedAt: "terminée à",
   selfUpdateDetailAcknowledgedAt: "confirmée à",

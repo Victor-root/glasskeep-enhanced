@@ -170,7 +170,7 @@ function SystemMonitor({ token, active }) {
             <div>
                 <div className={`flex items-center justify-between mb-1 ${labelClass}`}>
                     <span className="inline-flex items-center gap-1.5">
-                        <span aria-hidden="true">💾</span>
+                        <TI.Ram className="tabler-icon w-3.5 h-3.5" />
                         {t("selfUpdateRamLabel")}
                         {high && (
                             <span className="ml-1 font-semibold">
@@ -193,7 +193,7 @@ function SystemMonitor({ token, active }) {
                 <div>
                     <div className={`flex items-center justify-between mb-1 ${cpuLabelClass}`}>
                         <span className="inline-flex items-center gap-1.5">
-                            <span aria-hidden="true">⚙️</span>
+                            <TI.Cpu className="tabler-icon w-3.5 h-3.5" />
                             {t("selfUpdateCpuLabel")}
                             {cpuHigh && (
                                 <span className="ml-1 font-semibold">
@@ -224,16 +224,33 @@ function TechnicalLog({ token, phase, showDetails, onTextChanged }) {
     const [text, setText] = useState("");
 
     // Tell the parent every time the log text changes so the modal's
-    // outer scroll container can stick to the bottom. Auto-scrolling
-    // lives at the modal level now — the technical log no longer has
-    // its own scroll area: a long log just grows the modal and the
-    // user scrolls the whole thing.
+    // outer scroll container can stick to the bottom AND so the
+    // parent can scan the latest output for known failure patterns
+    // (OOM during build, lost network, etc.) to surface a friendlier
+    // hint in the header. Auto-scrolling lives at the modal level
+    // now — the technical log no longer has its own scroll area: a
+    // long log just grows the modal and the user scrolls the whole
+    // thing.
     useEffect(() => {
-        if (typeof onTextChanged === "function") onTextChanged();
+        if (typeof onTextChanged === "function") onTextChanged(text);
     }, [text, onTextChanged]);
 
     useEffect(() => {
-        if (!showDetails || !token) return;
+        // Fetch the log whenever the modal is non-idle, even if the
+        // details section is collapsed — the parent uses the text to
+        // detect failure hints, which need to be available the
+        // moment we hit a terminal failure state regardless of
+        // whether the user expanded the panel.
+        if (!token) return;
+        const active =
+            phase === "starting" ||
+            phase === "running" ||
+            phase === "waiting_for_server";
+        const terminal =
+            phase === "success" ||
+            phase === "error" ||
+            phase === "rolled_back";
+        if (!active && !terminal) return;
         let cancelled = false;
         let timer = null;
 
@@ -257,11 +274,14 @@ function TechnicalLog({ token, phase, showDetails, onTextChanged }) {
             } catch {
                 /* ignore — the modal is not the place to surface a fetch hiccup */
             }
-            const active =
+            // Re-poll only while the update is still running. Once
+            // we hit a terminal state we fetched the final log
+            // content above; no need to keep hammering the server.
+            const stillActive =
                 phase === "starting" ||
                 phase === "running" ||
                 phase === "waiting_for_server";
-            if (!cancelled && active) {
+            if (!cancelled && stillActive) {
                 timer = setTimeout(fetchOnce, 1000);
             }
         };
@@ -271,7 +291,7 @@ function TechnicalLog({ token, phase, showDetails, onTextChanged }) {
             cancelled = true;
             if (timer) clearTimeout(timer);
         };
-    }, [showDetails, token, phase]);
+    }, [token, phase]);
 
     const items = processLog(text);
 
@@ -335,6 +355,37 @@ const STEP_LABEL_KEYS = {
 function stepLabel(state) {
     const key = STEP_LABEL_KEYS[state];
     return key ? t(key) : state || "";
+}
+
+// Scan the technical log for known failure patterns and map them to
+// a category. The category drives a friendlier subtext / hint in the
+// header so the admin sees "out of memory during build" instead of
+// just the generic "exit 134". Categories are intentionally
+// conservative — when in doubt, return null and we fall back to the
+// default rolled_back / error messaging.
+function detectFailureHint(logText) {
+    if (!logText) return null;
+    if (
+        /Reached heap limit|JavaScript heap out of memory|Allocation failed/i.test(
+            logText
+        )
+    ) {
+        return "oom";
+    }
+    if (
+        /Could not resolve host|Connection refused|ENETUNREACH|Network is unreachable|fatal: unable to access/i.test(
+            logText
+        )
+    ) {
+        return "network";
+    }
+    if (/Permission denied|EACCES/i.test(logText)) {
+        return "permissions";
+    }
+    if (/ENOSPC|No space left on device/i.test(logText)) {
+        return "disk";
+    }
+    return null;
 }
 
 function modeLabel(mode) {
@@ -464,7 +515,15 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
         stickToBottomRef.current =
             el.scrollHeight - el.scrollTop - el.clientHeight < 40;
     };
-    const onLogTextChanged = useCallback(() => {
+
+    // Latest log text, captured here so we can scan it for known
+    // failure patterns (OOM, network down, perms…) without lifting
+    // the log state out of TechnicalLog. The scan result is fed back
+    // into the header subtext so the admin sees "out of memory"
+    // instead of just "build exited 134".
+    const [logText, setLogText] = useState("");
+    const onLogTextChanged = useCallback((newText) => {
+        if (typeof newText === "string") setLogText(newText);
         if (!stickToBottomRef.current) return;
         // Wait for the freshly-rendered lines to be in the DOM
         // before we measure scrollHeight.
@@ -500,12 +559,23 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
             ? t("selfUpdateHeadlineRolledBack")
             : t("selfUpdateHeadlineRunning");
 
+    // When the run failed, scan the technical log for a known
+    // failure category (OOM, network, perms, full disk) and prefer
+    // the specific message over the generic "couldn't finish" one
+    // so the admin learns the actionable cause without having to
+    // expand the details panel.
+    const failureHint =
+        (error || rolledBack) ? detectFailureHint(logText) : null;
     const subtext = success
         ? t("selfUpdateSubtextSuccess")
         : error
-          ? t("selfUpdateSubtextError")
+          ? failureHint
+              ? t(`selfUpdateSubtextError_${failureHint}`)
+              : t("selfUpdateSubtextError")
           : rolledBack
-            ? t("selfUpdateSubtextRolledBack")
+            ? failureHint
+                ? t(`selfUpdateSubtextRolledBack_${failureHint}`)
+                : t("selfUpdateSubtextRolledBack")
             : waiting
               ? t("selfUpdateSubtextWaiting")
               : t("selfUpdateSubtextRunning");
@@ -693,7 +763,11 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
                                 value={stepLabel(status?.state) || (status?.state || phase)}
                             />
                             <DetailRow
-                                label={t("selfUpdateDetailStep")}
+                                label={
+                                    error || rolledBack
+                                        ? t("selfUpdateDetailFailedAtStep")
+                                        : t("selfUpdateDetailStep")
+                                }
                                 value={`${step} / ${totalSteps}`}
                             />
                             <DetailRow
