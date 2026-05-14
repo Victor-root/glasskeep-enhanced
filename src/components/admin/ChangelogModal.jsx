@@ -86,6 +86,9 @@ export default function ChangelogModal() {
 
     if (!open) return null;
 
+    const currentVersion =
+        typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null;
+
     return (
         <div
             className="fixed inset-0 z-[9997] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
@@ -160,7 +163,7 @@ export default function ChangelogModal() {
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-[var(--border-light)] bg-white/60 dark:bg-white/5">
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                         <span className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
                             <TI.Sparkles className="tabler-icon w-5 h-5" />
                         </span>
@@ -176,6 +179,11 @@ export default function ChangelogModal() {
                             </p>
                         </div>
                     </div>
+                    {currentVersion && (
+                        <span className="shrink-0 px-2 py-1 rounded-md text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 tabular-nums">
+                            v{currentVersion}
+                        </span>
+                    )}
                     <button
                         type="button"
                         onClick={() => setOpen(false)}

@@ -401,65 +401,73 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
             aria-modal="true"
             aria-labelledby="self-update-headline"
         >
-            <div className="w-full max-w-2xl rounded-2xl border border-[var(--border-light)] bg-white dark:bg-[var(--bg-elevated,#1a1a1f)] shadow-2xl p-6">
-                <div className="flex items-start gap-4 mb-5">
-                    <StateIcon phase={phase} />
-                    <div className="min-w-0 flex-1">
-                        <h2
-                            id="self-update-headline"
-                            className="text-lg font-semibold text-gray-900 dark:text-gray-50"
-                        >
-                            {headline}
-                        </h2>
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                            {subtext}
-                        </p>
+            {/* Modal capped at the viewport height so opening the
+                "Show details" panel — which can grow tall on a small
+                laptop screen — never pushes the action buttons or
+                the header off the page. The header (status + progress)
+                and the footer (buttons) stay pinned; the details +
+                technical log scroll inside the middle area. */}
+            <div className="w-full max-w-2xl max-h-[calc(100dvh-2rem)] flex flex-col rounded-2xl border border-[var(--border-light)] bg-white dark:bg-[var(--bg-elevated,#1a1a1f)] shadow-2xl overflow-hidden">
+                <div className="flex-shrink-0 px-6 pt-6 pb-4">
+                    <div className="flex items-start gap-4 mb-5">
+                        <StateIcon phase={phase} />
+                        <div className="min-w-0 flex-1">
+                            <h2
+                                id="self-update-headline"
+                                className="text-lg font-semibold text-gray-900 dark:text-gray-50"
+                            >
+                                {headline}
+                            </h2>
+                            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                                {subtext}
+                            </p>
+                        </div>
                     </div>
+
+                    {!terminal && (
+                        <>
+                            <div className="mb-2 flex items-center justify-between text-sm">
+                                <span className="text-gray-700 dark:text-gray-200 font-medium">
+                                    {currentStep}
+                                </span>
+                                <span className="text-gray-500 tabular-nums">
+                                    {Math.min(step, totalSteps)} / {totalSteps}
+                                </span>
+                            </div>
+                            <ProgressBar
+                                step={step}
+                                total={totalSteps}
+                                terminal={false}
+                                success={false}
+                            />
+                        </>
+                    )}
+
+                    {terminal && (
+                        <ProgressBar
+                            step={totalSteps}
+                            total={totalSteps}
+                            terminal={true}
+                            success={success}
+                        />
+                    )}
+
+                    {errorMessage && (error || rolledBack) && (
+                        <div className="mt-4 rounded-lg border border-red-300/60 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-200">
+                            <div className="font-medium mb-0.5">
+                                {t("selfUpdateErrorTitle")}
+                            </div>
+                            <code className="block whitespace-pre-wrap break-words font-mono text-xs">
+                                {errorMessage}
+                            </code>
+                        </div>
+                    )}
                 </div>
 
-                {!terminal && (
-                    <>
-                        <div className="mb-2 flex items-center justify-between text-sm">
-                            <span className="text-gray-700 dark:text-gray-200 font-medium">
-                                {currentStep}
-                            </span>
-                            <span className="text-gray-500 tabular-nums">
-                                {Math.min(step, totalSteps)} / {totalSteps}
-                            </span>
-                        </div>
-                        <ProgressBar
-                            step={step}
-                            total={totalSteps}
-                            terminal={false}
-                            success={false}
-                        />
-                    </>
-                )}
-
-                {terminal && (
-                    <ProgressBar
-                        step={totalSteps}
-                        total={totalSteps}
-                        terminal={true}
-                        success={success}
-                    />
-                )}
-
-                {errorMessage && (error || rolledBack) && (
-                    <div className="mt-4 rounded-lg border border-red-300/60 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-200">
-                        <div className="font-medium mb-0.5">
-                            {t("selfUpdateErrorTitle")}
-                        </div>
-                        <code className="block whitespace-pre-wrap break-words font-mono text-xs">
-                            {errorMessage}
-                        </code>
-                    </div>
-                )}
-
-                {/* Details toggle — collapsed by default, opens up to show
-                    the raw state + version transition. Helps debug when
-                    something goes wrong. */}
-                <div className="mt-4">
+                {/* Scrollable middle. Holds the (collapsible) details
+                    panel and the technical log so the modal never
+                    overflows the viewport when both are expanded. */}
+                <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-2">
                     <button
                         type="button"
                         onClick={() => setShowDetails((v) => !v)}
@@ -542,7 +550,7 @@ export default function SelfUpdateProgress({ selfUpdate, token }) {
                     )}
                 </div>
 
-                <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+                <div className="flex-shrink-0 px-6 py-4 border-t border-[var(--border-light)] flex flex-wrap items-center justify-end gap-2">
                     {success && (
                         <button
                             type="button"
