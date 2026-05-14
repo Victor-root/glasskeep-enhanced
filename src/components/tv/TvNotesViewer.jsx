@@ -579,7 +579,7 @@ export default function TvNotesViewer({
         <main className={`tv-notes-scroll${viewMode === "carousel" ? " tv-notes-scroll--pager" : ""}`} aria-label={filterLabel}>
           {visible.length === 0 ? (
             <div className="tv-empty">
-              <div className="tv-empty__title">{t("noNotesYet") || "No notes yet"}</div>
+              <div className="tv-empty__title">{t("noNotesYet")}</div>
               <div className="tv-empty__hint">
                 {t("tvEmptyHint") ||
                   "Once you create notes from your phone or the web app they'll show up here, ready to read on the big screen."}

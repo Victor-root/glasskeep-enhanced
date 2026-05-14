@@ -1857,9 +1857,7 @@ export default function App() {
       setAiCitedNoteIds(result.citedNoteIds || []);
     } catch (err) {
       console.error("AI Error:", err);
-      setAiResponse(
-        "Sorry, I encountered an error while processing your request.",
-      );
+      setAiResponse(t("aiErrorGeneric"));
       setAiCitedNoteIds([]);
     } finally {
       setIsAiLoading(false);

@@ -56,7 +56,7 @@ export default function GenericConfirmDialog({ open, dark, config, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold mb-2">
-          {config.title || "Confirm Action"}
+          {config.title || t("confirmActionTitle")}
         </h3>
         <p className="text-sm text-gray-600 dark:text-gray-300">
           {config.message}
@@ -77,7 +77,7 @@ export default function GenericConfirmDialog({ open, dark, config, onClose }) {
               }
             }}
           >
-            {config.confirmText || "Confirm"}
+            {config.confirmText || t("confirm")}
           </button>
         </div>
       </div>

@@ -35,7 +35,7 @@ export const fr = {
   requestTimeout: "Délai dépassé. Vérifiez votre connexion.",
   networkError: "Erreur réseau.",
   search: "Rechercher...",
-searchOrAskAi: "Rechercher ou demander à l'IA...",
+  searchOrAskAi: "Rechercher ou demander à l'IA...",
 password: "Mot de passe",
 passwordMin6: "Mot de passe (min 6 caractères)",
 loginFailed: "Échec de la connexion",
@@ -1101,4 +1101,20 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   audioStorageEstimate: "Durée approx.",
   audioStorageEstimateValue: "~1h40 d'audio",
   audioStorageHint: "Quand la limite est atteinte, vous ne pouvez plus ajouter d'enregistrement à cette note. Créez-en une nouvelle pour continuer.",
+  // ── Passe de nettoyage i18n — chaînes auparavant en dur dans les composants ─────────
+  confirmActionTitle: "Confirmer l'action",
+  drawingPreviewEmpty: "Vide",
+  aiErrorGeneric:
+    "Désolé, une erreur s'est produite lors du traitement de votre requête.",
+  tvFailedToLoadNotes: "Échec du chargement des notes",
+  aiLoginRequired: "Vous devez être connecté pour utiliser l'assistant IA.",
+  aiMissingNoteContext: "Contexte de note manquant.",
+  aiMissingQuestion: "Question manquante.",
+  passkeyNoPrfOutput:
+    "Cette clé d'accès n'a pas renvoyé de sortie PRF. Utilisez le mot de passe ou la clé de récupération.",
+  audioNotDataUrl: "Ce n'est pas une data URL",
+  audioApiUnsupported: "Web Audio API non supportée",
+  audioReadFailed: "Échec de lecture audio",
+  syncRateLimited: "Limite atteinte (HTTP {status})",
+  syncUnknownError: "Erreur inconnue",
 };

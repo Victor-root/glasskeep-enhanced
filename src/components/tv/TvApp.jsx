@@ -4,6 +4,7 @@ import { TV_CSS, TV_STYLE_ID } from "./tvStyles.js";
 import TvLogin from "./TvLogin.jsx";
 import TvNotesViewer from "./TvNotesViewer.jsx";
 import { setTvModeOverride } from "../../utils/tvMode.js";
+import { t } from "../../i18n";
 
 // TV-mode entry point. Used in place of the phone/desktop tree whenever
 // the app boots on Android TV (or with the ?tv=1 override). Owns its own
@@ -124,7 +125,7 @@ export default function TvApp() {
         setAuth(null);
         return;
       }
-      setLoadError(err?.message || "Failed to load notes");
+      setLoadError(err?.message || t("tvFailedToLoadNotes"));
     }
   }, [token]);
 

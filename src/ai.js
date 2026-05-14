@@ -8,6 +8,7 @@
 
 import { api, getAuth, API_BASE } from "./utils/api.js";
 import { contentToPlain } from "./utils/richText.js";
+import { t } from "./i18n";
 
 function detectLang() {
   const lang = (navigator.language || "en").toLowerCase();
@@ -69,7 +70,7 @@ export async function askAI(question, notes, onProgress) {
   const auth = getAuth();
   const token = auth?.token;
   if (!token) {
-    throw new Error("You must be logged in to use the AI Assistant.");
+    throw new Error(t("aiLoginRequired"));
   }
 
   if (onProgress) onProgress({ status: "init" });
@@ -160,11 +161,11 @@ export async function askNoteAI({ note, messages, question }) {
   const auth = getAuth();
   const token = auth?.token;
   if (!token) {
-    throw new Error("You must be logged in to use the AI Assistant.");
+    throw new Error(t("aiLoginRequired"));
   }
-  if (!note) throw new Error("Missing note context.");
+  if (!note) throw new Error(t("aiMissingNoteContext"));
   if (!question || !String(question).trim()) {
-    throw new Error("Missing question.");
+    throw new Error(t("aiMissingQuestion"));
   }
 
   // Flatten the note the same way as global chat — text/checklist/draw
@@ -213,9 +214,9 @@ export async function askNoteAI({ note, messages, question }) {
 export async function askNoteAIStream({ note, messages, question, onChunk, signal }) {
   const auth = getAuth();
   const token = auth?.token;
-  if (!token) throw new Error("You must be logged in to use the AI Assistant.");
-  if (!note) throw new Error("Missing note context.");
-  if (!question || !String(question).trim()) throw new Error("Missing question.");
+  if (!token) throw new Error(t("aiLoginRequired"));
+  if (!note) throw new Error(t("aiMissingNoteContext"));
+  if (!question || !String(question).trim()) throw new Error(t("aiMissingQuestion"));
 
   const flatNote = {
     id: note.id != null ? String(note.id) : "",

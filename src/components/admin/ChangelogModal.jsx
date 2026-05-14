@@ -158,7 +158,7 @@ export default function ChangelogModal() {
             setTranslatedRaw(text);
             setShowOriginal(false);
         } catch (e) {
-            setTranslateError(e?.message || "translate failed");
+            setTranslateError(e?.message || t("changelogTranslateFailed"));
         } finally {
             setTranslating(false);
         }

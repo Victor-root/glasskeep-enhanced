@@ -51,7 +51,7 @@ export async function api(path, { method = "GET", body, token, timeoutMs } = {})
     // by rendering the unlock screen instead of the normal UI.
     if (res.status === 423) {
       window.dispatchEvent(new CustomEvent("instance-locked"));
-      const err = new Error(data?.error || "Instance is locked");
+      const err = new Error(data?.error || t("instanceLockedTitle"));
       err.status = 423;
       err.isLocked = true;
       throw err;
