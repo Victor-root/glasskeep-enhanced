@@ -29,7 +29,7 @@ const NATIVE_DEFAULTS = {
 const DOCKER_DEFAULTS = {
     dataDir: "/data",
     socket: "/var/run/docker.sock",
-    helperScript: "/app/scripts/docker-update-helper.js",
+    helperScript: "/app/scripts/docker-update-helper.cjs",
 };
 
 let cachedMode = null;
