@@ -309,6 +309,13 @@ async function main() {
     // Sanity check: confirm the main container exists and grab its config.
     CURRENT_STEP = 1;
     writeStatus("fetching", CURRENT_STEP, "Downloading the latest image...");
+    // Settle delay: gives the frontend a fighting chance to poll and
+    // show the "fetching" state before we charge into the pull. When
+    // the registry is local (test setup) the pull itself can complete
+    // in under 100 ms — without this pause, the modal would jump
+    // straight from "queued" to "success" through the brief network
+    // outage of the swap.
+    await sleep(800);
     const oldInspect = await inspectContainer(MAIN_CONTAINER);
     await dockerPullImage(TARGET_IMAGE);
 

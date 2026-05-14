@@ -201,7 +201,11 @@ export function useSelfUpdate({ token, isAdmin }) {
                         // Non-transient HTTP error (401, 500 etc.) — stop polling.
                         break;
                     }
-                    await sleep(1500);
+                    // Poll quickly while the update is in flight: the
+                    // Docker swap can blow through three or four steps
+                    // in a fraction of a second when the registry is
+                    // local, and a slow poll would miss them entirely.
+                    await sleep(500);
                 }
             } finally {
                 pollingRef.current = false;
