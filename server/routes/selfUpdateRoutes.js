@@ -11,6 +11,7 @@
 // =============================================================================
 
 const fs = require("fs");
+const http = require("http");
 const os = require("os");
 const orchestrator = require("../services/updateOrchestrator");
 const pkg = require("../../package.json");
@@ -65,40 +66,130 @@ function parseCgroupLimit(s) {
     return n;
 }
 
-function readCgroupMemory() {
-    // Returns { total, used } in bytes or null when no cgroup memory
-    // limit is set. "used" excludes page cache so the gauge tracks
-    // what would actually OOM the container — matches `docker stats`
-    // and `kubectl top pod`, NOT raw memory.current which is inflated
-    // by reclaimable file cache.
+function readCgroupMemoryLimit() {
+    // Returns the cgroup's memory limit in bytes, or null when no
+    // explicit limit is set at this level (the container can use up
+    // to the parent cgroup's limit — invisible from inside).
+    const v2 = readSysFile("/sys/fs/cgroup/memory.max");
+    if (v2 !== null) {
+        const n = parseCgroupLimit(v2);
+        if (n !== null) return n;
+    }
+    const v1 = readSysFile("/sys/fs/cgroup/memory/memory.limit_in_bytes");
+    if (v1 !== null) return parseCgroupLimit(v1);
+    return null;
+}
+
+function readCgroupMemoryUsage() {
+    // Returns the cgroup's CURRENT memory usage in bytes (page cache
+    // subtracted, so the value matches `docker stats` rather than
+    // raw memory.current which is inflated by reclaimable cache).
+    // Works even when no limit is set — the kernel always accounts
+    // for usage regardless of whether a cap is configured.
     //
-    // — cgroup v2 (unified hierarchy) —
-    const v2Max = readSysFile("/sys/fs/cgroup/memory.max");
+    // — cgroup v2 —
     const v2Cur = readSysFile("/sys/fs/cgroup/memory.current");
-    if (v2Max !== null && v2Cur !== null) {
-        const total = parseCgroupLimit(v2Max);
+    if (v2Cur !== null) {
         const current = parseInt(String(v2Cur).trim(), 10);
-        if (total !== null && Number.isFinite(current)) {
+        if (Number.isFinite(current)) {
             const stat = readSysFile("/sys/fs/cgroup/memory.stat") || "";
             const fileMatch = stat.match(/^file\s+(\d+)/m);
             const fileCache = fileMatch ? parseInt(fileMatch[1], 10) : 0;
-            return { total, used: Math.max(0, current - fileCache) };
+            return Math.max(0, current - fileCache);
         }
     }
     // — cgroup v1 —
-    const v1MaxStr = readSysFile("/sys/fs/cgroup/memory/memory.limit_in_bytes");
-    const v1CurStr = readSysFile("/sys/fs/cgroup/memory/memory.usage_in_bytes");
-    if (v1MaxStr !== null && v1CurStr !== null) {
-        const total = parseCgroupLimit(v1MaxStr);
-        const current = parseInt(String(v1CurStr).trim(), 10);
-        if (total !== null && Number.isFinite(current)) {
+    const v1Cur = readSysFile("/sys/fs/cgroup/memory/memory.usage_in_bytes");
+    if (v1Cur !== null) {
+        const current = parseInt(String(v1Cur).trim(), 10);
+        if (Number.isFinite(current)) {
             const stat = readSysFile("/sys/fs/cgroup/memory/memory.stat") || "";
             const cacheMatch = stat.match(/^cache\s+(\d+)/m);
             const cache = cacheMatch ? parseInt(cacheMatch[1], 10) : 0;
-            return { total, used: Math.max(0, current - cache) };
+            return Math.max(0, current - cache);
         }
     }
     return null;
+}
+
+// Cached snapshot of the Docker daemon's GET /info response. We query
+// it once on startup and keep the result for the process lifetime —
+// the values it exposes (host total RAM / CPU count) do not change
+// at runtime, and the fallback is only useful when our own cgroup
+// has no limit configured at this level.
+//
+// Why query the daemon at all? When this app runs in a Docker
+// container inside an LXC, our /proc is the kernel's raw procfs
+// (lxcfs is not propagated into nested Docker containers), so
+// os.totalmem() and os.cpus() return the underlying host's values
+// — typically the Proxmox host, not the LXC. The Docker daemon
+// itself runs inside the LXC's namespace and sees the
+// lxcfs-virtualized /proc at startup, so its /info reflects the
+// LXC's view faithfully. This lets the gauges auto-recover the
+// right numbers without forcing the operator to set explicit
+// mem_limit / cpus values in docker-compose.yml.
+let dockerInfoCache = null;
+let dockerInfoFetching = false;
+
+function ensureDockerInfo() {
+    // Idempotent: no-op once the cache is populated or a fetch is
+    // already in flight. Fire-and-forget — callers use whatever the
+    // cache currently holds (which may be null on the very first
+    // poll; the next poll will see the populated value).
+    if (dockerInfoCache !== null) return;
+    if (dockerInfoFetching) return;
+    dockerInfoFetching = true;
+    const req = http.request(
+        {
+            socketPath: "/var/run/docker.sock",
+            method: "GET",
+            path: "/info",
+            timeout: 2000,
+        },
+        (res) => {
+            const chunks = [];
+            res.on("data", (c) => chunks.push(c));
+            res.on("end", () => {
+                dockerInfoFetching = false;
+                try {
+                    const j = JSON.parse(
+                        Buffer.concat(chunks).toString("utf8")
+                    );
+                    dockerInfoCache = {
+                        memTotal:
+                            typeof j.MemTotal === "number" && j.MemTotal > 0
+                                ? j.MemTotal
+                                : null,
+                        nCpu:
+                            typeof j.NCPU === "number" && j.NCPU > 0
+                                ? j.NCPU
+                                : null,
+                    };
+                } catch {
+                    /* malformed JSON — leave the cache null so we
+                     * try again on the next /system poll */
+                }
+            });
+            res.on("error", () => {
+                dockerInfoFetching = false;
+            });
+        }
+    );
+    req.on("error", () => {
+        // Socket missing or unreadable (native install, denied
+        // permission, etc.). Don't retry tight — the next poll
+        // will re-trigger this function naturally.
+        dockerInfoFetching = false;
+    });
+    req.on("timeout", () => {
+        try {
+            req.destroy();
+        } catch {
+            /* ignore */
+        }
+        dockerInfoFetching = false;
+    });
+    req.end();
 }
 
 function readCgroupSwap() {
@@ -241,6 +332,12 @@ function isStrictlyNewer(latest, current) {
 }
 
 function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
+    // Warm the Docker daemon /info cache so the first /system poll
+    // already has the LXC-virtualized MemTotal / NCPU to fall back
+    // on. Silently no-ops on native installs where the Docker
+    // socket is absent.
+    ensureDockerInfo();
+
     // Mode + capability check. Cheap; safe to call on every panel mount.
     app.get("/api/admin/self-update/mode", auth, adminOnly, async (_req, res) => {
         try {
@@ -288,24 +385,49 @@ function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
         res.set("Pragma", "no-cache");
         res.set("Expires", "0");
 
+        // Kick off the Docker-daemon /info fetch in the background.
+        // Idempotent — populates the cache once and stays cached for
+        // the process lifetime. We do this on every poll so that an
+        // early Docker outage during startup doesn't permanently
+        // disable the fallback path.
+        ensureDockerInfo();
+
         // ── Memory ─────────────────────────────────────────────────────
-        // Prefer cgroup memory accounting — it reflects the limits
-        // actually enforced on this process tree, whereas os.totalmem()
-        // returns the host kernel's view (= the Proxmox host's RAM,
-        // not the LXC's, when running inside a Docker container that
-        // does not inherit lxcfs).
-        const cgMem = readCgroupMemory();
-        const totalMem = cgMem ? cgMem.total : os.totalmem();
-        const usedMem = cgMem
-            ? cgMem.used
-            : Math.max(0, os.totalmem() - os.freemem());
+        // Total: cgroup limit (most accurate) → Docker daemon /info
+        // (correct in Docker-in-LXC: the daemon sees lxcfs values) →
+        // os.totalmem() (kernel raw view; wrong in Docker but the
+        // only thing we have left).
+        // Used: cgroup current usage (always correct per-container,
+        // independent of whether a limit is set) → host-wide
+        // computation as a last resort.
+        const cgMemLimit = readCgroupMemoryLimit();
+        const cgMemUsage = readCgroupMemoryUsage();
+        let totalMem;
+        let memSource;
+        if (cgMemLimit !== null) {
+            totalMem = cgMemLimit;
+            memSource = "cgroup";
+        } else if (dockerInfoCache && dockerInfoCache.memTotal) {
+            totalMem = dockerInfoCache.memTotal;
+            memSource = "docker-info";
+        } else {
+            totalMem = os.totalmem();
+            memSource = "os";
+        }
+        const usedMem =
+            cgMemUsage !== null
+                ? cgMemUsage
+                : Math.max(0, os.totalmem() - os.freemem());
         const freeMem = Math.max(0, totalMem - usedMem);
 
         // ── Swap ───────────────────────────────────────────────────────
-        // Same logic: try cgroup first (accurate per-container), fall
-        // back to /proc/meminfo for setups where cgroup swap is not
-        // exposed. Returns null when no swap is configured so the
-        // frontend hides the bar instead of rendering an awkward 0/0.
+        // Only cgroup swap is reliable — /info has no swap field, and
+        // /proc/meminfo inside a Docker container reflects the
+        // unrelated Proxmox host swap rather than the LXC's. When
+        // we can't get an accurate per-container reading we hide the
+        // bar entirely (null) rather than show a misleading value.
+        // /proc/meminfo is still consulted for true native installs
+        // (no Docker daemon detected), where lxcfs handles things.
         let swap = null;
         const cgSwap = readCgroupSwap();
         if (cgSwap && cgSwap.total > 0) {
@@ -315,10 +437,11 @@ function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
                 free: Math.max(0, cgSwap.total - cgSwap.used),
                 percent: (cgSwap.used / cgSwap.total) * 100,
             };
-        } else if (!cgMem) {
-            // Only consult /proc/meminfo when we are also falling back
-            // for memory — mixing cgroup memory with host-wide swap
-            // would compare two different scopes.
+        } else if (memSource === "os") {
+            // Native install: /proc/meminfo IS lxcfs-virtualized so
+            // we trust it. Anywhere we already fell through to the
+            // Docker daemon's view, /proc/meminfo would be wrong,
+            // so we deliberately do nothing here.
             try {
                 const meminfo = fs.readFileSync("/proc/meminfo", "utf8");
                 const totalMatch = meminfo.match(/^SwapTotal:\s+(\d+)/m);
@@ -340,14 +463,20 @@ function attachSelfUpdateRoutes(app, { auth, adminOnly, log = console } = {}) {
         }
 
         // ── CPU ────────────────────────────────────────────────────────
-        // Effective CPU count: cgroup quota when set, else os.cpus().
+        // Effective CPU count: cgroup quota (when set) → Docker /info
+        // NCPU (correct in Docker-in-LXC) → os.cpus() (host view).
         // The percent is computed against this effective count so a
         // single-vCPU container pegging its core reads ~100 % rather
         // than ~25 % on a 4-core host.
         const cgCpuCount = readCgroupCpuCount();
-        const cpuCount = cgCpuCount !== null
-            ? cgCpuCount
-            : (os.cpus() || []).length || 1;
+        let cpuCount;
+        if (cgCpuCount !== null) {
+            cpuCount = cgCpuCount;
+        } else if (dockerInfoCache && dockerInfoCache.nCpu) {
+            cpuCount = dockerInfoCache.nCpu;
+        } else {
+            cpuCount = (os.cpus() || []).length || 1;
+        }
 
         // CPU usage as a real 0-100 % derived from the delta of
         // cumulative counters between this call and the previous one.
