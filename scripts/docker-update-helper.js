@@ -57,6 +57,42 @@ if (!MAIN_CONTAINER || !TARGET_IMAGE) {
     process.exit(1);
 }
 
+// Early diagnostics: surface uid/gid/groups, env, and docker socket
+// reachability BEFORE doing any real work so a permissions issue (the
+// usual suspect when this helper crashes silently) is visible in
+// `docker logs <helper>` even if /data is not writable yet.
+console.log(`[docker-update-helper] booting (pid ${process.pid})`);
+try {
+    console.log(
+        `[docker-update-helper] uid=${process.getuid()} gid=${process.getgid()} groups=${process.getgroups().join(",")}`
+    );
+} catch (e) {
+    console.log(`[docker-update-helper] uid/gid lookup failed: ${e.message}`);
+}
+console.log(`[docker-update-helper] MAIN_CONTAINER=${MAIN_CONTAINER}`);
+console.log(`[docker-update-helper] TARGET_IMAGE=${TARGET_IMAGE}`);
+console.log(`[docker-update-helper] STATUS_FILE=${STATUS_FILE}`);
+console.log(`[docker-update-helper] LOG_FILE=${LOG_FILE}`);
+console.log(`[docker-update-helper] DOCKER_SOCK=${DOCKER_SOCK}`);
+try {
+    fs.accessSync(DOCKER_SOCK, fs.constants.R_OK | fs.constants.W_OK);
+    console.log("[docker-update-helper] docker socket: accessible");
+} catch (e) {
+    console.error(
+        "[docker-update-helper] docker socket NOT accessible:",
+        e.message
+    );
+}
+try {
+    fs.accessSync(path.dirname(STATUS_FILE), fs.constants.W_OK);
+    console.log("[docker-update-helper] data dir: writable");
+} catch (e) {
+    console.error(
+        "[docker-update-helper] data dir NOT writable:",
+        e.message
+    );
+}
+
 // ── Status writer (atomic) ───────────────────────────────────────────────────
 function writeStatus(state, step, message, error = null, rolledBack = false) {
     const terminal = ["success", "error", "rolled_back"].includes(state);

@@ -266,6 +266,12 @@ async function startDockerUpdate({ fromVersion, toVersion }) {
     if (!dataMount) {
         throw new Error("could not locate the /data mount on the main container");
     }
+    const helperName = `${ownName}-updater-${Date.now()}`;
+    // AutoRemove is normally true so the helper cleans itself up after
+    // the swap. Setting UPDATE_KEEP_HELPER=1 in the main container's
+    // environment keeps the helper around (exited state) so the admin
+    // can run `docker logs <helper>` to inspect a failure.
+    const keepHelper = process.env.UPDATE_KEEP_HELPER === "1";
     const helperConfig = {
         Image: currentImageRef, // use the OLD image — it has our helper
         Cmd: ["node", DOCKER_DEFAULTS.helperScript],
@@ -279,7 +285,7 @@ async function startDockerUpdate({ fromVersion, toVersion }) {
             `STARTED_AT=${new Date().toISOString()}`,
         ],
         HostConfig: {
-            AutoRemove: true,
+            AutoRemove: !keepHelper,
             Binds: [
                 `${dataMount}:${DOCKER_DEFAULTS.dataDir}`,
                 `${DOCKER_DEFAULTS.socket}:${DOCKER_DEFAULTS.socket}`,
@@ -290,7 +296,6 @@ async function startDockerUpdate({ fromVersion, toVersion }) {
         // networks — Docker socket access is enough.
     };
 
-    const helperName = `${ownName}-updater-${Date.now()}`;
     const created = await dockerApi(
         "POST",
         `/containers/create?name=${encodeURIComponent(helperName)}`,
