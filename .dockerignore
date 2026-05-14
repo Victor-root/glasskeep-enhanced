@@ -33,6 +33,10 @@ Thumbs.db
 # Docs that bloat the build context
 *.md
 !README.md
+# CHANGELOG.md is imported as ?raw by the in-app "View changelog" modal
+# and the auto-popup after a successful self-update — must be present
+# in the build context or vite-plugin-pwa fails the build.
+!CHANGELOG.md
 
 # Keep the installer out of the image — Docker replaces it.
 install.sh
