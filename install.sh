@@ -179,6 +179,8 @@ setup_i18n() {
         MSG_SUMMARY_APP="Application"
         MSG_SUMMARY_BUNDLE="Bundle web"
         MSG_SUMMARY_SERVICE="Service systemd"
+        MSG_SUMMARY_UPDATER="Service updater"
+        MSG_SUMMARY_UPDATER_NOTE="déclenchable depuis le panel admin"
         MSG_SUMMARY_ENC="Chiffrement au repos"
         MSG_SUMMARY_HTTPS="HTTPS"
         MSG_SUMMARY_ENC_ON="activé"
@@ -307,6 +309,8 @@ setup_i18n() {
         MSG_SUMMARY_APP="Application"
         MSG_SUMMARY_BUNDLE="Web bundle"
         MSG_SUMMARY_SERVICE="Systemd service"
+        MSG_SUMMARY_UPDATER="Updater service"
+        MSG_SUMMARY_UPDATER_NOTE="triggered from the admin panel"
         MSG_SUMMARY_ENC="At-rest encryption"
         MSG_SUMMARY_HTTPS="HTTPS"
         MSG_SUMMARY_ENC_ON="enabled"
@@ -1278,6 +1282,7 @@ action_uninstall() {
 
     panel "$RED" "$MSG_UNINSTALL_WARN" \
         "${MSG_UNINSTALL_SVC}${BOLD}${SERVICE_FILE}${RESET}" \
+        "${MSG_UNINSTALL_SVC}${BOLD}${UPDATER_SERVICE_FILE}${RESET}" \
         "${MSG_UNINSTALL_APP}${BOLD}${INSTALL_DIR}${RESET}" \
         "${MSG_UNINSTALL_DATA}${BOLD}${DATA_DIR}${RESET}" \
         "${MSG_UNINSTALL_CFG}${BOLD}${ENV_FILE}${RESET}"
@@ -1387,6 +1392,7 @@ show_install_summary() {
         "${TEAL}${MSG_SUMMARY_APP}${RESET}     ${BOLD}${INSTALL_DIR}${RESET} ${GRAY}(${commit})${RESET}" \
         "${TEAL}${MSG_SUMMARY_BUNDLE}${RESET}      ${BOLD}${bundle}${RESET}" \
         "${TEAL}${MSG_SUMMARY_SERVICE}${RESET} ${BOLD}${SERVICE_NAME}${RESET}" \
+        "${TEAL}${MSG_SUMMARY_UPDATER}${RESET} ${BOLD}${UPDATER_SERVICE_NAME}${RESET} ${GRAY}(${MSG_SUMMARY_UPDATER_NOTE})${RESET}" \
         "${TEAL}${MSG_SUMMARY_ENC}${RESET} ${enc_status}" \
         "${TEAL}${MSG_SUMMARY_HTTPS}${RESET}            ${BOLD}${https_label}${RESET}"
 }
