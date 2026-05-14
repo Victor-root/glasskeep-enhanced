@@ -920,6 +920,53 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   copied: "Copied",
   copyCommand: "Copy command",
   openRepo: "Open repository",
+  // ── Self-update (one-click) ────────────────────────────────────────────────
+  selfUpdateButton: "Update now",
+  selfUpdateRunning: "Update in progress...",
+  selfUpdateButtonHint:
+    "Installs the new version and restarts the app — your data is preserved.",
+  selfUpdateConfirmTitle: "Update to v{version}?",
+  selfUpdateConfirmMessage:
+    "The app will briefly go offline while the new version is installed and the service restarts. Your notes and accounts are preserved. Continue?",
+  selfUpdateConfirmButton: "Update now",
+  selfUpdateHeadlineRunning: "Updating GlassKeep",
+  selfUpdateHeadlineSuccess: "Update complete",
+  selfUpdateHeadlineError: "Update failed",
+  selfUpdateHeadlineRolledBack: "Previous version restored",
+  selfUpdateSubtextRunning:
+    "Please keep this window open until the update is finished.",
+  selfUpdateSubtextWaiting:
+    "The app is restarting. Hang on — we will reconnect automatically.",
+  selfUpdateSubtextSuccess:
+    "GlassKeep was updated successfully. Reload the page to use the new version.",
+  selfUpdateSubtextError:
+    "The update could not be completed. The app may still be running on the previous version.",
+  selfUpdateSubtextRolledBack:
+    "The update did not finish. We rolled back to the previous version so you can keep working.",
+  selfUpdateStepQueued: "Queued",
+  selfUpdateStepPreparing: "Preparing",
+  selfUpdateStepStopping: "Stopping the app",
+  selfUpdateStepFetching: "Downloading the new version",
+  selfUpdateStepRenaming: "Preparing for the new version",
+  selfUpdateStepCreating: "Creating the new instance",
+  selfUpdateStepInstalling: "Installing dependencies",
+  selfUpdateStepBuilding: "Building",
+  selfUpdateStepStarting: "Restarting the app",
+  selfUpdateStepRollingBack: "Rolling back",
+  selfUpdateStepSuccess: "Done",
+  selfUpdateStepError: "Failed",
+  selfUpdateStepRolledBack: "Rolled back",
+  selfUpdateStepWaiting: "Waiting for the server to come back",
+  selfUpdateShowDetails: "Show details",
+  selfUpdateHideDetails: "Hide details",
+  selfUpdateErrorTitle: "Error",
+  selfUpdateReload: "Reload",
+  selfUpdateClose: "Close",
+  selfUpdateKeepOpenHint: "Keep this window open until it is over.",
+  selfUpdateDockerHintIntro:
+    "To enable one-click updates on Docker, add this single line under the 'volumes:' block of your docker-compose.yml, then restart the container once. You will never have to touch this file again.",
+  selfUpdateDockerHintFootnote:
+    "After saving, run: docker compose up -d. The 'Update now' button will then appear here.",
   audioNote: "Audio note",
   audioNoteDesc: "Voice memo from microphone",
   audioRecording: "Audio recording",

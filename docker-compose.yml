@@ -13,8 +13,9 @@
 #    3. Change the admin password from the admin settings panel.
 #
 #  Update:
-#    docker compose pull && docker compose up -d
-#    (Your notes and account survive — they live in ./data on the host.)
+#    - From the admin panel: click "Update now" (recommended)
+#    - From the shell: docker compose pull && docker compose up -d
+#    Your notes and account survive — they live in ./data on the host.
 # =============================================================================
 services:
   glasskeep:
@@ -48,7 +49,7 @@ services:
       #   openssl rand -hex 32
       # JWT_SECRET: ""
 
-      # --- Passkeys & encryption -------------------------------------------
+      # --- Passkeys & encryption --------------------------------------------
       # Passkeys and encryption are supported on Docker. Requirements:
       #   1. Set up a reverse proxy with HTTPS (Nginx, Caddy, Traefik, etc.)
       #   2. The reverse proxy MUST pass X-Forwarded-Host and X-Forwarded-Proto
@@ -60,7 +61,22 @@ services:
       # WEBAUTHN_ORIGIN: "https://example.com"
       #
       # Encryption keys are stored in the database (/data/notes.db) and
-      # are generated automatically — no additional setup needed.    volumes:
+      # are generated automatically — no additional setup needed.
+    volumes:
       # Persistent data: SQLite DB + auto-generated JWT secret.
       # Back this directory up to preserve your notes.
       - ./data:/data
+
+      # --- One-click self-update from the admin panel -----------------------
+      # Mounts the Docker socket so the container can pull a new image
+      # and replace itself when an admin clicks "Update now" in the UI.
+      #
+      # If you remove this line, the admin panel falls back to showing
+      # the manual `docker compose pull && docker compose up -d` command.
+      #
+      # Security note: exposing the Docker socket gives the container
+      # full control over Docker on this host. Only do this if you trust
+      # the image (you do — you self-host it). The container still runs
+      # as the unprivileged 'node' user inside, the socket is only used
+      # by the update flow.
+      - /var/run/docker.sock:/var/run/docker.sock

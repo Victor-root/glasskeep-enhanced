@@ -16,6 +16,29 @@ export DB_FILE
 if [ "$(id -u)" = "0" ]; then
     mkdir -p "$DATA_DIR"
     chown -R node:node "$DATA_DIR"
+
+    # If the operator mounted the Docker socket (one-click self-update
+    # from the admin panel), the 'node' user needs to be in the group
+    # that owns the socket on the host. The host's docker group GID
+    # varies (commonly 999/998/120/etc.), so we discover it at runtime
+    # and add a matching group inside the container.
+    if [ -S /var/run/docker.sock ]; then
+        DOCKER_SOCK_GID=$(stat -c %g /var/run/docker.sock 2>/dev/null || echo "")
+        if [ -n "$DOCKER_SOCK_GID" ] && [ "$DOCKER_SOCK_GID" != "0" ]; then
+            EXISTING_GROUP=$(awk -F: -v gid="$DOCKER_SOCK_GID" '$3 == gid {print $1; exit}' /etc/group)
+            if [ -z "$EXISTING_GROUP" ]; then
+                echo "dockerhost:x:${DOCKER_SOCK_GID}:node" >> /etc/group
+            else
+                # Append node to the existing group's member list if missing.
+                if ! awk -F: -v g="$EXISTING_GROUP" '$1 == g {print $4}' /etc/group | grep -qw node; then
+                    sed -i "s|^\(${EXISTING_GROUP}:[^:]*:[^:]*:\)\(.*\)$|\1\2,node|" /etc/group
+                    # Clean up a stray leading comma if the member list was empty.
+                    sed -i "s|^\(${EXISTING_GROUP}:[^:]*:[^:]*:\),|\1|" /etc/group
+                fi
+            fi
+        fi
+    fi
+
     exec gosu node "$0" "$@"
 fi
 

@@ -44,6 +44,8 @@ DATA_DIR="/opt/glass-keep/data"
 ENV_FILE="/opt/glass-keep/.env"
 SERVICE_NAME="glass-keep"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+UPDATER_SERVICE_NAME="glass-keep-updater"
+UPDATER_SERVICE_FILE="/etc/systemd/system/${UPDATER_SERVICE_NAME}.service"
 NODE_MAJOR=24
 
 # ── Language detection ────────────────────────────────────────────────────────
@@ -1133,6 +1135,30 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
+    # One-shot unit driven by the admin panel's "Update now" button.
+    # Runs as its own unit so stopping glass-keep.service does NOT kill
+    # the updater half-way through. Type=oneshot keeps systemctl waiting
+    # until the script returns; the main app calls it with --no-block so
+    # the HTTP request returns immediately while the updater works.
+    cat > "$UPDATER_SERVICE_FILE" <<EOF
+[Unit]
+Description=GlassKeep — Self-Update (one-shot)
+
+[Service]
+Type=oneshot
+WorkingDirectory=${INSTALL_DIR}
+EnvironmentFile=-${ENV_FILE}
+Environment=INSTALL_DIR=${INSTALL_DIR}
+Environment=DATA_DIR=${DATA_DIR}
+Environment=SERVICE_NAME=${SERVICE_NAME}
+ExecStart=/usr/bin/env bash ${INSTALL_DIR}/scripts/self-update.sh
+StandardOutput=journal
+StandardError=journal
+EOF
+
+    # The updater script must be executable for systemd to run it.
+    chmod +x "${INSTALL_DIR}/scripts/self-update.sh" 2>/dev/null || true
+
     step "$MSG_STEP_DAEMON" systemctl daemon-reload
     # shellcheck disable=SC2059
     step "$(printf "$MSG_STEP_SERVICE" "$SERVICE_NAME")" \
@@ -1207,6 +1233,28 @@ action_update() {
     # Apply HTTPS setting based on user's choice
     apply_ssl_to_env
 
+    # Make sure the one-shot updater unit exists. This is what powers
+    # the "Update now" button in the admin panel. Re-writing the file
+    # on every script-run keeps it in sync with the install paths and
+    # bootstraps it for installs that pre-date this feature.
+    cat > "$UPDATER_SERVICE_FILE" <<EOF
+[Unit]
+Description=GlassKeep — Self-Update (one-shot)
+
+[Service]
+Type=oneshot
+WorkingDirectory=${INSTALL_DIR}
+EnvironmentFile=-${ENV_FILE}
+Environment=INSTALL_DIR=${INSTALL_DIR}
+Environment=DATA_DIR=${DATA_DIR}
+Environment=SERVICE_NAME=${SERVICE_NAME}
+ExecStart=/usr/bin/env bash ${INSTALL_DIR}/scripts/self-update.sh
+StandardOutput=journal
+StandardError=journal
+EOF
+    chmod +x "${INSTALL_DIR}/scripts/self-update.sh" 2>/dev/null || true
+    systemctl daemon-reload
+
     # shellcheck disable=SC2059
     step "$(printf "$MSG_STEP_START" "$SERVICE_NAME")" \
         systemctl start "$SERVICE_NAME"
@@ -1250,6 +1298,12 @@ action_uninstall() {
         # shellcheck disable=SC2059
         step "$(printf "$MSG_STEP_DISABLE" "$SERVICE_NAME")" \
             systemctl disable "$SERVICE_NAME"
+    fi
+
+    # Best-effort cleanup of the one-shot updater unit.
+    systemctl stop "$UPDATER_SERVICE_NAME" 2>/dev/null || true
+    if [[ -f "$UPDATER_SERVICE_FILE" ]]; then
+        rm -f "$UPDATER_SERVICE_FILE"
     fi
 
     if [[ -f "$SERVICE_FILE" ]]; then

@@ -921,6 +921,54 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   copied: "Copié",
   copyCommand: "Copier la commande",
   openRepo: "Ouvrir le dépôt",
+  // ── Mise à jour en un clic ────────────────────────────────────────────────
+  selfUpdateButton: "Mettre à jour maintenant",
+  selfUpdateRunning: "Mise à jour en cours...",
+  selfUpdateButtonHint:
+    "Installe la nouvelle version et redémarre l'application — vos données sont conservées.",
+  selfUpdateConfirmTitle: "Mettre à jour vers la v{version} ?",
+  selfUpdateConfirmMessage:
+    "L'application sera indisponible quelques instants pendant l'installation et le redémarrage. Vos notes et comptes sont conservés. Continuer ?",
+  selfUpdateConfirmButton: "Mettre à jour",
+  selfUpdateHeadlineRunning: "Mise à jour de GlassKeep",
+  selfUpdateHeadlineSuccess: "Mise à jour terminée",
+  selfUpdateHeadlineError: "La mise à jour a échoué",
+  selfUpdateHeadlineRolledBack: "Version précédente restaurée",
+  selfUpdateSubtextRunning:
+    "Veuillez garder cette fenêtre ouverte jusqu'à la fin de la mise à jour.",
+  selfUpdateSubtextWaiting:
+    "L'application redémarre. Patientez — nous nous reconnectons automatiquement.",
+  selfUpdateSubtextSuccess:
+    "GlassKeep a été mis à jour avec succès. Rechargez la page pour utiliser la nouvelle version.",
+  selfUpdateSubtextError:
+    "La mise à jour n'a pas pu aboutir. L'application est peut-être toujours sur l'ancienne version.",
+  selfUpdateSubtextRolledBack:
+    "La mise à jour n'est pas allée au bout. Nous avons restauré l'ancienne version pour que vous puissiez continuer à utiliser l'app.",
+  selfUpdateStepQueued: "En attente",
+  selfUpdateStepPreparing: "Préparation",
+  selfUpdateStepStopping: "Arrêt de l'application",
+  selfUpdateStepFetching: "Téléchargement de la nouvelle version",
+  selfUpdateStepRenaming: "Préparation pour la nouvelle version",
+  selfUpdateStepCreating: "Création de la nouvelle instance",
+  selfUpdateStepInstalling: "Installation des dépendances",
+  selfUpdateStepBuilding: "Compilation",
+  selfUpdateStepStarting: "Redémarrage de l'application",
+  selfUpdateStepRollingBack: "Restauration en cours",
+  selfUpdateStepSuccess: "Terminé",
+  selfUpdateStepError: "Échec",
+  selfUpdateStepRolledBack: "Restauré",
+  selfUpdateStepWaiting: "En attente du retour du serveur",
+  selfUpdateShowDetails: "Voir les détails",
+  selfUpdateHideDetails: "Masquer les détails",
+  selfUpdateErrorTitle: "Erreur",
+  selfUpdateReload: "Recharger",
+  selfUpdateClose: "Fermer",
+  selfUpdateKeepOpenHint:
+    "Gardez cette fenêtre ouverte jusqu'à la fin.",
+  selfUpdateDockerHintIntro:
+    "Pour activer la mise à jour en un clic sur Docker, ajoutez cette ligne sous le bloc 'volumes:' de votre docker-compose.yml, puis redémarrez le conteneur une seule fois. Vous n'aurez plus jamais à toucher à ce fichier.",
+  selfUpdateDockerHintFootnote:
+    "Après modification, lancez : docker compose up -d. Le bouton « Mettre à jour maintenant » apparaîtra ensuite ici.",
   audioNote: "Note audio",
   audioNoteDesc: "Mémo vocal au microphone",
   audioRecording: "Enregistrement audio",

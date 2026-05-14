@@ -54,6 +54,8 @@ import TagSidebar from "./components/panels/TagSidebar.jsx";
 import SettingsPanel from "./components/panels/SettingsPanel.jsx";
 import AdminPanel from "./components/panels/AdminPanel.jsx";
 import { useUpdateCheck } from "./hooks/useUpdateCheck.js";
+import { useSelfUpdate } from "./hooks/useSelfUpdate.js";
+import SelfUpdateProgress from "./components/admin/SelfUpdateProgress.jsx";
 import NoteCard from "./components/notes/NoteCard.jsx";
 import AdminView from "./components/notes/AdminView.jsx";
 import NotesUI from "./components/notes/NotesUI.jsx";
@@ -351,6 +353,10 @@ export default function App() {
 
   // GitHub release update notification (admin-only, fail-silent).
   const updateInfo = useUpdateCheck({
+    token,
+    isAdmin: !!currentUser?.is_admin,
+  });
+  const selfUpdate = useSelfUpdate({
     token,
     isAdmin: !!currentUser?.is_admin,
   });
@@ -5602,6 +5608,7 @@ export default function App() {
         showGenericConfirm={showGenericConfirm}
         showToast={showToast}
         authToken={token}
+        selfUpdate={selfUpdate}
         updateInfo={updateInfo}
       />
 
@@ -5821,6 +5828,8 @@ export default function App() {
         config={genericConfirmConfig}
         onClose={() => setGenericConfirmOpen(false)}
       />
+
+      <SelfUpdateProgress selfUpdate={selfUpdate} />
 
       <ToastContainer toasts={toasts} />
 

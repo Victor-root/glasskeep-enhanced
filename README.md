@@ -160,6 +160,8 @@ services:
       ADMIN_PASSWORD: "choose-a-strong-password"
     volumes:
       - ./data:/data
+      # Lets the admin panel update the container in one click.
+      - /var/run/docker.sock:/var/run/docker.sock
 EOF
 docker compose up -d
 ```
@@ -170,11 +172,30 @@ Then:
 
 #### Update
 
+The easiest way is to open the admin panel and click **"Update now"** —
+the new image is pulled and the container is replaced automatically,
+your data is preserved.
+
+If you prefer the command line:
+
 ```bash
 cd ~/glasskeep && docker compose pull && docker compose up -d
 ```
 
 Your data stays preserved in the `./data` directory.
+
+##### Upgrading an existing Docker install to enable one-click updates
+
+If your `docker-compose.yml` was generated before this feature shipped,
+add this single line under the `volumes:` block (right under
+`- ./data:/data`), then run `docker compose up -d` once:
+
+```yaml
+      - /var/run/docker.sock:/var/run/docker.sock
+```
+
+After that, the "Update now" button in the admin panel takes care of all
+future upgrades — you will never have to touch this file again.
 
 ---
 

@@ -125,6 +125,7 @@ export default function AdminPanel({
   showToast,
   authToken,
   updateInfo,
+  selfUpdate,
 }) {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [editUserModalOpen, setEditUserModalOpen] = useState(false);
@@ -242,7 +243,11 @@ export default function AdminPanel({
         </div>
 
         <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
-          <AdminUpdateSection updateInfo={updateInfo} />
+          <AdminUpdateSection
+            updateInfo={updateInfo}
+            selfUpdate={selfUpdate}
+            showGenericConfirm={showGenericConfirm}
+          />
 
           {/* Pending Registrations — rendered first so admins see the
               actionable items without scrolling. Hidden when the
