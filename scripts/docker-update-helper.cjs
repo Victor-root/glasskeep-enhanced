@@ -115,6 +115,11 @@ function writeStatus(state, step, message, error = null, rolledBack = false) {
     } catch (e) {
         console.error("[docker-update-helper] cannot write status file:", e.message);
     }
+    // Also surface the step in the human-readable log so the admin's
+    // "Show details" panel reflects progress beyond the structured
+    // status fields. Errors get an explicit marker for grep-ability.
+    const errSuffix = error ? ` — ${error}` : "";
+    console.log(`[${state} ${step}/${TOTAL_STEPS}] ${message}${errSuffix}`);
 }
 
 // ── Docker HTTP API client over the Unix socket ──────────────────────────────
@@ -212,6 +217,14 @@ function splitImageRef(ref) {
 function buildCreateConfig(inspect, newImage) {
     const cfg = { ...(inspect.Config || {}) };
     cfg.Image = newImage;
+    // Hostname / Domainname must NOT be inherited. Docker auto-fills
+    // Hostname with the container's short ID when left empty, but the
+    // inspect output captures the OLD container's ID — preserving it
+    // freezes the new container's /etc/hostname at a stale value and
+    // breaks the next self-update (the orchestrator can no longer find
+    // its own container by hostname).
+    delete cfg.Hostname;
+    delete cfg.Domainname;
 
     const hostConfig = { ...(inspect.HostConfig || {}) };
 
