@@ -1,3 +1,16 @@
+<div align="center">
+
+[![Latest release](https://img.shields.io/github/v/release/Victor-root/glasskeep-enhanced?style=for-the-badge&logo=github&label=release)](https://github.com/Victor-root/glasskeep-enhanced/releases)
+[![Last update](https://img.shields.io/github/last-commit/Victor-root/glasskeep-enhanced/main?style=for-the-badge&logo=git&label=last%20update)](https://github.com/Victor-root/glasskeep-enhanced/commits/main)
+[![Active development](https://img.shields.io/badge/Active-development-2ea44f?style=for-the-badge&logo=rocket&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/commits/main)
+
+[![Easy install](https://img.shields.io/badge/Easy-install%20script-2ea44f?style=for-the-badge&logo=gnubash&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced#%EF%B8%8F-installation)
+[![Docker](https://img.shields.io/badge/Docker-GHCR-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced#-docker-installation)
+[![Android](https://img.shields.io/badge/Android-APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.3.0/GlassKeep-v1.2.0.apk)
+[![PWA](https://img.shields.io/badge/PWA-ready-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced)
+
+</div>
+
 # ✨ Glass Keep — Enhanced Fork
 
 > Fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep), with a strong focus on **local-first usage**, **offline support**, **Trash / restore**, **mobile usability**, **simpler self-hosting**, and a **native Android companion app**.
@@ -115,7 +128,7 @@ Current APK version: `1.2.0`
 
 ---
 
-## 🛠️ Installation
+## 🖥 Installation
 
 ### Recommended native installation (Debian / Ubuntu / Proxmox LXC)
 
