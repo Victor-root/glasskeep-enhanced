@@ -623,6 +623,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   languageLabel: "Langue",
   languageDesc: "Choisir la langue d'affichage de l'application",
   languageAuto: "Automatique",
+  languageAutoTooltip: "Suit automatiquement la langue du navigateur",
   languageFr: "Français",
   languageEn: "English",
   languageSaveFailed: "Impossible de sauvegarder la langue.",
