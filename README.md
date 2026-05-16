@@ -269,8 +269,10 @@ cd ~/glasskeep && docker compose pull && docker compose up -d
 ```
 
 > 💡 **Existing install without one-click updates?** You have two options:
-> - **Enable one-click updates** — add `- /var/run/docker.sock:/var/run/docker.sock` under the `volumes:` block, then re-deploy the stack once. After that, the in-app **Update now** button takes over and you never touch the file again.
-> - **Stay manual** — just pull the latest image and recreate the container whenever you want to update (`docker compose pull && docker compose up -d` on the CLI, or the equivalent "Pull / Recreate" button in your GUI of choice).
+> - **Patch the existing compose** — add `- /var/run/docker.sock:/var/run/docker.sock` under the `volumes:` block of your current `docker-compose.yml`, then re-deploy the stack once.
+> - **Redeploy from the current example** — replace your `docker-compose.yml` with the one at the top of this section (keep your `ADMIN_*` values and your `./data` volume), then re-deploy. The current example already ships the right configuration, so you'll never have to touch the file again.
+>
+> Either way, the in-app **Update now** button takes over from there.
 
 ---
 
