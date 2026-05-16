@@ -15,7 +15,7 @@
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
-const { spawn, spawnSync } = require("child_process");
+const { spawn, spawnSync, execFile } = require("child_process");
 
 const pkg = require("../../package.json");
 
@@ -530,6 +530,67 @@ async function cancelUpdate() {
     });
 }
 
+// ── Lifecycle (restart / shutdown the running instance) ─────────────────────
+// In native mode we delegate to systemd, which already supervises the unit.
+// In docker mode we ask the Docker daemon (via the mounted socket) to act on
+// our own container — the running JS process never has to coordinate its
+// own death, the daemon SIGTERMs us and either starts a fresh container or
+// leaves us stopped, depending on the call.
+function getOwnContainerId() {
+    const fromEnv = process.env.HOSTNAME;
+    if (fromEnv) return fromEnv.trim();
+    const fromFile = readFile("/etc/hostname");
+    return fromFile ? fromFile.trim() : "";
+}
+
+async function restartSelf() {
+    const mode = detectMode();
+    if (mode === "docker") {
+        if (!(await dockerSocketAvailable())) {
+            throw new Error("Docker socket is not mounted — cannot restart from inside the container.");
+        }
+        const ownId = getOwnContainerId();
+        if (!ownId) throw new Error("Could not determine own container ID.");
+        await dockerApi("POST", `/containers/${encodeURIComponent(ownId)}/restart?t=10`);
+        return;
+    }
+    if (mode === "native") {
+        return new Promise((resolve, reject) => {
+            execFile(
+                "systemctl",
+                ["restart", NATIVE_DEFAULTS.serviceName],
+                { timeout: 15000 },
+                (err) => (err ? reject(err) : resolve()),
+            );
+        });
+    }
+    throw new Error("Server lifecycle not supported in this environment.");
+}
+
+async function shutdownSelf() {
+    const mode = detectMode();
+    if (mode === "docker") {
+        if (!(await dockerSocketAvailable())) {
+            throw new Error("Docker socket is not mounted — cannot stop from inside the container.");
+        }
+        const ownId = getOwnContainerId();
+        if (!ownId) throw new Error("Could not determine own container ID.");
+        await dockerApi("POST", `/containers/${encodeURIComponent(ownId)}/stop?t=10`);
+        return;
+    }
+    if (mode === "native") {
+        return new Promise((resolve, reject) => {
+            execFile(
+                "systemctl",
+                ["stop", NATIVE_DEFAULTS.serviceName],
+                { timeout: 15000 },
+                (err) => (err ? reject(err) : resolve()),
+            );
+        });
+    }
+    throw new Error("Server lifecycle not supported in this environment.");
+}
+
 module.exports = {
     detectMode,
     getMode,
@@ -539,6 +600,8 @@ module.exports = {
     startUpdate,
     cancelUpdate,
     acknowledgeStatus,
+    restartSelf,
+    shutdownSelf,
     // exposed for tests / introspection
     _internals: {
         getStatusFilePath,
