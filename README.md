@@ -185,9 +185,25 @@ Once the container is up, open `http://<your-host>:8080` and sign in with the ad
 <details>
 <summary><b>🖥️ Command line (Linux / macOS / WSL)</b></summary>
 
+Edit the `ADMIN_EMAIL` and `ADMIN_PASSWORD` values below, then paste the whole block into your terminal — it creates the folder, writes the compose file and starts the container in one go.
+
 ```bash
-mkdir -p ~/glasskeep && cd ~/glasskeep
-# Paste the compose file above into docker-compose.yml, then:
+mkdir -p ~/glasskeep && cd ~/glasskeep && cat > docker-compose.yml <<'EOF'
+services:
+  glasskeep:
+    image: ghcr.io/victor-root/glasskeep-enhanced:latest
+    container_name: glasskeep
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADMIN_EMAIL: "your-admin-username"
+      ADMIN_PASSWORD: "choose-a-strong-password"
+    volumes:
+      - ./data:/data
+      # Lets the admin panel update the container in one click.
+      - /var/run/docker.sock:/var/run/docker.sock
+EOF
 docker compose up -d
 ```
 
