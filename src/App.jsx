@@ -7,7 +7,7 @@ import React, {
   useCallback,
 } from "react";
 import { askAI, askNoteAIStream } from "./ai";
-import { t, locale as currentLocale, getLanguageOverride, SUPPORTED_LANGUAGES } from "./i18n";
+import { t } from "./i18n";
 import Masonry from "react-masonry-css";
 import SyncStatusIcon from "./sync/SyncStatusIcon.jsx";
 import { SyncEngine } from "./sync/syncEngine.js";
@@ -3087,19 +3087,6 @@ export default function App() {
     setAuth(sessionWithId);
     if (res.must_change_password) {
       setMustChangePassword(true);
-    }
-    // If the user has a server-saved language preference that differs
-    // from the locale rendered at boot (and they haven't pinned an
-    // explicit override on this device), reload so the persisted
-    // session's language is picked up by the i18n module.
-    const serverLang = res?.user?.language;
-    if (
-      !getLanguageOverride() &&
-      SUPPORTED_LANGUAGES.includes(serverLang) &&
-      serverLang !== currentLocale
-    ) {
-      window.location.reload();
-      return { ok: true };
     }
     navigate("#/notes");
     return { ok: true };

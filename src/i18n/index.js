@@ -35,27 +35,14 @@ export function getLanguageOverride() {
   }
 }
 
-// Fallback to the server-saved preference cached in the persisted session
-// (utils/api.js stores the login response under "glass-keep-auth"). This
-// lets a freshly-installed device pick up the user's saved language at
-// the very first render after login, without a profile fetch round-trip.
-function readSessionLanguage() {
-  try {
-    const raw = localStorage.getItem("glass-keep-auth");
-    if (!raw) return null;
-    const lang = JSON.parse(raw)?.user?.language;
-    return SUPPORTED_LANGUAGES.includes(lang) ? lang : null;
-  } catch {
-    return null;
-  }
-}
-
 // Determine the effective locale used to render the app. Priority:
 //   1. explicit user override stored on this device
-//   2. server-side preference cached in the session
-//   3. browser/OS preferences (navigator.languages)
+//   2. browser/OS preferences (navigator.languages)
+// The server-stored preference is only used to populate the settings
+// picker — it never overrides the browser at boot. Cross-device users
+// are expected to set their language on each device once.
 export function detectLanguage() {
-  return getLanguageOverride() || readSessionLanguage() || detectBrowserLanguage();
+  return getLanguageOverride() || detectBrowserLanguage();
 }
 
 // Persist the user's choice locally and reload so module-level `dict`
