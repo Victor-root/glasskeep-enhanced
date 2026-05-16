@@ -126,6 +126,7 @@ export default function AdminPanel({
   authToken,
   updateInfo,
   selfUpdate,
+  syncStatus,
 }) {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [editUserModalOpen, setEditUserModalOpen] = useState(false);
@@ -141,7 +142,10 @@ export default function AdminPanel({
   const [restartPhase, setRestartPhase] = useState(null); // null | "waiting" | "countdown"
   const [restartCountdown, setRestartCountdown] = useState(5);
   const [isShuttingDown, setIsShuttingDown] = useState(false);
-  const [shutdownPhase, setShutdownPhase] = useState(null); // null | "waiting" | "done"
+  const [shutdownPhase, setShutdownPhase] = useState(null); // null | "waiting" | "countdown"
+  const [shutdownCountdown, setShutdownCountdown] = useState(3);
+
+  const serverOffline = syncStatus?.syncState === "offline" || syncStatus?.serverReachable === false;
 
   const handleRestart = () => {
     showGenericConfirm({
@@ -250,9 +254,19 @@ export default function AdminPanel({
               // Still responding — keep polling.
               setTimeout(poll, 1500);
             } catch {
-              // Fetch failed or aborted → server is down.
+              // Fetch failed or aborted → server is down. Start 3s countdown then reload.
               setIsShuttingDown(false);
-              setShutdownPhase("done");
+              setShutdownPhase("countdown");
+              setShutdownCountdown(3);
+              let n = 3;
+              const tick = setInterval(() => {
+                n -= 1;
+                setShutdownCountdown(n);
+                if (n <= 0) {
+                  clearInterval(tick);
+                  window.location.reload();
+                }
+              }, 1000);
             }
           };
           setTimeout(poll, 1500);
@@ -361,7 +375,7 @@ export default function AdminPanel({
             {t("adminPanel")}
           </h3>
           <div className="flex items-center gap-2">
-            <button
+            {!serverOffline && <button
               className="w-9 h-9 flex items-center justify-center rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
               onClick={handleShutdown}
               disabled={isShuttingDown || isRestarting}
@@ -369,8 +383,8 @@ export default function AdminPanel({
               aria-label={t("shutdownServer")}
             >
               <TI.Power className={`tabler-icon w-4 h-4${isShuttingDown ? " animate-spin" : ""}`} />
-            </button>
-            <button
+            </button>}
+            {!serverOffline && <button
               className="w-9 h-9 flex items-center justify-center rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
               onClick={handleRestart}
               disabled={isRestarting || isShuttingDown}
@@ -378,7 +392,7 @@ export default function AdminPanel({
               aria-label={t("restartServer")}
             >
               <TI.Refresh className={`tabler-icon w-4 h-4${isRestarting ? " animate-spin" : ""}`} />
-            </button>
+            </button>}
             <button
               className="p-2 rounded hover:bg-black/5 dark:hover:bg-white/10"
               onClick={onClose}
@@ -839,10 +853,12 @@ export default function AdminPanel({
             ) : (
               <>
                 <div className="flex justify-center mb-4">
-                  <TI.Power className="tabler-icon w-10 h-10 text-emerald-500" />
+                  <TI.Check className="tabler-icon w-10 h-10 text-emerald-500" />
                 </div>
                 <h3 className="text-lg font-semibold mb-1">{t("shutdownServerDone")}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t("shutdownServerDoneMsg")}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {t("restartServerReloadIn").replace("{n}", shutdownCountdown)}
+                </p>
               </>
             )}
           </div>

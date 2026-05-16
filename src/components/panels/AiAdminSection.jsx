@@ -74,7 +74,7 @@ export default function AiAdminSection({ token, showToast }) {
         );
         baselineRef.current = data;
       } catch (err) {
-        if (!cancelled) {
+        if (!cancelled && !err?.isNetworkError) {
           showToastRef.current?.(
             localizeServerError(err?.message, "genericError"),
             "error",

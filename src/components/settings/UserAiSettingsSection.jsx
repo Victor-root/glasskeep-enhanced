@@ -87,7 +87,7 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
           !!data.enabled && data.adminAiEnabled !== false,
         );
       } catch (err) {
-        if (!cancelled) {
+        if (!cancelled && !err?.isNetworkError) {
           showToastRef.current?.(
             localizeServerError(err?.message, "genericError"),
             "error",

@@ -5609,6 +5609,7 @@ export default function App() {
         authToken={token}
         selfUpdate={selfUpdate}
         updateInfo={updateInfo}
+        syncStatus={syncStatus}
       />
 
       <NotesUI

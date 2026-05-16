@@ -123,7 +123,6 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   shutdownServerInProgress: "Arrêt en cours",
   shutdownServerWaiting: "En attente de l'arrêt du serveur…",
   shutdownServerDone: "Le serveur a bien été arrêté.",
-  shutdownServerDoneMsg: "Vous pouvez fermer cette page.",
   shutdownServerTimeout: "Le serveur n'a pas répondu dans les temps. Vérifiez le service manuellement.",
   restartServerConfirmBtn: "Redémarrer",
   restartServerSuccess: "Le serveur redémarre…",
