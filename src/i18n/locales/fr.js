@@ -117,6 +117,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   restartServerConfirm: "Le service sera brièvement hors ligne. Les utilisateurs connectés seront déconnectés.",
   restartServerConfirmBtn: "Redémarrer",
   restartServerSuccess: "Le serveur redémarre…",
+  restartServerTimeout: "Le serveur n'a pas répondu dans les temps. Vérifiez le service manuellement.",
   aiAssistant: "Assistant IA",
   aiAssistantThinking: "L'assistant IA réfléchit...",
   aiCitedNotes: "Notes utilisées",

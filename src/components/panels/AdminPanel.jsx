@@ -148,6 +148,10 @@ export default function AdminPanel({
       onConfirm: async () => {
         setIsRestarting(true);
         try {
+          // Snapshot current server start time so we can detect the new instance.
+          const healthBefore = await fetch("/api/health").then((r) => r.json()).catch(() => null);
+          const startedAtBefore = healthBefore?.startedAt ?? Date.now();
+
           const res = await fetch("/api/admin/restart", {
             method: "POST",
             headers: { Authorization: `Bearer ${authToken}` },
@@ -155,17 +159,34 @@ export default function AdminPanel({
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
             showToast(data.error || t("error"), "error");
+            setIsRestarting(false);
             return;
           }
+
           showToast(t("restartServerSuccess"), "info");
-        } catch (err) {
-          // Network drop is expected: the server process dies before responding.
-          if (err instanceof TypeError) {
-            showToast(t("restartServerSuccess"), "info");
-          } else {
-            showToast(t("error"), "error");
-          }
-        } finally {
+
+          // Poll /api/health until startedAt is newer → confirmed new instance.
+          const deadline = Date.now() + 60_000;
+          const poll = async () => {
+            if (Date.now() > deadline) {
+              setIsRestarting(false);
+              showToast(t("restartServerTimeout"), "error");
+              return;
+            }
+            try {
+              const h = await fetch("/api/health").then((r) => r.json());
+              if (h?.startedAt && h.startedAt > startedAtBefore) {
+                window.location.reload();
+                return;
+              }
+            } catch {
+              // Server still down — keep polling.
+            }
+            setTimeout(poll, 1500);
+          };
+          setTimeout(poll, 1500);
+        } catch {
+          showToast(t("error"), "error");
           setIsRestarting(false);
         }
       },

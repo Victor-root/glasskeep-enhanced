@@ -2656,11 +2656,12 @@ app.patch("/api/admin/users/:id", auth, adminOnly, (req, res) => {
 
 
 // Restart the glasskeep systemd service (LXC host only).
+// Responds immediately so the client receives the 200 before the process dies.
 app.post("/api/admin/restart", auth, adminOnly, (_req, res) => {
-  execFile("systemctl", ["restart", "glass-keep"], { timeout: 15000 }, (err) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ ok: true });
-  });
+  res.json({ ok: true });
+  setTimeout(() => {
+    execFile("systemctl", ["restart", "glass-keep"], { timeout: 15000 }, () => {});
+  }, 300);
 });
 
 // ---------- AI Assistant (OpenAI-compatible provider) ----------
@@ -2668,7 +2669,12 @@ app.post("/api/admin/restart", auth, adminOnly, (_req, res) => {
 attachAiRoutes(app, { db, auth, adminOnly });
 
 // ---------- Health ----------
-app.get("/api/health", (_req, res) => res.json({ ok: true, service: "glasskeep", env: NODE_ENV }));
+app.get("/api/health", (_req, res) => res.json({
+  ok: true,
+  service: "glasskeep",
+  env: NODE_ENV,
+  startedAt: Math.round(Date.now() - process.uptime() * 1000),
+}));
 
 // ---------- Static (production) ----------
 if (NODE_ENV === "production") {
