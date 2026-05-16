@@ -2664,6 +2664,15 @@ app.post("/api/admin/restart", auth, adminOnly, (_req, res) => {
   }, 300);
 });
 
+// Shutdown the glasskeep systemd service (LXC host only).
+// Responds immediately so the client receives the 200 before the process dies.
+app.post("/api/admin/shutdown", auth, adminOnly, (_req, res) => {
+  res.json({ ok: true });
+  setTimeout(() => {
+    execFile("systemctl", ["stop", "glass-keep"], { timeout: 15000 }, () => {});
+  }, 300);
+});
+
 // ---------- AI Assistant (OpenAI-compatible provider) ----------
 // All AI endpoints (admin settings + user chat) live in server/ai/.
 attachAiRoutes(app, { db, auth, adminOnly });

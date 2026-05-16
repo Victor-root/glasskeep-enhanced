@@ -140,6 +140,8 @@ export default function AdminPanel({
   const [isRestarting, setIsRestarting] = useState(false);
   const [restartPhase, setRestartPhase] = useState(null); // null | "waiting" | "countdown"
   const [restartCountdown, setRestartCountdown] = useState(5);
+  const [isShuttingDown, setIsShuttingDown] = useState(false);
+  const [shutdownPhase, setShutdownPhase] = useState(null); // null | "waiting" | "done"
 
   const handleRestart = () => {
     showGenericConfirm({
@@ -202,6 +204,57 @@ export default function AdminPanel({
           showToast(t("error"), "error");
           setIsRestarting(false);
           setRestartPhase(null);
+        }
+      },
+    });
+  };
+
+  const handleShutdown = () => {
+    showGenericConfirm({
+      title: t("shutdownServerTitle"),
+      message: t("shutdownServerConfirm"),
+      confirmText: t("shutdownServerConfirmBtn"),
+      danger: true,
+      onConfirm: async () => {
+        setIsShuttingDown(true);
+        setShutdownPhase("waiting");
+        try {
+          const res = await fetch("/api/admin/shutdown", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            showToast(data.error || t("error"), "error");
+            setIsShuttingDown(false);
+            setShutdownPhase(null);
+            return;
+          }
+
+          // Poll /api/health until it fails → server is stopped.
+          const deadline = Date.now() + 30_000;
+          const poll = async () => {
+            if (Date.now() > deadline) {
+              setIsShuttingDown(false);
+              setShutdownPhase(null);
+              showToast(t("shutdownServerTimeout"), "error");
+              return;
+            }
+            try {
+              await fetch("/api/health");
+              // Still up — keep polling.
+              setTimeout(poll, 1500);
+            } catch {
+              // Server is down → confirmed stopped.
+              setIsShuttingDown(false);
+              setShutdownPhase("done");
+            }
+          };
+          setTimeout(poll, 1500);
+        } catch {
+          showToast(t("error"), "error");
+          setIsShuttingDown(false);
+          setShutdownPhase(null);
         }
       },
     });
@@ -305,8 +358,17 @@ export default function AdminPanel({
           <div className="flex items-center gap-2">
             <button
               className="w-9 h-9 flex items-center justify-center rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
+              onClick={handleShutdown}
+              disabled={isShuttingDown || isRestarting}
+              data-tooltip={t("shutdownServer")}
+              aria-label={t("shutdownServer")}
+            >
+              <TI.Power className={`tabler-icon w-4 h-4${isShuttingDown ? " animate-spin" : ""}`} />
+            </button>
+            <button
+              className="w-9 h-9 flex items-center justify-center rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none"
               onClick={handleRestart}
-              disabled={isRestarting}
+              disabled={isRestarting || isShuttingDown}
               data-tooltip={t("restartServer")}
               aria-label={t("restartServer")}
             >
@@ -749,6 +811,33 @@ export default function AdminPanel({
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {t("restartServerReloadIn").replace("{n}", restartCountdown)}
                 </p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      {shutdownPhase && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            className="glass-card rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative text-center"
+            style={{ backgroundColor: dark ? "rgba(40,40,40,0.97)" : "rgba(255,255,255,0.97)" }}
+          >
+            {shutdownPhase === "waiting" ? (
+              <>
+                <div className="flex justify-center mb-4">
+                  <TI.Power className="tabler-icon w-10 h-10 text-indigo-500 animate-spin" />
+                </div>
+                <h3 className="text-lg font-semibold mb-1">{t("shutdownServerInProgress")}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t("shutdownServerWaiting")}</p>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-center mb-4">
+                  <TI.Power className="tabler-icon w-10 h-10 text-emerald-500" />
+                </div>
+                <h3 className="text-lg font-semibold mb-1">{t("shutdownServerDone")}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t("shutdownServerDoneMsg")}</p>
               </>
             )}
           </div>
