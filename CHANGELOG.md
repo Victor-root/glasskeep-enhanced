@@ -1,6 +1,6 @@
 # 📋 Changelog
 
-## 🚀 v2.3.6 — 2026-05-15
+## 🚀 v2.3.6 — 2026-05-16
 
 ### ➕ Added
 - 🌍 **Language picker in settings** — themed dropdown to override the auto-detected language (Automatic / Français / English), saved server-side and synced via `PATCH /user/profile`
