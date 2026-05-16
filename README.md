@@ -157,12 +157,11 @@ The script is designed to make installation as simple as possible:
 
 ### 🐳 Docker installation
 
-Docker is also available, especially for NAS and similar environments.
+Docker is also available, especially for NAS and similar environments. The same `docker-compose.yml` works whether you deploy from a terminal or from a graphical interface — pick the one that matches your setup.
 
-#### Install
+#### 📋 The compose file
 
-```bash
-mkdir -p ~/glasskeep && cd ~/glasskeep && cat > docker-compose.yml <<'EOF'
+```yaml
 services:
   glasskeep:
     image: ghcr.io/victor-root/glasskeep-enhanced:latest
@@ -177,19 +176,91 @@ services:
       - ./data:/data
       # Lets the admin panel update the container in one click.
       - /var/run/docker.sock:/var/run/docker.sock
-EOF
+```
+
+Once the container is up, open `http://<your-host>:8080` and sign in with the admin username and password you chose.
+
+#### 🚀 Deploy
+
+<details>
+<summary><b>🖥️ Command line (Linux / macOS / WSL)</b></summary>
+
+```bash
+mkdir -p ~/glasskeep && cd ~/glasskeep
+# Paste the compose file above into docker-compose.yml, then:
 docker compose up -d
 ```
 
-Then:
-1. open `http://<your-host>:8080`
-2. sign in with the admin username and password you chose
+</details>
 
-#### Update
+<details>
+<summary><b>🐙 Portainer</b></summary>
 
-The easiest way is to open the admin panel and click **"Update now"** —
-the new image is pulled and the container is replaced automatically,
-your data is preserved.
+1. Open Portainer → select your environment → **Stacks** → **Add stack**
+2. Give it a name (e.g. `glasskeep`)
+3. Choose **Web editor** and paste the compose file above
+4. Edit the `ADMIN_EMAIL` / `ADMIN_PASSWORD` values
+5. Click **Deploy the stack**
+
+The container appears in the **Containers** tab once it's pulled and started.
+
+</details>
+
+<details>
+<summary><b>📦 Synology (Container Manager / DSM 7.2+)</b></summary>
+
+1. Open **Container Manager** → **Project** → **Create**
+2. Set **Project name** to `glasskeep` and **Path** to a folder of your choice (e.g. `/docker/glasskeep`)
+3. **Source** → **Create docker-compose.yml** and paste the compose file above
+4. Edit the `ADMIN_EMAIL` / `ADMIN_PASSWORD` values
+5. Click **Next** → **Done**
+
+The Docker socket volume works out of the box on DSM, so the in-app "Update now" button will work without extra setup.
+
+</details>
+
+<details>
+<summary><b>🟧 Unraid</b></summary>
+
+The simplest route is the **Compose Manager** plugin (Community Apps):
+
+1. Install **Compose Manager** from Community Apps if you don't have it
+2. Go to the **Docker** tab → **Add New Stack** → name it `glasskeep`
+3. Click the gear → **Edit Stack** → **Compose** and paste the compose file above
+4. Adjust the `ADMIN_*` values, click **Save**
+5. Click **Compose Up**
+
+You can also use the native **Add Container** form, but the compose route preserves the Docker-socket mount for one-click updates.
+
+</details>
+
+<details>
+<summary><b>🏠 CasaOS</b></summary>
+
+1. Click the **➕** icon on the dashboard → **Install a customized app** → **Import**
+2. Paste the compose file above
+3. Edit the `ADMIN_EMAIL` / `ADMIN_PASSWORD` values
+4. Click **Install**
+
+The app shows up on the dashboard with a launcher tile pointing to port 8080.
+
+</details>
+
+<details>
+<summary><b>🛟 TrueNAS SCALE</b></summary>
+
+TrueNAS SCALE doesn't ship a generic compose UI, so the simplest route is the built-in shell:
+
+1. Open **System Settings** → **Shell**
+2. Create a folder for the stack: `mkdir -p /mnt/<your-pool>/glasskeep && cd $_`
+3. Paste the compose file above into `docker-compose.yml`
+4. Run `docker compose up -d`
+
+</details>
+
+#### 🔄 Update
+
+The easiest way is to open the admin panel and click **"Update now"** — the new image is pulled and the container is replaced automatically. Your data is preserved.
 
 If you prefer the command line:
 
@@ -197,20 +268,7 @@ If you prefer the command line:
 cd ~/glasskeep && docker compose pull && docker compose up -d
 ```
 
-Your data stays preserved in the `./data` directory.
-
-##### Upgrading an existing Docker install to enable one-click updates
-
-If your `docker-compose.yml` was generated before this feature shipped,
-add this single line under the `volumes:` block (right under
-`- ./data:/data`), then run `docker compose up -d` once:
-
-```yaml
-      - /var/run/docker.sock:/var/run/docker.sock
-```
-
-After that, the "Update now" button in the admin panel takes care of all
-future upgrades — you will never have to touch this file again.
+> 💡 **Existing install without one-click updates?** Add `- /var/run/docker.sock:/var/run/docker.sock` under the `volumes:` block, then re-deploy the stack once. After that, the in-app **Update now** button takes over and you never touch the file again.
 
 ---
 
