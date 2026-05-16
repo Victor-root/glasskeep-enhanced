@@ -3,6 +3,7 @@
 
 const path = require("path");
 const fs = require("fs");
+const { execFile } = require("child_process");
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
@@ -2653,6 +2654,14 @@ app.patch("/api/admin/users/:id", auth, adminOnly, (req, res) => {
   });
 });
 
+
+// Restart the glasskeep systemd service (LXC host only).
+app.post("/api/admin/restart", auth, adminOnly, (_req, res) => {
+  execFile("systemctl", ["restart", "glass-keep"], { timeout: 15000 }, (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ ok: true });
+  });
+});
 
 // ---------- AI Assistant (OpenAI-compatible provider) ----------
 // All AI endpoints (admin settings + user chat) live in server/ai/.

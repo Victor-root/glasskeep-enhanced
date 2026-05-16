@@ -112,6 +112,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   actions: "Actions",
   add: "Ajouter",
   adminPanel: "Panneau d'administration",
+  restartServer: "Redémarrer le serveur",
   aiAssistant: "Assistant IA",
   aiAssistantThinking: "L'assistant IA réfléchit...",
   aiCitedNotes: "Notes utilisées",
