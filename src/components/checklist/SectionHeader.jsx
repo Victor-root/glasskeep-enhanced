@@ -148,6 +148,16 @@ export default function SectionHeader({
 
   React.useEffect(() => {
     if (!editing || !window.visualViewport) return;
+    // Skipped on iOS Safari: visualViewport emits unstable bounces while the
+    // keyboard is opening, which would immediately blur the input — same issue
+    // as ChecklistRow. iOS already blurs naturally on Done.
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+    const isIOS =
+      /iPad|iPhone|iPod/.test(ua) ||
+      (typeof navigator !== "undefined" &&
+        navigator.platform === "MacIntel" &&
+        navigator.maxTouchPoints > 1);
+    if (isIOS) return;
     let prevH = window.visualViewport.height;
     const onResize = () => {
       const h = window.visualViewport.height;
