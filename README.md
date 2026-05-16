@@ -131,7 +131,7 @@ Current APK version: `1.2.0`
 
 ## 🖥 Installation
 
-### Recommended native installation (Debian / Ubuntu / Proxmox LXC)
+### 🐧 Recommended native installation (Debian / Ubuntu / Proxmox LXC)
 
 Run as **root** on a clean Debian-based system:
 
@@ -268,7 +268,9 @@ If you prefer the command line:
 cd ~/glasskeep && docker compose pull && docker compose up -d
 ```
 
-> 💡 **Existing install without one-click updates?** Add `- /var/run/docker.sock:/var/run/docker.sock` under the `volumes:` block, then re-deploy the stack once. After that, the in-app **Update now** button takes over and you never touch the file again.
+> 💡 **Existing install without one-click updates?** You have two options:
+> - **Enable one-click updates** — add `- /var/run/docker.sock:/var/run/docker.sock` under the `volumes:` block, then re-deploy the stack once. After that, the in-app **Update now** button takes over and you never touch the file again.
+> - **Stay manual** — just pull the latest image and recreate the container whenever you want to update (`docker compose pull && docker compose up -d` on the CLI, or the equivalent "Pull / Recreate" button in your GUI of choice).
 
 ---
 
