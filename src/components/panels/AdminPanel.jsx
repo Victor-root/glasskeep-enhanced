@@ -737,7 +737,7 @@ export default function AdminPanel({
                 <div className="flex justify-center mb-4">
                   <TI.Refresh className="tabler-icon w-10 h-10 text-indigo-500 animate-spin" />
                 </div>
-                <h3 className="text-lg font-semibold mb-1">{t("restartServerTitle")}</h3>
+                <h3 className="text-lg font-semibold mb-1">{t("restartServerInProgress")}</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">{t("restartServerWaiting")}</p>
               </>
             ) : (
