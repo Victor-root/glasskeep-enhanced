@@ -155,35 +155,13 @@ async function fetchAiAvailable(token) {
 export default function ChangelogModal({ open, onClose }) {
     const [aiAvailable, setAiAvailable] = useState(false);
     const [translating, setTranslating] = useState(false);
-    // `translatedRaw` is the full accumulator — gets updated on every
-    // SSE delta. `displayedRaw` is a throttled mirror used for actual
-    // rendering, so we don't re-parse the whole markdown 30 times per
-    // second while the LLM is streaming. Without the throttle, the
-    // main thread is busy enough with marked + DOMPurify that taps on
-    // the close button get queued behind paint work and feel dead.
     const [translatedRaw, setTranslatedRaw] = useState(null);
-    const [displayedRaw, setDisplayedRaw] = useState(null);
     const [translateError, setTranslateError] = useState(null);
     const [showOriginal, setShowOriginal] = useState(false);
     // Holds the AbortController of an in-flight translation stream so
     // closing the modal mid-stream tears the upstream request down
     // (no more tokens wasted after the admin walks away).
     const translateAbortRef = useRef(null);
-
-    // Mirror translatedRaw → displayedRaw at most ~10 fps so the modal
-    // re-renders (and recompiles markdown via the useMemo below)
-    // stay scheduled instead of monopolising every animation frame.
-    // The final delta of any stream is followed by a setTranslating(
-    // false) call which retriggers this effect and flushes the last
-    // bit immediately.
-    useEffect(() => {
-        if (translatedRaw == null) {
-            setDisplayedRaw(null);
-            return undefined;
-        }
-        const id = setTimeout(() => setDisplayedRaw(translatedRaw), 100);
-        return () => clearTimeout(id);
-    }, [translatedRaw]);
 
     // Pull the AI availability flag once the modal opens so the
     // translate button starts in the right enabled / disabled state.
@@ -335,16 +313,13 @@ export default function ChangelogModal({ open, onClose }) {
 
     // Translated markdown is compiled on the fly; the original is
     // pre-compiled once at module load. The "Show original" toggle
-    // flips between the two without re-parsing the source. We compile
-    // from the throttled `displayedRaw` (not `translatedRaw`) so
-    // marked + DOMPurify only run ~10 times per second during a
-    // stream instead of on every delta.
+    // flips between the two without re-parsing the source.
     const translatedHtml = useMemo(
-        () => (displayedRaw ? compileMarkdown(displayedRaw) : ""),
-        [displayedRaw],
+        () => (translatedRaw ? compileMarkdown(translatedRaw) : ""),
+        [translatedRaw],
     );
     const displayHtml =
-        displayedRaw && !showOriginal ? translatedHtml : compiledChangelog;
+        translatedRaw && !showOriginal ? translatedHtml : compiledChangelog;
 
     if (!open) return null;
 
