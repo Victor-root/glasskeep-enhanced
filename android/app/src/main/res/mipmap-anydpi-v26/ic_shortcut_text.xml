@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon for the launcher's "Note texte" shortcut. The
+     launcher masks just the <background> layer (so the user gets a
+     clean circle/squircle of the brand colour on every launcher,
+     instead of the previous square-on-white-circle look that AOSP
+     produced on Pixel), then composites the white glyph on top. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/shortcut_text_bg" />
+    <foreground android:drawable="@drawable/ic_shortcut_text_fg" />
+</adaptive-icon>

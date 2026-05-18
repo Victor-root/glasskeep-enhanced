@@ -1,36 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    App-shortcut icon. Launchers compose this in their own pill /
-    circle container, so we paint a solid violet background (matches
-    the brand gradient's mid-tone) with a stylised QR pattern on top:
-    three finder squares (top-left, top-right, bottom-left) plus
-    scattered "data" cells in the bottom-right quadrant.
-
-    The QR pattern is wrapped in a <group> with a 1.7× scale centred
-    on the canvas — that way the QR occupies ~85% of the icon
-    instead of the original ~50%, which read as too much violet
-    padding around a tiny code. The translate values are derived
-    from: scale=1.7, original QR spans 27..81 (54 units centred at
-    54). To keep the centre at (54,54) under a 1.7× scale, the group
-    needs translate = 54 - 54*1.7 = -37.8 on both axes.
-
-    The finder squares use evenOdd fill so the middle ring is
-    transparent — same visual structure as a real QR finder.
+    Foreground layer for "Scan QRCODE". The QR pattern's raw paths
+    span 27..81 (54 units) in their own coordinate space; scaling by
+    72/54 = 1.333× and re-centring places the whole thing inside the
+    108×108 safe zone (18..90).
+    scaleX = scaleY = 1.333
+    To send (27,27) → (18,18): translate = 18 - 27 × 1.333 = -18
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Background -->
-    <path
-        android:fillColor="#6366F1"
-        android:pathData="M0,0 h108 v108 h-108 z" />
     <group
-        android:translateX="-37.8"
-        android:translateY="-37.8"
-        android:scaleX="1.7"
-        android:scaleY="1.7">
+        android:translateX="-18"
+        android:translateY="-18"
+        android:scaleX="1.333"
+        android:scaleY="1.333">
         <!-- Top-left finder pattern: outer 18, hole 12, dot 6 -->
         <path
             android:fillColor="#FFFFFF"

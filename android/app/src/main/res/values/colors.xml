@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#881bb2</color>
+    <!-- App-shortcut background colours. The launcher masks just the
+         background layer (so we get a clean circle / squircle of the
+         brand-coordinated colour), then composites the white-on-
+         transparent foreground on top. Matches NoteCreationButtons'
+         gradient anchors so the launcher menu mirrors the in-app
+         creation buttons' visual identity. -->
+    <color name="shortcut_text_bg">#6366F1</color>
+    <color name="shortcut_checklist_bg">#14B8A6</color>
+    <color name="shortcut_audio_bg">#D946EF</color>
+    <color name="shortcut_qr_bg">#6366F1</color>
 </resources>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Foreground layer for the "new text note" shortcut. White glyph
+    centred in the 108×108 canvas's adaptive-icon safe zone (the
+    inner 72×72 square, x=18..90 / y=18..90). Outside the safe zone
+    the launcher may crop; staying inside guarantees the icon
+    renders identically on every launcher.
+    scale = 72/24 = 3   →   icon fills the safe zone exactly
+    translate = (108 - 72)/2 = 18
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:translateX="18"
+        android:translateY="18"
+        android:scaleX="3"
+        android:scaleY="3">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M19,3H5c-1.1,0 -2,0.9 -2,2v14c0,1.1 0.9,2 2,2h14c1.1,0 2,-0.9 2,-2V5c0,-1.1 -0.9,-2 -2,-2zm0,16H5V5h14v14zm-2,-6H7v-2h10v2zm-4,4H7v-2h6v2zm4,-8H7V7h10v2z" />
+    </group>
+</vector>

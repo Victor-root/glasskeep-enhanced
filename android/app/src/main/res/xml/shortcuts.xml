@@ -21,7 +21,7 @@
     <shortcut
         android:shortcutId="qr_pc_login"
         android:enabled="true"
-        android:icon="@drawable/ic_shortcut_qr"
+        android:icon="@mipmap/ic_shortcut_qr"
         android:shortcutShortLabel="@string/shortcut_qr_short"
         android:shortcutLongLabel="@string/shortcut_qr_long">
         <intent
@@ -32,7 +32,7 @@
     <shortcut
         android:shortcutId="new_audio"
         android:enabled="true"
-        android:icon="@drawable/ic_shortcut_audio"
+        android:icon="@mipmap/ic_shortcut_audio"
         android:shortcutShortLabel="@string/shortcut_new_audio_short"
         android:shortcutLongLabel="@string/shortcut_new_audio_long">
         <intent
@@ -43,7 +43,7 @@
     <shortcut
         android:shortcutId="new_checklist"
         android:enabled="true"
-        android:icon="@drawable/ic_shortcut_checklist"
+        android:icon="@mipmap/ic_shortcut_checklist"
         android:shortcutShortLabel="@string/shortcut_new_checklist_short"
         android:shortcutLongLabel="@string/shortcut_new_checklist_long">
         <intent
@@ -54,7 +54,7 @@
     <shortcut
         android:shortcutId="new_text"
         android:enabled="true"
-        android:icon="@drawable/ic_shortcut_text"
+        android:icon="@mipmap/ic_shortcut_text"
         android:shortcutShortLabel="@string/shortcut_new_text_short"
         android:shortcutLongLabel="@string/shortcut_new_text_long">
         <intent
