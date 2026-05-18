@@ -22,6 +22,8 @@ This release brings **passkey support to the native Android app** — fingerprin
 ### 🐛 Fixed
 - 🔐 **Passkey verification accepts native-app origins** — `expectedOrigin` now allows the `android:apk-key-hash:<URL-safe base64(SHA-256(cert))>` form Credential Manager produces, in addition to the regular HTTPS origin (browser ceremonies)
 - 📐 **Edge-to-edge insets fixed on Android 15 WebView** — the stock Pixel WebView returns 0 for `env(safe-area-inset-*)` even in edge-to-edge mode, which left the FAB partially behind the navigation bar and the header floating under the status bar. The Activity now injects the real system-bar insets as CSS custom properties (`--android-inset-*`) read via a single `--safe-*` indirection across the whole app; the existing `env()` chain is kept as the fallback for browser / PWA contexts
+- 🌍 **Untranslated "user cancelled the request" toast** — Credential Manager surfaces cancellation under several exception classes and in the user's system locale, so the prior regex (English-only `cancelled` / `aborted`) missed `canceled` (US), `annulé` (FR), `interrupted`, etc. The bridge now flags any CANCEL/INTERRUPT exception type as `NotAllowedError` and the JS fallback regex covers the remaining variants
+- 🛠 **Restart / shutdown server errors localized** — `AdminPanel` now routes the server's English error text through `localizeServerError` so the admin sees a translated toast instead of the raw `data.error` string
 
 ### 🛠️ Upgrade
 

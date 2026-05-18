@@ -166,7 +166,7 @@ export default function AdminPanel({
           });
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            showToast(data.error || t("error"), "error");
+            showToast(localizeServerError(data.error, "error"), "error");
             setIsRestarting(false);
             setRestartPhase(null);
             return;
@@ -229,7 +229,7 @@ export default function AdminPanel({
           });
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            showToast(data.error || t("error"), "error");
+            showToast(localizeServerError(data.error, "error"), "error");
             setIsShuttingDown(false);
             setShutdownPhase(null);
             return;

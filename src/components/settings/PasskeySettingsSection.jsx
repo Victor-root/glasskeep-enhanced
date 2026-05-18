@@ -119,7 +119,7 @@ export default function PasskeySettingsSection({
           await refresh();
         } catch (e) {
           const msg = (e && e.message) || "";
-          const cancelled = e?.name === "NotAllowedError" || /NotAllowedError|cancelled|aborted/i.test(msg);
+          const cancelled = e?.name === "NotAllowedError" || /not[\s_-]*allowed|cancel|abort|interrupt|annul/i.test(msg);
           if (!cancelled) {
             toast(localizeServerError(msg, "passkeyAddFailed"), "error");
           }
@@ -181,7 +181,7 @@ export default function PasskeySettingsSection({
       toast(t("passkeyTestOk"), "success");
     } catch (e) {
       const msg = (e && e.message) || "";
-      const cancelled = e?.name === "NotAllowedError" || /NotAllowedError|cancelled|aborted/i.test(msg);
+      const cancelled = e?.name === "NotAllowedError" || /not[\s_-]*allowed|cancel|abort|interrupt|annul/i.test(msg);
       if (!cancelled) {
         toast(localizeServerError(msg, "passkeyTestFailed"), "error");
       }
@@ -203,7 +203,7 @@ export default function PasskeySettingsSection({
       await refresh();
     } catch (e) {
       const msg = (e && e.message) || "";
-      const cancelled = e?.name === "NotAllowedError" || /NotAllowedError|cancelled|aborted/i.test(msg);
+      const cancelled = e?.name === "NotAllowedError" || /not[\s_-]*allowed|cancel|abort|interrupt|annul/i.test(msg);
       if (!cancelled) {
         toast(localizeServerError(msg, "passkeyToggleFailed"), "error");
       }

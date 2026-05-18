@@ -114,14 +114,22 @@ class WebAuthnBridge(
                         }
 
                         override fun onError(e: CreateCredentialException) {
-                            val name =
-                                if (e is CreateCredentialCancellationException) {
-                                    // WebAuthn-spec name the frontend already
-                                    // recognises ("user cancelled").
-                                    "NotAllowedError"
-                                } else {
-                                    e.type.ifBlank { e.javaClass.simpleName }
-                                }
+                            // Map every "user dismissed the picker" path to the
+                            // WebAuthn-spec NotAllowedError name so the React
+                            // catch blocks recognise it via e.name regardless
+                            // of the user's locale. CredentialManager surfaces
+                            // cancellation through several exception classes
+                            // (Cancellation, Interrupted, sometimes Unknown
+                            // when the provider bails) AND the localised
+                            // message could be in any language — we can't rely
+                            // on grepping "cancel" out of e.errorMessage.
+                            val typeStr = e.type
+                            val isCancel = e is CreateCredentialCancellationException
+                                || typeStr.contains("USER_CANCELED", ignoreCase = true)
+                                || typeStr.contains("CANCEL", ignoreCase = true)
+                                || typeStr.contains("INTERRUPT", ignoreCase = true)
+                            val name = if (isCancel) "NotAllowedError"
+                                       else typeStr.ifBlank { e.javaClass.simpleName }
                             resolveError(cb, name, e.errorMessage?.toString() ?: e.message ?: name, e)
                         }
                     },
@@ -174,12 +182,15 @@ class WebAuthnBridge(
                         }
 
                         override fun onError(e: GetCredentialException) {
-                            val name =
-                                if (e is GetCredentialCancellationException) {
-                                    "NotAllowedError"
-                                } else {
-                                    e.type.ifBlank { e.javaClass.simpleName }
-                                }
+                            // Same cancellation-detection rationale as the
+                            // create branch above — see that comment.
+                            val typeStr = e.type
+                            val isCancel = e is GetCredentialCancellationException
+                                || typeStr.contains("USER_CANCELED", ignoreCase = true)
+                                || typeStr.contains("CANCEL", ignoreCase = true)
+                                || typeStr.contains("INTERRUPT", ignoreCase = true)
+                            val name = if (isCancel) "NotAllowedError"
+                                       else typeStr.ifBlank { e.javaClass.simpleName }
                             resolveError(cb, name, e.errorMessage?.toString() ?: e.message ?: name, e)
                         }
                     },
