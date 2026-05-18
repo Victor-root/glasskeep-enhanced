@@ -197,6 +197,18 @@ CREATE TABLE IF NOT EXISTS logos (
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_logos_user ON logos(user_id);
+
+-- App-wide admin settings (allow_new_accounts, login_slogan, etc.).
+-- Singleton row by design: CHECK (id = 1) ensures we never accidentally
+-- end up with multiple rows competing for "the truth". Without this
+-- table the settings only lived in process memory and reset to
+-- env-var defaults on every server restart, silently wiping any
+-- value the admin had configured through the panel.
+CREATE TABLE IF NOT EXISTS app_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  allow_new_accounts INTEGER NOT NULL DEFAULT 0,
+  login_slogan TEXT NOT NULL DEFAULT ''
+);
 `);
 
 // Tiny migrations (safe to run repeatedly)
@@ -2437,11 +2449,34 @@ app.delete("/api/logos/:id", auth, (req, res) => {
 // ---------- Admin ----------
 // adminOnly() lives near auth() (above) so unlock-routes can use it too.
 
-// Admin settings storage (in-memory for now, could be moved to DB)
-let adminSettings = {
-  allowNewAccounts: process.env.ALLOW_REGISTRATION === "true" || false,
-  loginSlogan: "",
-};
+// Admin settings — persisted in the `app_settings` singleton row. Kept
+// mirrored in this in-memory object so the hot read paths (login slogan
+// on every login page hit, allowNewAccounts on every signup attempt)
+// don't hit SQLite repeatedly. The mirror is updated on every PATCH so
+// it stays in sync.
+const getAppSettingsRow = db.prepare(`SELECT allow_new_accounts, login_slogan FROM app_settings WHERE id = 1`);
+const upsertAppSettings = db.prepare(
+  `INSERT INTO app_settings (id, allow_new_accounts, login_slogan) VALUES (1, ?, ?)
+   ON CONFLICT(id) DO UPDATE SET allow_new_accounts=excluded.allow_new_accounts, login_slogan=excluded.login_slogan`,
+);
+
+let adminSettings = (function loadAdminSettings() {
+  const row = getAppSettingsRow.get();
+  if (row) {
+    return {
+      allowNewAccounts: !!row.allow_new_accounts,
+      loginSlogan: row.login_slogan || "",
+    };
+  }
+  // Fresh install — seed the row from the env var default so subsequent
+  // boots read the same value the admin sees in the panel.
+  const seed = {
+    allowNewAccounts: process.env.ALLOW_REGISTRATION === "true",
+    loginSlogan: "",
+  };
+  upsertAppSettings.run(seed.allowNewAccounts ? 1 : 0, seed.loginSlogan);
+  return seed;
+})();
 
 // Get admin settings
 app.get("/api/admin/settings", auth, adminOnly, (_req, res) => {
@@ -2459,6 +2494,7 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
     adminSettings.loginSlogan = loginSlogan.slice(0, 200);
   }
 
+  upsertAppSettings.run(adminSettings.allowNewAccounts ? 1 : 0, adminSettings.loginSlogan);
   res.json(adminSettings);
 });
 
