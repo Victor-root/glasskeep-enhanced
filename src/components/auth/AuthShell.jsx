@@ -2,7 +2,7 @@ import React from "react";
 import { Sun, Moon } from "../../icons/index.jsx";
 import { t } from "../../i18n";
 
-export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, loginSlogan, children }) {
+export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, loginSlogan, children, sidePanel }) {
   return (
     <div className="min-h-screen flex flex-col px-4 relative overflow-hidden">
       {/* Decorative floating note cards */}
@@ -66,44 +66,79 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
       </div>}
       {/* Centered card area, takes the remaining vertical space so the
           footer below stays in normal flow and never overlaps the card
-          on small screens. */}
+          on small screens. When a `sidePanel` is provided (the QR
+          login flow opens one), the inner wrapper widens to fit BOTH
+          the auth card and the side panel side-by-side on lg+ screens
+          (≥1024 px). On narrower viewports the side panel falls back
+          to a stacked layout below the auth card so the user can
+          still see it without horizontal scroll. */}
       <div className="flex-1 w-full flex items-center justify-center py-8">
-        <div className="relative z-10 w-full max-w-md">
-        <div className="text-center mb-6">
-          <img
-            src="/pwa-192.png"
-            alt="Glass Keep"
-            className="h-16 w-16 rounded-2xl shadow-lg mx-auto mb-4 select-none pointer-events-none"
-            draggable="false"
-          />
-          <h1 className="text-3xl font-bold">Glass Keep</h1>
-          <p className="text-gray-500 dark:text-gray-400">{title}</p>
-        </div>
-        <div className="glass-card rounded-xl p-6 shadow-lg">{children}</div>
-        <div className="mt-6 text-center">
-          <button
-            onClick={onToggleDark}
-            className={`inline-flex items-center gap-2 text-sm ${dark ? "text-gray-300" : "text-gray-700"} hover:underline`}
-            data-tooltip={t("toggleDarkMode")}
-          >
-            {dark ? <Moon /> : <Sun />} {t("toggleTheme")}
-          </button>
-        </div>
-        {(loginSlogan || t("loginSlogan")) && (
-          <div className="mt-4 text-center">
-            <span className="glass-card inline-block rounded-full px-4 py-1.5 text-sm text-gray-600 dark:text-gray-300 shadow-sm">
-              {loginSlogan || t("loginSlogan")}
-            </span>
+        <div
+          className={`relative z-10 w-full flex flex-col items-center gap-6 ${
+            sidePanel ? "lg:max-w-3xl lg:flex-row lg:items-start" : "max-w-md"
+          }`}
+        >
+          <div className="w-full max-w-md lg:shrink-0">
+          <div className="text-center mb-6">
+            <img
+              src="/pwa-192.png"
+              alt="Glass Keep"
+              className="h-16 w-16 rounded-2xl shadow-lg mx-auto mb-4 select-none pointer-events-none"
+              draggable="false"
+            />
+            <h1 className="text-3xl font-bold">Glass Keep</h1>
+            <p className="text-gray-500 dark:text-gray-400">{title}</p>
           </div>
-        )}
-        {window.AndroidTheme && (
-          <div className="mt-4 text-center">
+          <div className="glass-card rounded-xl p-6 shadow-lg">{children}</div>
+          <div className="mt-6 text-center">
             <button
-              className="text-xs text-indigo-600 hover:underline"
-              onClick={() => window.AndroidTheme.changeServer()}
-            >{t("changeServer")}</button>
+              onClick={onToggleDark}
+              className={`inline-flex items-center gap-2 text-sm ${dark ? "text-gray-300" : "text-gray-700"} hover:underline`}
+              data-tooltip={t("toggleDarkMode")}
+            >
+              {dark ? <Moon /> : <Sun />} {t("toggleTheme")}
+            </button>
           </div>
-        )}
+          {(loginSlogan || t("loginSlogan")) && (
+            <div className="mt-4 text-center">
+              <span className="glass-card inline-block rounded-full px-4 py-1.5 text-sm text-gray-600 dark:text-gray-300 shadow-sm">
+                {loginSlogan || t("loginSlogan")}
+              </span>
+            </div>
+          )}
+          {window.AndroidTheme && (
+            <div className="mt-4 text-center">
+              <button
+                className="text-xs text-indigo-600 hover:underline"
+                onClick={() => window.AndroidTheme.changeServer()}
+              >{t("changeServer")}</button>
+            </div>
+          )}
+          </div>
+          {sidePanel && (
+            // Second card column. Below lg it falls under the form
+            // column in normal flow (max-w-md to match the form card
+            // width); on lg+ it sits to the right as a fixed-width
+            // card. An invisible spacer at the top of the side
+            // column mirrors the form column's logo+title block on
+            // lg+ so the QR card lines up with the glass-card top
+            // rather than starting at the column's actual y=0. We
+            // can't hard-code an mt-X here because the logo+title
+            // size changes with the user's font + i18n string, so
+            // the invisible placeholder is the self-aligning
+            // option.
+            <div className="w-full max-w-md lg:w-80 lg:max-w-none lg:shrink-0">
+              <div
+                className="hidden lg:block text-center mb-6 invisible"
+                aria-hidden="true"
+              >
+                <div className="h-16 w-16 mx-auto mb-4" />
+                <h1 className="text-3xl font-bold">.</h1>
+                <p>.</p>
+              </div>
+              {sidePanel}
+            </div>
+          )}
         </div>
       </div>
       <p className="text-center text-xs text-gray-400 dark:text-gray-600 z-10 select-none pb-4 pt-2 relative">

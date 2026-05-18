@@ -5,6 +5,7 @@ import UserAvatar from "../common/UserAvatar.jsx";
 import { localizeServerError } from "../../utils/serverErrors.js";
 import PasskeyLoginButton from "./PasskeyLoginButton.jsx";
 import QrLoginButton from "./QrLoginButton.jsx";
+import QrLoginPanel from "./QrLoginPanel.jsx";
 
 export default function LoginView({
   dark,
@@ -24,6 +25,23 @@ export default function LoginView({
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
+  // QR sign-in open/closed state. Held at the LoginView level so the
+  // matching panel can be rendered through AuthShell's `sidePanel`
+  // prop (the QR card needs to slot next to the auth card, which is
+  // a layout concern only AuthShell can answer). Survives mode
+  // switches because the user can flip between profiles / manual
+  // login without losing the QR they had open.
+  const [qrOpen, setQrOpen] = useState(false);
+  const qrSidePanel = qrOpen ? (
+    <QrLoginPanel
+      dark={dark}
+      onLoggedIn={(session) => {
+        setQrOpen(false);
+        onPasskeyLogin?.(session);
+      }}
+      onCancel={() => setQrOpen(false)}
+    />
+  ) : null;
 
   // If no visible profiles, show manual login directly
   const hasProfiles = loginProfiles && loginProfiles.length > 0;
@@ -66,6 +84,7 @@ export default function LoginView({
         onToggleDark={onToggleDark}
         floatingCardsEnabled={floatingCardsEnabled}
         loginSlogan={loginSlogan}
+        sidePanel={qrSidePanel}
       >
         <div className="flex flex-wrap justify-center gap-5 mb-4">
           {loginProfiles.map((profile) => (
@@ -110,6 +129,7 @@ export default function LoginView({
         onToggleDark={onToggleDark}
         floatingCardsEnabled={floatingCardsEnabled}
         loginSlogan={loginSlogan}
+        sidePanel={qrSidePanel}
       >
         <div className="flex flex-col items-center mb-4">
           <UserAvatar
@@ -140,7 +160,7 @@ export default function LoginView({
           >{t("signIn")}</button>
         </form>
         <PasskeyLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
-        <QrLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
+        <QrLoginButton open={qrOpen} onToggle={setQrOpen} />
         <div className="mt-4 text-sm text-center flex justify-center gap-4">
           {hasProfiles && (
             <button
@@ -165,6 +185,7 @@ export default function LoginView({
       onToggleDark={onToggleDark}
       floatingCardsEnabled={floatingCardsEnabled}
       loginSlogan={loginSlogan}
+      sidePanel={qrSidePanel}
     >
       <form onSubmit={handleManualSubmit} className="space-y-4">
         <input
@@ -192,7 +213,7 @@ export default function LoginView({
       </form>
 
       <PasskeyLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
-      <QrLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
+      <QrLoginButton open={qrOpen} onToggle={setQrOpen} />
 
       <div className="mt-4 text-sm flex justify-between items-center">
         {hasProfiles && (
