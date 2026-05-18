@@ -3697,6 +3697,35 @@ export default function App() {
     getInitialTags: getInitialTagsForNewNote,
   });
 
+  // Android launcher shortcut entry: /?new=<type> comes from
+  // MainActivity (long-press → "Note texte" / "Liste" / "Dessin" /
+  // "Note audio"). Consume the param exactly once, clean it from the
+  // URL so a refresh doesn't loop the action, and dispatch to the
+  // matching handleDirect* helper — but only when the user already
+  // has a session, otherwise the modal would mount on top of the
+  // login screen with no way to save.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const newType = params.get("new");
+      if (!newType) return;
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("new");
+        window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+      } catch { /* non-fatal */ }
+      if (!token) return;
+      const handlers = {
+        text: handleDirectText,
+        checklist: handleDirectChecklist,
+        draw: handleDirectDraw,
+        audio: handleDirectAudio,
+      };
+      handlers[newType]?.();
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const openModal = (id) => {
     const n = notes.find((x) => String(x.id) === String(id));
     if (!n) return;

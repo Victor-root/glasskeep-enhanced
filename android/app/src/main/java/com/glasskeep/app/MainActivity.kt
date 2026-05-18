@@ -26,18 +26,17 @@ class MainActivity : ComponentActivity() {
         // If URL already configured, go straight to WebView
         val savedUrl = prefs.getString("server_url", null)
         if (savedUrl != null) {
-            // App-shortcut entry point: long-press launcher → "Scan PC
-            // login" sends ACTION_SHORTCUT_QR_SCAN. Append a one-shot
-            // ?qr=open marker the SPA picks up at boot to pop the QR
-            // scanner modal straight away (only if the user already
-            // has a valid session — otherwise the marker is consumed
-            // silently). Strips itself from the URL bar so a refresh
-            // doesn't reopen the modal indefinitely.
-            val urlToLoad = if (intent?.action == ACTION_SHORTCUT_QR_SCAN) {
-                appendQueryParam(savedUrl, "qr", "open")
-            } else {
-                savedUrl
-            }
+            // App-shortcut entry point: long-press launcher → one of
+            // five shortcuts ("Scan QR" / new text / checklist / draw
+            // / audio). Each shortcut sends a distinct action; we map
+            // it to a one-shot query parameter and append it to the
+            // configured server URL. The SPA picks it up at boot, runs
+            // the matching action (only if the user already has a
+            // valid session), and strips the param from the URL so a
+            // refresh doesn't loop the action indefinitely.
+            val urlToLoad = SHORTCUT_QUERY_PARAMS[intent?.action]
+                ?.let { (key, value) -> appendQueryParam(savedUrl, key, value) }
+                ?: savedUrl
             launchWebView(urlToLoad)
             return
         }
@@ -93,6 +92,18 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        private const val ACTION_SHORTCUT_QR_SCAN = "com.glasskeep.app.SHORTCUT_QR_SCAN"
+        // Action strings must match res/xml/shortcuts.xml. Each maps
+        // to the (queryParamKey, queryParamValue) pair MainActivity
+        // appends to the configured server URL — keep this table in
+        // lockstep with the SPA's boot-time param dispatch in
+        // src/App.jsx (search for `params.get("qr")` /
+        // `params.get("new")`).
+        private val SHORTCUT_QUERY_PARAMS = mapOf(
+            "com.glasskeep.app.SHORTCUT_QR_SCAN"      to ("qr"  to "open"),
+            "com.glasskeep.app.SHORTCUT_NEW_TEXT"     to ("new" to "text"),
+            "com.glasskeep.app.SHORTCUT_NEW_CHECKLIST" to ("new" to "checklist"),
+            "com.glasskeep.app.SHORTCUT_NEW_DRAW"     to ("new" to "draw"),
+            "com.glasskeep.app.SHORTCUT_NEW_AUDIO"    to ("new" to "audio"),
+        )
     }
 }

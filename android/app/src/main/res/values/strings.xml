@@ -22,4 +22,12 @@
          scanner straight away (sign in to a PC paired with this phone). -->
     <string name="shortcut_qr_short">Scan QRCODE</string>
     <string name="shortcut_qr_long">Scan QRCODE</string>
+    <string name="shortcut_new_text_short">Text note</string>
+    <string name="shortcut_new_text_long">New text note</string>
+    <string name="shortcut_new_checklist_short">Checklist</string>
+    <string name="shortcut_new_checklist_long">New checklist</string>
+    <string name="shortcut_new_draw_short">Drawing</string>
+    <string name="shortcut_new_draw_long">New drawing</string>
+    <string name="shortcut_new_audio_short">Audio note</string>
+    <string name="shortcut_new_audio_long">New audio note</string>
 </resources>

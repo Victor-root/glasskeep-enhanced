@@ -1,15 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Static app shortcut: long-press the launcher icon to see "Scan PC
-    login" / "Scanner QR PC", which jumps straight to the QR scanner
-    modal. Hard-coded into the manifest (vs registered at runtime via
-    ShortcutManager) so it works even before the user has opened the
-    app for the first time.
+    Static app shortcuts: long-press the launcher icon to jump
+    straight to a common task. Hard-coded into the manifest (vs
+    registered at runtime via ShortcutManager) so they work even
+    before the user has opened the app for the first time.
 
-    The intent action is consumed by MainActivity (see MainActivity.kt
-    onCreate). It appends ?qr=open to the configured server URL before
-    handing it to WebViewActivity; the SPA reads the param at boot and
-    sets qrScannerOpen=true, but only if the user has a valid session.
+    Each shortcut's intent action is consumed by MainActivity (see
+    MainActivity.kt onCreate). MainActivity appends a one-shot query
+    parameter to the configured server URL before handing off to
+    WebViewActivity; the SPA reads the param at boot and triggers the
+    matching action (only if the user has a valid session).
+
+    Ordering matters: launchers typically display shortcuts in REVERSE
+    declaration order on long-press (most-recently declared first).
+    The 4 note-creation entries come first so they sit at the TOP of
+    the popup; the QR scanner sits at the BOTTOM as the "utility"
+    shortcut.
 -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
@@ -20,6 +26,50 @@
         android:shortcutLongLabel="@string/shortcut_qr_long">
         <intent
             android:action="com.glasskeep.app.SHORTCUT_QR_SCAN"
+            android:targetPackage="com.glasskeep.app"
+            android:targetClass="com.glasskeep.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_audio"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_audio"
+        android:shortcutShortLabel="@string/shortcut_new_audio_short"
+        android:shortcutLongLabel="@string/shortcut_new_audio_long">
+        <intent
+            android:action="com.glasskeep.app.SHORTCUT_NEW_AUDIO"
+            android:targetPackage="com.glasskeep.app"
+            android:targetClass="com.glasskeep.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_draw"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_draw"
+        android:shortcutShortLabel="@string/shortcut_new_draw_short"
+        android:shortcutLongLabel="@string/shortcut_new_draw_long">
+        <intent
+            android:action="com.glasskeep.app.SHORTCUT_NEW_DRAW"
+            android:targetPackage="com.glasskeep.app"
+            android:targetClass="com.glasskeep.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_checklist"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_checklist"
+        android:shortcutShortLabel="@string/shortcut_new_checklist_short"
+        android:shortcutLongLabel="@string/shortcut_new_checklist_long">
+        <intent
+            android:action="com.glasskeep.app.SHORTCUT_NEW_CHECKLIST"
+            android:targetPackage="com.glasskeep.app"
+            android:targetClass="com.glasskeep.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_text"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_text"
+        android:shortcutShortLabel="@string/shortcut_new_text_short"
+        android:shortcutLongLabel="@string/shortcut_new_text_long">
+        <intent
+            android:action="com.glasskeep.app.SHORTCUT_NEW_TEXT"
             android:targetPackage="com.glasskeep.app"
             android:targetClass="com.glasskeep.app.MainActivity" />
     </shortcut>

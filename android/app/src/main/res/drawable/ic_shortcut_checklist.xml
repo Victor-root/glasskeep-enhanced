@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    App-shortcut icon for "New checklist". Teal background (matches
+    the checklist-button gradient anchor) + the ChecklistIcon glyph
+    from src/icons/index.jsx, scaled up to fill ~82% of the canvas.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#14B8A6"
+        android:pathData="M0,0 h108 v108 h-108 z" />
+    <group
+        android:translateX="9.6"
+        android:translateY="9.6"
+        android:scaleX="3.7"
+        android:scaleY="3.7">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M11,7H3v2h8V7zm0,4H3v2h8v-2zm0,4H3v2h8v-2zm5.59,0.58L13,12l1.41,-1.41L16.59,12l4.59,-4.59L22.59,9 16.59,15z" />
+    </group>
+</vector>

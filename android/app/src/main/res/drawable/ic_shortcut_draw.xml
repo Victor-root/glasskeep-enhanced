@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    App-shortcut icon for "New drawing". Rose background (matches the
+    drawing-button gradient anchor) + the BrushIcon glyph from
+    src/icons/index.jsx, scaled up to fill ~82% of the canvas.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#F43F5E"
+        android:pathData="M0,0 h108 v108 h-108 z" />
+    <group
+        android:translateX="9.6"
+        android:translateY="9.6"
+        android:scaleX="3.7"
+        android:scaleY="3.7">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M20.71,4.63 L19.37,3.29c-0.39,-0.39 -1.04,-0.39 -1.41,0L9,12.25 11.75,15l8.96,-8.96c0.39,-0.39 0.39,-1.02 0,-1.41zM7.5,13.5a4.2,4.2 0 0 0 -4.2,4.2c0,1.83 -1.62,2.8 -2.8,2.8 1.29,1.71 3.49,2.8 5.6,2.8a5.6,5.6 0 0 0 5.6,-5.6 4.2,4.2 0 0 0 -4.2,-4.2z" />
+    </group>
+</vector>

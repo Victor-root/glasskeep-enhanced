@@ -19,4 +19,12 @@
     <string name="download_error">Erreur de téléchargement</string>
     <string name="shortcut_qr_short">Scanner QRCODE</string>
     <string name="shortcut_qr_long">Scanner QRCODE</string>
+    <string name="shortcut_new_text_short">Note texte</string>
+    <string name="shortcut_new_text_long">Nouvelle note texte</string>
+    <string name="shortcut_new_checklist_short">Liste</string>
+    <string name="shortcut_new_checklist_long">Nouvelle liste</string>
+    <string name="shortcut_new_draw_short">Dessin</string>
+    <string name="shortcut_new_draw_long">Nouveau dessin</string>
+    <string name="shortcut_new_audio_short">Note audio</string>
+    <string name="shortcut_new_audio_long">Nouvelle note audio</string>
 </resources>

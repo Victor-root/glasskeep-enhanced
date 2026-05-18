@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    App-shortcut icon for "New audio note". Fuchsia background
+    (matches the audio-button gradient anchor) + the MicIcon glyph
+    from src/icons/index.jsx, scaled up to fill ~82% of the canvas.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#D946EF"
+        android:pathData="M0,0 h108 v108 h-108 z" />
+    <group
+        android:translateX="9.6"
+        android:translateY="9.6"
+        android:scaleX="3.7"
+        android:scaleY="3.7">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M12,14a3,3 0 0 0 3,-3V5a3,3 0 1 0 -6,0v6a3,3 0 0 0 3,3zm5,-3a5,5 0 0 1 -10,0H5a7,7 0 0 0 6,6.92V21h2v-3.08A7,7 0 0 0 19,11h-2z" />
+    </group>
+</vector>
