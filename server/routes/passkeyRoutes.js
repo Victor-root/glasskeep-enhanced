@@ -413,6 +413,11 @@ function attachPasskeyRoutes(app, deps) {
 
     const token = signToken(user);
     log.info?.(`[passkey] login OK user=${user.id}`);
+    // Keep the response shape in lockstep with /api/login and the QR
+    // device-link poll. Any field that one flow returns and another
+    // omits ends up wiped from auth state when that flow is used
+    // (this is exactly how the missing avatar_url / language bugs
+    // surfaced via QR sign-in).
     res.json({
       ok: true,
       token,
@@ -422,6 +427,7 @@ function attachPasskeyRoutes(app, deps) {
         email: user.email,
         is_admin: !!user.is_admin,
         avatar_url: user.avatar_url || null,
+        language: user.language || null,
       },
       must_change_password: !!user.must_change_password,
     });
@@ -826,6 +832,7 @@ function attachPasskeyRoutes(app, deps) {
         email: user.email,
         is_admin: !!user.is_admin,
         avatar_url: user.avatar_url || null,
+        language: user.language || null,
       },
       must_change_password: !!user.must_change_password,
     });

@@ -1134,11 +1134,14 @@ app.post("/api/login", (req, res) => {
     return res.status(401).json({ error: "Incorrect password." });
   }
   const token = signToken(user);
+  // Always include must_change_password as a boolean for parity with
+  // the passkey + QR sign-in responses. Field-presence parity matters
+  // because the client stores the response straight into auth state.
   const response = {
     token,
     user: { id: user.id, name: user.name, email: user.email, is_admin: !!user.is_admin, avatar_url: user.avatar_url || null, language: user.language || null },
+    must_change_password: !!user.must_change_password,
   };
-  if (user.must_change_password) response.must_change_password = true;
   res.json(response);
 });
 
@@ -1181,8 +1184,8 @@ app.post("/api/login/secret", (req, res) => {
       const response = {
         token,
         user: { id: u.id, name: u.name, email: u.email, is_admin: !!u.is_admin, avatar_url: fullUser?.avatar_url || null, language: fullUser?.language || null },
+        must_change_password: !!fullUser?.must_change_password,
       };
-      if (fullUser?.must_change_password) response.must_change_password = true;
       return res.json(response);
     }
   }
@@ -1301,13 +1304,17 @@ app.post("/api/user/change-password", auth, (req, res) => {
   const hash = bcrypt.hashSync(new_password, 10);
   db.prepare("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?").run(hash, user.id);
 
-  // Return a fresh token so the session stays valid
+  // Return a fresh token + full user object. The client REPLACES its
+  // entire user state with whatever this returns (not a merge), so
+  // omitting language would wipe the user's language preference from
+  // session state on every password change.
   const updatedUser = getUserById.get(user.id);
   const token = signToken(updatedUser);
   res.json({
     ok: true,
     token,
-    user: { id: updatedUser.id, name: updatedUser.name, email: updatedUser.email, is_admin: !!updatedUser.is_admin, avatar_url: updatedUser.avatar_url || null },
+    user: { id: updatedUser.id, name: updatedUser.name, email: updatedUser.email, is_admin: !!updatedUser.is_admin, avatar_url: updatedUser.avatar_url || null, language: updatedUser.language || null },
+    must_change_password: !!updatedUser.must_change_password,
   });
 });
 

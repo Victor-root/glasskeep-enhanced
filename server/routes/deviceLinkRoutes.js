@@ -213,9 +213,11 @@ function attachDeviceLinkRoutes(
       }
       const jwt = signToken(user);
       // Keep parity with /api/login's response shape — the client
-      // stores this user object straight into auth state, so missing
-      // avatar_url/language reads as "the QR sign-in cleared my
-      // profile photo".
+      // stores this user object straight into auth state, so any
+      // field one flow returns and another omits ends up wiped from
+      // state when the omitting flow is used. must_change_password
+      // matters here too: without it, a user with the flag set who
+      // signs in via QR would never get prompted.
       return res.json({
         status: "approved",
         token: jwt,
@@ -227,6 +229,7 @@ function attachDeviceLinkRoutes(
           avatar_url: user.avatar_url || null,
           language: user.language || null,
         },
+        must_change_password: !!user.must_change_password,
       });
     }
     res.json({ status: c.status });
