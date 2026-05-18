@@ -1,5 +1,6 @@
 import React from "react";
 import { Sun, Moon } from "../../icons/index.jsx";
+import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
 
 export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, loginSlogan, children, sidePanel }) {
@@ -75,7 +76,7 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
       <div className="flex-1 w-full flex items-center justify-center py-8">
         <div
           className={`relative z-10 w-full flex flex-col items-center gap-6 ${
-            sidePanel ? "lg:max-w-3xl lg:flex-row lg:items-start" : "max-w-md"
+            sidePanel ? "lg:max-w-4xl lg:flex-row lg:items-start lg:gap-4" : "max-w-md"
           }`}
         >
           <div className="w-full max-w-md lg:shrink-0">
@@ -116,28 +117,46 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
           )}
           </div>
           {sidePanel && (
-            // Second card column. Below lg it falls under the form
-            // column in normal flow (max-w-md to match the form card
-            // width); on lg+ it sits to the right as a fixed-width
-            // card. An invisible spacer at the top of the side
-            // column mirrors the form column's logo+title block on
-            // lg+ so the QR card lines up with the glass-card top
-            // rather than starting at the column's actual y=0. We
-            // can't hard-code an mt-X here because the logo+title
-            // size changes with the user's font + i18n string, so
-            // the invisible placeholder is the self-aligning
-            // option.
-            <div className="w-full max-w-md lg:w-80 lg:max-w-none lg:shrink-0">
+            <>
+              {/* Decorative arrow pointing from the auth form to the
+                  QR card on wide screens. Hidden on phones / narrow
+                  windows where the cards stack vertically — an arrow
+                  between two stacked boxes doesn't carry the same
+                  meaning. */}
               <div
-                className="hidden lg:block text-center mb-6 invisible"
+                className="hidden lg:flex lg:shrink-0 lg:items-center lg:self-stretch text-indigo-500 dark:text-indigo-400"
                 aria-hidden="true"
               >
-                <div className="h-16 w-16 mx-auto mb-4" />
-                <h1 className="text-3xl font-bold">.</h1>
-                <p>.</p>
+                <TI.ArrowBadgeRight className="tabler-icon w-12 h-12" />
               </div>
-              {sidePanel}
-            </div>
+              {/* Second card column. Below lg it falls under the
+                  form column in normal flow (max-w-md to match the
+                  form card width); on lg+ it sits to the right as a
+                  fixed-width card. The placeholder at the top
+                  MIRRORS the form column's logo + title block exactly
+                  (same markup, wrapped in `invisible`) so the QR
+                  card aligns pixel-for-pixel with the glass-card on
+                  lg+ regardless of font / locale / whether `title`
+                  is set on this AuthShell instance. */}
+              <div className="w-full max-w-md lg:w-72 lg:max-w-none lg:shrink-0">
+                <div
+                  className="hidden lg:block invisible"
+                  aria-hidden="true"
+                >
+                  <div className="text-center mb-6">
+                    <img
+                      src="/pwa-192.png"
+                      alt=""
+                      className="h-16 w-16 rounded-2xl shadow-lg mx-auto mb-4"
+                      draggable="false"
+                    />
+                    <h1 className="text-3xl font-bold">Glass Keep</h1>
+                    <p className="text-gray-500 dark:text-gray-400">{title}</p>
+                  </div>
+                </div>
+                {sidePanel}
+              </div>
+            </>
           )}
         </div>
       </div>

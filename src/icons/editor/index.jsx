@@ -72,6 +72,7 @@ import eraserSvg           from "./tabler/eraser.svg?raw";
 import deviceFloppySvg     from "./tabler/device-floppy.svg?raw";
 import cameraSvg           from "./tabler/camera.svg?raw";
 import qrcodeSvg           from "./tabler/qrcode.svg?raw";
+import arrowBadgeRightSvg  from "./tabler/arrow-badge-right.svg?raw";
 import filter2QuestionSvg  from "./tabler/filter-2-question.svg?raw";
 import inputSparkSvg       from "./tabler/input-spark.svg?raw";
 import messageSearchSvg    from "./tabler/message-search.svg?raw";
@@ -196,6 +197,7 @@ export const TI = {
   DeviceFloppy:         (p) => <TablerIcon svg={deviceFloppySvg} {...p} />,
   Camera:               (p) => <TablerIcon svg={cameraSvg} {...p} />,
   Qrcode:               (p) => <TablerIcon svg={qrcodeSvg} {...p} />,
+  ArrowBadgeRight:      (p) => <TablerIcon svg={arrowBadgeRightSvg} {...p} />,
   Filter2Question:      (p) => <TablerIcon svg={filter2QuestionSvg} {...p} />,
   InputSpark:           (p) => <TablerIcon svg={inputSparkSvg} {...p} />,
   MessageSearch:        (p) => <TablerIcon svg={messageSearchSvg} {...p} />,
