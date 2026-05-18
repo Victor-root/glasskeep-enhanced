@@ -228,7 +228,13 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
             overlay during the loading phase — same visual result,
             no stylistic battle with the scanner. */}
         <div
-          className="relative w-full aspect-square rounded-xl overflow-hidden bg-black"
+          // 3:4 portrait container (was aspect-square) — phone back
+          // cameras output a portrait stream and `object-cover` was
+          // cropping its left + right edges hard inside the square,
+          // ~doubling the perceived zoom. A 3:4 box closely matches
+          // the native stream ratio so the visible field of view is
+          // roughly what the camera actually sees.
+          className="relative w-full aspect-[3/4] rounded-xl overflow-hidden bg-black"
           style={{
             display:
               phase === PHASES.loading || phase === PHASES.scanning

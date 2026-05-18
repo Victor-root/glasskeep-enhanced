@@ -723,6 +723,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
 
   // Cross-device QR sign-in (PC shows a QR, phone scans + approves)
   qrLoginCta: "Se connecter avec un QR code",
+  qrLoginHide: "Masquer le QR code",
   qrLoginTitle: "Connexion par QR code",
   qrLoginExplain: "Ouvrez GlassKeep sur votre téléphone, allez dans Paramètres → « Connecter un autre appareil » et scannez ce QR.",
   qrLoginGenerating: "Génération du QR code…",

@@ -723,6 +723,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
 
   // Cross-device QR sign-in (PC shows a QR, phone scans + approves)
   qrLoginCta: "Sign in with a QR code",
+  qrLoginHide: "Hide the QR code",
   qrLoginTitle: "Sign in with a QR code",
   qrLoginExplain: "Open GlassKeep on your phone, go to Settings → \"Sign in another device\" and scan this QR.",
   qrLoginGenerating: "Generating QR code…",
