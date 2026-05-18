@@ -49,12 +49,7 @@ const PHASES = {
   error: "error",
 };
 
-// `initialLinkToken` shortcuts the camera path: when set, the modal
-// jumps straight to the /info fetch + confirmation card. Used when the
-// user scanned the QR with a 3rd-party app (native camera, Binary Eye)
-// and Android opened our domain on /device-link/<token> — the camera
-// would just be in the way at that point.
-export default function QrScannerModal({ open, onClose, token, showToast, initialLinkToken }) {
+export default function QrScannerModal({ open, onClose, token, showToast }) {
   const videoRef = useRef(null);
   const scannerRef = useRef(null);
 
@@ -127,30 +122,6 @@ export default function QrScannerModal({ open, onClose, token, showToast, initia
     setInfo(null);
     setErrorText("");
     setScannedOrigin(null);
-
-    // External-scanner shortcut: the QR was already decoded by Android
-    // (Binary Eye, native camera, etc.) and we landed on
-    // /device-link/<token>. Skip the camera entirely — straight to the
-    // /info fetch, then the confirmation card.
-    if (initialLinkToken) {
-      setPhase(PHASES.fetching);
-      setLinkToken(initialLinkToken);
-      submittedRef.current = initialLinkToken;
-      (async () => {
-        try {
-          const data = await getDeviceLinkInfo(initialLinkToken, token);
-          if (cancelled) return;
-          setInfo(data);
-          setPhase(PHASES.confirm);
-        } catch (e) {
-          if (cancelled) return;
-          setErrorText(localizeServerError(e?.message || "", "qrScanInfoFailed"));
-          setPhase(PHASES.error);
-        }
-      })();
-      return () => { cancelled = true; };
-    }
-
     setPhase(PHASES.loading);
 
     const start = async () => {
@@ -186,7 +157,7 @@ export default function QrScannerModal({ open, onClose, token, showToast, initia
       cancelled = true;
       stopScanner();
     };
-  }, [open, onScan, stopScanner, initialLinkToken, token]);
+  }, [open, onScan, stopScanner]);
 
   // Body-scroll lock — without this, swipes started inside the QR
   // modal can scroll / swipe-navigate the notes view underneath on

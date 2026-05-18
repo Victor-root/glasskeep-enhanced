@@ -109,39 +109,27 @@ export async function rejectDeviceLink(linkToken, authToken) {
 
 // ── Shared helpers ───────────────────────────────────────────────────
 
-/** Build the URL we encode into the QR. The path form (no `#`) makes
- *  the URL visible to the server AND to Android App Links, so a third-
- *  party scanner (camera app, Binary Eye, etc.) can hand the URL to
- *  the installed GlassKeep app — or, when the app isn't installed,
- *  the browser falls back to the SPA and runs the same approval flow.
- *  Including the origin lets the phone refuse QRs that belong to a
- *  different GlassKeep instance (phishing guard). */
+/** Build the URL we encode into the QR. Including the origin lets the
+ *  phone refuse to approve QRs that belong to a different GlassKeep
+ *  instance (the user might have scanned a phishing screen). */
 export function buildLinkUrl(linkToken, origin = window.location.origin) {
-  return `${origin.replace(/\/$/, "")}/device-link/${encodeURIComponent(linkToken)}`;
+  return `${origin.replace(/\/$/, "")}/#/device-link/${encodeURIComponent(linkToken)}`;
 }
 
 /** Parse a string scanned out of a QR. Returns `{ token, origin }`
- *  when the input matches a GlassKeep device-link URL; `null`
- *  otherwise. Two formats accepted:
- *    - `<origin>/device-link/<token>`     ← new (path form)
- *    - `<origin>/#/device-link/<token>`   ← legacy fragment form
- *  Both are accepted so QRs generated before the path migration still
- *  work in the in-app scanner. The QR could in theory contain
- *  anything (the camera doesn't know what it's looking at), so we
- *  treat it like untrusted user input. */
+ *  when the input matches `<origin>/#/device-link/<token>`; `null`
+ *  otherwise. The QR could in theory contain anything (the camera
+ *  doesn't know what it's looking at), so we treat it like untrusted
+ *  user input. */
 export function parseLinkUrl(scanned) {
   if (typeof scanned !== "string") return null;
   const trimmed = scanned.trim();
   if (!trimmed) return null;
   try {
     const u = new URL(trimmed);
-    // Path form first (current default).
-    let m = u.pathname.match(/^\/device-link\/([A-Za-z0-9_-]+)\/?$/);
-    if (m) return { token: decodeURIComponent(m[1]), origin: u.origin };
-    // Legacy fragment form (kept for QRs encoded before the migration).
-    m = u.hash.match(/^#\/device-link\/([A-Za-z0-9_-]+)$/);
-    if (m) return { token: decodeURIComponent(m[1]), origin: u.origin };
-    return null;
+    const m = u.hash.match(/^#\/device-link\/([A-Za-z0-9_-]+)$/);
+    if (!m) return null;
+    return { token: decodeURIComponent(m[1]), origin: u.origin };
   } catch {
     return null;
   }

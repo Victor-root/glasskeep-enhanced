@@ -334,31 +334,6 @@ export default function App() {
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const openQrScanner = useCallback(() => setQrScannerOpen(true), []);
   const closeQrScanner = useCallback(() => setQrScannerOpen(false), []);
-
-  // External-scanner entry point. When the URL contains
-  // /device-link/<token> at first paint, the QR was decoded outside
-  // the app (Android App Link, native camera, Binary Eye, etc.) and
-  // the browser / WebView routed us here. We stash the token and open
-  // the confirmation modal as soon as the user has a valid session —
-  // if they're not signed in yet, the modal waits and pops the moment
-  // login completes. The URL is rewritten to "/" so a refresh on the
-  // login page doesn't loop back into this flow forever.
-  const [incomingLinkToken, setIncomingLinkToken] = useState(() => {
-    try {
-      const m = window.location.pathname.match(
-        /^\/device-link\/([A-Za-z0-9_-]+)\/?$/,
-      );
-      if (!m) return null;
-      const linkTok = decodeURIComponent(m[1]);
-      try {
-        window.history.replaceState(null, "", "/" + (window.location.hash || ""));
-      } catch { /* non-fatal: history blocked, URL just stays as-is */ }
-      return linkTok;
-    } catch {
-      return null;
-    }
-  });
-  const dismissIncomingLink = useCallback(() => setIncomingLinkToken(null), []);
   const [qrQuickEnabled, setQrQuickEnabledState] = useState(() => {
     try { return localStorage.getItem("glass-keep-qr-quick") === "1"; }
     catch { return false; }
@@ -5924,19 +5899,10 @@ export default function App() {
           optional header quick-access button can pop it without
           duplicating the modal in two subtrees. */}
       <QrScannerModal
-        // Opens via either the in-app button (qrScannerOpen) or via
-        // an external-scanner deep link (incomingLinkToken). The deep
-        // link path waits for a valid session — if the user lands on
-        // /device-link/<token> while signed out, the modal stays
-        // closed until login completes.
-        open={qrScannerOpen || (!!incomingLinkToken && !!token)}
-        onClose={() => {
-          if (incomingLinkToken) dismissIncomingLink();
-          closeQrScanner();
-        }}
+        open={qrScannerOpen}
+        onClose={closeQrScanner}
         token={token}
         showToast={showToast}
-        initialLinkToken={token ? (incomingLinkToken || undefined) : undefined}
       />
 
       <ToastContainer toasts={toasts} />
