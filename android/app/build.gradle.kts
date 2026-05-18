@@ -11,8 +11,8 @@ android {
         applicationId = "com.glasskeep.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.2.0"
+        versionCode = 6
+        versionName = "1.3.0"
     }
 
     buildTypes {
@@ -54,4 +54,12 @@ dependencies {
     implementation("androidx.webkit:webkit:1.9.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+
+    // Credential Manager: Android's unified API for passkeys, passwords
+    // and federated sign-in. Bridges the WebView's WebAuthn calls into
+    // the OS-level passkey UI (Google Password Manager / 1Password /
+    // Bitwarden / etc.) so passkeys work inside the app instead of
+    // forcing users back to a browser.
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
 }

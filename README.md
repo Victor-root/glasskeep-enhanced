@@ -123,9 +123,44 @@ The launcher icon, the Android TV banner, the PWA install icon, and the favicon 
 
 [Download latest Android APK](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.3.0/GlassKeep-v1.2.0.apk)
 
-Current APK version: `1.2.0`
+Current APK version: `1.3.0`
 
 > The Android source code is available in the `android/` directory.
+
+### 🔑 Passkeys in the Android app
+
+From APK `1.3.0` onward, the Android app supports passkeys natively — the same authenticators (fingerprint, face unlock, hardware security keys, Google / 1Password / Bitwarden password managers) you'd use from Chrome are now available from inside the app. There's nothing to configure when you install the **official APK** on top of a regular HTTPS install: the server publishes a Digital Asset Links file at `/.well-known/assetlinks.json` that pre-authorises both the official APK and the F-Droid build.
+
+Requirements:
+
+- HTTPS with a valid certificate (Let's Encrypt or any trusted CA — self-signed will not work)
+- Android 9+ with Google Play Services (or any system-provided credential manager on Android 14+)
+
+#### 🛠️ Custom-built APKs (for bidouilleurs)
+
+If you rebuild the APK yourself with your own keystore (or distribute through a third-party store that signs with a different key), the OS will refuse to share the domain's passkeys with your APK until your signature is listed in `/.well-known/assetlinks.json` too. To add it:
+
+1. Find the SHA-256 fingerprint of your signing key. From the `android/` directory of the project:
+
+   ```bash
+   ./gradlew signingReport
+   ```
+
+   Look for the `SHA-256` line under `Variant: release`.
+
+2. Add the fingerprint to the `ANDROID_EXTRA_FINGERPRINTS` environment variable on the server, comma-separated:
+
+   ```bash
+   ANDROID_EXTRA_FINGERPRINTS="AA:BB:CC:...:11:22"
+   # Multiple fingerprints separated by commas:
+   ANDROID_EXTRA_FINGERPRINTS="AA:BB:CC:...,DD:EE:FF:..."
+   ```
+
+   The variable can be set in `/opt/glass-keep/app/.env` (native install) or in the `environment:` block of `docker-compose.yml`. Restart the server (`systemctl restart glass-keep` or `docker compose restart`) and your APK will be authorised on the next ceremony.
+
+3. Verify by visiting `https://<your-domain>/.well-known/assetlinks.json` — your fingerprint should appear in the `sha256_cert_fingerprints` array.
+
+You do **not** need to ship a custom server build: the official `assetlinks.json` is generated dynamically from the `ANDROID_EXTRA_FINGERPRINTS` env var, so a single config line is all you need.
 
 ---
 

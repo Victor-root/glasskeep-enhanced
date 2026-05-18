@@ -37,6 +37,7 @@ class WebViewActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var swipeRefresh: androidx.swiperefreshlayout.widget.SwipeRefreshLayout
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
+    private lateinit var webAuthnBridge: WebAuthnBridge
 
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -217,8 +218,15 @@ class WebViewActivity : AppCompatActivity() {
             })
         } catch (_: Exception) { }
 
+        webAuthnBridge = WebAuthnBridge(this) { webView }
+
         webView.apply {
             addJavascriptInterface(ThemeBridge(), "AndroidTheme")
+            // Exposes window.AndroidPasskey to the WebView. The polyfill
+            // injected on every page load (see onPageStarted below) wraps
+            // it into the Promise-friendly window.GlassKeepAndroidPasskey
+            // that passkeyClient.js looks for.
+            addJavascriptInterface(webAuthnBridge, WebAuthnBridge.JS_INTERFACE_NAME)
 
             settings.apply {
                 javaScriptEnabled = true
@@ -274,6 +282,10 @@ class WebViewActivity : AppCompatActivity() {
                         // press shouldn't reload the whole web layer.
                         swipeRefresh.isEnabled = false
                     }
+                    // Install the passkey polyfill before any page script
+                    // runs. The polyfill is idempotent — re-injecting it
+                    // on SPA navigations is harmless.
+                    view.evaluateJavascript(WebAuthnBridge.POLYFILL_JS, null)
                 }
 
                 override fun onPageFinished(view: WebView, pageUrl: String?) {

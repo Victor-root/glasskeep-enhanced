@@ -62,6 +62,16 @@ services:
       #
       # Encryption keys are stored in the database (/data/notes.db) and
       # are generated automatically — no additional setup needed.
+
+      # --- Android app passkeys (advanced) ----------------------------------
+      # The server publishes a Digital Asset Links file at
+      # /.well-known/assetlinks.json that authorises the OFFICIAL Android
+      # APK (and the F-Droid build, when it ships) to use the domain's
+      # passkeys. If you rebuild the APK yourself with your own keystore,
+      # add your signing key's SHA-256 fingerprint here so Android shares
+      # passkeys with your custom build too. Comma-separated for several.
+      # Run ./gradlew signingReport inside android/ to find your value.
+      # ANDROID_EXTRA_FINGERPRINTS: "AA:BB:CC:DD:...,11:22:33:44:..."
     volumes:
       # Persistent data: SQLite DB + auto-generated JWT secret.
       # Back this directory up to preserve your notes.

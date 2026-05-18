@@ -707,7 +707,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   passkeyNoPrfRow: "Sans support PRF — utilisable uniquement pour la connexion.",
   passkeyHttpsRequired: "Les clés d'accès nécessitent une connexion HTTPS sécurisée. Configurez un reverse proxy HTTPS pour activer cette fonctionnalité.",
   passkeyBrowserUnsupported: "Votre navigateur ne prend pas en charge les clés d'accès (WebAuthn).",
-  passkeyWebViewUnavailable: "Les clés d'accès ne sont pas disponibles dans l'application. Utilisez votre navigateur pour les gérer.",
+  passkeyWebViewUpdateApp: "Cette version de l'application Android ne sait pas encore utiliser les clés d'accès. Mettez à jour vers la dernière version pour activer cette fonctionnalité.",
   passkeySignIn: "Se connecter avec une clé d'accès",
   passkeyLoginInProgress: "Connexion…",
   passkeyLoginCancelled: "Connexion par clé d'accès annulée.",

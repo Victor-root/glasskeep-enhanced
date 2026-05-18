@@ -303,6 +303,7 @@ const { attachUnlockRoutes } = require("./routes/unlockRoutes");
 const { attachPasskeyRoutes } = require("./routes/passkeyRoutes");
 const { attachUpdateRoutes } = require("./routes/updateRoutes");
 const { attachSelfUpdateRoutes } = require("./routes/selfUpdateRoutes");
+const { attachAssetLinksRoutes } = require("./routes/assetLinksRoutes");
 const { requireUnlocked } = require("./routes/lockMiddleware");
 
 instanceVault.ensureSchema(db);
@@ -1014,6 +1015,12 @@ passkeyVaultModule.ensureSchema(db);
 attachPasskeyRoutes(app, { db, auth, adminOnly, signToken, getUserById, log: console });
 attachUpdateRoutes(app, { auth, adminOnly, log: console });
 attachSelfUpdateRoutes(app, { auth, adminOnly, log: console });
+
+// Digital Asset Links — must answer at /.well-known/assetlinks.json
+// before the production catch-all sends every unknown path to
+// index.html. Stays public (no auth, no lock gate) because Android's
+// verifier hits the URL unauthenticated and from outside any session.
+attachAssetLinksRoutes(app, { log: console });
 
 const LOCK_ALLOW_PATHS = [
   /^\/api\/instance(\/|$)/,

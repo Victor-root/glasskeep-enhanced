@@ -20,6 +20,46 @@ import {
 } from "@simplewebauthn/browser";
 import { t } from "../i18n";
 
+// ── Android native passkey bridge ─────────────────────────────────────
+//
+// The native Android app injects a polyfill (see WebAuthnBridge.kt)
+// that exposes `window.GlassKeepAndroidPasskey` whenever Credential
+// Manager is reachable on the device. When present, we route the
+// registration / authentication ceremonies through Credential Manager
+// instead of @simplewebauthn/browser — the WebView's own WebAuthn
+// implementation is gimped on Android and would otherwise fail with
+// `NotSupportedError` no matter what the user does.
+//
+// The bridge produces the same WebAuthn-shaped JSON
+// (RegistrationResponseJSON / AuthenticationResponseJSON) the rest of
+// the client + server already speak, so callers don't need to care.
+function getAndroidBridge() {
+  if (typeof window === "undefined") return null;
+  const b = window.GlassKeepAndroidPasskey;
+  return b && b.available ? b : null;
+}
+
+async function performRegistration(optionsJSON) {
+  const bridge = getAndroidBridge();
+  if (bridge) {
+    return await bridge.register(optionsJSON);
+  }
+  return await startRegistration({ optionsJSON });
+}
+
+async function performAuthentication(optionsJSON, { withPrf = false } = {}) {
+  const bridge = getAndroidBridge();
+  if (bridge) {
+    // Credential Manager parses PRF eval bytes from the JSON directly,
+    // so we forward the options untouched — preparePrfOptions() is a
+    // workaround for @simplewebauthn/browser v13 and doesn't apply
+    // here.
+    return await bridge.authenticate(optionsJSON);
+  }
+  const prepared = withPrf ? preparePrfOptions(optionsJSON) : optionsJSON;
+  return await startAuthentication({ optionsJSON: prepared });
+}
+
 const API = "/api";
 
 function authHeaders(token) {
@@ -142,11 +182,22 @@ function extractPrfOutput(assertion) {
 
 // ── Feature detection ─────────────────────────────────────────────────
 export function isWebAuthnSupported() {
+  if (getAndroidBridge()) return true;
   try { return browserSupportsWebAuthn(); } catch { return false; }
 }
 
 export async function isPlatformAuthenticatorAvailable() {
+  if (getAndroidBridge()) return true;
   try { return await platformAuthenticatorIsAvailable(); } catch { return false; }
+}
+
+/** True when this runtime can drive WebAuthn ceremonies via the
+ *  Android native passkey bridge (Credential Manager). False in regular
+ *  browsers and in older app builds that predate the bridge. Used by
+ *  PasskeySettingsSection to decide whether to render the management
+ *  UI inside the Android WebView. */
+export function hasAndroidPasskeyBridge() {
+  return !!getAndroidBridge();
 }
 
 // ── User passkey list / management ────────────────────────────────────
@@ -184,7 +235,7 @@ export async function deletePasskey(token, credentialId) {
 // immediately reflect prfSupported in the UI without re-fetching.
 export async function registerPasskey(token, label) {
   const { options, challengeId } = await postJSON("/passkeys/register/options", {}, token);
-  const response = await startRegistration({ optionsJSON: options });
+  const response = await performRegistration(options);
   const verify = await postJSON("/passkeys/register/verify", {
     response,
     challengeId,
@@ -203,7 +254,7 @@ export async function registerPasskey(token, label) {
 // that downstream code might read.
 export async function loginWithPasskey() {
   const { options, challengeId } = await postJSON("/passkeys/login/options", {});
-  const response = await startAuthentication({ optionsJSON: options });
+  const response = await performAuthentication(options);
   const verify = await postJSON("/passkeys/login/verify", { response, challengeId });
   const { ok: _ok, ...session } = verify || {};
   return session;
@@ -228,7 +279,7 @@ export async function enableInstanceUnlock(token, credentialId) {
     {},
     token,
   );
-  const response = await startAuthentication({ optionsJSON: preparePrfOptions(options) });
+  const response = await performAuthentication(options, { withPrf: true });
   const prfOutput = extractPrfOutput(response);
   if (!prfOutput) {
     throw new Error(t("passkeyNoPrfOutput"));
@@ -247,7 +298,7 @@ export async function testPasskey(token, credentialId) {
     {},
     token,
   );
-  const response = await startAuthentication({ optionsJSON: options });
+  const response = await performAuthentication(options);
   return await postJSON(
     `/passkeys/${encodeURIComponent(credentialId)}/test/verify`,
     { response, challengeId },
@@ -270,7 +321,7 @@ export async function unlockInstanceWithPasskey() {
     {},
   );
   if (alreadyUnlocked) return { alreadyUnlocked: true };
-  const response = await startAuthentication({ optionsJSON: preparePrfOptions(options) });
+  const response = await performAuthentication(options, { withPrf: true });
   const prfOutput = extractPrfOutput(response);
   if (!prfOutput) {
     throw new Error(t("passkeyNoPrfOutput"));

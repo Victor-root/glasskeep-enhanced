@@ -53,7 +53,13 @@ export default defineConfig({
         // AbortError timeouts even when the network is fine. API calls
         // are live data — caching them causes stale reads and sync bugs.
         // Only static assets (JS, CSS, images) benefit from SW caching.
-        navigateFallbackDenylist: [/^\/api\//],
+        //
+        // /.well-known/* is also excluded: Android's Digital Asset Links
+        // verifier (used to authorise the native app for passkeys) hits
+        // /.well-known/assetlinks.json and expects raw JSON, not the SPA
+        // shell. Letting the SW return index.html here would break the
+        // passkey association silently.
+        navigateFallbackDenylist: [/^\/api\//, /^\/\.well-known\//],
         runtimeCaching: []
       }
       // devOptions: { enabled: true } // ← uncomment to test SW in dev (remember to disable later)

@@ -15,6 +15,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { t } from "../../i18n";
 import {
   isWebAuthnSupported,
+  hasAndroidPasskeyBridge,
   listPasskeys,
   registerPasskey,
   renamePasskey,
@@ -174,15 +175,23 @@ export default function PasskeySettingsSection({
     }
   };
 
-  if (isWebView) {
+  // Inside the Android app we route passkeys through Credential Manager
+  // via the WebAuthnBridge polyfill. Older APKs (≤ 1.2.0) ship without
+  // the bridge — surface a clear "update the app" notice instead of
+  // letting the user run a ceremony the WebView would silently fail.
+  if (isWebView && !hasAndroidPasskeyBridge()) {
     return (
       <div className="text-sm text-gray-500 dark:text-gray-400">
-        {t("passkeyWebViewUnavailable")}
+        {t("passkeyWebViewUpdateApp")}
       </div>
     );
   }
 
-  if (!window.isSecureContext) {
+  // Browsers (and the in-bridge WebView) still need a secure origin —
+  // Credential Manager itself enforces this server-side via the Digital
+  // Asset Links check, but a clearer message up front saves a confusing
+  // round trip through the OS picker.
+  if (!isWebView && !window.isSecureContext) {
     return (
       <div className="text-sm text-gray-500 dark:text-gray-400">
         {t("passkeyHttpsRequired")}
