@@ -415,7 +415,15 @@ export default function ChangelogModal() {
                 className="w-full h-full sm:h-[85vh] max-w-none sm:max-w-2xl rounded-none sm:rounded-2xl border-0 sm:border border-[var(--border-light)] bg-white dark:bg-[var(--bg-elevated,#1a1a1f)] shadow-2xl flex flex-col overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-[var(--border-light)] bg-white/60 dark:bg-white/5">
+                <div
+                    // Mobile fullscreen layout sits edge-to-edge so the
+                    // Android status bar overlaps the header — push the
+                    // header's content below the safe-area inset. On
+                    // desktop, --safe-top is 0 so the resolved padding
+                    // matches the original py-3 exactly.
+                    className="flex items-center justify-between gap-3 px-5 py-3 border-b border-[var(--border-light)] bg-white/60 dark:bg-white/5"
+                    style={{ paddingTop: "calc(var(--safe-top) + 0.75rem)" }}
+                >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                         <span className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
                             <TI.Sparkles className="tabler-icon w-5 h-5" />
