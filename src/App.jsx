@@ -339,9 +339,24 @@ export default function App() {
     catch { return false; }
   });
   const setQrQuickEnabled = useCallback((next) => {
-    setQrQuickEnabledState(!!next);
-    try { localStorage.setItem("glass-keep-qr-quick", next ? "1" : "0"); }
+    const v = !!next;
+    setQrQuickEnabledState(v);
+    try { localStorage.setItem("glass-keep-qr-quick", v ? "1" : "0"); }
     catch { /* private mode etc. — non-fatal, preference simply won't persist */ }
+    // Cross-device sync: persist the choice to /api/user/settings so
+    // the preference follows the user across browsers. token is read
+    // from the current auth; missing token (e.g. pre-login flash)
+    // just falls back to localStorage only.
+    try {
+      const tk = getAuth()?.token;
+      if (tk) {
+        api("/user/settings", {
+          method: "PATCH",
+          token: tk,
+          body: { qrQuickEnabled: v },
+        }).catch(() => { /* offline / 401 — local copy still wins */ });
+      }
+    } catch { /* api helper missing or auth helper threw — non-fatal */ }
   }, []);
 
   // Toast notification system
@@ -646,6 +661,10 @@ export default function App() {
           const normalized = normalizeTypographyPresets(settings.typographyPresets);
           setTypographyPresets(normalized);
           try { localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(normalized)); } catch (e) {}
+        }
+        if (typeof settings?.qrQuickEnabled === "boolean") {
+          setQrQuickEnabledState(settings.qrQuickEnabled);
+          try { localStorage.setItem("glass-keep-qr-quick", settings.qrQuickEnabled ? "1" : "0"); } catch (e) {}
         }
       } catch (e) {
         // Network error — default to true

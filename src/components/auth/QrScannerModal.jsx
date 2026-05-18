@@ -21,7 +21,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import QrScanner from "qr-scanner";
 import { t } from "../../i18n";
-import TI from "../../icons/editor/index.jsx";
 import {
   parseLinkUrl,
   getDeviceLinkInfo,
@@ -218,9 +217,13 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
             back from confirm → scanning doesn't have to re-acquire
             the stream. Hidden via CSS once we've moved past
             scanning rather than via conditional mount.
-            The video stays opacity-0 until the stream is actually
-            attached; otherwise the WebView's chrome paints its
-            generic "no source" play-button glyph through our card. */}
+            We use `visibility: hidden` while loading so the WebView
+            never paints the <video>'s default no-source play-button
+            poster — opacity-0 alone left it visible for one frame
+            on slow devices, producing a brief flash through our
+            placeholder. visibility:hidden keeps layout (qr-scanner
+            still needs a real video element behind the scenes) but
+            blocks all paint. */}
         <div
           className="relative w-full aspect-square rounded-xl overflow-hidden bg-black"
           style={{
@@ -236,13 +239,32 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
             muted
             disablePictureInPicture
             controls={false}
-            className={`w-full h-full object-cover transition-opacity duration-200 ${
-              phase === PHASES.scanning ? "opacity-100" : "opacity-0"
-            }`}
+            className="w-full h-full object-cover"
+            style={{
+              visibility: phase === PHASES.scanning ? "visible" : "hidden",
+            }}
           />
           {phase === PHASES.loading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-white/80 gap-3">
-              <TI.Camera className="tabler-icon w-12 h-12" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-white/80 gap-4">
+              <span
+                className="inline-flex items-center justify-center"
+                style={{ width: "96px", height: "96px" }}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="96"
+                  height="96"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 7h1a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2" />
+                  <path d="M9 13a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
+                </svg>
+              </span>
               <Spinner small />
             </div>
           )}

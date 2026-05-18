@@ -52,6 +52,29 @@ export default function NotesHeader({
   qrQuickEnabled = false,
   onOpenQrScanner,
 }) {
+  // The kebab dropdown can't rely on the typical "fixed inset-0
+  // backdrop captures the click" pattern: the host <header> has a
+  // permanent `transform: translateY(0)` for its slide-in animation,
+  // which turns the header into the containing block for any
+  // descendant `position: fixed`. A backdrop-fixed-inset-0 would
+  // therefore be clipped to the header's bounding rect, leaving the
+  // notes grid underneath fully clickable. So we listen at the
+  // document level in capture phase instead — clicks outside the
+  // menu and outside the toggling button get swallowed (no
+  // unintended note-open) and the menu is closed.
+  React.useEffect(() => {
+    if (!headerMenuOpen) return undefined;
+    const onClick = (e) => {
+      const target = e.target;
+      if (headerMenuRef?.current?.contains(target)) return;
+      if (headerBtnRef?.current?.contains(target)) return;
+      e.stopPropagation();
+      setHeaderMenuOpen(false);
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [headerMenuOpen, setHeaderMenuOpen, headerMenuRef, headerBtnRef]);
+
   // In landscape mobile, force mobile layout regardless of sm: breakpoint
   const mobileOnly = isLandscapeMobile ? "" : "sm:hidden";
   const desktopOnly = isLandscapeMobile ? "hidden" : "hidden sm:flex";
@@ -426,21 +449,18 @@ export default function NotesHeader({
 
             {headerMenuOpen && (
               <>
-                <div
-                  className="fixed inset-0 z-[1099]"
-                  onClick={() => setHeaderMenuOpen(false)}
-                />
                 {/* The dropdown's top is anchored to the kebab button
                     itself on mobile (top-0) so it paints OVER the 3
                     dots — combined with the visibility:hidden on the
                     Kebab glyph above, the menu visually replaces the
                     button. On wider viewports we keep the legacy
-                    "hangs below the button" placement. Width / height
-                    likewise stretch on mobile (≈ 75 % × 50 % of the
-                    viewport) and stay compact on desktop. */}
+                    "hangs below the button" placement.
+                    Width is content-driven (w-auto) so the menu hugs
+                    its widest item instead of stretching across the
+                    viewport with a sea of empty space on the left. */}
                 <div
                   ref={headerMenuRef}
-                  className={`absolute top-0 sm:top-12 right-0 w-[75vw] max-w-[360px] sm:w-auto sm:min-w-[220px] sm:max-w-[280px] max-h-[50vh] sm:max-h-[80vh] overflow-y-auto z-[1100] border border-[var(--border-light)] rounded-lg shadow-lg ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
+                  className={`absolute top-0 sm:top-12 right-0 w-auto max-w-[90vw] sm:min-w-[220px] sm:max-w-[280px] max-h-[50vh] sm:max-h-[80vh] overflow-y-auto z-[1100] border border-[var(--border-light)] rounded-lg shadow-lg ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
                   style={{ backgroundColor: dark ? "#222222" : undefined }}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -482,7 +502,7 @@ export default function NotesHeader({
                     <span className={dark ? "text-violet-400" : "text-violet-600"}><CheckSquareIcon /></span>{t("multiSelect")}</button>
                   {currentUser?.is_admin && (
                     <button
-                      className={`flex items-start gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                      className={`flex items-start gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                       onClick={() => {
                         setHeaderMenuOpen(false);
                         openAdminPanel?.();
