@@ -171,9 +171,9 @@ export default function SettingsPanel({
         style={{
           backgroundColor: dark ? "#222222" : "rgba(255,255,255,0.95)",
           borderLeft: "1px solid var(--border-light)",
-          paddingTop: "env(safe-area-inset-top)",
-          paddingBottom: "env(safe-area-inset-bottom)",
-          paddingRight: "env(safe-area-inset-right)",
+          paddingTop: "var(--safe-top)",
+          paddingBottom: "var(--safe-bottom)",
+          paddingRight: "var(--safe-right)",
         }}
         aria-hidden={!open}
       >

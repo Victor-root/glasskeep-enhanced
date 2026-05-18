@@ -747,7 +747,7 @@ export default function App() {
   // Edge-to-edge landscape: save + dynamically toggle body padding-left
   useEffect(() => {
     try { localStorage.setItem("edgeToEdgeLandscape", String(edgeToEdgeLandscape)); } catch (e) {}
-    document.body.style.paddingLeft = edgeToEdgeLandscape ? "" : "env(safe-area-inset-left)";
+    document.body.style.paddingLeft = edgeToEdgeLandscape ? "" : "var(--safe-left)";
     if (!sidebarSettingsLoadedRef.current) return;
     if (token) {
       api("/user/settings", {

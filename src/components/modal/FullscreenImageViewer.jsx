@@ -29,7 +29,7 @@ export default function FullscreenImageViewer({
       }}
     >
       {/* Controls */}
-      <div className="absolute z-10 flex items-center gap-2" style={{ top: "calc(env(safe-area-inset-top) + 1rem)", right: "calc(env(safe-area-inset-right) + 1rem)" }}>
+      <div className="absolute z-10 flex items-center gap-2" style={{ top: "calc(var(--safe-top) + 1rem)", right: "calc(var(--safe-right) + 1rem)" }}>
         <button
           className="px-3 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20"
           data-tooltip={t("downloadShortcut")}
@@ -86,7 +86,7 @@ export default function FullscreenImageViewer({
         <>
           <button
             className={`absolute top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-opacity duration-300 sm:opacity-100 sm:pointer-events-auto ${mobileNavVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-            style={{ left: "calc(env(safe-area-inset-left) + 1rem)" }}
+            style={{ left: "calc(var(--safe-left) + 1rem)" }}
             data-tooltip={t("previousArrow")}
             onClick={(e) => {
               e.stopPropagation();
@@ -98,7 +98,7 @@ export default function FullscreenImageViewer({
           </button>
           <button
             className={`absolute top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-opacity duration-300 sm:opacity-100 sm:pointer-events-auto ${mobileNavVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-            style={{ right: "calc(env(safe-area-inset-right) + 1rem)" }}
+            style={{ right: "calc(var(--safe-right) + 1rem)" }}
             data-tooltip={t("nextArrow")}
             onClick={(e) => {
               e.stopPropagation();
@@ -120,7 +120,7 @@ export default function FullscreenImageViewer({
         onClick={(e) => { e.stopPropagation(); onResetMobileNav(); }}
       />
       {/* Caption */}
-      <div className="absolute left-0 right-0 z-10 text-xs text-white text-center pointer-events-none" style={{ top: "calc(env(safe-area-inset-top) + 1rem)" }}>
+      <div className="absolute left-0 right-0 z-10 text-xs text-white text-center pointer-events-none" style={{ top: "calc(var(--safe-top) + 1rem)" }}>
         <span className="hidden sm:inline">{images[currentIndex].name || `image-${currentIndex + 1}`} </span>
         {images.length > 1 && (
           <span>{currentIndex + 1}/{images.length}</span>

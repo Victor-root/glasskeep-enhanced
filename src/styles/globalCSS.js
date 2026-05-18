@@ -174,7 +174,7 @@ html.dark header.glass-card {
      safe-area-inset-top. Header sits at z-40 and the dock at z-35,
      so any minor overlap from a banner row hides cleanly behind
      the header rather than poking through. */
-  top: calc(env(safe-area-inset-top, 0px) + 96px);
+  top: calc(var(--safe-top) + 96px);
   bottom: auto;
   z-index: 35;
   pointer-events: none;
@@ -303,10 +303,10 @@ html.dark .multi-select-dock__menu {
     transition: top 180ms cubic-bezier(.22,.61,.36,1);
   }
   .multi-select-dock[data-header-visible="true"] {
-    top: calc(env(safe-area-inset-top, 0px) + 80px);
+    top: calc(var(--safe-top) + 80px);
   }
   .multi-select-dock[data-header-visible="false"] {
-    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    top: calc(var(--safe-top) + 8px);
   }
   .multi-select-dock--exiting .multi-select-dock__inner {
     animation: none;
@@ -2996,13 +2996,12 @@ html.dark .settings-type-toggle {
   /* Respect Android / iOS safe areas so the modal never tucks under
      the status bar or the gesture handle on edge-to-edge devices.
      The 32 px top fallback covers the case where some Android
-     WebViews report env(safe-area-inset-top) as 0 even with
-     viewport-fit=cover — typical status-bar heights are 24–30 px,
-     notched displays 36–45 px. */
-  padding: max(32px, env(safe-area-inset-top))
-           max(16px, env(safe-area-inset-right))
-           max(16px, env(safe-area-inset-bottom))
-           max(16px, env(safe-area-inset-left));
+     WebViews report a 0-inset even with viewport-fit=cover — typical
+     status-bar heights are 24–30 px, notched displays 36–45 px. */
+  padding: max(32px, var(--safe-top))
+           max(16px, var(--safe-right))
+           max(16px, var(--safe-bottom))
+           max(16px, var(--safe-left));
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
@@ -3034,7 +3033,7 @@ html.dark .typo-modal {
      sat exactly at the inset boundary, which on a real Android
      device read as "touching the status bar". The max() fallback
      of 32 px covers WebViews that report env() as 0. */
-  padding: max(32px, calc(env(safe-area-inset-top) + 12px)) 20px 14px;
+  padding: max(32px, calc(var(--safe-top) + 12px)) 20px 14px;
   border-bottom: 1px solid var(--rt-divider);
 }
 .typo-modal-header-main {
@@ -3319,18 +3318,18 @@ html.dark .typo-modal-toggle {
        The 32 / env+12 floors mirror the header's own padding-top so
        the × clears the status bar on edge-to-edge Android. */
     position: absolute;
-    top: max(32px, calc(env(safe-area-inset-top) + 12px));
+    top: max(32px, calc(var(--safe-top) + 12px));
     right: 12px;
   }
   .typo-modal-body {
     grid-template-columns: 1fr;
     /* Bottom padding follows the same pattern as SettingsPanel:
-       env(safe-area-inset-bottom) with a 16 px floor so the last
+       var(--safe-bottom) with a 16 px floor so the last
        card is never hidden under the Android gesture nav bar. */
     padding: 12px
-             max(12px, env(safe-area-inset-right))
-             max(16px, env(safe-area-inset-bottom))
-             max(12px, env(safe-area-inset-left));
+             max(12px, var(--safe-right))
+             max(16px, var(--safe-bottom))
+             max(12px, var(--safe-left));
   }
 }
 

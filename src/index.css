@@ -4,15 +4,31 @@
 
 /* If you toggle dark mode by adding `.dark` to <html>, define this variant in v4 */
 
+/* Safe-area inset variables — single source of truth used throughout the
+   app (header sticky offset, FAB bottom, panel padding, etc.).
+   - In a regular browser / PWA, env(safe-area-inset-*) returns the right
+     values and `--android-inset-*` is unset, so var() falls through.
+   - Inside the Android WebView, WebViewActivity sets `--android-inset-*`
+     from the real Activity insets. Necessary because the Android 15
+     WebView on stock Pixel images returns 0 for env(safe-area-inset-*)
+     even though the device IS edge-to-edge, which leaves the FAB under
+     the nav bar and the header floating below the status bar. */
+:root {
+  --safe-top:    var(--android-inset-top,    env(safe-area-inset-top));
+  --safe-bottom: var(--android-inset-bottom, env(safe-area-inset-bottom));
+  --safe-left:   var(--android-inset-left,   env(safe-area-inset-left));
+  --safe-right:  var(--android-inset-right,  env(safe-area-inset-right));
+}
+
 /* On mouse click: remove focus outline AND Tailwind ring (box-shadow).
    Keyboard navigation (:focus-visible) keeps its indicator for accessibility. */
 /* Default cursor to arrow everywhere — text cursor only on actual inputs */
 body {
   cursor: default;
   /* Edge-to-edge PWA: content extends under system bars */
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-right: env(safe-area-inset-right);
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  padding-right: var(--safe-right);
 }
 
 *:focus:not(:focus-visible) {

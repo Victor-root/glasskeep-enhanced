@@ -59,9 +59,14 @@ export default function NotesHeader({
   const showOfflineBadge = !isOnline || syncStatus?.syncState === "offline" || syncStatus?.serverReachable === false;
   return (
       <header
-        className={`p-4 sm:p-6 flex justify-between items-center sticky top-0 ${mobileSearchOpen ? "z-[1000]" : "z-40"} glass-card mb-6 relative${showOfflineBadge && windowWidth < 640 ? " pb-7" : ""}`}
+        className={`p-4 sm:p-6 flex justify-between items-center sticky top-0 ${mobileSearchOpen ? "z-[1000]" : "z-40"} glass-card mb-6${showOfflineBadge && windowWidth < 640 ? " pb-7" : ""}`}
         style={{
-          top: "env(safe-area-inset-top)",
+          // Keep the sticky header tight against the status bar.
+          // `--safe-top` falls back to the standard env() value in any
+          // non-WebView context, but inside the Android app it picks up
+          // the Activity-injected inset (works around an Android 15
+          // WebView bug where env() returns 0 even in edge-to-edge).
+          top: "var(--safe-top)",
           transform: !headerVisible && (windowWidth < 700 || isLandscapeMobile) ? "translateY(-100%)" : "translateY(0)",
           transition: "transform 0.3s ease",
         }}

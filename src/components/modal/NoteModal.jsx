@@ -567,10 +567,10 @@ export default function NoteModal({
           style={{
             backgroundColor: modalBgFor(mColor, dark),
             height: mobileLayout ? '100dvh' : undefined,
-            paddingTop: mobileLayout ? 'env(safe-area-inset-top)' : undefined,
-            paddingBottom: mobileLayout ? 'env(safe-area-inset-bottom)' : undefined,
-            paddingLeft: mobileLayout && !edgeToEdgeLandscape ? 'env(safe-area-inset-left)' : undefined,
-            paddingRight: mobileLayout ? 'env(safe-area-inset-right)' : undefined,
+            paddingTop: mobileLayout ? 'var(--safe-top)' : undefined,
+            paddingBottom: mobileLayout ? 'var(--safe-bottom)' : undefined,
+            paddingLeft: mobileLayout && !edgeToEdgeLandscape ? 'var(--safe-left)' : undefined,
+            paddingRight: mobileLayout ? 'var(--safe-right)' : undefined,
           }}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
@@ -1041,10 +1041,10 @@ export default function NoteModal({
           style={{
             backgroundColor: modalBgFor(mColor, dark),
             height: '100dvh',
-            paddingTop: 'env(safe-area-inset-top)',
-            paddingBottom: 'env(safe-area-inset-bottom)',
-            paddingLeft: 'env(safe-area-inset-left)',
-            paddingRight: 'env(safe-area-inset-right)',
+            paddingTop: 'var(--safe-top)',
+            paddingBottom: 'var(--safe-bottom)',
+            paddingLeft: 'var(--safe-left)',
+            paddingRight: 'var(--safe-right)',
           }}
         >
           <NoteAiChatPanel

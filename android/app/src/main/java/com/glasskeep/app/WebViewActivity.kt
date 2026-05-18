@@ -167,6 +167,37 @@ class WebViewActivity : AppCompatActivity() {
         }
     }
 
+    // Latest system-bar / display-cutout insets in CSS pixels (dp). Captured by the
+    // OnApplyWindowInsetsListener on the WebView and replayed via `injectSafeAreaInsets`
+    // on every page load, so the React app has correct values BEFORE the first paint.
+    //
+    // We do this because the Android 15 WebView on stock Pixel images returns 0 for
+    // env(safe-area-inset-bottom) (the FAB ended up half-hidden behind the gesture/
+    // 3-button bar). The Activity already knows the real insets — we just hand them
+    // to the page as CSS custom properties so styles can read `var(--safe-bottom)`
+    // with `env(safe-area-inset-bottom)` as the fallback for non-WebView contexts.
+    private var safeAreaTopDp = 0.0
+    private var safeAreaBottomDp = 0.0
+    private var safeAreaLeftDp = 0.0
+    private var safeAreaRightDp = 0.0
+
+    private fun injectSafeAreaInsets() {
+        // Skip injection if the WebView hasn't loaded any page yet — evaluating JS
+        // before there's a document just queues a useless call.
+        if (!this::webView.isInitialized) return
+        val js = """
+            (function(){
+              var s = document.documentElement && document.documentElement.style;
+              if (!s) return;
+              s.setProperty('--android-inset-top',    '${safeAreaTopDp}px');
+              s.setProperty('--android-inset-bottom', '${safeAreaBottomDp}px');
+              s.setProperty('--android-inset-left',   '${safeAreaLeftDp}px');
+              s.setProperty('--android-inset-right',  '${safeAreaRightDp}px');
+            })();
+        """.trimIndent()
+        webView.evaluateJavascript(js, null)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -219,6 +250,32 @@ class WebViewActivity : AppCompatActivity() {
         } catch (_: Exception) { }
 
         webAuthnBridge = WebAuthnBridge(this) { webView }
+
+        // System-bar / display-cutout insets, in CSS pixels, exposed to the
+        // WebView as `--android-inset-*` custom properties. The Android 15
+        // WebView on stock Pixel images returns 0 for env(safe-area-inset-*)
+        // even though the device IS edge-to-edge — the FAB ends up under the
+        // navigation bar and the header floats below the status bar. Sourcing
+        // the value from the Activity's WindowInsetsCompat avoids that bug
+        // entirely, and the CSS keeps env() as a fallback for any non-WebView
+        // context (PWA in a browser, desktop, etc.).
+        //
+        // Returning `insets` unchanged keeps the existing SwipeRefreshLayout
+        // listener (registered above) working — insets only get consumed when
+        // a listener returns CONSUMED, and we explicitly want them to keep
+        // propagating to the WebView so other apps inside the layout still
+        // see them.
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(webView) { _, insets ->
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            val cutout = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.displayCutout())
+            val density = resources.displayMetrics.density
+            safeAreaTopDp    = maxOf(bars.top,    cutout.top)    / density.toDouble()
+            safeAreaBottomDp = maxOf(bars.bottom, cutout.bottom) / density.toDouble()
+            safeAreaLeftDp   = maxOf(bars.left,   cutout.left)   / density.toDouble()
+            safeAreaRightDp  = maxOf(bars.right,  cutout.right)  / density.toDouble()
+            injectSafeAreaInsets()
+            insets
+        }
 
         webView.apply {
             addJavascriptInterface(ThemeBridge(), "AndroidTheme")
@@ -286,6 +343,13 @@ class WebViewActivity : AppCompatActivity() {
                     // runs. The polyfill is idempotent — re-injecting it
                     // on SPA navigations is harmless.
                     view.evaluateJavascript(WebAuthnBridge.POLYFILL_JS, null)
+                    // Replay the cached system-bar insets so the React app
+                    // has the correct --android-inset-* values BEFORE the
+                    // first paint. We can't rely on the WindowInsets
+                    // listener firing at the right moment relative to
+                    // navigation — the page might mount on top of stale
+                    // (or zero) values otherwise.
+                    injectSafeAreaInsets()
                 }
 
                 override fun onPageFinished(view: WebView, pageUrl: String?) {

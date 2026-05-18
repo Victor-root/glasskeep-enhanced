@@ -21,6 +21,7 @@ This release brings **passkey support to the native Android app** — fingerprin
 
 ### 🐛 Fixed
 - 🔐 **Passkey verification accepts native-app origins** — `expectedOrigin` now allows the `android:apk-key-hash:<URL-safe base64(SHA-256(cert))>` form Credential Manager produces, in addition to the regular HTTPS origin (browser ceremonies)
+- 📐 **Edge-to-edge insets fixed on Android 15 WebView** — the stock Pixel WebView returns 0 for `env(safe-area-inset-*)` even in edge-to-edge mode, which left the FAB partially behind the navigation bar and the header floating under the status bar. The Activity now injects the real system-bar insets as CSS custom properties (`--android-inset-*`) read via a single `--safe-*` indirection across the whole app; the existing `env()` chain is kept as the fallback for browser / PWA contexts
 
 ### 🛠️ Upgrade
 

@@ -16,7 +16,7 @@ export default function ToastContainer({ toasts }) {
   return (
     <div
       className="fixed left-2 right-2 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[60] space-y-2 flex flex-col items-stretch sm:items-center"
-      style={{ top: "calc(env(safe-area-inset-top) + 1rem)" }}
+      style={{ top: "calc(var(--safe-top) + 1rem)" }}
     >
       {toasts.map((toast) => (
         <div

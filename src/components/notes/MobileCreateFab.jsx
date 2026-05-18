@@ -60,8 +60,14 @@ export default function MobileCreateFab({
         ref={containerRef}
         className="fixed z-40 flex flex-col items-end gap-3 pointer-events-none"
         style={{
-          bottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))",
-          right: "max(1.5rem, calc(env(safe-area-inset-right) + 1rem))",
+          // --safe-bottom / --safe-right resolve to the Android-injected
+          // value when running inside the native APK, or to the standard
+          // env() inset in any browser / PWA context. Necessary because
+          // the Android 15 WebView on stock Pixel images returns 0 for
+          // the bottom inset and the FAB ended up partly hidden behind
+          // the navigation bar.
+          bottom: "max(1.5rem, calc(var(--safe-bottom) + 1rem))",
+          right: "max(1.5rem, calc(var(--safe-right) + 1rem))",
         }}
       >
       <div
