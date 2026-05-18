@@ -131,6 +131,33 @@ class WebViewActivity : AppCompatActivity() {
         @JavascriptInterface
         fun isAndroidTV(): Boolean = isTelevision()
 
+        /** Open a URL in the device's external browser. Used by docs /
+         *  changelog links so the user isn't navigated AWAY from the
+         *  app inside the WebView (which would unmount the modal they
+         *  were reading). `window.open(url, "_blank")` doesn't pop a
+         *  new tab here because setSupportMultipleWindows(false), so
+         *  the JS layer calls this bridge method instead. */
+        @JavascriptInterface
+        fun openExternalUrl(url: String?) {
+            if (url.isNullOrBlank()) return
+            runOnUiThread {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(intent)
+                } catch (_: Exception) {
+                    // No browser available, or the URL was malformed —
+                    // fall back to a discreet toast so the user knows
+                    // their tap was acknowledged.
+                    Toast.makeText(
+                        this@WebViewActivity,
+                        url,
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
+        }
+
         @JavascriptInterface
         fun saveBlobFile(base64Data: String, filename: String, mimeType: String) {
             try {

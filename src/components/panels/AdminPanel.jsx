@@ -810,8 +810,7 @@ export default function AdminPanel({
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" />
           <div
-            className="glass-card rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative text-center"
-            style={{ backgroundColor: dark ? "rgba(40,40,40,0.97)" : "rgba(255,255,255,0.97)" }}
+            className="rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative text-center bg-white dark:bg-[#282828] border border-[var(--border-light)]"
           >
             {restartPhase === "waiting" ? (
               <>
@@ -839,8 +838,7 @@ export default function AdminPanel({
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" />
           <div
-            className="glass-card rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative text-center"
-            style={{ backgroundColor: dark ? "rgba(40,40,40,0.97)" : "rgba(255,255,255,0.97)" }}
+            className="rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative text-center bg-white dark:bg-[#282828] border border-[var(--border-light)]"
           >
             {shutdownPhase === "waiting" ? (
               <>

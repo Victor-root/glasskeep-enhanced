@@ -54,10 +54,7 @@ export default function ChangePasswordModal({ forced, token, dark, onSuccess, on
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div
-        className="w-[90%] max-w-md rounded-xl shadow-2xl p-6"
-        style={{
-          backgroundColor: dark ? "rgba(40,40,40,0.98)" : "rgba(255,255,255,0.98)",
-        }}
+        className="w-[90%] max-w-md rounded-xl shadow-2xl p-6 bg-white dark:bg-[#282828] border border-[var(--border-light)]"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-semibold mb-1">

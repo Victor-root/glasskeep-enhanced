@@ -91,8 +91,8 @@ export default function LogoPickerPopover({
         ...(nearRight && arrowDir === "up" && { borderTopRightRadius: '4px' }),
         ...(nearRight && arrowDir === "down" && { borderBottomRightRadius: '4px' }),
       }}
-      className={`rounded-2xl shadow-2xl backdrop-blur-xl border ring-1 ring-black/5 dark:ring-white/5 p-3 ${
-        dark ? "bg-gray-900/98 border-gray-700/50" : "bg-white/98 border-gray-100/80"
+      className={`rounded-2xl shadow-2xl border ring-1 ring-black/5 dark:ring-white/5 p-3 ${
+        dark ? "bg-gray-900 border-gray-700/50" : "bg-white border-gray-100/80"
       }`}
     >
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 48px)", gap: "12px" }}>

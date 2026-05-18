@@ -24,10 +24,7 @@ export default function ConfirmRemoveCollaboratorDialog({
         onClick={onClose}
       />
       <div
-        className="glass-card rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative"
-        style={{
-          backgroundColor: dark ? "#282828" : "#ffffff",
-        }}
+        className="rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative bg-white dark:bg-[#282828] border border-[var(--border-light)]"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold mb-2">

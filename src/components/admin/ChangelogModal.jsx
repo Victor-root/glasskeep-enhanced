@@ -78,6 +78,42 @@ function compileMarkdown(md) {
 // user clicks "Translate with AI".
 const compiledChangelog = compileMarkdown(changelogRaw);
 
+// Where relative changelog links (e.g. `./PASSKEYS.md`) live online.
+// The changelog is markdown checked into the repo, so any in-repo
+// reference makes sense once resolved against the GitHub view URL.
+const REPO_BLOB_BASE =
+    "https://github.com/Victor-root/glasskeep-enhanced/blob/main/";
+
+function resolveChangelogHref(href) {
+    if (!href) return null;
+    // Already absolute (http(s):, mailto:, tel:, etc.) — pass through.
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return href;
+    // Strip a leading `./` so URL doesn't fold it into the basename, then
+    // build against the GitHub blob root. Anchors and query strings are
+    // preserved because URL handles them natively.
+    try {
+        return new URL(href.replace(/^\.\//, ""), REPO_BLOB_BASE).toString();
+    } catch {
+        return null;
+    }
+}
+
+function openExternalUrl(url) {
+    if (!url) return;
+    // The native Android shell exposes a bridge that hands the URL to
+    // the system browser. Using window.open here would silently fail
+    // (the WebView has multi-window support disabled), so the bridge
+    // path is preferred whenever it's available.
+    try {
+        if (window.AndroidTheme && typeof window.AndroidTheme.openExternalUrl === "function") {
+            window.AndroidTheme.openExternalUrl(url);
+            return;
+        }
+    } catch { /* ignore — fall through to window.open */ }
+    try { window.open(url, "_blank", "noopener,noreferrer"); }
+    catch { /* nothing else we can do */ }
+}
+
 // True when the requesting user has a usable AI config (either the
 // shared "server" provider opted-in by the admin, or their own custom
 // endpoint). The "Translate with AI" button stays visible but disabled
@@ -442,6 +478,23 @@ export default function ChangelogModal() {
                 <div
                     className="gk-changelog flex-1 min-h-0 overflow-y-auto px-6 py-5 text-sm text-gray-800 dark:text-gray-100"
                     dangerouslySetInnerHTML={{ __html: displayHtml }}
+                    onClick={(e) => {
+                        // Markdown anchors are sanitised into real <a>
+                        // tags by DOMPurify, but their default action
+                        // navigates the WebView/SPA and the catch-all
+                        // server route returns index.html — so a click
+                        // on ./PASSKEYS.md sends the user back home.
+                        // Intercept here, resolve relative paths against
+                        // the GitHub blob root, and hand the URL to the
+                        // system browser (native bridge in the APK,
+                        // window.open in a regular browser).
+                        const a = e.target.closest && e.target.closest("a");
+                        if (!a) return;
+                        const href = a.getAttribute("href");
+                        if (!href || href.startsWith("#")) return;
+                        e.preventDefault();
+                        openExternalUrl(resolveChangelogHref(href));
+                    }}
                 />
             </div>
         </div>

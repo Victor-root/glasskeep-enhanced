@@ -390,7 +390,7 @@ export default function ModalFooter({
                   ...(nearRight && arrowDir === "up" && { borderTopRightRadius: '4px' }),
                   ...(nearRight && arrowDir === "down" && { borderBottomRightRadius: '4px' }),
                 }}
-                className="rounded-2xl shadow-2xl bg-white/98 dark:bg-gray-900/98 backdrop-blur-xl border border-indigo-100/80 dark:border-indigo-800/50 ring-1 ring-black/5 dark:ring-white/5"
+                className="rounded-2xl shadow-2xl bg-white dark:bg-gray-900 border border-indigo-100/80 dark:border-indigo-800/50 ring-1 ring-black/5 dark:ring-white/5"
               >
                 <div className="overflow-hidden rounded-2xl">
                 {/* Search input */}
