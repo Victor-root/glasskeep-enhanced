@@ -95,34 +95,52 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
             <p className="text-gray-500 dark:text-gray-400">{title}</p>
           </div>
 
-          {/* Cards row — contains ONLY the cards (and the decorative
-              arrow on lg+). The earlier layout grouped the form card
-              with the dark-mode toggle / slogan / "change server"
-              link inside a single flex column, which meant
-              `items-center` aligned the COLUMN centres, not the
-              actual card centres — the form column was a good 60 px
-              taller than the QR column thanks to those trailing
-              rows, and the QR card came out visibly off. Pulling
-              the trailing rows out of the flex row lets
-              `items-center` do the right thing: form-card centre =
-              QR-card centre. */}
+          {/* Cards row.
+              On mobile: flex column with the form card, a decorative
+              arrow-DOWN, and the QR card stacked one under the other.
+              On lg+: a `relative w-fit` block where the form card is
+              the only in-flow child; the right-pointing arrow and the
+              QR card are positioned ABSOLUTELY relative to it.
+              Why absolute on desktop:  with the QR card in flow, the
+              cards row's height was `max(formCard, qrCard)` — i.e. it
+              grew by ~190 px whenever the user popped the QR open,
+              which then made the outer-flex `items-center` re-centre
+              the whole page and shifted the logo+title visibly up.
+              Pulling the QR (and the arrow) out of the flow keeps the
+              row height pinned to the form card so the logo+title
+              never moves between QR-closed and QR-open. */}
           <div
             className={`flex flex-col items-center gap-6 ${
-              sidePanel ? "lg:flex-row lg:items-center lg:gap-4" : ""
+              sidePanel ? "lg:block lg:relative lg:w-fit lg:items-stretch" : ""
             }`}
           >
-            <div className="glass-card rounded-xl p-6 shadow-lg w-full max-w-md lg:shrink-0">
+            <div className="glass-card rounded-xl p-6 shadow-lg w-full max-w-md">
               {children}
             </div>
             {sidePanel && (
               <>
+                {/* Mobile: arrow pointing DOWN, sits between the form
+                    card and the QR card in flow. Hidden on lg+. */}
                 <div
-                  className="hidden lg:flex lg:items-center lg:shrink-0 text-indigo-500 dark:text-indigo-400"
+                  className="lg:hidden text-indigo-500 dark:text-indigo-400"
+                  aria-hidden="true"
+                >
+                  <TI.ArrowBadgeDown className="tabler-icon w-12 h-12" />
+                </div>
+                {/* Desktop: arrow pointing RIGHT, absolutely positioned
+                    just past the form card's right edge, vertically
+                    centred on it. */}
+                <div
+                  className="hidden lg:flex lg:items-center lg:absolute lg:top-1/2 lg:-translate-y-1/2 lg:left-[calc(100%+0.5rem)] text-indigo-500 dark:text-indigo-400"
                   aria-hidden="true"
                 >
                   <TI.ArrowBadgeRight className="tabler-icon w-12 h-12" />
                 </div>
-                <div className="w-full max-w-md lg:w-72 lg:max-w-none lg:shrink-0">
+                {/* QR card: in flow on mobile (full width, max-w-md);
+                    absolutely positioned on lg+ at form-right + arrow
+                    + gaps, vertically centred via top:50% +
+                    translate(-50%). */}
+                <div className="w-full max-w-md lg:absolute lg:top-1/2 lg:-translate-y-1/2 lg:left-[calc(100%+4rem)] lg:w-72 lg:max-w-none">
                   {sidePanel}
                 </div>
               </>
