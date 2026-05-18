@@ -64,10 +64,20 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
   // widest field of view by default, and exposes a slider so the
   // user can zoom IN if they need to fill the frame with a QR
   // that's far away. Hidden when the active camera doesn't expose
-  // the `zoom` capability (older devices, most desktop webcams).
+  // the `zoom` capability (older devices, most desktop webcams,
+  // Android System WebView builds).
   const [zoomCaps, setZoomCaps] = useState(null); // { min, max, step }
   const [zoomValue, setZoomValue] = useState(1);
   const videoTrackRef = useRef(null);
+
+  // Match the camera container's aspect ratio to whatever the active
+  // stream actually delivers. Without this, a 9:16 portrait stream
+  // (Android back cam in environment mode) gets cropped horizontally
+  // by ~25% inside the static 3:4 container — which is exactly what
+  // the user perceived as "the camera is too zoomed in", even on
+  // devices that don't expose hardware zoom at all. Lets the WebView
+  // path benefit even though it can't move the zoom slider.
+  const [streamAspect, setStreamAspect] = useState(null);
 
   // Track which token we've already submitted to the server so a
   // shaky camera doesn't double-POST when the user holds the phone
@@ -151,10 +161,28 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
     setPhase(PHASES.loading);
     setZoomCaps(null);
     setZoomValue(1);
+    setStreamAspect(null);
 
     const start = async () => {
       const video = videoRef.current;
       if (!video) return;
+
+      // Pick up the real stream dimensions as soon as they're known —
+      // before the first frame is decoded videoWidth/videoHeight are
+      // both 0, so we wait for loadedmetadata (or use the values now
+      // if metadata is already in by the time we attach).
+      const captureAspect = () => {
+        if (!videoRef.current) return;
+        const w = videoRef.current.videoWidth;
+        const h = videoRef.current.videoHeight;
+        if (w > 0 && h > 0 && !cancelled) {
+          setStreamAspect(w / h);
+          console.log("[QR] stream dimensions:", w, "x", h, "→ aspect", (w / h).toFixed(3));
+        }
+      };
+      video.addEventListener("loadedmetadata", captureAspect);
+      if (video.videoWidth > 0) captureAspect();
+
       try {
         const scanner = new QrScanner(video, onScan, {
           preferredCamera: "environment",
@@ -169,6 +197,7 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
           return;
         }
         setPhase(PHASES.scanning);
+        captureAspect();
         probeAndApplyZoom(video, () => cancelled, setZoomCaps, setZoomValue, videoTrackRef);
       } catch (e) {
         setErrorText(
@@ -285,18 +314,24 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
             overlay during the loading phase — same visual result,
             no stylistic battle with the scanner. */}
         <div
-          // 3:4 portrait container (was aspect-square) — phone back
-          // cameras output a portrait stream and `object-cover` was
-          // cropping its left + right edges hard inside the square,
-          // ~doubling the perceived zoom. A 3:4 box closely matches
-          // the native stream ratio so the visible field of view is
-          // roughly what the camera actually sees.
-          className="relative w-full aspect-[3/4] rounded-xl overflow-hidden bg-black"
+          // Container's aspect ratio adapts to whatever the camera
+          // stream actually delivers (read from videoWidth/videoHeight
+          // on loadedmetadata). The 3:4 here is a placeholder used
+          // before metadata is in. Why this matters: a 9:16 portrait
+          // Android stream inside a static 3:4 box gets cropped ~25%
+          // horizontally by object-cover, which the user perceives as
+          // "the camera is zoomed in too much". Adapting the box
+          // eliminates the crop and we see the camera's real FoV —
+          // no hardware zoom required.
+          className="relative w-full rounded-xl overflow-hidden bg-black"
           style={{
             display:
               phase === PHASES.loading || phase === PHASES.scanning
                 ? "block"
                 : "none",
+            aspectRatio: streamAspect
+              ? String(streamAspect)
+              : "3 / 4",
           }}
         >
           <video
@@ -416,14 +451,20 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
 
 // ─── helpers ─────────────────────────────────────────────────────────
 
-// Probe MediaTrackCapabilities.zoom and pin the track to its smallest
-// supported value. Android WebViews are known to populate the
-// capabilities object lazily — first call right after `start()` can
-// return an empty {} even though the camera supports zoom — so we
-// retry a handful of times before giving up. Console logs are
-// intentional: when a user reports "no slider on my phone", asking
-// them to share `chrome://inspect` output of these is much faster
-// than guessing.
+// Probe the back camera's zoom range and pin the track to its widest
+// setting. Two strategies, in order:
+//
+//   1. MediaTrackCapabilities.zoom — the "spec" way. Many Android
+//      WebViews populate this lazily so we retry a handful of times
+//      before giving up.
+//
+//   2. Trial-and-error applyConstraints — fallback for WebView builds
+//      that accept advanced[zoom] constraints WITHOUT advertising
+//      them through getCapabilities(). We try a few canonical values
+//      (0.5, 1, 2, 4, 8) and keep whichever the device accepts.
+//
+// All probe attempts are logged so a chrome://inspect session can
+// pinpoint why no slider appears on a given phone.
 async function probeAndApplyZoom(video, isCancelled, setZoomCaps, setZoomValue, videoTrackRef) {
   try {
     const stream = video?.srcObject;
@@ -435,46 +476,103 @@ async function probeAndApplyZoom(video, isCancelled, setZoomCaps, setZoomValue, 
       return;
     }
     videoTrackRef.current = track;
-    if (typeof track.getCapabilities !== "function") {
-      console.log("[QR] zoom probe: getCapabilities unsupported");
+
+    // ── Strategy 1: getCapabilities() with retries ─────────────────
+    if (typeof track.getCapabilities === "function") {
+      for (let i = 0; i < 6; i++) {
+        if (isCancelled()) return;
+        const caps = track.getCapabilities() || {};
+        const settings = typeof track.getSettings === "function"
+          ? track.getSettings() || {}
+          : {};
+        console.log("[QR] zoom probe attempt", i, "caps:", caps, "settings:", settings);
+
+        if (caps.zoom && typeof caps.zoom === "object"
+            && Number.isFinite(Number(caps.zoom.min))
+            && Number.isFinite(Number(caps.zoom.max))
+            && Number(caps.zoom.max) > Number(caps.zoom.min)) {
+          const min = Number(caps.zoom.min);
+          const max = Number(caps.zoom.max);
+          const step = Number(caps.zoom.step) || 0.1;
+          if (!isCancelled()) {
+            setZoomCaps({ min, max, step });
+            setZoomValue(min);
+          }
+          try {
+            await track.applyConstraints({ advanced: [{ zoom: min }] });
+            console.log("[QR] zoom via caps applied:", min);
+          } catch (e) {
+            console.log("[QR] zoom applyConstraints rejected:", e?.message || e);
+          }
+          return;
+        }
+
+        await new Promise(r => setTimeout(r, 250));
+      }
+      console.log("[QR] zoom caps absent after retries — falling back to trial");
+    } else {
+      console.log("[QR] getCapabilities unsupported — falling back to trial");
+    }
+
+    // ── Strategy 2: trial-and-error applyConstraints ───────────────
+    // Some Android WebViews silently accept any advanced[zoom] value
+    // without throwing, even on devices with no zoom hardware. To
+    // distinguish "accepted but no-op" from "real support", we read
+    // back getSettings().zoom after each apply and require it to
+    // actually move.
+    const probeValue = async (value) => {
+      try {
+        await track.applyConstraints({ advanced: [{ zoom: value }] });
+        const after = typeof track.getSettings === "function"
+          ? Number(track.getSettings()?.zoom)
+          : undefined;
+        return Number.isFinite(after) ? after : null;
+      } catch {
+        return null;
+      }
+    };
+
+    if (isCancelled()) return;
+    const baseline = await probeValue(1);
+    console.log("[QR] trial probe baseline @ zoom=1 →", baseline);
+    if (baseline == null) {
+      console.log("[QR] trial probe: device rejected zoom=1, no slider");
       return;
     }
 
-    // Up to 6 attempts × 250 ms = 1.5 s total. Plenty for Android.
-    for (let i = 0; i < 6; i++) {
+    // Walk down to find the smallest accepted value (ultra-wide), then
+    // up to find the largest (max telephoto / digital).
+    let detectedMin = 1;
+    for (const candidate of [0.5, 0.6, 0.7, 0.8, 0.9]) {
       if (isCancelled()) return;
-      const caps = track.getCapabilities() || {};
-      const settings = typeof track.getSettings === "function"
-        ? track.getSettings() || {}
-        : {};
-      console.log("[QR] zoom probe attempt", i, "caps:", caps, "settings:", settings);
-
-      let min, max, step;
-      if (caps.zoom && typeof caps.zoom === "object"
-          && Number.isFinite(Number(caps.zoom.min))
-          && Number.isFinite(Number(caps.zoom.max))
-          && Number(caps.zoom.max) > Number(caps.zoom.min)) {
-        min = Number(caps.zoom.min);
-        max = Number(caps.zoom.max);
-        step = Number(caps.zoom.step) || 0.1;
+      const after = await probeValue(candidate);
+      console.log("[QR] trial probe min @ zoom=", candidate, "→", after);
+      if (after != null && Math.abs(after - candidate) < 0.15) {
+        detectedMin = candidate;
+        break;
       }
-
-      if (min !== undefined) {
-        if (!isCancelled()) {
-          setZoomCaps({ min, max, step });
-          setZoomValue(min);
-        }
-        try {
-          await track.applyConstraints({ advanced: [{ zoom: min }] });
-        } catch (e) {
-          console.log("[QR] zoom applyConstraints rejected:", e?.message || e);
-        }
-        return;
-      }
-
-      await new Promise(r => setTimeout(r, 250));
     }
-    console.log("[QR] zoom probe: gave up after retries — device has no zoom range");
+    let detectedMax = 1;
+    for (const candidate of [8, 6, 4, 3, 2]) {
+      if (isCancelled()) return;
+      const after = await probeValue(candidate);
+      console.log("[QR] trial probe max @ zoom=", candidate, "→", after);
+      if (after != null && Math.abs(after - candidate) < 0.5) {
+        detectedMax = candidate;
+        break;
+      }
+    }
+
+    if (detectedMax > detectedMin) {
+      console.log("[QR] trial probe accepted range:", detectedMin, "→", detectedMax);
+      if (!isCancelled()) {
+        setZoomCaps({ min: detectedMin, max: detectedMax, step: 0.1 });
+        setZoomValue(detectedMin);
+      }
+      await probeValue(detectedMin);
+    } else {
+      console.log("[QR] trial probe: no usable range (min ==", detectedMin, ", max ==", detectedMax, ") — no slider");
+    }
   } catch (e) {
     console.log("[QR] zoom probe threw:", e?.message || e);
   }
