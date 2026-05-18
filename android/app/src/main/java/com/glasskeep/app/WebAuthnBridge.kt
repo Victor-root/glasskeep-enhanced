@@ -50,7 +50,7 @@ import org.json.JSONObject
  * (`registrationResponseJson` / `authenticationResponseJson`) are
  * likewise the standard `RegistrationResponseJSON` /
  * `AuthenticationResponseJSON` payloads the server's
- * `/passkeys/*/verify` endpoints already understand.
+ * `/passkeys/.../verify` endpoints already understand.
  *
  * @JavascriptInterface methods are invoked on a binder thread, NOT the
  * main thread. Credential Manager callbacks need an Executor and a UI
