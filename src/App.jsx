@@ -3718,7 +3718,6 @@ export default function App() {
       const handlers = {
         text: handleDirectText,
         checklist: handleDirectChecklist,
-        draw: handleDirectDraw,
         audio: handleDirectAudio,
       };
       handlers[newType]?.();

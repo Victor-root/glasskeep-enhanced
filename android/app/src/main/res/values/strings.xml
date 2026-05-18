@@ -26,8 +26,6 @@
     <string name="shortcut_new_text_long">New text note</string>
     <string name="shortcut_new_checklist_short">Checklist</string>
     <string name="shortcut_new_checklist_long">New checklist</string>
-    <string name="shortcut_new_draw_short">Drawing</string>
-    <string name="shortcut_new_draw_long">New drawing</string>
     <string name="shortcut_new_audio_short">Audio note</string>
     <string name="shortcut_new_audio_long">New audio note</string>
 </resources>

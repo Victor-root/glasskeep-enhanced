@@ -41,17 +41,6 @@
             android:targetClass="com.glasskeep.app.MainActivity" />
     </shortcut>
     <shortcut
-        android:shortcutId="new_draw"
-        android:enabled="true"
-        android:icon="@drawable/ic_shortcut_draw"
-        android:shortcutShortLabel="@string/shortcut_new_draw_short"
-        android:shortcutLongLabel="@string/shortcut_new_draw_long">
-        <intent
-            android:action="com.glasskeep.app.SHORTCUT_NEW_DRAW"
-            android:targetPackage="com.glasskeep.app"
-            android:targetClass="com.glasskeep.app.MainActivity" />
-    </shortcut>
-    <shortcut
         android:shortcutId="new_checklist"
         android:enabled="true"
         android:icon="@drawable/ic_shortcut_checklist"

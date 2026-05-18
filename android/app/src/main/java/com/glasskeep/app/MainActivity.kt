@@ -102,7 +102,6 @@ class MainActivity : ComponentActivity() {
             "com.glasskeep.app.SHORTCUT_QR_SCAN"      to ("qr"  to "open"),
             "com.glasskeep.app.SHORTCUT_NEW_TEXT"     to ("new" to "text"),
             "com.glasskeep.app.SHORTCUT_NEW_CHECKLIST" to ("new" to "checklist"),
-            "com.glasskeep.app.SHORTCUT_NEW_DRAW"     to ("new" to "draw"),
             "com.glasskeep.app.SHORTCUT_NEW_AUDIO"    to ("new" to "audio"),
         )
     }
