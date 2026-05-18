@@ -56,7 +56,7 @@ import AdminPanel from "./components/panels/AdminPanel.jsx";
 import { useUpdateCheck } from "./hooks/useUpdateCheck.js";
 import { useSelfUpdate } from "./hooks/useSelfUpdate.js";
 import SelfUpdateProgress from "./components/admin/SelfUpdateProgress.jsx";
-import ChangelogModal from "./components/admin/ChangelogModal.jsx";
+import ChangelogModal, { consumeChangelogShowFlag, onOpenChangelogRequest } from "./components/admin/ChangelogModal.jsx";
 import NoteCard from "./components/notes/NoteCard.jsx";
 import AdminView from "./components/notes/AdminView.jsx";
 import NotesUI from "./components/notes/NotesUI.jsx";
@@ -334,6 +334,18 @@ export default function App() {
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const openQrScanner = useCallback(() => setQrScannerOpen(true), []);
   const closeQrScanner = useCallback(() => setQrScannerOpen(false), []);
+
+  // ChangelogModal open state is lifted here (instead of inside the
+  // component) so it can be registered with the central Android
+  // back-button stack — overlayOpenCount + the popstate handler below.
+  // Without lifting, pressing back on Android while the changelog was
+  // open backgrounded the entire app.
+  const [changelogOpen, setChangelogOpen] = useState(false);
+  const closeChangelog = useCallback(() => setChangelogOpen(false), []);
+  useEffect(() => {
+    if (consumeChangelogShowFlag()) setChangelogOpen(true);
+  }, []);
+  useEffect(() => onOpenChangelogRequest(() => setChangelogOpen(true)), []);
   const [qrQuickEnabled, setQrQuickEnabledState] = useState(() => {
     try { return localStorage.getItem("glass-keep-qr-quick") === "1"; }
     catch { return false; }
@@ -3424,6 +3436,7 @@ export default function App() {
     modalKebabOpen, modalTagFocused, syncDropdownOpen, mobileSearchOpen,
     showColorPop, showComposerFmt, headerMenuOpen, multiMode,
     typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
+    noteAiOpen, changelogOpen,
   ].filter(Boolean).length;
   const prevOverlayCountRef = useRef(0);
 
@@ -3462,6 +3475,7 @@ export default function App() {
       popInProgressRef.current = true;
       // Close topmost overlay (highest z-index first)
       if (imgViewOpen) { setImgViewOpen(false); return; }
+      if (changelogOpen) { setChangelogOpen(false); return; }
       if (confirmDeleteOpen) { setConfirmDeleteOpen(false); return; }
       if (genericConfirmOpen) { setGenericConfirmOpen(false); return; }
       if (collaborationModalOpen) { setCollaborationModalOpen(false); return; }
@@ -3470,6 +3484,10 @@ export default function App() {
       if (modalMenuOpen) { setModalMenuOpen(false); return; }
       if (modalKebabOpen) { setModalKebabOpen(false); return; }
       if (modalTagFocused) { setModalTagFocused(false); return; }
+      // noteAiOpen lives INSIDE the NoteModal (open), so we close the
+      // AI panel before the note itself — otherwise back inside the
+      // AI panel would dismiss the entire note in one go.
+      if (noteAiOpen) { setNoteAiOpen(false); return; }
       if (open) { closeModalRef.current?.(); return; }
       if (fabOpen) { setFabOpen(false); return; }
       if (syncDropdownOpen) { setSyncDropdownOpen(false); return; }
@@ -3488,7 +3506,8 @@ export default function App() {
   }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
       showModalColorPop, showModalFmt, modalMenuOpen, modalKebabOpen, modalTagFocused,
       syncDropdownOpen, mobileSearchOpen, showColorPop, showComposerFmt,
-      headerMenuOpen, multiMode, typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen]);
+      headerMenuOpen, multiMode, typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
+      noteAiOpen, changelogOpen]);
 
   const addImagesToState = async (fileList, setter) => {
     const files = Array.from(fileList || []);
@@ -5892,7 +5911,7 @@ export default function App() {
         showGenericConfirm={showGenericConfirm}
       />
 
-      <ChangelogModal />
+      <ChangelogModal open={changelogOpen} onClose={closeChangelog} />
 
       {/* Cross-device QR sign-in: the camera + Approve / Reject card
           lives at App level so both the SettingsPanel row and the

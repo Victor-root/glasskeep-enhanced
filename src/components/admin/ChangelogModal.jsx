@@ -60,6 +60,23 @@ export function openChangelog() {
     }
 }
 
+// Read-and-clear the "show after update" flag. Called by App.jsx on
+// mount so the modal's open state can be lifted out of this file
+// (required for the Android back-button stack to know about it).
+export function consumeChangelogShowFlag() {
+    const flag = readShowFlag();
+    if (flag) clearShowFlag();
+    return flag;
+}
+
+// Subscribe to OPEN_EVENT requests. Returns an unsubscribe fn so
+// useEffect's cleanup can detach the listener.
+export function onOpenChangelogRequest(cb) {
+    const handler = () => { try { cb(); } catch { /* ignore */ } };
+    window.addEventListener(OPEN_EVENT, handler);
+    return () => window.removeEventListener(OPEN_EVENT, handler);
+}
+
 function compileMarkdown(md) {
     try {
         const html = marked.parse(String(md || ""), {
@@ -130,8 +147,12 @@ async function fetchAiAvailable(token) {
     }
 }
 
-export default function ChangelogModal() {
-    const [open, setOpen] = useState(false);
+// Controlled component: `open` / `onClose` are owned by App.jsx so the
+// modal can be registered with the central Android-back-button stack
+// (overlayOpenCount + popstate handler). The localStorage "show after
+// update" flag and the OPEN_EVENT custom-event listener have been
+// hoisted to App.jsx alongside.
+export default function ChangelogModal({ open, onClose }) {
     const [aiAvailable, setAiAvailable] = useState(false);
     const [translating, setTranslating] = useState(false);
     const [translatedRaw, setTranslatedRaw] = useState(null);
@@ -141,13 +162,6 @@ export default function ChangelogModal() {
     // closing the modal mid-stream tears the upstream request down
     // (no more tokens wasted after the admin walks away).
     const translateAbortRef = useRef(null);
-
-    useEffect(() => {
-        if (readShowFlag()) {
-            clearShowFlag();
-            setOpen(true);
-        }
-    }, []);
 
     // Pull the AI availability flag once the modal opens so the
     // translate button starts in the right enabled / disabled state.
@@ -286,16 +300,6 @@ export default function ChangelogModal() {
         }
     };
 
-    // On-demand opener: any module can dispatch the OPEN_EVENT to
-    // pop the modal (currently the "View changelog" link in the
-    // admin panel). Kept as a custom event so we don't have to lift
-    // open-state up into App.jsx for one button.
-    useEffect(() => {
-        const handler = () => setOpen(true);
-        window.addEventListener(OPEN_EVENT, handler);
-        return () => window.removeEventListener(OPEN_EVENT, handler);
-    }, []);
-
     // Lock body scroll while the changelog is open so the underlying
     // admin panel can't drift behind a fullscreen modal on mobile.
     useEffect(() => {
@@ -332,7 +336,7 @@ export default function ChangelogModal() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="changelog-modal-title"
-            onClick={() => setOpen(false)}
+            onClick={() => onClose?.()}
         >
             {/* Scoped typography for the rendered markdown so the modal
                 does not have to depend on a global prose stylesheet. */}
@@ -447,7 +451,7 @@ export default function ChangelogModal() {
                     )}
                     <button
                         type="button"
-                        onClick={() => setOpen(false)}
+                        onClick={() => onClose?.()}
                         aria-label={t("changelogModalClose")}
                         className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-md text-gray-500 hover:text-gray-800 hover:bg-black/5 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-white/10"
                     >
