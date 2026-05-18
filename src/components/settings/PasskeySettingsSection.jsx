@@ -252,15 +252,23 @@ export default function PasskeySettingsSection({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug max-w-prose">
+      {/* Description + Add CTA — stacked rather than side-by-side. On
+          mobile the previous row layout (text on the left, button on
+          the right with shrink-0) squeezed the description into a
+          column maybe 18ch wide, which makes the section feel much
+          smaller than its neighbours. Stacking gives the description
+          the full container width and lets the button stretch across
+          the row on phones (clear tap target), while desktops keep an
+          inline-sized button. */}
+      <div>
+        <p className="text-sm text-gray-500 dark:text-gray-400 leading-snug mb-3">
           {t("passkeySectionExplain")}
         </p>
         <button
           type="button"
           onClick={handleAdd}
           disabled={loading}
-          className="ml-3 shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 disabled:opacity-50 btn-gradient"
+          className="w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 disabled:opacity-50 btn-gradient"
         >
           {loading ? t("passkeyAddInProgress") : t("passkeyAddCta")}
         </button>

@@ -14,6 +14,8 @@ This release brings **passkey support to the native Android app** — fingerprin
 
 ### 🔄 Changed
 - 📱 **Mobile toasts now span the viewport** — long messages no longer crammed into a 384px column with empty gutters on each side; desktop layout untouched
+- 📐 **Passkey settings section rescaled for mobile** — description and "Add a passkey" button now stack vertically (text gets the full container width, button stretches across the row on phones) instead of cramming the text into an 18ch column to the left of an inline button
+- 🪟 **Themed dialogs are fully opaque** — passkey naming / confirmation modals drop the 95%-alpha + backdrop-blur in favour of solid `bg-white` / `bg-[#282828]` + a 1px card border, so the underlying settings panel stops bleeding through the dialog
 - 📦 **APK bumped to `1.3.0`** — minimum required to use passkeys in the app (asset-links validation needs the new signing pipeline + bridge)
 - 📚 **README passkey section trimmed** — one-line summary + link to the dedicated guide
 
