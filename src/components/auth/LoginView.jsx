@@ -4,6 +4,7 @@ import AuthShell from "./AuthShell.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
 import { localizeServerError } from "../../utils/serverErrors.js";
 import PasskeyLoginButton from "./PasskeyLoginButton.jsx";
+import QrLoginButton from "./QrLoginButton.jsx";
 
 export default function LoginView({
   dark,
@@ -139,6 +140,7 @@ export default function LoginView({
           >{t("signIn")}</button>
         </form>
         <PasskeyLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
+        <QrLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
         <div className="mt-4 text-sm text-center flex justify-center gap-4">
           {hasProfiles && (
             <button
@@ -190,6 +192,7 @@ export default function LoginView({
       </form>
 
       <PasskeyLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
+      <QrLoginButton onLoggedIn={onPasskeyLogin} dark={dark} />
 
       <div className="mt-4 text-sm flex justify-between items-center">
         {hasProfiles && (

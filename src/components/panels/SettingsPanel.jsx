@@ -10,6 +10,7 @@ import { fileToCompressedDataURL } from "../../utils/helpers.js";
 import TypographyModal from "./TypographyModal.jsx";
 import PasskeySettingsSection from "../settings/PasskeySettingsSection.jsx";
 import UserAiSettingsSection from "../settings/UserAiSettingsSection.jsx";
+import QrScannerModal from "../auth/QrScannerModal.jsx";
 
 // Single leading-icon component used in front of every section header
 // AND every row / button in the settings panel. Same 36 × 36 indigo
@@ -71,6 +72,7 @@ export default function SettingsPanel({
   const [languageChoice, setLanguageChoice] = useState(() => getLanguageOverride() || "");
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const languageBtnRef = useRef(null);
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
   // typographyModalOpen / setTypographyModalOpen come from App.jsx props
   // (see destructure above) — lifted to plug into the centralised
   // overlay back-button stack.
@@ -371,6 +373,25 @@ export default function SettingsPanel({
                 isWebView={!!isWebView}
               />
             </div>
+
+            {/* Cross-device QR sign-in. Phone-side entry point — the
+                user opens the camera, scans the QR shown on another
+                machine's login screen, and approves the resulting
+                confirmation. The PC side lives on the login screen
+                (QrLoginButton). If no camera is reachable, the modal
+                surfaces the actual MediaDevices error so we don't
+                need to gate the row up here. */}
+            <button
+              type="button"
+              onClick={() => setQrScannerOpen(true)}
+              className={`mt-3 w-full flex items-center gap-3 text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+            >
+              <RowIcon icon={TI.DeviceMobileRotated} />
+              <div className="min-w-0">
+                <div className="font-medium">{t("qrSignInRowTitle")}</div>
+                <div className="text-sm text-gray-500">{t("qrSignInRowSubtitle")}</div>
+              </div>
+            </button>
           </div>
 
           <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
@@ -788,6 +809,14 @@ export default function SettingsPanel({
         presets={typographyPresets}
         setPresets={setTypographyPresets}
         dark={dark}
+      />
+
+      {/* Camera + confirmation flow for cross-device QR sign-in. */}
+      <QrScannerModal
+        open={qrScannerOpen}
+        onClose={() => setQrScannerOpen(false)}
+        token={token}
+        showToast={showToast}
       />
     </>
   );

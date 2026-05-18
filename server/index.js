@@ -304,6 +304,7 @@ const { attachPasskeyRoutes } = require("./routes/passkeyRoutes");
 const { attachUpdateRoutes } = require("./routes/updateRoutes");
 const { attachSelfUpdateRoutes } = require("./routes/selfUpdateRoutes");
 const { attachAssetLinksRoutes } = require("./routes/assetLinksRoutes");
+const { attachDeviceLinkRoutes } = require("./routes/deviceLinkRoutes");
 const { requireUnlocked } = require("./routes/lockMiddleware");
 
 instanceVault.ensureSchema(db);
@@ -1021,6 +1022,11 @@ attachSelfUpdateRoutes(app, { auth, adminOnly, log: console });
 // index.html. Stays public (no auth, no lock gate) because Android's
 // verifier hits the URL unauthenticated and from outside any session.
 attachAssetLinksRoutes(app, { log: console });
+
+// Cross-device QR-code sign-in (the foreign PC shows a QR, the
+// phone scans + approves, the PC trades the token for a JWT on its
+// next poll). Schema is created lazily inside the route module.
+attachDeviceLinkRoutes(app, { db, auth, signToken, getUserById, log: console });
 
 const LOCK_ALLOW_PATHS = [
   /^\/api\/instance(\/|$)/,

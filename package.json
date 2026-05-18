@@ -77,6 +77,8 @@
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.539.0",
     "marked": "^16.1.2",
+    "qr-scanner": "^1.4.2",
+    "qrcode": "^1.5.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-masonry-css": "^1.0.16"
