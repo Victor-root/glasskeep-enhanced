@@ -283,7 +283,10 @@ export default function PasskeySettingsSection({
           {list.map((p) => (
             <li
               key={p.credentialId}
-              className="rounded-lg border border-[var(--border-light)] p-3 flex flex-col gap-3"
+              // md:+ flips to a row so the action buttons fill the
+              // empty band on the right; mobile stays stacked because
+              // the action row otherwise wraps awkwardly.
+              className="rounded-lg border border-[var(--border-light)] p-3 flex flex-col gap-3 md:flex-row md:items-center md:gap-4"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -310,7 +313,7 @@ export default function PasskeySettingsSection({
                 )}
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap md:flex-nowrap md:shrink-0 md:justify-end">
                 {/* Instance-unlock toggle (admins, PRF-capable, unlocked vault) */}
                 {isAdmin && encryptionEnabled && p.prfSupported && (
                   <button

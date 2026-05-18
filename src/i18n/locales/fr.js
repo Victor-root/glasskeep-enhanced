@@ -162,6 +162,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   signInLower: "Se connecter",
   signInWithEmailPassword: "Connexion avec e-mail et mot de passe",
   signInWithSecretKey: "Connexion avec clé secrète",
+  rememberCredentials: "Vous vous souvenez de vos identifiants ?",
   signOut: "Se déconnecter",
   storage: "Stockage",
   tags: "Tags",
@@ -758,6 +759,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   qrScanRetry: "Fermer",
   qrScanInfoFailed: "Impossible de récupérer les informations de l'autre appareil.",
   qrScanApproveFailed: "L'approbation a échoué. Le QR a peut-être expiré.",
+  qrScanZoom: "Zoom de l'appareil photo",
 
   encryptionSectionTitle: "Chiffrement des données au repos (côté serveur)",
   encryptionSectionDescription: "Chiffre le contenu de chaque note dans la base de données. À chaque redémarrage du service GlassKeep (mise à jour, reboot du serveur, etc.), un administrateur doit déverrouiller l'instance avec la passphrase ou la recovery key. Une fois l'instance déverrouillée, les utilisateurs se connectent normalement comme d'habitude.",

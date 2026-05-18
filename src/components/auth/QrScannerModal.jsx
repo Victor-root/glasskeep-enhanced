@@ -58,6 +58,16 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
   const [linkToken, setLinkToken] = useState(null);
   const [info, setInfo] = useState(null);
   const [scannedOrigin, setScannedOrigin] = useState(null);
+  // Optical zoom slider state. Some Android cameras default to a
+  // narrow / cropped view; querying MediaTrackCapabilities.zoom and
+  // pinning the track to the smallest supported value gives the
+  // widest field of view by default, and exposes a slider so the
+  // user can zoom IN if they need to fill the frame with a QR
+  // that's far away. Hidden when the active camera doesn't expose
+  // the `zoom` capability (older devices, most desktop webcams).
+  const [zoomCaps, setZoomCaps] = useState(null); // { min, max, step }
+  const [zoomValue, setZoomValue] = useState(1);
+  const videoTrackRef = useRef(null);
 
   // Track which token we've already submitted to the server so a
   // shaky camera doesn't double-POST when the user holds the phone
@@ -65,11 +75,27 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
   const submittedRef = useRef(null);
 
   const stopScanner = useCallback(() => {
+    videoTrackRef.current = null;
     const s = scannerRef.current;
     if (!s) return;
     try { s.stop(); } catch { /* ignore */ }
     try { s.destroy(); } catch { /* ignore */ }
     scannerRef.current = null;
+  }, []);
+
+  // Slider handler. Browsers reject zoom values outside the
+  // capability range so we don't clamp here — but we silence the
+  // promise rejection because the input could fire faster than the
+  // camera can keep up.
+  const onZoomChange = useCallback((next) => {
+    const value = Number(next);
+    if (!Number.isFinite(value)) return;
+    setZoomValue(value);
+    const track = videoTrackRef.current;
+    if (!track) return;
+    try {
+      track.applyConstraints({ advanced: [{ zoom: value }] }).catch(() => {});
+    } catch { /* track gone — slider will re-attach next open */ }
   }, []);
 
   // Handler called by qr-scanner whenever a QR is decoded from a
@@ -123,6 +149,8 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
     setErrorText("");
     setScannedOrigin(null);
     setPhase(PHASES.loading);
+    setZoomCaps(null);
+    setZoomValue(1);
 
     const start = async () => {
       const video = videoRef.current;
@@ -141,6 +169,37 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
           return;
         }
         setPhase(PHASES.scanning);
+        // Once the stream is attached, probe the back camera's
+        // optical-zoom capability. Many phones report a non-trivial
+        // `min` (e.g. 0.5x for an ultra-wide lens, 1x otherwise);
+        // applying that minimum on start gives the user the widest
+        // FoV by default and we expose a slider so they can zoom
+        // back in. Failures are non-fatal — the slider just stays
+        // hidden.
+        try {
+          const stream = video.srcObject;
+          const track = stream && stream.getVideoTracks
+            ? stream.getVideoTracks()[0]
+            : null;
+          if (track && typeof track.getCapabilities === "function") {
+            videoTrackRef.current = track;
+            const caps = track.getCapabilities();
+            if (caps && caps.zoom && typeof caps.zoom === "object") {
+              const min = Number(caps.zoom.min);
+              const max = Number(caps.zoom.max);
+              const step = Number(caps.zoom.step) || 0.1;
+              if (Number.isFinite(min) && Number.isFinite(max) && max > min) {
+                if (!cancelled) {
+                  setZoomCaps({ min, max, step });
+                  setZoomValue(min);
+                }
+                try {
+                  await track.applyConstraints({ advanced: [{ zoom: min }] });
+                } catch { /* device refused — slider can still nudge it */ }
+              }
+            }
+          }
+        } catch { /* no zoom capability — leave the UI as-is */ }
       } catch (e) {
         setErrorText(
           (e && e.message) ||
@@ -267,6 +326,28 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
                 <path d="M9 13a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
               </svg>
               <Spinner small />
+            </div>
+          )}
+          {/* Zoom slider — overlaid on the bottom of the camera surface
+              so it doesn't push the modal's layout around when it
+              appears. Only rendered when the active track exposes a
+              `zoom` capability and we're actually scanning. The
+              gradient backdrop keeps the slider legible regardless of
+              what the camera sees. */}
+          {phase === PHASES.scanning && zoomCaps && (
+            <div className="absolute bottom-0 left-0 right-0 px-3 pb-3 pt-6 bg-gradient-to-t from-black/60 via-black/30 to-transparent flex items-center gap-2 select-none">
+              <ZoomGlyph dir="out" />
+              <input
+                type="range"
+                min={zoomCaps.min}
+                max={zoomCaps.max}
+                step={zoomCaps.step}
+                value={zoomValue}
+                onChange={(e) => onZoomChange(parseFloat(e.target.value))}
+                aria-label={t("qrScanZoom")}
+                className="flex-1 accent-indigo-400 cursor-pointer"
+              />
+              <ZoomGlyph dir="in" />
             </div>
           )}
         </div>
@@ -429,6 +510,29 @@ function Spinner({ small }) {
       aria-hidden="true"
     >
       <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  );
+}
+
+// Magnifier glyphs flanking the zoom slider. `dir="out"` → minus (left
+// edge, widest field of view), `dir="in"` → plus (right edge, tightest
+// crop). Inline SVG so they inherit currentColor and stay crisp.
+function ZoomGlyph({ dir }) {
+  return (
+    <svg
+      className="w-4 h-4 text-white/90 shrink-0"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="10" cy="10" r="7" />
+      <line x1="21" y1="21" x2="15" y2="15" />
+      <line x1="7" y1="10" x2="13" y2="10" />
+      {dir === "in" && <line x1="10" y1="7" x2="10" y2="13" />}
     </svg>
   );
 }
