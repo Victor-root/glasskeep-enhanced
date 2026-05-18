@@ -1,6 +1,6 @@
 # 📋 Changelog
 
-## 🚀 v2.3.7 — 2026-05-18
+## 🚀 v2.3.7 — 2026-05-17
 
 This release brings **passkey support to the native Android app** — fingerprint, face unlock, hardware security keys and password managers (Google Password Manager, 1Password, Bitwarden…) now work from inside the APK the same way they do in a browser. Full setup guide and the reverse-proxy edge cases live in [`PASSKEYS.md`](./PASSKEYS.md).
 

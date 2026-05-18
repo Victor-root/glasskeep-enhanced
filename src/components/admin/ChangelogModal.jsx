@@ -451,20 +451,9 @@ export default function ChangelogModal({ open, onClose }) {
                     )}
                     <button
                         type="button"
-                        // stopPropagation + larger hit area: during the
-                        // streamed AI translation, compileMarkdown runs
-                        // on every delta and keeps the main thread busy,
-                        // and the original 32×32 button was tight
-                        // enough that mobile taps sometimes missed it
-                        // (or landed on the inner card's
-                        // stopPropagation wrapper). 40×40 is the Android
-                        // recommended minimum tap target.
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onClose?.();
-                        }}
+                        onClick={() => onClose?.()}
                         aria-label={t("changelogModalClose")}
-                        className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-md text-gray-500 hover:text-gray-800 hover:bg-black/5 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-white/10"
+                        className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-md text-gray-500 hover:text-gray-800 hover:bg-black/5 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-white/10"
                     >
                         <TI.X className="tabler-icon w-5 h-5" />
                     </button>
