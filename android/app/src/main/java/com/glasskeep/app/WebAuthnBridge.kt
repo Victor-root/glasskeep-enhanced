@@ -213,9 +213,9 @@ class WebAuthnBridge(
         cause: Throwable? = null,
     ) {
         if (cause != null) {
-            Log.w(TAG, "WebAuthn error [$name]: $message", cause)
+            Log.w(TAG, "WebAuthn error [${name}]: ${message}", cause)
         } else {
-            Log.w(TAG, "WebAuthn error [$name]: $message")
+            Log.w(TAG, "WebAuthn error [${name}]: ${message}")
         }
         val err =
             JSONObject().apply {

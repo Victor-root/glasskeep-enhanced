@@ -1,7 +1,26 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+// Pull release-keystore credentials from android/keystore.properties.
+// File is gitignored — it lives on the maintainer's machine and on no
+// CI box that the maintainer didn't set up themselves. When it's
+// missing (fresh clone, F-Droid build server, fork without a keystore)
+// we silently fall back to Android Studio's auto-debug keystore so the
+// project still builds. See keystore.properties.example for the format.
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps =
+    Properties().apply {
+        if (keystorePropsFile.exists()) {
+            keystorePropsFile.inputStream().use { load(it) }
+        }
+    }
+val hasReleaseSigning =
+    keystoreProps.getProperty("storeFile")?.isNotBlank() == true &&
+        rootProject.file(keystoreProps.getProperty("storeFile")).exists()
 
 android {
     namespace = "com.glasskeep.app"
@@ -15,7 +34,33 @@ android {
         versionName = "1.3.0"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            // Sign debug builds with the release key when available — this
+            // is what makes the green Run triangle in Android Studio
+            // install a passkey-capable APK without going through the
+            // "Generate Signed Bundle / APK" wizard. The fingerprint
+            // matches /.well-known/assetlinks.json, so Credential Manager
+            // accepts the WebView's WebAuthn calls.
+            //
+            // When keystore.properties is missing, Gradle falls back to
+            // its auto-generated debug key — useful for forks who haven't
+            // set up signing yet, but passkeys won't work in that build.
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -23,6 +68,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

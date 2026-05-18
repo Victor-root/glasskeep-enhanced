@@ -9,3 +9,10 @@
 .cxx
 local.properties
 gradle/wrapper/gradle-wrapper.jar
+
+# Release-key signing — kept on the maintainer's machine, never on
+# GitHub. The committed `keystore.properties.example` shows the format
+# anyone rebuilding their own APK should follow.
+keystore.properties
+*.jks
+*.keystore
