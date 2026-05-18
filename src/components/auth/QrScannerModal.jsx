@@ -169,37 +169,7 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
           return;
         }
         setPhase(PHASES.scanning);
-        // Once the stream is attached, probe the back camera's
-        // optical-zoom capability. Many phones report a non-trivial
-        // `min` (e.g. 0.5x for an ultra-wide lens, 1x otherwise);
-        // applying that minimum on start gives the user the widest
-        // FoV by default and we expose a slider so they can zoom
-        // back in. Failures are non-fatal — the slider just stays
-        // hidden.
-        try {
-          const stream = video.srcObject;
-          const track = stream && stream.getVideoTracks
-            ? stream.getVideoTracks()[0]
-            : null;
-          if (track && typeof track.getCapabilities === "function") {
-            videoTrackRef.current = track;
-            const caps = track.getCapabilities();
-            if (caps && caps.zoom && typeof caps.zoom === "object") {
-              const min = Number(caps.zoom.min);
-              const max = Number(caps.zoom.max);
-              const step = Number(caps.zoom.step) || 0.1;
-              if (Number.isFinite(min) && Number.isFinite(max) && max > min) {
-                if (!cancelled) {
-                  setZoomCaps({ min, max, step });
-                  setZoomValue(min);
-                }
-                try {
-                  await track.applyConstraints({ advanced: [{ zoom: min }] });
-                } catch { /* device refused — slider can still nudge it */ }
-              }
-            }
-          }
-        } catch { /* no zoom capability — leave the UI as-is */ }
+        probeAndApplyZoom(video, () => cancelled, setZoomCaps, setZoomValue, videoTrackRef);
       } catch (e) {
         setErrorText(
           (e && e.message) ||
@@ -217,6 +187,34 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
       stopScanner();
     };
   }, [open, onScan, stopScanner]);
+
+  // Body-scroll lock — without this, swipes started inside the QR
+  // modal can scroll / swipe-navigate the notes view underneath on
+  // Android (the modal's `fixed` positioning catches taps but doesn't
+  // prevent gesture chaining to the body). Restore the previous
+  // overflow/touch-action on cleanup so unmounting a *second* modal
+  // on top of this one doesn't permanently lock the body.
+  useEffect(() => {
+    if (!open) return undefined;
+    const html = document.documentElement;
+    const body = document.body;
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyTouchAction: body.style.touchAction,
+      bodyOverscroll: body.style.overscrollBehavior,
+    };
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.touchAction = "none";
+    body.style.overscrollBehavior = "contain";
+    return () => {
+      html.style.overflow = prev.htmlOverflow;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.touchAction = prev.bodyTouchAction;
+      body.style.overscrollBehavior = prev.bodyOverscroll;
+    };
+  }, [open]);
 
   const handleApprove = async () => {
     if (!linkToken) return;
@@ -414,6 +412,72 @@ export default function QrScannerModal({ open, onClose, token, showToast }) {
       </div>
     </div>
   );
+}
+
+// ─── helpers ─────────────────────────────────────────────────────────
+
+// Probe MediaTrackCapabilities.zoom and pin the track to its smallest
+// supported value. Android WebViews are known to populate the
+// capabilities object lazily — first call right after `start()` can
+// return an empty {} even though the camera supports zoom — so we
+// retry a handful of times before giving up. Console logs are
+// intentional: when a user reports "no slider on my phone", asking
+// them to share `chrome://inspect` output of these is much faster
+// than guessing.
+async function probeAndApplyZoom(video, isCancelled, setZoomCaps, setZoomValue, videoTrackRef) {
+  try {
+    const stream = video?.srcObject;
+    const track = stream && stream.getVideoTracks
+      ? stream.getVideoTracks()[0]
+      : null;
+    if (!track) {
+      console.log("[QR] zoom probe: no video track");
+      return;
+    }
+    videoTrackRef.current = track;
+    if (typeof track.getCapabilities !== "function") {
+      console.log("[QR] zoom probe: getCapabilities unsupported");
+      return;
+    }
+
+    // Up to 6 attempts × 250 ms = 1.5 s total. Plenty for Android.
+    for (let i = 0; i < 6; i++) {
+      if (isCancelled()) return;
+      const caps = track.getCapabilities() || {};
+      const settings = typeof track.getSettings === "function"
+        ? track.getSettings() || {}
+        : {};
+      console.log("[QR] zoom probe attempt", i, "caps:", caps, "settings:", settings);
+
+      let min, max, step;
+      if (caps.zoom && typeof caps.zoom === "object"
+          && Number.isFinite(Number(caps.zoom.min))
+          && Number.isFinite(Number(caps.zoom.max))
+          && Number(caps.zoom.max) > Number(caps.zoom.min)) {
+        min = Number(caps.zoom.min);
+        max = Number(caps.zoom.max);
+        step = Number(caps.zoom.step) || 0.1;
+      }
+
+      if (min !== undefined) {
+        if (!isCancelled()) {
+          setZoomCaps({ min, max, step });
+          setZoomValue(min);
+        }
+        try {
+          await track.applyConstraints({ advanced: [{ zoom: min }] });
+        } catch (e) {
+          console.log("[QR] zoom applyConstraints rejected:", e?.message || e);
+        }
+        return;
+      }
+
+      await new Promise(r => setTimeout(r, 250));
+    }
+    console.log("[QR] zoom probe: gave up after retries — device has no zoom range");
+  } catch (e) {
+    console.log("[QR] zoom probe threw:", e?.message || e);
+  }
 }
 
 // ─── sub-components ──────────────────────────────────────────────────
