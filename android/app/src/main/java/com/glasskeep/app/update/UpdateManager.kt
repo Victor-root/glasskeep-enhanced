@@ -117,6 +117,43 @@ object UpdateManager {
     }
 
     /**
+     * Manual "check now" hook — used by the in-app Settings entry so
+     * users who dismissed a previous install dialog (or who never
+     * granted notification permission) can re-trigger the flow. Skips
+     * the 12h throttle, reports both outcomes back via [onResult] on
+     * the main thread.
+     */
+    fun forceCheck(context: Context, onResult: (ReleaseInfo?) -> Unit) {
+        val appCtx = context.applicationContext
+        if (!checking.compareAndSet(false, true)) {
+            // An automatic check is mid-flight; let it finish.
+            onResult(null)
+            return
+        }
+        val mainHandler = Handler(Looper.getMainLooper())
+
+        Thread({
+            var result: ReleaseInfo? = null
+            try {
+                result = UpdateChecker.checkLatest(GITHUB_REPO, BuildConfig.VERSION_NAME)
+                // Stamp the timestamp so a follow-up automatic check
+                // still respects the throttle.
+                appCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putLong(KEY_LAST_CHECK, System.currentTimeMillis())
+                    .apply()
+                Log.i(TAG, "force check: ${result?.assetName ?: "already up to date"}")
+            } catch (t: Throwable) {
+                Log.w(TAG, "force check crashed: ${t.message}", t)
+            } finally {
+                checking.set(false)
+                val r = result
+                mainHandler.post { onResult(r) }
+            }
+        }, "GlassKeep-UpdateForce").apply { isDaemon = true }.start()
+    }
+
+    /**
      * Synchronous "is there a newer APK we should notify about?"
      * probe. Runs the network call and version comparison; everything
      * past here is UI. Returns null on throttle hit, network error,

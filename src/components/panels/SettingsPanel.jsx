@@ -833,6 +833,40 @@ export default function SettingsPanel({
             </SettingsSection>
           </div>
 
+          {/* Application section — Android-only manual update check. The
+              "AndroidTheme.checkForUpdate" bridge method ships in the
+              APK starting with 1.4.0, so the section stays hidden on
+              the web, on the desktop PWA, and on older APKs that don't
+              know about it. */}
+          {isWebView &&
+            typeof window !== "undefined" &&
+            window.AndroidTheme &&
+            typeof window.AndroidTheme.checkForUpdate === "function" && (
+            <div className="mb-2">
+              <SettingsSection
+                icon={TI.Refresh}
+                title={t("appSectionTitle")}
+                open={openSections.app}
+                onToggle={() => toggleSection("app")}
+              >
+                <div className="space-y-3">
+                  <button
+                    className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                    onClick={() => {
+                      try { window.AndroidTheme.checkForUpdate(); } catch (e) {}
+                    }}
+                  >
+                    <RowIcon icon={TI.Download} />
+                    <div className="min-w-0">
+                      <div className="font-medium">{t("checkForUpdateOption")}</div>
+                      <div className="text-sm text-gray-500">{t("checkForUpdateDesc")}</div>
+                    </div>
+                  </button>
+                </div>
+              </SettingsSection>
+            </div>
+          )}
+
           {/* Language section — was inline next to the profile / change-
               password rows; lives in its own bordered section now so
               "Language" feels like a top-level preference rather than an

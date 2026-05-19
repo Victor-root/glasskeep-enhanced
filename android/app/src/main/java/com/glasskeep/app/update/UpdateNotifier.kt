@@ -64,7 +64,11 @@ internal object UpdateNotifier {
             .setContentText(context.getString(R.string.update_notification_text, release.versionName))
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    context.getString(R.string.update_notification_text, release.versionName)
+                    // Expanded body adds the "remember to update the
+                    // server too" reminder — too long for the headline
+                    // text but worth surfacing when the user pulls the
+                    // notification open.
+                    context.getString(R.string.update_notification_bigtext, release.versionName)
                 )
             )
             .setContentIntent(pendingIntent)

@@ -29,8 +29,11 @@
     <string name="update_notification_channel">Mises à jour</string>
     <string name="update_notification_title">Mise à jour GlassKeep disponible</string>
     <string name="update_notification_text">Version %1$s — toucher pour télécharger et installer</string>
+    <string name="update_notification_bigtext">La version %1$s est disponible. Touchez pour télécharger et installer. Pensez à mettre aussi votre serveur GlassKeep à jour, sinon certaines fonctionnalités ne marcheront pas.</string>
     <string name="update_downloading">Téléchargement de la mise à jour…</string>
     <string name="update_download_failed">Échec du téléchargement</string>
+    <string name="update_checking">Vérification des mises à jour…</string>
+    <string name="update_up_to_date">GlassKeep est à jour</string>
 
     <string name="welcome_title">Bienvenue sur GlassKeep</string>
     <string name="welcome_subtitle">Quelques autorisations rapides avant de commencer. Vous pouvez ignorer n\'importe laquelle. La fonctionnalité associée sera simplement désactivée tant que l\'autorisation n\'est pas accordée.</string>

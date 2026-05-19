@@ -137,6 +137,34 @@ class WebViewActivity : AppCompatActivity() {
             runOnUiThread { showChangeServerDialog() }
         }
 
+        /** Manual "check for updates" hook for the in-app Settings
+         *  panel. Bypasses the 12h throttle. The UI side calls this
+         *  via window.AndroidTheme.checkForUpdate() and we surface
+         *  the outcome with a Toast + the standard heads-up notif
+         *  (so the user gets the same "tap to install" path as an
+         *  automatic discovery). */
+        @JavascriptInterface
+        fun checkForUpdate() {
+            runOnUiThread {
+                Toast.makeText(
+                    this@WebViewActivity,
+                    R.string.update_checking,
+                    Toast.LENGTH_SHORT,
+                ).show()
+                com.glasskeep.app.update.UpdateManager.forceCheck(this@WebViewActivity) { release ->
+                    if (release != null) {
+                        postUpdateNotification(release)
+                    } else {
+                        Toast.makeText(
+                            this@WebViewActivity,
+                            R.string.update_up_to_date,
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                }
+            }
+        }
+
         /** Tell the webapp it's running inside the Android TV launcher.
          *  The web layer reads window.__isAndroidTV on boot to swap the
          *  edit-heavy phone UI for a comfy, focus-driven viewer. */
