@@ -138,14 +138,17 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         /** Manual "check for updates" hook for the in-app Settings
-         *  panel. Bypasses the 12h throttle. The UI side calls this
-         *  via window.AndroidTheme.checkForUpdate() and we surface
-         *  the outcome with a Toast + the standard heads-up notif
-         *  (so the user gets the same "tap to install" path as an
-         *  automatic discovery) AND an in-app AlertDialog so a user
-         *  who's still on the Settings panel gets an immediate,
-         *  visible answer instead of having to drag down the
-         *  notification shade. */
+         *  panel. Bypasses the 12h throttle. Surfaces the outcome
+         *  three ways:
+         *  - Toast feedback for the "in progress" / "up to date" path
+         *  - System heads-up notification (same surface as the auto
+         *    background check)
+         *  - JS callback `window.__glasskeepUpdateAvailable(payload)`
+         *    so the Settings panel can render its themed "version
+         *    X.Y.Z available" card right under the trigger button,
+         *    or `window.__glasskeepUpdateUpToDate()` when nothing's
+         *    newer.
+         */
         @JavascriptInterface
         fun checkForUpdate() {
             runOnUiThread {
@@ -157,16 +160,89 @@ class WebViewActivity : AppCompatActivity() {
                 com.glasskeep.app.update.UpdateManager.forceCheck(this@WebViewActivity) { release ->
                     if (release != null) {
                         postUpdateNotification(release)
-                        showUpdateAvailableDialog(release)
+                        notifyJsUpdateAvailable(release)
                     } else {
                         Toast.makeText(
                             this@WebViewActivity,
                             R.string.update_up_to_date,
                             Toast.LENGTH_LONG,
                         ).show()
+                        notifyJsUpToDate()
                     }
                 }
             }
+        }
+
+        /** Returns the latest detected release as JSON (or null if no
+         *  pending update). Called from the Settings panel on open so
+         *  the card survives an Activity recreation. */
+        @JavascriptInterface
+        fun getAvailableUpdate(): String? {
+            val prefs = getSharedPreferences(
+                com.glasskeep.app.update.UpdateManager.PREFS,
+                MODE_PRIVATE,
+            )
+            val version = prefs.getString(
+                com.glasskeep.app.update.UpdateManager.KEY_AVAILABLE_VERSION,
+                null,
+            ) ?: return null
+            val asset = prefs.getString(
+                com.glasskeep.app.update.UpdateManager.KEY_AVAILABLE_ASSET,
+                null,
+            ) ?: return null
+            val url = prefs.getString(
+                com.glasskeep.app.update.UpdateManager.KEY_AVAILABLE_URL,
+                null,
+            ) ?: return null
+            return jsonReleaseStr(version, asset, url)
+        }
+
+        /** Settings card's "Télécharger" action. Triggers the same
+         *  download + install pipeline as a notification tap. */
+        @JavascriptInterface
+        fun installAvailableUpdate() {
+            val prefs = getSharedPreferences(
+                com.glasskeep.app.update.UpdateManager.PREFS,
+                MODE_PRIVATE,
+            )
+            val version = prefs.getString(
+                com.glasskeep.app.update.UpdateManager.KEY_AVAILABLE_VERSION,
+                null,
+            ) ?: return
+            val asset = prefs.getString(
+                com.glasskeep.app.update.UpdateManager.KEY_AVAILABLE_ASSET,
+                null,
+            ) ?: return
+            val url = prefs.getString(
+                com.glasskeep.app.update.UpdateManager.KEY_AVAILABLE_URL,
+                null,
+            ) ?: return
+            val release = com.glasskeep.app.update.ReleaseInfo(version, asset, url, -1L)
+            runOnUiThread {
+                Toast.makeText(
+                    this@WebViewActivity,
+                    R.string.update_downloading,
+                    Toast.LENGTH_SHORT,
+                ).show()
+                com.glasskeep.app.update.UpdateManager.downloadAndInstall(
+                    this@WebViewActivity,
+                    release,
+                ) { ok ->
+                    if (!ok) {
+                        Toast.makeText(
+                            this@WebViewActivity,
+                            R.string.update_download_failed,
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                }
+            }
+        }
+
+        /** Settings card's "Plus tard" action. */
+        @JavascriptInterface
+        fun dismissAvailableUpdate() {
+            com.glasskeep.app.update.UpdateManager.clearAvailableRelease(this@WebViewActivity)
         }
 
         /** Tell the webapp it's running inside the Android TV launcher.
@@ -867,30 +943,33 @@ class WebViewActivity : AppCompatActivity() {
      * first on Android 13+ if needed. If the user denies, the update
      * path stays dormant until they enable notifications themselves.
      */
-    /**
-     * In-app AlertDialog popped after the manual update check from
-     * Settings → Application → "Check for updates". The dialog mirrors
-     * the notification's content but lives inside the app so a user
-     * who runs the check from the panel gets an immediate, visible
-     * answer instead of having to drag down the notification shade.
-     */
-    private fun showUpdateAvailableDialog(release: com.glasskeep.app.update.ReleaseInfo) {
-        if (isFinishing || isDestroyed) return
-        val message = getString(R.string.update_dialog_message, release.versionName)
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(R.string.update_dialog_title)
-            .setMessage(message)
-            .setCancelable(true)
-            .setPositiveButton(R.string.update_dialog_download) { _, _ ->
-                Toast.makeText(this, R.string.update_downloading, Toast.LENGTH_SHORT).show()
-                com.glasskeep.app.update.UpdateManager.downloadAndInstall(this, release) { ok ->
-                    if (!ok) {
-                        Toast.makeText(this, R.string.update_download_failed, Toast.LENGTH_LONG).show()
-                    }
-                }
-            }
-            .setNegativeButton(R.string.update_dialog_later, null)
-            .show()
+    /** Push the latest detected release to the SPA so the Settings
+     *  panel can render its themed "Version X.Y.Z available" card.
+     *  Posted on the WebView's UI thread; harmless if the page hasn't
+     *  registered the callback (e.g. the user is still on the
+     *  pre-WebView setup flow) — evaluateJavascript no-ops in that
+     *  case. */
+    private fun notifyJsUpdateAvailable(release: com.glasskeep.app.update.ReleaseInfo) {
+        val payload = jsonReleaseStr(release.versionName, release.assetName, release.downloadUrl)
+        val js = "if (typeof window.__glasskeepUpdateAvailable === 'function') { try { window.__glasskeepUpdateAvailable($payload); } catch (e) {} }"
+        webView.post { webView.evaluateJavascript(js, null) }
+    }
+
+    private fun notifyJsUpToDate() {
+        val js = "if (typeof window.__glasskeepUpdateUpToDate === 'function') { try { window.__glasskeepUpdateUpToDate(); } catch (e) {} }"
+        webView.post { webView.evaluateJavascript(js, null) }
+    }
+
+    /** Tiny manual JSON serialiser — avoids dragging org.json in just
+     *  to package three strings, while still escaping the few chars
+     *  that would otherwise break out of the JSON literal. */
+    private fun jsonReleaseStr(version: String, asset: String, url: String): String {
+        fun esc(s: String): String = s
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+        return "{\"version\":\"${esc(version)}\",\"assetName\":\"${esc(asset)}\",\"downloadUrl\":\"${esc(url)}\"}"
     }
 
     private fun postUpdateNotification(release: com.glasskeep.app.update.ReleaseInfo) {

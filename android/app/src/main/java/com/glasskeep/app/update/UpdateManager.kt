@@ -29,8 +29,15 @@ object UpdateManager {
 
     private const val TAG = "GK-Updater"
     private const val GITHUB_REPO = "Victor-root/glasskeep-enhanced"
-    private const val PREFS = "glasskeep_updater"
+    internal const val PREFS = "glasskeep_updater"
     private const val KEY_LAST_CHECK = "lastCheckMs"
+    // Last successful check result, mirrored so the Settings panel
+    // can render its "Version X.Y.Z available" card across launches
+    // (the in-memory state would be lost the moment WebViewActivity
+    // is recreated).
+    internal const val KEY_AVAILABLE_VERSION = "availableVersion"
+    internal const val KEY_AVAILABLE_ASSET = "availableAsset"
+    internal const val KEY_AVAILABLE_URL = "availableUrl"
     // Twelve hours — short enough that an admin who just pushed a
     // release sees their phone notification within the same day, long
     // enough to never hit GitHub's anonymous rate limit (60 req/h).
@@ -137,11 +144,14 @@ object UpdateManager {
             try {
                 result = UpdateChecker.checkLatest(GITHUB_REPO, BuildConfig.VERSION_NAME)
                 // Stamp the timestamp so a follow-up automatic check
-                // still respects the throttle.
+                // still respects the throttle, and mirror the result
+                // into the "available release" prefs so the Settings
+                // card can survive an Activity recreation.
                 appCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                     .edit()
                     .putLong(KEY_LAST_CHECK, System.currentTimeMillis())
                     .apply()
+                storeAvailableRelease(appCtx, result)
                 Log.i(TAG, "force check: ${result?.assetName ?: "already up to date"}")
             } catch (t: Throwable) {
                 Log.w(TAG, "force check crashed: ${t.message}", t)
@@ -151,6 +161,34 @@ object UpdateManager {
                 mainHandler.post { onResult(r) }
             }
         }, "GlassKeep-UpdateForce").apply { isDaemon = true }.start()
+    }
+
+    /** Drop the "available release" prefs — called from the Settings
+     *  card's "Plus tard" / dismiss action. */
+    fun clearAvailableRelease(context: Context) {
+        storeAvailableRelease(context.applicationContext, null)
+    }
+
+    /** Mirrors the last-detected release into SharedPreferences so the
+     *  Settings panel can read it back the next time it opens. Passing
+     *  null clears the slot — used when an actual check ran and came
+     *  back "already on the latest version" (auto-cleanup of stale
+     *  state after an install). */
+    private fun storeAvailableRelease(context: Context, release: ReleaseInfo?) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        if (release == null) {
+            editor
+                .remove(KEY_AVAILABLE_VERSION)
+                .remove(KEY_AVAILABLE_ASSET)
+                .remove(KEY_AVAILABLE_URL)
+        } else {
+            editor
+                .putString(KEY_AVAILABLE_VERSION, release.versionName)
+                .putString(KEY_AVAILABLE_ASSET, release.assetName)
+                .putString(KEY_AVAILABLE_URL, release.downloadUrl)
+        }
+        editor.apply()
     }
 
     /**
@@ -171,8 +209,11 @@ object UpdateManager {
         val release = UpdateChecker.checkLatest(GITHUB_REPO, BuildConfig.VERSION_NAME)
         // Stamp the check timestamp even on null result so a streak of
         // empty responses (no APK asset, network blip) doesn't retry
-        // every single launch.
+        // every single launch. Mirror the outcome into the available-
+        // release prefs so the Settings card stays in sync with the
+        // latest network state.
         prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
+        storeAvailableRelease(context, release)
         if (release == null) {
             Log.i(TAG, "no newer APK published (or check failed)")
             return null

@@ -87,6 +87,50 @@ export default function SettingsPanel({
   // expansion state is server-synced (defaults to all collapsed).
   const toggleSection = (key) =>
     setOpenSections?.((prev) => ({ ...prev, [key]: !prev[key] }));
+  // Latest detected Android-app release as reported by the
+  // AndroidTheme.getAvailableUpdate() bridge. The Settings card under
+  // "Vérifier les mises à jour" renders when this is non-null.
+  const [availableUpdate, setAvailableUpdate] = useState(null);
+  React.useEffect(() => {
+    if (!open) return;
+    if (!isWebView) return;
+    try {
+      const json = window?.AndroidTheme?.getAvailableUpdate?.();
+      if (typeof json === "string" && json.length) {
+        const parsed = JSON.parse(json);
+        if (parsed && typeof parsed === "object" && parsed.version) {
+          setAvailableUpdate(parsed);
+          return;
+        }
+      }
+    } catch (e) {}
+    setAvailableUpdate(null);
+  }, [open, isWebView]);
+  // Hook the Android-side notification callbacks for the manual check
+  // (Settings → Application → "Check for updates" → check runs → bridge
+  // calls back into JS with the result). Registered once for the
+  // lifetime of the panel component.
+  React.useEffect(() => {
+    const onAvail = (info) => {
+      if (info && typeof info === "object" && info.version) {
+        setAvailableUpdate(info);
+      }
+    };
+    const onUpToDate = () => setAvailableUpdate(null);
+    if (typeof window !== "undefined") {
+      window.__glasskeepUpdateAvailable = onAvail;
+      window.__glasskeepUpdateUpToDate = onUpToDate;
+    }
+    return () => {
+      if (typeof window === "undefined") return;
+      if (window.__glasskeepUpdateAvailable === onAvail) {
+        window.__glasskeepUpdateAvailable = undefined;
+      }
+      if (window.__glasskeepUpdateUpToDate === onUpToDate) {
+        window.__glasskeepUpdateUpToDate = undefined;
+      }
+    };
+  }, []);
   // typographyModalOpen / setTypographyModalOpen come from App.jsx props
   // (see destructure above) — lifted to plug into the centralised
   // overlay back-button stack.
@@ -862,6 +906,44 @@ export default function SettingsPanel({
                       <div className="text-sm text-gray-500">{t("checkForUpdateDesc")}</div>
                     </div>
                   </button>
+
+                  {availableUpdate && (
+                    <div className="px-3 py-3 border border-indigo-300/60 dark:border-indigo-500/40 rounded-lg bg-indigo-50/60 dark:bg-indigo-900/20">
+                      <div className="flex items-start gap-3">
+                        <RowIcon icon={TI.Sparkles} />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium">{t("updateAvailableHeader")}</div>
+                          <div className="text-sm text-gray-700 dark:text-gray-200 mt-0.5">
+                            {t("updateAvailableVersion").replace("{version}", availableUpdate.version)}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+                            {t("updateAvailableServerHint")}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            try { window.AndroidTheme?.dismissAvailableUpdate?.(); } catch (e) {}
+                            setAvailableUpdate(null);
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                        >
+                          {t("updateAvailableLater")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            try { window.AndroidTheme?.installAvailableUpdate?.(); } catch (e) {}
+                          }}
+                          className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                        >
+                          {t("updateAvailableDownload")}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </SettingsSection>
             </div>

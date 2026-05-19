@@ -39,14 +39,6 @@
     <string name="update_download_failed">Update download failed</string>
     <string name="update_checking">Checking for updates…</string>
     <string name="update_up_to_date">GlassKeep is up to date</string>
-    <!-- In-app "update available" dialog — only popped when the user
-         triggers the manual check from Settings, so the heads-up
-         notification stays the only surface for the automatic
-         background check. -->
-    <string name="update_dialog_title">Update available</string>
-    <string name="update_dialog_message">GlassKeep %1$s is available. Tap Download to install it now.</string>
-    <string name="update_dialog_download">Download</string>
-    <string name="update_dialog_later">Later</string>
 
     <!-- First-launch onboarding screen — explains why we ask for each
          OS permission so the user knows what they're agreeing to. -->
