@@ -74,6 +74,7 @@ export default function NoteModal({
   setMColor,
   viewMode,
   setViewMode,
+  readModeEnabled = true,
   mImages,
   setMImages,
   mItems,
@@ -919,6 +920,7 @@ export default function NoteModal({
             // view/edit toggle
             mType={mType}
             viewMode={viewMode}
+            readModeEnabled={readModeEnabled}
             onToggleViewMode={() => {
               setViewMode((v) => !v);
               setShowModalFmt(false);
@@ -926,7 +928,7 @@ export default function NoteModal({
             // drawing mode toggle
             drawMode={drawMode}
             onToggleDrawMode={() => setDrawMode((m) => m === "view" ? "draw" : "view")}
-            onExitDrawToView={() => { setDrawMode("view"); setViewMode(true); }}
+            onExitDrawToView={() => { setDrawMode("view"); setViewMode(readModeEnabled); }}
             modalScrollRef={modalScrollRef}
             savedModalScrollRatioRef={savedModalScrollRatioRef}
             // actions

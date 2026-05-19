@@ -160,6 +160,14 @@ export default function App() {
       Number.isFinite(n) && n >= 600 && n <= 3000 ? Math.round(n) : 1280,
     );
   }, []);
+  const [readModeEnabled, setReadModeEnabled] = useState(() => {
+    try {
+      const stored = localStorage.getItem("readModeEnabled");
+      return stored !== null ? stored === "true" : true;
+    } catch (e) {
+      return true;
+    }
+  });
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     try {
       return parseInt(localStorage.getItem("sidebarWidth")) || 288;
@@ -691,6 +699,10 @@ export default function App() {
           setSidebarBreakpoint(settings.sidebarBreakpoint);
           localStorage.setItem("sidebarBreakpoint", String(Number(settings.sidebarBreakpoint)));
         }
+        if (settings && typeof settings.readModeEnabled === "boolean") {
+          setReadModeEnabled(settings.readModeEnabled);
+          localStorage.setItem("readModeEnabled", String(settings.readModeEnabled));
+        }
         if (settings && typeof settings.floatingCardsEnabled === "boolean") {
           setFloatingCardsEnabled(settings.floatingCardsEnabled);
           localStorage.setItem("floatingCardsEnabled", String(settings.floatingCardsEnabled));
@@ -761,6 +773,20 @@ export default function App() {
       }).catch(() => {});
     }
   }, [sidebarBreakpoint, token]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("readModeEnabled", String(readModeEnabled));
+    } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { readModeEnabled },
+      }).catch(() => {});
+    }
+  }, [readModeEnabled, token]);
 
   // Save floating cards preference to localStorage and server
   useEffect(() => {
@@ -3818,7 +3844,8 @@ export default function App() {
     // Audio notes have no read/edit distinction — the AudioNoteEditor always
     // shows the player + recorder controls regardless of viewMode. Open in
     // edit mode so the experience is identical to creating a new audio note.
-    setViewMode(n.type !== "audio");
+    // Users who disabled the read-mode setting always open in edit mode.
+    setViewMode(n.type !== "audio" && readModeEnabled);
     setModalMenuOpen(false);
     setOpen(true);
 
@@ -5373,6 +5400,7 @@ export default function App() {
       setMColor={setMColor}
       viewMode={viewMode}
       setViewMode={setViewMode}
+      readModeEnabled={readModeEnabled}
       mImages={mImages}
       setMImages={setMImages}
       mItems={mItems}
@@ -5713,6 +5741,8 @@ export default function App() {
         setAlwaysShowSidebarOnWide={setAlwaysShowSidebarOnWide}
         sidebarBreakpoint={sidebarBreakpoint}
         setSidebarBreakpoint={setSidebarBreakpoint}
+        readModeEnabled={readModeEnabled}
+        setReadModeEnabled={setReadModeEnabled}
         aiAssistantEnabled={aiAssistantEnabled}
         setAiAssistantEnabled={setAiAssistantEnabled}
         floatingCardsEnabled={floatingCardsEnabled}
@@ -5981,6 +6011,7 @@ export default function App() {
           showGenericConfirm={showGenericConfirm}
           runFormat={runFormat}
           isCollaborativeNote={isCollaborativeNote}
+          readModeEnabled={readModeEnabled}
         />
       )}
 

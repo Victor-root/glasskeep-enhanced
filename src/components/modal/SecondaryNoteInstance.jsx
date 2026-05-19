@@ -66,6 +66,7 @@ export default function SecondaryNoteInstance({
   showGenericConfirm,
   runFormat,
   isCollaborativeNote,
+  readModeEnabled = true,
 }) {
   // ─── Modal state (own instance) ────────────────────────────────────────
   const closeModalRef = useRef(null);
@@ -406,7 +407,7 @@ export default function SecondaryNoteInstance({
     initialModalStateRef.current = baselineState;
     committedBaselineRef.current = { ...baselineState };
 
-    setViewMode(true);
+    setViewMode(n.type !== "audio" && readModeEnabled);
     setModalMenuOpen(false);
     setOpen(true);
 
@@ -1166,6 +1167,7 @@ export default function SecondaryNoteInstance({
       setMColor={setMColor}
       viewMode={viewMode}
       setViewMode={setViewMode}
+      readModeEnabled={readModeEnabled}
       mImages={mImages}
       setMImages={setMImages}
       mItems={mItems}

@@ -67,6 +67,7 @@ export default function ModalFooter({
   // view/edit toggle
   mType,
   viewMode,
+  readModeEnabled = true,
   onToggleViewMode,
   // drawing mode toggle
   drawMode,
@@ -763,7 +764,7 @@ export default function ModalFooter({
         </Popover>
 
         {/* ── Edit/View toggle — text notes ── */}
-        {mType === "text" && (
+        {mType === "text" && readModeEnabled && (
           <button
             className={`${isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn"} modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]`}
             onClick={handleToggleViewMode}
@@ -788,8 +789,9 @@ export default function ModalFooter({
         {/* ── Mode buttons for drawing notes (grouped) ── */}
         {mType === "draw" && (
           <div className={`flex items-center ${isDesktop ? "gap-1" : "gap-2"}`}>
-            {/* Edit/View toggle (hidden in draw canvas mode) */}
-            {drawMode !== "draw" && (
+            {/* Edit/View toggle (hidden in draw canvas mode, or when the
+                user disabled the read-mode preference globally) */}
+            {drawMode !== "draw" && readModeEnabled && (
               <button
                 className={`${isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn"} modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]`}
                 onClick={handleToggleViewMode}
@@ -815,14 +817,14 @@ export default function ModalFooter({
               <button
                 className={`${isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn"} modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]`}
                 onClick={onExitDrawToView}
-                data-tooltip={!isDesktop ? t("readingMode") : undefined}
-                aria-label={t("readingMode")}
+                data-tooltip={!isDesktop ? t(readModeEnabled ? "readingMode" : "exitDrawMode") : undefined}
+                aria-label={t(readModeEnabled ? "readingMode" : "exitDrawMode")}
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z" stroke="currentColor" strokeWidth="1.8" />
                   <circle cx="12" cy="12" r="3.2" fill="currentColor" />
                 </svg>
-                {isDesktop && <span>{t("readingMode")}</span>}
+                {isDesktop && <span>{t(readModeEnabled ? "readingMode" : "exitDrawMode")}</span>}
               </button>
             ) : (
               <button

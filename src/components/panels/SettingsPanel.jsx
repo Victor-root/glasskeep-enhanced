@@ -45,6 +45,8 @@ export default function SettingsPanel({
   setAlwaysShowSidebarOnWide,
   sidebarBreakpoint,
   setSidebarBreakpoint,
+  readModeEnabled,
+  setReadModeEnabled,
   aiAssistantEnabled,
   setAiAssistantEnabled,
   floatingCardsEnabled,
@@ -605,6 +607,31 @@ export default function SettingsPanel({
                   </Popover>
                 </div>
               )}
+
+              <div className="flex items-center justify-between gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Eye} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("readModeOption")}</div>
+                    <div className="text-sm text-gray-500">{t("readModeOptionDesc")}</div>
+                  </div>
+                </div>
+                <button
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
+                    readModeEnabled
+                      ? "bg-indigo-600"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                  onClick={() => setReadModeEnabled(!readModeEnabled)}
+                  aria-pressed={readModeEnabled}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      readModeEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
 
               <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
