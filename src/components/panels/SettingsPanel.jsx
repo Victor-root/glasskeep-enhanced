@@ -246,7 +246,7 @@ export default function SettingsPanel({
       <div
         className={`fixed top-0 right-0 z-50 h-full w-full sm:w-[28rem] lg:w-[32rem] transition-transform duration-200 ${open ? "translate-x-0 shadow-2xl" : "translate-x-full shadow-none"}`}
         style={{
-          backgroundColor: dark ? "#222222" : "rgba(240,232,255,0.97)",
+          backgroundColor: dark ? "#222222" : "#f9f6ff",
           borderLeft: "1px solid var(--border-light)",
           paddingTop: "var(--safe-top)",
           paddingBottom: "var(--safe-bottom)",
@@ -266,7 +266,7 @@ export default function SettingsPanel({
           </button>
         </div>
 
-        <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
+        <div className="p-4 pb-12 overflow-y-auto h-[calc(100%-64px)]">
           {/* Profile Section — header (icon + "Profil" title) intentionally
               omitted; the avatar block is self-explanatory. */}
           <div className="mb-8">
@@ -581,7 +581,7 @@ export default function SettingsPanel({
             </SettingsSection>
           </div>
 
-          {/* UI Preferences Section */}
+          {/* UI Preferences Section — layout + animations live here. */}
           <div className="mb-2">
             <SettingsSection
               icon={TI.AdjustmentsHorizontal}
@@ -590,8 +590,6 @@ export default function SettingsPanel({
               onToggle={() => toggleSection("ui")}
             >
             <div className="space-y-4">
-              <UISubHeading label={t("uiSubGroupLayout")} />
-
               <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.LayoutSidebar} />
@@ -707,8 +705,44 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <UISubHeading label={t("uiSubGroupNotes")} />
+              <div className="flex items-center justify-between gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Sparkles} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("enableAnimationsMobile")}</div>
+                    <div className="text-sm text-gray-500">{t("enableAnimationsMobileDesc")}</div>
+                  </div>
+                </div>
+                <button
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
+                    floatingCardsEnabled
+                      ? "bg-indigo-600"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                  onClick={() => setFloatingCardsEnabled(!floatingCardsEnabled)}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      floatingCardsEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+            </SettingsSection>
+          </div>
 
+          {/* Notes Section — note-editing preferences (read mode, toolbar,
+              typography) and the previously top-level Checklist Settings
+              as a sub-group at the bottom. */}
+          <div className="mb-2">
+            <SettingsSection
+              icon={TI.Note}
+              title={t("notes")}
+              open={openSections.notes}
+              onToggle={() => toggleSection("notes")}
+            >
+            <div className="space-y-4">
               <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.Eye} />
@@ -791,45 +825,8 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <UISubHeading label={t("uiSubGroupAnimations")} />
+              <UISubHeading label={t("checklistSettings")} />
 
-              <div className="flex items-center justify-between gap-3 px-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <RowIcon icon={TI.Sparkles} />
-                  <div className="min-w-0">
-                    <div className="font-medium">{t("enableAnimationsMobile")}</div>
-                    <div className="text-sm text-gray-500">{t("enableAnimationsMobileDesc")}</div>
-                  </div>
-                </div>
-                <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
-                    floatingCardsEnabled
-                      ? "bg-indigo-600"
-                      : "bg-gray-300 dark:bg-gray-600"
-                  }`}
-                  onClick={() => setFloatingCardsEnabled(!floatingCardsEnabled)}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      floatingCardsEnabled ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-
-            </div>
-            </SettingsSection>
-          </div>
-
-          {/* Checklist Settings Section */}
-          <div className="mb-2">
-            <SettingsSection
-              icon={TI.ListCheck}
-              title={t("checklistSettings")}
-              open={openSections.checklist}
-              onToggle={() => toggleSection("checklist")}
-            >
-            <div className="space-y-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.IndentIncrease} />
@@ -978,12 +975,14 @@ export default function SettingsPanel({
             </div>
             </SettingsSection>
           </div>
+        </div>
 
-          <div className="mt-6 pb-1 flex justify-end">
-            <span className="text-xs text-gray-400 dark:text-gray-600 select-none tabular-nums">
-              v{__APP_VERSION__}
-            </span>
-          </div>
+        {/* Pinned panel footer — the app version stays anchored at the
+            bottom-right of the side sheet regardless of scroll. */}
+        <div className="pointer-events-none absolute bottom-2 right-3 select-none">
+          <span className="text-xs text-gray-400 dark:text-gray-600 tabular-nums">
+            v{__APP_VERSION__}
+          </span>
         </div>
       </div>
 
