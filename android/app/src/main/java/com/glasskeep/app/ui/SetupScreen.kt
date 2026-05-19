@@ -120,7 +120,7 @@ private val floatingCards = listOf(
 )
 
 @Composable
-private fun FloatingCardsBackground(dark: Boolean) {
+internal fun FloatingCardsBackground(dark: Boolean) {
     val transition = rememberInfiniteTransition(label = "float")
     val cardBg = if (dark) DarkFloatingCardBg else LightFloatingCardBg
     val lineColor = if (dark) DarkLineColor else LightLineColor

@@ -8,6 +8,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -121,6 +122,10 @@ fun WelcomeScreen(onContinue: () -> Unit) {
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
 
     Box(modifier = Modifier.fillMaxSize().then(bgModifier)) {
+        // Same animated background as SetupScreen — soft pastel cards
+        // drifting in the back, theme-aware via the dark flag.
+        FloatingCardsBackground(dark)
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -128,6 +133,15 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Image(
+                painter = painterResource(id = R.drawable.glasskeep_logo),
+                contentDescription = "GlassKeep",
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .shadow(8.dp, RoundedCornerShape(16.dp)),
+            )
+            Spacer(modifier = Modifier.height(20.dp))
             Text(
                 text = stringResource(R.string.welcome_title),
                 color = titleColor,
@@ -251,7 +265,6 @@ private fun PermissionCard(
         modifier = Modifier
             .fillMaxWidth()
             .widthIn(max = 560.dp)
-            .shadow(8.dp, RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
             .background(cardBg)
             .padding(16.dp),

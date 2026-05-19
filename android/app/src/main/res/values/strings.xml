@@ -41,7 +41,7 @@
     <!-- First-launch onboarding screen — explains why we ask for each
          OS permission so the user knows what they're agreeing to. -->
     <string name="welcome_title">Welcome to GlassKeep</string>
-    <string name="welcome_subtitle">A few quick permissions before you start. You can skip any of them — the matching feature simply won\'t work until granted.</string>
+    <string name="welcome_subtitle">A few quick permissions before you start. You can skip any of them. The matching feature simply won\'t work until granted.</string>
     <string name="welcome_continue">Continue</string>
     <string name="welcome_grant">Grant</string>
     <string name="welcome_granted">Granted ✓</string>
