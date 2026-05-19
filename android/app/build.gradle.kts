@@ -30,8 +30,13 @@ android {
         applicationId = "com.glasskeep.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 6
-        versionName = "1.3.0"
+        // TEMP — testing the self-update flow against the published
+        // 1.3.0 APK. Both versionCode and versionName are bumped down
+        // so Android's PackageManager accepts the 1.3.0 download as a
+        // genuine upgrade. Restore to versionCode=6 / versionName=1.3.0
+        // before publishing the next release.
+        versionCode = 5
+        versionName = "1.2.0"
     }
 
     signingConfigs {
