@@ -23,7 +23,14 @@ import com.glasskeep.app.R
  */
 internal object UpdateNotifier {
 
-    private const val CHANNEL_ID = "glasskeep_updates"
+    // v2 channel: bumped to IMPORTANCE_HIGH so the notification fires
+    // as a heads-up banner across the top of the screen for a few
+    // seconds, not just silently in the shade. Renamed from
+    // glasskeep_updates because channel importance can only be lowered
+    // by the app after creation — the new ID forces a fresh channel
+    // with HIGH importance for users updating from v1.
+    private const val CHANNEL_ID = "glasskeep_updates_v2"
+    private const val LEGACY_CHANNEL_ID = "glasskeep_updates"
     // Fixed ID so a re-issued notification (e.g. user dismissed, app
     // re-checked) updates the existing notification instead of stacking
     // multiple "update available" rows in the shade.
@@ -62,7 +69,14 @@ internal object UpdateNotifier {
             )
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            // HIGH priority is what triggers heads-up on pre-O devices
+            // (where the channel concept doesn't exist yet). On O+ the
+            // channel's IMPORTANCE_HIGH is what carries the heads-up
+            // behaviour — both lines together cover every API level.
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
 
         try {
@@ -76,11 +90,15 @@ internal object UpdateNotifier {
     private fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val mgr = context.getSystemService(NotificationManager::class.java) ?: return
+        // Drop the v1 channel left behind by earlier builds — it lived
+        // at IMPORTANCE_DEFAULT (no heads-up) and we can't bump
+        // existing channels, only delete + recreate.
+        try { mgr.deleteNotificationChannel(LEGACY_CHANNEL_ID) } catch (e: Exception) {}
         if (mgr.getNotificationChannel(CHANNEL_ID) != null) return
         val channel = NotificationChannel(
             CHANNEL_ID,
             context.getString(R.string.update_notification_channel),
-            NotificationManager.IMPORTANCE_DEFAULT,
+            NotificationManager.IMPORTANCE_HIGH,
         )
         mgr.createNotificationChannel(channel)
     }

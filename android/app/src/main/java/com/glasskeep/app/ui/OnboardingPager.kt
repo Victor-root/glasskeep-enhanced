@@ -2,6 +2,7 @@ package com.glasskeep.app.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,14 +12,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.glasskeep.app.R
 import kotlinx.coroutines.launch
 
 /**
@@ -73,6 +78,45 @@ fun OnboardingPager(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 16.dp),
+        )
+
+        // Back-arrow overlay only visible on the setup page. Swipe-back
+        // still works alongside it, but a discoverable tap target at
+        // the top-left covers users who don't know about the swipe.
+        if (pagerState.currentPage == 1) {
+            BackButton(
+                dark = dark,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 12.dp, top = 12.dp),
+                onClick = { scope.launch { pagerState.animateScrollToPage(0) } },
+            )
+        }
+    }
+}
+
+@Composable
+private fun BackButton(
+    dark: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(
+                if (dark) Color(0xFF282828).copy(alpha = 0.6f)
+                else Color.White.copy(alpha = 0.6f)
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_tabler_chevron_left),
+            contentDescription = null,
+            tint = if (dark) DarkTitleColor else LightTitleColor,
+            modifier = Modifier.size(22.dp),
         )
     }
 }
