@@ -61,7 +61,7 @@ function SettingsSection({ icon, title, open, onToggle, children }) {
   );
 }
 
-const SETTINGS_SECTION_KEYS = ["data", "ai", "ui", "checklist", "language"];
+const SETTINGS_SECTION_KEYS = ["security", "data", "ai", "ui", "checklist", "language"];
 const DEFAULT_OPEN_SECTIONS = SETTINGS_SECTION_KEYS.reduce(
   (acc, k) => ({ ...acc, [k]: true }),
   {},
@@ -325,6 +325,18 @@ export default function SettingsPanel({
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Security Section — login visibility, password change,
+              cross-device QR sign-in and passkeys grouped together. */}
+          <div className="mb-2">
+            <SettingsSection
+              icon={TI.ShieldLock}
+              title={t("securitySectionTitle")}
+              open={openSections.security}
+              onToggle={() => toggleSection("security")}
+            >
+            <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 px-3">
               <div className="flex items-center gap-3 min-w-0">
                 <RowIcon icon={TI.Eye} />
@@ -441,6 +453,8 @@ export default function SettingsPanel({
                 isWebView={!!isWebView}
               />
             </div>
+            </div>
+            </SettingsSection>
           </div>
 
           {/* Data Management Section */}

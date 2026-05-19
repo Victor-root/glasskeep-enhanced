@@ -751,6 +751,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   qrSignInQuickShow: "Afficher",
   qrSignInQuickHide: "Masquer",
   languageSectionTitle: "Langue",
+  securitySectionTitle: "Sécurité",
   qrScanTitle: "Scanner un QR code",
   qrScanExplain: "Visez le QR code affiché sur l'écran de connexion de l'autre appareil.",
   qrScanConfirmExplain: "Vérifiez que c'est bien votre appareil avant d'approuver la connexion.",
