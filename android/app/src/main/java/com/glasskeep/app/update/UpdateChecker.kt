@@ -14,7 +14,7 @@ import java.net.URL
  * are part of the platform, so we don't drag OkHttp/Retrofit in just
  * to issue one request every twelve hours.
  */
-internal data class ReleaseInfo(
+data class ReleaseInfo(
     val versionName: String,    // "1.4.0", parsed out of the asset filename
     val assetName: String,      // "GlassKeep-v1.4.0.apk"
     val downloadUrl: String,    // browser_download_url

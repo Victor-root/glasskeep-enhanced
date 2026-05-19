@@ -213,16 +213,14 @@ class WebViewActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // TEMP debug print so we can confirm the new build is the one
-        // actually running on the device. Remove once the update flow
-        // is confirmed working.
-        android.util.Log.i("GK-Updater", "WebViewActivity.onCreate — kicking update check")
-
-        // Fire-and-forget self-update check. UpdateManager throttles to
-        // one call per 12h via SharedPreferences and runs the whole
-        // GitHub-Releases → download → install flow on a background
-        // thread, so the WebView launch path is never blocked.
-        com.glasskeep.app.update.UpdateManager.checkInBackground(this)
+        // Self-update prompt. We only HIT the network here — the actual
+        // download is gated on the user tapping "Download" in the
+        // confirmation dialog popped from onUpdateAvailable. UpdateManager
+        // throttles re-checks to one per 12h and remembers per-version
+        // dismissals so the prompt never nags.
+        com.glasskeep.app.update.UpdateManager.checkInBackground(this) { release ->
+            showUpdateDialog(release)
+        }
 
         // Draw edge-to-edge: let the app handle system bar insets via CSS
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -817,5 +815,53 @@ class WebViewActivity : AppCompatActivity() {
             android.view.WindowManager.LayoutParams.WRAP_CONTENT
         )
         dialog.show()
+    }
+
+    /**
+     * "A newer APK is available, want to download it?" prompt — the
+     * only user-facing surface of the in-app self-updater. Reached
+     * from UpdateManager.checkInBackground's callback after the
+     * network check, runs on the main thread. Tapping Download triggers
+     * the silent background fetch + system install intent; Later
+     * persists the dismissal so we don't pop again until a newer
+     * version ships.
+     */
+    private fun showUpdateDialog(release: com.glasskeep.app.update.ReleaseInfo) {
+        if (isFinishing || isDestroyed) return
+        val message = getString(
+            R.string.update_dialog_message,
+            release.versionName,
+            com.glasskeep.app.BuildConfig.VERSION_NAME,
+        )
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.update_dialog_title)
+            .setMessage(message)
+            .setCancelable(true)
+            .setPositiveButton(R.string.update_dialog_download) { _, _ ->
+                Toast.makeText(this, R.string.update_downloading, Toast.LENGTH_SHORT).show()
+                com.glasskeep.app.update.UpdateManager.downloadAndInstall(this, release) { ok ->
+                    if (!ok && !com.glasskeep.app.update.UpdateInstaller.canRequestInstalls(this)) {
+                        // We bailed out because "Install unknown apps"
+                        // is off; UpdateManager has already opened the
+                        // settings page, so just nudge the user about
+                        // what to do next.
+                        Toast.makeText(
+                            this,
+                            R.string.update_install_perm_needed,
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    } else if (!ok) {
+                        Toast.makeText(
+                            this,
+                            R.string.update_download_failed,
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.update_dialog_later) { _, _ ->
+                com.glasskeep.app.update.UpdateManager.skipVersion(this, release.versionName)
+            }
+            .show()
     }
 }

@@ -25,4 +25,12 @@
     <string name="shortcut_new_checklist_long">Nouvelle liste</string>
     <string name="shortcut_new_audio_short">Note audio</string>
     <string name="shortcut_new_audio_long">Nouvelle note audio</string>
+
+    <string name="update_dialog_title">Mise à jour disponible</string>
+    <string name="update_dialog_message">GlassKeep %1$s est disponible. Vous utilisez actuellement la version %2$s. Souhaitez-vous la télécharger maintenant ?</string>
+    <string name="update_dialog_download">Télécharger</string>
+    <string name="update_dialog_later">Plus tard</string>
+    <string name="update_downloading">Téléchargement de la mise à jour…</string>
+    <string name="update_download_failed">Échec du téléchargement</string>
+    <string name="update_install_perm_needed">Activez « Installer depuis cette source » pour GlassKeep, puis rouvrez l\'application.</string>
 </resources>
