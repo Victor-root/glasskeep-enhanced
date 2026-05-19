@@ -8,20 +8,8 @@ The headline change is **"Read mode for notes"** — a per-user toggle that lets
 - 👁 **"Read mode for notes" toggle** — when off, text and drawing notes open directly in edit mode and the read/edit button is hidden from the modal footer; ideal for users who edit far more often than they re-read. Default stays on so existing users keep the read-by-default behaviour. Saved server-side, applied across all your devices
 - 🪟 **Collapsible categories** in the Settings and Admin panels — open/closed state per category persisted in `localStorage` and synced via `PATCH /user/settings`
 - 📐 **Configurable sidebar breakpoint** — the "Always show sidebar on wide screens" threshold is now a 5-preset dropdown (Tablet → Desktop, default 1280 px) instead of the hard-coded 700 px
-- 🔐 **New "Security" Settings section** — show-on-login, change password, QR sign-in and passkeys grouped together
-- 📋 **New "Notes" Settings section** — read mode, editor toolbar, typography and the former Checklist Settings folded in as a sub-group
-
-### 🔄 Changed
-- 🎨 **Lavender tint** on the Settings and Admin panels (`#f9f6ff` in light mode) to match the sidebar
-- 🖱️ **Accordion headers reuse the sidebar tag hover** — same lavender / indigo tint, chevron flips and turns indigo when the section is open
-- 🔑 **Passkey list collapsed behind a split button** — the "Add a passkey (N)" CTA gets a small chevron on the right that toggles the saved-keys list; auto-opens after a successful registration
-- 📌 **App version pinned at the Settings panel footer** instead of scrolling with content
-- 🧭 **Section order rewritten** — Settings: Security → UI → Notes → Data → AI → Language. Admin: Update → Pending → Site → Users → Create user → AI → Encryption
-- 🧹 **UI Preferences flattened** — sub-group captions retired now that "Notes" has its own top-level category
-- 🌍 **Settings copy de-tutoyed** to match the app's vouvoiement tone
 
 ### 🐛 Fixed
-- 🎯 **Drawing-note "exit canvas" button** relabelled to "Quitter le dessin" when read mode is off, lands in edit mode instead of forcing read-only
 - 🧷 **Hidden accordion content marked `aria-hidden` + `inert`** so screen readers and Tab navigation skip it
 
 ### 🛠️ Upgrade
