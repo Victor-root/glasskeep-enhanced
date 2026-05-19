@@ -146,7 +146,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   deleteThisNoteQuestion: "Supprimer cette note ?",
   editUser: "Modifier l'utilisateur",
   goToSignIn: "Aller à la connexion",
-  keepTagsPanelVisible: "Garder le panneau des tags visible sur les écrans de plus de 700px",
+  keepTagsPanelVisible: "Garder le panneau des tags visible sur les écrans de plus de 1280px (laptops 14\" et plus)",
   name: "Nom",
   noItemsYet: "Aucun élément pour le moment.",
   noTextContent: "Aucun texte ajouté.",

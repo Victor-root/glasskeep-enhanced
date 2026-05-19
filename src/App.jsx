@@ -5616,7 +5616,7 @@ export default function App() {
           onUnlock={() => setLockOverlayOpen(true)}
           onDismiss={() => setLockBannerDismissed(true)}
           sidebarOffset={
-            alwaysShowSidebarOnWide && windowWidth >= 700 && !isMobileDevice && !desktopSidebarHidden
+            alwaysShowSidebarOnWide && windowWidth >= 1280 && !isMobileDevice && !desktopSidebarHidden
               ? sidebarWidth
               : 0
           }
@@ -5627,7 +5627,7 @@ export default function App() {
       <TagSidebar
         open={sidebarOpen}
         onClose={() => {
-          if (alwaysShowSidebarOnWide && windowWidth >= 700 && !isMobileDevice) {
+          if (alwaysShowSidebarOnWide && windowWidth >= 1280 && !isMobileDevice) {
             setDesktopSidebarHidden(true);
           } else {
             setSidebarOpen(false);
@@ -5659,7 +5659,7 @@ export default function App() {
           }
         }}
         dark={dark}
-        permanent={alwaysShowSidebarOnWide && windowWidth >= 700 && !isMobileDevice && !desktopSidebarHidden}
+        permanent={alwaysShowSidebarOnWide && windowWidth >= 1280 && !isMobileDevice && !desktopSidebarHidden}
         width={sidebarWidth}
         onResize={setSidebarWidth}
       />
@@ -5803,7 +5803,7 @@ export default function App() {
         headerMenuRef={headerMenuRef}
         headerBtnRef={headerBtnRef}
         openSidebar={() => {
-          if (alwaysShowSidebarOnWide && windowWidth >= 700 && !isMobileDevice) {
+          if (alwaysShowSidebarOnWide && windowWidth >= 1280 && !isMobileDevice) {
             setDesktopSidebarHidden(h => !h);
           } else {
             setSidebarOpen(true);
@@ -5811,7 +5811,7 @@ export default function App() {
         }}
         activeTagFilter={tagFilter}
         activeTagFilters={activeTagFilters}
-        sidebarPermanent={alwaysShowSidebarOnWide && windowWidth >= 700 && !isMobileDevice && !desktopSidebarHidden}
+        sidebarPermanent={alwaysShowSidebarOnWide && windowWidth >= 1280 && !isMobileDevice && !desktopSidebarHidden}
         sidebarWidth={sidebarWidth}
         // AI props
         aiAssistantEnabled={aiAssistantEnabled}
