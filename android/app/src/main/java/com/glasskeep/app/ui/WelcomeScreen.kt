@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -145,7 +147,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
             Spacer(modifier = Modifier.height(28.dp))
 
             PermissionCard(
-                emoji = "🎤",
+                iconRes = R.drawable.ic_tabler_microphone,
                 title = stringResource(R.string.welcome_mic_title),
                 description = stringResource(R.string.welcome_mic_desc),
                 granted = micGranted,
@@ -158,7 +160,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(14.dp))
             PermissionCard(
-                emoji = "📷",
+                iconRes = R.drawable.ic_tabler_camera,
                 title = stringResource(R.string.welcome_camera_title),
                 description = stringResource(R.string.welcome_camera_desc),
                 granted = cameraGranted,
@@ -171,7 +173,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(14.dp))
             PermissionCard(
-                emoji = "🔔",
+                iconRes = R.drawable.ic_tabler_bell,
                 title = stringResource(R.string.welcome_notif_title),
                 description = stringResource(R.string.welcome_notif_desc),
                 granted = notifGranted,
@@ -192,7 +194,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(14.dp))
             PermissionCard(
-                emoji = "📦",
+                iconRes = R.drawable.ic_tabler_download,
                 title = stringResource(R.string.welcome_install_title),
                 description = stringResource(R.string.welcome_install_desc),
                 granted = installGranted,
@@ -227,7 +229,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
 
 @Composable
 private fun PermissionCard(
-    emoji: String,
+    iconRes: Int,
     title: String,
     description: String,
     granted: Boolean,
@@ -262,7 +264,12 @@ private fun PermissionCard(
                     .background(Indigo.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(text = emoji, fontSize = 22.sp)
+                Icon(
+                    painter = painterResource(iconRes),
+                    contentDescription = null,
+                    tint = Indigo,
+                    modifier = Modifier.size(22.dp),
+                )
             }
             Spacer(modifier = Modifier.size(12.dp))
             Text(
