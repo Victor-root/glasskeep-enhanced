@@ -1,20 +1,22 @@
 <div align="center">
 
-[![Latest release](https://img.shields.io/github/v/release/Victor-root/glasskeep-enhanced?style=for-the-badge&logo=github&label=release)](https://github.com/Victor-root/glasskeep-enhanced/releases)
-[![Last update](https://img.shields.io/github/last-commit/Victor-root/glasskeep-enhanced/main?style=for-the-badge&logo=git&label=last%20update)](https://github.com/Victor-root/glasskeep-enhanced/commits/main)
-[![Active development](https://img.shields.io/badge/Active-development-2ea44f?style=for-the-badge&logo=rocket&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/commits/main)
+[![Latest release](https://img.shields.io/github/v/release/Victor-root/glasskeep-enhanced?style=for-the-badge\&logo=github\&label=release)](https://github.com/Victor-root/glasskeep-enhanced/releases)
+[![Last update](https://img.shields.io/github/last-commit/Victor-root/glasskeep-enhanced/main?style=for-the-badge\&logo=git\&label=last%20update)](https://github.com/Victor-root/glasskeep-enhanced/commits/main)
+[![Active development](https://img.shields.io/badge/Active-development-2ea44f?style=for-the-badge\&logo=rocket\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/commits/main)
 
-[![Easy install](https://img.shields.io/badge/Easy-install%20script-2ea44f?style=for-the-badge&logo=gnubash&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced#-installation)
-[![Docker](https://img.shields.io/badge/Docker-GHCR-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced#-docker-installation)
-[![Android](https://img.shields.io/badge/Android-APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.3.7/GlassKeep-v1.3.0.apk)
-[![Android TV](https://img.shields.io/badge/Android%20TV-supported-3DDC84?style=for-the-badge&logo=androidtv&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.3.7/GlassKeep-v1.3.0.apk)
-[![PWA](https://img.shields.io/badge/PWA-ready-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced)
+[![Easy install](https://img.shields.io/badge/Easy-install%20script-2ea44f?style=for-the-badge\&logo=gnubash\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced#-installation)
+[![Docker](https://img.shields.io/badge/Docker-GHCR-2496ED?style=for-the-badge\&logo=docker\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced#-docker-installation)
+[![Android](https://img.shields.io/badge/Android-APK-3DDC84?style=for-the-badge\&logo=android\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.3.7/GlassKeep-v1.3.0.apk)
+[![Android TV](https://img.shields.io/badge/Android%20TV-supported-3DDC84?style=for-the-badge\&logo=androidtv\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.3.7/GlassKeep-v1.3.0.apk)
+[![PWA](https://img.shields.io/badge/PWA-ready-5A0FC8?style=for-the-badge\&logo=pwa\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced)
 
 </div>
 
-# ✨ Glass Keep — Enhanced Fork
+# ✨ GlassKeep
 
-> Fork of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep), with a strong focus on **local-first usage**, **offline support**, **Trash / restore**, **mobile usability**, **simpler self-hosting**, and a **native Android companion app**.
+> A self-hosted, local-first notes app focused on offline support, safer note management, mobile usability, simpler self-hosting, and a native Android companion app.
+>
+> Originally based on [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep).
 
 ---
 
@@ -28,7 +30,7 @@
     <td><img src="https://github.com/user-attachments/assets/98919346-5fef-4768-9853-a1c1cbc9441c" width="100%" /></td>
   </tr>
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/97e8935d-e9dd-4cfa-b501-101c3d36c67e"" width="100%" /></td>
+    <td><img src="https://github.com/user-attachments/assets/97e8935d-e9dd-4cfa-b501-101c3d36c67e" width="100%" /></td>
     <td><img src="https://github.com/user-attachments/assets/9d10b4ad-f432-4d9d-a5ba-2fe86ea11c6d" width="100%" /></td>
   </tr>
   <tr>
@@ -49,7 +51,7 @@
   </tr>
 </table>
 
-### 📱 Mobile 
+### 📱 Mobile
 
 <table width="100%">
   <tr>
@@ -63,59 +65,60 @@
 </table>
 
 ### 📺 TV
+
 <img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/a27ccb79-3197-42e5-9b7f-bd3583443685" />
 
 ---
 
-## 🎯 Additions in this fork
+## 🎯 What makes GlassKeep different
 
-Compared to the original project, this fork puts more emphasis on:
+GlassKeep focuses more strongly on:
 
-- **🔄 local-first usage and offline support**
-- **🗑️ safer note deletion with Trash / restore**
-- **📱 better mobile usability**
-- **✏️ a real WYSIWYG / live-formatting editor for text notes**
-- **🪟 side-by-side note reading and comparison**
-- **🤖 a native Android companion app**
-- **📺 an Android TV layout designed for couch use and remote control**
-- **🌍 a cleaner and more extensible i18n foundation**
-- **🛠️ simpler self-hosting**
-- **✨ a broad polish / stability pass**
-- **🎨 a deeper overhaul of the drawing mode**
-- **💬 configurable AI assistant with local or remote endpoints**
-- **🔐 Server-side encryption & passkeys**
-- **🔔 In-app update notifications**
-- **🚀 one-click in-app update** from the admin panel — live progress, cancel/rollback, AI-translatable changelog after install
-- **🎙️ audio notes**
-- **🖼️ refreshed logo and icons across the web app, PWA, favicon, and Android launcher / TV banner**
+* **🔄 local-first usage and offline support**
+* **🗑️ safer note deletion with Trash / restore**
+* **📱 better mobile usability**
+* **✏️ a real WYSIWYG / live-formatting editor for text notes**
+* **🪟 side-by-side note reading and comparison**
+* **🤖 a native Android companion app**
+* **📺 an Android TV layout designed for couch use and remote control**
+* **🌍 a cleaner and more extensible i18n foundation**
+* **🛠️ simpler self-hosting**
+* **✨ a broad polish / stability pass**
+* **🎨 a deeper overhaul of the drawing mode**
+* **💬 configurable AI assistant with local or remote endpoints**
+* **🔐 server-side encryption & passkeys**
+* **🔔 in-app update notifications**
+* **🚀 one-click in-app updates** from the admin panel — live progress, cancel/rollback, AI-translatable changelog after install
+* **🎙️ audio notes**
+* **🖼️ refreshed branding and icons** across the web app, PWA, favicon, Android launcher, and TV banner
 
-For a more complete and structured overview of the changes made since the fork, see:
+For a more complete and structured overview of the changes made over time, see:
 
 👉 [`IMPROVEMENTS.md`](./IMPROVEMENTS.md)
 
 ---
 
-## 🧩 Important Glass Keep features still present
+## 🧩 Core features
 
-This fork also keeps the main capabilities that already made the original project attractive:
+GlassKeep also includes:
 
-- 🔐 authentication and multi-user support
-- 👑 admin panel
-- 🗝️ secret recovery key login
-- 📝 Markdown notes, checklists, drawings, and images
-- 👥 real-time collaboration on notes
-- 📦 import / export with cross-device duplicate detection
-- 📥 Google Keep import (Takeout `.zip` — full colour, images, line breaks)
-- 🤖 optional AI assistant via any OpenAI-compatible endpoint (Ollama, Open WebUI, LiteLLM, OpenAI, …)
-- 📲 PWA support
+* 🔐 authentication and multi-user support
+* 👑 admin panel
+* 🗝️ secret recovery key login
+* 📝 Markdown notes, checklists, drawings, and images
+* 👥 real-time collaboration on notes
+* 📦 import / export with cross-device duplicate detection
+* 📥 Google Keep import (Takeout `.zip` — full colour, images, line breaks)
+* 🤖 optional AI assistant via any OpenAI-compatible endpoint (Ollama, Open WebUI, LiteLLM, OpenAI, …)
+* 📲 PWA support
 
 ---
 
-## 📱 Android app + 📺 Android TV 
+## 📱 Android app + 📺 Android TV
 
 A native Android companion app is available for GlassKeep, making self-hosted mobile usage more convenient.
 
-The Android app is a WebView wrapper for GlassKeep Enhanced and does not necessarily change with every project release.
+The Android app is a WebView wrapper for GlassKeep and does not necessarily change with every project release.
 
 The **same APK also runs on Android TV** — the app detects leanback hardware (or the `?tv=1` URL override) and switches the React frontend to a dedicated TV layout designed for the couch and the D-pad. No separate build, no separate install: phone, tablet and TV all share one codebase. See section **4** of [`IMPROVEMENTS.md`](./IMPROVEMENTS.md) for the full TV layout details.
 
@@ -148,18 +151,20 @@ curl -fsSL https://raw.githubusercontent.com/Victor-root/glasskeep-enhanced/main
 ```
 
 The script is designed to make installation as simple as possible:
-- it directly offers **install / update / uninstall**
-- it asks for the important information up front
-- it creates the admin account
-- it generates the configuration automatically
-- it sets up the systemd service
-- it can handle **HTTPS** depending on your setup:
-  - **reverse proxy**
-  - **self-signed certificate**
-  - **custom SSL certificate**
-- it optionally sets up **at-rest encryption** to protect notes in the database (you can enable it later from the admin panel if you prefer)
 
-> This is the main installation method recommended for this fork.
+* it directly offers **install / update / uninstall**
+* it asks for the important information up front
+* it creates the admin account
+* it generates the configuration automatically
+* it sets up the systemd service
+* it can handle **HTTPS** depending on your setup:
+
+  * **reverse proxy**
+  * **self-signed certificate**
+  * **custom SSL certificate**
+* it optionally sets up **at-rest encryption** to protect notes in the database (you can enable it later from the admin panel if you prefer)
+
+> This is the main installation method recommended for this project.
 
 ---
 
@@ -192,7 +197,7 @@ Once the container is up, open `http://<your-host>:8080` and sign in with the ad
 
 <details>
 <summary><b>🖥️ Command line (Linux / macOS / WSL)</b></summary>
-  
+
 Edit the `ADMIN_EMAIL` and `ADMIN_PASSWORD` values below, then paste the whole block into your terminal — it creates the folder, writes the compose file and starts the container in one go.
 
 ```bash
@@ -214,12 +219,16 @@ services:
 EOF
 docker compose up -d
 ```
+
 > 🐳 **Don't have Docker yet?**
-> - **Linux** — one-liner that works on Debian / Ubuntu / Fedora / Arch / …:
+>
+> * **Linux** — one-liner that works on Debian / Ubuntu / Fedora / Arch / …:
+>
 >   ```bash
 >   curl -fsSL https://get.docker.com | sudo sh
 >   ```
-> - **macOS / Windows** — install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and make sure it's running before continuing.
+>
+> * **macOS / Windows** — install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and make sure it's running before continuing.
 
 </details>
 
@@ -299,8 +308,9 @@ cd ~/glasskeep && docker compose pull && docker compose up -d
 ```
 
 > 💡 **Existing install without one-click updates?** You have two options:
-> - **Patch the existing compose** — add `- /var/run/docker.sock:/var/run/docker.sock` under the `volumes:` block of your current `docker-compose.yml`, then re-deploy the stack once.
-> - **Redeploy from the current example** — replace your `docker-compose.yml` with the one at the top of this section (keep your `ADMIN_*` values and your `./data` volume), then re-deploy. The current example already ships the right configuration, so you'll never have to touch the file again.
+>
+> * **Patch the existing compose** — add `- /var/run/docker.sock:/var/run/docker.sock` under the `volumes:` block of your current `docker-compose.yml`, then re-deploy the stack once.
+> * **Redeploy from the current example** — replace your `docker-compose.yml` with the one at the top of this section (keep your `ADMIN_*` values and your `./data` volume), then re-deploy. The current example already ships the right configuration, so you'll never have to touch the file again.
 >
 > Either way, the in-app **Update now** button takes over from there.
 
@@ -312,8 +322,8 @@ GlassKeep no longer ships an embedded local model — it was too small to be gen
 
 Two AI features are available once configured:
 
-- **🔎 Global AI search** — ask questions across your notes from the search bar. The backend pre-selects relevant notes before calling the model, and only cites notes it actually received (no fabricated sources).
-- **🗒️ Per-note assistant** — discuss the currently opened note with the AI. Conversations are temporary by default; a save button can keep them per note.
+* **🔎 Global AI search** — ask questions across your notes from the search bar. The backend pre-selects relevant notes before calling the model, and only cites notes it actually received (no fabricated sources).
+* **🗒️ Per-note assistant** — discuss the currently opened note with the AI. Conversations are temporary by default; a save button can keep them per note.
 
 Admins control AI at the instance level: disable it entirely, configure a **server-side provider** (optionally shared with users so the API key stays hidden), or let each user bring their **own endpoint** in their settings.
 
@@ -333,48 +343,49 @@ ollama pull qwen3:4b-instruct-2507-q4_K_M
 
 1. Copy `src/i18n/locales/en.js` to a new file, e.g. `src/i18n/locales/it.js`, and translate all values
 2. In `src/i18n/index.js`:
-   - import the new locale: `import { it } from "./locales/it";`
-   - add the language code to `SUPPORTED_LANGUAGES`: `export const SUPPORTED_LANGUAGES = ["fr", "en", "it"];`
-   - add the native display name to `LANGUAGE_NATIVE_LABELS`: `it: "Italiano"`
-   - extend the dict selector: `const dict = locale === "fr" ? fr : locale === "it" ? it : en;`
+
+   * import the new locale: `import { it } from "./locales/it";`
+   * add the language code to `SUPPORTED_LANGUAGES`: `export const SUPPORTED_LANGUAGES = ["fr", "en", "it"];`
+   * add the native display name to `LANGUAGE_NATIVE_LABELS`: `it: "Italiano"`
+   * extend the dict selector: `const dict = locale === "fr" ? fr : locale === "it" ? it : en;`
 3. In `server/index.js`, add the new code to the validation allowlist in `PATCH /api/user/profile` (the line that checks `lang !== "fr" && lang !== "en"`)
 4. Rebuild the app: `npm run build`
 
-The language selector in the settings panel will automatically show the new option.
-Missing keys fall back to English automatically.
+The language selector in the settings panel will automatically show the new option. Missing keys fall back to English automatically.
 
 ---
 
 ## 🗺️ Roadmap
 
 ### 🗓️ Planned
-- More translations with better RTL language support
-- Make the Android app available on **F-Droid**
+
+* More translations with better RTL language support
+* Make the Android app available on **F-Droid**
 
 ### 💭 Under consideration
-- *(open — suggestions welcome)*
+
+* *(open — suggestions welcome)*
 
 ---
 
 ## 🔐 Security
 
-- `JWT_SECRET` is automatically generated by the native install script
-- if you run the server outside the script, you must provide your own valid secret
-- serving the app behind HTTPS is still recommended
-- the recovery secret key should be treated like a password
+* `JWT_SECRET` is automatically generated by the native install script
+* if you run the server outside the script, you must provide your own valid secret
+* serving the app behind HTTPS is still recommended
+* the recovery secret key should be treated like a password
 
 ---
 
-## 🙏 About this fork
+## 🙏 About this project
 
-This repository is first and foremost a fork built on a foundation I genuinely liked.
+GlassKeep originally started from the foundation of [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep), a project I genuinely liked from the start.
 
-I originally started looking for a self-hosted and open-source alternative to Google Keep. I found **Glass Keep**, liked its direction, its interface, and especially the potential of its foundation. This fork started very modestly, with the idea of adding a French translation, and gradually evolved into a broader set of improvements.
+What began very modestly as a French translation gradually evolved into a much broader project focused on local-first usage, offline support, mobile usability, simpler self-hosting, and a more complete day-to-day experience.
 
-The goal here is not to replace the original project, nor to move “against” it.  
-On the contrary, the reason this fork grew so much is precisely because the foundation of **Glass Keep** made me want to spend a lot of time improving it.
+GlassKeep now follows its own direction, but it still keeps clear attribution to the original project and its author.
 
-Thanks to [nikunjsingh93](https://github.com/nikunjsingh93) for the original project and its foundation.
+Thanks to [nikunjsingh93](https://github.com/nikunjsingh93) for the original foundation that made this possible.
 
 ---
 
@@ -386,4 +397,7 @@ Thanks to [@Rikhtar](https://github.com/Rikhtar) for active testing, bug reports
 
 ## 📝 License
 
-MIT — based on [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep) by [nikunjsingh93](https://github.com/nikunjsingh93)
+MIT
+
+Originally based on [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep) by [nikunjsingh93](https://github.com/nikunjsingh93).
+Original attribution remains preserved in the project.
