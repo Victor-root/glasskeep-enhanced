@@ -542,15 +542,13 @@ export default function SettingsPanel({
               </div>
 
               {alwaysShowSidebarOnWide && (
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3 sm:pl-14">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="min-w-0">
-                      <div className="font-medium">{t("sidebarBreakpoint")}</div>
-                      <div className="text-sm text-gray-500">{t("sidebarBreakpointDesc")}</div>
-                    </div>
+                <div className="flex flex-col gap-2 px-3 sm:pl-14">
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("sidebarBreakpoint")}</div>
+                    <div className="text-sm text-gray-500">{t("sidebarBreakpointDesc")}</div>
                   </div>
                   <select
-                    className="flex-shrink-0 self-end sm:self-auto rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     value={sidebarBreakpoint}
                     onChange={(e) => setSidebarBreakpoint(Number(e.target.value))}
                   >
