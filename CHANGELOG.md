@@ -23,6 +23,8 @@ curl -fsSL https://raw.githubusercontent.com/Victor-root/glasskeep-enhanced/main
 
 This release brings **passkey support to the native Android app** — fingerprint, face unlock, hardware security keys and password managers (Google Password Manager, 1Password, Bitwarden…) now work from inside the APK the same way they do in a browser. Full setup guide and the reverse-proxy edge cases live in [`PASSKEYS.md`](./PASSKEYS.md).
 
+> ⚠️ **Both sides must be on v2.3.7+** — the Android features in this release (passkeys + cross-device QR sign-in) rely on new server endpoints. Update the server **and** install APK `1.3.0+` on every device that should benefit from them. Running APK `1.3.0` against an older server (or the new server against an older APK) will silently fall back to password-only login.
+
 ### ➕ Added
 - 📱 **Cross-device QR sign-in** — log in on a borrowed PC without typing your password. The login screen now has a "Sign in with a QR code" button; the GlassKeep app on a phone you're already signed in on can scan it (Settings → "Sign in another device"), show a confirmation card with the PC's browser / IP, and approve. The PC's poll picks up a fresh JWT a couple of seconds later. Single-use 2-minute tokens, origin-bound (the phone refuses to approve QRs that point at a different GlassKeep instance), and approval requires the phone to be authenticated — a stolen QR alone gets you nothing
 - 🔑 **Native Android passkey support** — `androidx.credentials` bridge wired into the WebView so `navigator.credentials.create / get` routes through Android's Credential Manager instead of the (gimped) in-WebView WebAuthn stack

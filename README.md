@@ -131,6 +131,8 @@ Current APK version: `1.3.0`
 
 From APK `1.3.0` onward, the Android app supports passkeys natively (fingerprint, face unlock, hardware security keys, password managers — the same authenticators you'd use from your browser). It works out-of-the-box with the official APK on a regular HTTPS install.
 
+> ⚠️ **Both the APK and the server must be up to date.** Android passkeys and cross-device QR sign-in rely on endpoints introduced in server **v2.3.7**. Pair APK `1.3.0+` with server `v2.3.7+`; mixing an old server with a new APK (or vice-versa) silently falls back to password-only login.
+
 > 📖 **Full setup guide, prerequisites, custom-build instructions and troubleshooting:** see **[`PASSKEYS.md`](./PASSKEYS.md)**. Worth a read even for the smooth path — the non-standard-port and reverse-proxy edge cases trip a lot of self-hosted setups.
 
 ---
