@@ -142,7 +142,10 @@ class WebViewActivity : AppCompatActivity() {
          *  via window.AndroidTheme.checkForUpdate() and we surface
          *  the outcome with a Toast + the standard heads-up notif
          *  (so the user gets the same "tap to install" path as an
-         *  automatic discovery). */
+         *  automatic discovery) AND an in-app AlertDialog so a user
+         *  who's still on the Settings panel gets an immediate,
+         *  visible answer instead of having to drag down the
+         *  notification shade. */
         @JavascriptInterface
         fun checkForUpdate() {
             runOnUiThread {
@@ -154,6 +157,7 @@ class WebViewActivity : AppCompatActivity() {
                 com.glasskeep.app.update.UpdateManager.forceCheck(this@WebViewActivity) { release ->
                     if (release != null) {
                         postUpdateNotification(release)
+                        showUpdateAvailableDialog(release)
                     } else {
                         Toast.makeText(
                             this@WebViewActivity,
@@ -863,6 +867,32 @@ class WebViewActivity : AppCompatActivity() {
      * first on Android 13+ if needed. If the user denies, the update
      * path stays dormant until they enable notifications themselves.
      */
+    /**
+     * In-app AlertDialog popped after the manual update check from
+     * Settings → Application → "Check for updates". The dialog mirrors
+     * the notification's content but lives inside the app so a user
+     * who runs the check from the panel gets an immediate, visible
+     * answer instead of having to drag down the notification shade.
+     */
+    private fun showUpdateAvailableDialog(release: com.glasskeep.app.update.ReleaseInfo) {
+        if (isFinishing || isDestroyed) return
+        val message = getString(R.string.update_dialog_message, release.versionName)
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.update_dialog_title)
+            .setMessage(message)
+            .setCancelable(true)
+            .setPositiveButton(R.string.update_dialog_download) { _, _ ->
+                Toast.makeText(this, R.string.update_downloading, Toast.LENGTH_SHORT).show()
+                com.glasskeep.app.update.UpdateManager.downloadAndInstall(this, release) { ok ->
+                    if (!ok) {
+                        Toast.makeText(this, R.string.update_download_failed, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.update_dialog_later, null)
+            .show()
+    }
+
     private fun postUpdateNotification(release: com.glasskeep.app.update.ReleaseInfo) {
         if (isFinishing || isDestroyed) return
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
