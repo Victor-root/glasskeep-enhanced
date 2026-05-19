@@ -39,6 +39,18 @@ class WebViewActivity : AppCompatActivity() {
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
     private lateinit var webAuthnBridge: WebAuthnBridge
 
+    // Held while we wait for the POST_NOTIFICATIONS runtime grant on
+    // Android 13+. Once the user replies, we re-attempt the notif post
+    // for this release (or drop it on the floor if denied).
+    private var pendingUpdateRelease: com.glasskeep.app.update.ReleaseInfo? = null
+    private val updateNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val release = pendingUpdateRelease ?: return@registerForActivityResult
+        pendingUpdateRelease = null
+        if (granted) com.glasskeep.app.update.UpdateNotifier.show(this, release)
+    }
+
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -213,13 +225,12 @@ class WebViewActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Self-update prompt. We only HIT the network here — the actual
-        // download is gated on the user tapping "Download" in the
-        // confirmation dialog popped from onUpdateAvailable. UpdateManager
-        // throttles re-checks to one per 12h and remembers per-version
-        // dismissals so the prompt never nags.
+        // Self-update prompt. The background check just posts a system
+        // notification when a newer APK is published — non-intrusive
+        // and easy to dismiss. Tapping the notification triggers the
+        // silent download + system installer.
         com.glasskeep.app.update.UpdateManager.checkInBackground(this) { release ->
-            showUpdateDialog(release)
+            postUpdateNotification(release)
         }
 
         // Draw edge-to-edge: let the app handle system bar insets via CSS
@@ -818,50 +829,22 @@ class WebViewActivity : AppCompatActivity() {
     }
 
     /**
-     * "A newer APK is available, want to download it?" prompt — the
-     * only user-facing surface of the in-app self-updater. Reached
-     * from UpdateManager.checkInBackground's callback after the
-     * network check, runs on the main thread. Tapping Download triggers
-     * the silent background fetch + system install intent; Later
-     * persists the dismissal so we don't pop again until a newer
-     * version ships.
+     * Fired on the main thread when UpdateManager's background check
+     * confirms a newer APK is published. Posts the update-available
+     * notification, requesting the POST_NOTIFICATIONS runtime grant
+     * first on Android 13+ if needed. If the user denies, the update
+     * path stays dormant until they enable notifications themselves.
      */
-    private fun showUpdateDialog(release: com.glasskeep.app.update.ReleaseInfo) {
+    private fun postUpdateNotification(release: com.glasskeep.app.update.ReleaseInfo) {
         if (isFinishing || isDestroyed) return
-        val message = getString(
-            R.string.update_dialog_message,
-            release.versionName,
-            com.glasskeep.app.BuildConfig.VERSION_NAME,
-        )
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(R.string.update_dialog_title)
-            .setMessage(message)
-            .setCancelable(true)
-            .setPositiveButton(R.string.update_dialog_download) { _, _ ->
-                Toast.makeText(this, R.string.update_downloading, Toast.LENGTH_SHORT).show()
-                com.glasskeep.app.update.UpdateManager.downloadAndInstall(this, release) { ok ->
-                    if (!ok && !com.glasskeep.app.update.UpdateInstaller.canRequestInstalls(this)) {
-                        // We bailed out because "Install unknown apps"
-                        // is off; UpdateManager has already opened the
-                        // settings page, so just nudge the user about
-                        // what to do next.
-                        Toast.makeText(
-                            this,
-                            R.string.update_install_perm_needed,
-                            Toast.LENGTH_LONG,
-                        ).show()
-                    } else if (!ok) {
-                        Toast.makeText(
-                            this,
-                            R.string.update_download_failed,
-                            Toast.LENGTH_LONG,
-                        ).show()
-                    }
-                }
-            }
-            .setNegativeButton(R.string.update_dialog_later) { _, _ ->
-                com.glasskeep.app.update.UpdateManager.skipVersion(this, release.versionName)
-            }
-            .show()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingUpdateRelease = release
+            updateNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            return
+        }
+        com.glasskeep.app.update.UpdateNotifier.show(this, release)
     }
 }

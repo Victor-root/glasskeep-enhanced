@@ -31,10 +31,9 @@ object UpdateManager {
     private const val GITHUB_REPO = "Victor-root/glasskeep-enhanced"
     private const val PREFS = "glasskeep_updater"
     private const val KEY_LAST_CHECK = "lastCheckMs"
-    private const val KEY_SKIPPED_VERSION = "skippedVersion"
     // Twelve hours — short enough that an admin who just pushed a
-    // release sees their phone prompt within the same day, long enough
-    // to never hit GitHub's anonymous rate limit (60 req/h).
+    // release sees their phone notification within the same day, long
+    // enough to never hit GitHub's anonymous rate limit (60 req/h).
     private const val CHECK_INTERVAL_MS = 12L * 60L * 60L * 1000L
 
     private val checking = AtomicBoolean(false)
@@ -121,21 +120,11 @@ object UpdateManager {
         }, "GlassKeep-UpdateDownload").apply { isDaemon = true }.start()
     }
 
-    /** Persist "user declined this version" so we don't re-prompt. */
-    fun skipVersion(context: Context, versionName: String) {
-        context.applicationContext
-            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_SKIPPED_VERSION, versionName)
-            .apply()
-        Log.i(TAG, "skipped version $versionName for future checks")
-    }
-
     /**
-     * Synchronous "should we ask the user about an update?" probe.
-     * Runs the network call and version comparison; everything past
-     * here is UI. Returns null on throttle hit, network error, no APK
-     * asset, version match, or user-skipped version.
+     * Synchronous "is there a newer APK we should notify about?"
+     * probe. Runs the network call and version comparison; everything
+     * past here is UI. Returns null on throttle hit, network error,
+     * no APK asset, or version match.
      */
     private fun doCheck(context: Context): ReleaseInfo? {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -153,12 +142,6 @@ object UpdateManager {
         prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
         if (release == null) {
             Log.i(TAG, "no newer APK published (or check failed)")
-            return null
-        }
-
-        val skipped = prefs.getString(KEY_SKIPPED_VERSION, null)
-        if (skipped != null && skipped == release.versionName) {
-            Log.i(TAG, "user previously skipped version ${release.versionName}")
             return null
         }
         return release
