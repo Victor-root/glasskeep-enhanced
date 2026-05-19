@@ -613,7 +613,7 @@ export default function SettingsPanel({
                   <RowIcon icon={TI.Eye} />
                   <div className="min-w-0">
                     <div className="font-medium">{t("readModeOption")}</div>
-                    <div className="text-sm text-gray-500">{t("readModeOptionDesc")}</div>
+                    <div className="text-sm text-gray-500 whitespace-pre-line">{t("readModeOptionDesc")}</div>
                   </div>
                 </div>
                 <button

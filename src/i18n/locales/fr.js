@@ -148,7 +148,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   goToSignIn: "Aller à la connexion",
   keepTagsPanelVisible: "Affiche en permanence la liste des tags sur les écrans assez larges. Le seuil est configurable juste en dessous.",
   readModeOption: "Mode lecture pour les notes",
-  readModeOptionDesc: "Activé : les notes texte et dessin s'ouvrent en lecture seule — évite les modifications involontaires, pas de curseur clignotant, idéal pour la consultation. Désactivé : les notes s'ouvrent directement en édition, pratique pour les modifications fréquentes (comportement Google Keep).",
+  readModeOptionDesc: "Activé : ouvre les notes en lecture seule, idéal si vous les consultez souvent et les modifiez rarement.\nDésactivé : ouvre les notes directement en édition, idéal si vous les modifiez souvent.",
   exitDrawMode: "Quitter le dessin",
   sidebarBreakpoint: "Taille d'écran minimale",
   sidebarBreakpointDesc: "Largeur d'écran minimale à partir de laquelle la barre latérale reste affichée. Augmenter la valeur si la barre prend trop de place à l'écran.",
