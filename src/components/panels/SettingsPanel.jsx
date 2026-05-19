@@ -24,6 +24,49 @@ function RowIcon({ icon: Icon }) {
 }
 const SectionHeaderIcon = RowIcon;
 
+// Collapsible section wrapper used to declutter the long Settings panel.
+// Header is a button (chevron + icon + title), content slides open/closed
+// with a grid-rows animation that handles variable height without JS.
+function SettingsSection({ icon, title, open, onToggle, children }) {
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="group w-full flex items-center gap-3 pl-3 pr-3 py-2 -mx-1 rounded-xl text-left hover:bg-black/[0.04] dark:hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 transition-colors"
+      >
+        <TI.ChevronDown
+          className={`tabler-icon w-5 h-5 shrink-0 transition-all duration-200 ${
+            open
+              ? "text-indigo-500 dark:text-indigo-400"
+              : "text-gray-400 dark:text-gray-500 -rotate-90"
+          } group-hover:text-indigo-500 dark:group-hover:text-indigo-400`}
+        />
+        <SectionHeaderIcon icon={icon} />
+        <span className="text-md font-semibold flex-1 min-w-0">{title}</span>
+      </button>
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+        aria-hidden={!open}
+        inert={!open}
+      >
+        <div className="overflow-hidden">
+          <div className="pt-4">{children}</div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+const SETTINGS_SECTION_KEYS = ["data", "ai", "ui", "checklist", "language"];
+const DEFAULT_OPEN_SECTIONS = SETTINGS_SECTION_KEYS.reduce(
+  (acc, k) => ({ ...acc, [k]: true }),
+  {},
+);
+
 const SIDEBAR_BREAKPOINT_PRESETS = [
   { value: 1024, labelKey: "sidebarBreakpoint1024" },
   { value: 1280, labelKey: "sidebarBreakpoint1280" },
@@ -91,6 +134,27 @@ export default function SettingsPanel({
   const languageBtnRef = useRef(null);
   const [breakpointMenuOpen, setBreakpointMenuOpen] = useState(false);
   const breakpointBtnRef = useRef(null);
+  // Per-section collapsed state. Defaults to everything open so first-time
+  // users still see the full panel; saved between sessions in localStorage.
+  const [openSections, setOpenSections] = useState(() => {
+    try {
+      const stored = localStorage.getItem("settingsOpenSections");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === "object") {
+          return { ...DEFAULT_OPEN_SECTIONS, ...parsed };
+        }
+      }
+    } catch (e) {}
+    return DEFAULT_OPEN_SECTIONS;
+  });
+  React.useEffect(() => {
+    try {
+      localStorage.setItem("settingsOpenSections", JSON.stringify(openSections));
+    } catch (e) {}
+  }, [openSections]);
+  const toggleSection = (key) =>
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   // typographyModalOpen / setTypographyModalOpen come from App.jsx props
   // (see destructure above) — lifted to plug into the centralised
   // overlay back-button stack.
@@ -379,14 +443,14 @@ export default function SettingsPanel({
             </div>
           </div>
 
-          <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
-
           {/* Data Management Section */}
-          <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
-              <SectionHeaderIcon icon={TI.Database} />
-              {t("dataManagement")}
-            </h4>
+          <div className="mb-2">
+            <SettingsSection
+              icon={TI.Database}
+              title={t("dataManagement")}
+              open={openSections.data}
+              onToggle={() => toggleSection("data")}
+            >
             <div className="space-y-3">
               <button
                 className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
@@ -486,19 +550,20 @@ export default function SettingsPanel({
                 </div>
               </button>
             </div>
+            </SettingsSection>
           </div>
-
-          <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
 
           {/* AI Assistant Section — per-user preferences. Mode picker
               (server vs. custom) and an optional personal OpenAI-
               compatible config. Never receives the admin's API key,
               base URL or model. */}
-          <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
-              <SectionHeaderIcon icon={TI.Brain} />
-              {t("aiSectionTitle")}
-            </h4>
+          <div className="mb-2">
+            <SettingsSection
+              icon={TI.Brain}
+              title={t("aiSectionTitle")}
+              open={openSections.ai}
+              onToggle={() => toggleSection("ai")}
+            >
             <div className="pl-3">
               <UserAiSettingsSection
                 token={token}
@@ -506,16 +571,17 @@ export default function SettingsPanel({
                 onEnabledChange={setAiAssistantEnabled}
               />
             </div>
+            </SettingsSection>
           </div>
 
-          <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
-
           {/* UI Preferences Section */}
-          <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
-              <SectionHeaderIcon icon={TI.AdjustmentsHorizontal} />
-              {t("uiPreferences")}
-            </h4>
+          <div className="mb-2">
+            <SettingsSection
+              icon={TI.AdjustmentsHorizontal}
+              title={t("uiPreferences")}
+              open={openSections.ui}
+              onToggle={() => toggleSection("ui")}
+            >
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
@@ -739,16 +805,17 @@ export default function SettingsPanel({
               </div>
 
             </div>
+            </SettingsSection>
           </div>
 
-          <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
-
           {/* Checklist Settings Section */}
-          <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
-              <SectionHeaderIcon icon={TI.ListCheck} />
-              {t("checklistSettings")}
-            </h4>
+          <div className="mb-2">
+            <SettingsSection
+              icon={TI.ListCheck}
+              title={t("checklistSettings")}
+              open={openSections.checklist}
+              onToggle={() => toggleSection("checklist")}
+            >
             <div className="space-y-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
@@ -814,20 +881,21 @@ export default function SettingsPanel({
                 </div>
               </div>
             </div>
+            </SettingsSection>
           </div>
-
-          <hr className="border-0 h-0.5 my-7 bg-gradient-to-r from-transparent via-gray-400/60 dark:via-white/30 to-transparent" />
 
           {/* Language section — was inline next to the profile / change-
               password rows; lives in its own bordered section now so
               "Language" feels like a top-level preference rather than an
               account control. Same Popover dropdown as before, no
               behaviour change beyond placement. */}
-          <div className="mb-8">
-            <h4 className="text-md font-semibold mb-4 flex items-center gap-3 pl-3">
-              <SectionHeaderIcon icon={TI.World} />
-              {t("languageSectionTitle")}
-            </h4>
+          <div className="mb-2">
+            <SettingsSection
+              icon={TI.World}
+              title={t("languageSectionTitle")}
+              open={openSections.language}
+              onToggle={() => toggleSection("language")}
+            >
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3 px-3 py-3 border border-[var(--border-light)] rounded-lg">
                 <div className="min-w-0 flex-1">
@@ -895,6 +963,7 @@ export default function SettingsPanel({
                 </Popover>
               </div>
             </div>
+            </SettingsSection>
           </div>
 
           <div className="mt-6 pb-1 flex justify-end">
