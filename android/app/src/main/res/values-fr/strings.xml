@@ -32,4 +32,19 @@
     <string name="update_downloading">Téléchargement de la mise à jour…</string>
     <string name="update_download_failed">Échec du téléchargement</string>
     <string name="update_install_perm_needed">Activez « Installer depuis cette source » pour GlassKeep, puis touchez à nouveau la notification.</string>
+
+    <string name="welcome_title">Bienvenue sur GlassKeep</string>
+    <string name="welcome_subtitle">Quelques autorisations rapides avant de commencer. Vous pouvez ignorer n\'importe laquelle — la fonctionnalité associée sera simplement désactivée tant que l\'autorisation n\'est pas accordée.</string>
+    <string name="welcome_continue">Continuer</string>
+    <string name="welcome_grant">Autoriser</string>
+    <string name="welcome_granted">Accordé ✓</string>
+    <string name="welcome_settings">Ouvrir les réglages</string>
+    <string name="welcome_mic_title">Micro</string>
+    <string name="welcome_mic_desc">Permet d\'enregistrer des notes audio directement depuis l\'application.</string>
+    <string name="welcome_camera_title">Caméra</string>
+    <string name="welcome_camera_desc">Sert à scanner le QR code qui vous connecte à GlassKeep sur un autre appareil (un PC, un ordinateur emprunté…).</string>
+    <string name="welcome_notif_title">Notifications</string>
+    <string name="welcome_notif_desc">Une notification système discrète quand une nouvelle version de l\'app est publiée, pour éviter d\'avoir à vérifier GitHub manuellement.</string>
+    <string name="welcome_install_title">Installer les mises à jour</string>
+    <string name="welcome_install_desc">GlassKeep n\'est pas sur le Play Store, Android a donc besoin de votre autorisation pour installer le nouvel APK que nous téléchargeons pour vous.</string>
 </resources>

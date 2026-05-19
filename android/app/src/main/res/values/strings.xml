@@ -37,4 +37,21 @@
     <string name="update_downloading">Downloading update…</string>
     <string name="update_download_failed">Update download failed</string>
     <string name="update_install_perm_needed">Enable \"Install unknown apps\" for GlassKeep, then tap the notification again.</string>
+
+    <!-- First-launch onboarding screen — explains why we ask for each
+         OS permission so the user knows what they're agreeing to. -->
+    <string name="welcome_title">Welcome to GlassKeep</string>
+    <string name="welcome_subtitle">A few quick permissions before you start. You can skip any of them — the matching feature simply won\'t work until granted.</string>
+    <string name="welcome_continue">Continue</string>
+    <string name="welcome_grant">Grant</string>
+    <string name="welcome_granted">Granted ✓</string>
+    <string name="welcome_settings">Open settings</string>
+    <string name="welcome_mic_title">Microphone</string>
+    <string name="welcome_mic_desc">Lets you record audio notes from inside the app.</string>
+    <string name="welcome_camera_title">Camera</string>
+    <string name="welcome_camera_desc">Used to scan the QR code that signs you in to GlassKeep on another device (a PC, a borrowed laptop…).</string>
+    <string name="welcome_notif_title">Notifications</string>
+    <string name="welcome_notif_desc">A discreet system notification when a new version of the app is available, so you don\'t have to keep checking GitHub.</string>
+    <string name="welcome_install_title">Install updates</string>
+    <string name="welcome_install_desc">GlassKeep isn\'t on the Play Store, so Android needs your permission to install the updated APK we download for you.</string>
 </resources>

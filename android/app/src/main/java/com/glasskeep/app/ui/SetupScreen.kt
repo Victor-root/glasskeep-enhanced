@@ -57,32 +57,36 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
+// Shared palette: setup + welcome screens both pull from these so the
+// onboarding flow stays visually consistent. `internal` keeps the
+// surface scoped to this module (no public API leak).
+
 // Light theme
-private val LightBgGradient = Brush.linearGradient(
+internal val LightBgGradient = Brush.linearGradient(
     colors = listOf(Color(0xFFf0e8ff), Color(0xFFe8f4fd), Color(0xFFfde8f0)),
     start = Offset(0f, 0f),
     end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
 )
-private val LightCardBg = Color(0xFFFFFFFF).copy(alpha = 0.7f)
+internal val LightCardBg = Color(0xFFFFFFFF).copy(alpha = 0.7f)
 private val LightFloatingCardBg = Color.White.copy(alpha = 0.35f)
-private val LightTitleColor = Color(0xFF1f2937)
-private val LightSubtextColor = Color(0xFF6b7280)
-private val LightBorderColor = Color(0xFFd1d5db).copy(alpha = 0.3f)
+internal val LightTitleColor = Color(0xFF1f2937)
+internal val LightSubtextColor = Color(0xFF6b7280)
+internal val LightBorderColor = Color(0xFFd1d5db).copy(alpha = 0.3f)
 private val LightLineColor = Color(0xFF9ca3af).copy(alpha = 0.15f)
 
 // Dark theme
-private val DarkBgColor = Color(0xFF1a1a1a)
-private val DarkCardBg = Color(0xFF282828).copy(alpha = 0.6f)
+internal val DarkBgColor = Color(0xFF1a1a1a)
+internal val DarkCardBg = Color(0xFF282828).copy(alpha = 0.6f)
 private val DarkFloatingCardBg = Color(0xFF1e1e28).copy(alpha = 0.65f)
-private val DarkTitleColor = Color(0xFFe5e7eb)
-private val DarkSubtextColor = Color(0xFF9ca3af)
-private val DarkBorderColor = Color(0xFF4b5563).copy(alpha = 0.3f)
+internal val DarkTitleColor = Color(0xFFe5e7eb)
+internal val DarkSubtextColor = Color(0xFF9ca3af)
+internal val DarkBorderColor = Color(0xFF4b5563).copy(alpha = 0.3f)
 private val DarkLineColor = Color(0xFF9ca3af).copy(alpha = 0.10f)
 
-private val ButtonGradient = Brush.horizontalGradient(
+internal val ButtonGradient = Brush.horizontalGradient(
     colors = listOf(Color(0xFF6366f1), Color(0xFF7c3aed))
 )
-private val Indigo = Color(0xFF6366f1)
+internal val Indigo = Color(0xFF6366f1)
 
 // Floating card accent colors
 private val FloatingCardColors = listOf(
