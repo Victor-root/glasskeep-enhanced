@@ -181,9 +181,9 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
         </div>
       </div>
       <p className="text-center text-xs text-gray-400 dark:text-gray-600 z-10 select-none pb-4 pt-2 relative">
-        Open source project &mdash; original by{" "}
+        Open source project &mdash; Originally based on Glass Keep by{" "}
         <a href="https://github.com/nikunjsingh93" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">nikunjsingh93</a>
-        {" · "}forked by{" "}
+        {" · "}maintained and expanded by{" "}
         <a href="https://github.com/Victor-root/glasskeep-enhanced" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">Victor-root</a>
       </p>
     </div>
