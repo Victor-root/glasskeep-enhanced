@@ -87,6 +87,8 @@ export default function SettingsPanel({
   const [languageChoice, setLanguageChoice] = useState(() => getLanguageOverride() || "");
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const languageBtnRef = useRef(null);
+  const [breakpointMenuOpen, setBreakpointMenuOpen] = useState(false);
+  const breakpointBtnRef = useRef(null);
   // typographyModalOpen / setTypographyModalOpen come from App.jsx props
   // (see destructure above) — lifted to plug into the centralised
   // overlay back-button stack.
@@ -542,25 +544,59 @@ export default function SettingsPanel({
               </div>
 
               {alwaysShowSidebarOnWide && (
-                <div className="flex flex-col gap-2 px-3 sm:pl-14">
-                  <div className="min-w-0">
+                <div className="flex items-center justify-between gap-3 px-3 py-3 border border-[var(--border-light)] rounded-lg mx-3">
+                  <div className="min-w-0 flex-1">
                     <div className="font-medium">{t("sidebarBreakpoint")}</div>
                     <div className="text-sm text-gray-500">{t("sidebarBreakpointDesc")}</div>
                   </div>
-                  <select
-                    className="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    value={sidebarBreakpoint}
-                    onChange={(e) => setSidebarBreakpoint(Number(e.target.value))}
+                  <button
+                    ref={breakpointBtnRef}
+                    type="button"
+                    onClick={() => setBreakpointMenuOpen((v) => !v)}
+                    className="shrink-0 inline-flex items-center justify-between gap-2 min-w-[7rem] px-3 py-1.5 text-sm rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                    aria-haspopup="listbox"
+                    aria-expanded={breakpointMenuOpen}
                   >
-                    {!SIDEBAR_BREAKPOINT_PRESETS.some((p) => p.value === sidebarBreakpoint) && (
-                      <option value={sidebarBreakpoint}>{sidebarBreakpoint}px</option>
-                    )}
-                    {SIDEBAR_BREAKPOINT_PRESETS.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {t(p.labelKey)}
-                      </option>
-                    ))}
-                  </select>
+                    <span>≥ {sidebarBreakpoint} px</span>
+                    <TI.ChevronDown
+                      className={`tabler-icon w-4 h-4 transition-transform ${breakpointMenuOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  <Popover
+                    anchorRef={breakpointBtnRef}
+                    open={breakpointMenuOpen}
+                    onClose={() => setBreakpointMenuOpen(false)}
+                    offset={6}
+                  >
+                    <ul
+                      className="min-w-[16rem] rounded-xl border border-[var(--border-light)] bg-white dark:bg-[#222222] text-gray-800 dark:text-gray-100 shadow-xl py-1.5 overflow-hidden"
+                      role="listbox"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {SIDEBAR_BREAKPOINT_PRESETS.map((p) => {
+                        const selected = sidebarBreakpoint === p.value;
+                        return (
+                          <li key={p.value} role="option" aria-selected={selected}>
+                            <button
+                              type="button"
+                              className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-sm text-left transition-colors ${
+                                selected
+                                  ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 font-semibold"
+                                  : "hover:bg-black/5 dark:hover:bg-white/10"
+                              }`}
+                              onClick={() => {
+                                setBreakpointMenuOpen(false);
+                                setSidebarBreakpoint(p.value);
+                              }}
+                            >
+                              <span>{t(p.labelKey)}</span>
+                              {selected && <TI.Check className="tabler-icon w-4 h-4 shrink-0" />}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </Popover>
                 </div>
               )}
 
