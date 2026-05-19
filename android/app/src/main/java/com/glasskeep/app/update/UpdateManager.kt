@@ -93,22 +93,18 @@ object UpdateManager {
         Thread({
             var ok = false
             try {
-                if (!UpdateInstaller.canRequestInstalls(appCtx)) {
-                    // Don't burn bandwidth on a download we can't
-                    // install: jump the user straight to the per-app
-                    // toggle. Next launch's check will re-pop the
-                    // dialog and they can try again.
-                    Log.i(TAG, "install-from-unknown-sources off → opening settings")
-                    UpdateInstaller.openInstallPermissionSettings(appCtx)
-                    return@Thread
-                }
-
                 val apk = UpdateDownloader.downloadTo(appCtx, release.downloadUrl, release.assetName)
                 if (apk == null) {
                     Log.w(TAG, "download failed")
                     return@Thread
                 }
                 Log.i(TAG, "downloaded to ${apk.absolutePath} (${apk.length()} bytes)")
+                // Fire the install intent regardless of the current
+                // "install unknown apps" toggle state. On Android 8+
+                // the system handles the missing-permission case
+                // inline: it opens the toggle page, and the moment
+                // the user enables it the install dialog pops by
+                // itself — no need to back-out + re-trigger from us.
                 ok = UpdateInstaller.install(appCtx, apk)
                 Log.i(TAG, "install intent launched=$ok")
             } catch (t: Throwable) {

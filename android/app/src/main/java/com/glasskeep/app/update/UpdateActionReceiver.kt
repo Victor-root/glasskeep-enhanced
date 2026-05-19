@@ -27,16 +27,13 @@ class UpdateActionReceiver : BroadcastReceiver() {
         Toast.makeText(context, R.string.update_downloading, Toast.LENGTH_SHORT).show()
 
         UpdateManager.downloadAndInstall(context, release) { ok ->
-            if (ok) return@downloadAndInstall
-            // Failure path: distinguish "permission missing" (we've
-            // already opened the settings page in UpdateManager — just
-            // tell the user what to do) from "actual download error".
-            val msg = if (!UpdateInstaller.canRequestInstalls(context)) {
-                R.string.update_install_perm_needed
-            } else {
-                R.string.update_download_failed
+            // Permission is now handled by Android itself when the
+            // install intent fires — no need to second-guess it here.
+            // Only surface a toast on actual failures (download error,
+            // file-provider hiccup, no installer activity).
+            if (!ok) {
+                Toast.makeText(context, R.string.update_download_failed, Toast.LENGTH_LONG).show()
             }
-            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
         }
     }
 

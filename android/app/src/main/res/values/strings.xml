@@ -36,7 +36,6 @@
     <string name="update_notification_text">Version %1$s — tap to download and install</string>
     <string name="update_downloading">Downloading update…</string>
     <string name="update_download_failed">Update download failed</string>
-    <string name="update_install_perm_needed">Enable \"Install unknown apps\" for GlassKeep, then tap the notification again.</string>
 
     <!-- First-launch onboarding screen — explains why we ask for each
          OS permission so the user knows what they're agreeing to. -->
