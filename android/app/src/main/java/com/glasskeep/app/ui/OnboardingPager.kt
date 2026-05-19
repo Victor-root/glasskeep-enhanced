@@ -1,5 +1,6 @@
 package com.glasskeep.app.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import kotlinx.coroutines.launch
  * who have already completed the welcome (e.g. an existing 1.2.x
  * install that's just changed its server URL).
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingPager(
     startAtSetup: Boolean,
