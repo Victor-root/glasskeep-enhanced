@@ -1,5 +1,40 @@
 # 📋 Changelog
 
+## 🚀 v2.3.8 — 2026-05-19
+
+This release is a deep polish pass on the **Settings and Admin side sheets**: every category is now a collapsible accordion with state persisted to the server, two new note-editing preferences (sidebar breakpoint, opt-out of read mode) ship as proper user settings, and the passkey list folds away behind the "Add" button to keep the section tidy.
+
+### ➕ Added
+- 🪟 **Collapsible Settings categories** — each Settings section (Security, UI Preferences, Notes, Data, AI Assistant, Language) now opens and closes via a chevron-led header. Per-user open/closed state persists in `localStorage` AND syncs through the existing `PATCH /user/settings` endpoint so the layout follows you across devices. Same treatment applied to the Admin panel (Pending registrations, Site settings, All users, Create user, AI, Encryption)
+- 📐 **Configurable sidebar breakpoint** — the "Always show sidebar on wide screens" setting used to kick in at 700 px, forcing the persistent tag list onto 1024 px tablets and small laptops. The threshold is now a 5-preset dropdown (Tablet 1024, Small laptop 1280 — recommended, 14″ laptop 1366, 15″ laptop 1440, Desktop monitor 1600), server-synced like every other UI preference
+- 👁 **"Read mode for notes" toggle** — Google-Keep-style preference: when off, text and drawing notes open straight in edit mode with no read/edit toggle visible in the modal footer. Default stays on so existing users see no behaviour change. Description spells out the trade-off ("ideal for browsing" vs "ideal for frequent edits")
+- 🔐 **Dedicated "Security" Settings section** — show-on-login, change password, cross-device QR sign-in and passkeys grouped under a single ShieldLock category instead of trailing the avatar block, so account-protection settings are easier to find
+- 📋 **"Notes" Settings section** — read mode, editor toolbar, typography and the former top-level Checklist Settings now live together under one Notes category, with a "Liste de tâches" sub-group caption inside it
+- 🧩 **Shared `SettingsAccordion` primitives** — `RowIcon`, `SettingsSection` and `SettingsSubHeading` extracted into `src/components/common/SettingsAccordion.jsx` so the Settings and Admin panels render identical headers from a single source of truth
+
+### 🔄 Changed
+- 🎨 **Settings & Admin panels share a lavender tint** — light-mode background switched from white to `#f9f6ff`, matching the tag sidebar so the side sheet reads as a continuation of the sidebar surface
+- 🖱️ **Section hover matches sidebar tag hover** — accordion headers tint to the same lavender (`#c1cfff66`) / indigo-tinted dark hover as the tag list, instead of a generic black/white wash. Chevron flips between right (closed) and down (open) and turns indigo when the section is active
+- 🔑 **Passkey list folds behind a split button** — the saved-keys list used to expand under the "Add a passkey" CTA permanently; it now collapses behind a small chevron sharing the gradient pill with the add button. Left zone runs the WebAuthn registration flow, right zone toggles the list, a thin translucent divider keeps the visual unity. The label shows the count in parens (e.g. "Ajouter une clé d'accès (3)") and a successful add auto-opens the list so the new key is visible without a second click
+- 📌 **App version pinned at the Settings panel footer** — was scrolling with content under the Language section; now positioned absolute at bottom-right of the panel itself. Admin panel doesn't need a pinned badge — the Update card at the top already surfaces the current version
+- 🧭 **Settings section order rewritten for the new structure** — Profile → Security → UI Preferences → Notes → Data Management → AI Assistant → Language. Admin panel reordered to Update notice → Pending Registrations → Site Settings → All Users → Create User → AI → Encryption
+- 🧹 **UI Preferences flattened** — sub-group captions ("Mise en page", "Notes", "Animations") removed now that the previous "Notes" sub-group has its own top-level category. The remaining options (sidebar toggle, breakpoint, edge-to-edge landscape, floating cards) sit in a flat list
+- 🌍 **Settings descriptions de-tutoyed** — "Si elle prend trop de place chez toi…" replaced with impersonal phrasing to match the rest of the app's vouvoiement tone
+- 〰️ **Gradient `<hr>` separators retired** — the chevron-led section headers now carry the visual rhythm in both side sheets; the dashed rules between sections were redundant once everything collapsed
+
+### 🐛 Fixed
+- 🎯 **Drawing-note "exit canvas" button relabelled when read mode is off** — the eye-icon button used to drop the canvas back to "Reading mode" even for users who disabled the read-mode preference; now reads "Quitter le dessin" / "Exit drawing" and lands back in edit mode instead of forcing a view-mode flip
+- 🪟 **Settings panel layout no longer jumbled** — the long flat list of options previously made it hard to spot a specific setting. Categories now collapse to a compact header stack when not in use; only the section the user is editing takes vertical real estate
+- 🧷 **Hidden accordion content properly inert** — collapsed sections are marked `aria-hidden` + `inert` so screen readers and keyboard tab navigation skip controls that aren't visible
+- 📱 **Sidebar breakpoint chooser readable on narrow panels** — the dropdown trigger originally broke its label word-by-word vertically because a stray flex wrapper collapsed the text column to its minimum content width; restructured so the label spans the full row and the chevron sits in its own gradient chip on the right
+
+### 🛠️ Upgrade
+
+**Native install:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/Victor-root/glasskeep-enhanced/main/install.sh | sudo bash
+```
+
 ## 🚀 v2.3.7 — 2026-05-18
 
 This release brings **passkey support to the native Android app** — fingerprint, face unlock, hardware security keys and password managers (Google Password Manager, 1Password, Bitwarden…) now work from inside the APK the same way they do in a browser. Full setup guide and the reverse-proxy edge cases live in [`PASSKEYS.md`](./PASSKEYS.md).
