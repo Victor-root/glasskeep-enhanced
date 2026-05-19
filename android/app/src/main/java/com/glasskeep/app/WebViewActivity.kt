@@ -213,6 +213,11 @@ class WebViewActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // TEMP debug print so we can confirm the new build is the one
+        // actually running on the device. Remove once the update flow
+        // is confirmed working.
+        android.util.Log.i("GK-Updater", "WebViewActivity.onCreate — kicking update check")
+
         // Fire-and-forget self-update check. UpdateManager throttles to
         // one call per 12h via SharedPreferences and runs the whole
         // GitHub-Releases → download → install flow on a background

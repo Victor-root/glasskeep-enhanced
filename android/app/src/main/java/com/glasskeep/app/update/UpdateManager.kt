@@ -25,10 +25,9 @@ object UpdateManager {
     private const val GITHUB_REPO = "Victor-root/glasskeep-enhanced"
     private const val PREFS = "glasskeep_updater"
     private const val KEY_LAST_CHECK = "lastCheckMs"
-    // Twelve hours — short enough that an admin who just pushed a
-    // release sees their phone update within the same day, long
-    // enough to never hit the GitHub anonymous rate limit (60/h).
-    private const val CHECK_INTERVAL_MS = 12L * 60L * 60L * 1000L
+    // TEMP — throttle disabled while we debug the test flow. Restore to
+    // 12L * 60L * 60L * 1000L once the update path is confirmed working.
+    private const val CHECK_INTERVAL_MS = 0L
 
     private val running = AtomicBoolean(false)
 
@@ -39,16 +38,22 @@ object UpdateManager {
      * from re-checking on every navigation event.
      */
     fun checkInBackground(context: Context) {
+        Log.i(TAG, "checkInBackground() called — current version=${BuildConfig.VERSION_NAME}")
         val appCtx = context.applicationContext
-        if (!running.compareAndSet(false, true)) return
+        if (!running.compareAndSet(false, true)) {
+            Log.i(TAG, "skip — another check already running")
+            return
+        }
 
         Thread({
+            Log.i(TAG, "worker thread started")
             try {
                 runOnce(appCtx)
             } catch (t: Throwable) {
-                Log.w(TAG, "Update worker crashed: ${t.message}")
+                Log.w(TAG, "Update worker crashed: ${t.message}", t)
             } finally {
                 running.set(false)
+                Log.i(TAG, "worker thread finished")
             }
         }, "GlassKeep-Updater").apply { isDaemon = true }.start()
     }
@@ -57,27 +62,34 @@ object UpdateManager {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
         val lastCheck = prefs.getLong(KEY_LAST_CHECK, 0L)
-        if (lastCheck > 0 && now - lastCheck < CHECK_INTERVAL_MS) return
-
-        val release = UpdateChecker.checkLatest(GITHUB_REPO, BuildConfig.VERSION_NAME)
-        // Record the check timestamp even on null result so a streak
-        // of empty responses (no APK asset, network blip) doesn't
-        // retry on every single launch.
-        prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
-        if (release == null) return
-
-        Log.i(TAG, "New version available: ${release.versionName} (have ${BuildConfig.VERSION_NAME})")
-        val apk = UpdateDownloader.downloadTo(context, release.downloadUrl, release.assetName)
-            ?: return
-
-        if (!UpdateInstaller.canRequestInstalls(context)) {
-            // Skip the install intent so we don't pop the settings page
-            // out from under whatever the user is doing right now. The
-            // APK stays in the cache; next launch (after the user has
-            // enabled "Install unknown apps") will pick it back up.
-            Log.i(TAG, "Install-from-unknown-sources disabled; APK cached for later")
+        Log.i(TAG, "runOnce — lastCheck=$lastCheck now=$now intervalMs=$CHECK_INTERVAL_MS")
+        if (lastCheck > 0 && now - lastCheck < CHECK_INTERVAL_MS) {
+            Log.i(TAG, "throttled — last check ${now - lastCheck}ms ago")
             return
         }
-        UpdateInstaller.install(context, apk)
+
+        Log.i(TAG, "hitting GitHub for $GITHUB_REPO …")
+        val release = UpdateChecker.checkLatest(GITHUB_REPO, BuildConfig.VERSION_NAME)
+        prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
+        if (release == null) {
+            Log.i(TAG, "no newer APK published (or check failed)")
+            return
+        }
+
+        Log.i(TAG, "newer APK detected: ${release.assetName} → ${release.downloadUrl}")
+        val apk = UpdateDownloader.downloadTo(context, release.downloadUrl, release.assetName)
+        if (apk == null) {
+            Log.w(TAG, "download failed")
+            return
+        }
+        Log.i(TAG, "downloaded to ${apk.absolutePath} (${apk.length()} bytes)")
+
+        if (!UpdateInstaller.canRequestInstalls(context)) {
+            Log.i(TAG, "install-from-unknown-sources disabled; APK cached for later")
+            UpdateInstaller.openInstallPermissionSettings(context)
+            return
+        }
+        val launched = UpdateInstaller.install(context, apk)
+        Log.i(TAG, "install intent launched=$launched")
     }
 }
