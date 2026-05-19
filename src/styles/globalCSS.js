@@ -59,8 +59,20 @@ html.dark body {
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border-light);
   box-shadow: 0 4px 24px rgba(139, 92, 246, 0.07);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  /* box-shadow transition removed — the shadow value never changes on
+     hover so it's dead repaint cost on every frame of the scale anim. */
+  transition: transform 0.2s ease;
   break-inside: avoid;
+}
+/* Touch devices (phones, tablets) drop the backdrop blur entirely:
+   compositing blur(20px) on every visible note card costs ~5ms each
+   on a mid-range Snapdragon, which is the main reason the list scroll
+   feels soft. Desktop browsers keep the glass aesthetic. */
+@media (hover: none) and (pointer: coarse) {
+  .glass-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 /* Note cards: skip rendering when off-screen, isolate paint */
 .note-card {

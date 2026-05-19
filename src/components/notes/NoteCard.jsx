@@ -15,7 +15,7 @@ import { parseAudioContent, formatDuration } from "../../utils/audioNote.js";
 
 const AUDIO_CARD_MAX_CLIPS = 10;
 
-export default function NoteCard({
+function NoteCard({
   n,
   dark,
   openModal,
@@ -86,6 +86,23 @@ export default function NoteCard({
     const slice = drawText.length > MAX_CHARS ? drawText.slice(0, MAX_CHARS).trimEnd() + "\u2026" : drawText;
     return renderSafeMarkdown(slice);
   }, [drawText]);
+
+  // Memoise the inline card style — without this we'd hand a brand
+  // new object to <div style={…}> on every render, blowing past
+  // React.memo's shallow prop check and forcing a paint cycle on
+  // every visible card whenever the parent re-renders.
+  const cardStyle = useMemo(() => {
+    const base = {
+      backgroundColor: bgFor(n.color, dark),
+      "--note-color":
+        !dark && (!n.color || n.color === "default")
+          ? "#a78bfa"
+          : solid(bgFor(n.color, dark)),
+    };
+    return isDraw
+      ? { ...base, overflow: "visible", contain: "none", contentVisibility: "visible" }
+      : base;
+  }, [n.color, dark, isDraw]);
 
   const total = countItems(n.items);
   const done = countChecked(n.items);
@@ -221,11 +238,7 @@ export default function NoteCard({
             ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent"
             : ""
         }`}
-        style={{
-          backgroundColor: bgFor(n.color, dark),
-          '--note-color': (!dark && (!n.color || n.color === 'default')) ? '#a78bfa' : solid(bgFor(n.color, dark)),
-          ...(isDraw ? { overflow: 'visible', contain: 'none', contentVisibility: 'visible' } : {}),
-        }}
+        style={cardStyle}
       >
       {multiMode && (
         <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
@@ -272,6 +285,8 @@ export default function NoteCard({
             className="w-full h-full"
             style={{ objectFit: "contain" }}
             draggable={false}
+            loading="lazy"
+            decoding="async"
           />
         </div>
       )}
@@ -293,6 +308,8 @@ export default function NoteCard({
                 alt={im.name || t("noteImage")}
                 className="w-full h-auto object-contain object-center"
                 style={{ maxHeight: "200px" }}
+                loading="lazy"
+                decoding="async"
               />
             </div>
           ))}
@@ -412,6 +429,13 @@ export default function NoteCard({
     </div>
   );
 }
+
+// Wrap the card in React.memo so the shallow prop check filters out
+// re-renders triggered by unrelated state changes upstream (theme
+// toggle, search input, sidebar open, …). Paired with the useMemo'd
+// `cardStyle` above this dramatically cuts the work the masonry grid
+// has to do on every list-level state change.
+export default React.memo(NoteCard);
 
 // Closed-card audio preview: a compact list of clips with the mic glyph
 // and the user's clip name (or a default "Recording N" fallback). Capped
