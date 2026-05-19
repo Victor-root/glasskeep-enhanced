@@ -145,6 +145,21 @@ export default function App() {
       return null;
     }
   });
+  const [sidebarBreakpoint, setSidebarBreakpointState] = useState(() => {
+    try {
+      const stored = localStorage.getItem("sidebarBreakpoint");
+      const n = stored !== null ? Number(stored) : NaN;
+      return Number.isFinite(n) && n >= 600 && n <= 3000 ? Math.round(n) : 1280;
+    } catch (e) {
+      return 1280;
+    }
+  });
+  const setSidebarBreakpoint = useCallback((value) => {
+    const n = Number(value);
+    setSidebarBreakpointState(
+      Number.isFinite(n) && n >= 600 && n <= 3000 ? Math.round(n) : 1280,
+    );
+  }, []);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     try {
       return parseInt(localStorage.getItem("sidebarWidth")) || 288;
@@ -672,6 +687,10 @@ export default function App() {
           // No server setting yet — default to true (new user)
           setAlwaysShowSidebarOnWide(true);
         }
+        if (settings && Number.isFinite(Number(settings.sidebarBreakpoint))) {
+          setSidebarBreakpoint(settings.sidebarBreakpoint);
+          localStorage.setItem("sidebarBreakpoint", String(Number(settings.sidebarBreakpoint)));
+        }
         if (settings && typeof settings.floatingCardsEnabled === "boolean") {
           setFloatingCardsEnabled(settings.floatingCardsEnabled);
           localStorage.setItem("floatingCardsEnabled", String(settings.floatingCardsEnabled));
@@ -728,6 +747,20 @@ export default function App() {
       }).catch(() => {});
     }
   }, [alwaysShowSidebarOnWide]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("sidebarBreakpoint", String(sidebarBreakpoint));
+    } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { sidebarBreakpoint },
+      }).catch(() => {});
+    }
+  }, [sidebarBreakpoint, token]);
 
   // Save floating cards preference to localStorage and server
   useEffect(() => {
@@ -5616,7 +5649,7 @@ export default function App() {
           onUnlock={() => setLockOverlayOpen(true)}
           onDismiss={() => setLockBannerDismissed(true)}
           sidebarOffset={
-            alwaysShowSidebarOnWide && windowWidth >= 1280 && !isMobileDevice && !desktopSidebarHidden
+            alwaysShowSidebarOnWide && windowWidth >= sidebarBreakpoint && !isMobileDevice && !desktopSidebarHidden
               ? sidebarWidth
               : 0
           }
@@ -5627,7 +5660,7 @@ export default function App() {
       <TagSidebar
         open={sidebarOpen}
         onClose={() => {
-          if (alwaysShowSidebarOnWide && windowWidth >= 1280 && !isMobileDevice) {
+          if (alwaysShowSidebarOnWide && windowWidth >= sidebarBreakpoint && !isMobileDevice) {
             setDesktopSidebarHidden(true);
           } else {
             setSidebarOpen(false);
@@ -5659,7 +5692,7 @@ export default function App() {
           }
         }}
         dark={dark}
-        permanent={alwaysShowSidebarOnWide && windowWidth >= 1280 && !isMobileDevice && !desktopSidebarHidden}
+        permanent={alwaysShowSidebarOnWide && windowWidth >= sidebarBreakpoint && !isMobileDevice && !desktopSidebarHidden}
         width={sidebarWidth}
         onResize={setSidebarWidth}
       />
@@ -5678,6 +5711,8 @@ export default function App() {
         onDownloadSecretKey={downloadSecretKey}
         alwaysShowSidebarOnWide={alwaysShowSidebarOnWide}
         setAlwaysShowSidebarOnWide={setAlwaysShowSidebarOnWide}
+        sidebarBreakpoint={sidebarBreakpoint}
+        setSidebarBreakpoint={setSidebarBreakpoint}
         aiAssistantEnabled={aiAssistantEnabled}
         setAiAssistantEnabled={setAiAssistantEnabled}
         floatingCardsEnabled={floatingCardsEnabled}
@@ -5803,7 +5838,7 @@ export default function App() {
         headerMenuRef={headerMenuRef}
         headerBtnRef={headerBtnRef}
         openSidebar={() => {
-          if (alwaysShowSidebarOnWide && windowWidth >= 1280 && !isMobileDevice) {
+          if (alwaysShowSidebarOnWide && windowWidth >= sidebarBreakpoint && !isMobileDevice) {
             setDesktopSidebarHidden(h => !h);
           } else {
             setSidebarOpen(true);
@@ -5811,7 +5846,7 @@ export default function App() {
         }}
         activeTagFilter={tagFilter}
         activeTagFilters={activeTagFilters}
-        sidebarPermanent={alwaysShowSidebarOnWide && windowWidth >= 1280 && !isMobileDevice && !desktopSidebarHidden}
+        sidebarPermanent={alwaysShowSidebarOnWide && windowWidth >= sidebarBreakpoint && !isMobileDevice && !desktopSidebarHidden}
         sidebarWidth={sidebarWidth}
         // AI props
         aiAssistantEnabled={aiAssistantEnabled}

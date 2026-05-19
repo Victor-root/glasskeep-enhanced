@@ -24,6 +24,14 @@ function RowIcon({ icon: Icon }) {
 }
 const SectionHeaderIcon = RowIcon;
 
+const SIDEBAR_BREAKPOINT_PRESETS = [
+  { value: 1024, labelKey: "sidebarBreakpoint1024" },
+  { value: 1280, labelKey: "sidebarBreakpoint1280" },
+  { value: 1366, labelKey: "sidebarBreakpoint1366" },
+  { value: 1440, labelKey: "sidebarBreakpoint1440" },
+  { value: 1600, labelKey: "sidebarBreakpoint1600" },
+];
+
 export default function SettingsPanel({
   open,
   onClose,
@@ -35,6 +43,8 @@ export default function SettingsPanel({
   onDownloadSecretKey,
   alwaysShowSidebarOnWide,
   setAlwaysShowSidebarOnWide,
+  sidebarBreakpoint,
+  setSidebarBreakpoint,
   aiAssistantEnabled,
   setAiAssistantEnabled,
   floatingCardsEnabled,
@@ -530,6 +540,31 @@ export default function SettingsPanel({
                   />
                 </button>
               </div>
+
+              {alwaysShowSidebarOnWide && (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3 sm:pl-14">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="min-w-0">
+                      <div className="font-medium">{t("sidebarBreakpoint")}</div>
+                      <div className="text-sm text-gray-500">{t("sidebarBreakpointDesc")}</div>
+                    </div>
+                  </div>
+                  <select
+                    className="flex-shrink-0 self-end sm:self-auto rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    value={sidebarBreakpoint}
+                    onChange={(e) => setSidebarBreakpoint(Number(e.target.value))}
+                  >
+                    {!SIDEBAR_BREAKPOINT_PRESETS.some((p) => p.value === sidebarBreakpoint) && (
+                      <option value={sidebarBreakpoint}>{sidebarBreakpoint}px</option>
+                    )}
+                    {SIDEBAR_BREAKPOINT_PRESETS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {t(p.labelKey)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
