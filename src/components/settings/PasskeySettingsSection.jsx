@@ -25,6 +25,7 @@ import {
   testPasskey,
 } from "../../auth/passkeyClient.js";
 import { localizeServerError } from "../../utils/serverErrors.js";
+import TI from "../../icons/editor/index.jsx";
 
 function formatDate(iso) {
   if (!iso) return null;
@@ -44,6 +45,11 @@ export default function PasskeySettingsSection({
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState(null);    // credentialId currently mutating (rename/delete/toggle)
   const [testingId, setTestingId] = useState(null); // credentialId currently being tested
+  // Saved-keys list collapses behind a chevron next to the "Add" button so
+  // the section stays compact when the user just wants to register a new
+  // credential. Auto-expands after a successful add so the new entry is
+  // visible without an extra click.
+  const [listOpen, setListOpen] = useState(false);
 
   // Styled prompt + confirm dialogs (replacing window.prompt / .confirm).
   // Native browser dialogs render as the OS chrome inside the Android
@@ -117,6 +123,7 @@ export default function PasskeySettingsSection({
             toast(t("passkeyNoPrfNotice"), "info", 10000);
           }
           await refresh();
+          setListOpen(true);
         } catch (e) {
           const msg = (e && e.message) || "";
           const cancelled = e?.name === "NotAllowedError" || /not[\s_-]*allowed|cancel|abort|interrupt|annul/i.test(msg);
@@ -264,14 +271,34 @@ export default function PasskeySettingsSection({
         <p className="text-sm text-gray-500 dark:text-gray-400 leading-snug mb-3">
           {t("passkeySectionExplain")}
         </p>
-        <button
-          type="button"
-          onClick={handleAdd}
-          disabled={loading}
-          className="w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 disabled:opacity-50 btn-gradient"
-        >
-          {loading ? t("passkeyAddInProgress") : t("passkeyAddCta")}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={loading}
+            className="flex-1 sm:flex-none min-w-0 sm:w-auto px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 disabled:opacity-50 btn-gradient"
+          >
+            <span className="truncate">
+              {loading ? t("passkeyAddInProgress") : t("passkeyAddCta")}
+              {list.length > 0 && !loading ? ` (${list.length})` : ""}
+            </span>
+          </button>
+          {list.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setListOpen((v) => !v)}
+              aria-expanded={listOpen}
+              aria-label={listOpen ? t("close") : t("show")}
+              className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[var(--border-light)] hover:bg-[#c1cfff66] dark:hover:bg-indigo-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 transition-colors"
+            >
+              <TI.ChevronDown
+                className={`tabler-icon w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 ${
+                  listOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+          )}
+        </div>
       </div>
 
       {list.length === 0 ? (
@@ -279,7 +306,15 @@ export default function PasskeySettingsSection({
           {t("passkeyNoneYet")}
         </p>
       ) : (
-        <ul className="space-y-2">
+        <div
+          className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+            listOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          }`}
+          aria-hidden={!listOpen}
+          inert={!listOpen}
+        >
+        <div className="overflow-hidden">
+        <ul className="space-y-2 pt-1">
           {list.map((p) => (
             <li
               key={p.credentialId}
@@ -354,6 +389,8 @@ export default function PasskeySettingsSection({
             </li>
           ))}
         </ul>
+        </div>
+        </div>
       )}
 
       <PasskeyTextDialog

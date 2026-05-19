@@ -168,6 +168,22 @@ export default function App() {
       return true;
     }
   });
+  // Which Settings-panel categories are currently expanded. Defaults to
+  // an empty object = all collapsed; persisted in localStorage and synced
+  // to the user's server settings so the layout follows them across
+  // devices.
+  const [settingsOpenSections, setSettingsOpenSections] = useState(() => {
+    try {
+      const stored = localStorage.getItem("settingsOpenSections");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return {};
+  });
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     try {
       return parseInt(localStorage.getItem("sidebarWidth")) || 288;
@@ -703,6 +719,20 @@ export default function App() {
           setReadModeEnabled(settings.readModeEnabled);
           localStorage.setItem("readModeEnabled", String(settings.readModeEnabled));
         }
+        if (
+          settings &&
+          settings.settingsOpenSections &&
+          typeof settings.settingsOpenSections === "object" &&
+          !Array.isArray(settings.settingsOpenSections)
+        ) {
+          setSettingsOpenSections(settings.settingsOpenSections);
+          try {
+            localStorage.setItem(
+              "settingsOpenSections",
+              JSON.stringify(settings.settingsOpenSections),
+            );
+          } catch (e) {}
+        }
         if (settings && typeof settings.floatingCardsEnabled === "boolean") {
           setFloatingCardsEnabled(settings.floatingCardsEnabled);
           localStorage.setItem("floatingCardsEnabled", String(settings.floatingCardsEnabled));
@@ -787,6 +817,23 @@ export default function App() {
       }).catch(() => {});
     }
   }, [readModeEnabled, token]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "settingsOpenSections",
+        JSON.stringify(settingsOpenSections),
+      );
+    } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { settingsOpenSections },
+      }).catch(() => {});
+    }
+  }, [settingsOpenSections, token]);
 
   // Save floating cards preference to localStorage and server
   useEffect(() => {
@@ -5743,6 +5790,8 @@ export default function App() {
         setSidebarBreakpoint={setSidebarBreakpoint}
         readModeEnabled={readModeEnabled}
         setReadModeEnabled={setReadModeEnabled}
+        openSections={settingsOpenSections}
+        setOpenSections={setSettingsOpenSections}
         aiAssistantEnabled={aiAssistantEnabled}
         setAiAssistantEnabled={setAiAssistantEnabled}
         floatingCardsEnabled={floatingCardsEnabled}

@@ -34,7 +34,7 @@ function SettingsSection({ icon, title, open, onToggle, children }) {
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="group w-full flex items-center gap-3 pl-3 pr-3 py-2 -mx-1 rounded-xl text-left hover:bg-black/[0.04] dark:hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 transition-colors"
+        className="group w-full flex items-center gap-3 pl-3 pr-3 py-2 -mx-1 rounded-xl text-left hover:bg-[#c1cfff66] dark:hover:bg-indigo-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 transition-colors"
       >
         <TI.ChevronDown
           className={`tabler-icon w-5 h-5 shrink-0 transition-all duration-200 ${
@@ -61,11 +61,19 @@ function SettingsSection({ icon, title, open, onToggle, children }) {
   );
 }
 
-const SETTINGS_SECTION_KEYS = ["security", "data", "ai", "ui", "checklist", "language"];
-const DEFAULT_OPEN_SECTIONS = SETTINGS_SECTION_KEYS.reduce(
-  (acc, k) => ({ ...acc, [k]: true }),
-  {},
-);
+// Lightweight sub-section divider used inside Settings sections that have
+// enough internal variety to benefit from groupings. Renders the label as
+// a small uppercase caption next to a thin trailing rule.
+function UISubHeading({ label }) {
+  return (
+    <div className="flex items-center gap-2 pl-3 pt-1 select-none">
+      <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        {label}
+      </span>
+      <div className="flex-1 h-px bg-gray-300/60 dark:bg-gray-600/40" />
+    </div>
+  );
+}
 
 const SIDEBAR_BREAKPOINT_PRESETS = [
   { value: 1024, labelKey: "sidebarBreakpoint1024" },
@@ -90,6 +98,8 @@ export default function SettingsPanel({
   setSidebarBreakpoint,
   readModeEnabled,
   setReadModeEnabled,
+  openSections = {},
+  setOpenSections,
   aiAssistantEnabled,
   setAiAssistantEnabled,
   floatingCardsEnabled,
@@ -134,27 +144,10 @@ export default function SettingsPanel({
   const languageBtnRef = useRef(null);
   const [breakpointMenuOpen, setBreakpointMenuOpen] = useState(false);
   const breakpointBtnRef = useRef(null);
-  // Per-section collapsed state. Defaults to everything open so first-time
-  // users still see the full panel; saved between sessions in localStorage.
-  const [openSections, setOpenSections] = useState(() => {
-    try {
-      const stored = localStorage.getItem("settingsOpenSections");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed && typeof parsed === "object") {
-          return { ...DEFAULT_OPEN_SECTIONS, ...parsed };
-        }
-      }
-    } catch (e) {}
-    return DEFAULT_OPEN_SECTIONS;
-  });
-  React.useEffect(() => {
-    try {
-      localStorage.setItem("settingsOpenSections", JSON.stringify(openSections));
-    } catch (e) {}
-  }, [openSections]);
+  // openSections / setOpenSections come from App.jsx so the per-section
+  // expansion state is server-synced (defaults to all collapsed).
   const toggleSection = (key) =>
-    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+    setOpenSections?.((prev) => ({ ...prev, [key]: !prev[key] }));
   // typographyModalOpen / setTypographyModalOpen come from App.jsx props
   // (see destructure above) — lifted to plug into the centralised
   // overlay back-button stack.
@@ -253,7 +246,7 @@ export default function SettingsPanel({
       <div
         className={`fixed top-0 right-0 z-50 h-full w-full sm:w-[28rem] lg:w-[32rem] transition-transform duration-200 ${open ? "translate-x-0 shadow-2xl" : "translate-x-full shadow-none"}`}
         style={{
-          backgroundColor: dark ? "#222222" : "rgba(255,255,255,0.95)",
+          backgroundColor: dark ? "#222222" : "rgba(240,232,255,0.97)",
           borderLeft: "1px solid var(--border-light)",
           paddingTop: "var(--safe-top)",
           paddingBottom: "var(--safe-bottom)",
@@ -597,6 +590,8 @@ export default function SettingsPanel({
               onToggle={() => toggleSection("ui")}
             >
             <div className="space-y-4">
+              <UISubHeading label={t("uiSubGroupLayout")} />
+
               <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.LayoutSidebar} />
@@ -690,6 +685,32 @@ export default function SettingsPanel({
 
               <div className="flex items-center justify-between gap-3 px-3">
                 <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.DeviceMobileRotated} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("edgeToEdgeLandscape")}</div>
+                    <div className="text-sm text-gray-500">{t("edgeToEdgeLandscapeDesc")}</div>
+                  </div>
+                </div>
+                <button
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
+                    edgeToEdgeLandscape
+                      ? "bg-indigo-600"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                  onClick={() => setEdgeToEdgeLandscape(!edgeToEdgeLandscape)}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      edgeToEdgeLandscape ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <UISubHeading label={t("uiSubGroupNotes")} />
+
+              <div className="flex items-center justify-between gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.Eye} />
                   <div className="min-w-0">
                     <div className="font-medium">{t("readModeOption")}</div>
@@ -708,54 +729,6 @@ export default function SettingsPanel({
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                       readModeEnabled ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 px-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <RowIcon icon={TI.Sparkles} />
-                  <div className="min-w-0">
-                    <div className="font-medium">{t("enableAnimationsMobile")}</div>
-                    <div className="text-sm text-gray-500">{t("enableAnimationsMobileDesc")}</div>
-                  </div>
-                </div>
-                <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
-                    floatingCardsEnabled
-                      ? "bg-indigo-600"
-                      : "bg-gray-300 dark:bg-gray-600"
-                  }`}
-                  onClick={() => setFloatingCardsEnabled(!floatingCardsEnabled)}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      floatingCardsEnabled ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 px-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <RowIcon icon={TI.DeviceMobileRotated} />
-                  <div className="min-w-0">
-                    <div className="font-medium">{t("edgeToEdgeLandscape")}</div>
-                    <div className="text-sm text-gray-500">{t("edgeToEdgeLandscapeDesc")}</div>
-                  </div>
-                </div>
-                <button
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
-                    edgeToEdgeLandscape
-                      ? "bg-indigo-600"
-                      : "bg-gray-300 dark:bg-gray-600"
-                  }`}
-                  onClick={() => setEdgeToEdgeLandscape(!edgeToEdgeLandscape)}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      edgeToEdgeLandscape ? "translate-x-6" : "translate-x-1"
                     }`}
                   />
                 </button>
@@ -815,6 +788,32 @@ export default function SettingsPanel({
                   onClick={() => setTypographyModalOpen(true)}
                 >
                   {t("typographyOpen")}
+                </button>
+              </div>
+
+              <UISubHeading label={t("uiSubGroupAnimations")} />
+
+              <div className="flex items-center justify-between gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Sparkles} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("enableAnimationsMobile")}</div>
+                    <div className="text-sm text-gray-500">{t("enableAnimationsMobileDesc")}</div>
+                  </div>
+                </div>
+                <button
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
+                    floatingCardsEnabled
+                      ? "bg-indigo-600"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                  onClick={() => setFloatingCardsEnabled(!floatingCardsEnabled)}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      floatingCardsEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
                 </button>
               </div>
 
