@@ -236,7 +236,9 @@ fun WelcomeScreen(onContinue: () -> Unit) {
 
             Spacer(modifier = Modifier.height(32.dp))
             ContinueButton(onClick = onContinue)
-            Spacer(modifier = Modifier.height(16.dp))
+            // Extra bottom room so the last button doesn't slide under
+            // the pager's page indicator dots.
+            Spacer(modifier = Modifier.height(48.dp))
         }
     }
 }

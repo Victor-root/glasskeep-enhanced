@@ -67,7 +67,7 @@ internal val LightBgGradient = Brush.linearGradient(
     start = Offset(0f, 0f),
     end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
 )
-internal val LightCardBg = Color(0xFFFFFFFF).copy(alpha = 0.7f)
+internal val LightCardBg = Color(0xFFFFFFFF)
 private val LightFloatingCardBg = Color.White.copy(alpha = 0.35f)
 internal val LightTitleColor = Color(0xFF1f2937)
 internal val LightSubtextColor = Color(0xFF6b7280)
@@ -76,7 +76,7 @@ private val LightLineColor = Color(0xFF9ca3af).copy(alpha = 0.15f)
 
 // Dark theme
 internal val DarkBgColor = Color(0xFF1a1a1a)
-internal val DarkCardBg = Color(0xFF282828).copy(alpha = 0.6f)
+internal val DarkCardBg = Color(0xFF282828)
 private val DarkFloatingCardBg = Color(0xFF1e1e28).copy(alpha = 0.65f)
 internal val DarkTitleColor = Color(0xFFe5e7eb)
 internal val DarkSubtextColor = Color(0xFF9ca3af)

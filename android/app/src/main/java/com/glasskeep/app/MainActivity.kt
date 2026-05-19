@@ -11,12 +11,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import com.glasskeep.app.ui.SetupScreen
-import com.glasskeep.app.ui.WelcomeScreen
+import com.glasskeep.app.ui.OnboardingPager
 import com.glasskeep.app.ui.theme.GlassKeepTheme
 
 class MainActivity : ComponentActivity() {
@@ -76,25 +71,20 @@ class MainActivity : ComponentActivity() {
                 }
             }
             GlassKeepTheme {
-                // Drive the onboarding state inside Compose so the
-                // transition from welcome → setup happens without
-                // tearing down the Activity.
-                var welcomeShown by remember { mutableStateOf(welcomeDone) }
-                if (!welcomeShown) {
-                    WelcomeScreen(onContinue = {
+                // Both screens live inside one HorizontalPager so the
+                // transition between them is a smooth swipe instead
+                // of a hard cut. Users who already saw the welcome
+                // (existing 1.2.x installs) land on page 2 directly.
+                OnboardingPager(
+                    startAtSetup = welcomeDone,
+                    onWelcomeCompleted = {
                         prefs.edit().putBoolean(KEY_WELCOME_DONE, true).apply()
-                        if (savedUrl != null) {
-                            launchWebView(savedUrl)
-                        } else {
-                            welcomeShown = true
-                        }
-                    })
-                } else {
-                    SetupScreen(onConnect = { url ->
+                    },
+                    onConnect = { url ->
                         prefs.edit().putString("server_url", url).apply()
                         launchWebView(url)
-                    })
-                }
+                    },
+                )
             }
         }
     }
