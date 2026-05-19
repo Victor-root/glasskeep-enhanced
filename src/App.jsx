@@ -184,6 +184,21 @@ export default function App() {
     } catch (e) {}
     return {};
   });
+  // Same idea for the Admin-panel categories. Server-synced under its
+  // own key so toggling a Settings section doesn't clobber the Admin
+  // layout (and vice versa).
+  const [adminOpenSections, setAdminOpenSections] = useState(() => {
+    try {
+      const stored = localStorage.getItem("adminOpenSections");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return {};
+  });
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     try {
       return parseInt(localStorage.getItem("sidebarWidth")) || 288;
@@ -733,6 +748,20 @@ export default function App() {
             );
           } catch (e) {}
         }
+        if (
+          settings &&
+          settings.adminOpenSections &&
+          typeof settings.adminOpenSections === "object" &&
+          !Array.isArray(settings.adminOpenSections)
+        ) {
+          setAdminOpenSections(settings.adminOpenSections);
+          try {
+            localStorage.setItem(
+              "adminOpenSections",
+              JSON.stringify(settings.adminOpenSections),
+            );
+          } catch (e) {}
+        }
         if (settings && typeof settings.floatingCardsEnabled === "boolean") {
           setFloatingCardsEnabled(settings.floatingCardsEnabled);
           localStorage.setItem("floatingCardsEnabled", String(settings.floatingCardsEnabled));
@@ -834,6 +863,23 @@ export default function App() {
       }).catch(() => {});
     }
   }, [settingsOpenSections, token]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "adminOpenSections",
+        JSON.stringify(adminOpenSections),
+      );
+    } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { adminOpenSections },
+      }).catch(() => {});
+    }
+  }, [adminOpenSections, token]);
 
   // Save floating cards preference to localStorage and server
   useEffect(() => {
@@ -5829,6 +5875,8 @@ export default function App() {
         open={adminPanelOpen}
         onClose={() => setAdminPanelOpen(false)}
         dark={dark}
+        openSections={adminOpenSections}
+        setOpenSections={setAdminOpenSections}
         adminSettings={adminSettings}
         setAdminSettings={setAdminSettings}
         allUsers={allUsers}
