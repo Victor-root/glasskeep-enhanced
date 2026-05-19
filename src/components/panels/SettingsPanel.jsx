@@ -450,137 +450,6 @@ export default function SettingsPanel({
             </SettingsSection>
           </div>
 
-          {/* Data Management Section */}
-          <div className="mb-2">
-            <SettingsSection
-              icon={TI.Database}
-              title={t("dataManagement")}
-              open={openSections.data}
-              onToggle={() => toggleSection("data")}
-            >
-            <div className="space-y-3">
-              <button
-                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
-                onClick={() => {
-                  onClose();
-                  onExportAll?.();
-                }}
-              >
-                <RowIcon icon={TI.Upload} />
-                <div className="min-w-0">
-                  <div className="font-medium">{t("exportAllNotesJson")}</div>
-                  <div className="text-sm text-gray-500">{t("downloadAllNotesJson")}</div>
-                </div>
-              </button>
-
-              <button
-                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
-                onClick={() => {
-                  onClose();
-                  onImportAll?.();
-                }}
-              >
-                <RowIcon icon={TI.Download} />
-                <div className="min-w-0">
-                  <div className="font-medium">{t("importNotesJson")}</div>
-                  <div className="text-sm text-gray-500">{t("importNotesFromJsonFile")}</div>
-                </div>
-              </button>
-
-              <button
-                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
-                onClick={() => {
-                  onClose();
-                  onImportGKeep?.();
-                }}
-              >
-                <RowIcon icon={TI.BrandGoogle} />
-                <div className="min-w-0">
-                  <div className="font-medium">{t("importGoogleKeepNotes")}</div>
-                  <div className="text-sm text-gray-500">
-                    {t("importNotesFromGoogleKeepExport")}{" "}
-                    {/* Inline help link to Google's Takeout instructions.
-                        stopPropagation so clicking the link doesn't also
-                        trigger the parent button's file-picker open. */}
-                    <a
-                      href="https://support.google.com/accounts/answer/3024190?hl=en-AM&utm"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-500 hover:text-indigo-600 dark:text-indigo-300 dark:hover:text-indigo-200 underline underline-offset-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {t("howToExportGoogleKeep")}
-                    </a>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
-                onClick={() => {
-                  onClose();
-                  onImportMd?.();
-                }}
-              >
-                <RowIcon icon={TI.FileText} />
-                <div className="min-w-0">
-                  <div className="font-medium">{t("importMarkdownFilesMd")}</div>
-                  <div className="text-sm text-gray-500">{t("importNotesFromMarkdownFiles")}</div>
-                </div>
-              </button>
-
-              <button
-                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
-                onClick={() => {
-                  onClose();
-                  onDownloadSecretKey?.();
-                }}
-              >
-                <RowIcon icon={TI.Key} />
-                <div className="min-w-0">
-                  <div className="font-medium">{t("downloadSecretKeyTxt")}</div>
-                  <div className="text-sm text-gray-500">{t("downloadEncryptionKeyBackup")}</div>
-                </div>
-              </button>
-
-              <button
-                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
-                onClick={() => {
-                  setOverridePositions(true);
-                  setResetDialogOpen(true);
-                }}
-              >
-                <RowIcon icon={TI.ArrowsSort} />
-                <div className="min-w-0">
-                  <div className="font-medium">{t("resetNoteOrder")}</div>
-                  <div className="text-sm text-gray-500">{t("resetNoteOrderDesc")}</div>
-                </div>
-              </button>
-            </div>
-            </SettingsSection>
-          </div>
-
-          {/* AI Assistant Section — per-user preferences. Mode picker
-              (server vs. custom) and an optional personal OpenAI-
-              compatible config. Never receives the admin's API key,
-              base URL or model. */}
-          <div className="mb-2">
-            <SettingsSection
-              icon={TI.Brain}
-              title={t("aiSectionTitle")}
-              open={openSections.ai}
-              onToggle={() => toggleSection("ai")}
-            >
-            <div className="pl-3">
-              <UserAiSettingsSection
-                token={token}
-                showToast={showToast}
-                onEnabledChange={setAiAssistantEnabled}
-              />
-            </div>
-            </SettingsSection>
-          </div>
-
           {/* UI Preferences Section — layout + animations live here. */}
           <div className="mb-2">
             <SettingsSection
@@ -890,6 +759,137 @@ export default function SettingsPanel({
                   </button>
                 </div>
               </div>
+            </div>
+            </SettingsSection>
+          </div>
+
+          {/* Data Management Section */}
+          <div className="mb-2">
+            <SettingsSection
+              icon={TI.Database}
+              title={t("dataManagement")}
+              open={openSections.data}
+              onToggle={() => toggleSection("data")}
+            >
+            <div className="space-y-3">
+              <button
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                onClick={() => {
+                  onClose();
+                  onExportAll?.();
+                }}
+              >
+                <RowIcon icon={TI.Upload} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("exportAllNotesJson")}</div>
+                  <div className="text-sm text-gray-500">{t("downloadAllNotesJson")}</div>
+                </div>
+              </button>
+
+              <button
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                onClick={() => {
+                  onClose();
+                  onImportAll?.();
+                }}
+              >
+                <RowIcon icon={TI.Download} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("importNotesJson")}</div>
+                  <div className="text-sm text-gray-500">{t("importNotesFromJsonFile")}</div>
+                </div>
+              </button>
+
+              <button
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                onClick={() => {
+                  onClose();
+                  onImportGKeep?.();
+                }}
+              >
+                <RowIcon icon={TI.BrandGoogle} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("importGoogleKeepNotes")}</div>
+                  <div className="text-sm text-gray-500">
+                    {t("importNotesFromGoogleKeepExport")}{" "}
+                    {/* Inline help link to Google's Takeout instructions.
+                        stopPropagation so clicking the link doesn't also
+                        trigger the parent button's file-picker open. */}
+                    <a
+                      href="https://support.google.com/accounts/answer/3024190?hl=en-AM&utm"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-500 hover:text-indigo-600 dark:text-indigo-300 dark:hover:text-indigo-200 underline underline-offset-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {t("howToExportGoogleKeep")}
+                    </a>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                onClick={() => {
+                  onClose();
+                  onImportMd?.();
+                }}
+              >
+                <RowIcon icon={TI.FileText} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("importMarkdownFilesMd")}</div>
+                  <div className="text-sm text-gray-500">{t("importNotesFromMarkdownFiles")}</div>
+                </div>
+              </button>
+
+              <button
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                onClick={() => {
+                  onClose();
+                  onDownloadSecretKey?.();
+                }}
+              >
+                <RowIcon icon={TI.Key} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("downloadSecretKeyTxt")}</div>
+                  <div className="text-sm text-gray-500">{t("downloadEncryptionKeyBackup")}</div>
+                </div>
+              </button>
+
+              <button
+                className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                onClick={() => {
+                  setOverridePositions(true);
+                  setResetDialogOpen(true);
+                }}
+              >
+                <RowIcon icon={TI.ArrowsSort} />
+                <div className="min-w-0">
+                  <div className="font-medium">{t("resetNoteOrder")}</div>
+                  <div className="text-sm text-gray-500">{t("resetNoteOrderDesc")}</div>
+                </div>
+              </button>
+            </div>
+            </SettingsSection>
+          </div>
+
+          {/* AI Assistant Section — per-user preferences. Mode picker
+              (server vs. custom) and an optional personal OpenAI-
+              compatible config. Never receives the admin's API key,
+              base URL or model. */}
+          <div className="mb-2">
+            <SettingsSection
+              icon={TI.Brain}
+              title={t("aiSectionTitle")}
+              open={openSections.ai}
+              onToggle={() => toggleSection("ai")}
+            >
+            <div className="pl-3">
+              <UserAiSettingsSection
+                token={token}
+                showToast={showToast}
+                onEnabledChange={setAiAssistantEnabled}
+              />
             </div>
             </SettingsSection>
           </div>
