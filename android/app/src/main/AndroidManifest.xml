@@ -10,6 +10,13 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <!-- In-app self-update: fetch the latest APK from GitHub Releases,
+         drop it into our private cache, then hand it to Android's
+         system installer via the FileProvider declared below. The user
+         has to flip "Install unknown apps" for GlassKeep once; after
+         that, future updates trigger the native "Update?" dialog
+         straight from a background check on launch. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
@@ -54,5 +61,20 @@
             android:exported="false"
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+
+        <!-- Self-update FileProvider: lets us hand the downloaded APK to
+             Android's system installer (ACTION_VIEW with
+             application/vnd.android.package-archive) without granting
+             external-storage permissions. The authority follows the
+             applicationId so it stays unique across forks / build types. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

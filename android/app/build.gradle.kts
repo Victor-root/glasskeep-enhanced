@@ -85,6 +85,10 @@ android {
 
     buildFeatures {
         compose = true
+        // BuildConfig is opt-in on AGP 8+. The self-update flow reads
+        // BuildConfig.VERSION_NAME to compare against the latest APK
+        // asset on GitHub Releases.
+        buildConfig = true
     }
 
     composeOptions {

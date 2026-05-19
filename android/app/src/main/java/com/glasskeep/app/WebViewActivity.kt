@@ -213,6 +213,12 @@ class WebViewActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Fire-and-forget self-update check. UpdateManager throttles to
+        // one call per 12h via SharedPreferences and runs the whole
+        // GitHub-Releases → download → install flow on a background
+        // thread, so the WebView launch path is never blocked.
+        com.glasskeep.app.update.UpdateManager.checkInBackground(this)
+
         // Draw edge-to-edge: let the app handle system bar insets via CSS
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
 

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FileProvider paths. The installer streams downloaded APKs into
+  context.cacheDir/updates/ and hands Android a content:// URI rooted at
+  this path so the system installer can read the file across the process
+  boundary without us needing READ/WRITE_EXTERNAL_STORAGE.
+-->
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>
