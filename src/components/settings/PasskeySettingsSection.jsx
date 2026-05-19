@@ -271,12 +271,18 @@ export default function PasskeySettingsSection({
         <p className="text-sm text-gray-500 dark:text-gray-400 leading-snug mb-3">
           {t("passkeySectionExplain")}
         </p>
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Split-button: one visual surface, two independent click zones.
+            The wide left zone runs the WebAuthn registration flow; the
+            chevron zone on the right toggles the saved-keys list. A thin
+            translucent divider keeps the visual unity. */}
+        <div
+          className={`inline-flex w-full sm:w-auto rounded-lg overflow-hidden text-white bg-gradient-to-r from-indigo-500 to-violet-600 shadow-md shadow-indigo-300/40 dark:shadow-none btn-gradient ${loading ? "opacity-50" : ""}`}
+        >
           <button
             type="button"
             onClick={handleAdd}
             disabled={loading}
-            className="flex-1 sm:flex-none min-w-0 sm:w-auto px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 disabled:opacity-50 btn-gradient"
+            className="flex-1 sm:flex-none min-w-0 px-4 py-2 text-sm font-semibold text-center hover:bg-white/10 active:bg-white/20 focus:outline-none focus-visible:bg-white/15 disabled:cursor-not-allowed transition-colors"
           >
             <span className="truncate">
               {loading ? t("passkeyAddInProgress") : t("passkeyAddCta")}
@@ -284,19 +290,22 @@ export default function PasskeySettingsSection({
             </span>
           </button>
           {list.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setListOpen((v) => !v)}
-              aria-expanded={listOpen}
-              aria-label={listOpen ? t("close") : t("show")}
-              className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[var(--border-light)] hover:bg-[#c1cfff66] dark:hover:bg-indigo-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 transition-colors"
-            >
-              <TI.ChevronDown
-                className={`tabler-icon w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 ${
-                  listOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
+            <>
+              <div className="w-px bg-white/30 self-stretch" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={() => setListOpen((v) => !v)}
+                aria-expanded={listOpen}
+                aria-label={listOpen ? t("close") : t("show")}
+                className="shrink-0 inline-flex items-center justify-center px-3 hover:bg-white/10 active:bg-white/20 focus:outline-none focus-visible:bg-white/15 transition-colors"
+              >
+                <TI.ChevronDown
+                  className={`tabler-icon w-4 h-4 transition-transform duration-200 ${
+                    listOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+            </>
           )}
         </div>
       </div>
