@@ -397,7 +397,7 @@ export default function AdminPanel({
           </div>
         </div>
 
-        <div className="p-4 pb-12 overflow-y-auto h-[calc(100%-64px)]">
+        <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
           <AdminUpdateSection
             updateInfo={updateInfo}
             selfUpdate={selfUpdate}
@@ -716,14 +716,6 @@ export default function AdminPanel({
             </SettingsSection>
           </div>
 
-        </div>
-
-        {/* Pinned panel footer — keeps the app version anchored at the
-            bottom-right regardless of scroll position. */}
-        <div className="pointer-events-none absolute bottom-2 right-3 select-none">
-          <span className="text-xs text-gray-400 dark:text-gray-600 tabular-nums">
-            v{typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : ""}
-          </span>
         </div>
       </div>
 
