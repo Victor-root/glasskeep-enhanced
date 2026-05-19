@@ -544,8 +544,8 @@ export default function SettingsPanel({
               </div>
 
               {alwaysShowSidebarOnWide && (
-                <div className="flex items-center justify-between gap-3 px-3 py-3 border border-[var(--border-light)] rounded-lg mx-3">
-                  <div className="min-w-0 flex-1">
+                <div className="flex flex-col gap-2 px-3 sm:pl-14">
+                  <div className="min-w-0">
                     <div className="font-medium">{t("sidebarBreakpoint")}</div>
                     <div className="text-sm text-gray-500">{t("sidebarBreakpointDesc")}</div>
                   </div>
@@ -553,13 +553,17 @@ export default function SettingsPanel({
                     ref={breakpointBtnRef}
                     type="button"
                     onClick={() => setBreakpointMenuOpen((v) => !v)}
-                    className="shrink-0 inline-flex items-center justify-between gap-2 min-w-[7rem] px-3 py-1.5 text-sm rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                    className="w-full inline-flex items-center justify-between gap-2 px-3 py-2 text-sm rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none active:scale-[0.98] btn-gradient"
                     aria-haspopup="listbox"
                     aria-expanded={breakpointMenuOpen}
                   >
-                    <span>≥ {sidebarBreakpoint} px</span>
+                    <span className="truncate text-left">
+                      {t(
+                        (SIDEBAR_BREAKPOINT_PRESETS.find((p) => p.value === sidebarBreakpoint) || {}).labelKey
+                      ) || `≥ ${sidebarBreakpoint} px`}
+                    </span>
                     <TI.ChevronDown
-                      className={`tabler-icon w-4 h-4 transition-transform ${breakpointMenuOpen ? "rotate-180" : ""}`}
+                      className={`tabler-icon w-4 h-4 shrink-0 transition-transform ${breakpointMenuOpen ? "rotate-180" : ""}`}
                     />
                   </button>
                   <Popover
