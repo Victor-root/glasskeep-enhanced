@@ -101,18 +101,28 @@ fun WelcomeScreen(onContinue: () -> Unit) {
         else context.packageManager.canRequestPackageInstalls()
     }
 
+    // Per-permission "the user has actually completed at least one
+    // grant attempt" flags. Set INSIDE the launcher callback, never
+    // synchronously in the click handler — that's what makes the red
+    // "Refusé ✗" badge wait for an actual decision instead of flashing
+    // the moment we kick the popup off.
+    var micTried by remember { mutableStateOf(false) }
+    var cameraTried by remember { mutableStateOf(false) }
+    var notifTried by remember { mutableStateOf(false) }
+    var installTried by remember { mutableStateOf(false) }
+
     val micLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { bump() }
+    ) { micTried = true; bump() }
     val cameraLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { bump() }
+    ) { cameraTried = true; bump() }
     val notifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { bump() }
+    ) { notifTried = true; bump() }
     val installSettingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) { bump() }
+    ) { installTried = true; bump() }
     val appSettingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { bump() }
@@ -171,6 +181,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 title = stringResource(R.string.welcome_mic_title),
                 description = stringResource(R.string.welcome_mic_desc),
                 granted = micGranted,
+                tried = micTried,
                 cardBg = cardBg,
                 borderColor = borderColor,
                 titleColor = titleColor,
@@ -184,6 +195,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 title = stringResource(R.string.welcome_camera_title),
                 description = stringResource(R.string.welcome_camera_desc),
                 granted = cameraGranted,
+                tried = cameraTried,
                 cardBg = cardBg,
                 borderColor = borderColor,
                 titleColor = titleColor,
@@ -198,6 +210,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                     title = stringResource(R.string.welcome_notif_title),
                     description = stringResource(R.string.welcome_notif_desc),
                     granted = notifGranted,
+                    tried = notifTried,
                     cardBg = cardBg,
                     borderColor = borderColor,
                     titleColor = titleColor,
@@ -221,13 +234,15 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                     title = stringResource(R.string.welcome_install_title),
                     description = stringResource(R.string.welcome_install_desc),
                     granted = installGranted,
+                    tried = installTried,
                     cardBg = cardBg,
                     borderColor = borderColor,
                     titleColor = titleColor,
                     subtextColor = subtextColor,
-                    // "Install unknown apps" is a special-access setting, never
-                    // a runtime permission popup. Route the grant flow straight
-                    // to the per-app toggle on every device.
+                    // "Install unknown apps" is a special-access setting,
+                    // never a runtime permission popup — both the initial
+                    // grant action AND the post-denial "Ouvrir les
+                    // réglages" route to the same per-app toggle.
                     onGrant = {
                         installSettingsLauncher.launch(
                             Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
@@ -240,7 +255,6 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                                 .setData(Uri.parse("package:${context.packageName}"))
                         )
                     },
-                    grantAlwaysOpensSettings = true,
                 )
             }
 
@@ -259,19 +273,20 @@ private fun PermissionCard(
     title: String,
     description: String,
     granted: Boolean,
+    tried: Boolean,
     cardBg: Color,
     borderColor: Color,
     titleColor: Color,
     subtextColor: Color,
     onGrant: () -> Unit,
     onSettings: () -> Unit,
-    grantAlwaysOpensSettings: Boolean = false,
 ) {
-    // After a denial the system dialog can't be re-triggered for that
-    // session (or the user picked "Don't ask again"). We track the
-    // attempt locally so the second click lands the user on the app's
-    // settings page where they can flip the toggle by hand.
-    var tried by remember { mutableStateOf(false) }
+    // `tried` is owned by the parent — it flips to true ONLY when the
+    // matching launcher's callback fires (i.e. Android actually
+    // returned a decision), never synchronously on click. That keeps
+    // the "Refusé ✗" badge from flashing the instant we kick off a
+    // permission request: it only ever appears once the user has
+    // actually completed an attempt.
 
     Column(
         modifier = Modifier
@@ -317,7 +332,6 @@ private fun PermissionCard(
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val isDenied = tried && !granted && !grantAlwaysOpensSettings
             if (granted) {
                 Text(
                     text = stringResource(R.string.welcome_granted),
@@ -325,11 +339,14 @@ private fun PermissionCard(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
-            } else if (isDenied) {
-                // User actively denied the system permission popup.
-                // Show a red status badge for clarity, with the
-                // "Open settings" button right next to it so they
-                // can still flip the toggle by hand.
+            } else if (tried) {
+                // Launcher fired and the OS returned without a grant —
+                // either the user clicked Deny in the popup, dismissed
+                // the system settings page without flipping the toggle,
+                // or hit Android 11+'s auto-deny rate limit. In every
+                // case it counts as a real refusal: red status badge +
+                // a follow-up "Open settings" button so they can still
+                // flip the toggle by hand.
                 Text(
                     text = stringResource(R.string.welcome_denied),
                     color = Color(0xFFdc2626),
@@ -342,16 +359,13 @@ private fun PermissionCard(
                     onClick = onSettings,
                 )
             } else {
-                // Either first attempt or grantAlwaysOpensSettings (the
-                // install-unknown-apps card). In both cases the button
-                // is labelled "Autoriser" and either pops the system
-                // permission dialog or jumps to the per-app settings.
+                // Idle state — the user hasn't kicked off any attempt
+                // yet for this card. Tapping fires onGrant which either
+                // pops the system permission dialog (runtime perms) or
+                // jumps to the per-app settings page (install perm).
                 PillButton(
                     label = stringResource(R.string.welcome_grant),
-                    onClick = {
-                        tried = true
-                        onGrant()
-                    },
+                    onClick = onGrant,
                 )
             }
         }
