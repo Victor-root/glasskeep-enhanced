@@ -757,6 +757,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   checkForUpdateDesc: "Recherche manuellement si une nouvelle version de l'app Android est disponible sur GitHub.",
   currentAppVersion: "Version installée : v{version}",
   appUpdatesManagedByFdroid: "Les mises à jour sont gérées par F-Droid.",
+  openFdroid: "Ouvrir F-Droid",
   updateAvailableHeader: "Mise à jour disponible",
   updateAvailableVersion: "Version {version} prête à être installée.",
   updateAvailableServerHint: "Pensez à mettre aussi votre serveur GlassKeep à jour pour profiter de toutes les fonctionnalités.",

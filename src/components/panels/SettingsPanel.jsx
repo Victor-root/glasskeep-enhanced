@@ -911,23 +911,30 @@ export default function SettingsPanel({
                 <div className="space-y-3">
                   {installedFromFdroid ? (
                     /* F-Droid installs delegate updates to F-Droid
-                       itself, so we hide the check button + update
-                       card and only show the running APK version
-                       with a one-liner explaining why nothing's
-                       actionable here. */
-                    <div className="flex items-center gap-3 px-3 py-3 border border-[var(--border-light)] rounded-lg">
+                       itself. Rather than a passive "managed by
+                       F-Droid" note, surface a button that opens
+                       F-Droid straight on this app's page so the
+                       user can update in one tap. */
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try { window.AndroidTheme?.openFdroidPage?.(); } catch (e) {}
+                      }}
+                      className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                    >
                       <RowIcon icon={TI.Download} />
                       <div className="min-w-0">
-                        {appVersion && (
-                          <div className="font-medium tabular-nums">
-                            {t("currentAppVersion").replace("{version}", appVersion)}
-                          </div>
-                        )}
+                        <div className="font-medium">{t("openFdroid")}</div>
                         <div className="text-sm text-gray-500 mt-0.5">
                           {t("appUpdatesManagedByFdroid")}
                         </div>
+                        {appVersion && (
+                          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1 tabular-nums">
+                            {t("currentAppVersion").replace("{version}", appVersion)}
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    </button>
                   ) : availableUpdate ? (
                     /* When a release has been detected the card replaces
                        the "Check for updates" button entirely — keeping

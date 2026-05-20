@@ -185,6 +185,28 @@ class WebViewActivity : AppCompatActivity() {
         fun isFdroidInstall(): Boolean =
             com.glasskeep.app.update.UpdateManager.isFdroidInstall(this@WebViewActivity)
 
+        /** Open F-Droid on this app's page. The HTTPS URL is claimed
+         *  by every F-Droid client variant (vanilla, Basic, Privileged
+         *  Extension), so we don't need to second-guess which variant
+         *  the user has — the system intent resolver picks it. Only
+         *  called from the Settings panel when isFdroidInstall() is
+         *  already true, so we're guaranteed at least one F-Droid
+         *  client is present. */
+        @JavascriptInterface
+        fun openFdroidPage() {
+            val url = "https://f-droid.org/packages/$packageName/"
+            runOnUiThread {
+                try {
+                    startActivity(
+                        Intent(Intent.ACTION_VIEW).apply {
+                            data = Uri.parse(url)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                    )
+                } catch (e: Exception) {}
+            }
+        }
+
         /** Returns the latest detected release as JSON (or null if no
          *  pending update). Called from the Settings panel on open so
          *  the card survives an Activity recreation. The helper auto-
