@@ -157,7 +157,7 @@ export default function ChecklistRow({
           {item.text
             ? (!preview ? linkifyContacts(item.text) : item.text)
             : !readOnly
-              ? <span className="text-gray-400 dark:text-gray-500 italic">{t("listItem")}</span>
+              ? <span className="text-gray-400 dark:text-gray-500">{t("listItem")}</span>
               : ""}
         </span>
       ) : (
