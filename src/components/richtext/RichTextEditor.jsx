@@ -8,6 +8,7 @@ import {
   emptyRichDoc,
   parseRichDoc,
 } from "../../utils/richText.js";
+import { sliceToCleanPlainText } from "../../utils/richTextClipboard.js";
 import RichTextToolbar from "./RichTextToolbar.jsx";
 
 /**
@@ -99,6 +100,14 @@ const RichTextEditor = forwardRef(function RichTextEditor(
         class: `rt-editor-content note-content note-content--dense focus:outline-none ${minHeightClass}`,
         spellcheck: "true",
       },
+      // Outbound-only clipboard hook: when the user presses Ctrl+C in
+      // the editor, PM serialises the selection to `text/plain` via
+      // this function. Our walker emits one line per block + proper
+      // list-prefix indentation so a paste into Notepad / any
+      // unstructured target stops producing huge gaps between blocks.
+      // The HTML side of the clipboard is left to PM's default so a
+      // paste into another rich-text target still gets full fidelity.
+      clipboardTextSerializer: (slice) => sliceToCleanPlainText(slice),
       handleKeyDown: (_, event) => {
         // Shift+Tab → hand focus back to the parent (title input).
         // Plain Tab is left to ProseMirror so list / code-block tab
