@@ -315,7 +315,9 @@ private fun PermissionCard(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            val isDenied = tried && !granted && !grantAlwaysOpensSettings
             if (granted) {
                 Text(
                     text = stringResource(R.string.welcome_granted),
@@ -323,18 +325,32 @@ private fun PermissionCard(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
-            } else {
-                val showSettings = tried && !grantAlwaysOpensSettings
+            } else if (isDenied) {
+                // User actively denied the system permission popup.
+                // Show a red status badge for clarity, with the
+                // "Open settings" button right next to it so they
+                // can still flip the toggle by hand.
+                Text(
+                    text = stringResource(R.string.welcome_denied),
+                    color = Color(0xFFdc2626),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.size(12.dp))
                 PillButton(
-                    label = stringResource(
-                        if (showSettings) R.string.welcome_settings
-                        else R.string.welcome_grant
-                    ),
+                    label = stringResource(R.string.welcome_settings),
+                    onClick = onSettings,
+                )
+            } else {
+                // Either first attempt or grantAlwaysOpensSettings (the
+                // install-unknown-apps card). In both cases the button
+                // is labelled "Autoriser" and either pops the system
+                // permission dialog or jumps to the per-app settings.
+                PillButton(
+                    label = stringResource(R.string.welcome_grant),
                     onClick = {
-                        if (showSettings) onSettings() else {
-                            tried = true
-                            onGrant()
-                        }
+                        tried = true
+                        onGrant()
                     },
                 )
             }

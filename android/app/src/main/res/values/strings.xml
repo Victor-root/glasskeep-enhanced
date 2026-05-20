@@ -47,6 +47,7 @@
     <string name="welcome_continue">Next</string>
     <string name="welcome_grant">Grant</string>
     <string name="welcome_granted">Granted ✓</string>
+    <string name="welcome_denied">Denied ✗</string>
     <string name="welcome_settings">Open settings</string>
     <string name="welcome_mic_title">Microphone</string>
     <string name="welcome_mic_desc">Lets you record audio notes from inside the app.</string>

@@ -40,6 +40,7 @@
     <string name="welcome_continue">Suivant</string>
     <string name="welcome_grant">Autoriser</string>
     <string name="welcome_granted">Accordé ✓</string>
+    <string name="welcome_denied">Refusé ✗</string>
     <string name="welcome_settings">Ouvrir les réglages</string>
     <string name="welcome_mic_title">Micro</string>
     <string name="welcome_mic_desc">Permet d\'enregistrer des notes audio directement depuis l\'application.</string>
