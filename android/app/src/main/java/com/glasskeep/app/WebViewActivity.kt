@@ -168,6 +168,14 @@ class WebViewActivity : AppCompatActivity() {
             }
         }
 
+        /** Returns the currently-installed APK version as a plain
+         *  string ("1.4.0"). Used by the Settings panel to surface
+         *  "you're on v…" next to the manual update-check trigger so
+         *  the user can confirm at a glance which build is running. */
+        @JavascriptInterface
+        fun getAppVersion(): String =
+            com.glasskeep.app.BuildConfig.VERSION_NAME
+
         /** Returns the latest detected release as JSON (or null if no
          *  pending update). Called from the Settings panel on open so
          *  the card survives an Activity recreation. */

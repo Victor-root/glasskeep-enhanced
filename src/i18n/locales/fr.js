@@ -755,6 +755,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   appSectionTitle: "Application",
   checkForUpdateOption: "Vérifier les mises à jour",
   checkForUpdateDesc: "Recherche manuellement si une nouvelle version de l'app Android est disponible sur GitHub.",
+  currentAppVersion: "Version installée : v{version}",
   updateAvailableHeader: "Mise à jour disponible",
   updateAvailableVersion: "Version {version} prête à être installée.",
   updateAvailableServerHint: "Pensez à mettre aussi votre serveur GlassKeep à jour pour profiter de toutes les fonctionnalités.",

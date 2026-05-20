@@ -87,6 +87,10 @@ export default function SettingsPanel({
   // expansion state is server-synced (defaults to all collapsed).
   const toggleSection = (key) =>
     setOpenSections?.((prev) => ({ ...prev, [key]: !prev[key] }));
+  // Current installed APK version, fetched once from the Android
+  // bridge. Empty string when running on the web/PWA (no bridge) so
+  // the "v…" line stays hidden.
+  const [appVersion, setAppVersion] = useState("");
   // Latest detected Android-app release as reported by the
   // AndroidTheme.getAvailableUpdate() bridge. The Settings card under
   // "Vérifier les mises à jour" renders when this is non-null.
@@ -94,6 +98,10 @@ export default function SettingsPanel({
   React.useEffect(() => {
     if (!open) return;
     if (!isWebView) return;
+    try {
+      const v = window?.AndroidTheme?.getAppVersion?.();
+      if (typeof v === "string" && v.length) setAppVersion(v);
+    } catch (e) {}
     try {
       const json = window?.AndroidTheme?.getAvailableUpdate?.();
       if (typeof json === "string" && json.length) {
@@ -945,6 +953,11 @@ export default function SettingsPanel({
                       <div className="min-w-0">
                         <div className="font-medium">{t("checkForUpdateOption")}</div>
                         <div className="text-sm text-gray-500">{t("checkForUpdateDesc")}</div>
+                        {appVersion && (
+                          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1 tabular-nums">
+                            {t("currentAppVersion").replace("{version}", appVersion)}
+                          </div>
+                        )}
                       </div>
                     </button>
                   )}
