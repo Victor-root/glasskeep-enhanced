@@ -191,27 +191,29 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 onGrant = { cameraLauncher.launch(Manifest.permission.CAMERA) },
                 onSettings = { appSettingsLauncher.launch(appInfoIntent(context.packageName)) },
             )
-            Spacer(modifier = Modifier.height(14.dp))
-            PermissionCard(
-                iconRes = R.drawable.ic_tabler_bell,
-                title = stringResource(R.string.welcome_notif_title),
-                description = stringResource(R.string.welcome_notif_desc),
-                granted = notifGranted,
-                cardBg = cardBg,
-                borderColor = borderColor,
-                titleColor = titleColor,
-                subtextColor = subtextColor,
-                onGrant = {
-                    if (needsNotifPerm) {
-                        notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    } else {
-                        // Pre-Tiramisu: nothing to ask for; just bump so the
-                        // card flips to "Accordé" without ceremony.
-                        bump()
-                    }
-                },
-                onSettings = { appSettingsLauncher.launch(appInfoIntent(context.packageName)) },
-            )
+            if (!isFdroid) {
+                Spacer(modifier = Modifier.height(14.dp))
+                PermissionCard(
+                    iconRes = R.drawable.ic_tabler_bell,
+                    title = stringResource(R.string.welcome_notif_title),
+                    description = stringResource(R.string.welcome_notif_desc),
+                    granted = notifGranted,
+                    cardBg = cardBg,
+                    borderColor = borderColor,
+                    titleColor = titleColor,
+                    subtextColor = subtextColor,
+                    onGrant = {
+                        if (needsNotifPerm) {
+                            notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            // Pre-Tiramisu: nothing to ask for; just bump so the
+                            // card flips to "Accordé" without ceremony.
+                            bump()
+                        }
+                    },
+                    onSettings = { appSettingsLauncher.launch(appInfoIntent(context.packageName)) },
+                )
+            }
             if (!isFdroid) {
                 Spacer(modifier = Modifier.height(14.dp))
                 PermissionCard(
