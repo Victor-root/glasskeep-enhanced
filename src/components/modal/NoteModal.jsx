@@ -737,7 +737,7 @@ export default function NoteModal({
                       onDocChange={handleRichDocChange}
                       placeholder={t("writeYourNoteEllipsis")}
                       dark={dark}
-                      autoFocus={!mTitle}
+                      autoFocus={!activeId && !mTitle}
                       minHeightClass="min-h-[160px]"
                       toolbarContainer={toolbarMount}
                       toolbarMode={editorToolbarMode}
