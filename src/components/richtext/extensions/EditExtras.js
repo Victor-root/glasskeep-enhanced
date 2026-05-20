@@ -131,7 +131,10 @@ function getInlineCopyEl() {
   if (inlineCopyEl && inlineCopyEl.isConnected) return inlineCopyEl;
   inlineCopyEl = document.createElement("button");
   inlineCopyEl.type = "button";
-  inlineCopyEl.className = "rt-inline-code-copy";
+  // Share .code-copy-btn with the code-block button so font/colors/
+  // padding/shadow are guaranteed identical; .rt-inline-code-copy
+  // contributes only positioning + show/hide.
+  inlineCopyEl.className = "rt-inline-code-copy code-copy-btn";
   inlineCopyEl.setAttribute("data-copy-btn", "1");
   inlineCopyEl.textContent = t("copy");
   inlineCopyEl.addEventListener("mousedown", (e) => e.preventDefault());

@@ -1207,30 +1207,46 @@ html.dark .modal-footer-btn--pin-active:hover {
   }
 }
 
-.note-content pre .code-copy-btn,
-.code-block-wrapper .code-copy-btn {
+/* Shared theme for code-copy buttons. Applied to the in-editor /
+   view-mode code-block button AND to the portaled inline-code button
+   (.rt-inline-code-copy below), so both surfaces look identical
+   regardless of which DOM context they end up rendered in. Explicit
+   font-family / font-weight / line-height because the inline button
+   sits in document.body and would otherwise inherit different defaults
+   than the in-editor block button. */
+.code-copy-btn {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
   font-size: .75rem;
+  font-weight: 500;
+  line-height: 1;
   padding: .2rem .45rem;
   border-radius: .35rem;
   background: var(--note-color, #111);
   color: #fff;
   border: none;
   box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+  cursor: pointer;
+}
+.code-copy-btn:hover {
+  background: var(--note-color-opaque, #111);
+}
+html:not(.dark) .code-copy-btn {
+  color: rgba(0,0,0,0.75);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* Code-block button positioning + hover-show. Scoped to descendants
+   of the wrapper / pre so the rules don't catch the portaled inline
+   button, which has its own visibility mechanism. */
+.note-content pre .code-copy-btn,
+.code-block-wrapper .code-copy-btn {
   opacity: 0;
   transition: opacity 0.15s;
   z-index: 2;
-  cursor: pointer;
 }
 .code-block-wrapper:hover .code-copy-btn {
   opacity: 1;
-}
-.code-block-wrapper .code-copy-btn:hover {
-  opacity: 1;
-  background: var(--note-color-opaque, #111);
-}
-html:not(.dark) .code-block-wrapper .code-copy-btn {
-  color: rgba(0,0,0,0.75);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
 .inline-code-copy-btn {
@@ -1269,36 +1285,19 @@ html:not(.dark) .code-block-wrapper .code-copy-btn {
 
 /* Floating "Copier" overlay anchored to inline code. Portaled into
    document.body so it can float above any modal scroll container.
-   Styled to match the code-block copy button so both code surfaces
-   feel like a single feature. */
+   The visual theme (font, padding, colours, shadow) is shared with
+   the code-block button via the .code-copy-btn class also applied
+   to this element — only positioning + show/hide live here. */
 .rt-inline-code-copy {
   position: fixed;
   z-index: 10050;
-  font-size: .75rem;
-  font-weight: 500;
-  padding: .2rem .45rem;
-  border-radius: .35rem;
-  border: none;
-  background: var(--note-color, #111);
-  color: #fff;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
-  cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.12s;
+  transition: opacity 0.15s;
 }
 .rt-inline-code-copy--visible {
   opacity: 1;
   pointer-events: auto;
-}
-.rt-inline-code-copy:hover {
-  background: var(--note-color-opaque, #111);
-}
-/* Light mode: dark text on the note-colour background, mirroring the
-   code-block button. Default white text is kept for dark mode. */
-html:not(.dark) .rt-inline-code-copy {
-  color: rgba(0,0,0,0.75);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
 /* Link hover tooltip. */
