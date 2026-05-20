@@ -169,6 +169,28 @@ object UpdateManager {
         storeAvailableRelease(context.applicationContext, null)
     }
 
+    /**
+     * Read the persisted "available release" back, BUT only return it
+     * if it's still strictly newer than the currently-installed APK.
+     * Cleans up stale prefs otherwise — covers the case where the user
+     * built and installed a fresher version through Android Studio
+     * (or a sideloaded APK) without going through the in-app updater,
+     * so the SharedPreferences still claim the now-old release is
+     * "available".
+     */
+    fun getStoredRelease(context: Context): ReleaseInfo? {
+        val appCtx = context.applicationContext
+        val prefs = appCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val version = prefs.getString(KEY_AVAILABLE_VERSION, null) ?: return null
+        val asset = prefs.getString(KEY_AVAILABLE_ASSET, null) ?: return null
+        val url = prefs.getString(KEY_AVAILABLE_URL, null) ?: return null
+        if (!UpdateChecker.isStrictlyNewer(version, BuildConfig.VERSION_NAME)) {
+            storeAvailableRelease(appCtx, null)
+            return null
+        }
+        return ReleaseInfo(version, asset, url, -1L)
+    }
+
     /** Mirrors the last-detected release into SharedPreferences so the
      *  Settings panel can read it back the next time it opens. Passing
      *  null clears the slot — used when an actual check ran and came

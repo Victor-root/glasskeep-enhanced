@@ -49,8 +49,11 @@ internal object UpdateChecker {
             val name = asset.optString("name", "")
             val match = APK_NAME_REGEX.matchEntire(name) ?: continue
             val parsedVersion = match.groupValues[1]
-            if (normalise(parsedVersion) == normalise(currentVersion)) {
-                // Latest published APK is the one we run — nothing to do.
+            // Compare numerically — a simple equality check would
+            // treat any *different* version as "an update", including
+            // older releases (the user could have built a newer APK
+            // locally than what's published).
+            if (!isStrictlyNewer(parsedVersion, currentVersion)) {
                 return null
             }
             val downloadUrl = asset.optString("browser_download_url", "")
@@ -62,6 +65,33 @@ internal object UpdateChecker {
     }
 
     private fun normalise(v: String) = v.trim().removePrefix("v").removePrefix("V")
+
+    /**
+     * Semver-ish comparator: splits both versions on "." and "-",
+     * coerces each segment to an Int (non-numeric tokens treated as
+     * 0), and walks them left-to-right until they differ. Returns
+     * true iff `candidate` is strictly greater than `installed`.
+     *
+     * Examples:
+     *   isStrictlyNewer("1.4.0", "1.3.0")  → true
+     *   isStrictlyNewer("1.3.0", "1.4.0")  → false  (older, was bug)
+     *   isStrictlyNewer("1.4.0", "1.4.0")  → false  (same)
+     *   isStrictlyNewer("1.10.0", "1.9.0") → true   (no lex pitfall)
+     */
+    internal fun isStrictlyNewer(candidate: String, installed: String): Boolean {
+        val c = parseVersion(candidate)
+        val i = parseVersion(installed)
+        val n = maxOf(c.size, i.size)
+        for (k in 0 until n) {
+            val cp = c.getOrNull(k) ?: 0
+            val ip = i.getOrNull(k) ?: 0
+            if (cp != ip) return cp > ip
+        }
+        return false
+    }
+
+    private fun parseVersion(v: String): List<Int> =
+        normalise(v).split('.', '-').map { it.toIntOrNull() ?: 0 }
 
     private fun fetchJson(url: String): JSONObject? {
         var conn: HttpURLConnection? = null

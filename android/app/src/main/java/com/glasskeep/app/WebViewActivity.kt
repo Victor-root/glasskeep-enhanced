@@ -178,49 +178,22 @@ class WebViewActivity : AppCompatActivity() {
 
         /** Returns the latest detected release as JSON (or null if no
          *  pending update). Called from the Settings panel on open so
-         *  the card survives an Activity recreation. */
+         *  the card survives an Activity recreation. The helper auto-
+         *  drops stale prefs when the stored release is no longer
+         *  strictly newer than the running APK. */
         @JavascriptInterface
         fun getAvailableUpdate(): String? {
-            val prefs = getSharedPreferences(
-                com.glasskeep.app.update.UpdateManager.PREFS,
-                MODE_PRIVATE,
-            )
-            val version = prefs.getString(
-                com.glasskeep.app.update.UpdateManager.KEY_AVAILABLE_VERSION,
-                null,
-            ) ?: return null
-            val asset = prefs.getString(
-                com.glasskeep.app.update.UpdateManager.KEY_AVAILABLE_ASSET,
-                null,
-            ) ?: return null
-            val url = prefs.getString(
-                com.glasskeep.app.update.UpdateManager.KEY_AVAILABLE_URL,
-                null,
-            ) ?: return null
-            return jsonReleaseStr(version, asset, url)
+            val release = com.glasskeep.app.update.UpdateManager
+                .getStoredRelease(this@WebViewActivity) ?: return null
+            return jsonReleaseStr(release.versionName, release.assetName, release.downloadUrl)
         }
 
         /** Settings card's "Télécharger" action. Triggers the same
          *  download + install pipeline as a notification tap. */
         @JavascriptInterface
         fun installAvailableUpdate() {
-            val prefs = getSharedPreferences(
-                com.glasskeep.app.update.UpdateManager.PREFS,
-                MODE_PRIVATE,
-            )
-            val version = prefs.getString(
-                com.glasskeep.app.update.UpdateManager.KEY_AVAILABLE_VERSION,
-                null,
-            ) ?: return
-            val asset = prefs.getString(
-                com.glasskeep.app.update.UpdateManager.KEY_AVAILABLE_ASSET,
-                null,
-            ) ?: return
-            val url = prefs.getString(
-                com.glasskeep.app.update.UpdateManager.KEY_AVAILABLE_URL,
-                null,
-            ) ?: return
-            val release = com.glasskeep.app.update.ReleaseInfo(version, asset, url, -1L)
+            val release = com.glasskeep.app.update.UpdateManager
+                .getStoredRelease(this@WebViewActivity) ?: return
             runOnUiThread {
                 Toast.makeText(
                     this@WebViewActivity,
