@@ -656,6 +656,62 @@ export const EditExtras = Extension.create({
             event.stopPropagation();
           };
 
+          // Third fallback: focus event. Some Android WebViews fire
+          // neither our touchend's preventDefault nor a normal
+          // synthesised mousedown for long taps on a contenteditable
+          // (the WebView interprets the long tap as a selection
+          // gesture and focuses directly). When that happens we
+          // never get a chance to arm before the OS keyboard pops
+          // up — so we also listen to focus, look up where the
+          // caret just landed, and if it's inside a code block /
+          // inline code, blur the editor immediately and arm.
+          // Coordinated with the other paths via
+          // `touchPathHandledRecently` and `pendingTap` so we don't
+          // re-arm something the touch path just handled.
+          const onFocus = () => {
+            if (!hasCoarsePointer()) return;
+            if (!isEditExtrasOn(editorView)) return;
+            if (touchPathHandledRecently) return;
+            if (pendingTap) return;
+            // Defer so the browser has finished placing the caret /
+            // selection in response to the touch.
+            setTimeout(() => {
+              if (!dom.isConnected) return;
+              if (document.activeElement !== dom) return;
+              const sel = window.getSelection ? window.getSelection() : null;
+              if (!sel || sel.rangeCount === 0) return;
+              const range = sel.getRangeAt(0);
+              let node = range.startContainer;
+              if (node && node.nodeType === 3) node = node.parentElement;
+              if (!node) return;
+              const wrapper = closestCodeBlockWrapper(node);
+              if (wrapper) {
+                if (armedCodeBlockEl === wrapper) {
+                  // User tapped twice — was already armed, let the
+                  // focus stay so the keyboard appears.
+                  clearCodeBlockArm();
+                  return;
+                }
+                try { dom.blur(); } catch (_e) {}
+                clearInlineCodeArm();
+                armCodeBlock(wrapper);
+                armSyntheticGuard();
+                return;
+              }
+              const inlineCode = closestInlineCode(node);
+              if (inlineCode) {
+                if (armedInlineCodeEl === inlineCode) {
+                  clearInlineCodeArm();
+                  return;
+                }
+                try { dom.blur(); } catch (_e) {}
+                clearCodeBlockArm();
+                armInlineCode(inlineCode);
+                armSyntheticGuard();
+              }
+            }, 0);
+          };
+
           dom.addEventListener("touchstart", onTouchStart, {
             passive: true,
             capture: true,
@@ -676,6 +732,7 @@ export const EditExtras = Extension.create({
             capture: true,
           });
           dom.addEventListener("click", onClickCapture, { capture: true });
+          dom.addEventListener("focus", onFocus);
 
           return {
             destroy() {
@@ -697,6 +754,8 @@ export const EditExtras = Extension.create({
               dom.removeEventListener("click", onClickCapture, {
                 capture: true,
               });
+              dom.removeEventListener("focus", onFocus);
+              if (touchPathHandledTimer) clearTimeout(touchPathHandledTimer);
               clearPending();
             },
           };

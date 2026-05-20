@@ -1258,8 +1258,12 @@ html:not(.dark) .code-block-wrapper .code-copy-btn {
 /* Mobile arm: tapping a code block once on a coarse pointer adds
    data-armed="true" so the copy button stays visible without the
    editor stealing focus. CSS also shows it for hover on desktop via
-   the existing .code-block-wrapper:hover rule. */
-.rt-editor[data-edit-extras="on"] .code-block-wrapper[data-armed="true"] .code-copy-btn {
+   the existing .code-block-wrapper:hover rule. Selector intentionally
+   doesn't require the .code-block-wrapper class — we also fall back
+   to arming a bare <pre> if for any reason the NodeView wrapper
+   isn't found at runtime, and we want the copy button (if present)
+   to still appear. */
+.rt-editor[data-edit-extras="on"] [data-armed="true"] .code-copy-btn {
   opacity: 1;
 }
 
@@ -1290,9 +1294,11 @@ html:not(.dark) .code-block-wrapper .code-copy-btn {
 .rt-inline-code-copy:hover {
   background: var(--note-color-opaque, #111);
 }
+/* Light mode: dark text on the note-colour background, mirroring the
+   code-block button. Default white text is kept for dark mode. */
 html:not(.dark) .rt-inline-code-copy {
-  color: rgba(255,255,255,0.95);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  color: rgba(0,0,0,0.75);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
 /* Link hover tooltip. */
