@@ -51,7 +51,7 @@ export default function SecondaryNoteInstance({
   dark, windowWidth, isLandscapeMobile, isWebView, edgeToEdgeLandscape,
   tagFilter, tagsWithCounts,
   logoLibrary, addLogoToLibrary, deleteLogoFromLibrary,
-  editorToolbarMode, checklistInsertPosition, checklistRemoveSectionBehavior,
+  editorToolbarMode, pasteMode, checklistInsertPosition, checklistRemoveSectionBehavior,
   aiAssistantEnabled,
   syncState,
   // Persistence
@@ -1265,6 +1265,7 @@ export default function SecondaryNoteInstance({
       checklistInsertPosition={checklistInsertPosition}
       checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
       editorToolbarMode={editorToolbarMode}
+      pasteMode={pasteMode}
       onConvertNoteType={convertNoteType}
       onDuplicateNote={duplicateActiveNote}
       initialDrawMode={initialDrawMode}

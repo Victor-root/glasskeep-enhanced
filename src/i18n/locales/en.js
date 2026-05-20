@@ -944,6 +944,14 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   editorToolbarModeAdvanced: "Advanced",
   editorToolbarModeAdvancedDesc: "Show all available formatting tools.",
 
+  // Paste behaviour (Ctrl+V default)
+  pasteBehaviorTitle: "Paste behavior",
+  pasteBehaviorDesc: "Choose whether Ctrl+V keeps formatting by default or always pastes plain text.",
+  pasteBehaviorRich: "Rich text",
+  pasteBehaviorPlain: "Plain text",
+  pasteBehaviorRichDesc: "Ctrl+V keeps formatting from sources like Word or web pages. Ctrl+Shift+V still pastes plain text.",
+  pasteBehaviorPlainDesc: "Ctrl+V always strips formatting and pastes plain text, like Ctrl+Shift+V.",
+
   // Checklist section
   collapseSection: "Collapse section",
   expandSection: "Expand section",

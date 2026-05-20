@@ -11,6 +11,8 @@
 // side of the clipboard is left untouched, so users who paste into
 // another rich-text target still get full fidelity.
 
+import { Fragment, Slice } from "@tiptap/pm/model";
+
 /* -------------------- ProseMirror / Tiptap slice -------------------- */
 
 /**
@@ -298,6 +300,28 @@ function collectDomInlineText(el) {
     }
   });
   return out;
+}
+
+/* -------------------- inbound plain-text → Slice -------------------- */
+
+// Inbound counterpart to `sliceToCleanPlainText`: turn a `text/plain`
+// clipboard payload into a ProseMirror Slice with one paragraph per
+// line. PM's default parser collapses `\r\n` / `\n` sources (Windows
+// Notepad, terminal output, …) into a single paragraph + hard-breaks
+// the schema then drops, so we build the slice ourselves.
+//
+// Used by both `clipboardTextParser` (the default fallback path) and
+// the forced-plain `handlePaste` that the "plain paste" preference
+// installs, so the line-preservation logic lives in one place.
+export function plainTextToPasteSlice(text, schema) {
+  const normalized = String(text == null ? "" : text).replace(/\r\n?/g, "\n");
+  const lines = normalized.split("\n");
+  const nodes = lines.map((line) =>
+    line
+      ? schema.nodes.paragraph.create(null, schema.text(line))
+      : schema.nodes.paragraph.create(),
+  );
+  return new Slice(Fragment.from(nodes), 1, 1);
 }
 
 /* -------------------- shared -------------------- */

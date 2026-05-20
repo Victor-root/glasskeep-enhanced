@@ -945,6 +945,14 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   editorToolbarModeAdvanced: "Avancé",
   editorToolbarModeAdvancedDesc: "Afficher tous les outils disponibles.",
 
+  // Comportement du collage (Ctrl+V par défaut)
+  pasteBehaviorTitle: "Comportement du collage",
+  pasteBehaviorDesc: "Choisis si Ctrl+V conserve la mise en forme par défaut ou colle toujours en texte brut.",
+  pasteBehaviorRich: "Mise en forme",
+  pasteBehaviorPlain: "Texte brut",
+  pasteBehaviorRichDesc: "Ctrl+V conserve la mise en forme des sources comme Word ou les pages web. Ctrl+Shift+V colle toujours en texte brut.",
+  pasteBehaviorPlainDesc: "Ctrl+V supprime toujours la mise en forme et colle en texte brut, comme Ctrl+Shift+V.",
+
   // Section checklist
   collapseSection: "Replier la section",
   expandSection: "Déplier la section",

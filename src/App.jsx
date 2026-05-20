@@ -280,6 +280,17 @@ export default function App() {
       return "simple";
     }
   });
+  // Default Ctrl+V behaviour inside the rich-text editor. "rich" keeps
+  // formatting when the clipboard provides HTML; "plain" strips it.
+  // Ctrl+Shift+V always pastes plain regardless of this setting.
+  const [pasteMode, setPasteMode] = useState(() => {
+    try {
+      const stored = localStorage.getItem("pasteMode");
+      return stored === "plain" ? "plain" : "rich";
+    } catch (e) {
+      return "rich";
+    }
+  });
   const [typographyPresets, setTypographyPresets] = useState(() => {
     try {
       const stored = localStorage.getItem(TYPOGRAPHY_STORAGE_KEY);
@@ -782,6 +793,10 @@ export default function App() {
           setEditorToolbarMode(settings.editorToolbarMode);
           localStorage.setItem("editorToolbarMode", settings.editorToolbarMode);
         }
+        if (settings?.pasteMode === "rich" || settings?.pasteMode === "plain") {
+          setPasteMode(settings.pasteMode);
+          localStorage.setItem("pasteMode", settings.pasteMode);
+        }
         if (settings?.typographyPresets && typeof settings.typographyPresets === "object") {
           const normalized = normalizeTypographyPresets(settings.typographyPresets);
           setTypographyPresets(normalized);
@@ -969,6 +984,18 @@ export default function App() {
       }).catch(() => {});
     }
   }, [editorToolbarMode]);
+
+  useEffect(() => {
+    try { localStorage.setItem("pasteMode", pasteMode); } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { pasteMode },
+      }).catch(() => {});
+    }
+  }, [pasteMode]);
 
   // Edge-to-edge landscape: save + dynamically toggle body padding-left
   useEffect(() => {
@@ -5592,6 +5619,7 @@ export default function App() {
       checklistInsertPosition={checklistInsertPosition}
       checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
       editorToolbarMode={editorToolbarMode}
+      pasteMode={pasteMode}
       onConvertNoteType={convertNoteType}
       onDuplicateNote={duplicateActiveNote}
       initialDrawMode={initialDrawMode}
@@ -5850,6 +5878,8 @@ export default function App() {
         setEdgeToEdgeLandscape={setEdgeToEdgeLandscape}
         editorToolbarMode={editorToolbarMode}
         setEditorToolbarMode={setEditorToolbarMode}
+        pasteMode={pasteMode}
+        setPasteMode={setPasteMode}
         typographyPresets={typographyPresets}
         setTypographyPresets={(next) => setTypographyPresets(normalizeTypographyPresets(next))}
         typographyModalOpen={typographyModalOpen}
@@ -6087,6 +6117,7 @@ export default function App() {
           addLogoToLibrary={addLogoToLibrary}
           deleteLogoFromLibrary={deleteLogoFromLibrary}
           editorToolbarMode={editorToolbarMode}
+          pasteMode={pasteMode}
           checklistInsertPosition={checklistInsertPosition}
           checklistRemoveSectionBehavior={checklistRemoveSectionBehavior}
           aiAssistantEnabled={aiAssistantEnabled}

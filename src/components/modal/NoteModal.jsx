@@ -215,6 +215,7 @@ export default function NoteModal({
   checklistInsertPosition,
   checklistRemoveSectionBehavior,
   editorToolbarMode,
+  pasteMode,
   // note type conversion (text <-> checklist)
   onConvertNoteType,
   onDuplicateNote,
@@ -740,6 +741,7 @@ export default function NoteModal({
                       minHeightClass="min-h-[160px]"
                       toolbarContainer={toolbarMount}
                       toolbarMode={editorToolbarMode}
+                      pasteMode={pasteMode}
                       onReady={(ed) => { richEditorRef.current = ed; }}
                       onShiftTabExit={focusModalTitle}
                     />
@@ -800,6 +802,7 @@ export default function NoteModal({
                     minHeightClass="min-h-[80px]"
                     toolbarContainer={toolbarMount}
                     toolbarMode={editorToolbarMode}
+                    pasteMode={pasteMode}
                     onReady={(ed) => { richEditorRef.current = ed; }}
                     onShiftTabExit={focusModalTitle}
                   />

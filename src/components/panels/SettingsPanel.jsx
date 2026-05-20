@@ -51,6 +51,8 @@ export default function SettingsPanel({
   setEdgeToEdgeLandscape,
   editorToolbarMode,
   setEditorToolbarMode,
+  pasteMode,
+  setPasteMode,
   typographyPresets,
   setTypographyPresets,
   // Lifted into App.jsx so the centralised overlay back-button stack
@@ -690,6 +692,42 @@ export default function SettingsPanel({
                 >
                   {t("typographyOpen")}
                 </button>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.ClearFormatting} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("pasteBehaviorTitle")}</div>
+                    <div className="text-sm text-gray-500">
+                      {pasteMode === "plain"
+                        ? t("pasteBehaviorPlainDesc")
+                        : t("pasteBehaviorRichDesc")}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 self-end sm:self-auto">
+                  <button
+                    className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
+                      pasteMode === "rich"
+                        ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                        : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                    onClick={() => setPasteMode("rich")}
+                  >
+                    {t("pasteBehaviorRich")}
+                  </button>
+                  <button
+                    className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
+                      pasteMode === "plain"
+                        ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                        : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                    onClick={() => setPasteMode("plain")}
+                  >
+                    {t("pasteBehaviorPlain")}
+                  </button>
+                </div>
               </div>
 
               <UISubHeading label={t("checklistSettings")} />

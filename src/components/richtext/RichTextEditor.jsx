@@ -1,7 +1,6 @@
 import React, { useEffect, useImperativeHandle, useMemo, useRef, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { useEditor, EditorContent } from "@tiptap/react";
-import { Fragment, Slice } from "@tiptap/pm/model";
 import { buildRichTextExtensions } from "./richTextSchema.js";
 import {
   contentToRichDoc,
@@ -9,7 +8,10 @@ import {
   emptyRichDoc,
   parseRichDoc,
 } from "../../utils/richText.js";
-import { sliceToCleanPlainText } from "../../utils/richTextClipboard.js";
+import {
+  sliceToCleanPlainText,
+  plainTextToPasteSlice,
+} from "../../utils/richTextClipboard.js";
 import RichTextToolbar from "./RichTextToolbar.jsx";
 
 /**
@@ -62,9 +64,28 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     // "simple" shows only essential formatting tools on one row.
     // "advanced" shows the full multi-row toolbar (default behaviour).
     toolbarMode = "simple",
+    // Default behaviour of Ctrl+V:
+    //   "rich"  — keep formatting when the clipboard contains HTML
+    //             (Word, web pages, mail). Plain-text-only sources
+    //             still get the line-preserving parser below.
+    //   "plain" — strip all formatting on every Ctrl+V. The matching
+    //             `handlePaste` below intercepts the paste event,
+    //             reads `text/plain` directly, and ignores any HTML
+    //             payload the source may also have provided.
+    // Ctrl+Shift+V is always plain-text in either mode (PM handles
+    // that flag itself by skipping `text/html`).
+    pasteMode = "rich",
   },
   ref,
 ) {
+  // `useEditor`'s editorProps closures capture variables at editor
+  // creation time, so we route `pasteMode` through a ref to avoid
+  // rebuilding the editor (and losing the caret) every time the user
+  // flips the setting.
+  const pasteModeRef = useRef(pasteMode);
+  useEffect(() => {
+    pasteModeRef.current = pasteMode;
+  }, [pasteMode]);
   const extensions = useMemo(
     () => buildRichTextExtensions({ placeholder }),
     [placeholder],
@@ -117,16 +138,24 @@ const RichTextEditor = forwardRef(function RichTextEditor(
       // keep the layout the user copied. Only fires when PM has no
       // `text/html` to work with, so rich pastes (Word, web pages) are
       // untouched.
-      clipboardTextParser: (text, $context, _plain, view) => {
-        const { schema } = view.state;
-        const normalized = String(text || "").replace(/\r\n?/g, "\n");
-        const lines = normalized.split("\n");
-        const nodes = lines.map((line) =>
-          line
-            ? schema.nodes.paragraph.create(null, schema.text(line))
-            : schema.nodes.paragraph.create(),
-        );
-        return new Slice(Fragment.from(nodes), 1, 1);
+      clipboardTextParser: (text, _context, _plain, view) =>
+        plainTextToPasteSlice(text, view.state.schema),
+      // `pasteMode === "plain"` makes Ctrl+V behave like Ctrl+Shift+V:
+      // we read `text/plain` directly and drop any HTML payload the
+      // source may have included. Returning `false` in "rich" mode
+      // hands the event back to PM so the default rich-paste flow (and
+      // the `clipboardTextParser` fallback above) keeps working.
+      handlePaste: (view, event) => {
+        if (pasteModeRef.current !== "plain") return false;
+        const cb = event.clipboardData;
+        if (!cb) return false;
+        const text = cb.getData("text/plain");
+        if (!text) return false;
+        const slice = plainTextToPasteSlice(text, view.state.schema);
+        if (!slice) return false;
+        event.preventDefault();
+        view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());
+        return true;
       },
       handleKeyDown: (_, event) => {
         // Shift+Tab → hand focus back to the parent (title input).
