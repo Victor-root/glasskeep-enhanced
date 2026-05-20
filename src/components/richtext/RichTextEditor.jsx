@@ -75,6 +75,15 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     // Ctrl+Shift+V is always plain-text in either mode (PM handles
     // that flag itself by skipping `text/html`).
     pasteMode = "rich",
+    // Mirrors the user's "Mode lecture pour les notes" preference.
+    // When the user has read-mode OFF (default), they never see the
+    // read-only view-mode renderer that injects copy buttons + handles
+    // link clicks. We compensate by enabling the same affordances
+    // inside the editor: copy buttons on code blocks / inline code,
+    // link tooltip + Ctrl/middle-click / mobile-tap popover. Users
+    // with read-mode ON keep their previous edit-mode behaviour so
+    // toggling a note to edit doesn't suddenly behave differently.
+    readModeEnabled = false,
   },
   ref,
 ) {
@@ -271,12 +280,32 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     editor.setEditable(editable);
   }, [editor, editable]);
 
+  // Toggle the edit-mode extras (copy buttons on code blocks / inline
+  // code, link tooltip + Ctrl/middle-click / mobile-tap popover) by
+  // flagging the editor DOM. CSS gates the visible affordances (code
+  // copy button on hover) and the `EditExtras` plugin gates the event
+  // handlers. This way flipping the user preference takes effect
+  // immediately without rebuilding the editor / losing the caret.
+  useEffect(() => {
+    if (!editor) return;
+    const dom = editor.view?.dom;
+    if (!dom) return;
+    if (readModeEnabled) {
+      dom.removeAttribute("data-edit-extras");
+    } else {
+      dom.setAttribute("data-edit-extras", "on");
+    }
+  }, [editor, readModeEnabled]);
+
   const toolbar = editable && showToolbar && editor
     ? <RichTextToolbar editor={editor} mode={toolbarMode} />
     : null;
 
   return (
-    <div className={`rt-editor${dark ? " rt-editor--dark" : ""} ${className}`}>
+    <div
+      className={`rt-editor${dark ? " rt-editor--dark" : ""} ${className}`}
+      data-edit-extras={readModeEnabled ? undefined : "on"}
+    >
       {toolbar && (toolbarContainer
         ? createPortal(toolbar, toolbarContainer)
         : toolbar)}

@@ -952,6 +952,11 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   pasteBehaviorRichDesc: "Ctrl+V keeps formatting from sources like Word or web pages. Ctrl+Shift+V still pastes plain text.",
   pasteBehaviorPlainDesc: "Ctrl+V always strips formatting and pastes plain text, like Ctrl+Shift+V.",
 
+  // Edit-mode link affordances (only used when read mode is OFF)
+  openLink: "Open",
+  editLink: "Edit",
+  openLinkHint: "Ctrl+Click to open",
+
   // Checklist section
   collapseSection: "Collapse section",
   expandSection: "Expand section",

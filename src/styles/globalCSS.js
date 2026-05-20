@@ -1242,6 +1242,110 @@ html:not(.dark) .code-block-wrapper .code-copy-btn {
   background: rgba(0,0,0,0.06);
 }
 
+/* ============================================================
+   Edit-mode link / code affordances (EditExtras + CodeBlockCopy)
+   ============================================================
+   Gated visually by data-edit-extras="on" on the editor wrapper
+   (RichTextEditor sets it based on the user's read-mode pref).
+   With the attribute absent, the editor stays exactly as it was
+   before so users who rely on the read-only view-mode keep their
+   previous edit-mode behaviour. */
+
+/* Code-block copy button inside the editor: hidden when extras off. */
+.rt-editor:not([data-edit-extras="on"]) .code-block-wrapper .code-copy-btn {
+  display: none;
+}
+
+/* Floating "Copier" overlay on inline-code hover. Portaled into
+   document.body so it can float above any modal scroll container. */
+.rt-inline-code-copy {
+  position: fixed;
+  z-index: 10050;
+  font-size: .7rem;
+  padding: .15rem .45rem;
+  border-radius: .35rem;
+  border: none;
+  background: rgba(17, 17, 17, 0.92);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+.rt-inline-code-copy--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+html:not(.dark) .rt-inline-code-copy {
+  background: rgba(31, 31, 31, 0.92);
+}
+
+/* Link hover tooltip. */
+.rt-link-tooltip {
+  position: fixed;
+  z-index: 10050;
+  font-size: .72rem;
+  font-weight: 500;
+  padding: .2rem .5rem;
+  border-radius: .35rem;
+  background: rgba(17, 17, 17, 0.92);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  white-space: nowrap;
+}
+.rt-link-tooltip--visible { opacity: 1; }
+
+/* Mobile tap-on-link popover with Open / Edit actions. */
+.rt-link-popover {
+  position: fixed;
+  z-index: 10060;
+  display: none;
+  flex-direction: row;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.12);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+.dark .rt-link-popover {
+  background: rgba(30, 30, 35, 0.98);
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+}
+.rt-link-popover--visible { display: inline-flex; }
+.rt-link-popover__btn {
+  font-size: .82rem;
+  font-weight: 600;
+  padding: .4rem .8rem;
+  border-radius: 7px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  color: #fff;
+}
+.rt-link-popover__btn--secondary {
+  background: transparent;
+  color: inherit;
+  border: 1px solid rgba(0,0,0,0.12);
+}
+.dark .rt-link-popover__btn--secondary {
+  border-color: rgba(255,255,255,0.18);
+}
+.rt-link-popover__btn:active { transform: scale(0.97); }
+
+/* When extras are off (read-mode user toggled note to edit) the
+   editor must not show a link-affordance cursor, since we don't wire
+   any link interaction in that mode. */
+.rt-editor:not([data-edit-extras="on"]) .ProseMirror a { cursor: text; }
+/* In edit-extras mode, hovering a link in the editor should hint at
+   the new interaction without making it look like a plain web link. */
+.rt-editor[data-edit-extras="on"] .ProseMirror a { cursor: pointer; }
+
 .checklist-drag-clone {
   box-shadow: 0 8px 24px rgba(0,0,0,0.18);
   border-radius: 8px;

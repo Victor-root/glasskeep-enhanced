@@ -742,6 +742,7 @@ export default function NoteModal({
                       toolbarContainer={toolbarMount}
                       toolbarMode={editorToolbarMode}
                       pasteMode={pasteMode}
+                      readModeEnabled={readModeEnabled}
                       onReady={(ed) => { richEditorRef.current = ed; }}
                       onShiftTabExit={focusModalTitle}
                     />
@@ -803,6 +804,7 @@ export default function NoteModal({
                     toolbarContainer={toolbarMount}
                     toolbarMode={editorToolbarMode}
                     pasteMode={pasteMode}
+                    readModeEnabled={readModeEnabled}
                     onReady={(ed) => { richEditorRef.current = ed; }}
                     onShiftTabExit={focusModalTitle}
                   />

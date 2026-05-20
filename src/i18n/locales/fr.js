@@ -953,6 +953,11 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   pasteBehaviorRichDesc: "Ctrl+V conserve la mise en forme des sources comme Word ou les pages web. Ctrl+Shift+V colle toujours en texte brut.",
   pasteBehaviorPlainDesc: "Ctrl+V supprime toujours la mise en forme et colle en texte brut, comme Ctrl+Shift+V.",
 
+  // Affordances de lien en mode édition (uniquement si « mode lecture » est désactivé)
+  openLink: "Ouvrir",
+  editLink: "Modifier",
+  openLinkHint: "Ctrl+Clic pour ouvrir",
+
   // Section checklist
   collapseSection: "Replier la section",
   expandSection: "Déplier la section",
