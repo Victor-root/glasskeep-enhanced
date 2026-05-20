@@ -149,6 +149,29 @@ CREATE TABLE IF NOT EXISTS note_collaborators (
   UNIQUE(note_id, user_id)
 );
 
+-- Persisted notifications for the recipient. Survives the user being
+-- offline at the moment a notification is generated — the client
+-- fetches everything still undelivered on next login and marks them
+-- delivered after displaying the toast. note_title / sender_name are
+-- captured at create time so the row still renders correctly even if
+-- the source note is later deleted or the sender renames themselves.
+CREATE TABLE IF NOT EXISTS notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  recipient_user_id INTEGER NOT NULL,
+  sender_user_id INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  note_id TEXT,
+  note_title TEXT,
+  sender_name TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  delivered_at TEXT,
+  FOREIGN KEY(recipient_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY(sender_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_pending
+  ON notifications(recipient_user_id, delivered_at);
+
 CREATE TABLE IF NOT EXISTS user_settings (
   user_id INTEGER PRIMARY KEY,
   settings_json TEXT NOT NULL DEFAULT '{}',
@@ -786,6 +809,24 @@ const updateNoteWithEditor = db.prepare(`
   WHERE id = ?
 `);
 
+// Notification statements
+const insertNotification = db.prepare(`
+  INSERT INTO notifications
+    (recipient_user_id, sender_user_id, type, note_id, note_title, sender_name, created_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+`);
+const getPendingNotificationsForUser = db.prepare(`
+  SELECT id, sender_user_id, type, note_id, note_title, sender_name, created_at
+  FROM notifications
+  WHERE recipient_user_id = ? AND delivered_at IS NULL
+  ORDER BY created_at ASC
+`);
+const markNotificationDelivered = db.prepare(`
+  UPDATE notifications
+  SET delivered_at = ?
+  WHERE id = ? AND recipient_user_id = ? AND delivered_at IS NULL
+`);
+
 // Per-user tags
 // Schema also carries (is_encrypted, enc_payload) so the rows can be
 // stored encrypted at rest. The plaintext tags_json column is kept as
@@ -1009,6 +1050,35 @@ function broadcastNoteUpdated(noteId) {
     const evt = { type: "note_updated", noteId };
     for (const uid of recipientIds) sendEventToUser(uid, evt);
   } catch { }
+}
+
+// Persist a "note_shared" notification and push it over SSE if the
+// recipient is currently connected. The frontend marks pending rows
+// delivered after showing the toast, so a row only fires once across
+// reloads even though it lives in the DB until then.
+function createShareNotification({ recipientId, senderId, senderName, noteId, noteTitle }) {
+  try {
+    const createdAt = nowISO();
+    const result = insertNotification.run(
+      recipientId,
+      senderId,
+      "note_shared",
+      noteId,
+      noteTitle || "",
+      senderName || "",
+      createdAt,
+    );
+    sendEventToUser(recipientId, {
+      type: "note_shared",
+      notificationId: result.lastInsertRowid,
+      senderName: senderName || "",
+      noteId,
+      noteTitle: noteTitle || "",
+      createdAt,
+    });
+  } catch (e) {
+    console.warn("[notifications] createShareNotification failed:", e?.message);
+  }
 }
 
 // ---------- At-rest encryption: unlock routes + lock gate ----------
@@ -1723,6 +1793,18 @@ app.post("/api/notes/:id/collaborate", auth, (req, res) => {
     updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
     broadcastNoteUpdated(noteId);
 
+    // Persist + push a "note_shared" notification for the new
+    // collaborator. Only runs on a fresh insert above — the 409
+    // duplicate path below skips it, so re-sharing an already-shared
+    // note never produces a duplicate toast.
+    createShareNotification({
+      recipientId: collaborator.id,
+      senderId: req.user.id,
+      senderName: req.user.name || req.user.email || "",
+      noteId,
+      noteTitle: note.title || "",
+    });
+
     res.json({
       ok: true,
       message: `Added ${collaborator.name} as collaborator`,
@@ -1866,6 +1948,33 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
   broadcastNoteUpdated(noteId);
 
   res.json({ ok: true, message: "Collaborator removed", copyNoteId });
+});
+
+// ---------- Notifications ----------
+// Pending = not yet shown to the user on any device. The client fetches
+// these right after auth and shows a toast for each, then marks them
+// delivered. Live notifications also flow over SSE; the client marks
+// those delivered immediately so a quick reload doesn't replay them.
+app.get("/api/notifications/pending", auth, (req, res) => {
+  const rows = getPendingNotificationsForUser.all(req.user.id) || [];
+  res.json({ notifications: rows });
+});
+
+app.post("/api/notifications/mark-delivered", auth, (req, res) => {
+  const { ids } = req.body || {};
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: "ids required" });
+  }
+  const now = nowISO();
+  const tx = db.transaction((rawIds) => {
+    for (const raw of rawIds) {
+      const n = Number(raw);
+      if (!Number.isFinite(n)) continue;
+      markNotificationDelivered.run(now, n, req.user.id);
+    }
+  });
+  tx(ids);
+  res.json({ ok: true });
 });
 
 app.get("/api/notes/collaborated", auth, (req, res) => {

@@ -71,6 +71,7 @@ import { dataUrlToBlob } from "./utils/audioConvert.js";
 import useModalState from "./hooks/useModalState.js";
 import useDraftNote from "./hooks/useDraftNote.js";
 import useAdminActions from "./hooks/useAdminActions.js";
+import { useShareNotifications } from "./hooks/useShareNotifications.js";
 import useImportExport from "./hooks/useImportExport.js";
 import useCollaboration from "./hooks/useCollaboration.js";
 import useFormatting from "./hooks/useFormatting.js";
@@ -486,6 +487,14 @@ export default function App() {
     setGenericConfirmConfig(config);
     setGenericConfirmOpen(true);
   };
+
+  // Share-notification toasts. The hook fetches anything still pending
+  // on auth (covers the recipient-was-offline case) and exposes a
+  // showShareToast helper the SSE dispatcher below uses for live
+  // events. Internal dedup keeps the rare fetch↔SSE race from
+  // showing the same toast twice.
+  const { showShareToast: showShareNotificationToast, markDelivered: markShareNotificationsDelivered } =
+    useShareNotifications({ token, userId: currentUser?.id, showToast });
 
   // GitHub release update notification (admin-only, fail-silent).
   const updateInfo = useUpdateCheck({
@@ -2831,6 +2840,17 @@ export default function App() {
                 if (String(activeIdRef.current) === nid) {
                   forceCloseModalForRemoteDelete(nid);
                 }
+              }
+            } else if (msg && msg.type === "note_shared") {
+              // A live share notification. Show the toast and mark
+              // the row delivered so a quick reload doesn't replay it.
+              showShareNotificationToast({
+                id: msg.notificationId,
+                senderName: msg.senderName,
+                noteTitle: msg.noteTitle,
+              });
+              if (msg.notificationId) {
+                markShareNotificationsDelivered([msg.notificationId]);
               }
             } else if (msg && msg.type === "pending_user_registered") {
               // Admin notification: a new user is awaiting approval.

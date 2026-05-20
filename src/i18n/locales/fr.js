@@ -664,6 +664,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   failedApproveUser: "Échec de l'approbation de l'utilisateur",
   failedRejectUser: "Échec du refus de l'utilisateur",
   pendingUserToast: "Nouvelle inscription en attente : {name}",
+  noteSharedToast: "{sender} a partagé la note {title} avec vous",
+  untitledNote: "(sans titre)",
   alreadyHaveAccount: "Vous avez déjà un compte ?",
 
   // Chiffrement des données au repos (côté serveur, déverrouillage applicatif)

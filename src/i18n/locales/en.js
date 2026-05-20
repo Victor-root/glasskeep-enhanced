@@ -664,6 +664,8 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   failedApproveUser: "Failed to approve user",
   failedRejectUser: "Failed to reject user",
   pendingUserToast: "New registration awaiting approval: {name}",
+  noteSharedToast: "{sender} shared the note {title} with you",
+  untitledNote: "(untitled)",
   alreadyHaveAccount: "Already have an account?",
 
   // At-rest encryption (server-side, app-level unlock)
