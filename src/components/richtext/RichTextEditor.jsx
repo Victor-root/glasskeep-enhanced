@@ -1,6 +1,7 @@
 import React, { useEffect, useImperativeHandle, useMemo, useRef, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { Fragment, Slice } from "@tiptap/pm/model";
 import { buildRichTextExtensions } from "./richTextSchema.js";
 import {
   contentToRichDoc,
@@ -108,6 +109,25 @@ const RichTextEditor = forwardRef(function RichTextEditor(
       // The HTML side of the clipboard is left to PM's default so a
       // paste into another rich-text target still gets full fidelity.
       clipboardTextSerializer: (slice) => sliceToCleanPlainText(slice),
+      // Inbound plain-text pastes: PM's default parser collapses
+      // sources whose only line separator is `\r\n` / `\n` (typical
+      // for Windows Notepad, terminal output, …) into a single
+      // paragraph with hard breaks the schema then drops. Build one
+      // paragraph per line ourselves so multi-line plain-text pastes
+      // keep the layout the user copied. Only fires when PM has no
+      // `text/html` to work with, so rich pastes (Word, web pages) are
+      // untouched.
+      clipboardTextParser: (text, $context, _plain, view) => {
+        const { schema } = view.state;
+        const normalized = String(text || "").replace(/\r\n?/g, "\n");
+        const lines = normalized.split("\n");
+        const nodes = lines.map((line) =>
+          line
+            ? schema.nodes.paragraph.create(null, schema.text(line))
+            : schema.nodes.paragraph.create(),
+        );
+        return new Slice(Fragment.from(nodes), 1, 1);
+      },
       handleKeyDown: (_, event) => {
         // Shift+Tab → hand focus back to the parent (title input).
         // Plain Tab is left to ProseMirror so list / code-block tab
