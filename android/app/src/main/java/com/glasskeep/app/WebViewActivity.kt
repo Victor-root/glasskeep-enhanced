@@ -176,6 +176,15 @@ class WebViewActivity : AppCompatActivity() {
         fun getAppVersion(): String =
             com.glasskeep.app.BuildConfig.VERSION_NAME
 
+        /** True when the running APK was installed by F-Droid (or one
+         *  of its variants). The Settings panel hides its update
+         *  controls in that case so we don't fight the F-Droid update
+         *  mechanism — same APK still works fine sideloaded or
+         *  installed from a GitHub Release. */
+        @JavascriptInterface
+        fun isFdroidInstall(): Boolean =
+            com.glasskeep.app.update.UpdateManager.isFdroidInstall(this@WebViewActivity)
+
         /** Returns the latest detected release as JSON (or null if no
          *  pending update). Called from the Settings panel on open so
          *  the card survives an Activity recreation. The helper auto-

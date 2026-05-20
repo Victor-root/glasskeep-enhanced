@@ -91,6 +91,9 @@ export default function SettingsPanel({
   // bridge. Empty string when running on the web/PWA (no bridge) so
   // the "v…" line stays hidden.
   const [appVersion, setAppVersion] = useState("");
+  // True when the APK was installed by F-Droid — we step out of the
+  // updater UI in that case (F-Droid handles updates itself).
+  const [installedFromFdroid, setInstalledFromFdroid] = useState(false);
   // Latest detected Android-app release as reported by the
   // AndroidTheme.getAvailableUpdate() bridge. The Settings card under
   // "Vérifier les mises à jour" renders when this is non-null.
@@ -101,6 +104,10 @@ export default function SettingsPanel({
     try {
       const v = window?.AndroidTheme?.getAppVersion?.();
       if (typeof v === "string" && v.length) setAppVersion(v);
+    } catch (e) {}
+    try {
+      const fd = window?.AndroidTheme?.isFdroidInstall?.();
+      setInstalledFromFdroid(fd === true);
     } catch (e) {}
     try {
       const json = window?.AndroidTheme?.getAvailableUpdate?.();
@@ -902,7 +909,26 @@ export default function SettingsPanel({
                 onToggle={() => toggleSection("app")}
               >
                 <div className="space-y-3">
-                  {availableUpdate ? (
+                  {installedFromFdroid ? (
+                    /* F-Droid installs delegate updates to F-Droid
+                       itself, so we hide the check button + update
+                       card and only show the running APK version
+                       with a one-liner explaining why nothing's
+                       actionable here. */
+                    <div className="flex items-center gap-3 px-3 py-3 border border-[var(--border-light)] rounded-lg">
+                      <RowIcon icon={TI.Download} />
+                      <div className="min-w-0">
+                        {appVersion && (
+                          <div className="font-medium tabular-nums">
+                            {t("currentAppVersion").replace("{version}", appVersion)}
+                          </div>
+                        )}
+                        <div className="text-sm text-gray-500 mt-0.5">
+                          {t("appUpdatesManagedByFdroid")}
+                        </div>
+                      </div>
+                    </div>
+                  ) : availableUpdate ? (
                     /* When a release has been detected the card replaces
                        the "Check for updates" button entirely — keeping
                        both side-by-side made the section feel redundant

@@ -1,6 +1,7 @@
 package com.glasskeep.app.update
 
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -46,6 +47,37 @@ object UpdateManager {
     private val checking = AtomicBoolean(false)
     private val downloading = AtomicBoolean(false)
 
+    // F-Droid policy expects apps shipped through their repository to
+    // either skip self-update mechanisms entirely or get flagged with
+    // the "UpdateCheck" anti-feature. The runtime check below lets a
+    // single APK behave correctly in both cases: the same binary
+    // sideloaded or pulled from GitHub Releases still runs the in-app
+    // updater, but when the user installed via F-Droid we cleanly
+    // step out of the way and let F-Droid handle updates.
+    private val FDROID_INSTALLERS = setOf(
+        "org.fdroid.fdroid",
+        "org.fdroid.basic",
+        "org.fdroid.fdroid.privileged",
+    )
+
+    fun isFdroidInstall(context: Context): Boolean {
+        val installer = installerPackage(context.applicationContext) ?: return false
+        return installer in FDROID_INSTALLERS
+    }
+
+    private fun installerPackage(context: Context): String? = try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context.packageManager
+                .getInstallSourceInfo(context.packageName)
+                .installingPackageName
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.getInstallerPackageName(context.packageName)
+        }
+    } catch (e: Exception) {
+        null
+    }
+
     /**
      * Background check. The [onAvailable] callback fires on the main
      * thread when a newer, non-skipped release is found; otherwise we
@@ -56,6 +88,10 @@ object UpdateManager {
     fun checkInBackground(context: Context, onAvailable: (ReleaseInfo) -> Unit) {
         Log.i(TAG, "checkInBackground() — running version ${BuildConfig.VERSION_NAME}")
         val appCtx = context.applicationContext
+        if (isFdroidInstall(appCtx)) {
+            Log.i(TAG, "skip — installed via F-Droid, updates handled there")
+            return
+        }
         if (!checking.compareAndSet(false, true)) {
             Log.i(TAG, "skip — another check already running")
             return
@@ -132,6 +168,11 @@ object UpdateManager {
      */
     fun forceCheck(context: Context, onResult: (ReleaseInfo?) -> Unit) {
         val appCtx = context.applicationContext
+        if (isFdroidInstall(appCtx)) {
+            Log.i(TAG, "skip force check — installed via F-Droid")
+            onResult(null)
+            return
+        }
         if (!checking.compareAndSet(false, true)) {
             // An automatic check is mid-flight; let it finish.
             onResult(null)
