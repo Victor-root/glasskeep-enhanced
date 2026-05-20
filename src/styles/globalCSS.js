@@ -1255,17 +1255,27 @@ html:not(.dark) .code-block-wrapper .code-copy-btn {
 .rt-editor:not([data-edit-extras="on"]) .code-block-wrapper .code-copy-btn {
   display: none;
 }
+/* Mobile arm: tapping a code block once on a coarse pointer adds
+   data-armed="true" so the copy button stays visible without the
+   editor stealing focus. CSS also shows it for hover on desktop via
+   the existing .code-block-wrapper:hover rule. */
+.rt-editor[data-edit-extras="on"] .code-block-wrapper[data-armed="true"] .code-copy-btn {
+  opacity: 1;
+}
 
-/* Floating "Copier" overlay on inline-code hover. Portaled into
-   document.body so it can float above any modal scroll container. */
+/* Floating "Copier" overlay anchored to inline code. Portaled into
+   document.body so it can float above any modal scroll container.
+   Styled to match the code-block copy button so both code surfaces
+   feel like a single feature. */
 .rt-inline-code-copy {
   position: fixed;
   z-index: 10050;
-  font-size: .7rem;
-  padding: .15rem .45rem;
+  font-size: .75rem;
+  font-weight: 500;
+  padding: .2rem .45rem;
   border-radius: .35rem;
   border: none;
-  background: rgba(17, 17, 17, 0.92);
+  background: var(--note-color, #111);
   color: #fff;
   box-shadow: 0 2px 10px rgba(0,0,0,0.25);
   cursor: pointer;
@@ -1277,8 +1287,12 @@ html:not(.dark) .code-block-wrapper .code-copy-btn {
   opacity: 1;
   pointer-events: auto;
 }
+.rt-inline-code-copy:hover {
+  background: var(--note-color-opaque, #111);
+}
 html:not(.dark) .rt-inline-code-copy {
-  background: rgba(31, 31, 31, 0.92);
+  color: rgba(255,255,255,0.95);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
 }
 
 /* Link hover tooltip. */

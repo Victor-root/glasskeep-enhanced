@@ -87,6 +87,10 @@ function hideTooltip() {
 let inlineCopyEl = null;
 let inlineCopyTarget = null;
 let inlineCopyHideTimer = null;
+// Mobile arms the inline-code button via a tap; it stays visible
+// (sticky) until the user taps elsewhere or taps the same code again.
+// Desktop hover shows it briefly and hides on mouseout.
+let inlineCopySticky = false;
 function getInlineCopyEl() {
   if (inlineCopyEl && inlineCopyEl.isConnected) return inlineCopyEl;
   inlineCopyEl = document.createElement("button");
@@ -102,7 +106,7 @@ function getInlineCopyEl() {
     }
   });
   inlineCopyEl.addEventListener("mouseleave", () => {
-    scheduleInlineCopyHide();
+    if (!inlineCopySticky) scheduleInlineCopyHide();
   });
   inlineCopyEl.addEventListener("click", (e) => {
     e.preventDefault();
@@ -122,35 +126,68 @@ function getInlineCopyEl() {
   document.body.appendChild(inlineCopyEl);
   return inlineCopyEl;
 }
-function showInlineCopyFor(codeEl) {
-  inlineCopyTarget = codeEl;
-  if (inlineCopyHideTimer) {
-    clearTimeout(inlineCopyHideTimer);
-    inlineCopyHideTimer = null;
-  }
-  const el = getInlineCopyEl();
-  el.textContent = t("copy");
-  const r = codeEl.getBoundingClientRect();
-  el.classList.add("rt-inline-code-copy--visible");
+function positionInlineCopyForCurrent() {
+  const code = inlineCopyTarget;
+  const el = inlineCopyEl;
+  if (!code || !el || !el.isConnected) return;
+  // Anchor the button at the right edge of the editor (the
+  // `.ProseMirror` element), aligned vertically with the last visual
+  // line of the inline code. `getClientRects()` gives one rect per
+  // line for inline content, so the last rect is the line where the
+  // code ends — the natural "end of the line" anchor the user asked
+  // for.
+  const editorEl = code.closest(".ProseMirror") || code.closest(".rt-editor");
+  const rects = code.getClientRects();
+  const lastRect = rects[rects.length - 1];
+  if (!editorEl || !lastRect) return;
+  const editorRect = editorEl.getBoundingClientRect();
   const btnR = el.getBoundingClientRect();
-  let top = r.top - btnR.height - 4;
-  let left = r.right - btnR.width;
-  if (top < 4) top = r.bottom + 4;
+  let top = lastRect.top + (lastRect.height - btnR.height) / 2;
+  let left = editorRect.right - btnR.width - 8;
+  if (top < 4) top = 4;
   if (left < 4) left = 4;
   const maxLeft = window.innerWidth - btnR.width - 4;
   if (left > maxLeft) left = maxLeft;
   el.style.top = `${Math.round(top)}px`;
   el.style.left = `${Math.round(left)}px`;
 }
+function showInlineCopyFor(codeEl, { sticky = false } = {}) {
+  inlineCopyTarget = codeEl;
+  inlineCopySticky = sticky;
+  if (inlineCopyHideTimer) {
+    clearTimeout(inlineCopyHideTimer);
+    inlineCopyHideTimer = null;
+  }
+  const el = getInlineCopyEl();
+  el.textContent = t("copy");
+  el.classList.add("rt-inline-code-copy--visible");
+  el.classList.toggle("rt-inline-code-copy--sticky", sticky);
+  // Defer positioning to next frame so the just-shown element has
+  // measurable dimensions (getBoundingClientRect returns the post-
+  // layout rect; before the next frame it might be 0).
+  requestAnimationFrame(positionInlineCopyForCurrent);
+}
 function scheduleInlineCopyHide() {
+  if (inlineCopySticky) return;
   if (inlineCopyHideTimer) clearTimeout(inlineCopyHideTimer);
   // Small delay so the user can move the cursor between the code and
   // the floating button without it disappearing under them.
   inlineCopyHideTimer = setTimeout(() => {
     inlineCopyEl?.classList.remove("rt-inline-code-copy--visible");
+    inlineCopyEl?.classList.remove("rt-inline-code-copy--sticky");
     inlineCopyTarget = null;
     inlineCopyHideTimer = null;
   }, 180);
+}
+function hideInlineCopyImmediate() {
+  if (inlineCopyHideTimer) {
+    clearTimeout(inlineCopyHideTimer);
+    inlineCopyHideTimer = null;
+  }
+  inlineCopySticky = false;
+  inlineCopyEl?.classList.remove("rt-inline-code-copy--visible");
+  inlineCopyEl?.classList.remove("rt-inline-code-copy--sticky");
+  inlineCopyTarget = null;
 }
 
 let linkPopoverEl = null;
@@ -254,6 +291,63 @@ function closestInlineCode(el) {
   if (code.closest("pre")) return null; // fenced block handled by NodeView
   return code;
 }
+function closestCodeBlockWrapper(el) {
+  if (!el || !el.closest) return null;
+  return el.closest(".code-block-wrapper");
+}
+function isInsideCopyButton(el) {
+  if (!el || !el.closest) return false;
+  return !!el.closest("[data-copy-btn='1']");
+}
+
+/* -------------------- mobile-armed state -------------------- */
+
+// Which code-block wrapper / inline-code element is currently "armed"
+// (showing its copy button after a single tap on mobile). At most one
+// is armed at a time — they're mutually exclusive UX states.
+let armedCodeBlockEl = null;
+let armedInlineCodeEl = null;
+
+function clearCodeBlockArm() {
+  if (armedCodeBlockEl) {
+    armedCodeBlockEl.removeAttribute("data-armed");
+  }
+  armedCodeBlockEl = null;
+}
+function armCodeBlock(wrapper) {
+  if (armedCodeBlockEl && armedCodeBlockEl !== wrapper) {
+    armedCodeBlockEl.removeAttribute("data-armed");
+  }
+  armedCodeBlockEl = wrapper;
+  wrapper.setAttribute("data-armed", "true");
+  ensureScrollReflowListener();
+}
+function clearInlineCodeArm() {
+  armedInlineCodeEl = null;
+  hideInlineCopyImmediate();
+}
+function armInlineCode(codeEl) {
+  armedInlineCodeEl = codeEl;
+  showInlineCopyFor(codeEl, { sticky: true });
+  ensureScrollReflowListener();
+}
+
+// Global capture-phase scroll listener that re-positions the sticky
+// inline-code button to follow its anchor as the user scrolls. The
+// code-block button has its own per-node scroll listener inside the
+// NodeView (see CodeBlockCopy.js). We register lazily on first arm
+// and never tear down — handlers are cheap (single rect read) and
+// the singletons live for the page lifetime.
+let scrollReflowRegistered = false;
+function ensureScrollReflowListener() {
+  if (scrollReflowRegistered) return;
+  scrollReflowRegistered = true;
+  const handler = () => {
+    if (armedInlineCodeEl) positionInlineCopyForCurrent();
+  };
+  document.addEventListener("scroll", handler, { passive: true, capture: true });
+  window.addEventListener("resize", handler, { passive: true });
+}
 
 /* -------------------- the plugin -------------------- */
 
@@ -300,6 +394,23 @@ export const EditExtras = Extension.create({
             }
           };
 
+          // Helper that swallows the synthesised mouse events the
+          // browser fires after a tap, used by all three "tap-arms"
+          // flows (link popover, code-block arm, inline-code arm).
+          const blurEditorIfFocused = () => {
+            const ae = document.activeElement;
+            if (ae && (ae === dom || dom.contains(ae))) {
+              try {
+                ae.blur();
+              } catch (_e) {}
+            }
+          };
+          const armSyntheticGuard = () => {
+            if (pendingTapTimer) clearTimeout(pendingTapTimer);
+            pendingTap = true;
+            pendingTapTimer = setTimeout(clearPending, TAP_GUARD_MS);
+          };
+
           const onTouchStart = (event) => {
             if (!isEditExtrasOn(editorView)) return;
             if (!hasCoarsePointer()) return;
@@ -312,20 +423,24 @@ export const EditExtras = Extension.create({
               touchInfo = null;
               return;
             }
-            const link = closestLink(event.target);
-            if (!link) {
+            // Tap on the copy button itself: let its own click handler
+            // run; don't interpret as a regular content tap.
+            if (isInsideCopyButton(event.target)) {
               touchInfo = null;
               return;
             }
-            const href = link.getAttribute("href");
-            if (!href) {
-              touchInfo = null;
-              return;
-            }
+            const target = event.target;
+            const link = closestLink(target);
+            const inlineCode = link ? null : closestInlineCode(target);
+            const codeBlock = link || inlineCode
+              ? null
+              : closestCodeBlockWrapper(target);
             const t = event.touches[0];
             touchInfo = {
               link,
-              href,
+              inlineCode,
+              codeBlock,
+              href: link ? link.getAttribute("href") : null,
               startX: t.clientX,
               startY: t.clientY,
               moved: false,
@@ -345,41 +460,67 @@ export const EditExtras = Extension.create({
 
           const onTouchEnd = (event) => {
             if (!touchInfo) return;
-            const { link, href, moved } = touchInfo;
+            const { link, href, inlineCode, codeBlock, moved } = touchInfo;
             touchInfo = null;
             if (moved) {
               // The touch became a scroll, not a tap. Let the
               // synthesised mouse events run normally — the user
-              // didn't ask for the popover.
+              // didn't ask for any affordance.
               return;
             }
-            // Real tap on a link.
-            // 1. `preventDefault` on touchend is honoured by most
-            //    modern browsers and suppresses the synthesised mouse
-            //    events. The capture-phase mousedown/click guards
-            //    below are the safety net for the few that don't.
-            event.preventDefault();
-            // 2. If the editor was already focused, blur it so the
-            //    OS keyboard goes away. Without this, tapping a link
-            //    while the keyboard is up would leave it up.
-            const ae = document.activeElement;
-            if (ae && (ae === dom || dom.contains(ae))) {
-              try {
-                ae.blur();
-              } catch (_e) {}
+
+            // --- Link tap: show the Open / Modifier popover. ---
+            if (link && href) {
+              event.preventDefault();
+              blurEditorIfFocused();
+              clearCodeBlockArm();
+              clearInlineCodeArm();
+              armSyntheticGuard();
+              showLinkPopover(link, href, editorView);
+              return;
             }
-            // 3. Arm the synthesised-mouse-event guard before showing
-            //    the popover, so any straggling mousedown/click is
-            //    caught by the capture handlers below.
-            pendingTap = { link, href };
-            if (pendingTapTimer) clearTimeout(pendingTapTimer);
-            pendingTapTimer = setTimeout(clearPending, TAP_GUARD_MS);
-            // 4. Show the popover. The dismiss listener installed
-            //    inside `showLinkPopover` uses pointerdown on
-            //    document, so a tap outside the popover closes it
-            //    (and a tap on Open / Edit fires those handlers
-            //    first because of pointerdown -> click ordering).
-            showLinkPopover(link, href, editorView);
+
+            // --- Code-block tap. ---
+            if (codeBlock) {
+              if (armedCodeBlockEl === codeBlock) {
+                // Second tap on the same block → release the arm so
+                // the next interaction (this one's synthesised mouse
+                // events) focuses the editor normally and the OS
+                // keyboard pops up. Don't preventDefault.
+                clearCodeBlockArm();
+                clearInlineCodeArm();
+                return;
+              }
+              event.preventDefault();
+              blurEditorIfFocused();
+              clearInlineCodeArm();
+              armCodeBlock(codeBlock);
+              armSyntheticGuard();
+              return;
+            }
+
+            // --- Inline-code tap. ---
+            if (inlineCode) {
+              if (armedInlineCodeEl === inlineCode) {
+                // Second tap on the same inline code → release the
+                // arm; the next interaction focuses normally.
+                clearInlineCodeArm();
+                clearCodeBlockArm();
+                return;
+              }
+              event.preventDefault();
+              blurEditorIfFocused();
+              clearCodeBlockArm();
+              armInlineCode(inlineCode);
+              armSyntheticGuard();
+              return;
+            }
+
+            // Tap landed on regular text. Disarm any active arms but
+            // let the synthesised mouse events do their normal thing
+            // (caret placement + keyboard).
+            clearCodeBlockArm();
+            clearInlineCodeArm();
           };
 
           const onTouchCancel = () => {
@@ -388,15 +529,23 @@ export const EditExtras = Extension.create({
 
           // Safety net: even with touchend.preventDefault, some
           // mobile browsers still synthesise mousedown / click for
-          // taps on links. Block those during the guard window so
-          // they can't focus the contenteditable.
+          // taps on links / code. Block those during the guard window
+          // so they can't focus the contenteditable.
+          //
+          // Exception: tapping the in-block copy button (which lives
+          // inside the editor DOM via the CodeBlockCopy NodeView)
+          // must still copy — the guard would otherwise swallow its
+          // click during the 700ms window that follows the arming
+          // tap on the same block.
           const onMouseDownCapture = (event) => {
             if (!pendingTap) return;
+            if (isInsideCopyButton(event.target)) return;
             event.preventDefault();
             event.stopPropagation();
           };
           const onClickCapture = (event) => {
             if (!pendingTap) return;
+            if (isInsideCopyButton(event.target)) return;
             event.preventDefault();
             event.stopPropagation();
           };
