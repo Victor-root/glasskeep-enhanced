@@ -145,14 +145,28 @@ const RichTextEditor = forwardRef(function RichTextEditor(
       // source may have included. Returning `false` in "rich" mode
       // hands the event back to PM so the default rich-paste flow (and
       // the `clipboardTextParser` fallback above) keeps working.
+      //
+      // We run PM's `transformPastedText` and `transformPasted` hooks
+      // manually before dispatching so paste-aware extensions still
+      // fire — most notably Tiptap's Link extension, whose
+      // `linkOnPaste` rule scans the slice for URLs and wraps them in
+      // link marks. Without this, URLs in a "plain" paste would
+      // arrive as inert text and only become real links after the
+      // user typed a space (the auto-link input rule).
       handlePaste: (view, event) => {
         if (pasteModeRef.current !== "plain") return false;
         const cb = event.clipboardData;
         if (!cb) return false;
-        const text = cb.getData("text/plain");
+        let text = cb.getData("text/plain");
         if (!text) return false;
-        const slice = plainTextToPasteSlice(text, view.state.schema);
+        view.someProp("transformPastedText", (f) => {
+          text = f(text, true, view);
+        });
+        let slice = plainTextToPasteSlice(text, view.state.schema);
         if (!slice) return false;
+        view.someProp("transformPasted", (f) => {
+          slice = f(slice, view);
+        });
         event.preventDefault();
         view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());
         return true;

@@ -694,7 +694,7 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
+              <div className="flex flex-col gap-2 px-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RowIcon icon={TI.ClearFormatting} />
                   <div className="min-w-0">
@@ -706,7 +706,7 @@ export default function SettingsPanel({
                     </div>
                   </div>
                 </div>
-                <div className="flex-shrink-0 inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 self-end sm:self-auto">
+                <div className="self-end inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
                   <button
                     className={`px-3 py-1.5 text-sm font-semibold transition-all duration-200 ${
                       pasteMode === "rich"
