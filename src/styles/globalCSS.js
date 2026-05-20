@@ -407,6 +407,21 @@ html.dark .multi-select-dock__menu {
 .note-content li ol {
   counter-reset: gk-ol;
 }
+/* Restart the gk-ol counter when an ordered list directly follows a
+   "break" element — paragraph, heading, blockquote, bullet list,
+   horizontal rule. Matches the Word / Google Docs behaviour: leaving
+   a list and typing a new title before starting a fresh list resets
+   the numbering to 1. The code block (<pre>) is deliberately absent
+   from this list, which preserves the existing "ol then code block
+   then ol keeps counting" behaviour. Adjacent-sibling selector (the
+   plus combinator) keeps the reset local to the ordered list itself,
+   dodging the CSS counter scoping quirk where a counter-reset on a
+   block leaks into its following siblings. */
+.rt-editor-content :is(p, h1, h2, h3, h4, h5, h6, blockquote, ul, hr) + ol,
+.note-content--dense :is(p, h1, h2, h3, h4, h5, h6, blockquote, ul, hr) + ol,
+.note-content :is(p, h1, h2, h3, h4, h5, h6, blockquote, ul, hr) + ol {
+  counter-reset: gk-ol;
+}
 .rt-editor-content ol > li,
 .note-content--dense ol > li,
 .note-content ol > li {
