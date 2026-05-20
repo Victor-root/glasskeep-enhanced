@@ -76,6 +76,12 @@ fun WelcomeScreen(onContinue: () -> Unit) {
     val bump: () -> Unit = { recheckTick++ }
 
     val needsNotifPerm = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    // F-Droid handles updates itself, so the "Install unknown apps"
+    // permission card is useless (and a bit alarming) for those
+    // installs — we skip it entirely.
+    val isFdroid = remember {
+        com.glasskeep.app.update.UpdateManager.isFdroidInstall(context)
+    }
 
     val micGranted = remember(recheckTick) {
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
@@ -206,33 +212,35 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 },
                 onSettings = { appSettingsLauncher.launch(appInfoIntent(context.packageName)) },
             )
-            Spacer(modifier = Modifier.height(14.dp))
-            PermissionCard(
-                iconRes = R.drawable.ic_tabler_download,
-                title = stringResource(R.string.welcome_install_title),
-                description = stringResource(R.string.welcome_install_desc),
-                granted = installGranted,
-                cardBg = cardBg,
-                borderColor = borderColor,
-                titleColor = titleColor,
-                subtextColor = subtextColor,
-                // "Install unknown apps" is a special-access setting, never
-                // a runtime permission popup. Route the grant flow straight
-                // to the per-app toggle on every device.
-                onGrant = {
-                    installSettingsLauncher.launch(
-                        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
-                            .setData(Uri.parse("package:${context.packageName}"))
-                    )
-                },
-                onSettings = {
-                    installSettingsLauncher.launch(
-                        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
-                            .setData(Uri.parse("package:${context.packageName}"))
-                    )
-                },
-                grantAlwaysOpensSettings = true,
-            )
+            if (!isFdroid) {
+                Spacer(modifier = Modifier.height(14.dp))
+                PermissionCard(
+                    iconRes = R.drawable.ic_tabler_download,
+                    title = stringResource(R.string.welcome_install_title),
+                    description = stringResource(R.string.welcome_install_desc),
+                    granted = installGranted,
+                    cardBg = cardBg,
+                    borderColor = borderColor,
+                    titleColor = titleColor,
+                    subtextColor = subtextColor,
+                    // "Install unknown apps" is a special-access setting, never
+                    // a runtime permission popup. Route the grant flow straight
+                    // to the per-app toggle on every device.
+                    onGrant = {
+                        installSettingsLauncher.launch(
+                            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                                .setData(Uri.parse("package:${context.packageName}"))
+                        )
+                    },
+                    onSettings = {
+                        installSettingsLauncher.launch(
+                            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                                .setData(Uri.parse("package:${context.packageName}"))
+                        )
+                    },
+                    grantAlwaysOpensSettings = true,
+                )
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
             ContinueButton(onClick = onContinue)
