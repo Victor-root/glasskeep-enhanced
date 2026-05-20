@@ -1,6 +1,6 @@
 # 📋 Changelog
 
-## 🚀 v2.3.8 — 2026-05-19
+## 🚀 v2.3.8 — 2026-05-20
 
 Two headline changes: **"Read mode for notes"** lets you opt out of the read/edit split (text and drawing notes open straight in edit mode, Google-Keep style), and the Android APK (1.4.0) gains a **fully-integrated in-app updater + a first-launch onboarding screen**. The rest of the release is a polish pass on the Settings and Admin side sheets.
 

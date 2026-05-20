@@ -6,8 +6,8 @@
 
 [![Easy install](https://img.shields.io/badge/Easy-install%20script-2ea44f?style=for-the-badge\&logo=gnubash\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced#-installation)
 [![Docker](https://img.shields.io/badge/Docker-GHCR-2496ED?style=for-the-badge\&logo=docker\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced#-docker-installation)
-[![Android](https://img.shields.io/badge/Android-APK-3DDC84?style=for-the-badge\&logo=android\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.3.7/GlassKeep-v1.3.0.apk)
-[![Android TV](https://img.shields.io/badge/Android%20TV-supported-3DDC84?style=for-the-badge\&logo=androidtv\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.3.7/GlassKeep-v1.3.0.apk)
+[![Android](https://img.shields.io/badge/Android-APK-3DDC84?style=for-the-badge\&logo=android\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.3.8/GlassKeep-v1.4.0.apk)
+[![Android TV](https://img.shields.io/badge/Android%20TV-supported-3DDC84?style=for-the-badge\&logo=androidtv\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.3.8/GlassKeep-v1.4.0.apk)
 [![PWA](https://img.shields.io/badge/PWA-ready-5A0FC8?style=for-the-badge\&logo=pwa\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced)
 
 </div>
@@ -124,9 +124,9 @@ The **same APK also runs on Android TV** — the app detects leanback hardware (
 
 The launcher icon, the Android TV banner, the PWA install icon, and the favicon have all been redrawn from a single master so the app looks coherent across every surface.
 
-[Download latest Android APK](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.3.7/GlassKeep-v1.3.0.apk)
+[Download latest Android APK](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.3.8/GlassKeep-v1.4.0.apk)
 
-Current APK version: `1.3.0`
+Current APK version: `1.4.0`
 
 > The Android source code is available in the `android/` directory.
 
