@@ -130,20 +130,18 @@ function positionInlineCopyForCurrent() {
   const code = inlineCopyTarget;
   const el = inlineCopyEl;
   if (!code || !el || !el.isConnected) return;
-  // Anchor the button at the right edge of the editor (the
-  // `.ProseMirror` element), aligned vertically with the last visual
-  // line of the inline code. `getClientRects()` gives one rect per
-  // line for inline content, so the last rect is the line where the
-  // code ends — the natural "end of the line" anchor the user asked
-  // for.
-  const editorEl = code.closest(".ProseMirror") || code.closest(".rt-editor");
+  // Anchor the button right after the visual END of the inline code,
+  // vertically centered on the line that contains its last fragment.
+  // `getClientRects()` returns one rect per line for inline content,
+  // so the last rect is the line where the code ends — placing the
+  // button at `lastRect.right + small offset` puts it directly after
+  // the closing letter the way the user asked ("juste après le .sh").
   const rects = code.getClientRects();
   const lastRect = rects[rects.length - 1];
-  if (!editorEl || !lastRect) return;
-  const editorRect = editorEl.getBoundingClientRect();
+  if (!lastRect) return;
   const btnR = el.getBoundingClientRect();
   let top = lastRect.top + (lastRect.height - btnR.height) / 2;
-  let left = editorRect.right - btnR.width - 8;
+  let left = lastRect.right + 4;
   if (top < 4) top = 4;
   if (left < 4) left = 4;
   const maxLeft = window.innerWidth - btnR.width - 4;
@@ -159,6 +157,21 @@ function showInlineCopyFor(codeEl, { sticky = false } = {}) {
     inlineCopyHideTimer = null;
   }
   const el = getInlineCopyEl();
+  // Propagate the modal's note-colour CSS vars to the button. The
+  // button is portaled to document.body so it doesn't inherit them
+  // naturally — read the computed value off the editor wrapper
+  // (which IS inside the themed modal) and apply inline. Without
+  // this, the gradient fell back to `#111` and the button looked
+  // out of place next to the code-block copy button.
+  const ancestor = codeEl.closest(".rt-editor") || codeEl;
+  try {
+    const cs = window.getComputedStyle(ancestor);
+    const nc = cs.getPropertyValue("--note-color");
+    const nco = cs.getPropertyValue("--note-color-opaque");
+    if (nc && nc.trim()) el.style.setProperty("--note-color", nc.trim());
+    if (nco && nco.trim())
+      el.style.setProperty("--note-color-opaque", nco.trim());
+  } catch (_e) {}
   el.textContent = t("copy");
   el.classList.add("rt-inline-code-copy--visible");
   el.classList.toggle("rt-inline-code-copy--sticky", sticky);
@@ -351,10 +364,11 @@ function ensureScrollReflowListener() {
 
 /* -------------------- the plugin -------------------- */
 
-// Tap-vs-scroll threshold. Smaller than the default OS recogniser so a
-// tap on a thin inline link still feels responsive, but large enough
-// that a deliberate flick doesn't trigger the popover.
-const TAP_MOVE_PX = 10;
+// Tap-vs-scroll threshold. Touch input on Android WebViews can jitter
+// a few pixels during a deliberate tap, so we stay generous — better
+// to treat a tiny accidental drift as a tap than to swallow a clearly
+// intentional tap because of WebView noise.
+const TAP_MOVE_PX = 16;
 // How long the post-tap synthesised mouse-events suppression stays
 // armed. iOS / some Android WebViews can take a few hundred ms to
 // fire the synthesised `mousedown` after `touchend`, so we keep the
@@ -392,6 +406,20 @@ export const EditExtras = Extension.create({
               clearTimeout(pendingTapTimer);
               pendingTapTimer = null;
             }
+          };
+          // Coordination flag for the mousedown fallback below. The
+          // touch handlers set this whenever they handle a tap so the
+          // synthesised mousedown that follows doesn't try to re-arm
+          // (or re-disarm) the same target. Cleared after a tap
+          // guard window passes.
+          let touchPathHandledRecently = false;
+          let touchPathHandledTimer = null;
+          const markTouchHandled = () => {
+            touchPathHandledRecently = true;
+            if (touchPathHandledTimer) clearTimeout(touchPathHandledTimer);
+            touchPathHandledTimer = setTimeout(() => {
+              touchPathHandledRecently = false;
+            }, TAP_GUARD_MS);
           };
 
           // Helper that swallows the synthesised mouse events the
@@ -460,9 +488,31 @@ export const EditExtras = Extension.create({
 
           const onTouchEnd = (event) => {
             if (!touchInfo) return;
-            const { link, href, inlineCode, codeBlock, moved } = touchInfo;
+            const {
+              link,
+              href,
+              inlineCode,
+              codeBlock,
+              moved,
+              startX,
+              startY,
+            } = touchInfo;
             touchInfo = null;
-            if (moved) {
+            // Re-confirm tap vs scroll using the END position. Some
+            // Android WebViews fire spurious low-amplitude touchmove
+            // events during a deliberate tap that would otherwise
+            // push `moved` past the threshold; if the finger landed
+            // close to where it started, treat it as a tap regardless.
+            let effectivelyMoved = moved;
+            const ct = event.changedTouches && event.changedTouches[0];
+            if (ct) {
+              const dx = Math.abs(ct.clientX - startX);
+              const dy = Math.abs(ct.clientY - startY);
+              if (dx <= TAP_MOVE_PX && dy <= TAP_MOVE_PX) {
+                effectivelyMoved = false;
+              }
+            }
+            if (effectivelyMoved) {
               // The touch became a scroll, not a tap. Let the
               // synthesised mouse events run normally — the user
               // didn't ask for any affordance.
@@ -476,12 +526,14 @@ export const EditExtras = Extension.create({
               clearCodeBlockArm();
               clearInlineCodeArm();
               armSyntheticGuard();
+              markTouchHandled();
               showLinkPopover(link, href, editorView);
               return;
             }
 
             // --- Code-block tap. ---
             if (codeBlock) {
+              markTouchHandled();
               if (armedCodeBlockEl === codeBlock) {
                 // Second tap on the same block → release the arm so
                 // the next interaction (this one's synthesised mouse
@@ -501,6 +553,7 @@ export const EditExtras = Extension.create({
 
             // --- Inline-code tap. ---
             if (inlineCode) {
+              markTouchHandled();
               if (armedInlineCodeEl === inlineCode) {
                 // Second tap on the same inline code → release the
                 // arm; the next interaction focuses normally.
@@ -519,6 +572,7 @@ export const EditExtras = Extension.create({
             // Tap landed on regular text. Disarm any active arms but
             // let the synthesised mouse events do their normal thing
             // (caret placement + keyboard).
+            markTouchHandled();
             clearCodeBlockArm();
             clearInlineCodeArm();
           };
@@ -527,21 +581,73 @@ export const EditExtras = Extension.create({
             touchInfo = null;
           };
 
-          // Safety net: even with touchend.preventDefault, some
-          // mobile browsers still synthesise mousedown / click for
-          // taps on links / code. Block those during the guard window
-          // so they can't focus the contenteditable.
+          // Safety net + fallback. Two roles:
+          //
+          // 1. When the touch path armed correctly, the synthesised
+          //    mousedown / click events the browser fires from the
+          //    tap must NOT focus the contenteditable (which would
+          //    pop the OS keyboard up). `pendingTap` flags that
+          //    state and we preventDefault the synthesised events.
+          //
+          // 2. Some Android WebViews emit touchend with
+          //    `preventDefault` already silently passive-ignored, so
+          //    the synthesised mousedown still arrives without our
+          //    touch-path having armed anything. In that case we arm
+          //    here as a fallback. `touchPathHandledRecently` lets
+          //    us tell the two cases apart so we don't double-arm
+          //    after a successful touch path nor re-arm a wrapper
+          //    the user just disarmed by tapping twice.
           //
           // Exception: tapping the in-block copy button (which lives
           // inside the editor DOM via the CodeBlockCopy NodeView)
-          // must still copy — the guard would otherwise swallow its
-          // click during the 700ms window that follows the arming
-          // tap on the same block.
+          // must still copy — neither role 1 nor role 2 should
+          // swallow its click.
+          const tryArmFromMouseDown = (event) => {
+            if (!hasCoarsePointer()) return false;
+            if (touchPathHandledRecently) return false;
+            if (isInsideCopyButton(event.target)) return false;
+            // Skip link taps in the fallback — the touch path is the
+            // one that knows how to show the popover; falling back to
+            // a synchronous "open" here would surprise users.
+            if (closestLink(event.target)) return false;
+            const wrapper = closestCodeBlockWrapper(event.target);
+            if (wrapper) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (armedCodeBlockEl === wrapper) {
+                clearCodeBlockArm();
+                return true;
+              }
+              blurEditorIfFocused();
+              clearInlineCodeArm();
+              armCodeBlock(wrapper);
+              armSyntheticGuard();
+              return true;
+            }
+            const inlineCode = closestInlineCode(event.target);
+            if (inlineCode) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (armedInlineCodeEl === inlineCode) {
+                clearInlineCodeArm();
+                return true;
+              }
+              blurEditorIfFocused();
+              clearCodeBlockArm();
+              armInlineCode(inlineCode);
+              armSyntheticGuard();
+              return true;
+            }
+            return false;
+          };
           const onMouseDownCapture = (event) => {
-            if (!pendingTap) return;
-            if (isInsideCopyButton(event.target)) return;
-            event.preventDefault();
-            event.stopPropagation();
+            if (pendingTap) {
+              if (isInsideCopyButton(event.target)) return;
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
+            tryArmFromMouseDown(event);
           };
           const onClickCapture = (event) => {
             if (!pendingTap) return;

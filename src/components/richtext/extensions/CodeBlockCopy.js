@@ -39,6 +39,11 @@ export const CodeBlockCopy = CodeBlock.extend({
       if (node.attrs?.language) {
         code.className = `language-${node.attrs.language}`;
       }
+      // Turn off the OS / browser spellchecker for code: shell paths,
+      // CLI flags, identifiers etc. are not natural-language words and
+      // the red squiggles only get in the way.
+      pre.setAttribute("spellcheck", "false");
+      code.setAttribute("spellcheck", "false");
       pre.appendChild(code);
       wrapper.appendChild(pre);
 
