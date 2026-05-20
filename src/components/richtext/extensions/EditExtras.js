@@ -364,11 +364,13 @@ function ensureScrollReflowListener() {
 
 /* -------------------- the plugin -------------------- */
 
-// Tap-vs-scroll threshold. Touch input on Android WebViews can jitter
-// a few pixels during a deliberate tap, so we stay generous — better
-// to treat a tiny accidental drift as a tap than to swallow a clearly
-// intentional tap because of WebView noise.
-const TAP_MOVE_PX = 16;
+// Tap-vs-scroll threshold. Generous on purpose — Android WebViews
+// fire spurious low-amplitude touchmove events during a deliberate
+// tap, and the `<pre>` element's `overflow-x: auto` makes the
+// WebView's tap detection extra noisy on code blocks. We measure
+// purely from touchstart to touchend (not from intermediate
+// touchmove) so jitter during the press doesn't poison the tap.
+const TAP_MOVE_PX = 24;
 // How long the post-tap synthesised mouse-events suppression stays
 // armed. iOS / some Android WebViews can take a few hundred ms to
 // fire the synthesised `mousedown` after `touchend`, so we keep the
@@ -471,52 +473,37 @@ export const EditExtras = Extension.create({
               href: link ? link.getAttribute("href") : null,
               startX: t.clientX,
               startY: t.clientY,
-              moved: false,
             };
           };
 
-          const onTouchMove = (event) => {
-            if (!touchInfo) return;
-            const t = event.touches[0];
-            if (!t) return;
-            const dx = Math.abs(t.clientX - touchInfo.startX);
-            const dy = Math.abs(t.clientY - touchInfo.startY);
-            if (dx > TAP_MOVE_PX || dy > TAP_MOVE_PX) {
-              touchInfo.moved = true;
-            }
-          };
+          // No touchmove handler: we decide tap vs scroll purely from
+          // the start↔end touch distance in onTouchEnd (see comment
+          // there). Tracking touchmove was too noisy on scrollable
+          // `<pre>` elements and made first-tap arming flake out.
 
           const onTouchEnd = (event) => {
             if (!touchInfo) return;
-            const {
-              link,
-              href,
-              inlineCode,
-              codeBlock,
-              moved,
-              startX,
-              startY,
-            } = touchInfo;
+            const { link, href, inlineCode, codeBlock, startX, startY } =
+              touchInfo;
             touchInfo = null;
-            // Re-confirm tap vs scroll using the END position. Some
-            // Android WebViews fire spurious low-amplitude touchmove
-            // events during a deliberate tap that would otherwise
-            // push `moved` past the threshold; if the finger landed
-            // close to where it started, treat it as a tap regardless.
-            let effectivelyMoved = moved;
+            // Tap vs scroll decided purely from the start↔end touch
+            // distance. We intentionally don't trust the intermediate
+            // touchmove because Android WebViews jitter coordinates
+            // by a few pixels during a deliberate press, especially
+            // on scrollable elements like `<pre>` (which has
+            // `overflow-x: auto`), and that jitter was making the
+            // code-block tap fall through to "regular text" — i.e.
+            // do nothing.
             const ct = event.changedTouches && event.changedTouches[0];
             if (ct) {
               const dx = Math.abs(ct.clientX - startX);
               const dy = Math.abs(ct.clientY - startY);
-              if (dx <= TAP_MOVE_PX && dy <= TAP_MOVE_PX) {
-                effectivelyMoved = false;
+              if (dx > TAP_MOVE_PX || dy > TAP_MOVE_PX) {
+                // The touch became a scroll, not a tap. Let the
+                // synthesised mouse events run normally — the user
+                // didn't ask for any affordance.
+                return;
               }
-            }
-            if (effectivelyMoved) {
-              // The touch became a scroll, not a tap. Let the
-              // synthesised mouse events run normally — the user
-              // didn't ask for any affordance.
-              return;
             }
 
             // --- Link tap: show the Open / Modifier popover. ---
@@ -612,12 +599,17 @@ export const EditExtras = Extension.create({
             if (closestLink(event.target)) return false;
             const wrapper = closestCodeBlockWrapper(event.target);
             if (wrapper) {
-              event.preventDefault();
-              event.stopPropagation();
               if (armedCodeBlockEl === wrapper) {
+                // Second tap on the armed wrapper — release the arm
+                // and let the focus go through normally so the OS
+                // keyboard appears. DO NOT preventDefault here, or
+                // we'd swallow the very focus we want to keep.
                 clearCodeBlockArm();
                 return true;
               }
+              // First tap on a new wrapper — arm + suppress focus.
+              event.preventDefault();
+              event.stopPropagation();
               blurEditorIfFocused();
               clearInlineCodeArm();
               armCodeBlock(wrapper);
@@ -626,12 +618,15 @@ export const EditExtras = Extension.create({
             }
             const inlineCode = closestInlineCode(event.target);
             if (inlineCode) {
-              event.preventDefault();
-              event.stopPropagation();
               if (armedInlineCodeEl === inlineCode) {
+                // Second tap on armed inline code — release arm,
+                // allow focus, no preventDefault (same logic as the
+                // code-block branch above).
                 clearInlineCodeArm();
                 return true;
               }
+              event.preventDefault();
+              event.stopPropagation();
               blurEditorIfFocused();
               clearCodeBlockArm();
               armInlineCode(inlineCode);
@@ -716,10 +711,6 @@ export const EditExtras = Extension.create({
             passive: true,
             capture: true,
           });
-          dom.addEventListener("touchmove", onTouchMove, {
-            passive: true,
-            capture: true,
-          });
           dom.addEventListener("touchend", onTouchEnd, {
             passive: false,
             capture: true,
@@ -737,9 +728,6 @@ export const EditExtras = Extension.create({
           return {
             destroy() {
               dom.removeEventListener("touchstart", onTouchStart, {
-                capture: true,
-              });
-              dom.removeEventListener("touchmove", onTouchMove, {
                 capture: true,
               });
               dom.removeEventListener("touchend", onTouchEnd, {
