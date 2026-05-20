@@ -894,20 +894,11 @@ export default function SettingsPanel({
                 onToggle={() => toggleSection("app")}
               >
                 <div className="space-y-3">
-                  <button
-                    className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
-                    onClick={() => {
-                      try { window.AndroidTheme.checkForUpdate(); } catch (e) {}
-                    }}
-                  >
-                    <RowIcon icon={TI.Download} />
-                    <div className="min-w-0">
-                      <div className="font-medium">{t("checkForUpdateOption")}</div>
-                      <div className="text-sm text-gray-500">{t("checkForUpdateDesc")}</div>
-                    </div>
-                  </button>
-
-                  {availableUpdate && (
+                  {availableUpdate ? (
+                    /* When a release has been detected the card replaces
+                       the "Check for updates" button entirely — keeping
+                       both side-by-side made the section feel redundant
+                       (the card is itself the answer to the check). */
                     <div className="px-3 py-3 border border-indigo-300/60 dark:border-indigo-500/40 rounded-lg bg-indigo-50/60 dark:bg-indigo-900/20">
                       <div className="flex items-start gap-3">
                         <RowIcon icon={TI.Sparkles} />
@@ -943,6 +934,19 @@ export default function SettingsPanel({
                         </button>
                       </div>
                     </div>
+                  ) : (
+                    <button
+                      className={`flex items-center gap-3 w-full text-left px-3 py-3 border border-[var(--border-light)] rounded-lg ${dark ? "hover:bg-white/10" : "hover:bg-gray-50"} transition-colors`}
+                      onClick={() => {
+                        try { window.AndroidTheme.checkForUpdate(); } catch (e) {}
+                      }}
+                    >
+                      <RowIcon icon={TI.Download} />
+                      <div className="min-w-0">
+                        <div className="font-medium">{t("checkForUpdateOption")}</div>
+                        <div className="text-sm text-gray-500">{t("checkForUpdateDesc")}</div>
+                      </div>
+                    </button>
                   )}
                 </div>
               </SettingsSection>
