@@ -109,10 +109,35 @@ export const CodeBlockCopy = CodeBlock.extend({
       return {
         dom: wrapper,
         contentDOM: code,
-        // Selection / mutation never touches our button — let PM handle
-        // the editable `code` subtree as usual.
-        ignoreMutation: (mutation) =>
-          mutation.target === btn || btn.contains(mutation.target),
+        // PM's MutationObserver fires for every DOM change inside the
+        // editor. For nodes it owns it would normally try to reconcile
+        // — and for an attribute mutation on a NodeView's wrapper PM
+        // marks the node dirty and recreates the whole NodeView, which
+        // destroys our wrapper / button instances.
+        //
+        // Two classes of mutation we must explicitly ignore:
+        //   1. Anything happening inside our copy button (label flip
+        //      "Copier" ↔ "Copié", style.top changes from the sticky
+        //      scroll follower). These are chrome, not content.
+        //   2. Attribute changes on the wrapper itself — most
+        //      importantly the mobile `data-armed="true"` flag set by
+        //      EditExtras on the first tap. Without this exception PM
+        //      destroyed and recreated the NodeView every time the
+        //      user tapped a code block, which is why the copy button
+        //      never appeared and every tap was logged as "BLOCK 1st
+        //      -> arm" instead of alternating 1st/2nd.
+        ignoreMutation: (mutation) => {
+          if (mutation.target === btn || btn.contains(mutation.target)) {
+            return true;
+          }
+          if (
+            mutation.type === "attributes" &&
+            mutation.target === wrapper
+          ) {
+            return true;
+          }
+          return false;
+        },
         destroy: () => {
           cancelAnimationFrame(raf);
           if (scrollEl) {
