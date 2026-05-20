@@ -8,6 +8,9 @@
 //     instead of letting the OS keyboard pop up — the user can then
 //     either visit the link or explicitly choose to edit it (which
 //     focuses the editor at the link and lets the keyboard appear).
+//   - Touch tap on a code block / inline code arms a "Copier" button
+//     on the first tap (no keyboard) and focuses the editor on the
+//     second tap of the same target (keyboard + edit).
 //
 // All of this only activates when the editor wrapper exposes
 // `data-edit-extras="on"` (set by `RichTextEditor.jsx` based on the
@@ -28,11 +31,6 @@ function isEditExtrasOn(view) {
   return view?.dom?.getAttribute(EDIT_EXTRAS_ATTR) === "on";
 }
 
-// Best-effort isMobile / coarse-pointer detection. We only use it to
-// decide between the desktop hover affordances (tooltip + inline-copy
-// overlay) and the mobile tap popover — if the heuristic is wrong, the
-// worst case is a popover appears on a desktop with a touch screen,
-// which is still a usable UX.
 function hasCoarsePointer() {
   if (typeof window === "undefined") return false;
   try {
@@ -42,26 +40,17 @@ function hasCoarsePointer() {
   }
 }
 
-/* -------------------- Event target normalization -------------------- */
-
-// Touch events fire with a Text node as event.target when the tap
-// lands on actual text characters — Text nodes don't expose .closest(),
-// so naive helpers like `target.closest(".code-block-wrapper")` would
-// silently return null and our "is this a code block?" detection
-// failed. That was the root cause of the mobile-code-block-tap bug
-// (tapping on the empty padding area of a `<pre>` worked because the
-// target was then the Element itself; tapping on actual text didn't).
-// Normalize to the nearest Element before any DOM walk.
+// Tap events fire with a Text node as event.target when the tap lands
+// on actual characters; Text nodes don't expose .closest(). Without
+// normalising first, every "is this a link / code block / inline code"
+// check silently failed on the most common case (tapping the text
+// itself), which is what made mobile code-block taps look random.
 function asElement(node) {
   if (!node) return null;
-  if (node.nodeType === 1) return node; // ELEMENT_NODE
-  if (node.nodeType === 3) return node.parentElement; // TEXT_NODE
+  if (node.nodeType === 1) return node;
+  if (node.nodeType === 3) return node.parentElement;
   return node.parentElement || null;
 }
-
-// Compose-aware lookup: walks composedPath() so the helper still works
-// if the tap target lives inside a shadow root (none today, but cheap
-// safety net). Falls back to event.target normalisation.
 function eventElement(event) {
   const path =
     typeof event.composedPath === "function" ? event.composedPath() : null;
@@ -73,12 +62,11 @@ function eventElement(event) {
   return asElement(event.target);
 }
 
-// 2nd-tap helper: focuses the editor at the user's tap point so the
-// OS keyboard opens and the caret lands where they pointed. Called
-// synchronously from touchend so the user gesture survives to the
-// focus() call. Used by the code-block 2nd-tap branch where the
-// NodeView's wrapper/pre/code structure doesn't always cause PM's
-// default mousedown handler to focus the contenteditable.
+// Place the caret at a viewport point and focus the editor. Called from
+// the code-block 2nd-tap branch where the NodeView's wrapper/pre/code
+// structure prevents PM's default mousedown handling from restoring
+// focus to the contenteditable — without an explicit focus() inside
+// the user-gesture touchend the OS keyboard stayed hidden.
 function focusEditorAtClientPoint(view, x, y) {
   try {
     view.focus();
@@ -88,54 +76,6 @@ function focusEditorAtClientPoint(view, x, y) {
       view.dispatch(view.state.tr.setSelection(TextSelection.near($pos)));
     }
   } catch (_e) {}
-}
-
-/* -------------------- opt-in tap debug overlay -------------------- */
-
-// Enable with `#dbg-tap` on the URL hash. Shows a small log overlay
-// in the top-left corner with each touch-handler decision so we can
-// see exactly what's happening on devices where the tap behaviour is
-// flaky. No effect when the hash is missing.
-function isTapDebugOn() {
-  if (typeof window === "undefined") return false;
-  try {
-    return /(?:^|[#&])dbg-tap(?:=|&|$)/.test(window.location.hash || "");
-  } catch (_e) {
-    return false;
-  }
-}
-let dbgEl = null;
-const dbgLines = [];
-function ensureDbgEl() {
-  if (!isTapDebugOn()) return null;
-  if (dbgEl && dbgEl.isConnected) return dbgEl;
-  dbgEl = document.createElement("div");
-  dbgEl.style.cssText = [
-    "position:fixed",
-    "top:4px",
-    "left:4px",
-    "z-index:99999",
-    "background:rgba(0,0,0,0.82)",
-    "color:#fff",
-    "padding:4px 8px",
-    "border-radius:4px",
-    "font:11px/1.25 ui-monospace,monospace",
-    "max-width:92vw",
-    "max-height:40vh",
-    "overflow:hidden",
-    "white-space:pre",
-    "pointer-events:none",
-  ].join(";");
-  document.body.appendChild(dbgEl);
-  return dbgEl;
-}
-function dbg(line) {
-  if (!isTapDebugOn()) return;
-  const t = new Date().toTimeString().slice(0, 8);
-  dbgLines.push(t + " " + line);
-  if (dbgLines.length > 10) dbgLines.shift();
-  const el = ensureDbgEl();
-  if (el) el.textContent = dbgLines.join("\n");
 }
 
 function ensureSchemeURL(raw) {
@@ -229,9 +169,7 @@ function positionInlineCopyForCurrent() {
   // Anchor the button right after the visual END of the inline code,
   // vertically centered on the line that contains its last fragment.
   // `getClientRects()` returns one rect per line for inline content,
-  // so the last rect is the line where the code ends — placing the
-  // button at `lastRect.right + small offset` puts it directly after
-  // the closing letter the way the user asked ("juste après le .sh").
+  // so the last rect is the line where the code ends.
   const rects = code.getClientRects();
   const lastRect = rects[rects.length - 1];
   if (!lastRect) return;
@@ -253,12 +191,9 @@ function showInlineCopyFor(codeEl, { sticky = false } = {}) {
     inlineCopyHideTimer = null;
   }
   const el = getInlineCopyEl();
-  // Propagate the modal's note-colour CSS vars to the button. The
-  // button is portaled to document.body so it doesn't inherit them
-  // naturally — read the computed value off the editor wrapper
-  // (which IS inside the themed modal) and apply inline. Without
-  // this, the gradient fell back to `#111` and the button looked
-  // out of place next to the code-block copy button.
+  // Propagate the modal's note-colour CSS vars to the portaled button
+  // so the gradient matches the surrounding modal instead of falling
+  // back to #111.
   const ancestor = codeEl.closest(".rt-editor") || codeEl;
   try {
     const cs = window.getComputedStyle(ancestor);
@@ -272,15 +207,12 @@ function showInlineCopyFor(codeEl, { sticky = false } = {}) {
   el.classList.add("rt-inline-code-copy--visible");
   el.classList.toggle("rt-inline-code-copy--sticky", sticky);
   // Defer positioning to next frame so the just-shown element has
-  // measurable dimensions (getBoundingClientRect returns the post-
-  // layout rect; before the next frame it might be 0).
+  // measurable dimensions.
   requestAnimationFrame(positionInlineCopyForCurrent);
 }
 function scheduleInlineCopyHide() {
   if (inlineCopySticky) return;
   if (inlineCopyHideTimer) clearTimeout(inlineCopyHideTimer);
-  // Small delay so the user can move the cursor between the code and
-  // the floating button without it disappearing under them.
   inlineCopyHideTimer = setTimeout(() => {
     inlineCopyEl?.classList.remove("rt-inline-code-copy--visible");
     inlineCopyEl?.classList.remove("rt-inline-code-copy--sticky");
@@ -343,9 +275,7 @@ function showLinkPopover(anchor, href, view) {
     hideLinkPopover();
     // Focus FIRST (synchronously, inside the user-initiated click
     // handler) so iOS Safari accepts it as a user gesture and shows
-    // the keyboard. Then place the caret inside the link. Reversing
-    // the order works on Android but iOS sometimes refuses to show
-    // the keyboard if the focus call isn't the first thing.
+    // the keyboard. Then place the caret inside the link.
     try {
       view.focus();
       const pos = view.posAtDOM(anchor, 0);
@@ -387,10 +317,6 @@ function showLinkPopover(anchor, href, view) {
 
 /* -------------------- shared helpers -------------------- */
 
-// All four helpers accept either an Element, a Text node, or anything
-// asElement() can normalise. Crucially they must NOT bail out when
-// passed a Text node — that was the original bug. asElement() turns
-// a Text node into its parentElement so .closest() can do its job.
 function closestLink(node) {
   const el = asElement(node);
   if (!el || !el.closest) return null;
@@ -450,9 +376,9 @@ function armInlineCode(codeEl) {
 // Global capture-phase scroll listener that re-positions the sticky
 // inline-code button to follow its anchor as the user scrolls. The
 // code-block button has its own per-node scroll listener inside the
-// NodeView (see CodeBlockCopy.js). We register lazily on first arm
-// and never tear down — handlers are cheap (single rect read) and
-// the singletons live for the page lifetime.
+// NodeView (see CodeBlockCopy.js). Registered lazily on first arm and
+// never torn down — handler is cheap (single rect read) and the
+// singletons live for the page lifetime.
 let scrollReflowRegistered = false;
 function ensureScrollReflowListener() {
   if (scrollReflowRegistered) return;
@@ -466,17 +392,11 @@ function ensureScrollReflowListener() {
 
 /* -------------------- the plugin -------------------- */
 
-// Tap-vs-scroll threshold. Generous on purpose — Android WebViews
-// fire spurious low-amplitude touchmove events during a deliberate
-// tap, and the `<pre>` element's `overflow-x: auto` makes the
-// WebView's tap detection extra noisy on code blocks. We measure
-// purely from touchstart to touchend (not from intermediate
-// touchmove) so jitter during the press doesn't poison the tap.
+// Tap-vs-scroll threshold measured from touchstart to touchend.
 const TAP_MOVE_PX = 24;
-// How long the post-tap synthesised mouse-events suppression stays
-// armed. iOS / some Android WebViews can take a few hundred ms to
-// fire the synthesised `mousedown` after `touchend`, so we keep the
-// guard wider than the worst case we've seen.
+// How long synthesised mouse events are suppressed after a tap we
+// handled, so the OS keyboard doesn't pop up from the click the
+// browser fires a few hundred ms later.
 const TAP_GUARD_MS = 700;
 
 export const EditExtras = Extension.create({
@@ -486,22 +406,21 @@ export const EditExtras = Extension.create({
       new Plugin({
         key: new PluginKey("editExtras"),
         // Manage touch handlers via the plugin view so we can register
-        // them with `passive: false` + `capture: true`. PM's own
-        // `handleDOMEvents` registration can default to passive on
-        // touch events depending on browser, which would silently
-        // ignore our preventDefault and let the OS keyboard pop up
-        // on link tap.
+        // touchend with `passive: false` — PM's own handleDOMEvents
+        // registration defaults to passive on touch events on some
+        // browsers, which would silently ignore preventDefault and let
+        // the OS keyboard pop up on link / code-block tap.
         view(editorView) {
           const dom = editorView.dom;
 
-          // Touch lifecycle state. We only show the popover on a
-          // confirmed *tap* (touchend without scroll). Anything that
-          // becomes a scroll is left alone so the page still scrolls.
+          // Touch lifecycle state. We only act on a confirmed *tap*
+          // (touchend without scroll). Anything that becomes a scroll
+          // is left alone so the page still scrolls.
           let touchInfo = null;
-          // After a confirmed link tap, mouse events that the OS
-          // synthesises from the touch must NOT focus the editor.
-          // `pendingTap` keeps the guard armed for the worst-case
-          // delay between touchend and the synthesised mousedown.
+          // After a tap we handled, the synthesised mouse events the
+          // browser fires next must NOT focus the editor. `pendingTap`
+          // flags that state for the worst-case delay between
+          // touchend and the synthesised mousedown.
           let pendingTap = null;
           let pendingTapTimer = null;
           const clearPending = () => {
@@ -511,24 +430,6 @@ export const EditExtras = Extension.create({
               pendingTapTimer = null;
             }
           };
-          // Coordination flag for the mousedown fallback below. The
-          // touch handlers set this whenever they handle a tap so the
-          // synthesised mousedown that follows doesn't try to re-arm
-          // (or re-disarm) the same target. Cleared after a tap
-          // guard window passes.
-          let touchPathHandledRecently = false;
-          let touchPathHandledTimer = null;
-          const markTouchHandled = () => {
-            touchPathHandledRecently = true;
-            if (touchPathHandledTimer) clearTimeout(touchPathHandledTimer);
-            touchPathHandledTimer = setTimeout(() => {
-              touchPathHandledRecently = false;
-            }, TAP_GUARD_MS);
-          };
-
-          // Helper that swallows the synthesised mouse events the
-          // browser fires after a tap, used by all three "tap-arms"
-          // flows (link popover, code-block arm, inline-code arm).
           const blurEditorIfFocused = () => {
             const ae = document.activeElement;
             if (ae && (ae === dom || dom.contains(ae))) {
@@ -544,10 +445,7 @@ export const EditExtras = Extension.create({
           };
 
           const onTouchStart = (event) => {
-            if (!isEditExtrasOn(editorView)) {
-              dbg("touchstart skip: extras off");
-              return;
-            }
+            if (!isEditExtrasOn(editorView)) return;
             if (!hasCoarsePointer()) return;
             if (event.touches.length === 1) {
               clearPending();
@@ -556,15 +454,9 @@ export const EditExtras = Extension.create({
               return;
             }
             if (isInsideCopyButton(event.target)) {
-              dbg("touchstart on copy-btn -> skip");
               touchInfo = null;
               return;
             }
-            // Normalise event.target to its nearest Element. Touching
-            // on actual text characters fires with a Text node as
-            // target on Android WebView, Pixel emulator, iOS Safari —
-            // .closest() doesn't exist on text nodes, so detection
-            // would silently fail without this step.
             const target = eventElement(event);
             const link = closestLink(target);
             const inlineCode = link ? null : closestInlineCode(target);
@@ -580,26 +472,10 @@ export const EditExtras = Extension.create({
               startX: t0.clientX,
               startY: t0.clientY,
             };
-            const origNt = event.target?.nodeType ?? "?";
-            const normTag = target?.tagName || "?";
-            dbg(
-              "touchstart nt=" + origNt + " tag=" + normTag +
-              " link=" + (link ? "Y" : "-") +
-              " inline=" + (inlineCode ? "Y" : "-") +
-              " block=" + (codeBlock ? "Y" : "-"),
-            );
           };
 
-          // No touchmove handler: we decide tap vs scroll purely from
-          // the start↔end touch distance in onTouchEnd (see comment
-          // there). Tracking touchmove was too noisy on scrollable
-          // `<pre>` elements and made first-tap arming flake out.
-
           const onTouchEnd = (event) => {
-            if (!touchInfo) {
-              dbg("touchend no touchInfo");
-              return;
-            }
+            if (!touchInfo) return;
             const { link, href, inlineCode, codeBlock, startX, startY } =
               touchInfo;
             touchInfo = null;
@@ -607,82 +483,64 @@ export const EditExtras = Extension.create({
             if (ct) {
               const dx = Math.abs(ct.clientX - startX);
               const dy = Math.abs(ct.clientY - startY);
-              if (dx > TAP_MOVE_PX || dy > TAP_MOVE_PX) {
-                dbg("touchend SCROLL dx=" + dx + " dy=" + dy);
-                return;
-              }
+              if (dx > TAP_MOVE_PX || dy > TAP_MOVE_PX) return;
             }
 
             if (link && href) {
-              dbg("touchend LINK -> popover");
               event.preventDefault();
               blurEditorIfFocused();
               clearCodeBlockArm();
               clearInlineCodeArm();
               armSyntheticGuard();
-              markTouchHandled();
               showLinkPopover(link, href, editorView);
               return;
             }
 
             if (codeBlock) {
               if (armedCodeBlockEl === codeBlock) {
-                dbg("touchend BLOCK 2nd -> release+focus");
+                // 2nd tap on the same block: dismiss the button and
+                // hand focus back to the editor so the keyboard
+                // opens and the caret lands where the user pointed.
+                // PM's default mousedown doesn't reliably focus
+                // through the NodeView wrapper, so we do it
+                // explicitly inside the touch gesture.
                 clearCodeBlockArm();
                 clearInlineCodeArm();
-                // Release the synthetic-event guard so PM's mousedown
-                // can focus normally; mark touch as handled so the
-                // mousedown fallback doesn't see "wrapper no longer
-                // armed" and immediately re-arm.
                 clearPending();
-                markTouchHandled();
-                // The NodeView's wrapper/pre/code structure means PM's
-                // default mousedown handling doesn't always restore
-                // focus to the contenteditable (the OS keyboard then
-                // stays hidden). Place the caret and call focus()
-                // explicitly here, inside the user-gesture touchend,
-                // so Android / iOS open the keyboard reliably.
-                const ct2 = event.changedTouches && event.changedTouches[0];
-                if (ct2) {
+                if (ct) {
                   focusEditorAtClientPoint(
                     editorView,
-                    ct2.clientX,
-                    ct2.clientY,
+                    ct.clientX,
+                    ct.clientY,
                   );
                 }
                 return;
               }
-              dbg("touchend BLOCK 1st -> arm");
               event.preventDefault();
               blurEditorIfFocused();
               clearInlineCodeArm();
               armCodeBlock(codeBlock);
               armSyntheticGuard();
-              markTouchHandled();
               return;
             }
 
             if (inlineCode) {
               if (armedInlineCodeEl === inlineCode) {
-                dbg("touchend INLINE 2nd -> release+focus");
                 clearInlineCodeArm();
                 clearCodeBlockArm();
                 clearPending();
-                markTouchHandled();
                 return;
               }
-              dbg("touchend INLINE 1st -> arm");
               event.preventDefault();
               blurEditorIfFocused();
               clearCodeBlockArm();
               armInlineCode(inlineCode);
               armSyntheticGuard();
-              markTouchHandled();
               return;
             }
 
-            dbg("touchend TEXT -> nothing");
-            markTouchHandled();
+            // Tap on regular text: clear any armed state and let PM
+            // handle the tap normally (caret placement + keyboard).
             clearCodeBlockArm();
             clearInlineCodeArm();
           };
@@ -691,79 +549,16 @@ export const EditExtras = Extension.create({
             touchInfo = null;
           };
 
-          // Safety net + fallback. Two roles:
-          //
-          // 1. When the touch path armed correctly, the synthesised
-          //    mousedown / click events the browser fires from the
-          //    tap must NOT focus the contenteditable (which would
-          //    pop the OS keyboard up). `pendingTap` flags that
-          //    state and we preventDefault the synthesised events.
-          //
-          // 2. Some Android WebViews emit touchend with
-          //    `preventDefault` already silently passive-ignored, so
-          //    the synthesised mousedown still arrives without our
-          //    touch-path having armed anything. In that case we arm
-          //    here as a fallback. `touchPathHandledRecently` lets
-          //    us tell the two cases apart so we don't double-arm
-          //    after a successful touch path nor re-arm a wrapper
-          //    the user just disarmed by tapping twice.
-          //
-          // Exception: tapping the in-block copy button (which lives
-          // inside the editor DOM via the CodeBlockCopy NodeView)
-          // must still copy — neither role 1 nor role 2 should
-          // swallow its click.
-          const tryArmFromMouseDown = (event) => {
-            if (!hasCoarsePointer()) return false;
-            if (touchPathHandledRecently) return false;
-            const target = eventElement(event);
-            if (isInsideCopyButton(target)) return false;
-            if (closestLink(target)) return false;
-            const wrapper = closestCodeBlockWrapper(target);
-            if (wrapper) {
-              if (armedCodeBlockEl === wrapper) {
-                dbg("mousedown BLOCK 2nd -> release+focus");
-                clearCodeBlockArm();
-                markTouchHandled();
-                return true;
-              }
-              dbg("mousedown BLOCK 1st -> arm");
-              event.preventDefault();
-              event.stopPropagation();
-              blurEditorIfFocused();
-              clearInlineCodeArm();
-              armCodeBlock(wrapper);
-              armSyntheticGuard();
-              markTouchHandled();
-              return true;
-            }
-            const inlineCode = closestInlineCode(target);
-            if (inlineCode) {
-              if (armedInlineCodeEl === inlineCode) {
-                dbg("mousedown INLINE 2nd -> release+focus");
-                clearInlineCodeArm();
-                markTouchHandled();
-                return true;
-              }
-              dbg("mousedown INLINE 1st -> arm");
-              event.preventDefault();
-              event.stopPropagation();
-              blurEditorIfFocused();
-              clearCodeBlockArm();
-              armInlineCode(inlineCode);
-              armSyntheticGuard();
-              markTouchHandled();
-              return true;
-            }
-            return false;
-          };
+          // Swallow the synthesised mousedown / click that the browser
+          // fires after a tap we handled, so the editor doesn't focus
+          // and the OS keyboard doesn't pop up. The in-block / inline
+          // copy buttons are exceptions — they live inside the editor
+          // DOM but must still receive their own click handler.
           const onMouseDownCapture = (event) => {
-            if (pendingTap) {
-              if (isInsideCopyButton(event.target)) return;
-              event.preventDefault();
-              event.stopPropagation();
-              return;
-            }
-            tryArmFromMouseDown(event);
+            if (!pendingTap) return;
+            if (isInsideCopyButton(event.target)) return;
+            event.preventDefault();
+            event.stopPropagation();
           };
           const onClickCapture = (event) => {
             if (!pendingTap) return;
@@ -771,16 +566,6 @@ export const EditExtras = Extension.create({
             event.preventDefault();
             event.stopPropagation();
           };
-
-          // We deliberately do NOT listen to the editor's focus event
-          // anymore. The previous focus-fallback was a workaround for
-          // the symptom of the real bug — event.target being a Text
-          // node — and it had the side-effect of re-arming the block
-          // after the 2nd tap's release branch had just disarmed it,
-          // which is why the keyboard never opened. With the
-          // asElement() / eventElement() normalisation above, the
-          // touchend path detects the code block reliably on a single
-          // quick tap, making the focus fallback unnecessary.
 
           dom.addEventListener("touchstart", onTouchStart, {
             passive: true,
@@ -816,7 +601,6 @@ export const EditExtras = Extension.create({
               dom.removeEventListener("click", onClickCapture, {
                 capture: true,
               });
-              if (touchPathHandledTimer) clearTimeout(touchPathHandledTimer);
               clearPending();
             },
           };
@@ -858,10 +642,6 @@ export const EditExtras = Extension.create({
             },
             mousedown: (view, event) => {
               if (!isEditExtrasOn(view)) return false;
-              // Synthesised-from-touch mousedown carries button 0 +
-              // no modifier keys, so neither branch below ever fires
-              // for a mobile link tap. The capture-phase guard above
-              // is what prevents focus on mobile.
               const link = closestLink(event.target);
               if (!link) return false;
               const href = link.getAttribute("href");
@@ -872,10 +652,9 @@ export const EditExtras = Extension.create({
                 window.open(ensureSchemeURL(href), "_blank", "noopener,noreferrer");
                 return true;
               }
-              // Ctrl/Cmd-click → open in a new tab. We catch it on
-              // mousedown because PM eats the click event for caret
-              // placement and the auxclick semantics differ across
-              // browsers.
+              // Ctrl/Cmd-click → open in a new tab. Caught on mousedown
+              // because PM eats the click event for caret placement and
+              // auxclick semantics differ across browsers.
               if (event.button === 0 && (event.ctrlKey || event.metaKey)) {
                 event.preventDefault();
                 window.open(ensureSchemeURL(href), "_blank", "noopener,noreferrer");
