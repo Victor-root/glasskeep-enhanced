@@ -2,15 +2,21 @@
 
 ## 🚀 v2.3.8 — 2026-05-19
 
-The headline change is **"Read mode for notes"** — a per-user toggle that lets you opt out of the read/edit split entirely and have your text and drawing notes open straight in edit mode, Google-Keep style. The rest of the release is a polish pass on the Settings and Admin side sheets.
+Two headline changes: **"Read mode for notes"** lets you opt out of the read/edit split (text and drawing notes open straight in edit mode, Google-Keep style), and the Android APK (1.4.0) gains a **fully-integrated in-app updater + a first-launch onboarding screen**. The rest of the release is a polish pass on the Settings and Admin side sheets.
 
 ### ➕ Added
 - 👁 **"Read mode for notes" toggle** — when off, text and drawing notes open directly in edit mode and the read/edit button is hidden from the modal footer; ideal for users who edit far more often than they re-read. Default stays on so existing users keep the read-by-default behaviour. Saved server-side, applied across all your devices
 - 🪟 **Collapsible categories** in the Settings and Admin panels — open/closed state per category persisted in `localStorage` and synced via `PATCH /user/settings`
 - 📐 **Configurable sidebar breakpoint** — the "Always show sidebar on wide screens" threshold is now a 5-preset dropdown (Tablet → Desktop, default 1280 px) instead of the hard-coded 700 px
+- 🔄 **In-app APK self-updater** (APK 1.4.0+) — background check against GitHub Releases on cold start, throttled to one network call every 12 h. When a newer APK is published a heads-up notification fires; tapping downloads the file silently into the app's cache and hands it to Android's native install dialog
+- ⚙️ **Manual "Check for updates" in Settings → Application** — bypasses the throttle, shows the installed APK version, and surfaces a themed in-app card with Download / Later actions when an update is detected
+- 👋 **First-launch welcome screen** — explains why the Android app asks for each OS permission (microphone, camera, notifications, install unknown apps) with a per-card Grant / Granted ✓ / Refused ✗ status. Sits in a 2-step swipeable pager next to the existing server-URL setup screen
+- 🌐 **F-Droid-aware single APK** — runtime detection disables the in-app updater on F-Droid installs and replaces the Settings Application section with a one-tap "Open F-Droid" shortcut that lands the user on the GlassKeep page. The welcome screen also hides the install-unknown-apps and notifications cards F-Droid users don't need
+- 📦 **APK filename auto-versioned** — Android Studio's Build → Build APK(s) now produces `GlassKeep-v<versionName>.apk` directly, matching the asset name the in-app updater scans for on GitHub Releases
 
 ### 🐛 Fixed
 - 🧷 **Hidden accordion content marked `aria-hidden` + `inert`** so screen readers and Tab navigation skip it
+- 📱 **Mobile scroll FPS lift on the notes list** — dropped the per-card backdrop blur on touch devices, memoised the masonry card render, and added `loading="lazy"` to inline note images. The desktop glass aesthetic stays unchanged
 
 ### 🛠️ Upgrade
 
