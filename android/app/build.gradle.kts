@@ -99,6 +99,21 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
     }
+
+    // Rename the output APK so Android Studio's Build → Build Bundle(s) /
+    // APK(s) → Build APK(s) drops a "GlassKeep-v<versionName>.apk" file
+    // (debug builds get a "-debug" suffix) instead of the default
+    // "app-release.apk" / "app-debug.apk". Matches the asset naming
+    // convention the in-app self-updater scans for on GitHub Releases,
+    // so the APK uploaded to a release is already named correctly.
+    applicationVariants.all {
+        val variant = this
+        outputs.forEach { output ->
+            val suffix = if (variant.buildType.name == "debug") "-debug" else ""
+            (output as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
+                .outputFileName = "GlassKeep-v${variant.versionName}${suffix}.apk"
+        }
+    }
 }
 
 dependencies {
