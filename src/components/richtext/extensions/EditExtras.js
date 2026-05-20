@@ -195,15 +195,17 @@ function showLinkPopover(anchor, href, view) {
     e.preventDefault();
     e.stopPropagation();
     hideLinkPopover();
-    // Place the caret inside the link and focus the editor so the OS
-    // keyboard pops up on the next interaction tick — same effect as a
-    // direct tap on the link would have had without our intercept.
+    // Focus FIRST (synchronously, inside the user-initiated click
+    // handler) so iOS Safari accepts it as a user gesture and shows
+    // the keyboard. Then place the caret inside the link. Reversing
+    // the order works on Android but iOS sometimes refuses to show
+    // the keyboard if the focus call isn't the first thing.
     try {
+      view.focus();
       const pos = view.posAtDOM(anchor, 0);
       view.dispatch(
         view.state.tr.setSelection(TextSelection.create(view.state.doc, pos)),
       );
-      view.focus();
     } catch (_e) {
       view.focus();
     }
@@ -255,12 +257,195 @@ function closestInlineCode(el) {
 
 /* -------------------- the plugin -------------------- */
 
+// Tap-vs-scroll threshold. Smaller than the default OS recogniser so a
+// tap on a thin inline link still feels responsive, but large enough
+// that a deliberate flick doesn't trigger the popover.
+const TAP_MOVE_PX = 10;
+// How long the post-tap synthesised mouse-events suppression stays
+// armed. iOS / some Android WebViews can take a few hundred ms to
+// fire the synthesised `mousedown` after `touchend`, so we keep the
+// guard wider than the worst case we've seen.
+const TAP_GUARD_MS = 700;
+
 export const EditExtras = Extension.create({
   name: "editExtras",
   addProseMirrorPlugins() {
     return [
       new Plugin({
         key: new PluginKey("editExtras"),
+        // Manage touch handlers via the plugin view so we can register
+        // them with `passive: false` + `capture: true`. PM's own
+        // `handleDOMEvents` registration can default to passive on
+        // touch events depending on browser, which would silently
+        // ignore our preventDefault and let the OS keyboard pop up
+        // on link tap.
+        view(editorView) {
+          const dom = editorView.dom;
+
+          // Touch lifecycle state. We only show the popover on a
+          // confirmed *tap* (touchend without scroll). Anything that
+          // becomes a scroll is left alone so the page still scrolls.
+          let touchInfo = null;
+          // After a confirmed link tap, mouse events that the OS
+          // synthesises from the touch must NOT focus the editor.
+          // `pendingTap` keeps the guard armed for the worst-case
+          // delay between touchend and the synthesised mousedown.
+          let pendingTap = null;
+          let pendingTapTimer = null;
+          const clearPending = () => {
+            pendingTap = null;
+            if (pendingTapTimer) {
+              clearTimeout(pendingTapTimer);
+              pendingTapTimer = null;
+            }
+          };
+
+          const onTouchStart = (event) => {
+            if (!isEditExtrasOn(editorView)) return;
+            if (!hasCoarsePointer()) return;
+            // Fresh single-finger touch — reset any stale tap-guard
+            // from a previous link tap so the user can resume normal
+            // editor interaction by tapping anywhere outside a link.
+            if (event.touches.length === 1) {
+              clearPending();
+            } else {
+              touchInfo = null;
+              return;
+            }
+            const link = closestLink(event.target);
+            if (!link) {
+              touchInfo = null;
+              return;
+            }
+            const href = link.getAttribute("href");
+            if (!href) {
+              touchInfo = null;
+              return;
+            }
+            const t = event.touches[0];
+            touchInfo = {
+              link,
+              href,
+              startX: t.clientX,
+              startY: t.clientY,
+              moved: false,
+            };
+          };
+
+          const onTouchMove = (event) => {
+            if (!touchInfo) return;
+            const t = event.touches[0];
+            if (!t) return;
+            const dx = Math.abs(t.clientX - touchInfo.startX);
+            const dy = Math.abs(t.clientY - touchInfo.startY);
+            if (dx > TAP_MOVE_PX || dy > TAP_MOVE_PX) {
+              touchInfo.moved = true;
+            }
+          };
+
+          const onTouchEnd = (event) => {
+            if (!touchInfo) return;
+            const { link, href, moved } = touchInfo;
+            touchInfo = null;
+            if (moved) {
+              // The touch became a scroll, not a tap. Let the
+              // synthesised mouse events run normally — the user
+              // didn't ask for the popover.
+              return;
+            }
+            // Real tap on a link.
+            // 1. `preventDefault` on touchend is honoured by most
+            //    modern browsers and suppresses the synthesised mouse
+            //    events. The capture-phase mousedown/click guards
+            //    below are the safety net for the few that don't.
+            event.preventDefault();
+            // 2. If the editor was already focused, blur it so the
+            //    OS keyboard goes away. Without this, tapping a link
+            //    while the keyboard is up would leave it up.
+            const ae = document.activeElement;
+            if (ae && (ae === dom || dom.contains(ae))) {
+              try {
+                ae.blur();
+              } catch (_e) {}
+            }
+            // 3. Arm the synthesised-mouse-event guard before showing
+            //    the popover, so any straggling mousedown/click is
+            //    caught by the capture handlers below.
+            pendingTap = { link, href };
+            if (pendingTapTimer) clearTimeout(pendingTapTimer);
+            pendingTapTimer = setTimeout(clearPending, TAP_GUARD_MS);
+            // 4. Show the popover. The dismiss listener installed
+            //    inside `showLinkPopover` uses pointerdown on
+            //    document, so a tap outside the popover closes it
+            //    (and a tap on Open / Edit fires those handlers
+            //    first because of pointerdown -> click ordering).
+            showLinkPopover(link, href, editorView);
+          };
+
+          const onTouchCancel = () => {
+            touchInfo = null;
+          };
+
+          // Safety net: even with touchend.preventDefault, some
+          // mobile browsers still synthesise mousedown / click for
+          // taps on links. Block those during the guard window so
+          // they can't focus the contenteditable.
+          const onMouseDownCapture = (event) => {
+            if (!pendingTap) return;
+            event.preventDefault();
+            event.stopPropagation();
+          };
+          const onClickCapture = (event) => {
+            if (!pendingTap) return;
+            event.preventDefault();
+            event.stopPropagation();
+          };
+
+          dom.addEventListener("touchstart", onTouchStart, {
+            passive: true,
+            capture: true,
+          });
+          dom.addEventListener("touchmove", onTouchMove, {
+            passive: true,
+            capture: true,
+          });
+          dom.addEventListener("touchend", onTouchEnd, {
+            passive: false,
+            capture: true,
+          });
+          dom.addEventListener("touchcancel", onTouchCancel, {
+            passive: true,
+            capture: true,
+          });
+          dom.addEventListener("mousedown", onMouseDownCapture, {
+            capture: true,
+          });
+          dom.addEventListener("click", onClickCapture, { capture: true });
+
+          return {
+            destroy() {
+              dom.removeEventListener("touchstart", onTouchStart, {
+                capture: true,
+              });
+              dom.removeEventListener("touchmove", onTouchMove, {
+                capture: true,
+              });
+              dom.removeEventListener("touchend", onTouchEnd, {
+                capture: true,
+              });
+              dom.removeEventListener("touchcancel", onTouchCancel, {
+                capture: true,
+              });
+              dom.removeEventListener("mousedown", onMouseDownCapture, {
+                capture: true,
+              });
+              dom.removeEventListener("click", onClickCapture, {
+                capture: true,
+              });
+              clearPending();
+            },
+          };
+        },
         props: {
           handleDOMEvents: {
             mouseover: (view, event) => {
@@ -298,6 +483,10 @@ export const EditExtras = Extension.create({
             },
             mousedown: (view, event) => {
               if (!isEditExtrasOn(view)) return false;
+              // Synthesised-from-touch mousedown carries button 0 +
+              // no modifier keys, so neither branch below ever fires
+              // for a mobile link tap. The capture-phase guard above
+              // is what prevents focus on mobile.
               const link = closestLink(event.target);
               if (!link) return false;
               const href = link.getAttribute("href");
@@ -318,23 +507,6 @@ export const EditExtras = Extension.create({
                 return true;
               }
               return false;
-            },
-            // Mobile / coarse-pointer: tap on a link shows the popover
-            // instead of placing the caret and opening the keyboard.
-            // We use `touchstart` (capture-able, fires before the
-            // click that would focus the contenteditable) and only
-            // intervene on coarse pointers so desktop click semantics
-            // stay untouched.
-            touchstart: (view, event) => {
-              if (!isEditExtrasOn(view)) return false;
-              if (!hasCoarsePointer()) return false;
-              const link = closestLink(event.target);
-              if (!link) return false;
-              const href = link.getAttribute("href");
-              if (!href) return false;
-              event.preventDefault();
-              showLinkPopover(link, href, view);
-              return true;
             },
           },
         },
