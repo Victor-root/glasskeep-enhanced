@@ -42,6 +42,54 @@ function hasCoarsePointer() {
   }
 }
 
+/* -------------------- opt-in tap debug overlay -------------------- */
+
+// Enable with `#dbg-tap` on the URL hash. Shows a small log overlay
+// in the top-left corner with each touch-handler decision so we can
+// see exactly what's happening on devices where the tap behaviour is
+// flaky. No effect when the hash is missing.
+function isTapDebugOn() {
+  if (typeof window === "undefined") return false;
+  try {
+    return /(?:^|[#&])dbg-tap(?:=|&|$)/.test(window.location.hash || "");
+  } catch (_e) {
+    return false;
+  }
+}
+let dbgEl = null;
+const dbgLines = [];
+function ensureDbgEl() {
+  if (!isTapDebugOn()) return null;
+  if (dbgEl && dbgEl.isConnected) return dbgEl;
+  dbgEl = document.createElement("div");
+  dbgEl.style.cssText = [
+    "position:fixed",
+    "top:4px",
+    "left:4px",
+    "z-index:99999",
+    "background:rgba(0,0,0,0.82)",
+    "color:#fff",
+    "padding:4px 8px",
+    "border-radius:4px",
+    "font:11px/1.25 ui-monospace,monospace",
+    "max-width:92vw",
+    "max-height:40vh",
+    "overflow:hidden",
+    "white-space:pre",
+    "pointer-events:none",
+  ].join(";");
+  document.body.appendChild(dbgEl);
+  return dbgEl;
+}
+function dbg(line) {
+  if (!isTapDebugOn()) return;
+  const t = new Date().toTimeString().slice(0, 8);
+  dbgLines.push(t + " " + line);
+  if (dbgLines.length > 10) dbgLines.shift();
+  const el = ensureDbgEl();
+  if (el) el.textContent = dbgLines.join("\n");
+}
+
 function ensureSchemeURL(raw) {
   const v = (raw || "").trim();
   if (!v) return "";
@@ -442,20 +490,19 @@ export const EditExtras = Extension.create({
           };
 
           const onTouchStart = (event) => {
-            if (!isEditExtrasOn(editorView)) return;
+            if (!isEditExtrasOn(editorView)) {
+              dbg("touchstart skip: extras off");
+              return;
+            }
             if (!hasCoarsePointer()) return;
-            // Fresh single-finger touch — reset any stale tap-guard
-            // from a previous link tap so the user can resume normal
-            // editor interaction by tapping anywhere outside a link.
             if (event.touches.length === 1) {
               clearPending();
             } else {
               touchInfo = null;
               return;
             }
-            // Tap on the copy button itself: let its own click handler
-            // run; don't interpret as a regular content tap.
             if (isInsideCopyButton(event.target)) {
+              dbg("touchstart on copy-btn -> skip");
               touchInfo = null;
               return;
             }
@@ -474,6 +521,12 @@ export const EditExtras = Extension.create({
               startX: t.clientX,
               startY: t.clientY,
             };
+            dbg(
+              "touchstart tag=" + (target.tagName || "?") +
+              " link=" + (link ? "Y" : "-") +
+              " inline=" + (inlineCode ? "Y" : "-") +
+              " block=" + (codeBlock ? "Y" : "-"),
+            );
           };
 
           // No touchmove handler: we decide tap vs scroll purely from
@@ -482,32 +535,25 @@ export const EditExtras = Extension.create({
           // `<pre>` elements and made first-tap arming flake out.
 
           const onTouchEnd = (event) => {
-            if (!touchInfo) return;
+            if (!touchInfo) {
+              dbg("touchend no touchInfo");
+              return;
+            }
             const { link, href, inlineCode, codeBlock, startX, startY } =
               touchInfo;
             touchInfo = null;
-            // Tap vs scroll decided purely from the start↔end touch
-            // distance. We intentionally don't trust the intermediate
-            // touchmove because Android WebViews jitter coordinates
-            // by a few pixels during a deliberate press, especially
-            // on scrollable elements like `<pre>` (which has
-            // `overflow-x: auto`), and that jitter was making the
-            // code-block tap fall through to "regular text" — i.e.
-            // do nothing.
             const ct = event.changedTouches && event.changedTouches[0];
             if (ct) {
               const dx = Math.abs(ct.clientX - startX);
               const dy = Math.abs(ct.clientY - startY);
               if (dx > TAP_MOVE_PX || dy > TAP_MOVE_PX) {
-                // The touch became a scroll, not a tap. Let the
-                // synthesised mouse events run normally — the user
-                // didn't ask for any affordance.
+                dbg("touchend SCROLL dx=" + dx + " dy=" + dy);
                 return;
               }
             }
 
-            // --- Link tap: show the Open / Modifier popover. ---
             if (link && href) {
+              dbg("touchend LINK -> popover");
               event.preventDefault();
               blurEditorIfFocused();
               clearCodeBlockArm();
@@ -518,18 +564,15 @@ export const EditExtras = Extension.create({
               return;
             }
 
-            // --- Code-block tap. ---
             if (codeBlock) {
               markTouchHandled();
               if (armedCodeBlockEl === codeBlock) {
-                // Second tap on the same block → release the arm so
-                // the next interaction (this one's synthesised mouse
-                // events) focuses the editor normally and the OS
-                // keyboard pops up. Don't preventDefault.
+                dbg("touchend BLOCK 2nd -> release+focus");
                 clearCodeBlockArm();
                 clearInlineCodeArm();
                 return;
               }
+              dbg("touchend BLOCK 1st -> arm");
               event.preventDefault();
               blurEditorIfFocused();
               clearInlineCodeArm();
@@ -538,16 +581,15 @@ export const EditExtras = Extension.create({
               return;
             }
 
-            // --- Inline-code tap. ---
             if (inlineCode) {
               markTouchHandled();
               if (armedInlineCodeEl === inlineCode) {
-                // Second tap on the same inline code → release the
-                // arm; the next interaction focuses normally.
+                dbg("touchend INLINE 2nd -> release+focus");
                 clearInlineCodeArm();
                 clearCodeBlockArm();
                 return;
               }
+              dbg("touchend INLINE 1st -> arm");
               event.preventDefault();
               blurEditorIfFocused();
               clearCodeBlockArm();
@@ -556,9 +598,7 @@ export const EditExtras = Extension.create({
               return;
             }
 
-            // Tap landed on regular text. Disarm any active arms but
-            // let the synthesised mouse events do their normal thing
-            // (caret placement + keyboard).
+            dbg("touchend TEXT -> nothing");
             markTouchHandled();
             clearCodeBlockArm();
             clearInlineCodeArm();
@@ -593,44 +633,41 @@ export const EditExtras = Extension.create({
             if (!hasCoarsePointer()) return false;
             if (touchPathHandledRecently) return false;
             if (isInsideCopyButton(event.target)) return false;
-            // Skip link taps in the fallback — the touch path is the
-            // one that knows how to show the popover; falling back to
-            // a synchronous "open" here would surprise users.
             if (closestLink(event.target)) return false;
             const wrapper = closestCodeBlockWrapper(event.target);
             if (wrapper) {
               if (armedCodeBlockEl === wrapper) {
-                // Second tap on the armed wrapper — release the arm
-                // and let the focus go through normally so the OS
-                // keyboard appears. DO NOT preventDefault here, or
-                // we'd swallow the very focus we want to keep.
+                dbg("mousedown BLOCK 2nd -> release+focus");
                 clearCodeBlockArm();
+                markTouchHandled();
                 return true;
               }
-              // First tap on a new wrapper — arm + suppress focus.
+              dbg("mousedown BLOCK 1st -> arm");
               event.preventDefault();
               event.stopPropagation();
               blurEditorIfFocused();
               clearInlineCodeArm();
               armCodeBlock(wrapper);
               armSyntheticGuard();
+              markTouchHandled();
               return true;
             }
             const inlineCode = closestInlineCode(event.target);
             if (inlineCode) {
               if (armedInlineCodeEl === inlineCode) {
-                // Second tap on armed inline code — release arm,
-                // allow focus, no preventDefault (same logic as the
-                // code-block branch above).
+                dbg("mousedown INLINE 2nd -> release+focus");
                 clearInlineCodeArm();
+                markTouchHandled();
                 return true;
               }
+              dbg("mousedown INLINE 1st -> arm");
               event.preventDefault();
               event.stopPropagation();
               blurEditorIfFocused();
               clearCodeBlockArm();
               armInlineCode(inlineCode);
               armSyntheticGuard();
+              markTouchHandled();
               return true;
             }
             return false;
@@ -666,10 +703,14 @@ export const EditExtras = Extension.create({
           const onFocus = () => {
             if (!hasCoarsePointer()) return;
             if (!isEditExtrasOn(editorView)) return;
-            if (touchPathHandledRecently) return;
-            if (pendingTap) return;
-            // Defer so the browser has finished placing the caret /
-            // selection in response to the touch.
+            if (touchPathHandledRecently) {
+              dbg("focus skip (touch handled)");
+              return;
+            }
+            if (pendingTap) {
+              dbg("focus skip (pendingTap)");
+              return;
+            }
             setTimeout(() => {
               if (!dom.isConnected) return;
               if (document.activeElement !== dom) return;
@@ -682,11 +723,11 @@ export const EditExtras = Extension.create({
               const wrapper = closestCodeBlockWrapper(node);
               if (wrapper) {
                 if (armedCodeBlockEl === wrapper) {
-                  // User tapped twice — was already armed, let the
-                  // focus stay so the keyboard appears.
+                  dbg("focus BLOCK 2nd -> release+focus");
                   clearCodeBlockArm();
                   return;
                 }
+                dbg("focus BLOCK 1st -> arm");
                 try { dom.blur(); } catch (_e) {}
                 clearInlineCodeArm();
                 armCodeBlock(wrapper);
@@ -696,9 +737,11 @@ export const EditExtras = Extension.create({
               const inlineCode = closestInlineCode(node);
               if (inlineCode) {
                 if (armedInlineCodeEl === inlineCode) {
+                  dbg("focus INLINE 2nd -> release+focus");
                   clearInlineCodeArm();
                   return;
                 }
+                dbg("focus INLINE 1st -> arm");
                 try { dom.blur(); } catch (_e) {}
                 clearCodeBlockArm();
                 armInlineCode(inlineCode);
