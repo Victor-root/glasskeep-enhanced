@@ -121,9 +121,60 @@ export function domSelectionToCleanPlainText() {
   const range = selection.getRangeAt(0);
   if (range.collapsed) return null;
   const fragment = range.cloneContents();
+  // When a selection spans several <li> children of the same <ul>/<ol>, the
+  // Range cloneContents() algorithm omits the wrapping list element — the
+  // fragment ends up with bare <li> nodes at its top level. domNodeToLines
+  // doesn't have a list-item case (those are handled by the parent list
+  // branch), so bare <li> nodes would fall through to the default branch
+  // and get concatenated as inline content. Re-wrap them in the original
+  // list container so the list walker handles them properly.
+  restoreListWrapper(fragment, range);
   const lines = [];
   fragment.childNodes.forEach((child) => domNodeToLines(child, lines, ""));
   return joinLines(lines);
+}
+
+function restoreListWrapper(fragment, range) {
+  let ancestor = range.commonAncestorContainer;
+  if (ancestor && ancestor.nodeType !== Node.ELEMENT_NODE) {
+    ancestor = ancestor.parentElement;
+  }
+  if (!ancestor) return;
+  const tag = ancestor.tagName?.toLowerCase?.();
+  if (tag !== "ul" && tag !== "ol") return;
+  const hasBareLi = Array.from(fragment.childNodes).some(
+    (n) =>
+      n.nodeType === Node.ELEMENT_NODE &&
+      n.tagName?.toLowerCase() === "li",
+  );
+  if (!hasBareLi) return;
+  const doc = fragment.ownerDocument || document;
+  const wrapper = doc.createElement(tag);
+  if (tag === "ol") {
+    // Compute the visible numbering of the first selected <li> so the
+    // copied list keeps the user-visible numbers, not "1." regardless of
+    // selection start.
+    const originalStart = Number(ancestor.getAttribute("start")) || 1;
+    const lis = Array.from(ancestor.children).filter(
+      (c) => c.tagName?.toLowerCase() === "li",
+    );
+    let offset = 0;
+    for (let i = 0; i < lis.length; i++) {
+      try {
+        if (range.intersectsNode(lis[i])) {
+          offset = i;
+          break;
+        }
+      } catch {
+        break;
+      }
+    }
+    wrapper.setAttribute("start", String(originalStart + offset));
+  }
+  while (fragment.firstChild) {
+    wrapper.appendChild(fragment.firstChild);
+  }
+  fragment.appendChild(wrapper);
 }
 
 function domNodeToLines(node, lines, indent) {
