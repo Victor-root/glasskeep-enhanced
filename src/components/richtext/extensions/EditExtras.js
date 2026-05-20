@@ -42,6 +42,54 @@ function hasCoarsePointer() {
   }
 }
 
+/* -------------------- Event target normalization -------------------- */
+
+// Touch events fire with a Text node as event.target when the tap
+// lands on actual text characters — Text nodes don't expose .closest(),
+// so naive helpers like `target.closest(".code-block-wrapper")` would
+// silently return null and our "is this a code block?" detection
+// failed. That was the root cause of the mobile-code-block-tap bug
+// (tapping on the empty padding area of a `<pre>` worked because the
+// target was then the Element itself; tapping on actual text didn't).
+// Normalize to the nearest Element before any DOM walk.
+function asElement(node) {
+  if (!node) return null;
+  if (node.nodeType === 1) return node; // ELEMENT_NODE
+  if (node.nodeType === 3) return node.parentElement; // TEXT_NODE
+  return node.parentElement || null;
+}
+
+// Compose-aware lookup: walks composedPath() so the helper still works
+// if the tap target lives inside a shadow root (none today, but cheap
+// safety net). Falls back to event.target normalisation.
+function eventElement(event) {
+  const path =
+    typeof event.composedPath === "function" ? event.composedPath() : null;
+  if (Array.isArray(path)) {
+    for (const item of path) {
+      if (item && item.nodeType === 1) return item;
+    }
+  }
+  return asElement(event.target);
+}
+
+// 2nd-tap helper: focuses the editor at the user's tap point so the
+// OS keyboard opens and the caret lands where they pointed. Called
+// synchronously from touchend so the user gesture survives to the
+// focus() call. Used by the code-block 2nd-tap branch where the
+// NodeView's wrapper/pre/code structure doesn't always cause PM's
+// default mousedown handler to focus the contenteditable.
+function focusEditorAtClientPoint(view, x, y) {
+  try {
+    view.focus();
+    const found = view.posAtCoords({ left: x, top: y });
+    if (found && Number.isFinite(found.pos)) {
+      const $pos = view.state.doc.resolve(found.pos);
+      view.dispatch(view.state.tr.setSelection(TextSelection.near($pos)));
+    }
+  } catch (_e) {}
+}
+
 /* -------------------- opt-in tap debug overlay -------------------- */
 
 // Enable with `#dbg-tap` on the URL hash. Shows a small log overlay
@@ -339,24 +387,30 @@ function showLinkPopover(anchor, href, view) {
 
 /* -------------------- shared helpers -------------------- */
 
-function closestLink(el) {
-  if (!el) return null;
-  // Walk to the nearest anchor — avoids missing the link if the user
-  // hovered a `<strong>` inside the link, etc.
-  return el.closest && el.closest("a[href]");
+// All four helpers accept either an Element, a Text node, or anything
+// asElement() can normalise. Crucially they must NOT bail out when
+// passed a Text node — that was the original bug. asElement() turns
+// a Text node into its parentElement so .closest() can do its job.
+function closestLink(node) {
+  const el = asElement(node);
+  if (!el || !el.closest) return null;
+  return el.closest("a[href]");
 }
-function closestInlineCode(el) {
+function closestInlineCode(node) {
+  const el = asElement(node);
   if (!el || !el.closest) return null;
   const code = el.closest("code");
   if (!code) return null;
   if (code.closest("pre")) return null; // fenced block handled by NodeView
   return code;
 }
-function closestCodeBlockWrapper(el) {
+function closestCodeBlockWrapper(node) {
+  const el = asElement(node);
   if (!el || !el.closest) return null;
   return el.closest(".code-block-wrapper");
 }
-function isInsideCopyButton(el) {
+function isInsideCopyButton(node) {
+  const el = asElement(node);
   if (!el || !el.closest) return false;
   return !!el.closest("[data-copy-btn='1']");
 }
@@ -506,23 +560,30 @@ export const EditExtras = Extension.create({
               touchInfo = null;
               return;
             }
-            const target = event.target;
+            // Normalise event.target to its nearest Element. Touching
+            // on actual text characters fires with a Text node as
+            // target on Android WebView, Pixel emulator, iOS Safari —
+            // .closest() doesn't exist on text nodes, so detection
+            // would silently fail without this step.
+            const target = eventElement(event);
             const link = closestLink(target);
             const inlineCode = link ? null : closestInlineCode(target);
             const codeBlock = link || inlineCode
               ? null
               : closestCodeBlockWrapper(target);
-            const t = event.touches[0];
+            const t0 = event.touches[0];
             touchInfo = {
               link,
               inlineCode,
               codeBlock,
               href: link ? link.getAttribute("href") : null,
-              startX: t.clientX,
-              startY: t.clientY,
+              startX: t0.clientX,
+              startY: t0.clientY,
             };
+            const origNt = event.target?.nodeType ?? "?";
+            const normTag = target?.tagName || "?";
             dbg(
-              "touchstart tag=" + (target.tagName || "?") +
+              "touchstart nt=" + origNt + " tag=" + normTag +
               " link=" + (link ? "Y" : "-") +
               " inline=" + (inlineCode ? "Y" : "-") +
               " block=" + (codeBlock ? "Y" : "-"),
@@ -565,11 +626,30 @@ export const EditExtras = Extension.create({
             }
 
             if (codeBlock) {
-              markTouchHandled();
               if (armedCodeBlockEl === codeBlock) {
                 dbg("touchend BLOCK 2nd -> release+focus");
                 clearCodeBlockArm();
                 clearInlineCodeArm();
+                // Release the synthetic-event guard so PM's mousedown
+                // can focus normally; mark touch as handled so the
+                // mousedown fallback doesn't see "wrapper no longer
+                // armed" and immediately re-arm.
+                clearPending();
+                markTouchHandled();
+                // The NodeView's wrapper/pre/code structure means PM's
+                // default mousedown handling doesn't always restore
+                // focus to the contenteditable (the OS keyboard then
+                // stays hidden). Place the caret and call focus()
+                // explicitly here, inside the user-gesture touchend,
+                // so Android / iOS open the keyboard reliably.
+                const ct2 = event.changedTouches && event.changedTouches[0];
+                if (ct2) {
+                  focusEditorAtClientPoint(
+                    editorView,
+                    ct2.clientX,
+                    ct2.clientY,
+                  );
+                }
                 return;
               }
               dbg("touchend BLOCK 1st -> arm");
@@ -578,15 +658,17 @@ export const EditExtras = Extension.create({
               clearInlineCodeArm();
               armCodeBlock(codeBlock);
               armSyntheticGuard();
+              markTouchHandled();
               return;
             }
 
             if (inlineCode) {
-              markTouchHandled();
               if (armedInlineCodeEl === inlineCode) {
                 dbg("touchend INLINE 2nd -> release+focus");
                 clearInlineCodeArm();
                 clearCodeBlockArm();
+                clearPending();
+                markTouchHandled();
                 return;
               }
               dbg("touchend INLINE 1st -> arm");
@@ -595,6 +677,7 @@ export const EditExtras = Extension.create({
               clearCodeBlockArm();
               armInlineCode(inlineCode);
               armSyntheticGuard();
+              markTouchHandled();
               return;
             }
 
@@ -632,9 +715,10 @@ export const EditExtras = Extension.create({
           const tryArmFromMouseDown = (event) => {
             if (!hasCoarsePointer()) return false;
             if (touchPathHandledRecently) return false;
-            if (isInsideCopyButton(event.target)) return false;
-            if (closestLink(event.target)) return false;
-            const wrapper = closestCodeBlockWrapper(event.target);
+            const target = eventElement(event);
+            if (isInsideCopyButton(target)) return false;
+            if (closestLink(target)) return false;
+            const wrapper = closestCodeBlockWrapper(target);
             if (wrapper) {
               if (armedCodeBlockEl === wrapper) {
                 dbg("mousedown BLOCK 2nd -> release+focus");
@@ -652,7 +736,7 @@ export const EditExtras = Extension.create({
               markTouchHandled();
               return true;
             }
-            const inlineCode = closestInlineCode(event.target);
+            const inlineCode = closestInlineCode(target);
             if (inlineCode) {
               if (armedInlineCodeEl === inlineCode) {
                 dbg("mousedown INLINE 2nd -> release+focus");
@@ -688,67 +772,15 @@ export const EditExtras = Extension.create({
             event.stopPropagation();
           };
 
-          // Third fallback: focus event. Some Android WebViews fire
-          // neither our touchend's preventDefault nor a normal
-          // synthesised mousedown for long taps on a contenteditable
-          // (the WebView interprets the long tap as a selection
-          // gesture and focuses directly). When that happens we
-          // never get a chance to arm before the OS keyboard pops
-          // up — so we also listen to focus, look up where the
-          // caret just landed, and if it's inside a code block /
-          // inline code, blur the editor immediately and arm.
-          // Coordinated with the other paths via
-          // `touchPathHandledRecently` and `pendingTap` so we don't
-          // re-arm something the touch path just handled.
-          const onFocus = () => {
-            if (!hasCoarsePointer()) return;
-            if (!isEditExtrasOn(editorView)) return;
-            if (touchPathHandledRecently) {
-              dbg("focus skip (touch handled)");
-              return;
-            }
-            if (pendingTap) {
-              dbg("focus skip (pendingTap)");
-              return;
-            }
-            setTimeout(() => {
-              if (!dom.isConnected) return;
-              if (document.activeElement !== dom) return;
-              const sel = window.getSelection ? window.getSelection() : null;
-              if (!sel || sel.rangeCount === 0) return;
-              const range = sel.getRangeAt(0);
-              let node = range.startContainer;
-              if (node && node.nodeType === 3) node = node.parentElement;
-              if (!node) return;
-              const wrapper = closestCodeBlockWrapper(node);
-              if (wrapper) {
-                if (armedCodeBlockEl === wrapper) {
-                  dbg("focus BLOCK 2nd -> release+focus");
-                  clearCodeBlockArm();
-                  return;
-                }
-                dbg("focus BLOCK 1st -> arm");
-                try { dom.blur(); } catch (_e) {}
-                clearInlineCodeArm();
-                armCodeBlock(wrapper);
-                armSyntheticGuard();
-                return;
-              }
-              const inlineCode = closestInlineCode(node);
-              if (inlineCode) {
-                if (armedInlineCodeEl === inlineCode) {
-                  dbg("focus INLINE 2nd -> release+focus");
-                  clearInlineCodeArm();
-                  return;
-                }
-                dbg("focus INLINE 1st -> arm");
-                try { dom.blur(); } catch (_e) {}
-                clearCodeBlockArm();
-                armInlineCode(inlineCode);
-                armSyntheticGuard();
-              }
-            }, 0);
-          };
+          // We deliberately do NOT listen to the editor's focus event
+          // anymore. The previous focus-fallback was a workaround for
+          // the symptom of the real bug — event.target being a Text
+          // node — and it had the side-effect of re-arming the block
+          // after the 2nd tap's release branch had just disarmed it,
+          // which is why the keyboard never opened. With the
+          // asElement() / eventElement() normalisation above, the
+          // touchend path detects the code block reliably on a single
+          // quick tap, making the focus fallback unnecessary.
 
           dom.addEventListener("touchstart", onTouchStart, {
             passive: true,
@@ -766,7 +798,6 @@ export const EditExtras = Extension.create({
             capture: true,
           });
           dom.addEventListener("click", onClickCapture, { capture: true });
-          dom.addEventListener("focus", onFocus);
 
           return {
             destroy() {
@@ -785,7 +816,6 @@ export const EditExtras = Extension.create({
               dom.removeEventListener("click", onClickCapture, {
                 capture: true,
               });
-              dom.removeEventListener("focus", onFocus);
               if (touchPathHandledTimer) clearTimeout(touchPathHandledTimer);
               clearPending();
             },
