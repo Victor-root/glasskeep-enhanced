@@ -139,16 +139,12 @@ class WebViewActivity : AppCompatActivity() {
 
         /** Manual "check for updates" hook for the in-app Settings
          *  panel. Bypasses the 12h throttle. Surfaces the outcome
-         *  three ways:
-         *  - Toast feedback for the "in progress" / "up to date" path
-         *  - System heads-up notification (same surface as the auto
-         *    background check)
-         *  - JS callback `window.__glasskeepUpdateAvailable(payload)`
-         *    so the Settings panel can render its themed "version
-         *    X.Y.Z available" card right under the trigger button,
-         *    or `window.__glasskeepUpdateUpToDate()` when nothing's
-         *    newer.
-         */
+         *  through a Toast + the in-app card (via JS callback) — no
+         *  system notification, because the user is already looking
+         *  at the result in the panel; the heads-up banner would be
+         *  redundant clutter. The cold-start auto-check still posts
+         *  the notification since the user isn't necessarily in the
+         *  Settings panel then. */
         @JavascriptInterface
         fun checkForUpdate() {
             runOnUiThread {
@@ -159,7 +155,6 @@ class WebViewActivity : AppCompatActivity() {
                 ).show()
                 com.glasskeep.app.update.UpdateManager.forceCheck(this@WebViewActivity) { release ->
                     if (release != null) {
-                        postUpdateNotification(release)
                         notifyJsUpdateAvailable(release)
                     } else {
                         Toast.makeText(
