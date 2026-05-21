@@ -3974,8 +3974,11 @@ html.dark .gk-notif-card__close {
 html.dark .gk-notif-card__close:hover { background: rgba(180, 180, 190, 1); }
 
 /* Compact variant — used by the history list in the center where
-   rows are denser and the close affordance should be persistent
-   (the panel is stationary, no hover-discoverability tradeoff). */
+   rows are denser. Close button keeps the floating-card behaviour:
+   hover-revealed and overhanging the corner so it reads as a
+   "remove" handle rather than an inline control. The list's
+   padding (8/10 px) absorbs the −6 px overhang without bumping into
+   the panel's overflow:hidden clip. */
 .gk-notif-card--compact {
   padding: 9px 12px;
   border-radius: 12px;
@@ -3999,33 +4002,10 @@ html.dark .gk-notif-card__close:hover { background: rgba(180, 180, 190, 1); }
 }
 .gk-notif-card--compact .gk-notif-card__title { font-size: 12.5px; }
 .gk-notif-card--compact .gk-notif-card__message { font-size: 12px; }
-/* Always-visible close button sitting INSIDE the card so it can't
-   overflow into the panel's padding (the panel uses overflow:hidden
-   to clip its rounded corners). */
-.gk-notif-card--compact .gk-notif-card__close {
-  opacity: 1;
-  top: 4px;
-  right: 4px;
-  left: auto;
-  width: 16px;
-  height: 16px;
-  font-size: 8px;
-  background: rgba(80, 80, 85, 0.55);
-}
-.gk-notif-card--compact .gk-notif-card__close:hover {
-  background: rgba(80, 80, 85, 0.9);
-}
-html.dark .gk-notif-card--compact .gk-notif-card__close {
-  background: rgba(255, 255, 255, 0.18);
-  color: #f5f5f7;
-}
-html.dark .gk-notif-card--compact .gk-notif-card__close:hover {
-  background: rgba(255, 255, 255, 0.32);
-}
-/* Make room for the inset close button so the timestamp text doesn't
-   overlap it. */
-.gk-notif-card--compact .gk-notif-card__header { padding-right: 28px; }
-.gk-notif-card--compact .gk-notif-card__time { top: 9px; right: 24px; }
+/* Tighter top-right corner for the timestamp inside the compact
+   header (smaller padding). */
+.gk-notif-card--compact .gk-notif-card__header { padding-right: 56px; }
+.gk-notif-card--compact .gk-notif-card__time { top: 9px; right: 14px; }
 
 @keyframes gkNotifIn {
   from { opacity: 0; transform: translateY(-8px) scale(0.96); }

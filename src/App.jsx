@@ -328,6 +328,21 @@ export default function App() {
     } catch (e) {}
     return true;
   });
+  // Default duration (ms) for auto-dismissing notifications, or null
+  // for "persistent" (stays until the user closes manually). The set
+  // of allowed values is locked down in the settings UI; anything
+  // unexpected falls back to 10 s. Per-call `duration` overrides on
+  // notify() are still respected.
+  const [notificationsDuration, setNotificationsDuration] = useState(() => {
+    const allowed = [5000, 10000, 20000, 30000];
+    try {
+      const stored = localStorage.getItem("notificationsDuration");
+      if (stored === "null" || stored === "persistent") return null;
+      const n = Number(stored);
+      if (allowed.includes(n)) return n;
+    } catch (e) {}
+    return 10000;
+  });
   const [typographyPresets, setTypographyPresets] = useState(() => {
     try {
       const stored = localStorage.getItem(TYPOGRAPHY_STORAGE_KEY);
@@ -502,8 +517,17 @@ export default function App() {
   // existing call sites in App.jsx, panels and hooks delegate to it,
   // so we route their input through the same provider instead of
   // touching them all.
-  const { notify, dismiss: dismissNotification, notifications: allNotifications } =
-    useNotifications();
+  const {
+    notify,
+    dismiss: dismissNotification,
+    notifications: allNotifications,
+    setDefaultDuration: setNotifDefaultDuration,
+  } = useNotifications();
+  // Apply the user's preferred default duration to the provider —
+  // every subsequent `notify()` without an explicit duration uses it.
+  useEffect(() => {
+    setNotifDefaultDuration(notificationsDuration);
+  }, [notificationsDuration, setNotifDefaultDuration]);
   const showToast = useCallback(
     (message, type = "success", duration) => {
       // Pre-existing variants used by the codebase: "success" | "error"
@@ -894,6 +918,17 @@ export default function App() {
             settings.notificationsSound ? "1" : "0",
           );
         }
+        if ("notificationsDuration" in (settings || {})) {
+          const raw = settings.notificationsDuration;
+          const allowed = [5000, 10000, 20000, 30000];
+          if (raw === null) {
+            setNotificationsDuration(null);
+            localStorage.setItem("notificationsDuration", "null");
+          } else if (typeof raw === "number" && allowed.includes(raw)) {
+            setNotificationsDuration(raw);
+            localStorage.setItem("notificationsDuration", String(raw));
+          }
+        }
         if (settings?.typographyPresets && typeof settings.typographyPresets === "object") {
           const normalized = normalizeTypographyPresets(settings.typographyPresets);
           setTypographyPresets(normalized);
@@ -1122,6 +1157,23 @@ export default function App() {
       }).catch(() => {});
     }
   }, [notificationsSound]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "notificationsDuration",
+        notificationsDuration == null ? "null" : String(notificationsDuration),
+      );
+    } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { notificationsDuration },
+      }).catch(() => {});
+    }
+  }, [notificationsDuration]);
 
   // Edge-to-edge landscape: save + dynamically toggle body padding-left
   useEffect(() => {
@@ -6065,6 +6117,8 @@ export default function App() {
         setNotificationsPosition={setNotificationsPosition}
         notificationsSound={notificationsSound}
         setNotificationsSound={setNotificationsSound}
+        notificationsDuration={notificationsDuration}
+        setNotificationsDuration={setNotificationsDuration}
         typographyPresets={typographyPresets}
         setTypographyPresets={(next) => setTypographyPresets(normalizeTypographyPresets(next))}
         typographyModalOpen={typographyModalOpen}

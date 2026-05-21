@@ -83,19 +83,33 @@ function reducer(state, action) {
   }
 }
 
-// Every variant defaults to 10 s — the user asked for a uniform
-// display window across the board. Callers that need a different
-// length still pass `duration` explicitly, and `persistent: true`
-// (or `duration: null`) still suppresses auto-dismiss entirely.
-function pickDefaultDuration(_variant) {
-  return 10000;
-}
+// Every variant defaults to whatever the consumer last set via
+// `setDefaultDuration(ms|null)` — App wires this to a user pref.
+// Callers can still override per-call with `duration`; `persistent:
+// true` (or `duration: null`) suppresses auto-dismiss regardless.
+const FALLBACK_DEFAULT_DURATION = 10000;
 
 export function NotificationProvider({ children }) {
   const [notifications, dispatch] = useReducer(reducer, []);
   // Per-notification auto-dismiss timers. Cleared on dismiss, on
   // dismissAll, on clear, and on unmount.
   const timersRef = useRef(new Map());
+  // Held in a ref so updating it from a consumer (App watches the
+  // user pref) doesn't re-render the whole subtree. `notify` reads
+  // the latest value when scheduling each new notification.
+  const defaultDurationRef = useRef(FALLBACK_DEFAULT_DURATION);
+
+  const setDefaultDuration = useCallback((ms) => {
+    // null / undefined means "persistent" — no auto-dismiss.
+    if (ms == null) {
+      defaultDurationRef.current = null;
+      return;
+    }
+    const n = Number(ms);
+    if (Number.isFinite(n) && n >= 0) {
+      defaultDurationRef.current = n;
+    }
+  }, []);
 
   useEffect(() => {
     const timers = timersRef.current;
@@ -150,11 +164,17 @@ export function NotificationProvider({ children }) {
       input.persistent === true ||
       input.duration === null ||
       input.duration === Infinity;
-    const duration = isPersistent
-      ? null
-      : typeof input.duration === "number"
-        ? input.duration
-        : pickDefaultDuration(variant);
+    // Resolution order: per-call override → user-pref default (via
+    // setDefaultDuration) → hard fallback. Result is `null` when the
+    // resolved default itself is "persistent" (user pref).
+    let duration;
+    if (isPersistent) {
+      duration = null;
+    } else if (typeof input.duration === "number") {
+      duration = input.duration;
+    } else {
+      duration = defaultDurationRef.current;
+    }
 
     const n = {
       id,
@@ -188,6 +208,7 @@ export function NotificationProvider({ children }) {
     remove,
     dismissAll,
     clear,
+    setDefaultDuration,
   };
 
   return (
@@ -204,6 +225,7 @@ const NOOP_VALUE = {
   remove: () => {},
   dismissAll: () => {},
   clear: () => {},
+  setDefaultDuration: () => {},
 };
 
 export function useNotifications() {
