@@ -670,6 +670,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   untitledNote: "(sans titre)",
   notifications: "Notifications",
   notificationCenterTitle: "Notifications",
+  appName: "GlassKeep",
   noNotifications: "Aucune notification",
   notificationsMarkAllRead: "Tout marquer lu",
   notificationsClearAll: "Effacer",

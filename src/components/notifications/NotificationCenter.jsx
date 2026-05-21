@@ -16,17 +16,6 @@ import { t } from "../../i18n";
 
 const SHEET_BREAKPOINT_PX = 640;
 
-function formatRelative(ts) {
-  if (!ts) return "";
-  const diff = Date.now() - ts;
-  if (diff < 60_000) return t("relativeJustNow");
-  if (diff < 3_600_000)
-    return t("relativeMinutesAgo", { n: Math.floor(diff / 60_000) });
-  if (diff < 86_400_000)
-    return t("relativeHoursAgo", { n: Math.floor(diff / 3_600_000) });
-  return t("relativeDaysAgo", { n: Math.floor(diff / 86_400_000) });
-}
-
 export default function NotificationCenter({
   open,
   anchor,
@@ -158,9 +147,6 @@ export default function NotificationCenter({
                 }}
                 compact
               />
-              <time className="gk-notif-center__time" dateTime={new Date(n.createdAt).toISOString()}>
-                {formatRelative(n.createdAt)}
-              </time>
             </div>
           ))
         )}

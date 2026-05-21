@@ -3732,105 +3732,191 @@ html.dark .typo-modal-toggle {
   }
 }
 
-/* Notification card — used by viewport + center */
+/* Notification card — macOS Notification Centre styling. Heavy
+   backdrop blur so the underlying UI tints the card, ultra-soft
+   rounding, subtle stroke + drop shadow, header row with variant
+   chip + uppercase app label + relative timestamp, bold title, body
+   text, and an optional right-aligned pill action. Close button sits
+   at the top-left corner (hover-revealed on pointing devices, always
+   visible on touch). */
 .gk-notif-card {
   position: relative;
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 11px;
   width: 100%;
-  padding: 10px 12px 10px 14px;
-  border-radius: 10px;
-  border-left: 4px solid var(--gk-notif-accent, #3b82f6);
-  background: rgba(255, 255, 255, 0.98);
-  color: #1f2937;
+  padding: 11px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow:
-    0 10px 24px -6px rgba(15, 23, 42, 0.18),
-    0 4px 10px -4px rgba(15, 23, 42, 0.12);
-  animation: gkNotifIn 200ms cubic-bezier(.22,.61,.36,1) both;
+    0 14px 36px rgba(0, 0, 0, 0.16),
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  animation: gkNotifIn 280ms cubic-bezier(.22,.61,.36,1) both;
 }
 html.dark .gk-notif-card {
-  background: rgba(30, 30, 35, 0.98);
-  color: #e5e7eb;
+  background: rgba(40, 40, 45, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
-    0 10px 24px -6px rgba(0, 0, 0, 0.6),
-    0 4px 10px -4px rgba(0, 0, 0, 0.45);
+    0 14px 36px rgba(0, 0, 0, 0.55),
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #f5f5f7;
 }
+
+/* Variant accent — used by the icon chip only, the card chrome
+   itself stays neutral so the glass look is preserved. */
 .gk-notif-card--info    { --gk-notif-accent: #3b82f6; }
 .gk-notif-card--success { --gk-notif-accent: #10b981; }
 .gk-notif-card--warning { --gk-notif-accent: #f59e0b; }
 .gk-notif-card--error   { --gk-notif-accent: #ef4444; }
 
-.gk-notif-card__glyph {
+.gk-notif-card__icon {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   color: #fff;
   background: var(--gk-notif-accent);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
+
 .gk-notif-card__body {
   flex: 1 1 auto;
   min-width: 0;
 }
-.gk-notif-card__title {
-  font-weight: 600;
-  font-size: .9rem;
-  line-height: 1.3;
-  margin-bottom: 2px;
+
+.gk-notif-card__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 1px;
 }
-.gk-notif-card__message {
-  font-size: .85rem;
-  line-height: 1.4;
+.gk-notif-card__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.65;
+}
+.gk-notif-card__time {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+.gk-notif-card__title {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1px 0;
   word-break: break-word;
 }
-.gk-notif-card__actions {
-  margin-top: 6px;
+.gk-notif-card__message {
+  font-size: 13px;
+  line-height: 1.35;
+  opacity: 0.88;
+  word-break: break-word;
 }
+
 .gk-notif-card__action-btn {
-  font-size: .8rem;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  background: linear-gradient(135deg, #6366f1, #7c3aed);
-  color: #fff;
-}
-.gk-notif-card__action-btn:hover {
-  background: linear-gradient(135deg, #4f46e5, #6d28d9);
-}
-.gk-notif-card__close {
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
+  align-self: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 5px 14px;
   border-radius: 999px;
   border: none;
-  background: transparent;
-  color: inherit;
-  opacity: 0.55;
   cursor: pointer;
-  font-size: 12px;
+  background: rgba(0, 0, 0, 0.07);
+  color: #1d1d1f;
+  transition: background 0.15s, transform 0.1s;
+}
+.gk-notif-card__action-btn:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+.gk-notif-card__action-btn:active {
+  transform: scale(0.96);
+}
+html.dark .gk-notif-card__action-btn {
+  background: rgba(255, 255, 255, 0.13);
+  color: #f5f5f7;
+}
+html.dark .gk-notif-card__action-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Close button: top-left corner, macOS-style circular pill. Hidden by
+   default on hover-capable devices and revealed on hover/focus of the
+   card; always visible on coarse pointers where there's no hover. */
+.gk-notif-card__close {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(80, 80, 85, 0.92);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
   line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  z-index: 2;
 }
-.gk-notif-card__close:hover {
+.gk-notif-card:hover .gk-notif-card__close,
+.gk-notif-card:focus-within .gk-notif-card__close {
   opacity: 1;
-  background: rgba(0,0,0,0.06);
 }
-html.dark .gk-notif-card__close:hover { background: rgba(255,255,255,0.08); }
+.gk-notif-card__close:hover { background: rgba(60, 60, 65, 1); }
+.gk-notif-card__close:active { transform: scale(0.9); }
+@media (hover: none) {
+  .gk-notif-card__close { opacity: 1; }
+}
+html.dark .gk-notif-card__close {
+  background: rgba(160, 160, 170, 0.92);
+  color: #1d1d1f;
+}
+html.dark .gk-notif-card__close:hover { background: rgba(180, 180, 190, 1); }
+
+/* Compact variant — used by the history list in the center where
+   rows are denser. */
 .gk-notif-card--compact {
-  padding: 8px 10px 8px 12px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  gap: 9px;
 }
-.gk-notif-card--compact .gk-notif-card__title { font-size: .85rem; }
-.gk-notif-card--compact .gk-notif-card__message { font-size: .8rem; }
+.gk-notif-card--compact .gk-notif-card__icon {
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+.gk-notif-card--compact .gk-notif-card__title { font-size: 12.5px; }
+.gk-notif-card--compact .gk-notif-card__message { font-size: 12px; }
 
 @keyframes gkNotifIn {
-  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  from { opacity: 0; transform: translateY(-8px) scale(0.96); }
   to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
 
@@ -3956,13 +4042,5 @@ html.dark .gk-notif-center__close:hover { background: rgba(255,255,255,0.08); }
 }
 .gk-notif-center__item.is-dismissed .gk-notif-card__close {
   display: none;
-}
-.gk-notif-center__time {
-  position: absolute;
-  bottom: 6px;
-  right: 38px;
-  font-size: .65rem;
-  opacity: 0.6;
-  pointer-events: none;
 }
 `;

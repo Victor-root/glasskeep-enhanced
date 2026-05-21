@@ -1,11 +1,14 @@
-// Single notification card. Used by both the viewport (top-of-screen
-// floating stack) and the notification center (history list).
+// Single notification card. Designed in the macOS Notification Centre
+// style: heavy backdrop blur, very translucent background so the
+// underlying UI tints through, soft rounded corners, app-style header
+// (variant chip + label + relative timestamp), bold title, message,
+// and a pill action on the right. The close button sits at the
+// top-left corner and only reveals on hover (always visible on touch
+// devices because there's no hover state to reveal it).
 //
-// Visual structure: variant-coloured left border + variant chip icon,
-// optional title, message body, optional action button, optional close
-// button. The card is rendered as plain text — React escapes children,
-// so no HTML injection is possible from title/message/sender values
-// the server returns to us.
+// String content is rendered as text children — React escapes, so
+// title/message/label are XSS-safe even when the values originate
+// from the server.
 
 import React from "react";
 import { t } from "../../i18n";
@@ -24,18 +27,31 @@ const VARIANT_GLYPH = {
   info: "i",
 };
 
+// Reused by NotificationCenter too — we re-export so the center can
+// fall back to the same relative-time format the card uses, keeping
+// "à l'instant" / "il y a 5 min" formatting consistent.
+export function formatRelativeTime(ts) {
+  if (!ts) return "";
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return t("relativeJustNow");
+  if (diff < 3_600_000)
+    return t("relativeMinutesAgo", { n: Math.floor(diff / 60_000) });
+  if (diff < 86_400_000)
+    return t("relativeHoursAgo", { n: Math.floor(diff / 3_600_000) });
+  return t("relativeDaysAgo", { n: Math.floor(diff / 86_400_000) });
+}
+
 export default function NotificationCard({
   notification,
   onDismiss,
   onAction,
-  // When rendered inside the notification center we don't want a slide
-  // animation (the user just opened the panel) and the layout is a bit
-  // tighter. Toggle via `compact`.
   compact = false,
 }) {
   if (!notification) return null;
-  const { id, title, message, variant, dismissible, action } = notification;
+  const { id, title, message, variant, dismissible, action, createdAt } =
+    notification;
   const klass = VARIANT_CLASS[variant] || VARIANT_CLASS.info;
+  const time = formatRelativeTime(createdAt);
 
   return (
     <div
@@ -43,26 +59,6 @@ export default function NotificationCard({
       aria-live={variant === "error" ? "assertive" : "polite"}
       className={`gk-notif-card ${klass}${compact ? " gk-notif-card--compact" : ""}`}
     >
-      <span className="gk-notif-card__glyph" aria-hidden="true">
-        {VARIANT_GLYPH[variant] || VARIANT_GLYPH.info}
-      </span>
-      <div className="gk-notif-card__body">
-        {title ? <div className="gk-notif-card__title">{title}</div> : null}
-        {message ? (
-          <div className="gk-notif-card__message">{message}</div>
-        ) : null}
-        {action ? (
-          <div className="gk-notif-card__actions">
-            <button
-              type="button"
-              className="gk-notif-card__action-btn"
-              onClick={() => onAction && onAction(notification)}
-            >
-              {action.label}
-            </button>
-          </div>
-        ) : null}
-      </div>
       {dismissible !== false ? (
         <button
           type="button"
@@ -71,6 +67,31 @@ export default function NotificationCard({
           onClick={() => onDismiss && onDismiss(id)}
         >
           ✕
+        </button>
+      ) : null}
+
+      <span className="gk-notif-card__icon" aria-hidden="true">
+        {VARIANT_GLYPH[variant] || VARIANT_GLYPH.info}
+      </span>
+
+      <div className="gk-notif-card__body">
+        <div className="gk-notif-card__header">
+          <span className="gk-notif-card__label">{t("appName")}</span>
+          {time ? <span className="gk-notif-card__time">{time}</span> : null}
+        </div>
+        {title ? <div className="gk-notif-card__title">{title}</div> : null}
+        {message ? (
+          <div className="gk-notif-card__message">{message}</div>
+        ) : null}
+      </div>
+
+      {action ? (
+        <button
+          type="button"
+          className="gk-notif-card__action-btn"
+          onClick={() => onAction && onAction(notification)}
+        >
+          {action.label}
         </button>
       ) : null}
     </div>
