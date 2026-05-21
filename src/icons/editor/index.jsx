@@ -102,6 +102,9 @@ import ramSvg             from "./tabler/ram.svg?raw";
 import arrowsDownUpSvg    from "./tabler/arrows-down-up.svg?raw";
 import powerSvg            from "./tabler/power.svg?raw";
 
+// Notifications
+import bellSvg             from "./tabler/bell.svg?raw";
+
 // Cache of sanitised markup keyed by the raw SVG string. The transformation
 // only depends on the SVG source, so each icon is processed exactly once.
 const markupCache = new Map();
@@ -226,6 +229,7 @@ export const TI = {
   Ram:                  (p) => <TablerIcon svg={ramSvg} {...p} />,
   Swap:                 (p) => <TablerIcon svg={arrowsDownUpSvg} {...p} />,
   Power:                (p) => <TablerIcon svg={powerSvg} {...p} />,
+  Bell:                 (p) => <TablerIcon svg={bellSvg} {...p} />,
 };
 
 export default TI;

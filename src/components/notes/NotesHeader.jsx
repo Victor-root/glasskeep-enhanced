@@ -51,6 +51,13 @@ export default function NotesHeader({
   multiMode,
   qrQuickEnabled = false,
   onOpenQrScanner,
+  // Notification bell slots. Two separate instances are passed because
+  // the desktop and mobile icon clusters live in different containers,
+  // and a single instance shared via React props would render twice
+  // anyway. Each instance has its own popover state but they read the
+  // same NotificationProvider, so the badge count stays consistent.
+  notificationBellDesktop = null,
+  notificationBellMobile = null,
 }) {
   // The kebab dropdown can't rely on the typical "fixed inset-0
   // backdrop captures the click" pattern: the host <header> has a
@@ -329,6 +336,7 @@ export default function NotesHeader({
         <div className="relative flex items-center gap-3 shrink-0">
           {/* Desktop: icon buttons directly in header bar */}
           <div className={`${desktopOnly} items-center gap-1`}>
+            {notificationBellDesktop}
             <button
               onClick={() => onToggleViewMode?.()}
               className={`p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${dark ? "text-blue-400 hover:text-blue-300 hover:bg-blue-500/15 focus:ring-blue-500" : "text-blue-600 hover:text-blue-700 hover:bg-blue-100 focus:ring-blue-400"}`}
@@ -434,6 +442,7 @@ export default function NotesHeader({
 
           {/* Mobile: sync icon + 3-dot menu */}
           <div className={`${mobileOnly} flex items-center gap-1`}>
+            {notificationBellMobile}
             <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} syncDropdownOpen={syncDropdownOpen} setSyncDropdownOpen={setSyncDropdownOpen} instanceLocked={instanceLocked} />
             {qrQuickEnabled && (
               <button

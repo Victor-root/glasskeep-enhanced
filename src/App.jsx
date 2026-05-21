@@ -61,7 +61,9 @@ import NoteCard from "./components/notes/NoteCard.jsx";
 import AdminView from "./components/notes/AdminView.jsx";
 import NotesUI from "./components/notes/NotesUI.jsx";
 import GenericConfirmDialog from "./components/common/GenericConfirmDialog.jsx";
-import ToastContainer from "./components/common/ToastContainer.jsx";
+import NotificationViewport from "./components/notifications/NotificationViewport.jsx";
+import NotificationBell from "./components/notifications/NotificationBell.jsx";
+import { useNotifications } from "./components/notifications/NotificationProvider.jsx";
 import QrScannerModal from "./components/auth/QrScannerModal.jsx";
 import FloatingCardsBackground from "./components/common/FloatingCardsBackground.jsx";
 import NoteModal from "./components/modal/NoteModal.jsx";
@@ -292,6 +294,29 @@ export default function App() {
       return "rich";
     }
   });
+  // Notification viewport position. Persisted alongside the other UI
+  // prefs (localStorage + /api/user/settings) — see save effect below.
+  // Default depends on form factor: top-right on desktop, top-center on
+  // mobile because a right-anchored 360-px stack would crowd the cards
+  // toward the screen edge with no room to breathe.
+  const [notificationsPosition, setNotificationsPosition] = useState(() => {
+    const validPositions = [
+      "top-left",
+      "top-center",
+      "top-right",
+      "bottom-left",
+      "bottom-center",
+      "bottom-right",
+    ];
+    try {
+      const stored = localStorage.getItem("notificationsPosition");
+      if (validPositions.includes(stored)) return stored;
+    } catch (e) {}
+    if (typeof window !== "undefined" && window.innerWidth < 640) {
+      return "top-center";
+    }
+    return "top-right";
+  });
   const [typographyPresets, setTypographyPresets] = useState(() => {
     try {
       const stored = localStorage.getItem(TYPOGRAPHY_STORAGE_KEY);
@@ -460,27 +485,32 @@ export default function App() {
     } catch { /* api helper missing or auth helper threw — non-fatal */ }
   }, []);
 
-  // Toast notification system
-  const [toasts, setToasts] = useState([]);
-  const toastIdRef = useRef(0);
-
-  const showToast = (message, type = "success", duration) => {
-    // Default durations: success/error 5s, info 10s
-    if (duration === undefined) {
-      duration = type === "info" ? 10000 : 5000;
-    }
-    const id = ++toastIdRef.current;
-    const toast = { id, message, type };
-    setToasts((prev) => [...prev, toast]);
-
-    if (duration > 0) {
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, duration);
-    }
-
-    return id;
-  };
+  // Notification system. `notify` is the modern API used directly by
+  // new code (share notifications, etc.). `showToast(message, type,
+  // duration)` is kept as a thin compatibility shim — the dozens of
+  // existing call sites in App.jsx, panels and hooks delegate to it,
+  // so we route their input through the same provider instead of
+  // touching them all.
+  const { notify: notify, dismiss: dismissNotification } = useNotifications();
+  const showToast = useCallback(
+    (message, type = "success", duration) => {
+      // Pre-existing variants used by the codebase: "success" | "error" | "info".
+      // The provider accepts the same set under `variant`; default duration is
+      // derived from variant if the caller didn't pass one (10s for info, 5s
+      // otherwise) to match the previous showToast behaviour.
+      const variant =
+        type === "success" || type === "error" || type === "info" || type === "warning"
+          ? type
+          : "info";
+      return notify({
+        type: "toast",
+        variant,
+        message,
+        duration: duration === undefined ? undefined : duration,
+      });
+    },
+    [notify],
+  );
 
   // Generic confirmation dialog helper
   const showGenericConfirm = (config) => {
@@ -494,7 +524,7 @@ export default function App() {
   // events. Internal dedup keeps the rare fetch↔SSE race from
   // showing the same toast twice.
   const { showShareToast: showShareNotificationToast, markDelivered: markShareNotificationsDelivered } =
-    useShareNotifications({ token, userId: currentUser?.id, showToast });
+    useShareNotifications({ token, userId: currentUser?.id });
 
   // GitHub release update notification (admin-only, fail-silent).
   const updateInfo = useUpdateCheck({
@@ -806,6 +836,20 @@ export default function App() {
           setPasteMode(settings.pasteMode);
           localStorage.setItem("pasteMode", settings.pasteMode);
         }
+        if (
+          typeof settings?.notificationsPosition === "string" &&
+          [
+            "top-left",
+            "top-center",
+            "top-right",
+            "bottom-left",
+            "bottom-center",
+            "bottom-right",
+          ].includes(settings.notificationsPosition)
+        ) {
+          setNotificationsPosition(settings.notificationsPosition);
+          localStorage.setItem("notificationsPosition", settings.notificationsPosition);
+        }
         if (settings?.typographyPresets && typeof settings.typographyPresets === "object") {
           const normalized = normalizeTypographyPresets(settings.typographyPresets);
           setTypographyPresets(normalized);
@@ -1005,6 +1049,18 @@ export default function App() {
       }).catch(() => {});
     }
   }, [pasteMode]);
+
+  useEffect(() => {
+    try { localStorage.setItem("notificationsPosition", notificationsPosition); } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { notificationsPosition },
+      }).catch(() => {});
+    }
+  }, [notificationsPosition]);
 
   // Edge-to-edge landscape: save + dynamically toggle body padding-left
   useEffect(() => {
@@ -2842,12 +2898,13 @@ export default function App() {
                 }
               }
             } else if (msg && msg.type === "note_shared") {
-              // A live share notification. Show the toast and mark
-              // the row delivered so a quick reload doesn't replay it.
+              // A live share notification. Show the card and mark the
+              // row delivered so a quick reload doesn't replay it.
               showShareNotificationToast({
                 id: msg.notificationId,
                 senderName: msg.senderName,
                 noteTitle: msg.noteTitle,
+                noteId: msg.noteId,
               });
               if (msg.notificationId) {
                 markShareNotificationsDelivered([msg.notificationId]);
@@ -3998,6 +4055,20 @@ export default function App() {
       setNoteAiMessages(savedMsgs);
       setNoteAiSaved(true);
       setNoteAiHasBeenOpened(true);
+    }
+  };
+
+  // Handler for notification action buttons (the "Ouvrir" affordance
+  // on a shared-note toast, etc.). For an action carrying a noteId
+  // the linked note opens in the modal and the notification is
+  // dismissed. Defined as a plain function rather than useCallback so
+  // it always closes over the freshest openModal / notes references.
+  const handleNotificationAction = (notif) => {
+    if (!notif) return;
+    const noteId = notif.action?.noteId;
+    if (noteId) {
+      try { openModal(String(noteId)); } catch (_e) {}
+      dismissNotification(notif.id);
     }
   };
 
@@ -5900,6 +5971,8 @@ export default function App() {
         setEditorToolbarMode={setEditorToolbarMode}
         pasteMode={pasteMode}
         setPasteMode={setPasteMode}
+        notificationsPosition={notificationsPosition}
+        setNotificationsPosition={setNotificationsPosition}
         typographyPresets={typographyPresets}
         setTypographyPresets={(next) => setTypographyPresets(normalizeTypographyPresets(next))}
         typographyModalOpen={typographyModalOpen}
@@ -6106,6 +6179,12 @@ export default function App() {
         // floating cards toggle
         floatingCardsEnabled={floatingCardsEnabled}
         onToggleFloatingCards={toggleFloatingCards}
+        notificationBellDesktop={
+          <NotificationBell dark={dark} onAction={handleNotificationAction} />
+        }
+        notificationBellMobile={
+          <NotificationBell dark={dark} onAction={handleNotificationAction} />
+        }
       />
       {modal}
 
@@ -6189,7 +6268,10 @@ export default function App() {
         showToast={showToast}
       />
 
-      <ToastContainer toasts={toasts} />
+      <NotificationViewport
+        position={notificationsPosition}
+        onAction={handleNotificationAction}
+      />
 
       {/* Forced password change (first login with temp password) */}
       {mustChangePassword && (

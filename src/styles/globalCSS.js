@@ -3667,4 +3667,302 @@ html.dark .typo-modal-toggle {
 .modal-scrim[data-ai-panel-side="left"] .note-ai-panel-wrapper.closing .note-ai-panel {
   animation: noteAiPanelOutRightToLeft 0.32s cubic-bezier(0.55, 0, 0.55, 0.6) both;
 }
+
+/* ============================================================
+   In-app notifications (provider + viewport + center + bell)
+   ============================================================
+   Six positional variants, glass card visual, badge on the bell.
+   Mobile (<640px) collapses the desktop column to full-width edge
+   margins so a long message wraps without overflowing the screen. */
+
+/* Floating viewport — six fixed-position variants */
+.gk-notif-viewport {
+  position: fixed;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none; /* cards opt back in individually */
+  max-width: calc(100vw - 16px);
+  width: 360px;
+}
+.gk-notif-viewport > * { pointer-events: auto; }
+.gk-notif-viewport--top-left {
+  top: calc(var(--safe-top, 0px) + 1rem);
+  left: 12px;
+  align-items: flex-start;
+}
+.gk-notif-viewport--top-center {
+  top: calc(var(--safe-top, 0px) + 1rem);
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+}
+.gk-notif-viewport--top-right {
+  top: calc(var(--safe-top, 0px) + 1rem);
+  right: 12px;
+  align-items: flex-end;
+}
+.gk-notif-viewport--bottom-left {
+  bottom: calc(var(--safe-bottom, 0px) + 1rem);
+  left: 12px;
+  align-items: flex-start;
+}
+.gk-notif-viewport--bottom-center {
+  bottom: calc(var(--safe-bottom, 0px) + 1rem);
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+}
+.gk-notif-viewport--bottom-right {
+  bottom: calc(var(--safe-bottom, 0px) + 1rem);
+  right: 12px;
+  align-items: flex-end;
+}
+@media (max-width: 639px) {
+  /* Mobile: viewport fills the horizontal space regardless of the
+     user's left/center/right preference so a long message has room
+     to wrap. Vertical anchor (top/bottom) is still respected. */
+  .gk-notif-viewport {
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+    transform: none !important;
+    align-items: stretch !important;
+  }
+}
+
+/* Notification card — used by viewport + center */
+.gk-notif-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px 10px 14px;
+  border-radius: 10px;
+  border-left: 4px solid var(--gk-notif-accent, #3b82f6);
+  background: rgba(255, 255, 255, 0.98);
+  color: #1f2937;
+  box-shadow:
+    0 10px 24px -6px rgba(15, 23, 42, 0.18),
+    0 4px 10px -4px rgba(15, 23, 42, 0.12);
+  animation: gkNotifIn 200ms cubic-bezier(.22,.61,.36,1) both;
+}
+html.dark .gk-notif-card {
+  background: rgba(30, 30, 35, 0.98);
+  color: #e5e7eb;
+  box-shadow:
+    0 10px 24px -6px rgba(0, 0, 0, 0.6),
+    0 4px 10px -4px rgba(0, 0, 0, 0.45);
+}
+.gk-notif-card--info    { --gk-notif-accent: #3b82f6; }
+.gk-notif-card--success { --gk-notif-accent: #10b981; }
+.gk-notif-card--warning { --gk-notif-accent: #f59e0b; }
+.gk-notif-card--error   { --gk-notif-accent: #ef4444; }
+
+.gk-notif-card__glyph {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--gk-notif-accent);
+}
+.gk-notif-card__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.gk-notif-card__title {
+  font-weight: 600;
+  font-size: .9rem;
+  line-height: 1.3;
+  margin-bottom: 2px;
+}
+.gk-notif-card__message {
+  font-size: .85rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.gk-notif-card__actions {
+  margin-top: 6px;
+}
+.gk-notif-card__action-btn {
+  font-size: .8rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  color: #fff;
+}
+.gk-notif-card__action-btn:hover {
+  background: linear-gradient(135deg, #4f46e5, #6d28d9);
+}
+.gk-notif-card__close {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+.gk-notif-card__close:hover {
+  opacity: 1;
+  background: rgba(0,0,0,0.06);
+}
+html.dark .gk-notif-card__close:hover { background: rgba(255,255,255,0.08); }
+.gk-notif-card--compact {
+  padding: 8px 10px 8px 12px;
+}
+.gk-notif-card--compact .gk-notif-card__title { font-size: .85rem; }
+.gk-notif-card--compact .gk-notif-card__message { font-size: .8rem; }
+
+@keyframes gkNotifIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* Bell + badge */
+.gk-notif-bell-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.96);
+}
+html.dark .gk-notif-bell-badge {
+  box-shadow: 0 0 0 2px rgba(28, 28, 34, 0.98);
+}
+
+/* Notification center popover */
+.gk-notif-center {
+  z-index: 75;
+  background: rgba(255, 255, 255, 0.98);
+  color: #1f2937;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 18px 40px -10px rgba(15, 23, 42, 0.22),
+    0 8px 18px -6px rgba(15, 23, 42, 0.16);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: gkNotifCenterIn 180ms ease-out both;
+}
+html.dark .gk-notif-center {
+  background: rgba(28, 28, 34, 0.98);
+  color: #e5e7eb;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 18px 40px -10px rgba(0, 0, 0, 0.65),
+    0 8px 18px -6px rgba(0, 0, 0, 0.45);
+}
+@keyframes gkNotifCenterIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+.gk-notif-center__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  gap: 6px;
+}
+html.dark .gk-notif-center__header {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+.gk-notif-center__title {
+  font-size: .95rem;
+  font-weight: 600;
+  margin: 0;
+}
+.gk-notif-center__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.gk-notif-center__header-btn {
+  font-size: .72rem;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.gk-notif-center__header-btn:hover {
+  opacity: 1;
+  background: rgba(0,0,0,0.05);
+}
+html.dark .gk-notif-center__header-btn:hover { background: rgba(255,255,255,0.07); }
+.gk-notif-center__close {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.gk-notif-center__close:hover { opacity: 1; background: rgba(0,0,0,0.06); }
+html.dark .gk-notif-center__close:hover { background: rgba(255,255,255,0.08); }
+
+.gk-notif-center__list {
+  overflow-y: auto;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gk-notif-center__empty {
+  text-align: center;
+  font-size: .85rem;
+  opacity: 0.7;
+  padding: 24px 12px;
+}
+.gk-notif-center__item {
+  position: relative;
+}
+.gk-notif-center__item.is-dismissed .gk-notif-card {
+  opacity: 0.55;
+}
+.gk-notif-center__item.is-dismissed .gk-notif-card__close {
+  display: none;
+}
+.gk-notif-center__time {
+  position: absolute;
+  bottom: 6px;
+  right: 38px;
+  font-size: .65rem;
+  opacity: 0.6;
+  pointer-events: none;
+}
 `;

@@ -53,6 +53,8 @@ export default function SettingsPanel({
   setEditorToolbarMode,
   pasteMode,
   setPasteMode,
+  notificationsPosition,
+  setNotificationsPosition,
   typographyPresets,
   setTypographyPresets,
   // Lifted into App.jsx so the centralised overlay back-button stack
@@ -728,6 +730,28 @@ export default function SettingsPanel({
                     {t("pasteBehaviorPlain")}
                   </button>
                 </div>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Bell} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("notificationsPositionTitle")}</div>
+                    <div className="text-sm text-gray-500">{t("notificationsPositionDesc")}</div>
+                  </div>
+                </div>
+                <select
+                  value={notificationsPosition || "top-right"}
+                  onChange={(e) => setNotificationsPosition?.(e.target.value)}
+                  className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 px-3 py-1.5 text-sm self-end sm:self-auto focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:focus:ring-indigo-500"
+                >
+                  <option value="top-left">{t("posTopLeft")}</option>
+                  <option value="top-center">{t("posTopCenter")}</option>
+                  <option value="top-right">{t("posTopRight")}</option>
+                  <option value="bottom-left">{t("posBottomLeft")}</option>
+                  <option value="bottom-center">{t("posBottomCenter")}</option>
+                  <option value="bottom-right">{t("posBottomRight")}</option>
+                </select>
               </div>
 
               <UISubHeading label={t("checklistSettings")} />

@@ -161,6 +161,8 @@ function NotesUI({
   setMobileSearchOpen,
   fabOpen,
   setFabOpen,
+  notificationBellDesktop = null,
+  notificationBellMobile = null,
 }) {
   const mobileSearchRef = useRef(null);
   const isMobile = windowWidth < 700 || isLandscapeMobile;
@@ -281,6 +283,8 @@ function NotesUI({
         SectionIcon={SectionIcon}
         openSidebar={openSidebar}
         activeTagFilter={activeTagFilter}
+        notificationBellDesktop={notificationBellDesktop}
+        notificationBellMobile={notificationBellMobile}
       />
 
       {/* Wrapper that pushes the composer + sections down by the dock's
