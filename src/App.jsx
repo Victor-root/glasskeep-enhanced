@@ -506,10 +506,10 @@ export default function App() {
     useNotifications();
   const showToast = useCallback(
     (message, type = "success", duration) => {
-      // Pre-existing variants used by the codebase: "success" | "error" | "info".
-      // The provider accepts the same set under `variant`; default duration is
-      // derived from variant if the caller didn't pass one (10s for info, 5s
-      // otherwise) to match the previous showToast behaviour.
+      // Pre-existing variants used by the codebase: "success" | "error"
+      // | "info". The provider accepts the same set under `variant`.
+      // When the caller didn't pass a duration we let the provider's
+      // 10-second default apply.
       const variant =
         type === "success" || type === "error" || type === "info" || type === "warning"
           ? type
@@ -557,8 +557,11 @@ export default function App() {
   // showShareToast helper the SSE dispatcher below uses for live
   // events. Internal dedup keeps the rare fetch↔SSE race from
   // showing the same toast twice.
-  const { showShareToast: showShareNotificationToast, markDelivered: markShareNotificationsDelivered } =
-    useShareNotifications({ token, userId: currentUser?.id });
+  const {
+    showShareToast: showShareNotificationToast,
+    showRevokeToast: showRevokeNotificationToast,
+    markDelivered: markShareNotificationsDelivered,
+  } = useShareNotifications({ token, userId: currentUser?.id });
 
   // GitHub release update notification (admin-only, fail-silent).
   const updateInfo = useUpdateCheck({
@@ -2959,6 +2962,20 @@ export default function App() {
               // A live share notification. Show the card and mark the
               // row delivered so a quick reload doesn't replay it.
               showShareNotificationToast({
+                id: msg.notificationId,
+                senderName: msg.senderName,
+                noteTitle: msg.noteTitle,
+                noteId: msg.noteId,
+              });
+              if (msg.notificationId) {
+                markShareNotificationsDelivered([msg.notificationId]);
+              }
+            } else if (msg && msg.type === "note_access_revoked_notification") {
+              // Live notification for the now-ex-collaborator. The
+              // accompanying `note_access_revoked` event (handled
+              // below) removes the note from their local store; this
+              // is purely the toast/history surface.
+              showRevokeNotificationToast({
                 id: msg.notificationId,
                 senderName: msg.senderName,
                 noteTitle: msg.noteTitle,

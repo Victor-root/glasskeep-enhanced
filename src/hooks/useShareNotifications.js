@@ -75,17 +75,51 @@ export function useShareNotifications({ token, userId }) {
     const noteId = n.noteId ?? n.note_id ?? null;
     const fn = notifyRef.current;
     if (typeof fn !== "function") return;
+    // Wrap the note title with the `**...**` marker the card's message
+    // renderer recognises so the title appears in bold inside the
+    // sentence (the user asked for the title to stand out from the
+    // surrounding "X a partagé la note … avec vous").
     fn({
       type: "note_shared",
       variant: "info",
       title: t("noteSharedTitle"),
-      message: t("noteSharedToast", { sender, title: noteTitle }),
+      message: t("noteSharedToast", { sender, title: `**${noteTitle}**` }),
       persistent: true,
       dismissible: true,
       action: noteId
         ? { label: t("noteSharedAction"), noteId: String(noteId) }
         : null,
       metadata: { serverNotificationId: id, noteId },
+    });
+  }, []);
+
+  // Same shape as share toast, but without an "Open" action (the note
+  // is no longer accessible — opening it would 404). Persistent so the
+  // ex-collaborator sees it on next login even if they were offline.
+  const showRevokeToast = useCallback((n) => {
+    if (!n) return;
+    const id = n.id ?? n.notificationId;
+    if (id != null) {
+      if (shownIdsRef.current.has(id)) return;
+      shownIdsRef.current.add(id);
+    }
+    const sender = String(n.senderName ?? n.sender_name ?? "").trim();
+    const rawTitle = String(n.noteTitle ?? n.note_title ?? "").trim();
+    const noteTitle = rawTitle || t("untitledNote");
+    const fn = notifyRef.current;
+    if (typeof fn !== "function") return;
+    fn({
+      type: "note_access_revoked",
+      variant: "warning",
+      title: t("noteAccessRevokedTitle"),
+      message: t("noteAccessRevokedToast", {
+        sender,
+        title: `**${noteTitle}**`,
+      }),
+      persistent: true,
+      dismissible: true,
+      action: null,
+      metadata: { serverNotificationId: id },
     });
   }, []);
 
@@ -99,13 +133,17 @@ export function useShareNotifications({ token, userId }) {
         if (cancelled || list.length === 0) return;
         const handled = [];
         for (const n of list) {
+          const payload = {
+            id: n.id,
+            senderName: n.sender_name,
+            noteTitle: n.note_title,
+            noteId: n.note_id,
+          };
           if (n.type === "note_shared") {
-            showShareToast({
-              id: n.id,
-              senderName: n.sender_name,
-              noteTitle: n.note_title,
-              noteId: n.note_id,
-            });
+            showShareToast(payload);
+            handled.push(n.id);
+          } else if (n.type === "note_access_revoked") {
+            showRevokeToast(payload);
             handled.push(n.id);
           }
         }
@@ -118,9 +156,9 @@ export function useShareNotifications({ token, userId }) {
     return () => {
       cancelled = true;
     };
-  }, [token, userId, showShareToast, markDelivered]);
+  }, [token, userId, showShareToast, showRevokeToast, markDelivered]);
 
-  return { showShareToast, markDelivered };
+  return { showShareToast, showRevokeToast, markDelivered };
 }
 
 export default useShareNotifications;

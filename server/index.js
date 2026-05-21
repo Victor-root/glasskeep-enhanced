@@ -1943,6 +1943,35 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
   // was granted, the payload also carries its id so the client fetches it in.
   sendEventToUser(userIdToRemove, { type: "note_access_revoked", noteId, copyNoteId });
 
+  // Persist + push a "note_access_revoked" notification so the ex-
+  // collaborator sees a toast (live if they're connected, on next
+  // login otherwise) telling them they no longer have access. Skipped
+  // when the user removed themselves — they already know.
+  if (!isRemovingSelf) {
+    try {
+      const revokeCreatedAt = nowISO();
+      const revokeRow = insertNotification.run(
+        userIdToRemove,
+        req.user.id,
+        "note_access_revoked",
+        noteId,
+        note.title || "",
+        req.user.name || req.user.email || "",
+        revokeCreatedAt,
+      );
+      sendEventToUser(userIdToRemove, {
+        type: "note_access_revoked_notification",
+        notificationId: revokeRow.lastInsertRowid,
+        senderName: req.user.name || req.user.email || "",
+        noteId,
+        noteTitle: note.title || "",
+        createdAt: revokeCreatedAt,
+      });
+    } catch (e) {
+      console.warn("[notifications] revoke notification failed:", e?.message);
+    }
+  }
+
   // Update note with editor info and notify remaining participants
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
   broadcastNoteUpdated(noteId);

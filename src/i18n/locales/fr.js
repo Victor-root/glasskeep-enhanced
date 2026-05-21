@@ -667,6 +667,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   noteSharedToast: "{sender} a partagé la note {title} avec vous",
   noteSharedTitle: "Note partagée",
   noteSharedAction: "Ouvrir",
+  noteAccessRevokedTitle: "Accès retiré",
+  noteAccessRevokedToast: "{sender} vous a retiré l'accès à la note {title}",
   untitledNote: "(sans titre)",
   notifications: "Notifications",
   notificationCenterTitle: "Notifications",

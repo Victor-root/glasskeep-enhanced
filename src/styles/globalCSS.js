@@ -3741,13 +3741,13 @@ html.dark .typo-modal-toggle {
   }
 }
 
-/* Notification card — macOS Notification Centre styling rebuilt with
-   the app's violet/blue/pink palette. The background is a tinted
-   diagonal gradient (indigo → violet → fuchsia) on top of heavy
-   backdrop blur, so the card reads as a frosted slab of the same
-   glass family used elsewhere in the UI. The "white card" first
-   pass was too generic — this version explicitly carries the
-   GlassKeep identity. */
+/* Notification card — macOS Notification Centre styling with the
+   app's violet/blue/pink palette. The card has a tinted diagonal
+   gradient background over a heavy backdrop blur, plus a thin
+   matching gradient border drawn via the dual-background /
+   border-box-clip technique so the rounded corners stay clean
+   (border-image would have flattened them). The border is subtle
+   but visible enough to lift the card off whatever sits behind. */
 .gk-notif-card {
   position: relative;
   display: flex;
@@ -3756,15 +3756,21 @@ html.dark .typo-modal-toggle {
   width: 100%;
   padding: 11px 14px;
   border-radius: 16px;
+  /* Transparent border layer that the second background gradient
+     paints into — keeps the radius working unlike border-image. */
+  border: 1px solid transparent;
   background:
     linear-gradient(135deg,
       rgba(248, 244, 255, 0.78) 0%,
       rgba(238, 234, 255, 0.74) 35%,
       rgba(240, 232, 252, 0.74) 65%,
-      rgba(252, 232, 244, 0.78) 100%);
+      rgba(252, 232, 244, 0.78) 100%) padding-box,
+    linear-gradient(135deg,
+      rgba(167, 139, 250, 0.55) 0%,
+      rgba(96, 165, 250, 0.55) 50%,
+      rgba(244, 114, 182, 0.55) 100%) border-box;
   backdrop-filter: blur(34px) saturate(190%);
   -webkit-backdrop-filter: blur(34px) saturate(190%);
-  border: 1px solid rgba(124, 58, 237, 0.18);
   box-shadow:
     0 14px 36px rgba(76, 29, 149, 0.18),
     0 4px 12px rgba(99, 102, 241, 0.12),
@@ -3778,8 +3784,11 @@ html.dark .gk-notif-card {
     linear-gradient(135deg,
       rgba(40, 30, 70, 0.78) 0%,
       rgba(35, 32, 75, 0.78) 50%,
-      rgba(55, 32, 60, 0.78) 100%);
-  border: 1px solid rgba(167, 139, 250, 0.22);
+      rgba(55, 32, 60, 0.78) 100%) padding-box,
+    linear-gradient(135deg,
+      rgba(167, 139, 250, 0.55) 0%,
+      rgba(129, 140, 248, 0.5) 50%,
+      rgba(244, 114, 182, 0.5) 100%) border-box;
   box-shadow:
     0 14px 36px rgba(0, 0, 0, 0.55),
     0 4px 12px rgba(76, 29, 149, 0.32),
@@ -3821,9 +3830,23 @@ html.dark .gk-notif-card {
     0 1px 3px rgba(0, 0, 0, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
-/* Filled glyph inside the chip — slightly smaller than the chip so
-   it doesn't look pinned to the edges. */
+/* Info variant: drop the chip background so the filled info-circle
+   icon reads as a free-floating "i" inside its own ring rather than
+   a circle pasted on top of a coloured square. The icon takes the
+   accent colour and fills the chip slot to keep layout aligned with
+   the other variants. */
+.gk-notif-card--info .gk-notif-card__icon {
+  background: transparent;
+  box-shadow: none;
+  color: var(--gk-notif-accent);
+  width: 30px;
+  height: 30px;
+}
 .gk-notif-card__icon-glyph { width: 18px; height: 18px; }
+.gk-notif-card--info .gk-notif-card__icon-glyph {
+  width: 30px;
+  height: 30px;
+}
 
 .gk-notif-card__body {
   flex: 1 1 auto;
@@ -3833,9 +3856,11 @@ html.dark .gk-notif-card {
 .gk-notif-card__header {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 8px;
   margin-bottom: 1px;
+  /* Reserve room on the right for the absolutely-positioned
+     timestamp so the label doesn't run into it on narrow cards. */
+  padding-right: 56px;
 }
 .gk-notif-card__label {
   font-size: 11px;
@@ -3843,11 +3868,17 @@ html.dark .gk-notif-card {
   letter-spacing: 0.2px;
   opacity: 0.7;
 }
+/* Timestamp sits in the card's top-right corner regardless of whether
+   an action button is present, so the position stays consistent
+   between cards with and without actions. */
 .gk-notif-card__time {
+  position: absolute;
+  top: 11px;
+  right: 14px;
   font-size: 11px;
   font-weight: 400;
   opacity: 0.55;
-  flex-shrink: 0;
+  pointer-events: none;
 }
 .gk-notif-card__title {
   font-size: 13.5px;
@@ -3943,7 +3974,8 @@ html.dark .gk-notif-card__close {
 html.dark .gk-notif-card__close:hover { background: rgba(180, 180, 190, 1); }
 
 /* Compact variant — used by the history list in the center where
-   rows are denser. */
+   rows are denser and the close affordance should be persistent
+   (the panel is stationary, no hover-discoverability tradeoff). */
 .gk-notif-card--compact {
   padding: 9px 12px;
   border-radius: 12px;
@@ -3955,8 +3987,45 @@ html.dark .gk-notif-card__close:hover { background: rgba(180, 180, 190, 1); }
   font-size: 12px;
   border-radius: 8px;
 }
+.gk-notif-card--compact .gk-notif-card--info .gk-notif-card__icon,
+.gk-notif-card--compact.gk-notif-card--info .gk-notif-card__icon {
+  width: 26px;
+  height: 26px;
+}
+.gk-notif-card--compact .gk-notif-card--info .gk-notif-card__icon-glyph,
+.gk-notif-card--compact.gk-notif-card--info .gk-notif-card__icon-glyph {
+  width: 26px;
+  height: 26px;
+}
 .gk-notif-card--compact .gk-notif-card__title { font-size: 12.5px; }
 .gk-notif-card--compact .gk-notif-card__message { font-size: 12px; }
+/* Always-visible close button sitting INSIDE the card so it can't
+   overflow into the panel's padding (the panel uses overflow:hidden
+   to clip its rounded corners). */
+.gk-notif-card--compact .gk-notif-card__close {
+  opacity: 1;
+  top: 4px;
+  right: 4px;
+  left: auto;
+  width: 16px;
+  height: 16px;
+  font-size: 8px;
+  background: rgba(80, 80, 85, 0.55);
+}
+.gk-notif-card--compact .gk-notif-card__close:hover {
+  background: rgba(80, 80, 85, 0.9);
+}
+html.dark .gk-notif-card--compact .gk-notif-card__close {
+  background: rgba(255, 255, 255, 0.18);
+  color: #f5f5f7;
+}
+html.dark .gk-notif-card--compact .gk-notif-card__close:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+/* Make room for the inset close button so the timestamp text doesn't
+   overlap it. */
+.gk-notif-card--compact .gk-notif-card__header { padding-right: 28px; }
+.gk-notif-card--compact .gk-notif-card__time { top: 9px; right: 24px; }
 
 @keyframes gkNotifIn {
   from { opacity: 0; transform: translateY(-8px) scale(0.96); }

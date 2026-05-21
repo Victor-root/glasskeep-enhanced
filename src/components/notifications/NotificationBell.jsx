@@ -29,14 +29,16 @@ export default function NotificationBell({ dark, onAction }) {
     0,
   );
 
-  // Same colour treatment as the settings cog button (neutral grey,
-  // theme-aware) so the bell visually belongs to the "utility"
-  // cluster of the header rather than competing for attention.
+  // Filled bell uses the indigo accent — #6366f1 (indigo-500) in light
+  // mode, #9c9ddb (a desaturated indigo) in dark — so the icon reads as
+  // a coloured indicator rather than a neutral chrome glyph. Hover and
+  // focus stay subtle so the button still sits inside the utility row.
   const baseClass =
     "relative inline-flex items-center justify-center w-9 h-9 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors";
   const themeClass = dark
-    ? "text-gray-300 hover:text-gray-100 hover:bg-gray-700 focus:ring-gray-500"
-    : "text-gray-600 hover:text-gray-800 hover:bg-gray-200 focus:ring-gray-400";
+    ? "hover:bg-white/10 focus:ring-indigo-400"
+    : "hover:bg-indigo-100 focus:ring-indigo-400";
+  const iconColor = dark ? "#9c9ddb" : "#6366f1";
 
   const handleToggle = () => {
     setOpen((wasOpen) => {
@@ -58,7 +60,10 @@ export default function NotificationBell({ dark, onAction }) {
         aria-haspopup="dialog"
         aria-expanded={open}
       >
-        <TI.BellRingingFilled className="tabler-icon tabler-icon--filled" />
+        <TI.BellFilled
+          className="tabler-icon tabler-icon--filled"
+          style={{ color: iconColor }}
+        />
         {unread > 0 ? (
           <span className="gk-notif-bell-badge" aria-hidden="true">
             {unread > 9 ? "9+" : unread}

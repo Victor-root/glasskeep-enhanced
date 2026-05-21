@@ -83,8 +83,12 @@ function reducer(state, action) {
   }
 }
 
-function pickDefaultDuration(variant) {
-  return variant === "info" ? 10000 : 5000;
+// Every variant defaults to 10 s — the user asked for a uniform
+// display window across the board. Callers that need a different
+// length still pass `duration` explicitly, and `persistent: true`
+// (or `duration: null`) still suppresses auto-dismiss entirely.
+function pickDefaultDuration(_variant) {
+  return 10000;
 }
 
 export function NotificationProvider({ children }) {

@@ -149,6 +149,10 @@ export default function NotificationCenter({
                   if (onClose) onClose();
                 }}
                 compact
+                // Inside the panel the X lives on the right of each
+                // row, away from the panel's left edge where it
+                // would otherwise collide with the gutter.
+                closeSide="right"
               />
             </div>
           ))

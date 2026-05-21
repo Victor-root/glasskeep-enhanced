@@ -2,9 +2,10 @@
 // the app's violet/blue/pink gradient + heavy blur instead of a flat
 // white surface — see globalCSS.
 //
-// String content is rendered as text children — React escapes, so
-// title/message/label are XSS-safe even when the values originate
-// from the server.
+// Message content can be a plain string OR contain `**bold**` markers
+// (parsed into <strong> spans). React escapes the surrounding text
+// children, so title / message / label remain XSS-safe even when the
+// values originate from the server.
 
 import React from "react";
 import TI from "../../icons/editor/index.jsx";
@@ -17,11 +18,12 @@ const VARIANT_CLASS = {
   info: "gk-notif-card--info",
 };
 
-// Glyph rendered inside the variant chip. `info` uses the filled
-// info-circle Tabler icon the user requested; the others stay as
-// short text so they read cleanly at the 30 px chip size. `success`
-// is intentionally absent — that variant hides its chip entirely
-// (see CSS) so the white card on its own communicates "all good".
+// Glyph rendered as the variant indicator. Info gets the filled
+// info-circle Tabler icon — rendered ungrouped (no coloured square
+// behind it) so it reads as a free-floating "i" inside the circle.
+// success has no glyph (the plain white card communicates "all good"
+// on its own); error / warning keep the punchy "!" inside their
+// chip background.
 function VariantGlyph({ variant }) {
   if (variant === "info") {
     return (
@@ -33,7 +35,7 @@ function VariantGlyph({ variant }) {
   if (variant === "error" || variant === "warning") {
     return <span aria-hidden="true">!</span>;
   }
-  return <span aria-hidden="true">i</span>;
+  return null;
 }
 
 export function formatRelativeTime(ts) {
@@ -47,15 +49,32 @@ export function formatRelativeTime(ts) {
   return t("relativeDaysAgo", { n: Math.floor(diff / 86_400_000) });
 }
 
+// Tiny `**bold**` parser used by message rendering — lets callers
+// emphasise a single substring (a note title, a username, …) without
+// having to pass a React node through the provider state. Only `**`
+// is recognised; everything else is rendered as plain text so a
+// stray asterisk in user content can't generate unexpected markup.
+function renderMessage(message) {
+  if (message == null) return null;
+  if (typeof message !== "string") return message; // already a React node
+  if (!message.includes("**")) return message;
+  const parts = message.split(/(\*\*[^*]+\*\*)/);
+  return parts.map((p, i) => {
+    if (!p) return null;
+    if (p.startsWith("**") && p.endsWith("**")) {
+      return <strong key={i}>{p.slice(2, -2)}</strong>;
+    }
+    return <React.Fragment key={i}>{p}</React.Fragment>;
+  });
+}
+
 export default function NotificationCard({
   notification,
   onDismiss,
   onAction,
   compact = false,
   // "left" (default) places the close button on the top-left corner;
-  // "right" flips it to the top-right. The viewport picks the side
-  // opposite its anchor edge so the X never sits flush against the
-  // screen border.
+  // "right" flips it to the top-right.
   closeSide = "left",
 }) {
   if (!notification) return null;
@@ -83,6 +102,12 @@ export default function NotificationCard({
         </button>
       ) : null}
 
+      {/* Timestamp sits in its own absolutely-positioned slot in the
+          card's top-right corner so it stays put whether or not an
+          action button is rendered. The action button's column would
+          otherwise squeeze the header into a half-width strip. */}
+      {time ? <span className="gk-notif-card__time">{time}</span> : null}
+
       <span className="gk-notif-card__icon" aria-hidden="true">
         <VariantGlyph variant={variant} />
       </span>
@@ -90,11 +115,10 @@ export default function NotificationCard({
       <div className="gk-notif-card__body">
         <div className="gk-notif-card__header">
           <span className="gk-notif-card__label">{t("appName")}</span>
-          {time ? <span className="gk-notif-card__time">{time}</span> : null}
         </div>
         {title ? <div className="gk-notif-card__title">{title}</div> : null}
         {message ? (
-          <div className="gk-notif-card__message">{message}</div>
+          <div className="gk-notif-card__message">{renderMessage(message)}</div>
         ) : null}
       </div>
 

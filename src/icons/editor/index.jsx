@@ -104,6 +104,7 @@ import powerSvg            from "./tabler/power.svg?raw";
 
 // Notifications
 import bellSvg             from "./tabler/bell.svg?raw";
+import bellFilledSvg       from "./tabler/bell-filled.svg?raw";
 import bellRingingFilledSvg from "./tabler/bell-ringing-filled.svg?raw";
 import infoCircleFilledSvg from "./tabler/info-circle-filled.svg?raw";
 
@@ -232,6 +233,7 @@ export const TI = {
   Swap:                 (p) => <TablerIcon svg={arrowsDownUpSvg} {...p} />,
   Power:                (p) => <TablerIcon svg={powerSvg} {...p} />,
   Bell:                 (p) => <TablerIcon svg={bellSvg} {...p} />,
+  BellFilled:           (p) => <TablerIcon svg={bellFilledSvg} {...p} />,
   BellRingingFilled:    (p) => <TablerIcon svg={bellRingingFilledSvg} {...p} />,
   InfoCircleFilled:     (p) => <TablerIcon svg={infoCircleFilledSvg} {...p} />,
 };
