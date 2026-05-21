@@ -351,29 +351,63 @@ function isInsideCopyButton(node) {
 // is armed at a time — they're mutually exclusive UX states.
 let armedCodeBlockEl = null;
 let armedInlineCodeEl = null;
+// Auto-hide timers (mobile only): the button vanishes after a few
+// seconds of inactivity so a stale arm doesn't sit on screen forever.
+// Disarming via the timer is a plain clear — it does NOT focus the
+// editor or open the keyboard, so the next tap on the same element
+// is detected as a "1st tap" again and the cycle restarts cleanly.
+let armedCodeBlockHideTimer = null;
+let armedInlineCodeHideTimer = null;
+const MOBILE_ARM_AUTO_HIDE_MS = 5000;
 
 function clearCodeBlockArm() {
+  if (armedCodeBlockHideTimer) {
+    clearTimeout(armedCodeBlockHideTimer);
+    armedCodeBlockHideTimer = null;
+  }
   if (armedCodeBlockEl) {
     armedCodeBlockEl.removeAttribute("data-armed");
   }
   armedCodeBlockEl = null;
 }
 function armCodeBlock(wrapper) {
+  // Cancel any leftover timer from the previously armed wrapper so
+  // its delayed clear doesn't fire after we re-arm a new one.
+  if (armedCodeBlockHideTimer) {
+    clearTimeout(armedCodeBlockHideTimer);
+    armedCodeBlockHideTimer = null;
+  }
   if (armedCodeBlockEl && armedCodeBlockEl !== wrapper) {
     armedCodeBlockEl.removeAttribute("data-armed");
   }
   armedCodeBlockEl = wrapper;
   wrapper.setAttribute("data-armed", "true");
   ensureScrollReflowListener();
+  armedCodeBlockHideTimer = setTimeout(() => {
+    armedCodeBlockHideTimer = null;
+    clearCodeBlockArm();
+  }, MOBILE_ARM_AUTO_HIDE_MS);
 }
 function clearInlineCodeArm() {
+  if (armedInlineCodeHideTimer) {
+    clearTimeout(armedInlineCodeHideTimer);
+    armedInlineCodeHideTimer = null;
+  }
   armedInlineCodeEl = null;
   hideInlineCopyImmediate();
 }
 function armInlineCode(codeEl) {
+  if (armedInlineCodeHideTimer) {
+    clearTimeout(armedInlineCodeHideTimer);
+    armedInlineCodeHideTimer = null;
+  }
   armedInlineCodeEl = codeEl;
   showInlineCopyFor(codeEl, { sticky: true });
   ensureScrollReflowListener();
+  armedInlineCodeHideTimer = setTimeout(() => {
+    armedInlineCodeHideTimer = null;
+    clearInlineCodeArm();
+  }, MOBILE_ARM_AUTO_HIDE_MS);
 }
 
 // Global capture-phase scroll listener that re-positions the sticky
