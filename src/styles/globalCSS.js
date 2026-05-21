@@ -3796,78 +3796,37 @@ html.dark .gk-notif-card {
   color: #f5f5f7;
 }
 
-/* Variant accent — used by the icon chip only, the card chrome
-   itself stays neutral so the glass look is preserved.
-   Success is intentionally absent: the original toast palette had
-   green/red/blue, and the user wants success (the most common
-   "everything went fine" state) to read as the plain white card
-   without a coloured chip; info (blue) and error (red) keep their
-   colours; warning gets amber so the four-variant API stays usable. */
+/* Variant accent — used by the variant icon. Card chrome stays
+   neutral so the glass look reads as one unified surface. Every
+   variant has its own canonical Tabler icon, so success now ALSO
+   carries an indicator (a green filled circle-check) instead of
+   relying on absence-of-chip to communicate the state. */
 .gk-notif-card--info    { --gk-notif-accent: #3b82f6; }
+.gk-notif-card--success { --gk-notif-accent: #10b981; }
 .gk-notif-card--warning { --gk-notif-accent: #f59e0b; }
 .gk-notif-card--error   { --gk-notif-accent: #ef4444; }
 
-/* Success has no chip at all — the body fills the card edge to
-   edge. Selector also clears any inherited accent var so an in-line
-   style override can't sneak a colour back in. */
-.gk-notif-card--success .gk-notif-card__icon {
-  display: none;
-}
-
+/* All variants render a filled Tabler glyph in the accent colour,
+   with no coloured chip background — the icon itself carries the
+   variant identity. The icon slot stays at 30×30 so the body lines
+   up consistently across notifications. */
 .gk-notif-card__icon {
   flex: 0 0 auto;
   width: 30px;
   height: 30px;
-  border-radius: 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  font-weight: 700;
-  color: #fff;
-  background: var(--gk-notif-accent);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-/* Info variant: drop the chip background so the filled info-circle
-   icon reads as a free-floating "i" inside its own ring rather than
-   a circle pasted on top of a coloured square. The icon takes the
-   accent colour and fills the chip slot to keep layout aligned with
-   the other variants. */
-.gk-notif-card--info .gk-notif-card__icon {
   background: transparent;
-  box-shadow: none;
   color: var(--gk-notif-accent);
-  width: 30px;
-  height: 30px;
 }
-.gk-notif-card__icon-glyph { width: 18px; height: 18px; }
-.gk-notif-card--info .gk-notif-card__icon-glyph {
-  width: 30px;
-  height: 30px;
-}
+.gk-notif-card__icon-glyph { width: 30px; height: 30px; }
 
 .gk-notif-card__body {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.gk-notif-card__header {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 1px;
-  /* Reserve room on the right for the absolutely-positioned
-     timestamp so the label doesn't run into it on narrow cards. */
-  padding-right: 56px;
-}
-.gk-notif-card__label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  opacity: 0.7;
-}
 /* Timestamp sits in the card's top-right corner regardless of whether
    an action button is present, so the position stays consistent
    between cards with and without actions. */
@@ -3880,12 +3839,17 @@ html.dark .gk-notif-card {
   opacity: 0.55;
   pointer-events: none;
 }
+/* Title acts as the notification's headline (was "GlassKeep" in an
+   earlier iteration; the user moved the title here so each card
+   "presents" itself). Right-padded so a long title doesn't run
+   into the absolutely-positioned timestamp. */
 .gk-notif-card__title {
   font-size: 13.5px;
   font-weight: 600;
   line-height: 1.3;
-  margin: 1px 0;
+  margin-bottom: 2px;
   word-break: break-word;
+  padding-right: 56px;
 }
 .gk-notif-card__message {
   font-size: 13px;
@@ -4000,11 +3964,11 @@ html.dark .gk-notif-card__close:hover { background: rgba(180, 180, 190, 1); }
   width: 26px;
   height: 26px;
 }
-.gk-notif-card--compact .gk-notif-card__title { font-size: 12.5px; }
+.gk-notif-card--compact .gk-notif-card__title {
+  font-size: 12.5px;
+  padding-right: 48px;
+}
 .gk-notif-card--compact .gk-notif-card__message { font-size: 12px; }
-/* Tighter top-right corner for the timestamp inside the compact
-   header (smaller padding). */
-.gk-notif-card--compact .gk-notif-card__header { padding-right: 56px; }
 .gk-notif-card--compact .gk-notif-card__time { top: 9px; right: 14px; }
 
 @keyframes gkNotifIn {

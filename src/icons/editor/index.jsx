@@ -107,6 +107,9 @@ import bellSvg             from "./tabler/bell.svg?raw";
 import bellFilledSvg       from "./tabler/bell-filled.svg?raw";
 import bellRingingFilledSvg from "./tabler/bell-ringing-filled.svg?raw";
 import infoCircleFilledSvg from "./tabler/info-circle-filled.svg?raw";
+import circleCheckFilledSvg from "./tabler/circle-check-filled.svg?raw";
+import alertTriangleFilledSvg from "./tabler/alert-triangle-filled.svg?raw";
+import alertCircleFilledSvg from "./tabler/alert-circle-filled.svg?raw";
 
 // Cache of sanitised markup keyed by the raw SVG string. The transformation
 // only depends on the SVG source, so each icon is processed exactly once.
@@ -236,6 +239,9 @@ export const TI = {
   BellFilled:           (p) => <TablerIcon svg={bellFilledSvg} {...p} />,
   BellRingingFilled:    (p) => <TablerIcon svg={bellRingingFilledSvg} {...p} />,
   InfoCircleFilled:     (p) => <TablerIcon svg={infoCircleFilledSvg} {...p} />,
+  CircleCheckFilled:    (p) => <TablerIcon svg={circleCheckFilledSvg} {...p} />,
+  AlertTriangleFilled:  (p) => <TablerIcon svg={alertTriangleFilledSvg} {...p} />,
+  AlertCircleFilled:    (p) => <TablerIcon svg={alertCircleFilledSvg} {...p} />,
 };
 
 export default TI;

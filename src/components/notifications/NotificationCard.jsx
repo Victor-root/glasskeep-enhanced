@@ -2,9 +2,19 @@
 // the app's violet/blue/pink gradient + heavy blur instead of a flat
 // white surface — see globalCSS.
 //
+// Layout:
+//   [variant icon]  [title]                     [time]
+//                   [message]               [action btn]
+//
+// The `title` field is what "presents" the notification (the user
+// renamed the previous "GlassKeep" header into a per-notification
+// title). Every notification should carry one — the fallback below
+// uses the variant name so a malformed dispatch still looks correct
+// instead of dropping the header entirely.
+//
 // Message content can be a plain string OR contain `**bold**` markers
 // (parsed into <strong> spans). React escapes the surrounding text
-// children, so title / message / label remain XSS-safe even when the
+// children, so title / message / sender remain XSS-safe even when the
 // values originate from the server.
 
 import React from "react";
@@ -18,24 +28,25 @@ const VARIANT_CLASS = {
   info: "gk-notif-card--info",
 };
 
-// Glyph rendered as the variant indicator. Info gets the filled
-// info-circle Tabler icon — rendered ungrouped (no coloured square
-// behind it) so it reads as a free-floating "i" inside the circle.
-// success has no glyph (the plain white card communicates "all good"
-// on its own); error / warning keep the punchy "!" inside their
-// chip background.
+// Filled Tabler icon used as the variant indicator. No coloured chip
+// background — the icon itself carries the variant colour via the
+// `--filled` CSS class which lets fill: currentColor through. Each
+// variant uses the canonical Tabler glyph for its semantic.
 function VariantGlyph({ variant }) {
-  if (variant === "info") {
-    return (
-      <TI.InfoCircleFilled
-        className="tabler-icon tabler-icon--filled gk-notif-card__icon-glyph"
-      />
-    );
-  }
-  if (variant === "error" || variant === "warning") {
-    return <span aria-hidden="true">!</span>;
-  }
-  return null;
+  const className = "tabler-icon tabler-icon--filled gk-notif-card__icon-glyph";
+  if (variant === "success") return <TI.CircleCheckFilled className={className} />;
+  if (variant === "warning") return <TI.AlertTriangleFilled className={className} />;
+  if (variant === "error") return <TI.AlertCircleFilled className={className} />;
+  return <TI.InfoCircleFilled className={className} />;
+}
+
+// Sensible per-variant fallback title for callers that forgot to set
+// one. Keeps the header occupied so the layout never collapses.
+function fallbackTitle(variant) {
+  if (variant === "success") return t("notifFallbackSuccess");
+  if (variant === "warning") return t("notifFallbackWarning");
+  if (variant === "error") return t("notifFallbackError");
+  return t("notifFallbackInfo");
 }
 
 export function formatRelativeTime(ts) {
@@ -56,7 +67,7 @@ export function formatRelativeTime(ts) {
 // stray asterisk in user content can't generate unexpected markup.
 function renderMessage(message) {
   if (message == null) return null;
-  if (typeof message !== "string") return message; // already a React node
+  if (typeof message !== "string") return message;
   if (!message.includes("**")) return message;
   const parts = message.split(/(\*\*[^*]+\*\*)/);
   return parts.map((p, i) => {
@@ -73,8 +84,6 @@ export default function NotificationCard({
   onDismiss,
   onAction,
   compact = false,
-  // "left" (default) places the close button on the top-left corner;
-  // "right" flips it to the top-right.
   closeSide = "left",
 }) {
   if (!notification) return null;
@@ -84,6 +93,7 @@ export default function NotificationCard({
   const closeKlass =
     closeSide === "right" ? " gk-notif-card--close-right" : "";
   const time = formatRelativeTime(createdAt);
+  const headline = title || fallbackTitle(variant);
 
   return (
     <div
@@ -102,10 +112,6 @@ export default function NotificationCard({
         </button>
       ) : null}
 
-      {/* Timestamp sits in its own absolutely-positioned slot in the
-          card's top-right corner so it stays put whether or not an
-          action button is rendered. The action button's column would
-          otherwise squeeze the header into a half-width strip. */}
       {time ? <span className="gk-notif-card__time">{time}</span> : null}
 
       <span className="gk-notif-card__icon" aria-hidden="true">
@@ -113,10 +119,7 @@ export default function NotificationCard({
       </span>
 
       <div className="gk-notif-card__body">
-        <div className="gk-notif-card__header">
-          <span className="gk-notif-card__label">{t("appName")}</span>
-        </div>
-        {title ? <div className="gk-notif-card__title">{title}</div> : null}
+        <div className="gk-notif-card__title">{headline}</div>
         {message ? (
           <div className="gk-notif-card__message">{renderMessage(message)}</div>
         ) : null}

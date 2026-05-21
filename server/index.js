@@ -1943,17 +1943,24 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
   // was granted, the payload also carries its id so the client fetches it in.
   sendEventToUser(userIdToRemove, { type: "note_access_revoked", noteId, copyNoteId });
 
-  // Persist + push a "note_access_revoked" notification so the ex-
-  // collaborator sees a toast (live if they're connected, on next
-  // login otherwise) telling them they no longer have access. Skipped
-  // when the user removed themselves — they already know.
+  // Persist + push a notification on BOTH sides — the ex-collaborator
+  // gets a "your access was removed" toast, the owner gets a "you
+  // removed X" confirmation toast. Variant suffix tells the client
+  // whether a copy was kept so the i18n message picks the right
+  // phrasing. Skipped when the user removed themselves — they
+  // already know, and notifying the owner about their own action
+  // would be circular.
   if (!isRemovingSelf) {
     try {
       const revokeCreatedAt = nowISO();
+      // -- Ex-collaborator notification --
+      const recipientType = shouldGrantCopy
+        ? "note_access_revoked_with_copy"
+        : "note_access_revoked";
       const revokeRow = insertNotification.run(
         userIdToRemove,
         req.user.id,
-        "note_access_revoked",
+        recipientType,
         noteId,
         note.title || "",
         req.user.name || req.user.email || "",
@@ -1961,10 +1968,42 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
       );
       sendEventToUser(userIdToRemove, {
         type: "note_access_revoked_notification",
+        notificationType: recipientType,
         notificationId: revokeRow.lastInsertRowid,
         senderName: req.user.name || req.user.email || "",
         noteId,
         noteTitle: note.title || "",
+        withCopy: shouldGrantCopy,
+        createdAt: revokeCreatedAt,
+      });
+
+      // -- Owner confirmation notification --
+      // The owner is the one driving the removal, so the sender of
+      // the row is the removed user (for the i18n {sender} slot to
+      // resolve to their name).
+      const removedUser = getUserById.get(userIdToRemove);
+      const removedName =
+        (removedUser && (removedUser.name || removedUser.email)) || "";
+      const ownerType = shouldGrantCopy
+        ? "collaborator_removed_with_copy"
+        : "collaborator_removed";
+      const ownerRow = insertNotification.run(
+        req.user.id,
+        userIdToRemove,
+        ownerType,
+        noteId,
+        note.title || "",
+        removedName,
+        revokeCreatedAt,
+      );
+      sendEventToUser(req.user.id, {
+        type: "note_access_revoked_notification",
+        notificationType: ownerType,
+        notificationId: ownerRow.lastInsertRowid,
+        senderName: removedName,
+        noteId,
+        noteTitle: note.title || "",
+        withCopy: shouldGrantCopy,
         createdAt: revokeCreatedAt,
       });
     } catch (e) {

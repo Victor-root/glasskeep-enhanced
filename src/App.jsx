@@ -328,6 +328,24 @@ export default function App() {
     } catch (e) {}
     return true;
   });
+  // Per-category sound opt-out. Three buckets cover every notification
+  // currently dispatched: `share` for note_shared, `access` for all
+  // four revoke/collaborator-removed variants, `generic` for the
+  // legacy showToast() shim and any unscoped notify() call. When the
+  // master `notificationsSound` toggle is off, none of these matter.
+  const [notificationsSoundTypes, setNotificationsSoundTypes] = useState(() => {
+    const DEF = { share: true, access: true, generic: true };
+    try {
+      const stored = localStorage.getItem("notificationsSoundTypes");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          return { ...DEF, ...parsed };
+        }
+      }
+    } catch (e) {}
+    return DEF;
+  });
   // Default duration (ms) for auto-dismissing notifications, or null
   // for "persistent" (stays until the user closes manually). The set
   // of allowed values is locked down in the settings UI; anything
@@ -548,27 +566,44 @@ export default function App() {
     [notify],
   );
 
+  // Map a notification type to one of the three sound categories the
+  // user can enable/disable independently. Anything we don't
+  // recognise falls into "generic" (the legacy toast bucket).
+  const soundCategoryForType = (typeKey) => {
+    if (typeKey === "note_shared") return "share";
+    if (
+      typeKey === "note_access_revoked" ||
+      typeKey === "note_access_revoked_with_copy" ||
+      typeKey === "collaborator_removed" ||
+      typeKey === "collaborator_removed_with_copy"
+    ) {
+      return "access";
+    }
+    return "generic";
+  };
+
   // Discrete ding whenever a new notification appears, gated by the
-  // notificationsSound user pref. The provider returns the list
-  // newest-first; we just need to detect when index 0's id changes
-  // to play exactly once per addition. The ref starts at a sentinel
-  // so the first notification of a session still triggers the sound.
+  // master sound toggle AND the per-category opt-outs. The provider
+  // returns the list newest-first; we just need to detect when
+  // index 0's id changes to play exactly once per addition.
   const lastDingedIdRef = useRef(null);
   useEffect(() => {
-    if (!notificationsSound) return;
     const newest = allNotifications[0];
     if (!newest) return;
     if (lastDingedIdRef.current === newest.id) return;
     // Skip if the "newest" is actually a stale entry being re-dispatched
-    // (dismissed: true means the only state change was a dismiss action,
+    // (dismissed:true means the only state change was a dismiss action,
     // not a fresh add).
     if (newest.dismissed) {
       lastDingedIdRef.current = newest.id;
       return;
     }
     lastDingedIdRef.current = newest.id;
+    if (!notificationsSound) return;
+    const category = soundCategoryForType(newest.type);
+    if (notificationsSoundTypes[category] === false) return;
     playNotificationDing();
-  }, [allNotifications, notificationsSound]);
+  }, [allNotifications, notificationsSound, notificationsSoundTypes]);
 
   // Generic confirmation dialog helper
   const showGenericConfirm = (config) => {
@@ -918,6 +953,25 @@ export default function App() {
             settings.notificationsSound ? "1" : "0",
           );
         }
+        if (
+          settings?.notificationsSoundTypes &&
+          typeof settings.notificationsSoundTypes === "object" &&
+          !Array.isArray(settings.notificationsSoundTypes)
+        ) {
+          const incoming = settings.notificationsSoundTypes;
+          const next = {
+            share: incoming.share !== false,
+            access: incoming.access !== false,
+            generic: incoming.generic !== false,
+          };
+          setNotificationsSoundTypes(next);
+          try {
+            localStorage.setItem(
+              "notificationsSoundTypes",
+              JSON.stringify(next),
+            );
+          } catch (e) {}
+        }
         if ("notificationsDuration" in (settings || {})) {
           const raw = settings.notificationsDuration;
           const allowed = [5000, 10000, 20000, 30000];
@@ -1157,6 +1211,23 @@ export default function App() {
       }).catch(() => {});
     }
   }, [notificationsSound]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "notificationsSoundTypes",
+        JSON.stringify(notificationsSoundTypes),
+      );
+    } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { notificationsSoundTypes },
+      }).catch(() => {});
+    }
+  }, [notificationsSoundTypes]);
 
   useEffect(() => {
     try {
@@ -3023,12 +3094,15 @@ export default function App() {
                 markShareNotificationsDelivered([msg.notificationId]);
               }
             } else if (msg && msg.type === "note_access_revoked_notification") {
-              // Live notification for the now-ex-collaborator. The
-              // accompanying `note_access_revoked` event (handled
-              // below) removes the note from their local store; this
-              // is purely the toast/history surface.
+              // Live notification for either side of a revoke. The
+              // notificationType field on the payload picks the right
+              // title/message pair (ex-collaborator vs owner, with
+              // copy vs without). The accompanying `note_access_revoked`
+              // event still drives the local note removal on the
+              // ex-collaborator side.
               showRevokeNotificationToast({
                 id: msg.notificationId,
+                notificationType: msg.notificationType,
                 senderName: msg.senderName,
                 noteTitle: msg.noteTitle,
                 noteId: msg.noteId,
@@ -6117,6 +6191,8 @@ export default function App() {
         setNotificationsPosition={setNotificationsPosition}
         notificationsSound={notificationsSound}
         setNotificationsSound={setNotificationsSound}
+        notificationsSoundTypes={notificationsSoundTypes}
+        setNotificationsSoundTypes={setNotificationsSoundTypes}
         notificationsDuration={notificationsDuration}
         setNotificationsDuration={setNotificationsDuration}
         typographyPresets={typographyPresets}

@@ -93,9 +93,13 @@ export function useShareNotifications({ token, userId }) {
     });
   }, []);
 
-  // Same shape as share toast, but without an "Open" action (the note
-  // is no longer accessible — opening it would 404). Persistent so the
-  // ex-collaborator sees it on next login even if they were offline.
+  // Revoke side — either "your access was removed" (the ex-
+  // collaborator perspective) or "you removed X" (the owner's
+  // confirmation). The exact wording also branches on whether the
+  // owner kept a copy of the note for the removed user. The
+  // `notificationType` carries the four-variant key; we map it to
+  // the right title/message pair here so the rendering stays the
+  // same across all four cases.
   const showRevokeToast = useCallback((n) => {
     if (!n) return;
     const id = n.id ?? n.notificationId;
@@ -108,14 +112,30 @@ export function useShareNotifications({ token, userId }) {
     const noteTitle = rawTitle || t("untitledNote");
     const fn = notifyRef.current;
     if (typeof fn !== "function") return;
+
+    const typeKey =
+      n.notificationType || n.type || "note_access_revoked";
+    let titleKey;
+    let messageKey;
+    if (typeKey === "collaborator_removed_with_copy") {
+      titleKey = "collaboratorRemovedTitle";
+      messageKey = "collaboratorRemovedWithCopyToast";
+    } else if (typeKey === "collaborator_removed") {
+      titleKey = "collaboratorRemovedTitle";
+      messageKey = "collaboratorRemovedToast";
+    } else if (typeKey === "note_access_revoked_with_copy") {
+      titleKey = "noteAccessRevokedTitle";
+      messageKey = "noteAccessRevokedWithCopyToast";
+    } else {
+      titleKey = "noteAccessRevokedTitle";
+      messageKey = "noteAccessRevokedToast";
+    }
+
     fn({
-      type: "note_access_revoked",
+      type: typeKey,
       variant: "warning",
-      title: t("noteAccessRevokedTitle"),
-      message: t("noteAccessRevokedToast", {
-        sender,
-        title: `**${noteTitle}**`,
-      }),
+      title: t(titleKey),
+      message: t(messageKey, { sender, title: `**${noteTitle}**` }),
       persistent: true,
       dismissible: true,
       action: null,
@@ -135,6 +155,7 @@ export function useShareNotifications({ token, userId }) {
         for (const n of list) {
           const payload = {
             id: n.id,
+            notificationType: n.type,
             senderName: n.sender_name,
             noteTitle: n.note_title,
             noteId: n.note_id,
@@ -142,7 +163,12 @@ export function useShareNotifications({ token, userId }) {
           if (n.type === "note_shared") {
             showShareToast(payload);
             handled.push(n.id);
-          } else if (n.type === "note_access_revoked") {
+          } else if (
+            n.type === "note_access_revoked" ||
+            n.type === "note_access_revoked_with_copy" ||
+            n.type === "collaborator_removed" ||
+            n.type === "collaborator_removed_with_copy"
+          ) {
             showRevokeToast(payload);
             handled.push(n.id);
           }
