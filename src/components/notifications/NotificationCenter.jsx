@@ -22,7 +22,7 @@ export default function NotificationCenter({
   onClose,
   onAction,
 }) {
-  const { notifications, dismiss, dismissAll, clear } = useNotifications();
+  const { notifications, remove, dismissAll, clear } = useNotifications();
   const panelRef = useRef(null);
 
   useEffect(() => {
@@ -73,8 +73,10 @@ export default function NotificationCenter({
       right = Math.max(8, window.innerWidth - r.left - PANEL_WIDTH);
     }
     style = {
+      // Sit close to the bell — 4 px below feels anchored without
+      // touching the button outline.
       position: "fixed",
-      top: r.bottom + 8,
+      top: r.bottom + 4,
       right,
       width: PANEL_WIDTH,
       maxHeight: "70vh",
@@ -138,10 +140,11 @@ export default function NotificationCenter({
             >
               <NotificationCard
                 notification={n}
-                onDismiss={dismiss}
+                // History cards remove the row entirely on close —
+                // the entry is already in the panel, so a "soft
+                // dismiss" would just dim it without freeing space.
+                onDismiss={remove}
                 onAction={(notif) => {
-                  // Centre lets the user re-trigger the action; if it's
-                  // a navigation action we close the panel afterwards.
                   if (onAction) onAction(notif);
                   if (onClose) onClose();
                 }}

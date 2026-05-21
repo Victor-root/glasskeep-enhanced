@@ -1,16 +1,13 @@
-// Single notification card. Designed in the macOS Notification Centre
-// style: heavy backdrop blur, very translucent background so the
-// underlying UI tints through, soft rounded corners, app-style header
-// (variant chip + label + relative timestamp), bold title, message,
-// and a pill action on the right. The close button sits at the
-// top-left corner and only reveals on hover (always visible on touch
-// devices because there's no hover state to reveal it).
+// Single notification card. macOS Notification Centre styling with
+// the app's violet/blue/pink gradient + heavy blur instead of a flat
+// white surface — see globalCSS.
 //
 // String content is rendered as text children — React escapes, so
 // title/message/label are XSS-safe even when the values originate
 // from the server.
 
 import React from "react";
+import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
 
 const VARIANT_CLASS = {
@@ -20,16 +17,25 @@ const VARIANT_CLASS = {
   info: "gk-notif-card--info",
 };
 
-const VARIANT_GLYPH = {
-  success: "✓",
-  error: "!",
-  warning: "!",
-  info: "i",
-};
+// Glyph rendered inside the variant chip. `info` uses the filled
+// info-circle Tabler icon the user requested; the others stay as
+// short text so they read cleanly at the 30 px chip size. `success`
+// is intentionally absent — that variant hides its chip entirely
+// (see CSS) so the white card on its own communicates "all good".
+function VariantGlyph({ variant }) {
+  if (variant === "info") {
+    return (
+      <TI.InfoCircleFilled
+        className="tabler-icon tabler-icon--filled gk-notif-card__icon-glyph"
+      />
+    );
+  }
+  if (variant === "error" || variant === "warning") {
+    return <span aria-hidden="true">!</span>;
+  }
+  return <span aria-hidden="true">i</span>;
+}
 
-// Reused by NotificationCenter too — we re-export so the center can
-// fall back to the same relative-time format the card uses, keeping
-// "à l'instant" / "il y a 5 min" formatting consistent.
 export function formatRelativeTime(ts) {
   if (!ts) return "";
   const diff = Date.now() - ts;
@@ -49,8 +55,7 @@ export default function NotificationCard({
   // "left" (default) places the close button on the top-left corner;
   // "right" flips it to the top-right. The viewport picks the side
   // opposite its anchor edge so the X never sits flush against the
-  // screen border. The notification center always passes "left" to
-  // stay consistent inside the right-anchored panel.
+  // screen border.
   closeSide = "left",
 }) {
   if (!notification) return null;
@@ -79,7 +84,7 @@ export default function NotificationCard({
       ) : null}
 
       <span className="gk-notif-card__icon" aria-hidden="true">
-        {VARIANT_GLYPH[variant] || VARIANT_GLYPH.info}
+        <VariantGlyph variant={variant} />
       </span>
 
       <div className="gk-notif-card__body">

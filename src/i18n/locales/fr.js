@@ -676,6 +676,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   notificationsClearAll: "Effacer",
   notificationsPositionTitle: "Position des notifications",
   notificationsPositionDesc: "Emplacement des notifications dans l'app",
+  notificationsSoundTitle: "Son des notifications",
+  notificationsSoundDesc: "Joue un petit son discret à chaque nouvelle notification",
   posTopLeft: "Haut gauche",
   posTopCenter: "Haut centre",
   posTopRight: "Haut droite",

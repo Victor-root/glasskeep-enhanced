@@ -56,11 +56,20 @@ function reducer(state, action) {
     case "ADD":
       return [action.notification, ...state].slice(0, MAX_HISTORY);
     case "DISMISS":
+      // Soft-hide: mark as dismissed but keep the row in history so
+      // the notification center still surfaces it. Used by the
+      // viewport close button and by `dismissAll`.
       return state.map((n) =>
         n.id === action.id && !n.dismissed
           ? { ...n, dismissed: true, dismissedAt: Date.now() }
           : n,
       );
+    case "REMOVE":
+      // Hard delete: drop the row entirely. Used by the per-item X
+      // in the notification center, so the user can prune history
+      // selectively without nuking the whole list (which is what
+      // CLEAR is for).
+      return state.filter((n) => n.id !== action.id);
     case "DISMISS_ALL": {
       const ts = Date.now();
       return state.map((n) =>
@@ -104,6 +113,14 @@ export function NotificationProvider({ children }) {
     (id) => {
       cancelTimer(id);
       dispatch({ type: "DISMISS", id });
+    },
+    [cancelTimer],
+  );
+
+  const remove = useCallback(
+    (id) => {
+      cancelTimer(id);
+      dispatch({ type: "REMOVE", id });
     },
     [cancelTimer],
   );
@@ -164,6 +181,7 @@ export function NotificationProvider({ children }) {
     notifications,
     notify,
     dismiss,
+    remove,
     dismissAll,
     clear,
   };
@@ -179,6 +197,7 @@ const NOOP_VALUE = {
   notifications: [],
   notify: () => null,
   dismiss: () => {},
+  remove: () => {},
   dismissAll: () => {},
   clear: () => {},
 };

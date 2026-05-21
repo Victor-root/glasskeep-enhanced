@@ -2426,6 +2426,15 @@ html.dark .rt-toolbar {
   stroke-linejoin: round;
   fill: none;
 }
+/* Filled Tabler glyphs (anything from the tabler-icons-filled set —
+   e.g. bell-ringing-filled, info-circle-filled). The default rule
+   above strokes everything and clears fill, which strips a filled
+   icon to outlines; this restores the intended look. */
+.tabler-icon--filled > svg {
+  fill: currentColor;
+  stroke: none;
+}
+.tabler-icon--filled > svg [fill="none"] { fill: none; }
 .tabler-icon--chevron,
 .tabler-icon--chevron > svg { width: 12px; height: 12px; stroke-width: 2; opacity: 0.75; }
 
@@ -3732,14 +3741,13 @@ html.dark .typo-modal-toggle {
   }
 }
 
-/* Notification card — macOS Notification Centre styling. Mostly
-   white over a heavy backdrop blur so the underlying UI tints
-   through subtly without washing out the surface. Soft rounding,
-   stroke + drop shadow with an inner highlight, header row with
-   variant chip + uppercase app label + relative timestamp, bold
-   title, body text, and an optional right-aligned pill action.
-   Close button sits at the corner opposite the viewport anchor edge
-   so it never visually crowds the screen edge. */
+/* Notification card — macOS Notification Centre styling rebuilt with
+   the app's violet/blue/pink palette. The background is a tinted
+   diagonal gradient (indigo → violet → fuchsia) on top of heavy
+   backdrop blur, so the card reads as a frosted slab of the same
+   glass family used elsewhere in the UI. The "white card" first
+   pass was too generic — this version explicitly carries the
+   GlassKeep identity. */
 .gk-notif-card {
   position: relative;
   display: flex;
@@ -3748,25 +3756,34 @@ html.dark .typo-modal-toggle {
   width: 100%;
   padding: 11px 14px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  background:
+    linear-gradient(135deg,
+      rgba(248, 244, 255, 0.78) 0%,
+      rgba(238, 234, 255, 0.74) 35%,
+      rgba(240, 232, 252, 0.74) 65%,
+      rgba(252, 232, 244, 0.78) 100%);
+  backdrop-filter: blur(34px) saturate(190%);
+  -webkit-backdrop-filter: blur(34px) saturate(190%);
+  border: 1px solid rgba(124, 58, 237, 0.18);
   box-shadow:
-    0 14px 36px rgba(0, 0, 0, 0.16),
-    0 4px 12px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    0 14px 36px rgba(76, 29, 149, 0.18),
+    0 4px 12px rgba(99, 102, 241, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
   color: #1d1d1f;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   animation: gkNotifIn 280ms cubic-bezier(.22,.61,.36,1) both;
 }
 html.dark .gk-notif-card {
-  background: rgba(40, 40, 45, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(135deg,
+      rgba(40, 30, 70, 0.78) 0%,
+      rgba(35, 32, 75, 0.78) 50%,
+      rgba(55, 32, 60, 0.78) 100%);
+  border: 1px solid rgba(167, 139, 250, 0.22);
   box-shadow:
     0 14px 36px rgba(0, 0, 0, 0.55),
-    0 4px 12px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 4px 12px rgba(76, 29, 149, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
   color: #f5f5f7;
 }
 
@@ -3804,6 +3821,9 @@ html.dark .gk-notif-card {
     0 1px 3px rgba(0, 0, 0, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
+/* Filled glyph inside the chip — slightly smaller than the chip so
+   it doesn't look pinned to the edges. */
+.gk-notif-card__icon-glyph { width: 18px; height: 18px; }
 
 .gk-notif-card__body {
   flex: 1 1 auto;
@@ -3820,9 +3840,8 @@ html.dark .gk-notif-card {
 .gk-notif-card__label {
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  opacity: 0.65;
+  letter-spacing: 0.2px;
+  opacity: 0.7;
 }
 .gk-notif-card__time {
   font-size: 11px;
@@ -3891,7 +3910,11 @@ html.dark .gk-notif-card__action-btn:hover {
   font-size: 9px;
   font-weight: 700;
   line-height: 1;
-  cursor: pointer;
+  /* Default cursor — explicit override so the global
+     'button { cursor: pointer }' rule near the top of this file
+     does not apply. The user wants this affordance subtle, not
+     advertised on hover. */
+  cursor: default;
   opacity: 0;
   transition: opacity 0.15s, transform 0.1s;
   display: flex;
@@ -3961,28 +3984,42 @@ html.dark .gk-notif-bell-badge {
   box-shadow: 0 0 0 2px rgba(28, 28, 34, 0.98);
 }
 
-/* Notification center popover */
+/* Notification center popover — same frosted glass + violet/pink
+   gradient as the cards, so opening the panel feels like the cards
+   resolved into a single sheet. */
 .gk-notif-center {
   z-index: 75;
-  background: rgba(255, 255, 255, 0.98);
-  color: #1f2937;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #1d1d1f;
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg,
+      rgba(248, 244, 255, 0.88) 0%,
+      rgba(238, 234, 255, 0.86) 50%,
+      rgba(252, 232, 244, 0.88) 100%);
+  backdrop-filter: blur(34px) saturate(190%);
+  -webkit-backdrop-filter: blur(34px) saturate(190%);
+  border: 1px solid rgba(124, 58, 237, 0.22);
   box-shadow:
-    0 18px 40px -10px rgba(15, 23, 42, 0.22),
-    0 8px 18px -6px rgba(15, 23, 42, 0.16);
+    0 18px 40px -10px rgba(76, 29, 149, 0.25),
+    0 8px 18px -6px rgba(99, 102, 241, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   animation: gkNotifCenterIn 180ms ease-out both;
 }
 html.dark .gk-notif-center {
-  background: rgba(28, 28, 34, 0.98);
-  color: #e5e7eb;
-  border-color: rgba(255, 255, 255, 0.08);
+  color: #f5f5f7;
+  background:
+    linear-gradient(135deg,
+      rgba(40, 30, 70, 0.88) 0%,
+      rgba(35, 32, 75, 0.88) 50%,
+      rgba(55, 32, 60, 0.88) 100%);
+  border: 1px solid rgba(167, 139, 250, 0.28);
   box-shadow:
     0 18px 40px -10px rgba(0, 0, 0, 0.65),
-    0 8px 18px -6px rgba(0, 0, 0, 0.45);
+    0 8px 18px -6px rgba(76, 29, 149, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 @keyframes gkNotifCenterIn {
   from { opacity: 0; transform: translateY(-6px) scale(0.98); }
@@ -4060,7 +4097,7 @@ html.dark .gk-notif-center__close:hover { background: rgba(255,255,255,0.08); }
 .gk-notif-center__item.is-dismissed .gk-notif-card {
   opacity: 0.55;
 }
-.gk-notif-center__item.is-dismissed .gk-notif-card__close {
-  display: none;
-}
+/* Dismissed-in-history rows keep their X — the user wants per-item
+   removal in the panel (it calls REMOVE, not DISMISS, so the row is
+   actually deleted). Only "Effacer" wipes the entire list. */
 `;

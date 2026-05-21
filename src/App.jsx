@@ -64,6 +64,7 @@ import GenericConfirmDialog from "./components/common/GenericConfirmDialog.jsx";
 import NotificationViewport from "./components/notifications/NotificationViewport.jsx";
 import NotificationBell from "./components/notifications/NotificationBell.jsx";
 import { useNotifications } from "./components/notifications/NotificationProvider.jsx";
+import { playNotificationDing } from "./utils/notificationSound.js";
 import QrScannerModal from "./components/auth/QrScannerModal.jsx";
 import FloatingCardsBackground from "./components/common/FloatingCardsBackground.jsx";
 import NoteModal from "./components/modal/NoteModal.jsx";
@@ -317,6 +318,16 @@ export default function App() {
     }
     return "top-right";
   });
+  // Notification sound toggle. Defaults to on — the ding is short
+  // and quiet enough that the user opt-out is the right default.
+  const [notificationsSound, setNotificationsSound] = useState(() => {
+    try {
+      const stored = localStorage.getItem("notificationsSound");
+      if (stored === "0" || stored === "false") return false;
+      if (stored === "1" || stored === "true") return true;
+    } catch (e) {}
+    return true;
+  });
   const [typographyPresets, setTypographyPresets] = useState(() => {
     try {
       const stored = localStorage.getItem(TYPOGRAPHY_STORAGE_KEY);
@@ -491,7 +502,8 @@ export default function App() {
   // existing call sites in App.jsx, panels and hooks delegate to it,
   // so we route their input through the same provider instead of
   // touching them all.
-  const { notify: notify, dismiss: dismissNotification } = useNotifications();
+  const { notify, dismiss: dismissNotification, notifications: allNotifications } =
+    useNotifications();
   const showToast = useCallback(
     (message, type = "success", duration) => {
       // Pre-existing variants used by the codebase: "success" | "error" | "info".
@@ -511,6 +523,28 @@ export default function App() {
     },
     [notify],
   );
+
+  // Discrete ding whenever a new notification appears, gated by the
+  // notificationsSound user pref. The provider returns the list
+  // newest-first; we just need to detect when index 0's id changes
+  // to play exactly once per addition. The ref starts at a sentinel
+  // so the first notification of a session still triggers the sound.
+  const lastDingedIdRef = useRef(null);
+  useEffect(() => {
+    if (!notificationsSound) return;
+    const newest = allNotifications[0];
+    if (!newest) return;
+    if (lastDingedIdRef.current === newest.id) return;
+    // Skip if the "newest" is actually a stale entry being re-dispatched
+    // (dismissed: true means the only state change was a dismiss action,
+    // not a fresh add).
+    if (newest.dismissed) {
+      lastDingedIdRef.current = newest.id;
+      return;
+    }
+    lastDingedIdRef.current = newest.id;
+    playNotificationDing();
+  }, [allNotifications, notificationsSound]);
 
   // Generic confirmation dialog helper
   const showGenericConfirm = (config) => {
@@ -850,6 +884,13 @@ export default function App() {
           setNotificationsPosition(settings.notificationsPosition);
           localStorage.setItem("notificationsPosition", settings.notificationsPosition);
         }
+        if (typeof settings?.notificationsSound === "boolean") {
+          setNotificationsSound(settings.notificationsSound);
+          localStorage.setItem(
+            "notificationsSound",
+            settings.notificationsSound ? "1" : "0",
+          );
+        }
         if (settings?.typographyPresets && typeof settings.typographyPresets === "object") {
           const normalized = normalizeTypographyPresets(settings.typographyPresets);
           setTypographyPresets(normalized);
@@ -1061,6 +1102,23 @@ export default function App() {
       }).catch(() => {});
     }
   }, [notificationsPosition]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "notificationsSound",
+        notificationsSound ? "1" : "0",
+      );
+    } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { notificationsSound },
+      }).catch(() => {});
+    }
+  }, [notificationsSound]);
 
   // Edge-to-edge landscape: save + dynamically toggle body padding-left
   useEffect(() => {
@@ -5988,6 +6046,8 @@ export default function App() {
         setPasteMode={setPasteMode}
         notificationsPosition={notificationsPosition}
         setNotificationsPosition={setNotificationsPosition}
+        notificationsSound={notificationsSound}
+        setNotificationsSound={setNotificationsSound}
         typographyPresets={typographyPresets}
         setTypographyPresets={(next) => setTypographyPresets(normalizeTypographyPresets(next))}
         typographyModalOpen={typographyModalOpen}

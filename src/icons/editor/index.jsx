@@ -104,6 +104,8 @@ import powerSvg            from "./tabler/power.svg?raw";
 
 // Notifications
 import bellSvg             from "./tabler/bell.svg?raw";
+import bellRingingFilledSvg from "./tabler/bell-ringing-filled.svg?raw";
+import infoCircleFilledSvg from "./tabler/info-circle-filled.svg?raw";
 
 // Cache of sanitised markup keyed by the raw SVG string. The transformation
 // only depends on the SVG source, so each icon is processed exactly once.
@@ -230,6 +232,8 @@ export const TI = {
   Swap:                 (p) => <TablerIcon svg={arrowsDownUpSvg} {...p} />,
   Power:                (p) => <TablerIcon svg={powerSvg} {...p} />,
   Bell:                 (p) => <TablerIcon svg={bellSvg} {...p} />,
+  BellRingingFilled:    (p) => <TablerIcon svg={bellRingingFilledSvg} {...p} />,
+  InfoCircleFilled:     (p) => <TablerIcon svg={infoCircleFilledSvg} {...p} />,
 };
 
 export default TI;

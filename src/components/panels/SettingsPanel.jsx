@@ -55,6 +55,8 @@ export default function SettingsPanel({
   setPasteMode,
   notificationsPosition,
   setNotificationsPosition,
+  notificationsSound,
+  setNotificationsSound,
   typographyPresets,
   setTypographyPresets,
   // Lifted into App.jsx so the centralised overlay back-button stack
@@ -87,6 +89,8 @@ export default function SettingsPanel({
   const languageBtnRef = useRef(null);
   const [breakpointMenuOpen, setBreakpointMenuOpen] = useState(false);
   const breakpointBtnRef = useRef(null);
+  const [notifPosMenuOpen, setNotifPosMenuOpen] = useState(false);
+  const notifPosBtnRef = useRef(null);
   // openSections / setOpenSections come from App.jsx so the per-section
   // expansion state is server-synced (defaults to all collapsed).
   const toggleSection = (key) =>
@@ -600,26 +604,94 @@ export default function SettingsPanel({
                 </button>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3">
-                <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-center justify-between gap-3 px-3 py-3 border border-[var(--border-light)] rounded-lg">
+                <div className="min-w-0 flex-1 flex items-center gap-3">
                   <RowIcon icon={TI.Bell} />
                   <div className="min-w-0">
                     <div className="font-medium">{t("notificationsPositionTitle")}</div>
                     <div className="text-sm text-gray-500">{t("notificationsPositionDesc")}</div>
                   </div>
                 </div>
-                <select
-                  value={notificationsPosition || "top-right"}
-                  onChange={(e) => setNotificationsPosition?.(e.target.value)}
-                  className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 px-3 py-1.5 text-sm self-end sm:self-auto focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:focus:ring-indigo-500"
+                <button
+                  ref={notifPosBtnRef}
+                  type="button"
+                  onClick={() => setNotifPosMenuOpen((v) => !v)}
+                  className="shrink-0 inline-flex items-center justify-between gap-2 min-w-[9rem] px-3 py-1.5 text-sm rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient"
+                  aria-haspopup="listbox"
+                  aria-expanded={notifPosMenuOpen}
                 >
-                  <option value="top-left">{t("posTopLeft")}</option>
-                  <option value="top-center">{t("posTopCenter")}</option>
-                  <option value="top-right">{t("posTopRight")}</option>
-                  <option value="bottom-left">{t("posBottomLeft")}</option>
-                  <option value="bottom-center">{t("posBottomCenter")}</option>
-                  <option value="bottom-right">{t("posBottomRight")}</option>
-                </select>
+                  <span>{t(`pos${(notificationsPosition || "top-right").replace(/-/g, " ").replace(/(?:^|\s)\S/g, (m) => m.toUpperCase()).replace(/\s/g, "")}`)}</span>
+                  <TI.ChevronDown
+                    className={`tabler-icon w-4 h-4 transition-transform ${notifPosMenuOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                <Popover
+                  anchorRef={notifPosBtnRef}
+                  open={notifPosMenuOpen}
+                  onClose={() => setNotifPosMenuOpen(false)}
+                  offset={6}
+                >
+                  <ul
+                    className="min-w-[11rem] rounded-xl border border-[var(--border-light)] bg-white dark:bg-[#222222] text-gray-800 dark:text-gray-100 shadow-xl py-1.5 overflow-hidden"
+                    role="listbox"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {[
+                      { value: "top-left", label: t("posTopLeft") },
+                      { value: "top-center", label: t("posTopCenter") },
+                      { value: "top-right", label: t("posTopRight") },
+                      { value: "bottom-left", label: t("posBottomLeft") },
+                      { value: "bottom-center", label: t("posBottomCenter") },
+                      { value: "bottom-right", label: t("posBottomRight") },
+                    ].map((opt) => {
+                      const selected = (notificationsPosition || "top-right") === opt.value;
+                      return (
+                        <li key={opt.value} role="option" aria-selected={selected}>
+                          <button
+                            type="button"
+                            className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-sm text-left transition-colors ${
+                              selected
+                                ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 font-semibold"
+                                : "hover:bg-black/5 dark:hover:bg-white/10"
+                            }`}
+                            onClick={() => {
+                              setNotifPosMenuOpen(false);
+                              setNotificationsPosition?.(opt.value);
+                            }}
+                          >
+                            <span>{opt.label}</span>
+                            {selected && <TI.Check className="tabler-icon w-4 h-4 shrink-0" />}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </Popover>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 px-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <RowIcon icon={TI.Bell} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{t("notificationsSoundTitle")}</div>
+                    <div className="text-sm text-gray-500">{t("notificationsSoundDesc")}</div>
+                  </div>
+                </div>
+                <button
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full self-end sm:self-auto transition-colors ${
+                    notificationsSound
+                      ? "bg-indigo-600"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                  onClick={() => setNotificationsSound?.(!notificationsSound)}
+                  aria-pressed={notificationsSound}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      notificationsSound ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
               </div>
             </div>
             </SettingsSection>
