@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { t } from "../i18n";
 import { formatEditedStamp, normalizeImageFilename, downloadDataUrl } from "../utils/helpers.js";
+import { attachPlainTextCodeCopy } from "../utils/plainTextCodeCopy.js";
 
 /**
  * useModalState — Pure UI state and effects for the note modal.
@@ -482,10 +483,17 @@ export default function useModalState({ notes, currentUser, closeModalRef, runFo
       mo.observe(root, { childList: true, subtree: true });
     } catch (e) {}
 
+    // Force plain-text clipboard payload when the user selects inside
+    // a <pre>/<code>. The dedicated copy button already does the right
+    // thing — this catches manual Ctrl+C / OS long-press copy from a
+    // selection that the in-block button doesn't drive.
+    const detachCodeCopy = attachPlainTextCodeCopy(root);
+
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       mo.disconnect();
+      detachCodeCopy();
     };
   }, [open, viewMode, mType, mBody, activeId]);
 

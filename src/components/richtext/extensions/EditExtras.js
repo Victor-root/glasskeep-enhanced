@@ -23,6 +23,7 @@
 
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
+import { attachPlainTextCodeCopy } from "../../../utils/plainTextCodeCopy.js";
 import { t } from "../../../i18n";
 
 const EDIT_EXTRAS_ATTR = "data-edit-extras";
@@ -621,8 +622,17 @@ export const EditExtras = Extension.create({
           });
           dom.addEventListener("click", onClickCapture, { capture: true });
 
+          // Force plain-text on the clipboard when the user selects
+          // and copies inside a code block / inline code (Ctrl+C, OS
+          // long-press → Copy). The in-block "Copier" button already
+          // serialises via textContent; this catches manual selections
+          // so the surrounding fragment never sneaks the styled HTML
+          // into the clipboard.
+          const detachCodeCopy = attachPlainTextCodeCopy(dom);
+
           return {
             destroy() {
+              detachCodeCopy();
               dom.removeEventListener("touchstart", onTouchStart, {
                 capture: true,
               });
