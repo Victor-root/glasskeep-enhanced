@@ -14,7 +14,8 @@
     "preview": "vite preview",
     "unlock-instance": "node scripts/unlock-instance.cjs",
     "unlock-instance-recovery": "node scripts/unlock-instance.cjs --recovery",
-    "unlock-instance-status": "node scripts/unlock-instance.cjs --status"
+    "unlock-instance-status": "node scripts/unlock-instance.cjs --status",
+    "test-notification": "node scripts/test-notification.cjs"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",

@@ -2909,6 +2909,21 @@ export default function App() {
               if (msg.notificationId) {
                 markShareNotificationsDelivered([msg.notificationId]);
               }
+            } else if (msg && msg.type === "test_notification") {
+              // Dev/test notification dispatched via the
+              // scripts/test-notification.cjs CLI. Routed through the
+              // generic notify() so it inherits the standard card UI,
+              // history entry and unread badge.
+              notify({
+                type: "test",
+                variant: msg.variant || "info",
+                title: msg.title || null,
+                message: msg.message || "",
+                persistent: !!msg.persistent,
+              });
+              if (msg.notificationId) {
+                markShareNotificationsDelivered([msg.notificationId]);
+              }
             } else if (msg && msg.type === "pending_user_registered") {
               // Admin notification: a new user is awaiting approval.
               if (currentUserRef.current?.is_admin) {

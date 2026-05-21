@@ -41,6 +41,15 @@ const POSITION_CLASS = {
   "bottom-right": "gk-notif-viewport--bottom-right",
 };
 
+// Map a viewport anchor to the close-button side. A right-anchored
+// stack puts its X on the LEFT so the X overhangs INTO the screen
+// rather than off the screen edge; left- and centre-anchored stacks
+// put their X on the RIGHT for the same reason.
+function closeSideForPosition(position) {
+  if (position === "top-right" || position === "bottom-right") return "left";
+  return "right";
+}
+
 export default function NotificationViewport({
   position = "top-right",
   onAction,
@@ -51,6 +60,7 @@ export default function NotificationViewport({
   if (active.length === 0) return null;
   const positionClass = POSITION_CLASS[position] || POSITION_CLASS["top-right"];
   const isBottom = position.startsWith("bottom");
+  const closeSide = closeSideForPosition(position);
   // Bottom-anchored stacks render the newest notification at the bottom
   // (closest to the anchor edge), top-anchored stacks render the newest
   // at the top — both match user intuition about "the new thing comes in
@@ -64,6 +74,7 @@ export default function NotificationViewport({
           notification={n}
           onDismiss={dismiss}
           onAction={onAction}
+          closeSide={closeSide}
         />
       ))}
     </div>

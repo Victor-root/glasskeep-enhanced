@@ -3732,13 +3732,14 @@ html.dark .typo-modal-toggle {
   }
 }
 
-/* Notification card — macOS Notification Centre styling. Heavy
-   backdrop blur so the underlying UI tints the card, ultra-soft
-   rounding, subtle stroke + drop shadow, header row with variant
-   chip + uppercase app label + relative timestamp, bold title, body
-   text, and an optional right-aligned pill action. Close button sits
-   at the top-left corner (hover-revealed on pointing devices, always
-   visible on touch). */
+/* Notification card — macOS Notification Centre styling. Mostly
+   white over a heavy backdrop blur so the underlying UI tints
+   through subtly without washing out the surface. Soft rounding,
+   stroke + drop shadow with an inner highlight, header row with
+   variant chip + uppercase app label + relative timestamp, bold
+   title, body text, and an optional right-aligned pill action.
+   Close button sits at the corner opposite the viewport anchor edge
+   so it never visually crowds the screen edge. */
 .gk-notif-card {
   position: relative;
   display: flex;
@@ -3747,20 +3748,20 @@ html.dark .typo-modal-toggle {
   width: 100%;
   padding: 11px 14px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow:
     0 14px 36px rgba(0, 0, 0, 0.16),
     0 4px 12px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
   color: #1d1d1f;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   animation: gkNotifIn 280ms cubic-bezier(.22,.61,.36,1) both;
 }
 html.dark .gk-notif-card {
-  background: rgba(40, 40, 45, 0.6);
+  background: rgba(40, 40, 45, 0.78);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
     0 14px 36px rgba(0, 0, 0, 0.55),
@@ -3770,11 +3771,22 @@ html.dark .gk-notif-card {
 }
 
 /* Variant accent — used by the icon chip only, the card chrome
-   itself stays neutral so the glass look is preserved. */
+   itself stays neutral so the glass look is preserved.
+   Success is intentionally absent: the original toast palette had
+   green/red/blue, and the user wants success (the most common
+   "everything went fine" state) to read as the plain white card
+   without a coloured chip; info (blue) and error (red) keep their
+   colours; warning gets amber so the four-variant API stays usable. */
 .gk-notif-card--info    { --gk-notif-accent: #3b82f6; }
-.gk-notif-card--success { --gk-notif-accent: #10b981; }
 .gk-notif-card--warning { --gk-notif-accent: #f59e0b; }
 .gk-notif-card--error   { --gk-notif-accent: #ef4444; }
+
+/* Success has no chip at all — the body fills the card edge to
+   edge. Selector also clears any inherited accent var so an in-line
+   style override can't sneak a colour back in. */
+.gk-notif-card--success .gk-notif-card__icon {
+  display: none;
+}
 
 .gk-notif-card__icon {
   flex: 0 0 auto;
@@ -3859,9 +3871,13 @@ html.dark .gk-notif-card__action-btn:hover {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Close button: top-left corner, macOS-style circular pill. Hidden by
-   default on hover-capable devices and revealed on hover/focus of the
-   card; always visible on coarse pointers where there's no hover. */
+/* Close button: corner circular pill (macOS style). The side switches
+   based on the parent viewport's anchor edge — see the
+   .gk-notif-card--close-right modifier — so for a right-anchored
+   stack the X sits on the LEFT of the card (away from the screen
+   edge it would otherwise crowd) and vice versa. Hidden by default
+   on hover-capable devices and revealed on hover/focus; always
+   visible on coarse pointers where there's no hover. */
 .gk-notif-card__close {
   position: absolute;
   top: -6px;
@@ -3883,6 +3899,10 @@ html.dark .gk-notif-card__action-btn:hover {
   justify-content: center;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
   z-index: 2;
+}
+.gk-notif-card--close-right .gk-notif-card__close {
+  left: auto;
+  right: -6px;
 }
 .gk-notif-card:hover .gk-notif-card__close,
 .gk-notif-card:focus-within .gk-notif-card__close {

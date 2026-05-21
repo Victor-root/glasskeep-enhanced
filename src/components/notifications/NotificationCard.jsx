@@ -46,18 +46,26 @@ export default function NotificationCard({
   onDismiss,
   onAction,
   compact = false,
+  // "left" (default) places the close button on the top-left corner;
+  // "right" flips it to the top-right. The viewport picks the side
+  // opposite its anchor edge so the X never sits flush against the
+  // screen border. The notification center always passes "left" to
+  // stay consistent inside the right-anchored panel.
+  closeSide = "left",
 }) {
   if (!notification) return null;
   const { id, title, message, variant, dismissible, action, createdAt } =
     notification;
   const klass = VARIANT_CLASS[variant] || VARIANT_CLASS.info;
+  const closeKlass =
+    closeSide === "right" ? " gk-notif-card--close-right" : "";
   const time = formatRelativeTime(createdAt);
 
   return (
     <div
       role="status"
       aria-live={variant === "error" ? "assertive" : "polite"}
-      className={`gk-notif-card ${klass}${compact ? " gk-notif-card--compact" : ""}`}
+      className={`gk-notif-card ${klass}${compact ? " gk-notif-card--compact" : ""}${closeKlass}`}
     >
       {dismissible !== false ? (
         <button

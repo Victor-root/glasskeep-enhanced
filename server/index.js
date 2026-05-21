@@ -1977,6 +1977,67 @@ app.post("/api/notifications/mark-delivered", auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Dev/test endpoint: synthesise a notification and push it via SSE
+// the same way a real event would arrive. Admin-only because there's
+// no reason a regular user should be able to make arbitrary toasts
+// appear on their own session, and the script that drives this lives
+// outside the app (scripts/test-notification.cjs). Accepts an
+// optional `recipientEmail` so the admin can target other users.
+app.post("/api/notifications/test", auth, adminOnly, (req, res) => {
+  const {
+    variant = "info",
+    title = null,
+    message = "",
+    persistent = false,
+    recipientEmail = null,
+  } = req.body || {};
+
+  if (!message || typeof message !== "string") {
+    return res.status(400).json({ error: "message required" });
+  }
+  if (!["info", "success", "warning", "error"].includes(variant)) {
+    return res.status(400).json({ error: "invalid variant" });
+  }
+
+  let recipient = req.user;
+  if (recipientEmail && typeof recipientEmail === "string") {
+    const found = getUserByEmail.get(recipientEmail);
+    if (!found) return res.status(404).json({ error: "recipient not found" });
+    recipient = found;
+  }
+
+  const createdAt = nowISO();
+  const result = insertNotification.run(
+    recipient.id,
+    req.user.id,
+    "test",
+    null,
+    title || "",
+    req.user.name || req.user.email || "test",
+    createdAt,
+  );
+
+  // Mirror the SSE shape the live `note_shared` path uses so the
+  // client renders this with the same code, with a distinct `type`
+  // so the App-level handler routes it through a generic toast
+  // instead of the share-specific deduper.
+  sendEventToUser(recipient.id, {
+    type: "test_notification",
+    notificationId: result.lastInsertRowid,
+    variant,
+    title: title || null,
+    message,
+    persistent: !!persistent,
+    createdAt,
+  });
+
+  res.json({
+    ok: true,
+    notificationId: result.lastInsertRowid,
+    recipient: { id: recipient.id, email: recipient.email },
+  });
+});
+
 app.get("/api/notes/collaborated", auth, (req, res) => {
   const rows = decryptRows(db.prepare(`
     SELECT n.*,
