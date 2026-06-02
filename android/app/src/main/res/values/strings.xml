@@ -32,6 +32,7 @@
     <!-- In-app self-update prompts (English). update_notification_text
          interpolates the new version as %1$s. -->
     <string name="update_notification_channel">App updates</string>
+    <string name="reminder_notification_channel">Reminders</string>
     <string name="update_notification_title">GlassKeep update available</string>
     <string name="update_notification_text">Version %1$s — tap to download and install</string>
     <string name="update_notification_bigtext">Version %1$s is available. Tap to download and install. Make sure the GlassKeep server is also on the latest version, otherwise some features won\'t work.</string>

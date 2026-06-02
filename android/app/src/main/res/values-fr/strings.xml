@@ -27,6 +27,7 @@
     <string name="shortcut_new_audio_long">Nouvelle note audio</string>
 
     <string name="update_notification_channel">Mises à jour</string>
+    <string name="reminder_notification_channel">Rappels</string>
     <string name="update_notification_title">Mise à jour GlassKeep disponible</string>
     <string name="update_notification_text">Version %1$s — toucher pour télécharger et installer</string>
     <string name="update_notification_bigtext">La version %1$s est disponible. Touchez pour télécharger et installer. Pensez à mettre aussi votre serveur GlassKeep à jour, sinon certaines fonctionnalités ne marcheront pas.</string>

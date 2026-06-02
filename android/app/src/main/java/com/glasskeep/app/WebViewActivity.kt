@@ -51,6 +51,14 @@ class WebViewActivity : AppCompatActivity() {
         if (granted) com.glasskeep.app.update.UpdateNotifier.show(this, release)
     }
 
+    // POST_NOTIFICATIONS grant for reminder alarms. Requested once (per
+    // session) the first time the web app schedules a reminder; the grant
+    // persists, so later reminder notifications just work.
+    private var reminderPermissionAsked = false
+    private val reminderNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* grant persists; nothing to retry here */ }
+
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -479,6 +487,11 @@ class WebViewActivity : AppCompatActivity() {
             // it into the Promise-friendly window.GlassKeepAndroidPasskey
             // that passkeyClient.js looks for.
             addJavascriptInterface(webAuthnBridge, WebAuthnBridge.JS_INTERFACE_NAME)
+            // window.AndroidReminders — lets the web app schedule LOCAL
+            // alarms for note reminders (Web Push isn't available in a
+            // WebView). The web app calls schedule/cancel when a reminder
+            // changes and syncAll on load. See ReminderScheduler.
+            addJavascriptInterface(RemindersBridge(), "AndroidReminders")
 
             settings.apply {
                 javaScriptEnabled = true
@@ -1048,5 +1061,92 @@ class WebViewActivity : AppCompatActivity() {
             return
         }
         com.glasskeep.app.update.UpdateNotifier.show(this, release)
+    }
+
+    // Track foreground state so ReminderAlarmReceiver can skip the system
+    // notification while the app is open (the in-app/SSE notification
+    // already shows it) — avoids a visible duplicate.
+    override fun onResume() {
+        super.onResume()
+        isForeground = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isForeground = false
+    }
+
+    // Ensure the POST_NOTIFICATIONS grant (Android 13+) so a fired reminder
+    // can actually post its notification. Asked at most once per session.
+    private fun ensureReminderNotificationPermission() {
+        if (isFinishing || isDestroyed || reminderPermissionAsked) return
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+        ) {
+            reminderPermissionAsked = true
+            try {
+                reminderNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } catch (e: Exception) {
+                // launcher unavailable (activity tearing down) — ignore
+            }
+        }
+    }
+
+    /**
+     * window.AndroidReminders — local reminder scheduling for the WebView
+     * (Web Push is unavailable here). Methods run on a binder thread;
+     * AlarmManager + SharedPreferences are thread-safe, but any UI work
+     * (permission prompt) is marshalled back to the main thread.
+     */
+    inner class RemindersBridge {
+        @JavascriptInterface
+        fun isSupported(): Boolean = true
+
+        @JavascriptInterface
+        fun schedule(noteId: String?, triggerAtMillis: String?, title: String?, body: String?) {
+            val id = noteId ?: return
+            val at = triggerAtMillis?.toLongOrNull() ?: return
+            com.glasskeep.app.reminders.ReminderScheduler.schedule(
+                applicationContext, id, at, title ?: "", body ?: "",
+            )
+            runOnUiThread { ensureReminderNotificationPermission() }
+        }
+
+        @JavascriptInterface
+        fun cancel(noteId: String?) {
+            val id = noteId ?: return
+            com.glasskeep.app.reminders.ReminderScheduler.cancel(applicationContext, id)
+        }
+
+        @JavascriptInterface
+        fun syncAll(json: String?) {
+            val raw = json ?: return
+            val items = ArrayList<com.glasskeep.app.reminders.ReminderScheduler.ReminderItem>()
+            try {
+                val arr = org.json.JSONArray(raw)
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val id = o.optString("noteId")
+                    val at = o.optLong("t")
+                    if (id.isBlank() || at <= 0L) continue
+                    items.add(
+                        com.glasskeep.app.reminders.ReminderScheduler.ReminderItem(
+                            id, at, o.optString("title"), o.optString("body"),
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                return
+            }
+            com.glasskeep.app.reminders.ReminderScheduler.syncAll(applicationContext, items)
+            if (items.isNotEmpty()) runOnUiThread { ensureReminderNotificationPermission() }
+        }
+    }
+
+    companion object {
+        // Read by ReminderAlarmReceiver (possibly from another thread).
+        @Volatile
+        var isForeground: Boolean = false
     }
 }

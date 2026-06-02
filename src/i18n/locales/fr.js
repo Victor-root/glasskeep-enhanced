@@ -175,7 +175,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   pushNotifDesc: "Recevez les rappels sur cet appareil, même quand l'app est fermée.",
   pushUnsupported: "Non pris en charge par ce navigateur.",
   pushUnsupportedIos: "Sur iPhone : ajoutez d'abord l'app à l'écran d'accueil (iOS 16.4+).",
-  pushUnsupportedWebview: "Indisponible dans l'app Android. Ouvrez GlassKeep dans Chrome et installez-le (menu ⋮ → Ajouter à l'écran d'accueil) pour les notifications push.",
+  pushUnsupportedWebview: "Dans l'app Android, les rappels s'affichent automatiquement via des notifications locales — rien à activer ici.",
   pushDenied: "Notifications bloquées. Autorisez-les dans les réglages du navigateur.",
   pushUnconfigured: "Les notifications push ne sont pas activées sur ce serveur.",
   pushEnableError: "Impossible d'activer les notifications push.",

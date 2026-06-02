@@ -40,6 +40,7 @@ import {
 } from "./utils/typographyPresets.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES, REMINDERS } from "./utils/constants.js";
+import { hasAndroidReminders, syncAndroidReminders } from "./utils/androidReminders.js";
 import { setNoteIcon } from "./utils/noteIcon.js";
 import { fetchLogoLibrary, createLogo, deleteLogo as apiDeleteLogo } from "./utils/logoLibrary.js";
 import { ColorDot } from "./components/common/ColorDot.jsx";
@@ -5915,6 +5916,31 @@ export default function App() {
       /* toast is best-effort feedback */
     }
   };
+
+  // Android WebView only: mirror upcoming reminders to the native local
+  // alarm scheduler (Web Push isn't available in a WebView, so the APK
+  // fires reminders via AlarmManager instead). No-op in the PWA / browser,
+  // where Web Push handles it. Reconciles the whole set on every change
+  // (create / edit / delete, cross-device sync, app launch); the signature
+  // guard skips redundant bridge calls.
+  const androidReminderSyncRef = useRef("");
+  useEffect(() => {
+    if (!hasAndroidReminders()) return;
+    const now = Date.now();
+    const title = t("reminderNotificationTitle");
+    const items = (notes || [])
+      .filter((n) => n.reminderAt && new Date(n.reminderAt).getTime() > now)
+      .map((n) => ({
+        noteId: String(n.id),
+        t: new Date(n.reminderAt).getTime(),
+        title,
+        body: (n.title || "").trim() || t("untitledNote"),
+      }));
+    const sig = JSON.stringify(items);
+    if (sig === androidReminderSyncRef.current) return;
+    androidReminderSyncRef.current = sig;
+    syncAndroidReminders(items);
+  }, [notes]);
 
   /** -------- Reset note order -------- */
   const resetNoteOrder = async (overridePositions = true) => {

@@ -22,6 +22,16 @@
          on Android 13+. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Local reminder alarms (note-reminders feature). Exact alarms make a
+         reminder fire on time even in Doze; USE_EXACT_ALARM is the Android
+         13+ form (auto-granted for reminder/alarm apps), SCHEDULE_EXACT_ALARM
+         the 31–32 form. RECEIVE_BOOT_COMPLETED re-arms pending alarms after a
+         reboot. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <!-- TV support: declare leanback as optional and touchscreen as not required so
@@ -88,5 +98,22 @@
         <receiver
             android:name=".update.UpdateActionReceiver"
             android:exported="false" />
+
+        <!-- Reminder alarm target: AlarmManager fires this when a note
+             reminder comes due; it posts the local notification (unless the
+             app is foregrounded, where the in-app notification handles it). -->
+        <receiver
+            android:name=".reminders.ReminderAlarmReceiver"
+            android:exported="false" />
+
+        <!-- Re-arms persisted reminder alarms after a reboot. -->
+        <receiver
+            android:name=".reminders.ReminderBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
