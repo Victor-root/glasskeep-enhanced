@@ -1,45 +1,41 @@
 #!/usr/bin/env node
 // scripts/test-reminder.cjs
 //
-// Fire a note's reminder ON DEMAND — the instant-test counterpart to
-// "set a reminder and wait for it". Runs the real dispatchReminder()
-// pipeline on the server, so the recipient gets exactly what a genuine
-// due reminder produces:
-//   - the in-app reminder card over SSE (any logged-in session, incl.
-//     the Android WebView app while it's open), with the "Open" action;
-//   - a persisted notification (shows in history / unread badge);
-//   - a Web Push for installed PWAs (if VAPID keys are configured).
+// Set a note's reminder FOR YOU, exactly as if you'd set it by hand in the
+// UI — no typing, no waiting. By default it sets the reminder to *now*, so
+// the real pipeline fires it within ~1s:
+//   - the in-app reminder card over SSE (any logged-in session, incl. the
+//     Android app while it's OPEN), with the "Open" action;
+//   - a persisted notification (history / unread badge);
+//   - a Web Push for installed PWAs (if VAPID keys are configured);
+//   - on the Android app, the note update also re-arms the on-device local
+//     alarm (so --in <sec> + backgrounding the app reproduces the native
+//     "app closed" notification without the manual setup).
 //
-// Sibling of scripts/test-notification.cjs and works the same way:
+// It writes reminder_at / clears reminder_fired_at / bumps client_updated_at
+// and broadcasts the note update — the exact same state change the UI makes.
+//
+// Sibling of scripts/test-notification.cjs; works the same way:
 //   1. Reads /opt/glass-keep/.env (or $GLASSKEEP_ENV) for JWT_SECRET,
 //      DB_FILE and the API port.
 //   2. Opens the SQLite DB read-only to pick an admin to authenticate as
 //      (the endpoint is admin-only). --as <email> overrides.
-//   3. Signs a short-lived JWT with the server's secret.
-//   4. POSTs to /api/notes/<noteId>/fire-reminder on the running service.
-//
-// NOTE: the reminder is delivered to the NOTE's recipients (its owner +
-// any collaborators), not necessarily the admin you authenticate as.
-//
-// What it does NOT do: trigger the Android APK's *local* alarm. That
-// notification is scheduled on the device by AlarmManager and only the
-// device can raise it when the app is closed — there's no channel from
-// the server to a closed WebView app. To test that native notification
-// (and its tap-to-open) instantly, use scripts/test-reminder-native.sh
-// (adb). This script covers the in-app + Web Push paths.
+//   3. Signs a short-lived JWT and POSTs to
+//      /api/notes/<noteId>/test-reminder.
 //
 // Usage:
-//   node scripts/test-reminder.cjs <noteId>
-//   node scripts/test-reminder.cjs --note 1777374322541-t1vpuv
-//   GLASSKEEP_TEST_NOTE_ID=1777374322541-t1vpuv node scripts/test-reminder.cjs
-//   node scripts/test-reminder.cjs --as admin@example.com <noteId>
+//   node scripts/test-reminder.cjs <noteId>            # due now, fires now
+//   node scripts/test-reminder.cjs <noteId> --in 20    # due in 20s
+//   GLASSKEEP_TEST_NOTE_ID=<id> node scripts/test-reminder.cjs
 //
 // Flags:
-//   --note <id>   note id to fire (else first positional, else
-//                 $GLASSKEEP_TEST_NOTE_ID)
-//   --as <email>  authenticate as this admin (default: first admin in DB)
-//   --port <n>    override discovered API port
-//   --host <h>    override host (default 127.0.0.1)
+//   --in <seconds>  schedule the reminder this many seconds out (default 0 =
+//                   now, fired immediately). Use e.g. --in 20 then background
+//                   the Android app to test the native "app closed" notif.
+//   --note <id>     note id (else first positional, else $GLASSKEEP_TEST_NOTE_ID)
+//   --as <email>    authenticate as this admin (default: first admin in DB)
+//   --port <n>      override discovered API port
+//   --host <h>      override host (default 127.0.0.1)
 //
 // Run as a user that can read the .env file (usually root or the
 // glass-keep service user).
@@ -50,12 +46,13 @@ const http = require("http");
 const https = require("https");
 
 function parseArgs(argv) {
-  const out = { note: null, as: null, port: null, host: null, help: false, positional: [] };
+  const out = { note: null, in: 0, as: null, port: null, host: null, help: false, positional: [] };
   const av = argv.slice(2);
   for (let i = 0; i < av.length; i++) {
     const a = av[i];
     const next = () => av[++i];
     if (a === "--help" || a === "-h") out.help = true;
+    else if (a === "--in" || a === "--in-seconds") out.in = Number(next()) || 0;
     else if (a === "--note" || a === "--noteId") out.note = next();
     else if (a === "--as") out.as = next();
     else if (a === "--port") out.port = Number(next());
@@ -70,14 +67,13 @@ function parseArgs(argv) {
 function usage() {
   console.log(
     [
-      "Glass Keep — fire a note reminder on demand",
+      "Glass Keep — set a note reminder on demand (as if done by hand)",
       "",
-      "  test-reminder.cjs <noteId>",
-      "  test-reminder.cjs --note 1777374322541-t1vpuv",
+      "  test-reminder.cjs <noteId>            due now, fires within ~1s",
+      "  test-reminder.cjs <noteId> --in 20    due in 20 seconds",
       "  GLASSKEEP_TEST_NOTE_ID=<id> test-reminder.cjs",
-      "  test-reminder.cjs --as admin@example.com <noteId>",
       "",
-      "Flags: --note --as --port --host",
+      "Flags: --in <seconds> --note --as --port --host",
       "",
     ].join("\n"),
   );
@@ -213,8 +209,6 @@ async function main() {
 
   const db = new Database(cfg.dbFile, { readonly: true });
   const admin = pickAdmin(db, args);
-  // Sanity-check the note exists and surface its owner so the operator
-  // knows who will actually receive the card.
   const note = db
     .prepare("SELECT id, user_id FROM notes WHERE id = ?")
     .get(String(args.note));
@@ -235,8 +229,8 @@ async function main() {
     port: cfg.port,
     httpsEnabled: cfg.httpsEnabled,
     method: "POST",
-    path: `/api/notes/${encodeURIComponent(String(args.note))}/fire-reminder`,
-    body: {},
+    path: `/api/notes/${encodeURIComponent(String(args.note))}/test-reminder`,
+    body: { inSeconds: args.in },
     token,
   });
 
@@ -244,8 +238,15 @@ async function main() {
     console.error(`[error] ${res.status} ${res.body?.error || res.raw || "unknown"}`);
     process.exit(1);
   }
-  console.log(`[ok] reminder fired for note ${args.note} → owner user #${note.user_id} (+ collaborators)`);
-  console.log("     Open the app (or have it open) to see the card; tap \"Open\" to jump to the note.");
+
+  if (args.in > 0) {
+    console.log(`[ok] reminder set on note ${args.note} for +${args.in}s (${res.body?.reminderAt}).`);
+    console.log(`     It'll fire on the next sweep. For the NATIVE app-closed notif:`);
+    console.log(`     keep the app open now, then press home before it's due.`);
+  } else {
+    console.log(`[ok] reminder set on note ${args.note} for NOW and fired through the real pipeline.`);
+    console.log(`     Have the app open to see the card; tap "Open" to jump to the note.`);
+  }
 }
 
 main().catch((e) => {

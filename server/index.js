@@ -2599,25 +2599,47 @@ app.post("/api/notes/:id/reminder", auth, (req, res) => {
   res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });
 });
 
-// Dev/test: fire a note's reminder *right now*, end-to-end through the
-// real dispatchReminder() pipeline (in-app SSE card + persisted
-// notification + Web Push), without waiting for the 30s sweep or
-// fiddling with reminder_at. Admin-only, same as /notifications/test;
-// driven by scripts/test-reminder.cjs. Does NOT touch the note's own
-// reminder_at, so any real reminder set on the note still fires later as
-// scheduled. (The native APK's local alarm is device-side and can't be
-// triggered from here — this drives the in-app + Web Push paths.)
-app.post("/api/notes/:id/fire-reminder", auth, adminOnly, async (req, res) => {
+// Dev/test: SET a note's reminder programmatically — exactly what the UI
+// "set reminder" action does (writes reminder_at, clears reminder_fired_at,
+// bumps client_updated_at and broadcasts the note update so every device —
+// including the Android app, which then re-arms its local alarm — picks it
+// up). It's "as if you'd set it by hand", minus the typing and the wait.
+//
+//   - inSeconds <= 0 (default): the reminder is due NOW, and we run the real
+//     scheduler sweep immediately so it fires through the normal pipeline in
+//     ~1s instead of waiting up to REMINDER_SWEEP_MS. The atomic claim means
+//     the next scheduled sweep won't double-fire it.
+//   - inSeconds > 0: scheduled that far out and left to fire naturally on the
+//     next sweep — handy for "set it, background the app, get the native
+//     notification" tests.
+//
+// Admin-only, like /notifications/test; driven by scripts/test-reminder.cjs.
+let reminderScheduler = null; // handle from startReminderScheduler (assigned below)
+const setReminderForTest = db.prepare(
+  `UPDATE notes SET reminder_at = @at, reminder_fired_at = NULL,
+     client_updated_at = @cua WHERE id = @id`,
+);
+app.post("/api/notes/:id/test-reminder", auth, adminOnly, async (req, res) => {
   const id = String(req.params.id);
   const note = getNoteById.get(id);
   if (!note) return res.status(404).json({ error: "Note not found" });
+
+  const inSeconds = Number(req.body?.inSeconds) || 0;
+  const when = new Date(Date.now() + inSeconds * 1000);
   try {
-    await dispatchReminder(id);
+    setReminderForTest.run({ at: when.toISOString(), cua: nowISO(), id });
+    // Mirror the real reminder route: stamp the editor + fan out the note
+    // update so open sessions (and the APK's alarm scheduler) re-sync.
+    updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+    broadcastNoteUpdated(id);
+    if (inSeconds <= 0 && reminderScheduler?.sweepNow) {
+      await reminderScheduler.sweepNow();
+    }
   } catch (e) {
-    console.warn("[reminders] manual fire failed:", e?.message);
-    return res.status(500).json({ error: "dispatch failed" });
+    console.warn("[reminders] test set/fire failed:", e?.message);
+    return res.status(500).json({ error: "test reminder failed" });
   }
-  res.json({ ok: true, noteId: id, firedAt: nowISO() });
+  res.json({ ok: true, noteId: id, reminderAt: when.toISOString(), inSeconds, fired: inSeconds <= 0 });
 });
 
 // ---------- Web Push subscriptions (PWA push notifications) ----------
@@ -4004,7 +4026,7 @@ async function dispatchReminder(noteId) {
 }
 
 pushService.init(console);
-startReminderScheduler({
+reminderScheduler = startReminderScheduler({
   db,
   dispatch: dispatchReminder,
   log: console,

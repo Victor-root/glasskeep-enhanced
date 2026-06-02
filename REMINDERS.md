@@ -190,25 +190,29 @@ npm run dev      # or run the API + Vite dev servers
 
 ### Fire a reminder on demand (no waiting)
 
-Two helpers trigger a reminder **instantly** so you don't have to set one
-and wait for it.
-
-**Server pipeline** (in-app card over SSE + Web Push) — run on the host/LXC:
+**Set the reminder for you** — exactly like setting it by hand in the UI,
+minus the typing and the wait. Run on the host/LXC:
 
 ```bash
 # Admin JWT is derived from the server .env + DB, like test-notification.cjs.
-node scripts/test-reminder.cjs <noteId>
+node scripts/test-reminder.cjs <noteId>           # due now -> fires in ~1s
+node scripts/test-reminder.cjs <noteId> --in 20   # due in 20 seconds
 # e.g.
 node scripts/test-reminder.cjs 1777374322541-t1vpuv
 ```
 
-This runs the real `dispatchReminder()`: the note's recipients get the in-app
-card (with **Open**) on any open session, and installed PWAs get a Web Push.
-It does **not** touch the note's own `reminder_at`, so a real reminder you've
-set on it still fires later as scheduled.
+It writes `reminder_at` / clears `reminder_fired_at` / bumps
+`client_updated_at` and broadcasts the note update — the **same state change
+the UI makes** — then, for the default "now", runs the real scheduler sweep
+so it fires immediately through the genuine pipeline: the in-app card (with
+**Open**) on any open session, a persisted notification, and a Web Push for
+PWAs. With `--in <sec>` it's left to fire naturally on the next sweep; on the
+Android app the broadcast also re-arms the on-device alarm, so `--in 20` +
+backgrounding the app reproduces the native "app closed" notification without
+any manual setup.
 
-**Native Android notification** (the on-device local alarm + tap-to-open) —
-via adb to a **debug** APK:
+**Instant native notification** (the on-device alarm + tap-to-open), via adb
+to a **debug** APK:
 
 ```bash
 # phone over USB, or `adb connect <phone-ip>:5555` for wireless first
@@ -217,8 +221,8 @@ scripts/test-reminder-native.sh <noteId> "Title" "Body"
 
 It broadcasts to `ReminderDebugReceiver` — a **debug-only** receiver (absent
 from release builds) that raises the real reminder notification immediately,
-even with the app open. This is the only way to exercise the **closed-app
-native path** on demand, since the server can't reach a closed WebView app.
+even with the app open. The fastest way to exercise the **closed-app native
+path** on demand, since the server can't reach a closed WebView app.
 
 ---
 
