@@ -11,6 +11,7 @@
 // regardless.
 
 import { api } from "../utils/api.js";
+import { locale } from "../i18n";
 
 // True when the browser has the APIs Web Push needs. Note: on iOS this is
 // only true inside an installed (home-screen) PWA, never in a Safari tab.
@@ -92,11 +93,12 @@ export async function enablePush(token) {
       });
     }
 
-    // 4. Hand the subscription to the server.
+    // 4. Hand the subscription to the server. `lang` lets the server
+    //    localize the push payload (title) for "auto"-language users.
     await api("/push/subscribe", {
       method: "POST",
       token,
-      body: { subscription: sub.toJSON() },
+      body: { subscription: sub.toJSON(), lang: locale },
     });
     console.log("[push] enable: subscribed OK", sub.endpoint?.slice(0, 48) + "…");
     return { ok: true };

@@ -21,6 +21,20 @@ function isIos() {
   );
 }
 
+// The Android app is a plain WebView (it injects window.AndroidTheme).
+// WebView has no Web Push API, so push can't work there — only in the
+// PWA installed via Chrome. Detect it to show a clearer message.
+function isAndroidWebView() {
+  return typeof window !== "undefined" && !!window.AndroidTheme;
+}
+
+// Pick the right "why is push unavailable" message for this platform.
+function unsupportedNote() {
+  if (isAndroidWebView()) return "pushUnsupportedWebview";
+  if (isIos()) return "pushUnsupportedIos";
+  return "pushUnsupported";
+}
+
 /**
  * Self-contained Settings row that enables/disables Web Push on this
  * device. Lives in the Notifications section. Degrades to an explanatory
@@ -37,7 +51,7 @@ export default function PushNotificationToggle({ token }) {
     let cancelled = false;
     (async () => {
       if (!supported) {
-        setNote(isIos() ? "pushUnsupportedIos" : "pushUnsupported");
+        setNote(unsupportedNote());
         return;
       }
       if (getPushPermission() === "denied") setNote("pushDenied");
@@ -62,7 +76,7 @@ export default function PushNotificationToggle({ token }) {
           setEnabled(false);
           if (res.reason === "denied") setNote("pushDenied");
           else if (res.reason === "unconfigured") setNote("pushUnconfigured");
-          else if (res.reason === "unsupported") setNote(isIos() ? "pushUnsupportedIos" : "pushUnsupported");
+          else if (res.reason === "unsupported") setNote(unsupportedNote());
           else if (res.reason === "default") setNote("pushDenied");
           else setNote("pushEnableError");
         }

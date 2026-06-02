@@ -254,6 +254,7 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   p256dh TEXT NOT NULL,
   auth TEXT NOT NULL,
   user_agent TEXT,
+  lang TEXT,
   created_at TEXT NOT NULL,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -388,6 +389,20 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
     );
   } catch {
     // ignore if partial indexes unsupported (very old SQLite)
+  }
+})();
+
+// push_subscriptions migration: the `lang` column was added after the
+// initial reminders release so the Web Push payload (title) can be
+// localized per device — installs created before it need the ALTER.
+(function ensurePushSubscriptionColumns() {
+  try {
+    const cols = db.prepare(`PRAGMA table_info(push_subscriptions)`).all();
+    if (!cols.some((c) => c.name === "lang")) {
+      db.exec(`ALTER TABLE push_subscriptions ADD COLUMN lang TEXT`);
+    }
+  } catch {
+    // table may not exist yet (fresh boot creates it with the column)
   }
 })();
 
@@ -2597,9 +2612,9 @@ app.post("/api/push/subscribe", auth, (req, res) => {
   if (!pushService.isConfigured()) {
     return res.status(503).json({ error: "Push notifications are not configured on this server" });
   }
-  const { subscription } = req.body || {};
+  const { subscription, lang } = req.body || {};
   try {
-    pushService.saveSubscription(db, req.user.id, subscription, req.headers["user-agent"]);
+    pushService.saveSubscription(db, req.user.id, subscription, req.headers["user-agent"], lang);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: e?.message || "Invalid subscription" });
@@ -3819,13 +3834,23 @@ if (NODE_ENV === "production") {
 // app's canonical fallback). Users who set their language explicitly in
 // Settings get their reminder text in that language.
 const getUserLanguageStmt = db.prepare("SELECT language FROM users WHERE id = ?");
+const getLatestPushLangStmt = db.prepare(
+  "SELECT lang FROM push_subscriptions WHERE user_id = ? AND lang IS NOT NULL ORDER BY id DESC LIMIT 1",
+);
 function getUserLanguage(userId) {
   try {
-    const lang = getUserLanguageStmt.get(userId)?.language;
-    return lang === "fr" || lang === "en" ? lang : "en";
+    // 1. Explicit profile language wins.
+    const profileLang = getUserLanguageStmt.get(userId)?.language;
+    if (profileLang === "fr" || profileLang === "en") return profileLang;
+    // 2. "auto"-language users have no server-visible browser hint, so
+    //    fall back to the locale reported by their most recent push
+    //    subscription (the device's UI language).
+    const subLang = getLatestPushLangStmt.get(userId)?.lang;
+    if (subLang === "fr" || subLang === "en") return subLang;
   } catch {
-    return "en";
+    /* fall through to default */
   }
+  return "en";
 }
 
 // Build a short, plain-text preview for a note that has no title, used as

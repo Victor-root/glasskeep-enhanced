@@ -3441,7 +3441,11 @@ export default function App() {
               notify({
                 type: "reminder",
                 variant: msg.variant || "info",
-                title: msg.title || t("reminderNotificationTitle"),
+                // Always render the title in THIS client's locale (the
+                // server-sent title can be English when the recipient's
+                // language is on "auto"). The body is the note's own
+                // title/preview, which is language-neutral.
+                title: t("reminderNotificationTitle"),
                 message: msg.message || "",
                 icon: msg.icon || "reminder",
                 persistent: true,

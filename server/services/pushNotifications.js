@@ -63,27 +63,32 @@ function getPublicKey() {
 // Upsert a subscription keyed by its endpoint. Re-subscribing the same
 // device (e.g. after the SW updates its keys) replaces the old row and
 // re-points it at the current user, rather than piling up duplicates.
-function saveSubscription(db, userId, subscription, userAgent) {
+function saveSubscription(db, userId, subscription, userAgent, lang) {
   if (!subscription || !subscription.endpoint || !subscription.keys) {
     throw new Error("Invalid subscription");
   }
   const { endpoint } = subscription;
   const { p256dh, auth } = subscription.keys;
   if (!p256dh || !auth) throw new Error("Invalid subscription keys");
+  // Only keep a known UI language; anything else is left NULL so the
+  // server falls back to the user's profile language.
+  const normalizedLang = lang === "fr" || lang === "en" ? lang : null;
   db.prepare(
-    `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent, created_at)
-     VALUES (@user_id, @endpoint, @p256dh, @auth, @user_agent, @created_at)
+    `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent, lang, created_at)
+     VALUES (@user_id, @endpoint, @p256dh, @auth, @user_agent, @lang, @created_at)
      ON CONFLICT(endpoint) DO UPDATE SET
        user_id = excluded.user_id,
        p256dh = excluded.p256dh,
        auth = excluded.auth,
-       user_agent = excluded.user_agent`,
+       user_agent = excluded.user_agent,
+       lang = excluded.lang`,
   ).run({
     user_id: userId,
     endpoint,
     p256dh,
     auth,
     user_agent: userAgent || null,
+    lang: normalizedLang,
     created_at: new Date().toISOString(),
   });
 }

@@ -179,6 +179,15 @@ function buildHistoryEntry(n) {
         { label: t("reject"), kind: "reject_pending_user", pendingUserId: pendingId },
       ];
     }
+  } else if (type === "reminder") {
+    // Reminder: render the title in the viewer's locale (the stored
+    // note_title can be English when the recipient's language is on
+    // "auto"). The note's own title/preview lives in `message`.
+    title = t("reminderNotificationTitle");
+    message = n.message || "";
+    variant = "info";
+    icon = icon || "reminder";
+    action = noteId ? { label: t("reminderOpenNoteAction"), noteId: String(noteId) } : null;
   } else if (n.message) {
     // Generic / test notification — use stored fields directly.
     title = n.note_title || null;
@@ -479,6 +488,28 @@ export function useShareNotifications({ token, userId }) {
               deletedName: n.note_title,
               adminName: n.sender_name,
             });
+          } else if (n.type === "reminder") {
+            // Reminder replayed after being offline. Title rendered in
+            // this client's locale (stored note_title can be English for
+            // "auto"-language users); body is the note title/preview.
+            const fn = notifyRef.current;
+            if (typeof fn === "function") {
+              fn({
+                type: "reminder",
+                variant: "info",
+                title: t("reminderNotificationTitle"),
+                message: n.message || "",
+                persistent: !!n.persistent,
+                icon: n.icon || "reminder",
+                action: n.note_id
+                  ? { label: t("reminderOpenNoteAction"), noteId: String(n.note_id) }
+                  : null,
+                metadata: {
+                  serverNotificationId: n.id,
+                  ...(n.note_id ? { noteId: n.note_id } : {}),
+                },
+              });
+            }
           } else if (n.variant || n.message) {
             // Generic persisted notification (test-CLI, future events).
             const fn = notifyRef.current;
