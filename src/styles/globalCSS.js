@@ -3603,30 +3603,89 @@ html.dark .rt-icon-swatch-bar { border-color: rgba(255, 255, 255, 0.12); }
 
 /* ── Reminder picker ─────────────────────────────────────────────────
    Reuses the rich-text menu shell (.rt-pop) so it looks exactly like the
-   font / block-type dropdowns: opaque, themed, same rows. Only the
-   date/time fields + the primary action are reminder-specific. */
-.rt-pop--reminder { min-width: 252px; max-width: calc(100vw - 16px); padding: 6px; }
+   font / block-type dropdowns: opaque, themed, same rows. The date is a
+   custom mini-calendar and the time a custom stepper + chips — no native
+   browser controls, all theme-aware via the accent token. */
+.rt-pop--reminder {
+  width: 286px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  padding: 6px;
+}
 .rt-pop--reminder .rt-pop-label { padding: 0 4px; }
 .rt-pop--reminder .gk-reminder-sep { height: 1px; margin: 7px 4px; background: var(--rt-pop-border); }
-.rt-pop--reminder .gk-reminder-fields { display: flex; gap: 6px; padding: 2px 4px 9px; }
-.rt-pop--reminder .gk-reminder-input {
-  flex: 1 1 auto;
-  min-width: 0;
-  font: inherit;
-  font-size: 0.85rem;
-  padding: 7px 9px;
-  border-radius: 8px;
-  border: 1px solid var(--rt-pop-border);
-  background: var(--rt-btn-hover);
-  color: inherit;
+
+/* Mini calendar */
+.rt-pop--reminder .gk-cal { padding: 2px 2px 4px; }
+.rt-pop--reminder .gk-cal-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; padding: 0 2px;
 }
-.rt-pop--reminder .gk-reminder-input--time { flex: 0 0 5.75rem; }
-.rt-pop--reminder .gk-reminder-input:focus {
-  outline: none;
+.rt-pop--reminder .gk-cal-title { font-size: 0.85rem; font-weight: 600; text-transform: capitalize; }
+.rt-pop--reminder .gk-cal-nav {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: 0; border-radius: 8px;
+  background: transparent; color: inherit; cursor: pointer; transition: background 0.12s ease;
+}
+.rt-pop--reminder .gk-cal-nav:hover { background: var(--rt-btn-hover); }
+.rt-pop--reminder .gk-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.rt-pop--reminder .gk-cal-dow {
+  text-align: center; font-size: 0.62rem; font-weight: 600; opacity: 0.55;
+  padding: 2px 0; text-transform: uppercase;
+}
+.rt-pop--reminder .gk-cal-day {
+  aspect-ratio: 1 / 1; min-height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 9px; background: transparent; color: inherit;
+  font-size: 0.8rem; cursor: pointer; transition: background 0.12s ease, color 0.12s ease;
+}
+.rt-pop--reminder .gk-cal-day:hover:not(:disabled) { background: var(--rt-btn-hover); }
+.rt-pop--reminder .gk-cal-day--muted { opacity: 0.32; }
+.rt-pop--reminder .gk-cal-day:disabled { opacity: 0.25; cursor: default; }
+.rt-pop--reminder .gk-cal-day--today {
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--gk-chrome-accent) 45%, transparent);
+}
+.rt-pop--reminder .gk-cal-day--selected,
+.rt-pop--reminder .gk-cal-day--selected:hover {
+  background: var(--gk-chrome-accent); color: #fff; font-weight: 600;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--gk-chrome-accent) 45%, transparent);
+}
+
+/* Time stepper + chips */
+.rt-pop--reminder .gk-time { padding: 2px 4px; }
+.rt-pop--reminder .gk-time-stepper { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 9px; }
+.rt-pop--reminder .gk-time-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.rt-pop--reminder .gk-time-btn {
+  width: 34px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 7px; background: var(--rt-btn-hover); color: inherit; cursor: pointer;
+  transition: background 0.12s ease;
+}
+.rt-pop--reminder .gk-time-btn:hover { background: color-mix(in srgb, var(--gk-chrome-accent) 22%, transparent); }
+.rt-pop--reminder .gk-time-val {
+  font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  min-width: 2.2ch; text-align: center; padding: 1px 0;
+}
+.rt-pop--reminder .gk-time-sep { font-size: 1.3rem; font-weight: 700; opacity: 0.45; }
+.rt-pop--reminder .gk-time-chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+.rt-pop--reminder .gk-time-chip {
+  font-size: 0.78rem; font-weight: 600; padding: 5px 10px; border-radius: 999px;
+  border: 1px solid var(--rt-pop-border); background: var(--rt-btn-hover); color: inherit;
+  cursor: pointer; transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.rt-pop--reminder .gk-time-chip:hover { border-color: color-mix(in srgb, var(--gk-chrome-accent) 50%, transparent); }
+.rt-pop--reminder .gk-time-chip--active {
+  background: color-mix(in srgb, var(--gk-chrome-accent) 16%, transparent);
   border-color: var(--gk-chrome-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gk-chrome-accent) 28%, transparent);
+  color: var(--gk-chrome-accent);
 }
-html.dark .rt-pop--reminder .gk-reminder-input { color-scheme: dark; }
+html.dark .rt-pop--reminder .gk-time-chip--active {
+  color: #fff; background: color-mix(in srgb, var(--gk-chrome-accent) 32%, transparent);
+}
+
+.rt-pop--reminder .gk-reminder-past-hint { font-size: 0.72rem; color: #dc2626; padding: 0 4px 4px; text-align: center; }
+html.dark .rt-pop--reminder .gk-reminder-past-hint { color: #f87171; }
+
 .rt-pop--reminder .gk-reminder-actions { display: flex; align-items: center; gap: 8px; padding: 2px 4px; }
 .rt-pop--reminder .gk-reminder-remove {
   font-size: 0.8rem;

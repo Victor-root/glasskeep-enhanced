@@ -839,7 +839,7 @@ export default function ModalFooter({
             onClose={() => setReminderPopOpen(false)}
             anchorRef={reminderInFooter ? reminderBtnRef : kebabRef}
             className="rt-pop--reminder"
-            preferredWidth={252}
+            preferredWidth={286}
           >
             <ReminderPicker
               value={reminderAt}
