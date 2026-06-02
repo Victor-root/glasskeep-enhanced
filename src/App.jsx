@@ -3430,16 +3430,21 @@ export default function App() {
             } else if (msg && msg.type === "reminder_due") {
               // A note's reminder came due (server scheduler). Same generic
               // notify() path as test_notification so it gets the standard
-              // card, history entry, unread badge and ding. The action opens
-              // the linked note; metadata carries the server id (for the
-              // cross-device dismiss broadcast) and the noteId. Delivery ack
-              // is deferred to the bell, like the other server-backed cards.
+              // card, history entry, unread badge and ding. Persistent: a
+              // reminder stays until the user closes it (no auto-dismiss /
+              // timer bar). The action opens the linked note; metadata
+              // carries the server id (cross-device dismiss) and the noteId.
+              console.log("[reminders] reminder_due received", {
+                noteId: msg.noteId,
+                notificationId: msg.notificationId,
+              });
               notify({
                 type: "reminder",
                 variant: msg.variant || "info",
                 title: msg.title || t("reminderNotificationTitle"),
                 message: msg.message || "",
                 icon: msg.icon || "reminder",
+                persistent: true,
                 action: msg.noteId
                   ? { label: t("reminderOpenNoteAction"), noteId: String(msg.noteId) }
                   : null,
@@ -5860,6 +5865,7 @@ export default function App() {
     const leaseId = acquireLocalLease(nid);
     const nowIso = new Date().toISOString();
     const reminderAt = reminderAtIso || null;
+    console.log(`[reminders] setNoteReminder note=${nid} ->`, reminderAt || "(cleared)");
 
     // Optimistic state — the chip + the modal bell update instantly.
     setNotes((prev) =>

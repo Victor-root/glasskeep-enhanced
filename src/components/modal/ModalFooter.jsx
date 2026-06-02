@@ -7,6 +7,7 @@ import UserAvatar from "../common/UserAvatar.jsx";
 import AddImageMenu from "./AddImageMenu.jsx";
 import LogoPickerPopover from "./LogoPickerPopover.jsx";
 import ReminderPicker from "../notes/ReminderPicker.jsx";
+import { Popover as RichTextPopover } from "../richtext/Popover.jsx";
 import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon, LogoIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
@@ -156,6 +157,13 @@ export default function ModalFooter({
   const [reminderPopOpen, setReminderPopOpen] = useState(false);
   const reminderAt = activeNoteObj?.reminderAt || null;
   const hasReminder = !!reminderAt;
+  const canRemind = !isTrashed && typeof onSetReminder === "function";
+  // The bell lives in the footer EXCEPT when editing a text note with the
+  // read/edit toggle present — that's the only case where the toggle +
+  // formatting controls crowd the toolbar, so we tuck it into the kebab.
+  // Read mode, read-mode-disabled (no toggle), checklists, draw and audio
+  // notes all keep the bell in the footer where there's room.
+  const reminderInFooter = !(mType === "text" && readModeEnabled && !viewMode);
 
   /* Kebab menu (download + collaborate) */
   const kebabRef = useRef(null);
@@ -199,47 +207,37 @@ export default function ModalFooter({
           onSelect={(name) => setMColor(name)}
         />
 
-        {/* ── Reminder ── (hidden in trash view: trashed notes can't be reminded) */}
-        {!isTrashed && typeof onSetReminder === "function" && (
-          <>
-            <button
-              ref={reminderBtnRef}
-              className={`${btnClass} focus:outline-none`}
-              onClick={() => setReminderPopOpen((v) => !v)}
-              data-tooltip={!isDesktop ? t("reminder") : undefined}
-              aria-label={t("reminder")}
-              aria-haspopup="dialog"
-            >
-              {hasReminder ? (
-                <TI.BellRingingFilled
-                  className="tabler-icon tabler-icon--filled"
-                  style={{
-                    width: isDesktop ? 16 : 18,
-                    height: isDesktop ? 16 : 18,
-                    color: "var(--gk-chrome-accent, #6366f1)",
-                  }}
-                />
-              ) : (
-                <TI.Bell
-                  className="tabler-icon"
-                  style={{ width: isDesktop ? 16 : 18, height: isDesktop ? 16 : 18 }}
-                />
-              )}
-              {isDesktop && <span>{t("reminder")}</span>}
-            </button>
-            <Popover
-              anchorRef={reminderBtnRef}
-              open={reminderPopOpen}
-              onClose={() => setReminderPopOpen(false)}
-            >
-              <ReminderPicker
-                value={reminderAt}
-                onSave={(iso) => onSetReminder(activeId, iso)}
-                onClear={() => onSetReminder(activeId, null)}
-                onClose={() => setReminderPopOpen(false)}
+        {/* ── Reminder ── In read mode (or when read-mode is off) the bell
+            sits here in the footer; in edit mode it moves to the kebab.
+            Hidden in trash view (trashed notes can't be reminded). The
+            popover itself is rendered once, below, anchored to whichever
+            trigger is active. */}
+        {canRemind && reminderInFooter && (
+          <button
+            ref={reminderBtnRef}
+            className={`${btnClass} focus:outline-none`}
+            onClick={() => setReminderPopOpen((v) => !v)}
+            data-tooltip={!isDesktop ? t("reminder") : undefined}
+            aria-label={t("reminder")}
+            aria-haspopup="dialog"
+          >
+            {hasReminder ? (
+              <TI.BellRingingFilled
+                className="tabler-icon tabler-icon--filled"
+                style={{
+                  width: isDesktop ? 16 : 18,
+                  height: isDesktop ? 16 : 18,
+                  color: "var(--gk-chrome-accent, #6366f1)",
+                }}
               />
-            </Popover>
-          </>
+            ) : (
+              <TI.Bell
+                className="tabler-icon"
+                style={{ width: isDesktop ? 16 : 18, height: isDesktop ? 16 : 18 }}
+              />
+            )}
+            {isDesktop && <span>{t("reminder")}</span>}
+          </button>
         )}
 
         {/* ── Add image / logo (hidden in view mode for draw notes, hidden in draw canvas) ──
@@ -720,6 +718,22 @@ export default function ModalFooter({
               style={{ backgroundColor: dark ? "#222222" : undefined }}
               onClick={(e) => e.stopPropagation()}
             >
+            {/* Reminder — only here when it's been moved out of the footer
+                (edit mode). Opens the same picker anchored to the kebab. */}
+            {canRemind && !reminderInFooter && (
+              <button
+                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                style={{ color: hasReminder ? "var(--gk-chrome-accent, #6366f1)" : undefined }}
+                onClick={() => { setModalKebabOpen(false); setReminderPopOpen(true); }}
+              >
+                {hasReminder ? (
+                  <TI.BellRingingFilled className="tabler-icon tabler-icon--filled" style={{ width: 18, height: 18 }} />
+                ) : (
+                  <TI.Bell className="tabler-icon" style={{ width: 18, height: 18 }} />
+                )}
+                {t("reminder")}
+              </button>
+            )}
             {/* Archive / Restore */}
             {isTrashed ? (
               <button
@@ -814,6 +828,27 @@ export default function ModalFooter({
             )}
           </div>
         </Popover>
+
+        {/* Reminder picker — rendered once, anchored to whichever trigger is
+            active (footer bell in read mode, kebab in edit mode). Uses the
+            rich-text menu shell so it matches the editor's font/block-type
+            dropdowns. */}
+        {canRemind && (
+          <RichTextPopover
+            open={reminderPopOpen}
+            onClose={() => setReminderPopOpen(false)}
+            anchorRef={reminderInFooter ? reminderBtnRef : kebabRef}
+            className="rt-pop--reminder"
+            preferredWidth={252}
+          >
+            <ReminderPicker
+              value={reminderAt}
+              onSave={(iso) => onSetReminder(activeId, iso)}
+              onClear={() => onSetReminder(activeId, null)}
+              onClose={() => setReminderPopOpen(false)}
+            />
+          </RichTextPopover>
+        )}
 
         {/* ── Edit/View toggle — text notes ── */}
         {mType === "text" && readModeEnabled && (

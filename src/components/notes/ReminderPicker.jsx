@@ -32,9 +32,8 @@ function presetLaterToday() {
   if (d.getHours() < 20) {
     d.setHours(20, 0, 0, 0); // this evening
   } else {
-    d.setTime(d.getTime() + 60 * 60 * 1000); // +1h
     d.setMinutes(0, 0, 0);
-    d.setHours(d.getHours() + 1);
+    d.setHours(d.getHours() + 1); // +1h, rounded to the hour
   }
   return d;
 }
@@ -55,11 +54,12 @@ function presetNextWeek() {
 }
 
 /**
- * Reminder editor rendered inside the ModalFooter Popover.
+ * Reminder editor. Rendered as the body of the rich-text-style popover
+ * (the `.rt-pop` shell is provided by the parent), so it visually matches
+ * the editor's font / block-type dropdowns: same rows, same theming.
  *
  * Props:
  *   value    — current reminder ISO string (or null)
- *   dark     — dark mode flag (theme tokens otherwise drive the styling)
  *   onSave   — (isoString) => void
  *   onClear  — () => void   (remove the reminder)
  *   onClose  — () => void
@@ -80,7 +80,6 @@ export default function ReminderPicker({ value, onSave, onClear, onClose }) {
     onSave?.(d.toISOString());
     onClose?.();
   };
-
   const handleCustomSave = () => {
     const d = combineLocal(dateStr, timeStr);
     if (d) commit(d);
@@ -93,77 +92,60 @@ export default function ReminderPicker({ value, onSave, onClear, onClose }) {
   ];
 
   return (
-    <div
-      className="gk-reminder-popover w-[17rem] max-w-[calc(100vw-1.5rem)] rounded-2xl shadow-2xl bg-white dark:bg-gray-900 border border-indigo-100/80 dark:border-indigo-800/50 ring-1 ring-black/5 dark:ring-white/5 p-3"
-      role="dialog"
-      aria-label={t("reminderTitle")}
-    >
-      <div className="flex items-center gap-2 mb-2.5 px-0.5">
-        <TI.BellRingingFilled className="tabler-icon tabler-icon--filled w-4 h-4 text-[var(--gk-chrome-accent,#6366f1)]" />
-        <span className="text-sm font-semibold">{t("reminderTitle")}</span>
+    <>
+      <div className="rt-pop-label">{t("reminderTitle")}</div>
+
+      {presets.map((p) => (
+        <button
+          key={p.key}
+          type="button"
+          className="rt-menu-item"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => commit(p.make())}
+        >
+          <span className="rt-menu-item-icon">
+            <TI.Clock className="tabler-icon" />
+          </span>
+          <span className="rt-menu-item-label">{p.label}</span>
+        </button>
+      ))}
+
+      <div className="gk-reminder-sep" />
+
+      <div className="rt-pop-label">{t("reminderPickDateTime")}</div>
+      <div className="gk-reminder-fields">
+        <input
+          type="date"
+          className="gk-reminder-input"
+          value={dateStr}
+          min={minDate}
+          onChange={(e) => setDateStr(e.target.value)}
+          aria-label={t("reminderDateLabel")}
+        />
+        <input
+          type="time"
+          className="gk-reminder-input gk-reminder-input--time"
+          value={timeStr}
+          onChange={(e) => setTimeStr(e.target.value)}
+          aria-label={t("reminderTimeLabel")}
+        />
       </div>
 
-      {/* Presets */}
-      <div className="flex flex-col gap-1 mb-3">
-        {presets.map((p) => (
-          <button
-            key={p.key}
-            type="button"
-            onClick={() => commit(p.make())}
-            className="flex items-center gap-2 w-full text-left text-sm px-2.5 py-2 rounded-lg hover:bg-[var(--gk-accent-soft-bg,rgba(99,102,241,0.1))] transition-colors"
-          >
-            <TI.Clock className="tabler-icon w-4 h-4 opacity-70 shrink-0" />
-            <span className="truncate">{p.label}</span>
+      <div className="gk-reminder-actions">
+        {value && (
+          <button type="button" className="gk-reminder-remove" onClick={() => { onClear?.(); onClose?.(); }}>
+            {t("reminderRemove")}
           </button>
-        ))}
+        )}
+        <button
+          type="button"
+          onClick={handleCustomSave}
+          disabled={!combineLocal(dateStr, timeStr)}
+          className="gk-reminder-set px-3 py-1.5 rounded-lg font-semibold text-sm text-white transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none disabled:hover:scale-100"
+        >
+          {value ? t("reminderUpdate") : t("reminderSet")}
+        </button>
       </div>
-
-      {/* Custom date + time */}
-      <div className="border-t border-[var(--border-light)] pt-2.5">
-        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 px-0.5">
-          {t("reminderPickDateTime")}
-        </div>
-        <div className="flex gap-2 mb-2.5">
-          <input
-            type="date"
-            value={dateStr}
-            min={minDate}
-            onChange={(e) => setDateStr(e.target.value)}
-            className="gk-reminder-input flex-1 min-w-0 text-sm rounded-lg border border-[var(--border-light)] bg-white/70 dark:bg-gray-800/70 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
-            aria-label={t("reminderDateLabel")}
-          />
-          <input
-            type="time"
-            value={timeStr}
-            onChange={(e) => setTimeStr(e.target.value)}
-            className="gk-reminder-input w-[5.5rem] shrink-0 text-sm rounded-lg border border-[var(--border-light)] bg-white/70 dark:bg-gray-800/70 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
-            aria-label={t("reminderTimeLabel")}
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          {value && (
-            <button
-              type="button"
-              onClick={() => {
-                onClear?.();
-                onClose?.();
-              }}
-              className="text-xs font-medium px-2.5 py-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
-            >
-              {t("reminderRemove")}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={handleCustomSave}
-            disabled={!combineLocal(dateStr, timeStr)}
-            className="ml-auto text-sm font-semibold px-3 py-1.5 rounded-lg bg-[var(--gk-chrome-accent,#6366f1)] text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
-          >
-            {value ? t("reminderUpdate") : t("reminderSet")}
-          </button>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }

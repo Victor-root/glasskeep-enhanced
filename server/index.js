@@ -1674,6 +1674,8 @@ app.get("/api/notes", auth, (req, res) => {
       lastEditedBy: r.last_edited_by,
       lastEditedAt: r.last_edited_at,
       archived: !!r.archived,
+      reminderAt: r.reminder_at || null,
+      reminderFiredAt: r.reminder_fired_at || null,
       collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
     }))
   );
@@ -2940,6 +2942,8 @@ app.get("/api/notes/:id", auth, (req, res) => {
     lastEditedAt: r.last_edited_at,
     archived: !!r.archived,
     trashed: !!r.trashed,
+    reminderAt: r.reminder_at || null,
+    reminderFiredAt: r.reminder_fired_at || null,
     collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
   });
 });
@@ -3879,13 +3883,19 @@ function notePreviewText(note) {
 // all work unchanged. Called by the scheduler once per reminder.
 async function dispatchReminder(noteId) {
   const note = getNoteById.get(noteId);
-  if (!note) return;
+  if (!note) {
+    console.log(`[reminders] dispatch skipped — note ${noteId} not found (deleted?)`);
+    return;
+  }
   const recipientIds = new Set([
     note.user_id,
     ...getCollaboratorUserIdsForNote(noteId),
   ]);
   const createdAt = nowISO();
   const preview = notePreviewText(note);
+  console.log(
+    `[reminders] dispatching note ${noteId} to ${recipientIds.size} recipient(s); push=${pushService.isConfigured() ? "on" : "off"}`,
+  );
 
   for (const uid of recipientIds) {
     const lang = getUserLanguage(uid);
@@ -3894,7 +3904,9 @@ async function dispatchReminder(noteId) {
 
     // Persist so the reminder survives the recipient being offline: the
     // /notifications/pending replay (generic branch) renders it from
-    // note_title (→ card title) + message + variant + icon.
+    // note_title (→ card title) + message + variant + icon. persistent=1
+    // so it stays until the user closes it (a reminder shouldn't auto-
+    // dismiss the way a transient "saved" toast does).
     let notificationId = null;
     try {
       const r = insertNotification.run(
@@ -3906,7 +3918,7 @@ async function dispatchReminder(noteId) {
         "",
         "info",
         message,
-        0,
+        1,
         "reminder",
         createdAt,
       );
@@ -3915,11 +3927,13 @@ async function dispatchReminder(noteId) {
       console.warn("[reminders] persist failed:", e?.message);
     }
 
-    // Live in-app card for any currently-connected session.
+    // Live in-app card for any currently-connected session. persistent so
+    // it stays on screen (no timer bar) until manually dismissed.
     sendEventToUser(uid, {
       type: "reminder_due",
       notificationId,
       variant: "info",
+      persistent: true,
       title,
       message,
       noteId,
@@ -3936,6 +3950,9 @@ async function dispatchReminder(noteId) {
         { title, body: message, noteId: String(noteId), tag: `reminder-${noteId}` },
         console,
       )
+      .then((n) => {
+        if (n > 0) console.log(`[reminders] push sent to user ${uid} (${n} device(s))`);
+      })
       .catch((e) => console.warn("[reminders] push failed:", e?.message));
   }
 }

@@ -50,6 +50,9 @@ function startReminderScheduler({ db, dispatch, log = console, intervalMs = DEFA
     try {
       const now = new Date().toISOString();
       const due = selectDue.all({ now });
+      if (due.length > 0) {
+        log.log?.(`[reminders] sweep: ${due.length} reminder(s) due`);
+      }
       for (const { id } of due) {
         let claimed = false;
         try {

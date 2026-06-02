@@ -62,15 +62,22 @@ export async function isPushEnabledHere() {
 //   { ok: true }
 //   { ok: false, reason: "unsupported" | "unconfigured" | "denied" | "error" }
 export async function enablePush(token) {
-  if (!isPushSupported()) return { ok: false, reason: "unsupported" };
+  if (!isPushSupported()) {
+    console.log("[push] enable: unsupported browser");
+    return { ok: false, reason: "unsupported" };
+  }
   try {
     // 1. Server must have VAPID keys configured.
     const { key } = await api("/push/vapid-public-key", { token });
-    if (!key) return { ok: false, reason: "unconfigured" };
+    if (!key) {
+      console.log("[push] enable: server has no VAPID keys (unconfigured)");
+      return { ok: false, reason: "unconfigured" };
+    }
 
     // 2. Ask the user (must be triggered by a user gesture — the Settings
     //    toggle click qualifies).
     const permission = await Notification.requestPermission();
+    console.log("[push] enable: permission =", permission);
     if (permission !== "granted") {
       return { ok: false, reason: permission === "denied" ? "denied" : "default" };
     }
@@ -91,8 +98,10 @@ export async function enablePush(token) {
       token,
       body: { subscription: sub.toJSON() },
     });
+    console.log("[push] enable: subscribed OK", sub.endpoint?.slice(0, 48) + "…");
     return { ok: true };
   } catch (e) {
+    console.warn("[push] enable: error", e?.message);
     return { ok: false, reason: "error", error: e?.message };
   }
 }
@@ -116,6 +125,7 @@ export async function disablePush(token) {
         token,
         body: { endpoint },
       }).catch(() => {});
+      console.log("[push] disable: unsubscribed");
     }
     return { ok: true };
   } catch (e) {

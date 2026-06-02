@@ -3601,6 +3601,48 @@ html.dark .rt-icon-swatch-bar { border-color: rgba(255, 255, 255, 0.12); }
 .rt-menu-item--p  .rt-menu-item-sample { font-weight: 500; opacity: 0.8; }
 .rt-menu-item-label { flex: 1; font-weight: 500; }
 
+/* ── Reminder picker ─────────────────────────────────────────────────
+   Reuses the rich-text menu shell (.rt-pop) so it looks exactly like the
+   font / block-type dropdowns: opaque, themed, same rows. Only the
+   date/time fields + the primary action are reminder-specific. */
+.rt-pop--reminder { min-width: 252px; max-width: calc(100vw - 16px); padding: 6px; }
+.rt-pop--reminder .rt-pop-label { padding: 0 4px; }
+.rt-pop--reminder .gk-reminder-sep { height: 1px; margin: 7px 4px; background: var(--rt-pop-border); }
+.rt-pop--reminder .gk-reminder-fields { display: flex; gap: 6px; padding: 2px 4px 9px; }
+.rt-pop--reminder .gk-reminder-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--rt-pop-border);
+  background: var(--rt-btn-hover);
+  color: inherit;
+}
+.rt-pop--reminder .gk-reminder-input--time { flex: 0 0 5.75rem; }
+.rt-pop--reminder .gk-reminder-input:focus {
+  outline: none;
+  border-color: var(--gk-chrome-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gk-chrome-accent) 28%, transparent);
+}
+html.dark .rt-pop--reminder .gk-reminder-input { color-scheme: dark; }
+.rt-pop--reminder .gk-reminder-actions { display: flex; align-items: center; gap: 8px; padding: 2px 4px; }
+.rt-pop--reminder .gk-reminder-remove {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: #dc2626;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+html.dark .rt-pop--reminder .gk-reminder-remove { color: #f87171; }
+.rt-pop--reminder .gk-reminder-remove:hover { background: color-mix(in srgb, #ef4444 14%, transparent); }
+.rt-pop--reminder .gk-reminder-set { margin-left: auto; }
+
 /* Font-size popover — default row gets the ghost "Default" label after the
    number so the numeric size still reads cleanly. */
 .rt-size-row { justify-content: space-between; }
