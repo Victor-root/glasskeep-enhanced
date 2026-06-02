@@ -4831,6 +4831,36 @@ export default function App() {
     return () => navigator.serviceWorker.removeEventListener("message", onMessage);
   }, [openModal]);
 
+  // Native (Android APK) reminder deep-link: a notification tap calls
+  // window.__glasskeepOpenNote(noteId) (see WebViewActivity.maybeDispatchOpenNote)
+  // to pop that note's modal — the native sibling of the SSE / Web-Push
+  // "Open" actions above (the WebView has no Web Push). On a cold start the
+  // notes list may not be hydrated when the tap arrives, so we stash the id
+  // and open it the moment the note shows up.
+  const openModalRef = useRef(openModal);
+  openModalRef.current = openModal;
+  const pendingOpenNoteIdRef = useRef(null);
+  useEffect(() => {
+    const tryOpen = (id) => {
+      const sid = String(id);
+      if (notes.some((n) => String(n.id) === sid)) {
+        try { openModalRef.current?.(sid); } catch (_e) {}
+        return true;
+      }
+      return false;
+    };
+    window.__glasskeepOpenNote = (id) => {
+      if (id == null || id === "") return;
+      if (!tryOpen(id)) pendingOpenNoteIdRef.current = String(id);
+    };
+    // A deep-link that arrived before notes hydrated — retry now that this
+    // effect re-ran on a notes change.
+    if (pendingOpenNoteIdRef.current && tryOpen(pendingOpenNoteIdRef.current)) {
+      pendingOpenNoteIdRef.current = null;
+    }
+    return () => { delete window.__glasskeepOpenNote; };
+  }, [notes]);
+
   // Side-by-side: open two selected notes simultaneously. The PRIMARY (left)
   // pane is the existing App-hosted modal driven by useModalState/openModal —
   // it keeps every feature wired through App. The SECONDARY (right) pane is

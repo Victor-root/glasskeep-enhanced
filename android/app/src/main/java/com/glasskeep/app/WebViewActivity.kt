@@ -39,6 +39,12 @@ class WebViewActivity : AppCompatActivity() {
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
     private lateinit var webAuthnBridge: WebAuthnBridge
 
+    // Reminder notification deep-link: the target note id (from a tap) plus a
+    // flag for whether the web app has finished loading, so we only fire the
+    // window.__glasskeepOpenNote hook when the page can actually handle it.
+    private var pendingOpenNoteId: String? = null
+    private var pageLoaded = false
+
     // Held while we wait for the POST_NOTIFICATIONS runtime grant on
     // Android 13+. Once the user replies, we re-attempt the notif post
     // for this release (or drop it on the floor if denied).
@@ -402,6 +408,9 @@ class WebViewActivity : AppCompatActivity() {
             ?: getSharedPreferences("glasskeep", MODE_PRIVATE).getString("server_url", null)
             ?: run { finish(); return }
 
+        // Deep-link target if we were launched by a reminder notification tap.
+        pendingOpenNoteId = intent.getStringExtra(EXTRA_OPEN_NOTE_ID)
+
         webView = findViewById(R.id.webview)
 
         // Pull-to-refresh
@@ -626,6 +635,9 @@ class WebViewActivity : AppCompatActivity() {
                           sync();
                         })()
                     """.trimIndent(), null)
+                    // Web app is ready — replay any pending reminder deep-link.
+                    pageLoaded = true
+                    maybeDispatchOpenNote()
                 }
             }
 
@@ -762,6 +774,17 @@ class WebViewActivity : AppCompatActivity() {
         webView.evaluateJavascript(
             "if(window.__setDarkMode)window.__setDarkMode($isDark)", null
         )
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // singleTask: a reminder tap on the already-running app lands here.
+        // Adopt the new intent and deep-link to the note it carries.
+        setIntent(intent)
+        intent.getStringExtra(EXTRA_OPEN_NOTE_ID)?.let {
+            pendingOpenNoteId = it
+            maybeDispatchOpenNote()
+        }
     }
 
     /** Open `uri` via the user's default browser using Android Custom
@@ -1094,6 +1117,26 @@ class WebViewActivity : AppCompatActivity() {
     }
 
     /**
+     * Fire the web app's reminder deep-link hook for any pending note id,
+     * but only once the page is loaded (so the React handler exists). The
+     * hook itself tolerates a not-yet-hydrated notes list — it stashes the
+     * id and opens the modal when the note appears — so a single shot here
+     * is enough for both warm taps and cold starts.
+     */
+    private fun maybeDispatchOpenNote() {
+        val id = pendingOpenNoteId ?: return
+        if (!pageLoaded || !this::webView.isInitialized) return
+        pendingOpenNoteId = null
+        val esc = id.replace("\\", "\\\\").replace("'", "\\'")
+        webView.post {
+            webView.evaluateJavascript(
+                "if(window.__glasskeepOpenNote){try{window.__glasskeepOpenNote('$esc')}catch(e){}}",
+                null,
+            )
+        }
+    }
+
+    /**
      * window.AndroidReminders — local reminder scheduling for the WebView
      * (Web Push is unavailable here). Methods run on a binder thread;
      * AlarmManager + SharedPreferences are thread-safe, but any UI work
@@ -1148,5 +1191,9 @@ class WebViewActivity : AppCompatActivity() {
         // Read by ReminderAlarmReceiver (possibly from another thread).
         @Volatile
         var isForeground: Boolean = false
+
+        // Reminder notification deep-link: ReminderNotifier stashes the target
+        // note id here; we forward it to window.__glasskeepOpenNote once loaded.
+        const val EXTRA_OPEN_NOTE_ID = "openNoteId"
     }
 }

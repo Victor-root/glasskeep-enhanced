@@ -4,15 +4,19 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.glasskeep.app.R
+import com.glasskeep.app.WebViewActivity
 
 /**
  * Posts a local "reminder due" notification. Mirrors UpdateNotifier: a
- * HIGH-importance channel so it fires as a heads-up banner. Tapping opens
- * the app (the reminder also surfaces in the in-app notification list).
+ * HIGH-importance channel so it fires as a heads-up banner. Tapping the
+ * notification (or its "Open" action) deep-links straight to the note — it
+ * hands WebViewActivity the note id, which the web app opens via its
+ * window.__glasskeepOpenNote hook.
  *
  * This is a LOCAL notification raised by ReminderAlarmReceiver when an
  * AlarmManager alarm fires — no server push / Firebase involved, so it
@@ -28,20 +32,12 @@ internal object ReminderNotifier {
         if (!mgr.areNotificationsEnabled()) return
         ensureChannel(context)
 
-        // Tapping opens the app's launcher (MainActivity → WebViewActivity);
-        // the specific note then surfaces via the in-app notification list
-        // once the web app loads and fetches pending notifications.
-        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        val pendingIntent = if (launch != null) {
-            PendingIntent.getActivity(
-                context,
-                noteId.hashCode(),
-                launch,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-        } else {
-            null
-        }
+        // Tapping the notification — or its explicit "Open" action — deep-links
+        // to the note: WebViewActivity gets the note id and the web app pops the
+        // modal via window.__glasskeepOpenNote once the page is ready. (It's
+        // singleTask, so an already-open app receives the id through onNewIntent
+        // rather than a cold relaunch.)
+        val pendingIntent = buildOpenNoteIntent(context, noteId)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -53,7 +49,10 @@ internal object ReminderNotifier {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
-        if (pendingIntent != null) builder.setContentIntent(pendingIntent)
+            .setContentIntent(pendingIntent)
+            // Mirror the in-app card's "Open" button. Icon 0: action icons
+            // aren't rendered in the standard template on Android 7+.
+            .addAction(0, context.getString(R.string.reminder_open_action), pendingIntent)
 
         try {
             // Stable per-note id so re-firing the same note replaces its row
@@ -62,6 +61,28 @@ internal object ReminderNotifier {
         } catch (e: SecurityException) {
             // Notifications revoked between the enabled-check and notify().
         }
+    }
+
+    /**
+     * PendingIntent that re-opens the app on the given note. Targets
+     * WebViewActivity directly (it falls back to the saved server_url when
+     * launched cold) and carries the note id as EXTRA_OPEN_NOTE_ID.
+     */
+    private fun buildOpenNoteIntent(context: Context, noteId: String): PendingIntent {
+        val intent = Intent(context, WebViewActivity::class.java).apply {
+            putExtra(WebViewActivity.EXTRA_OPEN_NOTE_ID, noteId)
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP,
+            )
+        }
+        return PendingIntent.getActivity(
+            context,
+            noteId.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     private fun ensureChannel(context: Context) {

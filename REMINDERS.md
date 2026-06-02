@@ -25,6 +25,10 @@ setup, how to test it, and the known limitations.
     to any open session, over SSE; and
   - a **Web Push** system notification to the user's installed PWAs
     (when push is configured and the user has opted in).
+- On the **Android app (APK)** the notification is raised by an **on-device
+  local alarm** (a WebView has no Web Push), so it works fully offline and
+  with the app closed. **Tapping** the notification — or its **Open**
+  action — opens the target note directly.
 - A reminder fires **exactly once**. Editing a fired reminder to a new
   (future) time re-arms it.
 
@@ -74,6 +78,24 @@ sends a Web Push to each of the recipient's devices.
 
 Other devices are independent: your phone (app closed) still gets the
 push while your desktop (app open) shows the in-app card.
+
+### Android app (APK): local alarms + tap-to-open
+The Android wrapper is a WebView, which has **no Web Push API**. Instead the
+web app mirrors every upcoming reminder to the native layer over the
+`AndroidReminders` JS bridge, and `ReminderScheduler` arms an **exact
+`AlarmManager` alarm** per reminder (re-armed after reboot by
+`ReminderBootReceiver`). When it fires:
+
+- app **closed / backgrounded** → `ReminderAlarmReceiver` posts the system
+  notification via `ReminderNotifier`;
+- app **foregrounded** → it's skipped, because the in-app SSE card already
+  shows it (same no-duplicate rule as the PWA service worker).
+
+**Tap-to-open:** the notification's content intent (and its **Open** action)
+carries the note id to `WebViewActivity`, which—once the page is ready—calls
+`window.__glasskeepOpenNote(noteId)` in the web app to pop that note's modal.
+On a cold start the hook stashes the id and opens the note as soon as the
+notes list has hydrated.
 
 ### Service worker
 The Web Push `push` / `notificationclick` handlers live in
@@ -166,18 +188,52 @@ npm run dev      # or run the API + Vite dev servers
    open on the same device.
 10. Confirm archive, trash, tags and existing notifications still work.
 
-A quick server-side firing test (in-app path) without a browser:
+### Fire a reminder on demand (no waiting)
+
+Two helpers trigger a reminder **instantly** so you don't have to set one
+and wait for it.
+
+**Server pipeline** (in-app card over SSE + Web Push) — run on the host/LXC:
 
 ```bash
-# with the dev API running and a user that owns a note:
-# POST /api/notes/:id/reminder { reminderAt: <a few seconds ago>, client_updated_at: <now> }
-# then GET /api/notifications/pending → a { type: "reminder" } row appears.
+# Admin JWT is derived from the server .env + DB, like test-notification.cjs.
+node scripts/test-reminder.cjs <noteId>
+# e.g.
+node scripts/test-reminder.cjs 1777374322541-t1vpuv
 ```
+
+This runs the real `dispatchReminder()`: the note's recipients get the in-app
+card (with **Open**) on any open session, and installed PWAs get a Web Push.
+It does **not** touch the note's own `reminder_at`, so a real reminder you've
+set on it still fires later as scheduled.
+
+**Native Android notification** (the on-device local alarm + tap-to-open) —
+via adb to a **debug** APK:
+
+```bash
+# phone over USB, or `adb connect <phone-ip>:5555` for wireless first
+scripts/test-reminder-native.sh <noteId> "Title" "Body"
+```
+
+It broadcasts to `ReminderDebugReceiver` — a **debug-only** receiver (absent
+from release builds) that raises the real reminder notification immediately,
+even with the app open. This is the only way to exercise the **closed-app
+native path** on demand, since the server can't reach a closed WebView app.
 
 ---
 
 ## Known limitations
 
+- **Native app vs. PWA push (and Brave)**: the **Android APK** delivers
+  reminders through an **on-device local alarm** — no Google services, no
+  VAPID, no browser push — which makes it the **most reliable** closed-app
+  path. A **PWA** instead depends on **Web Push**, delivered on Android via
+  the browser's push service (Chrome / Google Play Services). On **Brave for
+  Android**, Web Push is **unreliable / often unavailable** because Brave
+  strips that Google push component, so background reminders in a Brave PWA
+  may never arrive. For closed-app reminders prefer the **APK**; if you want
+  a PWA, use **Chrome** with VAPID keys configured. The in-app card (app
+  open) works in **any** browser, Brave included.
 - **iOS**: Web Push only works inside an **installed** PWA ("Add to Home
   Screen") on **iOS 16.4+** — never in a regular Safari tab. The Settings
   toggle detects this and shows a hint. Android (installed PWA or Chrome)

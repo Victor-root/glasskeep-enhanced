@@ -2599,6 +2599,27 @@ app.post("/api/notes/:id/reminder", auth, (req, res) => {
   res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });
 });
 
+// Dev/test: fire a note's reminder *right now*, end-to-end through the
+// real dispatchReminder() pipeline (in-app SSE card + persisted
+// notification + Web Push), without waiting for the 30s sweep or
+// fiddling with reminder_at. Admin-only, same as /notifications/test;
+// driven by scripts/test-reminder.cjs. Does NOT touch the note's own
+// reminder_at, so any real reminder set on the note still fires later as
+// scheduled. (The native APK's local alarm is device-side and can't be
+// triggered from here — this drives the in-app + Web Push paths.)
+app.post("/api/notes/:id/fire-reminder", auth, adminOnly, async (req, res) => {
+  const id = String(req.params.id);
+  const note = getNoteById.get(id);
+  if (!note) return res.status(404).json({ error: "Note not found" });
+  try {
+    await dispatchReminder(id);
+  } catch (e) {
+    console.warn("[reminders] manual fire failed:", e?.message);
+    return res.status(500).json({ error: "dispatch failed" });
+  }
+  res.json({ ok: true, noteId: id, firedAt: nowISO() });
+});
+
 // ---------- Web Push subscriptions (PWA push notifications) ----------
 // The public VAPID key is needed by the browser to subscribe. It is NOT
 // a secret (it's the applicationServerKey). Returns { key: null } when
