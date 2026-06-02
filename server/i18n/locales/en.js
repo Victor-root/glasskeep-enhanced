@@ -73,4 +73,9 @@ module.exports = {
   aiNoteChatContentLabel: "Content",
   aiNoteChatMissingNote: "No note context was provided.",
   aiNoteChatMissingQuestion: "Missing question.",
+
+  // Reminders (note-reminders feature) — text used both for the persisted
+  // in-app notification and the Web Push payload shown on the device.
+  reminderNotificationTitle: "Reminder",
+  reminderNotificationUntitled: "Untitled note",
 };

@@ -2,6 +2,7 @@ import React from "react";
 import { t } from "../../i18n";
 import Masonry from "react-masonry-css";
 import NoteCard from "./NoteCard.jsx";
+import { REMINDERS } from "../../utils/constants.js";
 
 function NotesSections({
   pinned,
@@ -216,12 +217,14 @@ function NotesSections({
           </p>
         )}
         {!notesLoading && filteredEmptyWithSearch && (
-          <p className="text-center text-gray-500 dark:text-gray-400 mt-10">{t("noMatchingNotes")}</p>
+          <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
+            {activeTagFilter === REMINDERS ? t("noRemindersYet") : t("noMatchingNotes")}
+          </p>
         )}
         {!notesLoading && allEmpty && (
           <div className="text-center mt-10 px-4">
             <p className="text-gray-500 dark:text-gray-400">
-              {activeTagFilter === "TRASHED" ? t("noTrashedNotes") : activeTagFilter === "ARCHIVED" ? t("noMatchingNotes") : t("noNotesYet")}
+              {activeTagFilter === "TRASHED" ? t("noTrashedNotes") : activeTagFilter === "ARCHIVED" ? t("noMatchingNotes") : activeTagFilter === REMINDERS ? t("noRemindersYet") : t("noNotesYet")}
             </p>
             {syncStatus?.syncState === "offline" && (
               <p className="mt-2 text-sm text-amber-500 dark:text-amber-400">

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../../i18n";
-import { ALL_IMAGES } from "../../utils/constants.js";
-import { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon } from "../../icons/sidebarIcons.jsx";
+import { ALL_IMAGES, REMINDERS } from "../../utils/constants.js";
+import { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon, RemindersSidebarIcon } from "../../icons/sidebarIcons.jsx";
 import MultiSelectToolbar from "./MultiSelectToolbar.jsx";
 import NotesHeader from "./NotesHeader.jsx";
 import NotesComposer from "./NotesComposer.jsx";
@@ -202,6 +202,7 @@ function NotesUI({
     if (activeTagFilter === ALL_IMAGES) return t("allImages");
     if (activeTagFilter === "ARCHIVED") return t("archivedNotes");
     if (activeTagFilter === "TRASHED") return t("trashedNotes");
+    if (activeTagFilter === REMINDERS) return t("remindersNotes");
     if (activeTagFilter) return activeTagFilter;
     return t("notes");
   })();
@@ -210,6 +211,7 @@ function NotesUI({
     if (activeTagFilter === ALL_IMAGES) return ImagesIcon;
     if (activeTagFilter === "ARCHIVED") return ArchiveSidebarIcon;
     if (activeTagFilter === "TRASHED") return TrashSidebarIcon;
+    if (activeTagFilter === REMINDERS) return RemindersSidebarIcon;
     if (activeTagFilter || activeTagFilters.length > 0) return TagIcon;
     return NotesIcon;
   })();

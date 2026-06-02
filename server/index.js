@@ -241,6 +241,24 @@ CREATE TABLE IF NOT EXISTS app_settings (
   login_bg_blur INTEGER NOT NULL DEFAULT 0,
   custom_logo_pwa TEXT
 );
+
+-- Web Push subscriptions (PWA push notifications for reminders). One row
+-- per browser/device endpoint. The endpoint is unique so re-subscribing
+-- the same device upserts instead of duplicating. p256dh / auth are the
+-- subscription's encryption keys (base64url). Rows are pruned when the
+-- push service reports the endpoint as gone (HTTP 404/410).
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  user_agent TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
+  ON push_subscriptions(user_id);
 `);
 
 // Tiny migrations (safe to run repeatedly)
@@ -337,10 +355,39 @@ CREATE TABLE IF NOT EXISTS app_settings (
         // Backfill: set position = creation timestamp (ms) so notes sort by creation date
         db.exec(`UPDATE notes SET position = CAST(strftime('%s', COALESCE(timestamp, '1970-01-01')) AS REAL) * 1000`);
       }
+      // Reminders (note-reminders feature). `reminder_at` is the due
+      // instant as an ISO-8601 UTC string (NULL = no reminder).
+      // `reminder_fired_at` records when the scheduler dispatched the
+      // notification (NULL = still pending) so a due reminder fires
+      // exactly once and survives a server restart. Both are kept in
+      // the clear (NOT inside enc_payload): they carry no note content,
+      // and the scheduler must be able to query them with plain SQL
+      // regardless of the at-rest encryption unlock state.
+      if (!names.has("reminder_at")) {
+        db.exec(`ALTER TABLE notes ADD COLUMN reminder_at TEXT`);
+      }
+      if (!names.has("reminder_fired_at")) {
+        db.exec(`ALTER TABLE notes ADD COLUMN reminder_fired_at TEXT`);
+      }
     });
     tx();
   } catch {
     // ignore if ALTER not supported or already applied
+  }
+})();
+
+// Partial index so the reminder scheduler's "what's due now" sweep stays
+// a cheap index scan even as the notes table grows: only rows that
+// actually carry a pending reminder are indexed.
+(function ensureReminderIndex() {
+  try {
+    db.exec(
+      `CREATE INDEX IF NOT EXISTS idx_notes_pending_reminders
+         ON notes(reminder_at)
+         WHERE reminder_at IS NOT NULL AND reminder_fired_at IS NULL`,
+    );
+  } catch {
+    // ignore if partial indexes unsupported (very old SQLite)
   }
 })();
 
@@ -443,6 +490,9 @@ const { attachSelfUpdateRoutes } = require("./routes/selfUpdateRoutes");
 const { attachAssetLinksRoutes } = require("./routes/assetLinksRoutes");
 const { attachDeviceLinkRoutes } = require("./routes/deviceLinkRoutes");
 const { requireUnlocked } = require("./routes/lockMiddleware");
+const { t: serverT } = require("./i18n");
+const pushService = require("./services/pushNotifications");
+const { startReminderScheduler } = require("./services/reminderScheduler");
 
 instanceVault.ensureSchema(db);
 {
@@ -628,6 +678,11 @@ function serializeNote(r, userId) {
     lastEditedAt: r.last_edited_at,
     archived: !!r.archived,
     trashed: !!r.trashed,
+    // Reminders: ISO-8601 UTC due instant (null = none) and the moment
+    // the scheduler dispatched it (null = still pending). Plain columns,
+    // never encrypted — see the ensureNoteColumns migration.
+    reminderAt: r.reminder_at || null,
+    reminderFiredAt: r.reminder_fired_at || null,
   };
 }
 
@@ -2459,6 +2514,103 @@ app.get("/api/notes/archived", auth, (req, res) => {
   res.json(rows.map((r) => serializeNote(r, req.user.id)));
 });
 
+// ---------- Reminders ----------
+// Set, update, or clear a note's reminder. Body:
+//   { reminderAt: ISO-8601 string | null, client_updated_at: ISO }
+// Passing a date sets/updates the reminder and re-arms it (clears
+// reminder_fired_at) so a previously-fired reminder moved to a future
+// time fires again. Passing null clears the reminder entirely.
+//
+// Reminder columns are plain (never encrypted), so this dedicated route
+// stays out of the sensitive-field write path (buildWriteRow / cipher).
+// Owner OR collaborator may set it — a reminder is a property of the
+// shared note, and when it fires every participant is notified.
+const updateReminderStmt = db.prepare(`
+  UPDATE notes SET
+    reminder_at = @reminder_at,
+    reminder_fired_at = NULL,
+    client_updated_at = @client_updated_at
+  WHERE id = @id AND (user_id = @user_id OR EXISTS(
+    SELECT 1 FROM note_collaborators nc
+    WHERE nc.note_id = @id AND nc.user_id = @user_id
+  ))
+`);
+app.post("/api/notes/:id/reminder", auth, (req, res) => {
+  const id = req.params.id;
+  const { reminderAt } = req.body || {};
+  if (!req.body?.client_updated_at) {
+    return res.status(400).json({ error: "client_updated_at is required" });
+  }
+  const tsResult = validateLwwTimestamp(req.body.client_updated_at);
+  if (tsResult.error) {
+    return res.status(400).json({ error: tsResult.error });
+  }
+
+  // Normalise the reminder instant to ISO-8601 UTC. null/"" clears it.
+  let reminderIso = null;
+  if (reminderAt != null && reminderAt !== "") {
+    const d = new Date(reminderAt);
+    if (Number.isNaN(d.getTime())) {
+      return res.status(400).json({ error: "Invalid reminderAt" });
+    }
+    reminderIso = d.toISOString();
+  }
+
+  const existing = getNoteWithCollaboration.get(req.user.id, id, req.user.id);
+  if (!existing) {
+    return res.status(404).json({ error: "Note not found" });
+  }
+
+  // LWW: reject stale writes (compare milliseconds)
+  if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
+    return res.json({ ok: true, stale: true, note: serializeNote(existing, req.user.id) });
+  }
+
+  const result = updateReminderStmt.run({
+    reminder_at: reminderIso,
+    client_updated_at: tsResult.iso,
+    id,
+    user_id: req.user.id,
+  });
+  if (result.changes === 0) {
+    return res.status(404).json({ error: "Note not found or access denied" });
+  }
+
+  updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+  broadcastNoteUpdated(id);
+  const fresh = getNoteById.get(id);
+  res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });
+});
+
+// ---------- Web Push subscriptions (PWA push notifications) ----------
+// The public VAPID key is needed by the browser to subscribe. It is NOT
+// a secret (it's the applicationServerKey). Returns { key: null } when
+// push isn't configured so the client can hide the toggle gracefully.
+app.get("/api/push/vapid-public-key", auth, (req, res) => {
+  res.json({ key: pushService.getPublicKey() });
+});
+
+// Register (or refresh) this device's push subscription.
+app.post("/api/push/subscribe", auth, (req, res) => {
+  if (!pushService.isConfigured()) {
+    return res.status(503).json({ error: "Push notifications are not configured on this server" });
+  }
+  const { subscription } = req.body || {};
+  try {
+    pushService.saveSubscription(db, req.user.id, subscription, req.headers["user-agent"]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: e?.message || "Invalid subscription" });
+  }
+});
+
+// Drop this device's push subscription (toggle off / sign-out).
+app.post("/api/push/unsubscribe", auth, (req, res) => {
+  const { endpoint } = req.body || {};
+  pushService.removeSubscription(db, endpoint);
+  res.json({ ok: true });
+});
+
 // Trash/Restore notes
 app.post("/api/notes/:id/trash", auth, (req, res) => {
   const id = req.params.id;
@@ -3656,6 +3808,146 @@ if (NODE_ENV === "production") {
     res.sendFile(path.join(dist, "index.html"));
   });
 }
+
+// ---------- Reminders: scheduler + delivery ----------
+// Per-recipient language for the localized reminder text. NULL ("auto")
+// has no server-visible browser hint, so we fall back to English (the
+// app's canonical fallback). Users who set their language explicitly in
+// Settings get their reminder text in that language.
+const getUserLanguageStmt = db.prepare("SELECT language FROM users WHERE id = ?");
+function getUserLanguage(userId) {
+  try {
+    const lang = getUserLanguageStmt.get(userId)?.language;
+    return lang === "fr" || lang === "en" ? lang : "en";
+  } catch {
+    return "en";
+  }
+}
+
+// Build a short, plain-text preview for a note that has no title, used as
+// the reminder notification body. Defensive throughout: rich-text JSON,
+// checklist items, draw-note text and legacy markdown are all reduced to
+// a trimmed one-liner; anything unparseable just yields "".
+function notePreviewText(note) {
+  const title = (note.title || "").trim();
+  if (title) return title.slice(0, 120);
+  try {
+    if (note.type === "checklist") {
+      const items = JSON.parse(note.items_json || "[]");
+      const texts = (Array.isArray(items) ? items : [])
+        .map((i) => (i && typeof i.text === "string" ? i.text.trim() : ""))
+        .filter(Boolean);
+      if (texts.length) return texts.slice(0, 4).join(", ").slice(0, 120);
+    }
+  } catch {
+    /* fall through */
+  }
+  let raw = note.content || "";
+  if (note.type === "draw") {
+    try {
+      const p = typeof raw === "string" ? JSON.parse(raw) : raw;
+      raw = (p && p.text) || "";
+    } catch {
+      raw = "";
+    }
+  }
+  raw = String(raw);
+  if (raw.trim().startsWith("{")) {
+    // Rich-text (TipTap) JSON — walk the tree collecting text nodes.
+    try {
+      const json = JSON.parse(raw);
+      const parts = [];
+      const walk = (node) => {
+        if (!node || typeof node !== "object") return;
+        if (typeof node.text === "string") parts.push(node.text);
+        if (Array.isArray(node.content)) node.content.forEach(walk);
+      };
+      walk(json);
+      raw = parts.join(" ");
+    } catch {
+      /* leave raw as-is */
+    }
+  }
+  // Strip light markdown punctuation and collapse whitespace.
+  raw = raw.replace(/[#*_>`~]/g, " ").replace(/\s+/g, " ").trim();
+  return raw.slice(0, 120);
+}
+
+// Deliver a due reminder: one in-app notification (persisted + live SSE)
+// and one Web Push per recipient (owner + collaborators). Reuses the
+// existing notification pipeline so the card, history and unread badge
+// all work unchanged. Called by the scheduler once per reminder.
+async function dispatchReminder(noteId) {
+  const note = getNoteById.get(noteId);
+  if (!note) return;
+  const recipientIds = new Set([
+    note.user_id,
+    ...getCollaboratorUserIdsForNote(noteId),
+  ]);
+  const createdAt = nowISO();
+  const preview = notePreviewText(note);
+
+  for (const uid of recipientIds) {
+    const lang = getUserLanguage(uid);
+    const title = serverT(lang, "reminderNotificationTitle");
+    const message = preview || serverT(lang, "reminderNotificationUntitled");
+
+    // Persist so the reminder survives the recipient being offline: the
+    // /notifications/pending replay (generic branch) renders it from
+    // note_title (→ card title) + message + variant + icon.
+    let notificationId = null;
+    try {
+      const r = insertNotification.run(
+        uid,
+        note.user_id,
+        "reminder",
+        noteId,
+        title,
+        "",
+        "info",
+        message,
+        0,
+        "reminder",
+        createdAt,
+      );
+      notificationId = r.lastInsertRowid;
+    } catch (e) {
+      console.warn("[reminders] persist failed:", e?.message);
+    }
+
+    // Live in-app card for any currently-connected session.
+    sendEventToUser(uid, {
+      type: "reminder_due",
+      notificationId,
+      variant: "info",
+      title,
+      message,
+      noteId,
+      icon: "reminder",
+      createdAt,
+    });
+
+    // System push for installed PWAs (fires even when the app is closed).
+    // Best-effort: a push failure must never break the in-app reminder.
+    pushService
+      .sendToUser(
+        db,
+        uid,
+        { title, body: message, noteId: String(noteId), tag: `reminder-${noteId}` },
+        console,
+      )
+      .catch((e) => console.warn("[reminders] push failed:", e?.message));
+  }
+}
+
+pushService.init(console);
+startReminderScheduler({
+  db,
+  dispatch: dispatchReminder,
+  log: console,
+  // Sweep cadence (ms). Default 30s; override with REMINDER_SWEEP_MS.
+  intervalMs: Number(process.env.REMINDER_SWEEP_MS) || undefined,
+});
 
 // ---------- Listen ----------
 const SSL_CERT    = process.env.SSL_CERT;

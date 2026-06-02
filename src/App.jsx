@@ -39,7 +39,7 @@ import {
   normalizeTypographyPresets,
 } from "./utils/typographyPresets.js";
 import { globalCSS } from "./styles/globalCSS.js";
-import { ALL_IMAGES } from "./utils/constants.js";
+import { ALL_IMAGES, REMINDERS } from "./utils/constants.js";
 import { setNoteIcon } from "./utils/noteIcon.js";
 import { fetchLogoLibrary, createLogo, deleteLogo as apiDeleteLogo } from "./utils/logoLibrary.js";
 import { ColorDot } from "./components/common/ColorDot.jsx";
@@ -3427,6 +3427,27 @@ export default function App() {
               // immediately dismisses the card we just showed. The bell
               // calls markDelivered when the panel is opened, which is
               // the right moment to record "user has seen this".
+            } else if (msg && msg.type === "reminder_due") {
+              // A note's reminder came due (server scheduler). Same generic
+              // notify() path as test_notification so it gets the standard
+              // card, history entry, unread badge and ding. The action opens
+              // the linked note; metadata carries the server id (for the
+              // cross-device dismiss broadcast) and the noteId. Delivery ack
+              // is deferred to the bell, like the other server-backed cards.
+              notify({
+                type: "reminder",
+                variant: msg.variant || "info",
+                title: msg.title || t("reminderNotificationTitle"),
+                message: msg.message || "",
+                icon: msg.icon || "reminder",
+                action: msg.noteId
+                  ? { label: t("reminderOpenNoteAction"), noteId: String(msg.noteId) }
+                  : null,
+                metadata: {
+                  ...(msg.notificationId ? { serverNotificationId: msg.notificationId } : {}),
+                  ...(msg.noteId ? { noteId: msg.noteId } : {}),
+                },
+              });
             } else if (msg && msg.type === "notifications_cleared") {
               // Another device wiped the user's notification history.
               // Only drop server-backed rows: local-only toasts (e.g.
@@ -4538,7 +4559,7 @@ export default function App() {
 
   // Compute the tag context that should pre-fill a freshly created note.
   // Rule:
-  //  - Special filters (ARCHIVED / TRASHED / ALL_IMAGES) → no auto-tag.
+  //  - Special filters (ARCHIVED / TRASHED / ALL_IMAGES / REMINDERS) → no auto-tag.
   //  - activeTagFilters (real multi-tag selection, OR logic) → apply them all:
   //    the new note then satisfies the current filter and stays visible.
   //    Single-tag clicks also land in activeTagFilters, so this covers both.
@@ -4546,7 +4567,7 @@ export default function App() {
   //    current sidebar never sets it to a tag string).
   const getInitialTagsForNewNote = useCallback(() => {
     const isSpecial =
-      tagFilter === "ARCHIVED" || tagFilter === "TRASHED" || tagFilter === ALL_IMAGES;
+      tagFilter === "ARCHIVED" || tagFilter === "TRASHED" || tagFilter === ALL_IMAGES || tagFilter === REMINDERS;
     if (isSpecial) return [];
     const collected = [];
     if (Array.isArray(activeTagFilters) && activeTagFilters.length > 0) {
@@ -4784,6 +4805,21 @@ export default function App() {
       dismissNotification(notif.id);
     }
   };
+
+  // Tapping a Web Push reminder focuses the app (handled by push-sw.js)
+  // and posts { type: "gk-open-note", noteId } to this client; route it to
+  // the note modal. Focusing is guaranteed by the SW regardless of this.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    const onMessage = (event) => {
+      const data = event.data;
+      if (data && data.type === "gk-open-note" && data.noteId) {
+        try { openModal(String(data.noteId)); } catch (_e) {}
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, [openModal]);
 
   // Side-by-side: open two selected notes simultaneously. The PRIMARY (left)
   // pane is the existing App-hosted modal driven by useModalState/openModal —
@@ -5804,6 +5840,72 @@ export default function App() {
     setTimeout(() => releaseLocalLeaseWithPrune(nid, leaseId), 1000);
   };
 
+  /** -------- Set / update / clear a note's reminder -------- */
+  // Offline-first like togglePin: optimistic React + IndexedDB update,
+  // then a dedicated "reminder" sync op (POST /notes/:id/reminder). Pass
+  // a null ISO to clear the reminder. Setting one always re-arms it
+  // (clears reminderFiredAt) so a previously-fired reminder fires again.
+  const setNoteReminder = async (id, reminderAtIso) => {
+    // Reminding a draft counts as a real action — materialise it first so
+    // the create lands in the queue before the reminder write follows.
+    if (pendingDraftRef.current && String(id) === String(pendingDraftRef.current.id)) {
+      materializeDraftIfNeeded();
+    }
+    // A reminder is a durable commitment — clear the freshly-created marker
+    // so the empty-on-close auto-trash doesn't discard a reminded note.
+    if (freshlyCreatedNoteRef.current === String(id)) {
+      freshlyCreatedNoteRef.current = null;
+    }
+    const nid = String(id);
+    const leaseId = acquireLocalLease(nid);
+    const nowIso = new Date().toISOString();
+    const reminderAt = reminderAtIso || null;
+
+    // Optimistic state — the chip + the modal bell update instantly.
+    setNotes((prev) =>
+      prev.map((n) =>
+        String(n.id) === nid ? { ...n, reminderAt, reminderFiredAt: null } : n,
+      ),
+    );
+
+    try {
+      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
+      if (existing) {
+        await idbPutNote(
+          { ...existing, reminderAt, reminderFiredAt: null, client_updated_at: nowIso },
+          currentUser?.id,
+          sessionId,
+        );
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    invalidateNotesCache();
+
+    try {
+      await enqueueAndSync({
+        type: "reminder",
+        noteId: nid,
+        payload: { reminderAt, client_updated_at: nowIso },
+      });
+    } catch (e) {
+      // On failure the lease stays active so SSE patches can't clobber the
+      // optimistic state; the queued op retries when connectivity returns.
+      return;
+    }
+    setTimeout(() => releaseLocalLeaseWithPrune(nid, leaseId), 1000);
+
+    try {
+      if (reminderAt) {
+        showToast(t("reminderSetToast"), "success", undefined, "reminder");
+      } else {
+        showToast(t("reminderRemovedToast"), "info", undefined, "reminder");
+      }
+    } catch (_) {
+      /* toast is best-effort feedback */
+    }
+  };
+
   /** -------- Reset note order -------- */
   const resetNoteOrder = async (overridePositions = true) => {
     // Reorder is per-user on the server (note_user_positions), so shared
@@ -6244,7 +6346,9 @@ export default function App() {
           ? null
           : tagFilter === "TRASHED"
             ? null
-            : tagFilter?.toLowerCase() || null;
+            : tagFilter === REMINDERS
+              ? null
+              : tagFilter?.toLowerCase() || null;
 
     return notes.filter((n) => {
       if (tagFilter === ALL_IMAGES) {
@@ -6255,6 +6359,11 @@ export default function App() {
       } else if (tagFilter === "TRASHED") {
         // In trashed view, show all notes (they're already filtered by the backend)
         // Just apply search filter
+      } else if (tagFilter === REMINDERS) {
+        // Reminders view: a client-side lens over the regular notes list —
+        // keep only notes that carry a reminder. They remain visible in the
+        // normal view too (this filter doesn't load a separate data set).
+        if (!n.reminderAt) return false;
       } else if (activeTagFilters.length > 0) {
         // Multi-tag filter : la note doit contenir AU MOINS UN des tags sélectionnés
         const noteTags = (n.tags || []).map((t) => String(t).toLowerCase());
@@ -6417,6 +6526,7 @@ export default function App() {
       scrimClickStartRef={scrimClickStartRef}
       savedModalScrollRatioRef={savedModalScrollRatioRef}
       activeNoteObj={activeNoteObj}
+      onSetReminder={setNoteReminder}
       editedStamp={editedStamp}
       modalHasChanges={modalHasChanges}
       modalScrollable={modalScrollable}
@@ -6687,8 +6797,10 @@ export default function App() {
         activeTag={tagFilter}
         activeTagFilters={activeTagFilters}
         onSelect={(tag, event) => {
-          if (tag === "ARCHIVED" || tag === "TRASHED" || tag === ALL_IMAGES || tag === null) {
-            // Only clear notes when SWITCHING views, not when re-clicking the same one
+          if (tag === "ARCHIVED" || tag === "TRASHED" || tag === ALL_IMAGES || tag === REMINDERS || tag === null) {
+            // Only clear notes when SWITCHING views, not when re-clicking the same one.
+            // REMINDERS is a client-side lens over the already-loaded regular
+            // notes, so it deliberately does NOT clear/reload like archive/trash.
             if ((tag === "ARCHIVED" || tag === "TRASHED") && tag !== tagFilter) setNotes([]);
             setTagFilter(tag);
             setActiveTagFilters([]);

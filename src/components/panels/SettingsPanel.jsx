@@ -10,6 +10,7 @@ import { fileToCompressedDataURL } from "../../utils/helpers.js";
 import TypographyModal from "./TypographyModal.jsx";
 import PasskeySettingsSection from "../settings/PasskeySettingsSection.jsx";
 import UserAiSettingsSection from "../settings/UserAiSettingsSection.jsx";
+import PushNotificationToggle from "../settings/PushNotificationToggle.jsx";
 import WorkspaceThemeSection from "../settings/WorkspaceThemeSection.jsx";
 import { RowIcon, SettingsSection, SettingsSubHeading as UISubHeading } from "../common/SettingsAccordion.jsx";
 
@@ -940,6 +941,9 @@ export default function SettingsPanel({
                   </Popover>
                 </div>
               </div>
+
+              {/* Push notifications — system reminders on installed PWAs. */}
+              <PushNotificationToggle token={token} />
             </SettingsSection>
           </div>
 

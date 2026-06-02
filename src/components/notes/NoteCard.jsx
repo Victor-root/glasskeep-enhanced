@@ -420,6 +420,7 @@ function NoteCard({
             collabs={collabs}
             isCollab={isCollab}
             dark={dark}
+            reminderAt={n.reminderAt}
           />
         );
       })()}

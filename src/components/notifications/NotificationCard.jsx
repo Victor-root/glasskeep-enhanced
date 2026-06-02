@@ -54,6 +54,7 @@ const SEMANTIC_ICONS = {
   camera: { Comp: TI.Camera, filled: false },
   refresh: { Comp: TI.Refresh, filled: false },
   power: { Comp: TI.Power, filled: false },
+  reminder: { Comp: TI.BellRingingFilled, filled: true },
 };
 
 function VariantGlyph({ variant, iconKey }) {

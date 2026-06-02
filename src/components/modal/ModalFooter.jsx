@@ -6,6 +6,7 @@ import Popover from "../common/Popover.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
 import AddImageMenu from "./AddImageMenu.jsx";
 import LogoPickerPopover from "./LogoPickerPopover.jsx";
+import ReminderPicker from "../notes/ReminderPicker.jsx";
 import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon, LogoIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
@@ -86,6 +87,8 @@ export default function ModalFooter({
   onRestoreFromTrash,
   onArchiveNote,
   onOpenConfirmDelete,
+  // reminders — onSetReminder(noteId, isoStringOrNull)
+  onSetReminder,
   // kebab menu (state lifted to App)
   modalKebabOpen,
   setModalKebabOpen,
@@ -148,6 +151,12 @@ export default function ModalFooter({
     setMImages((prev) => setNoteIcon(prev, { id: uid(), src: logo.src, name: logo.name }));
   };
 
+  /* Reminder picker popover */
+  const reminderBtnRef = useRef(null);
+  const [reminderPopOpen, setReminderPopOpen] = useState(false);
+  const reminderAt = activeNoteObj?.reminderAt || null;
+  const hasReminder = !!reminderAt;
+
   /* Kebab menu (download + collaborate) */
   const kebabRef = useRef(null);
 
@@ -189,6 +198,49 @@ export default function ModalFooter({
           darkMode={dark}
           onSelect={(name) => setMColor(name)}
         />
+
+        {/* ── Reminder ── (hidden in trash view: trashed notes can't be reminded) */}
+        {!isTrashed && typeof onSetReminder === "function" && (
+          <>
+            <button
+              ref={reminderBtnRef}
+              className={`${btnClass} focus:outline-none`}
+              onClick={() => setReminderPopOpen((v) => !v)}
+              data-tooltip={!isDesktop ? t("reminder") : undefined}
+              aria-label={t("reminder")}
+              aria-haspopup="dialog"
+            >
+              {hasReminder ? (
+                <TI.BellRingingFilled
+                  className="tabler-icon tabler-icon--filled"
+                  style={{
+                    width: isDesktop ? 16 : 18,
+                    height: isDesktop ? 16 : 18,
+                    color: "var(--gk-chrome-accent, #6366f1)",
+                  }}
+                />
+              ) : (
+                <TI.Bell
+                  className="tabler-icon"
+                  style={{ width: isDesktop ? 16 : 18, height: isDesktop ? 16 : 18 }}
+                />
+              )}
+              {isDesktop && <span>{t("reminder")}</span>}
+            </button>
+            <Popover
+              anchorRef={reminderBtnRef}
+              open={reminderPopOpen}
+              onClose={() => setReminderPopOpen(false)}
+            >
+              <ReminderPicker
+                value={reminderAt}
+                onSave={(iso) => onSetReminder(activeId, iso)}
+                onClear={() => onSetReminder(activeId, null)}
+                onClose={() => setReminderPopOpen(false)}
+              />
+            </Popover>
+          </>
+        )}
 
         {/* ── Add image / logo (hidden in view mode for draw notes, hidden in draw canvas) ──
               Clicking the button opens a small sub-menu offering either

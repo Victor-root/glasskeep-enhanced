@@ -134,6 +134,7 @@ export default function NoteModal({
   savedModalScrollRatioRef,
   // derived
   activeNoteObj,
+  onSetReminder,
   editedStamp,
   modalHasChanges,
   modalScrollable,
@@ -974,6 +975,7 @@ export default function NoteModal({
             onDownloadNote={handleDownloadNote}
             onRestoreFromTrash={restoreFromTrash}
             onArchiveNote={handleArchiveNote}
+            onSetReminder={onSetReminder}
             onOpenConfirmDelete={() => setConfirmDeleteOpen(true)}
             modalKebabOpen={modalKebabOpen}
             setModalKebabOpen={setModalKebabOpen}

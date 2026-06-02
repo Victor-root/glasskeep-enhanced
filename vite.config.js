@@ -66,7 +66,14 @@ export default defineConfig({
         // shell. Letting the SW return index.html here would break the
         // passkey association silently.
         navigateFallbackDenylist: [/^\/api\//, /^\/\.well-known\//],
-        runtimeCaching: []
+        runtimeCaching: [],
+        // Layer the Web Push handlers (push + notificationclick) onto the
+        // generated service worker. This is Workbox's supported extension
+        // point, so all the precache/offline behaviour above is preserved
+        // untouched — we only ADD push handling. push-sw.js lives in
+        // /public, so it ships to the dist root and is importScripts()'d
+        // at /push-sw.js by the generated sw.js.
+        importScripts: ["/push-sw.js"]
       }
       // devOptions: { enabled: true } // ← uncomment to test SW in dev (remember to disable later)
     })
