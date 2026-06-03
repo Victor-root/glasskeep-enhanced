@@ -132,21 +132,28 @@
           return px;
         }
 
-        var layer = document.createElement('div');
-        layer.id = 'gk-login-bg-boot';
-        layer.setAttribute('aria-hidden', 'true');
-        layer.style.cssText = 'position:fixed;inset:0;z-index:-1;pointer-events:none;background-color:' + bg.color + ';background-size:cover;background-position:center;background-repeat:no-repeat;';
+        // Paint the placeholder on the BODY background (the page canvas).
+        // It propagates to the whole viewport and sits behind ALL content,
+        // with none of the cross-stacking-context surprises an overlay <div>
+        // hits — an opaque wrapper inside #root would silently hide a
+        // z-index:-1 layer, which is exactly the kind of thing that only
+        // breaks in the real app. AuthShell fades the sharp image in over it
+        // and then clears these inline styles.
+        var bs = document.body.style;
+        bs.backgroundColor = bg.color;
+        bs.backgroundSize = 'cover';
+        bs.backgroundPosition = 'center';
+        bs.backgroundRepeat = 'no-repeat';
         if (bg.hash) {
           try {
             var px = decodeBlurhash(bg.hash, 32, 32);
             if (px) {
               var cv = document.createElement('canvas'); cv.width = 32; cv.height = 32;
               cv.getContext('2d').putImageData(new ImageData(px, 32, 32), 0, 0);
-              layer.style.backgroundImage = 'url(' + cv.toDataURL() + ')';
+              bs.backgroundImage = 'url(' + cv.toDataURL() + ')';
             }
           } catch (e) { /* canvas/ImageData unavailable — colour-only fallback */ }
         }
-        document.body.appendChild(layer);
       } catch (e) { /* never let the backdrop break boot */ }
     })();
   </script>

@@ -4,11 +4,19 @@ import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
 import { useBranding, DEFAULT_APP_NAME } from "../../branding/BrandingContext.jsx";
 
-// Remove the boot-time placeholder layer (colour + BlurHash painted by the
-// inline script in index.html) once React owns the backdrop. Safe to call
-// repeatedly / when it was never created.
+// Clear the boot-time placeholder (colour + BlurHash painted on the body
+// background by the inline script in index.html) once React owns the
+// backdrop. Restores the stylesheet's --gk-app-bg. Safe to call repeatedly /
+// when nothing was painted.
 function removeBootBgLayer() {
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined" || !document.body) return;
+  const s = document.body.style;
+  s.backgroundColor = "";
+  s.backgroundImage = "";
+  s.backgroundSize = "";
+  s.backgroundPosition = "";
+  s.backgroundRepeat = "";
+  // Older boot script used an overlay element — remove it if present.
   const el = document.getElementById("gk-login-bg-boot");
   if (el) el.remove();
 }
