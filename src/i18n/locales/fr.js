@@ -752,6 +752,9 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   collaboratorLeftTitle: "Collaborateur parti",
   collaboratorLeftToast:
     "{sender} a quitté la collaboration sur la note {title}",
+  sharedNoteDeletedTitle: "Note partagée supprimée",
+  sharedNoteDeletedToast:
+    "{sender} a supprimé la note {title} qui était partagée avec vous",
   untitledNote: "(sans titre)",
   notifications: "Notifications",
   notificationCenterTitle: "Notifications",

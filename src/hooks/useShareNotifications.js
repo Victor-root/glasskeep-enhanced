@@ -114,19 +114,22 @@ function buildHistoryEntry(n) {
     type === "note_access_revoked_with_copy" ||
     type === "collaborator_removed" ||
     type === "collaborator_removed_with_copy" ||
-    type === "collaborator_left"
+    type === "collaborator_left" ||
+    type === "shared_note_deleted"
   ) {
     const titleKeyMap = {
       collaborator_removed: "collaboratorRemovedTitle",
       collaborator_removed_with_copy: "collaboratorRemovedTitle",
       collaborator_left: "collaboratorLeftTitle",
       note_access_revoked_with_copy: "noteAccessRevokedTitle",
+      shared_note_deleted: "sharedNoteDeletedTitle",
     };
     const msgKeyMap = {
       collaborator_removed: "collaboratorRemovedToast",
       collaborator_removed_with_copy: "collaboratorRemovedWithCopyToast",
       collaborator_left: "collaboratorLeftToast",
       note_access_revoked_with_copy: "noteAccessRevokedWithCopyToast",
+      shared_note_deleted: "sharedNoteDeletedToast",
     };
     title = t(titleKeyMap[type] || "noteAccessRevokedTitle");
     message = buildHighlightedMessage(
@@ -403,6 +406,9 @@ export function useShareNotifications({ token, userId }) {
     } else if (typeKey === "note_access_revoked_with_copy") {
       titleKey = "noteAccessRevokedTitle";
       messageKey = "noteAccessRevokedWithCopyToast";
+    } else if (typeKey === "shared_note_deleted") {
+      titleKey = "sharedNoteDeletedTitle";
+      messageKey = "sharedNoteDeletedToast";
     } else {
       titleKey = "noteAccessRevokedTitle";
       messageKey = "noteAccessRevokedToast";
@@ -467,7 +473,8 @@ export function useShareNotifications({ token, userId }) {
             n.type === "note_access_revoked_with_copy" ||
             n.type === "collaborator_removed" ||
             n.type === "collaborator_removed_with_copy" ||
-            n.type === "collaborator_left"
+            n.type === "collaborator_left" ||
+            n.type === "shared_note_deleted"
           ) {
             showRevokeToast(payload);
           } else if (n.type === "pending_user_registered") {

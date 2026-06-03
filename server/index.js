@@ -1292,6 +1292,43 @@ function createShareNotification({ recipientId, senderId, senderName, noteId, no
   }
 }
 
+// Persist + push a "shared_note_deleted" notification: the owner deleted a
+// note that was shared with this collaborator. The transient note_deleted
+// SSE event only removes the note from a CONNECTED client's view and leaves
+// no trace — so an offline collaborator never learns the shared note is
+// gone. This persisted row fixes that: it replays on reconnect and lands in
+// the notification history. note_id is null (no note to open anymore, and it
+// keeps the FK happy when the row outlives a permanent delete). It rides the
+// same envelope as revoke notices so the client routes it via showRevokeToast.
+function createSharedNoteDeletedNotification({ recipientId, senderId, senderName, noteTitle }) {
+  try {
+    const createdAt = nowISO();
+    const row = insertNotification.run(
+      recipientId,
+      senderId,
+      "shared_note_deleted",
+      null,
+      noteTitle || "",
+      senderName || "",
+      null,
+      null,
+      0,
+      null,
+      createdAt,
+    );
+    sendEventToUser(recipientId, {
+      type: "note_access_revoked_notification",
+      notificationType: "shared_note_deleted",
+      notificationId: row.lastInsertRowid,
+      senderName: senderName || "",
+      noteTitle: noteTitle || "",
+      createdAt,
+    });
+  } catch (e) {
+    console.warn("[notifications] createSharedNoteDeletedNotification failed:", e?.message);
+  }
+}
+
 // ---------- At-rest encryption: unlock routes + lock gate ----------
 // These have to be registered BEFORE the bulk of the API so the lock
 // middleware can short-circuit everything else with HTTP 423 while
@@ -2805,6 +2842,18 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
       // without it landing in their trash view.
       const evt = { type: "note_deleted", noteId: id };
       for (const cid of collabIds) sendEventToUser(cid, evt);
+      // ...and a persisted notice so each collaborator actually learns the
+      // shared note was removed (the note_deleted event above is transient —
+      // an offline collaborator would otherwise never find out).
+      const ownerName = req.user.name || req.user.email || "";
+      for (const cid of collabIds) {
+        createSharedNoteDeletedNotification({
+          recipientId: cid,
+          senderId: req.user.id,
+          senderName: ownerName,
+          noteTitle: existing.title || "",
+        });
+      }
       const fresh = getNoteById.get(id);
       return res.json({ ok: true, deletedForAll: true, note: serializeNote(fresh || existing, req.user.id) });
     }
@@ -2966,6 +3015,22 @@ app.delete("/api/notes/:id/permanent", auth, (req, res) => {
 
   const evt = { type: "note_deleted", noteId: id };
   for (const uid of recipientIds) sendEventToUser(uid, evt);
+
+  // Any collaborator still attached at permanent-delete time (rare — a
+  // delete-for-all usually detaches them first) gets a persisted notice so
+  // the removal survives offline rather than vanishing with a transient sync
+  // event. Self-deletion of one's own (non-shared) note notifies nobody.
+  const ownerName = req.user.name || req.user.email || "";
+  for (const uid of recipientIds) {
+    if (uid !== existing.user_id) {
+      createSharedNoteDeletedNotification({
+        recipientId: uid,
+        senderId: req.user.id,
+        senderName: ownerName,
+        noteTitle: existing.title || "",
+      });
+    }
+  }
 
   res.json({ ok: true });
 });

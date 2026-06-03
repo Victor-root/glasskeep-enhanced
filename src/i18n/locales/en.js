@@ -752,6 +752,9 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   collaboratorLeftTitle: "Collaborator left",
   collaboratorLeftToast:
     "{sender} left the collaboration on the note {title}",
+  sharedNoteDeletedTitle: "Shared note deleted",
+  sharedNoteDeletedToast:
+    "{sender} deleted the note {title} that was shared with you",
   untitledNote: "(untitled)",
   notifications: "Notifications",
   notificationCenterTitle: "Notifications",

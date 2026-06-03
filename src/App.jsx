@@ -617,7 +617,8 @@ export default function App() {
       typeKey === "note_access_revoked_with_copy" ||
       typeKey === "collaborator_removed" ||
       typeKey === "collaborator_removed_with_copy" ||
-      typeKey === "collaborator_left"
+      typeKey === "collaborator_left" ||
+      typeKey === "shared_note_deleted"
     ) {
       return "access";
     }
