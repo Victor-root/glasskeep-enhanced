@@ -24,6 +24,24 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Glass Keep</title>
   <script>
+    /* Dark mode BEFORE first paint. The app otherwise toggles `.dark` from a
+       React effect (App.jsx), so a dark-mode user gets a white flash on every
+       cold load. Mirror that effect's decision here, synchronously: a manual
+       session preference wins, else follow the OS (prefers-color-scheme) —
+       the same source the app falls back to (incognito has no session pref,
+       so it correctly follows the OS). With `.dark` set now, body paints with
+       the dark --gk-app-bg straight away. */
+    (function () {
+      try {
+        var pref = sessionStorage.getItem('glass-keep-dark-mode-manual');
+        var dark = pref !== null
+          ? pref === 'true'
+          : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.classList.add('dark');
+      } catch (e) {}
+    })();
+  </script>
+  <script>
     /* Boot-time branding: apply the cached custom app name + logo to the
        tab title and favicon BEFORE React mounts, so a reload doesn't
        flash the default name/logo. The BrandingProvider reads the same
