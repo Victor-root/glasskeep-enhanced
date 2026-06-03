@@ -1,4 +1,5 @@
 import { t } from "../i18n";
+import { encode as blurhashEncode } from "blurhash";
 
 /** ---------- Utils ---------- */
 export const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -235,4 +236,50 @@ export async function makeSquarePngIcon(dataUrl, size = 512, bg = "#ffffff", pad
   const h = Math.round(img.height * scale);
   ctx.drawImage(img, Math.round((size - w) / 2), Math.round((size - h) / 2), w, h);
   return canvas.toDataURL("image/png");
+}
+
+/** Derive the two tiny placeholders for a login-background image (a data
+ *  URL): its mean colour (#rrggbb) and a BlurHash string (~30 chars). The
+ *  login page paints the colour, then the decoded BlurHash, then fades in
+ *  the real image — so there's never a flash of the default backdrop, even
+ *  on a cold load. Both outputs are a few bytes, so unlike the image itself
+ *  they can be inlined in the page / cached cheaply. Returns
+ *  { color, hash }, or null if the image can't be read. */
+export async function deriveBackgroundPlaceholders(dataUrl) {
+  try {
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = rej;
+      i.src = dataUrl;
+    });
+    // Downscale to a small box: BlurHash only needs a coarse sample and the
+    // mean colour is resolution-independent, so this keeps encode() fast on
+    // large uploads. Guard against a zero dimension on odd images.
+    const maxDim = 64;
+    const scale = Math.min(1, maxDim / Math.max(img.width || 1, img.height || 1));
+    const w = Math.max(1, Math.round((img.width || 1) * scale));
+    const h = Math.max(1, Math.round((img.height || 1) * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, w, h);
+    const { data } = ctx.getImageData(0, 0, w, h);
+
+    // Mean colour across every pixel.
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      r += data[i]; g += data[i + 1]; b += data[i + 2]; n += 1;
+    }
+    const hex = (v) => Math.round(v / n).toString(16).padStart(2, "0");
+    const color = `#${hex(r)}${hex(g)}${hex(b)}`;
+
+    // 4×3 components — the sweet spot (enough to recognise the image, still
+    // a ~30-char string), the same the BlurHash authors recommend.
+    const hash = blurhashEncode(data, w, h, 4, 3);
+    return { color, hash };
+  } catch {
+    return null;
+  }
 }

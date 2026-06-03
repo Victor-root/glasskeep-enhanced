@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { t } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
 import { RowIcon } from "../common/SettingsAccordion.jsx";
-import { fileToCompressedDataURL, makeSquarePngIcon } from "../../utils/helpers.js";
+import { fileToCompressedDataURL, makeSquarePngIcon, deriveBackgroundPlaceholders } from "../../utils/helpers.js";
 import { DEFAULT_APP_NAME } from "../../branding/BrandingContext.jsx";
 import DefaultBackdropPreview from "../common/DefaultBackdropPreview.jsx";
 
@@ -143,7 +143,15 @@ export default function LoginBrandingSection({ dark, adminSettings, updateAdminS
         const logoPwa = await makeSquarePngIcon(dataUrl, 512, "#ffffff", 0.12);
         patch = { logo: dataUrl, logoPwa };
       } else {
-        patch = { loginBackground: dataUrl };
+        // Derive the instant-paint placeholders (mean colour + BlurHash) so
+        // the login page never flashes the default backdrop before the real
+        // image loads. Best-effort: a failure just means no placeholder.
+        const ph = await deriveBackgroundPlaceholders(dataUrl);
+        patch = {
+          loginBackground: dataUrl,
+          loginBackgroundColor: ph?.color || null,
+          loginBackgroundHash: ph?.hash || null,
+        };
       }
       const res = await saveField(patch);
       if (res) showToast?.(t(successKey), "success", undefined, "camera");

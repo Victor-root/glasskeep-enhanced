@@ -239,7 +239,15 @@ CREATE TABLE IF NOT EXISTS app_settings (
   custom_logo TEXT,
   login_bg_image TEXT,
   login_bg_blur INTEGER NOT NULL DEFAULT 0,
-  custom_logo_pwa TEXT
+  custom_logo_pwa TEXT,
+  -- Tiny placeholders derived from the login background at upload time so
+  -- the login page can paint instantly (no flash of the default backdrop)
+  -- while the full image downloads: a mean colour (#rrggbb) and a BlurHash
+  -- string (~30 chars). login_bg_version is a cache-buster bumped on every
+  -- background change so the (otherwise constant) image URL is re-fetched.
+  login_bg_color TEXT,
+  login_bg_hash TEXT,
+  login_bg_version TEXT
 );
 
 -- Web Push subscriptions (PWA push notifications for reminders). One row
@@ -465,6 +473,17 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
       // manifest (home-screen icon). Generated client-side on upload.
       if (!names.has("custom_logo_pwa")) {
         db.exec(`ALTER TABLE app_settings ADD COLUMN custom_logo_pwa TEXT`);
+      }
+      // Login-background placeholders (mean colour + BlurHash) and a
+      // cache-buster version. Added after the initial branding release.
+      if (!names.has("login_bg_color")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN login_bg_color TEXT`);
+      }
+      if (!names.has("login_bg_hash")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN login_bg_hash TEXT`);
+      }
+      if (!names.has("login_bg_version")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN login_bg_version TEXT`);
       }
     });
     tx();
@@ -3255,9 +3274,15 @@ const upsertAppSettings = db.prepare(
 // Branding images live in their own read/write statements so the
 // (potentially multi-MB) data URLs never get held in the in-memory
 // mirror — which is broadcast to admins on every settings change.
-const getBrandingImagesRow = db.prepare(`SELECT custom_logo, login_bg_image FROM app_settings WHERE id = 1`);
+const getBrandingImagesRow = db.prepare(`SELECT custom_logo, login_bg_image, login_bg_color, login_bg_hash, login_bg_version FROM app_settings WHERE id = 1`);
 const setCustomLogoStmt = db.prepare(`UPDATE app_settings SET custom_logo = ? WHERE id = 1`);
 const setLoginBgStmt = db.prepare(`UPDATE app_settings SET login_bg_image = ? WHERE id = 1`);
+// The login-background placeholders (mean colour + BlurHash) and the
+// cache-buster version are written together with the image: an explicit
+// background change always refreshes all three (or clears them on remove).
+const setLoginBgMetaStmt = db.prepare(`UPDATE app_settings SET login_bg_color = ?, login_bg_hash = ?, login_bg_version = ? WHERE id = 1`);
+// Raw login-background bytes for GET /api/branding/login-bg.
+const getLoginBgRow = db.prepare(`SELECT login_bg_image FROM app_settings WHERE id = 1`);
 // Square PWA icon (PNG data URL) derived from the custom logo.
 const getPwaIconRow = db.prepare(`SELECT custom_logo_pwa FROM app_settings WHERE id = 1`);
 const setPwaIconStmt = db.prepare(`UPDATE app_settings SET custom_logo_pwa = ? WHERE id = 1`);
@@ -3268,6 +3293,11 @@ const setPwaIconStmt = db.prepare(`UPDATE app_settings SET custom_logo_pwa = ? W
 // the primary limit. Only raster formats are allowed; SVG is rejected to
 // avoid the script-injection surface that inline SVG carries.
 const BRANDING_IMAGE_RE = /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/]+=*$/;
+// Placeholder formats: a 6-digit hex colour and a BlurHash (base83, capped
+// well above any 9×9-component hash). Both are tiny and client-supplied, so
+// they're validated before storage and simply dropped if malformed.
+const BRANDING_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+const BRANDING_HASH_RE = /^[0-9A-Za-z#$%*+,\-.:;=?@[\]^_{|}~]{6,200}$/;
 const MAX_LOGO_BYTES = 2 * 1024 * 1024; // ~2 MB data URL (≈1.5 MB decoded)
 const MAX_LOGIN_BG_BYTES = 4 * 1024 * 1024; // ~4 MB data URL (≈3 MB decoded)
 const MAX_APP_NAME_LEN = 10;
@@ -3303,7 +3333,18 @@ function brandingSettingsPayload() {
     ...adminSettings,
     logo: images.custom_logo || null,
     loginBackground: images.login_bg_image || null,
+    loginBackgroundColor: images.login_bg_color || null,
+    loginBackgroundHash: images.login_bg_hash || null,
   };
+}
+
+// Public, cacheable URL for the login background, or null when none is set.
+// Versioned (?v=) so changing the background busts the browser HTTP cache
+// even though the path is constant. `row` is a getBrandingImagesRow result.
+function loginBgUrl(row) {
+  if (!row || !row.login_bg_image) return null;
+  const v = row.login_bg_version || "1";
+  return `/api/branding/login-bg?v=${encodeURIComponent(v)}`;
 }
 
 // Get admin settings
@@ -3313,7 +3354,7 @@ app.get("/api/admin/settings", auth, adminOnly, (_req, res) => {
 
 // Update admin settings
 app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
-  const { allowNewAccounts, loginSlogan, appName, loginBackgroundBlur, logo, logoPwa, loginBackground } = req.body || {};
+  const { allowNewAccounts, loginSlogan, appName, loginBackgroundBlur, logo, logoPwa, loginBackground, loginBackgroundColor, loginBackgroundHash } = req.body || {};
 
   if (typeof allowNewAccounts === 'boolean') {
     adminSettings.allowNewAccounts = allowNewAccounts;
@@ -3359,6 +3400,8 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
 
   if (loginBackground === null) {
     setLoginBgStmt.run(null);
+    // Clearing the image clears its derived placeholders + version too.
+    setLoginBgMetaStmt.run(null, null, null);
   } else if (typeof loginBackground === 'string' && loginBackground) {
     if (!BRANDING_IMAGE_RE.test(loginBackground)) {
       return res.status(400).json({ error: "Background must be a PNG, JPEG or WebP image data URL." });
@@ -3367,6 +3410,12 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
       return res.status(413).json({ error: "Background image is too large." });
     }
     setLoginBgStmt.run(loginBackground);
+    // Store the client-derived placeholders (best-effort: drop them if
+    // malformed rather than failing the whole upload) and bump the
+    // cache-buster so clients re-fetch the new image at /login-bg.
+    const color = BRANDING_COLOR_RE.test(loginBackgroundColor || "") ? loginBackgroundColor : null;
+    const hash = BRANDING_HASH_RE.test(loginBackgroundHash || "") ? loginBackgroundHash : null;
+    setLoginBgMetaStmt.run(color, hash, Date.now().toString(36));
   }
 
   upsertAppSettings.run(
@@ -3398,7 +3447,14 @@ app.get("/api/branding", (_req, res) => {
   res.json({
     appName: adminSettings.appName || "",
     logo: images.custom_logo || null,
-    loginBackground: images.login_bg_image || null,
+    // The (multi-MB) background is NOT inlined here anymore: clients load
+    // it from the cacheable /login-bg endpoint instead, so this payload
+    // stays small and the browser HTTP-caches the image across reloads.
+    // The URL is versioned so a background change busts that cache. The
+    // mean colour + BlurHash let the login page paint instantly.
+    loginBackground: loginBgUrl(images),
+    loginBackgroundColor: images.login_bg_color || null,
+    loginBackgroundHash: images.login_bg_hash || null,
     loginBackgroundBlur: adminSettings.loginBackgroundBlur || 0,
   });
 });
@@ -3413,6 +3469,22 @@ app.get("/api/branding/pwa-icon", (_req, res) => {
   const buf = Buffer.from(m[1], "base64");
   res.setHeader("Content-Type", "image/png");
   res.setHeader("Cache-Control", "no-cache");
+  res.end(buf);
+});
+
+// Login background as a real (cacheable) image, decoded from the stored
+// data URL. 404 when none is set. Public — the login page fetches it before
+// any token exists. The URL is versioned (?v=) by the caller, so a long
+// immutable cache is safe: a new background gets a new URL.
+app.get("/api/branding/login-bg", (req, res) => {
+  const dataUrl = getLoginBgRow.get()?.login_bg_image;
+  const m = /^data:image\/(png|jpe?g|webp);base64,([A-Za-z0-9+/]+=*)$/.exec(dataUrl || "");
+  if (!m) return res.status(404).end();
+  const buf = Buffer.from(m[2], "base64");
+  res.setHeader("Content-Type", `image/${m[1] === "jpg" ? "jpeg" : m[1]}`);
+  // Immutable only when a version was supplied (cache-bustable); otherwise
+  // revalidate so an unversioned hit can't pin a stale image forever.
+  res.setHeader("Cache-Control", req.query.v ? "public, max-age=31536000, immutable" : "public, max-age=0, must-revalidate");
   res.end(buf);
 });
 
@@ -3849,26 +3921,61 @@ app.get("/api/health", (_req, res) => res.json({
 // ---------- Static (production) ----------
 if (NODE_ENV === "production") {
   const dist = path.join(__dirname, "..", "dist");
+  const INDEX_CACHE_CONTROL = "public, max-age=0, must-revalidate, stale-while-revalidate=86400, stale-if-error=604800";
 
-  // Hashed assets (JS/CSS bundles, images) — content-addressed so they
-  // can be cached for a very long time.
+  // The built index.html is read once and cached; per request we inject a
+  // tiny global with the login background's placeholder (mean colour +
+  // BlurHash + versioned image URL). This is what lets the login page paint
+  // instantly on a cold/incognito load — no client cache or service worker
+  // is involved, exactly like a server-rendered page. The payload is a few
+  // bytes (NOT the multi-MB image), so it doesn't bloat the HTML or the PWA
+  // precache. A service-worker-served (offline) index.html skips this and
+  // falls back to the localStorage branding cache instead.
+  let indexTemplate = null;
+  function renderIndexHtml() {
+    if (indexTemplate == null) {
+      try { indexTemplate = fs.readFileSync(path.join(dist, "index.html"), "utf8"); }
+      catch { indexTemplate = ""; }
+    }
+    const images = getBrandingImagesRow.get() || {};
+    let inject = "";
+    if (images.login_bg_image) {
+      // base83 (hash) and hex (colour) can't contain "<" or "/", so the
+      // JSON can't break out of the <script> — values are also validated
+      // on write. The URL is a fixed path plus a base36 version token.
+      const data = JSON.stringify({
+        url: loginBgUrl(images),
+        color: images.login_bg_color || null,
+        hash: images.login_bg_hash || null,
+      });
+      inject = `<script>window.__GK_LOGIN_BG__=${data};</script>`;
+    }
+    return indexTemplate.replace("<head>", "<head>" + inject);
+  }
+  function sendIndex(res) {
+    res.setHeader("Cache-Control", INDEX_CACHE_CONTROL);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(renderIndexHtml());
+  }
+
+  // index.html (root + explicit path) is always injected, never served raw.
+  app.get(["/", "/index.html"], (_req, res) => sendIndex(res));
+
+  // Hashed assets (JS/CSS bundles, images) — content-addressed so they can
+  // be cached for a very long time. `index: false` so this never serves the
+  // un-injected index.html for "/"; that's handled above + the SPA fallback.
   app.use(express.static(dist, {
+    index: false,
     setHeaders(res, filePath) {
       if (/\.[0-9a-f]{8,}\.(js|css|woff2?|png|svg|ico|webp)$/i.test(filePath)) {
         res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       } else if (filePath.endsWith("index.html")) {
-        // index.html: revalidate when online, serve stale when offline.
-        // stale-if-error lets the WebView fall back to the cached copy
-        // when the server is unreachable (no-network / server stopped).
-        res.setHeader("Cache-Control", "public, max-age=0, must-revalidate, stale-while-revalidate=86400, stale-if-error=604800");
+        res.setHeader("Cache-Control", INDEX_CACHE_CONTROL);
       }
     },
   }));
 
-  app.get("*", (_req, res) => {
-    res.setHeader("Cache-Control", "public, max-age=0, must-revalidate, stale-while-revalidate=86400, stale-if-error=604800");
-    res.sendFile(path.join(dist, "index.html"));
-  });
+  app.get("*", (_req, res) => sendIndex(res));
 }
 
 // ---------- Reminders: scheduler + delivery ----------
