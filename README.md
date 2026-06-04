@@ -1,5 +1,7 @@
 <div align="center">
 
+🌐 [Français](./docs/README.fr.md)
+
 [![Latest release](https://img.shields.io/github/v/release/Victor-root/glasskeep-enhanced?style=for-the-badge\&logo=github\&label=release)](https://github.com/Victor-root/glasskeep-enhanced/releases)
 [![Last update](https://img.shields.io/github/last-commit/Victor-root/glasskeep-enhanced/main?style=for-the-badge\&logo=git\&label=last%20update)](https://github.com/Victor-root/glasskeep-enhanced/commits/main)
 [![Active development](https://img.shields.io/badge/Active-development-2ea44f?style=for-the-badge\&logo=rocket\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/commits/main)
