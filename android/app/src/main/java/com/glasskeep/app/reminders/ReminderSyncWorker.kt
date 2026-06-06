@@ -40,15 +40,24 @@ class ReminderSyncWorker(
         val prefs = applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val serverUrl = prefs.getString("server_url", null)?.trimEnd('/')
         val token = prefs.getString(KEY_TOKEN, null)
+        android.util.Log.i(
+            "GKReminders",
+            "sync: start (serverUrl=${!serverUrl.isNullOrBlank()}, token=${!token.isNullOrBlank()})",
+        )
         if (serverUrl.isNullOrBlank() || token.isNullOrBlank()) {
-            return@withContext Result.success() // not signed in / not set up yet
+            android.util.Log.w("GKReminders", "sync: skipped — not signed in (no server_url/token yet)")
+            return@withContext Result.success()
         }
 
         val body = try {
             httpGet("$serverUrl/api/reminders/upcoming", token)
         } catch (e: Exception) {
-            return@withContext Result.retry() // transient (offline) — back off and retry
-        } ?: return@withContext Result.success() // 401/403 → wait for the app to refresh the token
+            android.util.Log.w("GKReminders", "sync: network error, will retry — ${e.message}")
+            return@withContext Result.retry()
+        } ?: run {
+            android.util.Log.w("GKReminders", "sync: auth rejected (401/403) — token stale? reopen the app")
+            return@withContext Result.success()
+        }
 
         val items = ArrayList<ReminderScheduler.ReminderItem>()
         try {
@@ -68,6 +77,7 @@ class ReminderSyncWorker(
         }
 
         // Reconcile the full set: arms new alarms, cancels ones no longer due.
+        android.util.Log.i("GKReminders", "sync: server returned ${items.size} upcoming reminder(s) -> arming")
         ReminderScheduler.syncAll(applicationContext, items)
         Result.success()
     }
@@ -83,6 +93,7 @@ class ReminderSyncWorker(
         }
         try {
             val code = conn.responseCode
+            android.util.Log.i("GKReminders", "sync: GET upcoming -> HTTP $code")
             if (code == 401 || code == 403) return null
             if (code !in 200..299) throw RuntimeException("HTTP $code")
             return conn.inputStream.bufferedReader().use { it.readText() }
@@ -103,6 +114,10 @@ class ReminderSyncWorker(
         fun setAuthToken(ctx: Context, token: String) {
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putString(KEY_TOKEN, token).apply()
+            android.util.Log.i(
+                "GKReminders",
+                "setAuthToken: token ${if (token.isBlank()) "cleared" else "stored"}; scheduling periodic + immediate sync",
+            )
             if (token.isNotBlank()) {
                 schedulePeriodic(ctx)
                 syncNow(ctx)

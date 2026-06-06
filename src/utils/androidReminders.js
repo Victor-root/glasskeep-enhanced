@@ -19,8 +19,10 @@ export function hasAndroidReminders() {
 // call covers create, edit, delete, cross-device changes and app launch.
 export function syncAndroidReminders(items) {
   if (!hasAndroidReminders()) return;
+  const list = Array.isArray(items) ? items : [];
   try {
-    window.AndroidReminders.syncAll(JSON.stringify(Array.isArray(items) ? items : []));
+    console.log("[reminders] -> native syncAll:", list.length, "upcoming alarm(s)");
+    window.AndroidReminders.syncAll(JSON.stringify(list));
   } catch {
     /* bridge unavailable — ignore */
   }
@@ -40,6 +42,7 @@ export function notifyAndroidNow(noteId, title, body) {
     return;
   }
   try {
+    console.log("[reminders] -> native notifyNow (backgrounded):", String(noteId ?? ""));
     window.AndroidReminders.notifyNow(
       String(noteId ?? ""),
       String(title ?? ""),

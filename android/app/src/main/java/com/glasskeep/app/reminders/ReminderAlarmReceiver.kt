@@ -19,13 +19,22 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
         val body = intent.getStringExtra(EXTRA_BODY) ?: ""
 
+        android.util.Log.i(
+            "GKReminders",
+            "alarm fired: note=$noteId (appForeground=${WebViewActivity.isForeground})",
+        )
+
         // The alarm has fired once — drop it from the persisted set so a
         // reboot doesn't resurrect it.
         ReminderScheduler.cancel(context, noteId)
 
         // App in foreground → the in-app notification already shows it.
-        if (WebViewActivity.isForeground) return
+        if (WebViewActivity.isForeground) {
+            android.util.Log.i("GKReminders", "alarm: app foreground -> skipping system notif (in-app handles it)")
+            return
+        }
 
+        android.util.Log.i("GKReminders", "alarm: app not foreground -> posting system notif")
         ReminderNotifier.show(context, noteId, title, body)
     }
 

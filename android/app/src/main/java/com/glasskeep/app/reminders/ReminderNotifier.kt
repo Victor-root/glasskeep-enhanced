@@ -29,8 +29,12 @@ internal object ReminderNotifier {
 
     fun show(context: Context, noteId: String, title: String, body: String) {
         val mgr = NotificationManagerCompat.from(context)
-        if (!mgr.areNotificationsEnabled()) return
+        if (!mgr.areNotificationsEnabled()) {
+            android.util.Log.w("GKReminders", "notifier: notifications DISABLED — cannot post (note=$noteId)")
+            return
+        }
         ensureChannel(context)
+        android.util.Log.i("GKReminders", "notifier: posting notification (note=$noteId)")
 
         // Tapping the notification — or its explicit "Open" action — deep-links
         // to the note: WebViewActivity gets the note id and the web app pops the
@@ -58,8 +62,10 @@ internal object ReminderNotifier {
             // Stable per-note id so re-firing the same note replaces its row
             // instead of stacking duplicates.
             mgr.notify(noteId.hashCode(), builder.build())
+            android.util.Log.i("GKReminders", "notifier: notify() OK (note=$noteId)")
         } catch (e: SecurityException) {
             // Notifications revoked between the enabled-check and notify().
+            android.util.Log.w("GKReminders", "notifier: SecurityException posting (note=$noteId)", e)
         }
     }
 
