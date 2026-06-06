@@ -2698,6 +2698,45 @@ app.post("/api/notes/:id/test-reminder", auth, adminOnly, async (req, res) => {
   res.json({ ok: true, noteId: id, reminderAt: when.toISOString(), inSeconds, fired: inSeconds <= 0 });
 });
 
+// Upcoming (future, not-yet-fired) reminders for the signed-in user — owned
+// or collaborated. The Android app's background sync (WorkManager) polls this
+// while the app is closed to (re)arm its on-device local alarms, so a reminder
+// created on another device still fires on the phone with the app shut — and
+// without any push service (no Google/FCM dependency). Returns exactly the
+// shape the native ReminderScheduler wants: { noteId, t (epoch ms), title, body }.
+const selectUpcomingReminders = db.prepare(`
+  SELECT id, reminder_at FROM notes
+   WHERE reminder_at IS NOT NULL
+     AND reminder_fired_at IS NULL
+     AND reminder_at > @now
+     AND (user_id = @uid OR EXISTS(
+       SELECT 1 FROM note_collaborators nc
+        WHERE nc.note_id = notes.id AND nc.user_id = @uid))
+   ORDER BY reminder_at ASC
+   LIMIT 200
+`);
+app.get("/api/reminders/upcoming", auth, (req, res) => {
+  const now = new Date().toISOString();
+  const lang = getUserLanguage(req.user.id);
+  const title = serverT(lang, "reminderNotificationTitle");
+  let rows;
+  try {
+    rows = selectUpcomingReminders.all({ now, uid: req.user.id });
+  } catch (e) {
+    console.warn("[reminders] upcoming query failed:", e?.message);
+    return res.status(500).json({ error: "query failed" });
+  }
+  const reminders = [];
+  for (const r of rows) {
+    const ts = Date.parse(r.reminder_at);
+    if (Number.isNaN(ts)) continue;
+    const note = getNoteById.get(r.id);
+    const body = (note && notePreviewText(note)) || serverT(lang, "reminderNotificationUntitled");
+    reminders.push({ noteId: String(r.id), t: ts, title, body });
+  }
+  res.json({ reminders });
+});
+
 // ---------- Web Push subscriptions (PWA push notifications) ----------
 // The public VAPID key is needed by the browser to subscribe. It is NOT
 // a secret (it's the applicationServerKey). Returns { key: null } when

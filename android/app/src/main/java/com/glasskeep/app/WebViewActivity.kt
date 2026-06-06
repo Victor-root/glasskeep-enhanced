@@ -411,6 +411,14 @@ class WebViewActivity : AppCompatActivity() {
         // Deep-link target if we were launched by a reminder notification tap.
         pendingOpenNoteId = intent.getStringExtra(EXTRA_OPEN_NOTE_ID)
 
+        // Returning user with a stored token → ensure the background reminder
+        // sync is scheduled (covers reboots / updates where the web layer might
+        // not immediately re-hand the token).
+        if (!getSharedPreferences("glasskeep", MODE_PRIVATE)
+                .getString("auth_token", null).isNullOrBlank()) {
+            com.glasskeep.app.reminders.ReminderSyncWorker.schedulePeriodic(applicationContext)
+        }
+
         webView = findViewById(R.id.webview)
 
         // Pull-to-refresh
@@ -1136,6 +1144,32 @@ class WebViewActivity : AppCompatActivity() {
         }
     }
 
+    // Ask once to be exempted from battery optimization, so the background
+    // reminder sync + exact alarms survive aggressive OEM power management
+    // (Xiaomi/Samsung/Huawei & co). Pref-gated (asked at most once); declining
+    // is fine — reminders still work, this just maximizes reliability.
+    private fun maybeAskBatteryExemption() {
+        if (isFinishing || isDestroyed) return
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) return
+        val prefs = getSharedPreferences("glasskeep", MODE_PRIVATE)
+        if (prefs.getBoolean("battery_exemption_asked", false)) return
+        // Mark asked up-front so a decline (or a ROM without the dialog) isn't
+        // re-prompted on every reminder.
+        prefs.edit().putBoolean("battery_exemption_asked", true).apply()
+        val pm = getSystemService(android.os.PowerManager::class.java)
+        if (pm == null || pm.isIgnoringBatteryOptimizations(packageName)) return
+        try {
+            startActivity(
+                Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+            )
+        } catch (e: Exception) {
+            // Some OEMs/ROMs don't expose this intent — the user can still
+            // exempt the app manually from system settings.
+        }
+    }
+
     /**
      * window.AndroidReminders — local reminder scheduling for the WebView
      * (Web Push is unavailable here). Methods run on a binder thread;
@@ -1153,7 +1187,10 @@ class WebViewActivity : AppCompatActivity() {
             com.glasskeep.app.reminders.ReminderScheduler.schedule(
                 applicationContext, id, at, title ?: "", body ?: "",
             )
-            runOnUiThread { ensureReminderNotificationPermission() }
+            runOnUiThread {
+                ensureReminderNotificationPermission()
+                maybeAskBatteryExemption()
+            }
         }
 
         @JavascriptInterface
@@ -1183,7 +1220,21 @@ class WebViewActivity : AppCompatActivity() {
                 return
             }
             com.glasskeep.app.reminders.ReminderScheduler.syncAll(applicationContext, items)
-            if (items.isNotEmpty()) runOnUiThread { ensureReminderNotificationPermission() }
+            if (items.isNotEmpty()) runOnUiThread {
+                ensureReminderNotificationPermission()
+                maybeAskBatteryExemption()
+            }
+        }
+
+        /**
+         * Hand the current auth token to native so the background sync
+         * (ReminderSyncWorker) can poll the server while the app is closed.
+         * Empty string on sign-out. Stored in SharedPreferences; the worker
+         * reads it alongside server_url.
+         */
+        @JavascriptInterface
+        fun setAuth(token: String?) {
+            com.glasskeep.app.reminders.ReminderSyncWorker.setAuthToken(applicationContext, token ?: "")
         }
     }
 

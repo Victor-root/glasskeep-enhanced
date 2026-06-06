@@ -97,6 +97,53 @@ carries the note id to `WebViewActivity`, which—once the page is ready—calls
 On a cold start the hook stashes the id and opens the note as soon as the
 notes list has hydrated.
 
+**Background sync (so reminders created elsewhere still fire on the phone).**
+Local alarms only cover reminders the phone already knows about — a reminder
+created on the **desktop** (or another device) while the phone app is closed
+wouldn't be armed. To close that gap **without any push service**, a
+`ReminderSyncWorker` (WorkManager) runs **every ~15 min even when the app is
+closed**, calls `GET /api/reminders/upcoming`, and re-arms the local alarms
+(`ReminderScheduler.syncAll`). The web app hands the session token to native
+(`AndroidReminders.setAuth`) so the worker can authenticate while the app is
+shut. Net effect: a reminder created anywhere reaches the closed phone within
+~15 min, then fires **exactly on time** (the alarm itself is Doze-proof).
+
+- **Auth:** the JWT + `server_url` live in app-private SharedPreferences; the
+  worker sends `Authorization: Bearer <token>`. If the app isn't opened for
+  > 7 days the token expires and sync pauses until the next launch.
+- **Battery:** on first reminder use the app asks (once) to be **exempted from
+  battery optimization** — aggressive OEMs (Xiaomi/Samsung/Huawei…) otherwise
+  kill the worker and alarms. Declining is fine; it just lowers reliability.
+- **TLS:** the worker uses the system trust store, so the server needs a
+  **trusted certificate** (Let's Encrypt is fine). A **self-signed** cert
+  fails the background fetch — in-app sync (while the app is open) still works.
+
+### Why WorkManager, and not Google / FCM
+Waking a fully-closed app instantly is normally FCM's job — i.e. **Google Play
+Services**. We deliberately **don't** use it, to keep GlassKeep free of a
+Google dependency. The realistic options and their trade-offs:
+
+| Approach | Closed-app delivery | Google? | Extra to install | Cost |
+| --- | --- | --- | --- | --- |
+| **WorkManager + local alarm** (chosen) | ✅ | ❌ none | ❌ none | ~15 min to learn a *remotely-created* reminder; then exact |
+| FCM (Firebase) | ✅ instant | ⚠️ yes | none | ties the app to Google |
+| ntfy / UnifiedPush | ✅ instant | ❌ | an ntfy server **+** the ntfy app | extra moving parts |
+| Persistent foreground service | instant-ish | ❌ | none | permanent notification + battery, and Doze can still delay it |
+
+WorkManager is **AndroidX → JobScheduler (AOSP)**, *not* Google Play Services,
+so it adds **no Google dependency**. The only price is the ~15 min worst-case
+latency for a reminder **created on another device** while the phone is fully
+closed; for the common cases (set on the phone, or set in advance on any
+device) it fires exactly on time. "Instant **and** closed **and** no Google
+**and** nothing to install" is not achievable on Android (OS limitation), so
+we optimise for **no Google, nothing external** and accept that one trade-off.
+
+> Apple/Google note: a PWA's closed-state push is bound to the **browser
+> vendor's** push service (Chrome/Brave → Google FCM, Firefox → Mozilla,
+> Safari/iOS → Apple). That's the browser's choice, the payload is encrypted
+> end-to-end, and no Google account/Firebase project is involved. The **APK**
+> path above avoids it entirely.
+
 ### Service worker
 The Web Push `push` / `notificationclick` handlers live in
 `public/push-sw.js` and are layered onto the Workbox-generated service
@@ -269,9 +316,13 @@ path** on demand, since the server can't reach a closed WebView app.
 ## Files of interest
 
 - `server/services/reminderScheduler.js` — the due-sweep loop.
-- `server/services/pushNotifications.js` — VAPID + subscription storage + send.
+- `server/services/pushNotifications.js` — VAPID (auto-generated) + subscription storage + send.
+- `GET /api/reminders/upcoming` (`server/index.js`) — feed for the Android background sync.
 - `public/push-sw.js` — service-worker push / click handlers.
 - `src/components/notes/ReminderPicker.jsx` — the date/time picker.
 - `src/components/notes/NoteReminderChip.jsx` — the card pill.
 - `src/push/pushClient.js` — browser subscribe/unsubscribe helpers.
 - `src/components/settings/PushNotificationToggle.jsx` — the Settings toggle.
+- `src/utils/androidReminders.js` — JS bridge to the APK (sync alarms + hand over auth).
+- `android/.../reminders/ReminderScheduler.kt` — arms exact local alarms on the device.
+- `android/.../reminders/ReminderSyncWorker.kt` — WorkManager background sync (no Google).

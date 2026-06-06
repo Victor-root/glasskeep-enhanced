@@ -25,3 +25,22 @@ export function syncAndroidReminders(items) {
     /* bridge unavailable — ignore */
   }
 }
+
+// Hand the current auth token to the native layer so the Android background
+// sync (WorkManager) can fetch upcoming reminders from the server while the
+// APK is closed — that's what lets a reminder created on another device still
+// fire on the phone, with no push service (no Google). No-op everywhere else.
+export function setAndroidReminderAuth(token) {
+  if (
+    typeof window === "undefined" ||
+    !window.AndroidReminders ||
+    typeof window.AndroidReminders.setAuth !== "function"
+  ) {
+    return;
+  }
+  try {
+    window.AndroidReminders.setAuth(typeof token === "string" ? token : "");
+  } catch {
+    /* bridge unavailable — ignore */
+  }
+}

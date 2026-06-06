@@ -40,7 +40,7 @@ import {
 } from "./utils/typographyPresets.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES, REMINDERS } from "./utils/constants.js";
-import { hasAndroidReminders, syncAndroidReminders } from "./utils/androidReminders.js";
+import { hasAndroidReminders, syncAndroidReminders, setAndroidReminderAuth } from "./utils/androidReminders.js";
 import { setNoteIcon } from "./utils/noteIcon.js";
 import { fetchLogoLibrary, createLogo, deleteLogo as apiDeleteLogo } from "./utils/logoLibrary.js";
 import { ColorDot } from "./components/common/ColorDot.jsx";
@@ -5972,6 +5972,15 @@ export default function App() {
     androidReminderSyncRef.current = sig;
     syncAndroidReminders(items);
   }, [notes]);
+
+  // Android WebView only: hand the session token to the native layer so its
+  // background reminder sync (WorkManager) can poll the server while the APK
+  // is closed — letting a reminder created on another device still fire on
+  // the phone, with no push service (no Google). No-op in the PWA / browser.
+  // Re-runs on login / logout / token refresh.
+  useEffect(() => {
+    setAndroidReminderAuth(token || "");
+  }, [token]);
 
   /** -------- Reset note order -------- */
   const resetNoteOrder = async (overridePositions = true) => {
