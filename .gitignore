@@ -46,6 +46,10 @@ data/notes.db
 data/notes.db-shm
 data/notes.db-wal
 
+# Auto-generated Web Push (VAPID) keys, persisted next to the DB
+.vapid.json
+**/.vapid.json
+
 # Android signing
 *.jks
 *.keystore

@@ -4197,7 +4197,10 @@ async function dispatchReminder(noteId) {
   }
 }
 
-pushService.init(console);
+// Resolve VAPID keys with auto-generation: env -> persisted file (next to
+// the DB) -> freshly generated + persisted. Push thus works with no manual
+// setup on a fresh install or after an upgrade; an explicit env pair wins.
+pushService.init(console, { persistFile: path.join(path.dirname(dbFile), ".vapid.json") });
 reminderScheduler = startReminderScheduler({
   db,
   dispatch: dispatchReminder,

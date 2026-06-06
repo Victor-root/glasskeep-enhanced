@@ -106,35 +106,45 @@ preserved untouched.
 
 ---
 
-## Web Push setup (optional)
+## Web Push setup (auto-configured)
 
-Push is **opt-in and optional**. Without VAPID keys the server logs that
-push is disabled and everything else (in-app reminders included) works
-normally.
+Push works **out of the box — no manual setup**. On first boot the server
+**generates a VAPID key pair and persists it** next to the SQLite DB
+(`.vapid.json`, mode `0600`), then reuses it across restarts. A fresh
+install **or an upgrade** therefore enables push automatically. On boot
+you'll see one of:
 
-### 1. Generate VAPID keys (once)
+```
+[push] Web Push enabled (VAPID keys auto-generated)        # first boot
+[push] Web Push enabled (VAPID keys from persisted file)   # later boots
+[push] Web Push enabled (VAPID keys from environment)      # you set your own
+```
+
+### Bring your own keys (optional)
+
+To use a specific pair instead of the auto-generated one — an explicit pair
+**always wins** — generate it:
 
 ```bash
 npx web-push generate-vapid-keys
 ```
 
-This prints a `Public Key` and a `Private Key`.
-
-### 2. Configure the server environment
-
-Add to your server `.env` (e.g. `/opt/glass-keep/.env`):
+and set it in your server `.env` (e.g. `/opt/glass-keep/.env`):
 
 ```ini
-VAPID_PUBLIC_KEY=<public key from step 1>
-VAPID_PRIVATE_KEY=<private key from step 1>
+VAPID_PUBLIC_KEY=<public key>
+VAPID_PRIVATE_KEY=<private key>
 VAPID_SUBJECT=mailto:you@example.com
 ```
 
-- The **public** key is sent to browsers (it must be — it's the
-  `applicationServerKey`). The **private** key stays server-side and is
-  **never** shipped to the client or committed to the repo.
-- `VAPID_SUBJECT` is a contact URL required by the spec (a `mailto:` is
-  fine).
+- The **public** key is sent to browsers (it's the `applicationServerKey`).
+  The **private** key stays server-side and is **never** shipped to the
+  client or committed to the repo.
+- ⚠️ The key must stay **stable**: push subscriptions are bound to it, so
+  changing it invalidates every existing subscription (devices must
+  re-enable push). That's exactly why it's persisted, not regenerated each
+  boot.
+- `VAPID_SUBJECT` is a contact URL required by the spec (a `mailto:` is fine).
 
 Optional tuning:
 
@@ -143,11 +153,7 @@ Optional tuning:
 REMINDER_SWEEP_MS=30000
 ```
 
-### 3. Restart the server
-
-On boot you should see `[push] Web Push enabled (VAPID keys present)`.
-
-### 4. Enable push on each device
+### Enable push on each device
 
 In **Settings → Notifications → Push notifications (reminders)**, toggle
 it on and accept the browser permission prompt. HTTPS is required.
@@ -158,10 +164,13 @@ it on and accept the browser permission prompt. HTTPS is required.
 
 | variable             | required | default          | purpose                                   |
 | -------------------- | -------- | ---------------- | ----------------------------------------- |
-| `VAPID_PUBLIC_KEY`   | for push | —                | Web Push application server (public) key  |
-| `VAPID_PRIVATE_KEY`  | for push | —                | Web Push private key (**secret**)         |
+| `VAPID_PUBLIC_KEY`   | no¹      | auto-generated   | Web Push application server (public) key  |
+| `VAPID_PRIVATE_KEY`  | no¹      | auto-generated   | Web Push private key (**secret**)         |
 | `VAPID_SUBJECT`      | no       | `mailto:admin@…` | VAPID contact URL (`mailto:`/`https:`)    |
 | `REMINDER_SWEEP_MS`  | no       | `30000`          | Scheduler sweep interval (ms)             |
+
+¹ Auto-generated and persisted (`.vapid.json` next to the DB) on first boot,
+so push works with no setup. Set **both** to pin your own pair (it wins).
 
 ---
 
