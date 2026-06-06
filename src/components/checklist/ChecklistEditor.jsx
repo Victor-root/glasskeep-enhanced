@@ -61,34 +61,18 @@ export default function ChecklistEditor({
     if (!noteId) return false;
     try { return localStorage.getItem(`ck-done-${noteId}`) === "1"; } catch { return false; }
   });
-  const [collapsedSections, setCollapsedSections] = React.useState(() => {
-    if (!noteId) return new Set();
-    try {
-      const stored = localStorage.getItem(`ck-sec-${noteId}`);
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch { return new Set(); }
-  });
-
   React.useEffect(() => {
     if (!noteId) return;
     try { localStorage.setItem(`ck-done-${noteId}`, doneCollapsed ? "1" : "0"); } catch {}
   }, [doneCollapsed, noteId]);
 
-  React.useEffect(() => {
-    if (!noteId) return;
-    const ids = [...collapsedSections];
-    try { localStorage.setItem(`ck-sec-${noteId}`, JSON.stringify(ids)); } catch {}
-    window.dispatchEvent(new CustomEvent("checklist-collapse-change", { detail: { noteId, ids } }));
-  }, [collapsedSections, noteId]);
-
-  const toggleSectionCollapse = React.useCallback((id) => {
-    setCollapsedSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  // Section collapsed/expanded state is persisted ON the section entry
+  // (`collapsed: true`) so it syncs across devices via the note's items
+  // array — toggling it saves the note like any other checklist edit.
+  const toggleSectionCollapse = (id) => {
+    const current = items.find((e) => e.id === id);
+    commit(updateEntry(items, id, { collapsed: !current?.collapsed }));
+  };
   const requestFocus = React.useCallback((id, caret = "end") => {
     setFocusItemId(id);
     setFocusCaret(caret);
@@ -281,7 +265,7 @@ export default function ChecklistEditor({
           {sections.map((section) => {
             const uncheckedInSection = section.items.filter((it) => !it.done);
             const isDefault = section.id === DEFAULT_SECTION_ID;
-            const isCollapsed = !isDefault && collapsedSections.has(section.id);
+            const isCollapsed = !isDefault && !!section.collapsed;
 
             const colorKey = !isDefault ? (section.color ?? "none") : null;
             const colorHex = colorKey
