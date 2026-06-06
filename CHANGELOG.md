@@ -18,6 +18,7 @@
 ### 🐛 Fixed
 - **Login-screen flash on cold load** — background renders a placeholder (mean colour + BlurHash) before first paint, dark mode applied early, decorative cards no longer stack at the top on load.
 - **Browser notifications suppressed for backgrounded tabs** — service worker dedup changed from `document.visibilityState === "visible"` to `client.focused === true`; tabs that are open but not focused now receive system notifications correctly.
+- **Checklist section collapsed state now syncs across devices** — collapsed/expanded state was kept in `localStorage` (device-local). It's now persisted on the section entry (`collapsed: true`) in the note's items, so it follows the note across devices and survives refresh. Old checklists default to expanded.
 
 ### 🛠️ Upgrade
 
