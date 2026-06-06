@@ -1,5 +1,25 @@
 # 📋 Changelog
 
+## 🚀 v2.5.0 — 2026-06-06
+
+Headline: **note reminders**, with a notification system that reaches you **everywhere** — the in-app card, a real **browser / PWA push**, and on the **Android app even when it's fully closed** — all **without any Google dependency**. Plus a smoother login cold-load and a collaboration notification.
+
+### ➕ Added
+- ⏰ **Note reminders (Google Keep-style)** — attach a date & time to any note (quick presets + a themed picker). A reminded note shows a bell pill on its card, and a dedicated **Reminders** view lists them in the sidebar. Each reminder fires **once**; editing it to a future time re-arms it. On shared notes, owner **and** collaborators are notified.
+- 🔔 **Reminders on every surface** — the **in-app card** when the app is open (instant, over SSE), a real **browser / PWA push** when it's backgrounded or closed (Web Push), and a **native notification on the Android app**.
+- 🤖 **Android reminders fire even fully closed — without Google** — a WebView can't do Web Push, so the app arms **exact on-device alarms** (Doze-proof, re-armed after reboot) and runs a lightweight **background sync** (WorkManager, ~15 min) so a reminder created on another device still reaches the phone. No Firebase/FCM, no extra app to install — AndroidX/JobScheduler only.
+- 👆 **Tap-to-open + cross-device clear** — tapping a reminder notification (or its **Open** action) opens the exact note, and opening that note dismisses the in-app card on **all** your devices.
+- 🔑 **Zero-config push** — the server **auto-generates and persists VAPID keys** on first boot (and after an upgrade), so Web Push just works with no setup; set your own keys via the environment to override.
+- 🔋 **Optional battery-optimization card** in the Android first-launch onboarding — clearly explained and entirely optional (it never blocks setup), so background reminders stay reliable on aggressive-power-management phones.
+- 👥 **Collaborator notification on shared-note deletion** — when an owner deletes a shared note, its collaborators are now notified.
+
+### 🐛 Fixed
+- ✨ **No more login-screen flash on cold load** — the background paints an instant placeholder (mean colour + BlurHash), dark mode is applied before the first paint, and the decorative cards no longer flash piled at the top.
+
+### 🛠️ Upgrade
+
+> Pull, rebuild the web, and restart the server — **VAPID keys are generated automatically**, nothing to configure. To enable browser/PWA push, toggle it on in **Settings → Notifications** (HTTPS required). For the native Android reminders + background sync, rebuild and reinstall the APK (**1.4.6**). Full architecture + testing details in [`REMINDERS.md`](./REMINDERS.md).
+
 ## 🚀 v2.4.5 — 2026-05-31
 
 Two headline features: fully **customisable branding** (each instance can theme its login page from the UI, nothing hard-coded) and **interface colour themes** — pick a workspace theme and the whole app chrome (header, sidebar, notes background, scrollbars, panels, icons, buttons and editor highlights) recolours coherently in light **and** dark mode, while your notes stay exactly as they are. The release also lands a big **desktop performance pass**, a **seamless desktop-PWA title bar**, a round of **mobile chrome polish**, and fixes one-click in-app updates on **Synology Container Manager / DSM**.

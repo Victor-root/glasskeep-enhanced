@@ -6,8 +6,8 @@
 
 [![Installation facile](https://img.shields.io/badge/Installation-script%20facile-2ea44f?style=for-the-badge\&logo=gnubash\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced#-installation)
 [![Docker](https://img.shields.io/badge/Docker-GHCR-2496ED?style=for-the-badge\&logo=docker\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced#-installation-docker)
-[![Android](https://img.shields.io/badge/Android-APK-3DDC84?style=for-the-badge\&logo=android\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.4.5/GlassKeep-v1.4.5.apk)
-[![Android TV](https://img.shields.io/badge/Android%20TV-supporté-3DDC84?style=for-the-badge\&logo=androidtv\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.4.5/GlassKeep-v1.4.5.apk)
+[![Android](https://img.shields.io/badge/Android-APK-3DDC84?style=for-the-badge\&logo=android\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.5.0/GlassKeep-v1.4.6.apk)
+[![Android TV](https://img.shields.io/badge/Android%20TV-supporté-3DDC84?style=for-the-badge\&logo=androidtv\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.5.0/GlassKeep-v1.4.6.apk)
 [![PWA](https://img.shields.io/badge/PWA-prêt-5A0FC8?style=for-the-badge\&logo=pwa\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced)
 
 </div>
@@ -110,6 +110,7 @@ GlassKeep inclut également :
 * 📥 import Google Keep (Takeout `.zip` — couleurs complètes, images, sauts de ligne)
 * 🤖 assistant IA optionnel via n'importe quel endpoint compatible OpenAI (Ollama, Open WebUI, LiteLLM, OpenAI, …)
 * 📲 support PWA
+* ⏰ rappels de notes avec notifications partout — in-app, push navigateur/PWA, et sur l'app Android même totalement fermée (sans Google, sans service tiers)
 
 ---
 
@@ -123,9 +124,9 @@ L'application Android est un wrapper WebView pour GlassKeep et n'évolue pas né
 
 L'icône du launcher, la bannière Android TV, l'icône d'installation PWA et le favicon ont tous été redessinés depuis un master unique afin que l'application soit cohérente sur toutes les surfaces.
 
-[Télécharger le dernier APK Android](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.4.5/GlassKeep-v1.4.5.apk)
+[Télécharger le dernier APK Android](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.5.0/GlassKeep-v1.4.6.apk)
 
-Version APK actuelle : `1.4.5`
+Version APK actuelle : `1.4.6`
 
 > Le code source Android est disponible dans le répertoire `android/`.
 
