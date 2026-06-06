@@ -26,6 +26,30 @@ export function syncAndroidReminders(items) {
   }
 }
 
+// Ask the native layer to post a reminder's SYSTEM notification right now.
+// Used when an SSE reminder arrives while the APK is backgrounded (not
+// foreground): the in-app card would be invisible, so we surface a real
+// notification instead — driven by the live SSE, no push service. No-op
+// off-Android (browsers/PWA use Web Push for the backgrounded case).
+export function notifyAndroidNow(noteId, title, body) {
+  if (
+    typeof window === "undefined" ||
+    !window.AndroidReminders ||
+    typeof window.AndroidReminders.notifyNow !== "function"
+  ) {
+    return;
+  }
+  try {
+    window.AndroidReminders.notifyNow(
+      String(noteId ?? ""),
+      String(title ?? ""),
+      String(body ?? ""),
+    );
+  } catch {
+    /* bridge unavailable — ignore */
+  }
+}
+
 // Hand the current auth token to the native layer so the Android background
 // sync (WorkManager) can fetch upcoming reminders from the server while the
 // APK is closed — that's what lets a reminder created on another device still

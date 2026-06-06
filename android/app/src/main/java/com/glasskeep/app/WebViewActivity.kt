@@ -1204,6 +1204,24 @@ class WebViewActivity : AppCompatActivity() {
         fun setAuth(token: String?) {
             com.glasskeep.app.reminders.ReminderSyncWorker.setAuthToken(applicationContext, token ?: "")
         }
+
+        /**
+         * Post a reminder's system notification immediately. Called from the
+         * web app's SSE handler when a reminder arrives while the app is
+         * BACKGROUNDED (not foreground) — the in-app card would be invisible,
+         * so we surface a real system notification instead, driven by the live
+         * SSE connection (no push service / no Google needed). Foreground stays
+         * in-app only. Uses the same note id as the local-alarm path, so the
+         * two collapse into one if both ever fire.
+         */
+        @JavascriptInterface
+        fun notifyNow(noteId: String?, title: String?, body: String?) {
+            val id = noteId ?: return
+            if (id.isBlank()) return
+            com.glasskeep.app.reminders.ReminderNotifier.show(
+                applicationContext, id, title ?: "", body ?: "",
+            )
+        }
     }
 
     companion object {

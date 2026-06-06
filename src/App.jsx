@@ -40,7 +40,7 @@ import {
 } from "./utils/typographyPresets.js";
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES, REMINDERS } from "./utils/constants.js";
-import { hasAndroidReminders, syncAndroidReminders, setAndroidReminderAuth } from "./utils/androidReminders.js";
+import { hasAndroidReminders, syncAndroidReminders, setAndroidReminderAuth, notifyAndroidNow } from "./utils/androidReminders.js";
 import { setNoteIcon } from "./utils/noteIcon.js";
 import { fetchLogoLibrary, createLogo, deleteLogo as apiDeleteLogo } from "./utils/logoLibrary.js";
 import { ColorDot } from "./components/common/ColorDot.jsx";
@@ -3459,6 +3459,20 @@ export default function App() {
                   ...(msg.noteId ? { noteId: msg.noteId } : {}),
                 },
               });
+              // Android APK: if the app isn't in the foreground, the in-app
+              // card is invisible — so post a real SYSTEM notification
+              // natively (this SSE event already reached us, so no push
+              // service is needed). Foreground stays in-app only. Same note
+              // id as the local-alarm path → they collapse, no duplicate.
+              // No-op in the browser/PWA, where Web Push covers the
+              // backgrounded/closed case.
+              if (
+                msg.noteId &&
+                typeof document !== "undefined" &&
+                document.visibilityState !== "visible"
+              ) {
+                notifyAndroidNow(msg.noteId, t("reminderNotificationTitle"), msg.message || "");
+              }
             } else if (msg && msg.type === "notifications_cleared") {
               // Another device wiped the user's notification history.
               // Only drop server-backed rows: local-only toasts (e.g.
