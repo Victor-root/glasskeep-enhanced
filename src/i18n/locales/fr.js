@@ -755,6 +755,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   sharedNoteDeletedTitle: "Note partagée supprimée",
   sharedNoteDeletedToast:
     "{sender} a supprimé la note {title} qui était partagée avec vous",
+  sharedNoteDeletedWithCopyToast:
+    "{sender} a supprimé la note partagée {title} et vous en a laissé une copie",
   untitledNote: "(sans titre)",
   notifications: "Notifications",
   notificationCenterTitle: "Notifications",

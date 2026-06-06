@@ -1297,17 +1297,26 @@ function createShareNotification({ recipientId, senderId, senderName, noteId, no
 // SSE event only removes the note from a CONNECTED client's view and leaves
 // no trace — so an offline collaborator never learns the shared note is
 // gone. This persisted row fixes that: it replays on reconnect and lands in
-// the notification history. note_id is null (no note to open anymore, and it
-// keeps the FK happy when the row outlives a permanent delete). It rides the
-// same envelope as revoke notices so the client routes it via showRevokeToast.
-function createSharedNoteDeletedNotification({ recipientId, senderId, senderName, noteTitle }) {
+// the notification history. By default note_id is null (no note to open after
+// a full delete, and it keeps the FK happy when the row outlives a permanent
+// delete); the owner-left-with-copy case passes noteId so the recipient can
+// open the note they kept. It rides the same envelope as revoke notices so the
+// client routes it via showRevokeToast.
+function createSharedNoteDeletedNotification({
+  recipientId,
+  senderId,
+  senderName,
+  noteTitle,
+  noteId = null,
+  notificationType = "shared_note_deleted",
+}) {
   try {
     const createdAt = nowISO();
     const row = insertNotification.run(
       recipientId,
       senderId,
-      "shared_note_deleted",
-      null,
+      notificationType,
+      noteId,
       noteTitle || "",
       senderName || "",
       null,
@@ -1318,10 +1327,11 @@ function createSharedNoteDeletedNotification({ recipientId, senderId, senderName
     );
     sendEventToUser(recipientId, {
       type: "note_access_revoked_notification",
-      notificationType: "shared_note_deleted",
+      notificationType,
       notificationId: row.lastInsertRowid,
       senderName: senderName || "",
       noteTitle: noteTitle || "",
+      noteId: noteId ?? undefined,
       createdAt,
     });
   } catch (e) {
@@ -2923,6 +2933,18 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     broadcastNoteUpdated(id);
+    // The note was handed over to this collaborator (they keep it / become its
+    // owner). Persist a notice so they actually learn the owner deleted the
+    // shared note and left them a copy — broadcastNoteUpdated above is
+    // transient (an offline collaborator would otherwise never find out).
+    createSharedNoteDeletedNotification({
+      recipientId: newOwner.id,
+      senderId: req.user.id,
+      senderName: req.user.name || req.user.email || "",
+      noteTitle: existing.title || "",
+      noteId: id,
+      notificationType: "shared_note_deleted_with_copy",
+    });
     const trashedCopy = getNoteById.get(trashedCopyId);
     return res.json({ ok: true, left: true, trashedCopy: trashedCopy ? serializeNote(trashedCopy, req.user.id) : null });
   }

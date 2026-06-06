@@ -115,7 +115,8 @@ function buildHistoryEntry(n) {
     type === "collaborator_removed" ||
     type === "collaborator_removed_with_copy" ||
     type === "collaborator_left" ||
-    type === "shared_note_deleted"
+    type === "shared_note_deleted" ||
+    type === "shared_note_deleted_with_copy"
   ) {
     const titleKeyMap = {
       collaborator_removed: "collaboratorRemovedTitle",
@@ -123,6 +124,7 @@ function buildHistoryEntry(n) {
       collaborator_left: "collaboratorLeftTitle",
       note_access_revoked_with_copy: "noteAccessRevokedTitle",
       shared_note_deleted: "sharedNoteDeletedTitle",
+      shared_note_deleted_with_copy: "sharedNoteDeletedTitle",
     };
     const msgKeyMap = {
       collaborator_removed: "collaboratorRemovedToast",
@@ -130,6 +132,7 @@ function buildHistoryEntry(n) {
       collaborator_left: "collaboratorLeftToast",
       note_access_revoked_with_copy: "noteAccessRevokedWithCopyToast",
       shared_note_deleted: "sharedNoteDeletedToast",
+      shared_note_deleted_with_copy: "sharedNoteDeletedWithCopyToast",
     };
     title = t(titleKeyMap[type] || "noteAccessRevokedTitle");
     message = buildHighlightedMessage(
@@ -142,7 +145,11 @@ function buildHistoryEntry(n) {
     // points to the copy. The server persists the copy's id in the
     // note_id column for this type so we can read it straight off
     // the history row.
-    if (type === "note_access_revoked_with_copy" && noteId) {
+    if (
+      (type === "note_access_revoked_with_copy" ||
+        type === "shared_note_deleted_with_copy") &&
+      noteId
+    ) {
       action = { label: t("noteSharedAction"), noteId: String(noteId) };
     }
   } else if (type === "user_deleted") {
@@ -409,6 +416,9 @@ export function useShareNotifications({ token, userId }) {
     } else if (typeKey === "shared_note_deleted") {
       titleKey = "sharedNoteDeletedTitle";
       messageKey = "sharedNoteDeletedToast";
+    } else if (typeKey === "shared_note_deleted_with_copy") {
+      titleKey = "sharedNoteDeletedTitle";
+      messageKey = "sharedNoteDeletedWithCopyToast";
     } else {
       titleKey = "noteAccessRevokedTitle";
       messageKey = "noteAccessRevokedToast";
@@ -426,7 +436,8 @@ export function useShareNotifications({ token, userId }) {
       // Same as the share toast: defer to the user's duration pref.
       dismissible: true,
       action:
-        typeKey === "note_access_revoked_with_copy" && noteId
+        (typeKey === "note_access_revoked_with_copy" ||
+          typeKey === "shared_note_deleted_with_copy") && noteId
           ? { label: t("noteSharedAction"), noteId: String(noteId) }
           : null,
       metadata: { serverNotificationId: id, noteId },

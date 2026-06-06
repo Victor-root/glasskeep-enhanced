@@ -755,6 +755,8 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   sharedNoteDeletedTitle: "Shared note deleted",
   sharedNoteDeletedToast:
     "{sender} deleted the note {title} that was shared with you",
+  sharedNoteDeletedWithCopyToast:
+    "{sender} deleted the shared note {title} and left you a copy",
   untitledNote: "(untitled)",
   notifications: "Notifications",
   notificationCenterTitle: "Notifications",
