@@ -8,16 +8,11 @@
 - 🔔 **In-app reminder delivery (SSE)** — reminder card delivered in real time over the existing SSE connection when the app is open.
 - 🌐 **Web Push reminders** — browser/PWA push notification when the app is backgrounded or closed. VAPID keys are auto-generated and persisted on first boot (`~/.vapid.json` next to the DB, mode 0600); set `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` env vars to override.
 - 🤖 **Android native reminders (no FCM)** — exact on-device alarms (`AlarmManager.setExactAndAllowWhileIdle`, re-armed after reboot via `ReminderBootReceiver`). A `WorkManager` periodic job (~15 min, `NetworkType.CONNECTED`) polls `GET /api/reminders/upcoming` and re-arms alarms for reminders created on other devices. No Firebase / Google Play Services dependency.
-- 👆 **Reminder tap deep-link** — tapping a reminder notification (or its "Open" action button) calls `window.__glasskeepOpenNote(noteId)` in the WebView and opens the note directly.
-- ✅ **Cross-device in-app card dismissal** — opening a note auto-dismisses its matching reminder cards on all connected sessions.
 - 🔋 **Battery optimization onboarding card** (Android) — optional `WelcomeScreen` card requesting `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`; never blocks setup.
 - 👥 **`shared_note_deleted_with_copy` notification** — collaborators receive a notification (with an "Open" action targeting the copy) when an owner deletes a shared note but leaves them a personal copy.
-- 🛠️ **`GET /api/reminders/upcoming`** — authenticated endpoint returning unfired upcoming reminders for WorkManager polling.
-- 🛠️ **`POST /api/notes/:id/test-reminder`** (admin) — sets `reminder_at` to now (or `+inSeconds`) and triggers an immediate sweep; for testing the full pipeline.
 
 ### 🐛 Fixed
 - **Login-screen flash on cold load** — background renders a placeholder (mean colour + BlurHash) before first paint, dark mode applied early, decorative cards no longer stack at the top on load.
-- **Browser notifications suppressed for backgrounded tabs** — service worker dedup changed from `document.visibilityState === "visible"` to `client.focused === true`; tabs that are open but not focused now receive system notifications correctly.
 - **Checklist section collapsed state now syncs across devices** — collapsed/expanded state was kept in `localStorage` (device-local). It's now persisted on the section entry (`collapsed: true`) in the note's items, so it follows the note across devices and survives refresh. Old checklists default to expanded.
 
 ### 🛠️ Upgrade
