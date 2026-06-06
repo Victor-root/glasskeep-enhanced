@@ -35,14 +35,20 @@ self.addEventListener("push", (event) => {
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((clients) => {
-        // De-dupe: if an app window is visible on THIS device, the in-app
-        // SSE notification already shows this reminder — skip the system
-        // notification so the user doesn't see it twice. Other devices
-        // (app closed) still get the system push. (Showing nothing on an
-        // occasional focused push is within Chrome's userVisibleOnly
-        // budget; the common, accepted pattern for foreground de-dupe.)
-        const appVisible = clients.some((c) => c.visibilityState === "visible");
-        if (appVisible) return undefined;
+        // De-dupe: only skip the system notification when an app window is
+        // actually FOCUSED on this device — the user is looking at the
+        // in-app SSE card for this reminder, so a system notification would
+        // be a visible duplicate. A merely-open-but-unfocused window
+        // (another tab, another window, or another app in front) still gets
+        // the system notification — matching "focused → in-app card,
+        // not focused → browser notification". `visibilityState` was wrong
+        // here: a non-foreground but on-screen window reports "visible", so
+        // it swallowed the notification whenever the tab wasn't closed.
+        // Other devices are independent. (Showing nothing on an occasional
+        // focused push is within Chrome's userVisibleOnly budget — the
+        // accepted foreground de-dupe pattern.)
+        const appFocused = clients.some((c) => c.focused === true);
+        if (appFocused) return undefined;
         return self.registration.showNotification(title, options);
       }),
   );
