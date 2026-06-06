@@ -186,7 +186,12 @@ async function sendToUser(db, userId, payload, log = console) {
         keys: { p256dh: s.p256dh, auth: s.auth },
       };
       try {
-        await webpush.sendNotification(subscription, body, { TTL: 60 * 60 });
+        // urgency:"high" asks the push service (FCM/…) to deliver right
+        // away instead of batching/deferring it to save the device's
+        // battery — appropriate for a time-sensitive reminder, and it
+        // tightens the gap vs the instant in-app SSE card. TTL caps how
+        // long it's retried if the device is offline.
+        await webpush.sendNotification(subscription, body, { TTL: 60 * 60, urgency: "high" });
         sent += 1;
       } catch (err) {
         const code = err?.statusCode;
