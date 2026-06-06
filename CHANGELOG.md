@@ -17,7 +17,7 @@
 
 ### 🛠️ Upgrade
 
-Pull, rebuild the web app, restart the server. VAPID keys are generated on first boot — no manual setup needed. To enable browser/PWA push: Settings → Notifications (requires HTTPS). For Android native reminders, install APK **1.4.6** (build it or download the release). See [`REMINDERS.md`](./REMINDERS.md) for architecture and test tooling.
+VAPID keys are generated on first boot — no manual setup needed. To enable browser/PWA push: Settings → Notifications (requires HTTPS with domain name). For Android native reminders, install APK **1.4.6** (build it or download the release). See [`REMINDERS.md`](./REMINDERS.md) for architecture and test tooling.
 
 ## 🚀 v2.4.5 — 2026-05-31
 
