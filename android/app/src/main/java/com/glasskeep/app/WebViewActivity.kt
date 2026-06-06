@@ -1234,7 +1234,12 @@ class WebViewActivity : AppCompatActivity() {
          */
         @JavascriptInterface
         fun setAuth(token: String?) {
-            com.glasskeep.app.reminders.ReminderSyncWorker.setAuthToken(applicationContext, token ?: "")
+            val t = token ?: ""
+            com.glasskeep.app.reminders.ReminderSyncWorker.setAuthToken(applicationContext, t)
+            // Logged in → the background sync is now active, so this is the
+            // moment to ask (once) for the battery-optimization exemption it
+            // relies on — regardless of whether any reminder exists yet.
+            if (t.isNotBlank()) runOnUiThread { maybeAskBatteryExemption() }
         }
     }
 
