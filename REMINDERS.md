@@ -111,9 +111,11 @@ shut. Net effect: a reminder created anywhere reaches the closed phone within
 - **Auth:** the JWT + `server_url` live in app-private SharedPreferences; the
   worker sends `Authorization: Bearer <token>`. If the app isn't opened for
   > 7 days the token expires and sync pauses until the next launch.
-- **Battery:** on first reminder use the app asks (once) to be **exempted from
-  battery optimization** — aggressive OEMs (Xiaomi/Samsung/Huawei…) otherwise
-  kill the worker and alarms. Declining is fine; it just lowers reliability.
+- **Battery:** the **first-launch onboarding** offers an *optional* card to
+  **exempt the app from battery optimization** — aggressive OEMs
+  (Xiaomi/Samsung/Huawei…) otherwise kill the worker and alarms. It never gates
+  setup; declining just lowers reliability, and it can be set later in Android
+  Settings → Apps → GlassKeep → Battery → Unrestricted.
 - **TLS:** the worker uses the system trust store, so the server needs a
   **trusted certificate** (Let's Encrypt is fine). A **self-signed** cert
   fails the background fetch — in-app sync (while the app is open) still works.

@@ -1144,32 +1144,6 @@ class WebViewActivity : AppCompatActivity() {
         }
     }
 
-    // Ask once to be exempted from battery optimization, so the background
-    // reminder sync + exact alarms survive aggressive OEM power management
-    // (Xiaomi/Samsung/Huawei & co). Pref-gated (asked at most once); declining
-    // is fine — reminders still work, this just maximizes reliability.
-    private fun maybeAskBatteryExemption() {
-        if (isFinishing || isDestroyed) return
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) return
-        val prefs = getSharedPreferences("glasskeep", MODE_PRIVATE)
-        if (prefs.getBoolean("battery_exemption_asked", false)) return
-        // Mark asked up-front so a decline (or a ROM without the dialog) isn't
-        // re-prompted on every reminder.
-        prefs.edit().putBoolean("battery_exemption_asked", true).apply()
-        val pm = getSystemService(android.os.PowerManager::class.java)
-        if (pm == null || pm.isIgnoringBatteryOptimizations(packageName)) return
-        try {
-            startActivity(
-                Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                    data = Uri.parse("package:$packageName")
-                }
-            )
-        } catch (e: Exception) {
-            // Some OEMs/ROMs don't expose this intent — the user can still
-            // exempt the app manually from system settings.
-        }
-    }
-
     /**
      * window.AndroidReminders — local reminder scheduling for the WebView
      * (Web Push is unavailable here). Methods run on a binder thread;
@@ -1187,10 +1161,7 @@ class WebViewActivity : AppCompatActivity() {
             com.glasskeep.app.reminders.ReminderScheduler.schedule(
                 applicationContext, id, at, title ?: "", body ?: "",
             )
-            runOnUiThread {
-                ensureReminderNotificationPermission()
-                maybeAskBatteryExemption()
-            }
+            runOnUiThread { ensureReminderNotificationPermission() }
         }
 
         @JavascriptInterface
@@ -1220,10 +1191,7 @@ class WebViewActivity : AppCompatActivity() {
                 return
             }
             com.glasskeep.app.reminders.ReminderScheduler.syncAll(applicationContext, items)
-            if (items.isNotEmpty()) runOnUiThread {
-                ensureReminderNotificationPermission()
-                maybeAskBatteryExemption()
-            }
+            if (items.isNotEmpty()) runOnUiThread { ensureReminderNotificationPermission() }
         }
 
         /**
@@ -1234,12 +1202,7 @@ class WebViewActivity : AppCompatActivity() {
          */
         @JavascriptInterface
         fun setAuth(token: String?) {
-            val t = token ?: ""
-            com.glasskeep.app.reminders.ReminderSyncWorker.setAuthToken(applicationContext, t)
-            // Logged in → the background sync is now active, so this is the
-            // moment to ask (once) for the battery-optimization exemption it
-            // relies on — regardless of whether any reminder exists yet.
-            if (t.isNotBlank()) runOnUiThread { maybeAskBatteryExemption() }
+            com.glasskeep.app.reminders.ReminderSyncWorker.setAuthToken(applicationContext, token ?: "")
         }
     }
 

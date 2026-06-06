@@ -1,10 +1,12 @@
 package com.glasskeep.app.ui
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -100,6 +102,11 @@ fun WelcomeScreen(onContinue: () -> Unit) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) true
         else context.packageManager.canRequestPackageInstalls()
     }
+    val batteryIgnored = remember(recheckTick) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) true
+        else (context.getSystemService(Context.POWER_SERVICE) as? PowerManager)
+            ?.isIgnoringBatteryOptimizations(context.packageName) ?: false
+    }
 
     // Per-permission "the user has actually completed at least one
     // grant attempt" flags. Set INSIDE the launcher callback, never
@@ -110,6 +117,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
     var cameraTried by remember { mutableStateOf(false) }
     var notifTried by remember { mutableStateOf(false) }
     var installTried by remember { mutableStateOf(false) }
+    var batteryTried by remember { mutableStateOf(false) }
 
     val micLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -126,6 +134,9 @@ fun WelcomeScreen(onContinue: () -> Unit) {
     val appSettingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { bump() }
+    val batteryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { batteryTried = true; bump() }
 
     val bgModifier = if (dark) {
         Modifier.background(DarkBgColor)
@@ -227,6 +238,34 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                     onSettings = { appSettingsLauncher.launch(appInfoIntent(context.packageName)) },
                 )
             }
+            // Battery optimization — optional, shown for every install source.
+            // It's a special-access setting (not a runtime permission), so it
+            // lives here as a tappable card that opens the system dialog and
+            // NEVER gates "Continuer". Lets background reminders fire reliably
+            // on aggressive-power-management OEMs.
+            Spacer(modifier = Modifier.height(14.dp))
+            PermissionCard(
+                iconRes = R.drawable.ic_tabler_bolt,
+                title = stringResource(R.string.welcome_battery_title),
+                description = stringResource(R.string.welcome_battery_desc),
+                granted = batteryIgnored,
+                tried = batteryTried,
+                cardBg = cardBg,
+                borderColor = borderColor,
+                titleColor = titleColor,
+                subtextColor = subtextColor,
+                onGrant = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        batteryLauncher.launch(
+                            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                                .setData(Uri.parse("package:${context.packageName}"))
+                        )
+                    } else {
+                        bump()
+                    }
+                },
+                onSettings = { appSettingsLauncher.launch(appInfoIntent(context.packageName)) },
+            )
             if (!isFdroid) {
                 Spacer(modifier = Modifier.height(14.dp))
                 PermissionCard(

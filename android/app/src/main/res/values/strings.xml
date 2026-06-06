@@ -59,4 +59,6 @@
     <string name="welcome_notif_desc">A discreet system notification when a new version of the app is available, so you don\'t have to keep checking GitHub.</string>
     <string name="welcome_install_title">Install updates</string>
     <string name="welcome_install_desc">GlassKeep isn\'t on the Play Store, so Android needs your permission to install the updated APK we download for you.</string>
+    <string name="welcome_battery_title">Battery optimization (optional)</string>
+    <string name="welcome_battery_desc">So your reminders fire on time even when the app is fully closed, allow GlassKeep to ignore battery optimization. Without it, Android may delay or block reminders in the background. It\'s optional — you can decline, and reminders will still work most of the time.</string>
 </resources>
