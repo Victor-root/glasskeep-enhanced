@@ -485,6 +485,9 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
       if (!names.has("login_bg_version")) {
         db.exec(`ALTER TABLE app_settings ADD COLUMN login_bg_version TEXT`);
       }
+      if (!names.has("login_theme")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN login_theme TEXT NOT NULL DEFAULT 'glasskeep'`);
+      }
     });
     tx();
   } catch {
@@ -3392,10 +3395,10 @@ app.delete("/api/logos/:id", auth, (req, res) => {
 // on every login page hit, allowNewAccounts on every signup attempt)
 // don't hit SQLite repeatedly. The mirror is updated on every PATCH so
 // it stays in sync.
-const getAppSettingsRow = db.prepare(`SELECT allow_new_accounts, login_slogan, custom_app_name, login_bg_blur FROM app_settings WHERE id = 1`);
+const getAppSettingsRow = db.prepare(`SELECT allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme FROM app_settings WHERE id = 1`);
 const upsertAppSettings = db.prepare(
-  `INSERT INTO app_settings (id, allow_new_accounts, login_slogan, custom_app_name, login_bg_blur) VALUES (1, ?, ?, ?, ?)
-   ON CONFLICT(id) DO UPDATE SET allow_new_accounts=excluded.allow_new_accounts, login_slogan=excluded.login_slogan, custom_app_name=excluded.custom_app_name, login_bg_blur=excluded.login_bg_blur`,
+  `INSERT INTO app_settings (id, allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme) VALUES (1, ?, ?, ?, ?, ?)
+   ON CONFLICT(id) DO UPDATE SET allow_new_accounts=excluded.allow_new_accounts, login_slogan=excluded.login_slogan, custom_app_name=excluded.custom_app_name, login_bg_blur=excluded.login_bg_blur, login_theme=excluded.login_theme`,
 );
 // Branding images live in their own read/write statements so the
 // (potentially multi-MB) data URLs never get held in the in-memory
@@ -3424,6 +3427,7 @@ const BRANDING_IMAGE_RE = /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/]+=*
 // they're validated before storage and simply dropped if malformed.
 const BRANDING_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 const BRANDING_HASH_RE = /^[0-9A-Za-z#$%*+,\-.:;=?@[\]^_{|}~]{6,200}$/;
+const VALID_LOGIN_THEMES = new Set(["glasskeep", "emerald", "amber", "rosewood", "graphite", "blush"]);
 const MAX_LOGO_BYTES = 2 * 1024 * 1024; // ~2 MB data URL (≈1.5 MB decoded)
 const MAX_LOGIN_BG_BYTES = 4 * 1024 * 1024; // ~4 MB data URL (≈3 MB decoded)
 const MAX_APP_NAME_LEN = 10;
@@ -3437,6 +3441,7 @@ let adminSettings = (function loadAdminSettings() {
       loginSlogan: row.login_slogan || "",
       appName: row.custom_app_name || "",
       loginBackgroundBlur: row.login_bg_blur || 0,
+      loginTheme: VALID_LOGIN_THEMES.has(row.login_theme) ? row.login_theme : "glasskeep",
     };
   }
   // Fresh install — seed the row from the env var default so subsequent
@@ -3446,8 +3451,9 @@ let adminSettings = (function loadAdminSettings() {
     loginSlogan: "",
     appName: "",
     loginBackgroundBlur: 0,
+    loginTheme: "glasskeep",
   };
-  upsertAppSettings.run(seed.allowNewAccounts ? 1 : 0, seed.loginSlogan, seed.appName, seed.loginBackgroundBlur);
+  upsertAppSettings.run(seed.allowNewAccounts ? 1 : 0, seed.loginSlogan, seed.appName, seed.loginBackgroundBlur, seed.loginTheme);
   return seed;
 })();
 
@@ -3480,7 +3486,7 @@ app.get("/api/admin/settings", auth, adminOnly, (_req, res) => {
 
 // Update admin settings
 app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
-  const { allowNewAccounts, loginSlogan, appName, loginBackgroundBlur, logo, logoPwa, loginBackground, loginBackgroundColor, loginBackgroundHash } = req.body || {};
+  const { allowNewAccounts, loginSlogan, appName, loginBackgroundBlur, loginTheme, logo, logoPwa, loginBackground, loginBackgroundColor, loginBackgroundHash } = req.body || {};
 
   if (typeof allowNewAccounts === 'boolean') {
     adminSettings.allowNewAccounts = allowNewAccounts;
@@ -3493,6 +3499,9 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
   }
   if (typeof loginBackgroundBlur === 'number' && Number.isFinite(loginBackgroundBlur)) {
     adminSettings.loginBackgroundBlur = Math.max(0, Math.min(MAX_LOGIN_BLUR, Math.round(loginBackgroundBlur)));
+  }
+  if (typeof loginTheme === 'string' && VALID_LOGIN_THEMES.has(loginTheme)) {
+    adminSettings.loginTheme = loginTheme;
   }
 
   // Image fields use a tri-state contract: an explicit `null` clears the
@@ -3549,6 +3558,7 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
     adminSettings.loginSlogan,
     adminSettings.appName,
     adminSettings.loginBackgroundBlur,
+    adminSettings.loginTheme,
   );
   // Live-sync the scalar settings to every other admin so their
   // AdminPanel toggles / slogan / app name / blur reflect the change
@@ -3582,6 +3592,7 @@ app.get("/api/branding", (_req, res) => {
     loginBackgroundColor: images.login_bg_color || null,
     loginBackgroundHash: images.login_bg_hash || null,
     loginBackgroundBlur: adminSettings.loginBackgroundBlur || 0,
+    loginTheme: adminSettings.loginTheme || "glasskeep",
   });
 });
 

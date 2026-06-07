@@ -3,6 +3,7 @@ import { Sun, Moon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
 import { useBranding, DEFAULT_APP_NAME } from "../../branding/BrandingContext.jsx";
+import { applyShellThemeClass, applyStoredShellTheme, DEFAULT_SHELL_THEME } from "../../theme/shellTheme.js";
 
 // Clear the boot-time placeholder (colour + BlurHash painted on the body
 // background by the inline script in index.html) once React owns the
@@ -24,6 +25,14 @@ function removeBootBgLayer() {
 export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, loginSlogan, children, sidePanel }) {
   const { branding } = useBranding();
   const appName = branding.appName || DEFAULT_APP_NAME;
+
+  // Apply the admin-configured login page theme while this shell is visible.
+  // Restores the user's own saved theme on unmount (when they log in).
+  const loginTheme = branding.loginTheme || DEFAULT_SHELL_THEME;
+  useEffect(() => {
+    applyShellThemeClass(loginTheme);
+    return () => applyStoredShellTheme();
+  }, [loginTheme]);
   const logoSrc = branding.logo || "/pwa-192.png";
   // A custom logo is shown raw (no rounded clip / shadow) so a
   // transparent PNG doesn't get an ugly box behind it; the bundled

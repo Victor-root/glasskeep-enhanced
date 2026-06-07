@@ -595,6 +595,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   brandingLogoRemoved: "Logo supprimé",
   brandingBackgroundUpdated: "Arrière-plan mis à jour",
   brandingBackgroundRemoved: "Arrière-plan supprimé",
+  loginPageTheme: "Thème de la page de connexion",
+  loginPageThemeDesc: "Thème de couleur appliqué à la page de connexion pour tous les visiteurs.",
   trash: "Corbeille",
   trashedNotes: "Corbeille",
   moveToTrash: "Mettre à la corbeille",

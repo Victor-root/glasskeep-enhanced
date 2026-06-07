@@ -21,6 +21,7 @@ const DEFAULT_BRANDING = {
   loginBackgroundColor: null,
   loginBackgroundHash: null,
   loginBackgroundBlur: 0,
+  loginTheme: null,
 };
 
 // Last-known branding is cached in localStorage so a reload paints the
@@ -46,6 +47,7 @@ function readCachedBranding() {
       loginBackgroundColor: c.loginBackgroundColor || null,
       loginBackgroundHash: c.loginBackgroundHash || null,
       loginBackgroundBlur: Number.isFinite(c.loginBackgroundBlur) ? c.loginBackgroundBlur : 0,
+      loginTheme: typeof c.loginTheme === "string" ? c.loginTheme : null,
     };
   } catch {
     return DEFAULT_BRANDING;
@@ -63,6 +65,7 @@ function writeCachedBranding(b) {
         loginBackgroundColor: b.loginBackgroundColor || null,
         loginBackgroundHash: b.loginBackgroundHash || null,
         loginBackgroundBlur: b.loginBackgroundBlur || 0,
+        loginTheme: b.loginTheme || null,
       }),
     );
   } catch {
@@ -181,6 +184,7 @@ export function BrandingProvider({ children }) {
           loginBackgroundBlur: Number.isFinite(data.loginBackgroundBlur)
             ? data.loginBackgroundBlur
             : 0,
+          loginTheme: typeof data.loginTheme === "string" ? data.loginTheme : null,
         };
         setBranding(next);
         writeCachedBranding(next);
