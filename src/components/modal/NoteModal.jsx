@@ -892,7 +892,7 @@ export default function NoteModal({
               className={`mobile-fmt-sheet${showModalFmt ? " is-open" : ""}${dark ? " mobile-fmt-sheet--dark" : ""}`}
               role="dialog"
               aria-label={t("formatting")}
-              aria-hidden={showModalFmt ? "false" : "true"}
+              inert={showModalFmt ? undefined : ""}
               style={{ backgroundColor: modalBgFor(mColor, dark) }}
             >
               <div
