@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { t, locale } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
 
@@ -30,35 +30,56 @@ function startOfDay(d) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-// Quick presets, Google Keep style. Each returns a future Date.
-function presetLaterToday() {
-  const d = new Date();
-  if (d.getHours() < 20) {
-    d.setHours(20, 0, 0, 0); // this evening
-  } else {
-    d.setMinutes(0, 0, 0);
-    d.setHours(d.getHours() + 1); // +1h, rounded to the hour
-  }
-  return d;
-}
+// Default reminder anchor when the note has none yet: tomorrow 09:00.
 function presetTomorrow() {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   d.setHours(9, 0, 0, 0);
   return d;
 }
-function presetNextWeek() {
-  const d = new Date();
-  // Next Monday (ISO week start). If today is Monday, jump a full week.
-  const day = d.getDay(); // 0=Sun … 1=Mon
-  const delta = ((8 - day) % 7) || 7;
-  d.setDate(d.getDate() + delta);
-  d.setHours(9, 0, 0, 0);
-  return d;
-}
 
 const intlLocale = locale === "fr" ? "fr-FR" : "en-US";
-const TIME_CHIPS = ["09:00", "12:00", "15:00", "18:00", "20:00"];
+
+// ---------- Custom time suggestions (user-editable, persisted) ----------
+// Quick-pick time chips shown under the stepper. The defaults match the
+// old hard-coded list; the user can edit them (max 5) via the pencil
+// button and the override is stored per-device in localStorage.
+const CHIP_STORAGE_KEY = "gk-reminder-time-chips";
+const DEFAULT_TIME_CHIPS = ["09:00", "12:00", "15:00", "18:00", "20:00"];
+const MAX_TIME_CHIPS = 5;
+
+function isValidHHMM(s) {
+  return typeof s === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+}
+// Coerce free-typed digits into a valid "HH:MM" (clamped), or null.
+function normalizeChip(s) {
+  const digits = String(s).replace(/[^0-9]/g, "").slice(0, 4);
+  if (!digits) return null;
+  let hh, mm;
+  if (digits.length <= 2) { hh = Number(digits); mm = 0; }
+  else { hh = Number(digits.slice(0, 2)); mm = Number(digits.slice(2)); }
+  if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+  return `${pad(Math.min(23, hh))}:${pad(Math.min(59, mm))}`;
+}
+// Live formatter while typing (auto-inserts the colon after 2 digits).
+function formatChipInput(s) {
+  const digits = String(s).replace(/[^0-9]/g, "").slice(0, 4);
+  return digits.length <= 2 ? digits : `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+function loadChips() {
+  try {
+    const raw = localStorage.getItem(CHIP_STORAGE_KEY);
+    if (!raw) return DEFAULT_TIME_CHIPS;
+    const arr = JSON.parse(raw);
+    const clean = Array.isArray(arr) ? arr.filter(isValidHHMM).slice(0, MAX_TIME_CHIPS) : [];
+    return clean.length ? clean : DEFAULT_TIME_CHIPS;
+  } catch {
+    return DEFAULT_TIME_CHIPS;
+  }
+}
+function saveChips(arr) {
+  try { localStorage.setItem(CHIP_STORAGE_KEY, JSON.stringify(arr)); } catch {}
+}
 
 // ---------- Custom mini calendar (no native picker) ----------
 // Monday-first month grid. Past days are disabled; the selected day uses
@@ -143,16 +164,51 @@ function MiniCalendar({ valueDate, onPick }) {
   );
 }
 
-// One HH or MM column: ▲ value ▼ (the up chevron is the down glyph rotated,
+// One editable HH or MM field, clamped to [0, max]. Typing is allowed
+// directly in the number (the request: click the value between the
+// chevrons to enter it by hand); the chevrons still step it.
+function TimeField({ val, max, onChange, label }) {
+  const [draft, setDraft] = useState(pad(val));
+  // Keep the visible draft in sync when the value changes via the steppers
+  // or a quick-chip, but not while the user is mid-edit (handled by focus).
+  useEffect(() => { setDraft(pad(val)); }, [val]);
+
+  const commit = (raw) => {
+    let n = parseInt(String(raw).replace(/[^0-9]/g, ""), 10);
+    if (Number.isNaN(n)) n = val;
+    n = Math.max(0, Math.min(max, n));
+    onChange(n);
+    setDraft(pad(n));
+  };
+
+  return (
+    <input
+      className="gk-time-val gk-time-input"
+      type="text"
+      inputMode="numeric"
+      maxLength={2}
+      value={draft}
+      aria-label={label}
+      onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+      onFocus={(e) => e.target.select()}
+      onBlur={() => commit(draft)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { commit(draft); e.target.blur(); }
+      }}
+    />
+  );
+}
+
+// One stepper column: ▲ field ▼ (up chevron is the down glyph rotated,
 // since the icon set only ships ChevronDown).
-function TimeStepper({ val, onUp, onDown, upLabel, downLabel, valLabel }) {
+function TimeStepperCol({ children, onUp, onDown, upLabel, downLabel }) {
   return (
     <div className="gk-time-col">
-      <button type="button" className="gk-time-btn" onClick={onUp} aria-label={upLabel}>
+      <button type="button" className="gk-time-btn" onClick={onUp} aria-label={upLabel} onMouseDown={(e) => e.preventDefault()}>
         <TI.ChevronDown className="tabler-icon" style={{ width: 16, height: 16, transform: "rotate(180deg)" }} />
       </button>
-      <span className="gk-time-val" aria-label={valLabel}>{pad(val)}</span>
-      <button type="button" className="gk-time-btn" onClick={onDown} aria-label={downLabel}>
+      {children}
+      <button type="button" className="gk-time-btn" onClick={onDown} aria-label={downLabel} onMouseDown={(e) => e.preventDefault()}>
         <TI.ChevronDown className="tabler-icon" style={{ width: 16, height: 16 }} />
       </button>
     </div>
@@ -160,46 +216,108 @@ function TimeStepper({ val, onUp, onDown, upLabel, downLabel, valLabel }) {
 }
 
 // ---------- Custom time picker (no native picker) ----------
-// Compact HH:MM stepper (hour ±1, minute ±5, both wrap) plus quick chips.
+// Editable HH:MM stepper (hour ±1, minute ±5, both wrap) plus the
+// user-editable quick chips.
 function TimePicker({ value, onChange }) {
   const [hh, mm] = (value || "09:00").split(":").map((n) => Number(n) || 0);
   const setHour = (h) => onChange(`${pad((h + 24) % 24)}:${pad(mm)}`);
   const setMinute = (m) => onChange(`${pad(hh)}:${pad((m + 60) % 60)}`);
 
+  const [chips, setChips] = useState(loadChips);
+  const [editing, setEditing] = useState(false);
+
+  const updateChip = (i, v) => setChips((prev) => prev.map((c, idx) => (idx === i ? v : c)));
+  const removeChip = (i) => setChips((prev) => prev.filter((_, idx) => idx !== i));
+  const addChip = () => setChips((prev) => (prev.length >= MAX_TIME_CHIPS ? prev : [...prev, "12:00"]));
+  const finishEditing = () => {
+    const seen = new Set();
+    const clean = [];
+    for (const c of chips) {
+      const norm = normalizeChip(c);
+      if (norm && !seen.has(norm)) { seen.add(norm); clean.push(norm); }
+    }
+    const final = (clean.length ? clean : DEFAULT_TIME_CHIPS).slice(0, MAX_TIME_CHIPS);
+    setChips(final);
+    saveChips(final);
+    setEditing(false);
+  };
+
   return (
     <div className="gk-time">
       <div className="gk-time-stepper">
-        <TimeStepper
-          val={hh}
+        <TimeStepperCol
           onUp={() => setHour(hh + 1)}
           onDown={() => setHour(hh - 1)}
           upLabel={t("reminderHourUp")}
           downLabel={t("reminderHourDown")}
-          valLabel={t("reminderHour")}
-        />
+        >
+          <TimeField val={hh} max={23} onChange={(n) => onChange(`${pad(n)}:${pad(mm)}`)} label={t("reminderHour")} />
+        </TimeStepperCol>
         <span className="gk-time-sep" aria-hidden="true">:</span>
-        <TimeStepper
-          val={mm}
+        <TimeStepperCol
           onUp={() => setMinute(mm + 5)}
           onDown={() => setMinute(mm - 5)}
           upLabel={t("reminderMinUp")}
           downLabel={t("reminderMinDown")}
-          valLabel={t("reminderMinute")}
-        />
+        >
+          <TimeField val={mm} max={59} onChange={(n) => onChange(`${pad(hh)}:${pad(n)}`)} label={t("reminderMinute")} />
+        </TimeStepperCol>
       </div>
-      <div className="gk-time-chips">
-        {TIME_CHIPS.map((c) => (
+
+      {editing ? (
+        <div className="gk-time-chips-edit">
+          {chips.map((c, i) => (
+            <div key={i} className="gk-chip-edit-row">
+              <input
+                className="gk-chip-edit-input"
+                type="text"
+                inputMode="numeric"
+                placeholder="HH:MM"
+                value={c}
+                onChange={(e) => updateChip(i, formatChipInput(e.target.value))}
+                onFocus={(e) => e.target.select()}
+              />
+              <button type="button" className="gk-chip-edit-del" onClick={() => removeChip(i)} aria-label={t("delete")}>
+                <TI.X className="tabler-icon" style={{ width: 14, height: 14 }} />
+              </button>
+            </div>
+          ))}
+          <div className="gk-chip-edit-actions">
+            {chips.length < MAX_TIME_CHIPS && (
+              <button type="button" className="gk-chip-edit-add" onClick={addChip}>+</button>
+            )}
+            <button type="button" className="gk-chip-edit-done" onClick={finishEditing}>
+              <TI.Check className="tabler-icon" style={{ width: 14, height: 14 }} />
+              <span>{t("done")}</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="gk-time-chips">
+          {chips.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`gk-time-chip${value === c ? " gk-time-chip--active" : ""}`}
+              aria-pressed={value === c}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onChange(c)}
+            >
+              {c}
+            </button>
+          ))}
           <button
-            key={c}
             type="button"
-            className={`gk-time-chip${value === c ? " gk-time-chip--active" : ""}`}
-            aria-pressed={value === c}
-            onClick={() => onChange(c)}
+            className="gk-time-chip gk-time-chip--edit"
+            aria-label={t("reminderEditSuggestions")}
+            data-tooltip={t("reminderEditSuggestions")}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setEditing(true)}
           >
-            {c}
+            <TI.Pencil className="tabler-icon" style={{ width: 14, height: 14 }} />
           </button>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -242,33 +360,8 @@ export default function ReminderPicker({ value, onSave, onClear, onClose }) {
     if (canSet) commit(combined);
   };
 
-  const presets = [
-    { key: "laterToday", label: t("reminderLaterToday"), make: presetLaterToday },
-    { key: "tomorrow", label: t("reminderTomorrow"), make: presetTomorrow },
-    { key: "nextWeek", label: t("reminderNextWeek"), make: presetNextWeek },
-  ];
-
   return (
     <>
-      <div className="rt-pop-label">{t("reminderTitle")}</div>
-
-      {presets.map((p) => (
-        <button
-          key={p.key}
-          type="button"
-          className="rt-menu-item"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => commit(p.make())}
-        >
-          <span className="rt-menu-item-icon">
-            <TI.Clock className="tabler-icon" />
-          </span>
-          <span className="rt-menu-item-label">{p.label}</span>
-        </button>
-      ))}
-
-      <div className="gk-reminder-sep" />
-
       <div className="rt-pop-label">{t("reminderPickDateTime")}</div>
       <MiniCalendar valueDate={valueDate} onPick={(d) => setDateStr(toDateInput(d))} />
       <TimePicker value={timeStr} onChange={setTimeStr} />

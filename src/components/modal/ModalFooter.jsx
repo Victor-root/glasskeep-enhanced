@@ -90,6 +90,10 @@ export default function ModalFooter({
   onOpenConfirmDelete,
   // reminders — onSetReminder(noteId, isoStringOrNull)
   onSetReminder,
+  // reminder picker open state (lifted to App so the Android back button
+  // and the mobile full-screen panel hook into the central overlay stack)
+  reminderPopOpen,
+  setReminderPopOpen,
   // kebab menu (state lifted to App)
   modalKebabOpen,
   setModalKebabOpen,
@@ -152,18 +156,11 @@ export default function ModalFooter({
     setMImages((prev) => setNoteIcon(prev, { id: uid(), src: logo.src, name: logo.name }));
   };
 
-  /* Reminder picker popover */
-  const reminderBtnRef = useRef(null);
-  const [reminderPopOpen, setReminderPopOpen] = useState(false);
+  /* Reminder picker popover — the bell lives in the kebab menu; the picker
+     anchors to the kebab trigger. */
   const reminderAt = activeNoteObj?.reminderAt || null;
   const hasReminder = !!reminderAt;
   const canRemind = !isTrashed && typeof onSetReminder === "function";
-  // The bell lives in the footer EXCEPT when editing a text note with the
-  // read/edit toggle present — that's the only case where the toggle +
-  // formatting controls crowd the toolbar, so we tuck it into the kebab.
-  // Read mode, read-mode-disabled (no toggle), checklists, draw and audio
-  // notes all keep the bell in the footer where there's room.
-  const reminderInFooter = !(mType === "text" && readModeEnabled && !viewMode);
 
   /* Kebab menu (download + collaborate) */
   const kebabRef = useRef(null);
@@ -207,38 +204,8 @@ export default function ModalFooter({
           onSelect={(name) => setMColor(name)}
         />
 
-        {/* ── Reminder ── In read mode (or when read-mode is off) the bell
-            sits here in the footer; in edit mode it moves to the kebab.
-            Hidden in trash view (trashed notes can't be reminded). The
-            popover itself is rendered once, below, anchored to whichever
-            trigger is active. */}
-        {canRemind && reminderInFooter && (
-          <button
-            ref={reminderBtnRef}
-            className={`${btnClass} focus:outline-none`}
-            onClick={() => setReminderPopOpen((v) => !v)}
-            data-tooltip={!isDesktop ? t("reminder") : undefined}
-            aria-label={t("reminder")}
-            aria-haspopup="dialog"
-          >
-            {hasReminder ? (
-              <TI.BellRingingFilled
-                className="tabler-icon tabler-icon--filled"
-                style={{
-                  width: isDesktop ? 16 : 18,
-                  height: isDesktop ? 16 : 18,
-                  color: "var(--gk-chrome-accent, #6366f1)",
-                }}
-              />
-            ) : (
-              <TI.Bell
-                className="tabler-icon"
-                style={{ width: isDesktop ? 16 : 18, height: isDesktop ? 16 : 18 }}
-              />
-            )}
-            {isDesktop && <span>{t("reminder")}</span>}
-          </button>
-        )}
+        {/* ── Reminder ── The bell lives in the kebab menu (see below); the
+            picker popover is rendered once, anchored to the kebab trigger. */}
 
         {/* ── Add image / logo (hidden in view mode for draw notes, hidden in draw canvas) ──
               Clicking the button opens a small sub-menu offering either
@@ -718,12 +685,13 @@ export default function ModalFooter({
               style={{ backgroundColor: dark ? "#222222" : undefined }}
               onClick={(e) => e.stopPropagation()}
             >
-            {/* Reminder — only here when it's been moved out of the footer
-                (edit mode). Opens the same picker anchored to the kebab. */}
-            {canRemind && !reminderInFooter && (
+            {/* Reminder — lives in the kebab. Opens the picker anchored to
+                the kebab trigger. Uses a dedicated orange so it reads
+                distinctly from the other coloured menu entries. */}
+            {canRemind && (
               <button
                 className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                style={{ color: hasReminder ? "var(--gk-chrome-accent, #6366f1)" : undefined }}
+                style={{ color: dark ? "#fb923c" : "#ea580c" }}
                 onClick={() => { setModalKebabOpen(false); setReminderPopOpen(true); }}
               >
                 {hasReminder ? (
@@ -804,11 +772,13 @@ export default function ModalFooter({
                 {t("noteAiChatMenuItem")}
               </button>
             )}
-            {/* Collaborate — shown in kebab on mobile text edit mode & draw edit mode */}
+            {/* Collaborate — shown in kebab on mobile text edit mode & draw edit mode.
+                Keeps the footer button's purple so the colour doesn't change
+                when it folds into the kebab. */}
             {((!isDesktop && mType === "text" && !viewMode) || (mType === "draw" && drawMode !== "draw" && !viewMode)) && (
               <button
                 className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                style={{ color: dark ? "#93c5fd" : "#2563eb" }}
+                style={{ color: dark ? "#c4b5fd" : "#7c3aed" }}
                 onClick={() => { onOpenCollaboration(); setModalKebabOpen(false); }}
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" /></svg>
@@ -837,9 +807,11 @@ export default function ModalFooter({
           <RichTextPopover
             open={reminderPopOpen}
             onClose={() => setReminderPopOpen(false)}
-            anchorRef={reminderInFooter ? reminderBtnRef : kebabRef}
+            anchorRef={kebabRef}
             className="rt-pop--reminder"
             preferredWidth={286}
+            fullscreenOnMobile
+            title={t("reminder")}
           >
             <ReminderPicker
               value={reminderAt}

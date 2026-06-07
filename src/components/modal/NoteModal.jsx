@@ -153,6 +153,10 @@ export default function NoteModal({
   // color popover
   showModalColorPop,
   setShowModalColorPop,
+  // reminder picker (lifted so Android back + mobile full-screen hook into
+  // the central overlay stack)
+  reminderPopOpen,
+  setReminderPopOpen,
   // kebab menu
   modalKebabOpen,
   setModalKebabOpen,
@@ -976,6 +980,8 @@ export default function NoteModal({
             onRestoreFromTrash={restoreFromTrash}
             onArchiveNote={handleArchiveNote}
             onSetReminder={onSetReminder}
+            reminderPopOpen={reminderPopOpen}
+            setReminderPopOpen={setReminderPopOpen}
             onOpenConfirmDelete={() => setConfirmDeleteOpen(true)}
             modalKebabOpen={modalKebabOpen}
             setModalKebabOpen={setModalKebabOpen}

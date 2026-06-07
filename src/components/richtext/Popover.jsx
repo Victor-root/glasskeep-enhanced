@@ -9,9 +9,28 @@
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { t } from "../../i18n";
 
 const POP_GAP = 6;
 const POP_EDGE_MARGIN = 8;
+
+// Tracks the mobile breakpoint (only when a popover opts into
+// `fullscreenOnMobile`). Phones get a full-screen sheet instead of a tiny
+// anchored popover.
+function useIsMobile(enabled) {
+  const [mobile, setMobile] = useState(
+    () => enabled && typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
+  );
+  useEffect(() => {
+    if (!enabled || typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const on = () => setMobile(mq.matches);
+    on();
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, [enabled]);
+  return mobile;
+}
 
 export function usePopoverPosition(anchorRef, open, popRef, preferredWidth = 220) {
   const [pos, setPos] = useState(null);
@@ -59,8 +78,9 @@ export function usePopoverPosition(anchorRef, open, popRef, preferredWidth = 220
   return pos;
 }
 
-export function Popover({ open, onClose, anchorRef, children, className = "", preferredWidth }) {
+export function Popover({ open, onClose, anchorRef, children, className = "", preferredWidth, fullscreenOnMobile = false, title }) {
   const ref = useRef(null);
+  const isMobileFs = useIsMobile(fullscreenOnMobile) && fullscreenOnMobile;
   const pos = usePopoverPosition(anchorRef, open, ref, preferredWidth);
 
   useEffect(() => {
@@ -92,6 +112,34 @@ export function Popover({ open, onClose, anchorRef, children, className = "", pr
   }, [open, anchorRef, onClose]);
 
   if (!open) return null;
+  if (typeof document === "undefined") return null;
+
+  // Mobile: render a full-screen sheet (backdrop + close button) instead of
+  // the tiny anchored popover, so there's room to breathe. The Android back
+  // button closes it through App.jsx's central overlay stack (the open state
+  // is lifted), and a tap on the backdrop or the ✕ closes it too.
+  if (isMobileFs) {
+    return createPortal(
+      <div
+        className="rt-pop-fs-backdrop"
+        onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
+      >
+        <div ref={ref} className={`rt-pop rt-pop--fs ${className}`.trim()} role="dialog" aria-modal="true">
+          <div className="rt-pop-fs-header">
+            {title && <span className="rt-pop-fs-title">{title}</span>}
+            <button type="button" className="rt-pop-fs-close" onClick={() => onClose?.()} aria-label={t("close")}>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="rt-pop-fs-body">{children}</div>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
   const style = pos
     ? { top: `${pos.top}px`, left: `${pos.left}px` }
     : { top: "-9999px", left: "-9999px" }; // first-frame measurement off-screen
@@ -101,7 +149,6 @@ export function Popover({ open, onClose, anchorRef, children, className = "", pr
   // would otherwise turn `position: fixed` into "fixed relative to the
   // transformed ancestor" — that's what put popovers in the middle of the
   // modal instead of next to the button.
-  if (typeof document === "undefined") return null;
   return createPortal(
     <div
       ref={ref}

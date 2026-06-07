@@ -169,6 +169,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   reminderMinUp: "Minutes + 5",
   reminderMinDown: "Minutes − 5",
   reminderPastHint: "Choisissez une date et une heure à venir.",
+  reminderEditSuggestions: "Modifier les heures rapides",
   noRemindersYet: "Aucun rappel pour le moment.",
   // Push notifications (PWA Web Push for reminders)
   pushNotifTitle: "Notifications push (rappels)",

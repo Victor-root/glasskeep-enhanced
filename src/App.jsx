@@ -471,6 +471,14 @@ export default function App() {
     onModalBodyClick, isCollaborativeNote, formatModal, resizeModalTextarea,
   } = useModalState({ notes, currentUser, closeModalRef, runFormat });
 
+  // Reminder picker open state — lifted here (not in ModalFooter) so it joins
+  // the central overlay stack: the Android back button closes it and the
+  // mobile full-screen panel pushes/pops a history entry like every other
+  // overlay.
+  const [reminderPopOpen, setReminderPopOpen] = useState(false);
+  // Never leave the reminder picker "open" behind a closed note modal.
+  useEffect(() => { if (!open) setReminderPopOpen(false); }, [open]);
+
   // Generic confirmation dialog
   const [genericConfirmOpen, setGenericConfirmOpen] = useState(false);
   const [genericConfirmConfig, setGenericConfirmConfig] = useState({});
@@ -4395,7 +4403,7 @@ export default function App() {
   const overlayOpenCount = [
     imgViewOpen, confirmDeleteOpen, genericConfirmOpen,
     collaborationModalOpen, showModalColorPop, showModalFmt, modalMenuOpen,
-    modalKebabOpen, modalTagFocused, notifCenterOpen, syncDropdownOpen, mobileSearchOpen,
+    modalKebabOpen, reminderPopOpen, modalTagFocused, notifCenterOpen, syncDropdownOpen, mobileSearchOpen,
     showColorPop, showComposerFmt, headerMenuOpen, multiMode,
     typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
     noteAiOpen, changelogOpen, qrScannerOpen,
@@ -4453,6 +4461,7 @@ export default function App() {
       if (showModalFmt) { setShowModalFmt(false); return; }
       if (modalMenuOpen) { setModalMenuOpen(false); return; }
       if (modalKebabOpen) { setModalKebabOpen(false); return; }
+      if (reminderPopOpen) { setReminderPopOpen(false); return; }
       if (modalTagFocused) { setModalTagFocused(false); return; }
       // noteAiOpen lives INSIDE the NoteModal (open), so we close the
       // AI panel before the note itself — otherwise back inside the
@@ -4475,7 +4484,7 @@ export default function App() {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [imgViewOpen, confirmDeleteOpen, genericConfirmOpen, collaborationModalOpen,
-      showModalColorPop, showModalFmt, modalMenuOpen, modalKebabOpen, modalTagFocused,
+      showModalColorPop, showModalFmt, modalMenuOpen, modalKebabOpen, reminderPopOpen, modalTagFocused,
       notifCenterOpen, syncDropdownOpen, mobileSearchOpen, showColorPop, showComposerFmt,
       headerMenuOpen, multiMode, typographyModalOpen, settingsPanelOpen, adminPanelOpen, sidebarOpen, open, fabOpen,
       noteAiOpen, changelogOpen, qrScannerOpen]);
@@ -6653,6 +6662,8 @@ export default function App() {
       formatModal={formatModal}
       showModalColorPop={showModalColorPop}
       setShowModalColorPop={setShowModalColorPop}
+      reminderPopOpen={reminderPopOpen}
+      setReminderPopOpen={setReminderPopOpen}
       modalKebabOpen={modalKebabOpen}
       setModalKebabOpen={setModalKebabOpen}
       confirmDeleteOpen={confirmDeleteOpen}

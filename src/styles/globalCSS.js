@@ -1717,6 +1717,28 @@ html.dark .modal-footer-toolbar {
   max-width: 30%;
 }
 
+/* Paragraph super-group on mobile: the desktop ribbon centres "Increase
+   indent" over the "Justify / Decrease indent" join with margin tricks.
+   On the phone sheet that single flat wrapping line reads better as:
+     row 1 → lists + Increase/Decrease indent together
+     row 2 → the four alignment buttons
+   We reset the desktop margins and reorder with flex order, forcing a
+   full-width break before the alignment buttons so they drop to their own
+   line. Desktop layout is untouched. */
+.mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"] .rt-sg-row > .rt-btn:last-child {
+  margin-left: 0;
+  margin-right: 0;
+}
+.mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"] .rt-btn--indent { order: 1; }
+.mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"] .rt-btn--outdent { order: 2; }
+.mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"]::after {
+  content: "";
+  flex: 0 0 100%;
+  height: 0;
+  order: 3;
+}
+.mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"] .rt-btn--align { order: 4; }
+
 /* Mobile-only "Mise en forme" footer toggle styling — flag the active
    state with the same indigo accent the toolbar already uses. */
 .modal-footer-btn--fmt.is-active {
@@ -3637,9 +3659,15 @@ html.dark .rt-icon-swatch-bar { border-color: rgba(255, 255, 255, 0.12); }
   aspect-ratio: 1 / 1; min-height: 30px;
   display: inline-flex; align-items: center; justify-content: center;
   border: 0; border-radius: 9px; background: transparent; color: inherit;
-  font-size: 0.8rem; cursor: pointer; transition: background 0.12s ease, color 0.12s ease;
+  font-size: 0.8rem; cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease;
 }
-.rt-pop--reminder .gk-cal-day:hover:not(:disabled) { background: var(--rt-btn-hover); }
+/* Hover = a gentle grow for every day. Plain days also get a soft
+   background; the selected day keeps its accent fill (handled below) and
+   only grows — so hovering it no longer swaps to a near-white background
+   while the text stays white. */
+.rt-pop--reminder .gk-cal-day:hover:not(:disabled) { transform: scale(1.12); }
+.rt-pop--reminder .gk-cal-day:hover:not(:disabled):not(.gk-cal-day--selected) { background: var(--rt-btn-hover); }
 .rt-pop--reminder .gk-cal-day--muted { opacity: 0.32; }
 .rt-pop--reminder .gk-cal-day:disabled { opacity: 0.25; cursor: default; }
 .rt-pop--reminder .gk-cal-day--today {
@@ -3666,6 +3694,18 @@ html.dark .rt-icon-swatch-bar { border-color: rgba(255, 255, 255, 0.12); }
   font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums;
   min-width: 2.2ch; text-align: center; padding: 1px 0;
 }
+/* The HH / MM values are editable inputs (type to set them by hand) — reset
+   the native chrome so they read like the old static numbers. */
+.rt-pop--reminder .gk-time-input {
+  width: 2.4ch; box-sizing: content-box;
+  border: 0; border-radius: 7px; background: transparent; color: inherit;
+  outline: none; cursor: text; -moz-appearance: textfield;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+}
+.rt-pop--reminder .gk-time-input:focus {
+  background: color-mix(in srgb, var(--gk-chrome-accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--gk-chrome-accent) 55%, transparent);
+}
 .rt-pop--reminder .gk-time-sep { font-size: 1.3rem; font-weight: 700; opacity: 0.45; }
 .rt-pop--reminder .gk-time-chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
 .rt-pop--reminder .gk-time-chip {
@@ -3682,6 +3722,48 @@ html.dark .rt-icon-swatch-bar { border-color: rgba(255, 255, 255, 0.12); }
 html.dark .rt-pop--reminder .gk-time-chip--active {
   color: #fff; background: color-mix(in srgb, var(--gk-chrome-accent) 32%, transparent);
 }
+/* Pencil chip — opens the inline "edit suggestions" mode. */
+.rt-pop--reminder .gk-time-chip--edit {
+  display: inline-flex; align-items: center; justify-content: center; padding: 5px 9px;
+}
+.rt-pop--reminder .gk-time-chip--edit:hover { color: var(--gk-chrome-accent); }
+
+/* Inline editor for the quick-time suggestions (max 5). */
+.rt-pop--reminder .gk-time-chips-edit {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; padding: 2px 4px;
+}
+.rt-pop--reminder .gk-chip-edit-row { display: inline-flex; align-items: center; gap: 1px; }
+.rt-pop--reminder .gk-chip-edit-input {
+  width: 5.4ch; text-align: center; font-size: 0.82rem; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--rt-pop-border); border-radius: 8px;
+  background: var(--rt-btn-hover); color: inherit; padding: 4px 2px; outline: none;
+  transition: border-color 0.12s ease;
+}
+.rt-pop--reminder .gk-chip-edit-input:focus { border-color: var(--gk-chrome-accent); }
+.rt-pop--reminder .gk-chip-edit-del {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border: 0; border-radius: 6px;
+  background: transparent; color: #dc2626; cursor: pointer; transition: background 0.12s ease;
+}
+.rt-pop--reminder .gk-chip-edit-del:hover { background: color-mix(in srgb, #ef4444 14%, transparent); }
+html.dark .rt-pop--reminder .gk-chip-edit-del { color: #f87171; }
+.rt-pop--reminder .gk-chip-edit-actions { display: inline-flex; align-items: center; gap: 6px; }
+.rt-pop--reminder .gk-chip-edit-add {
+  width: 28px; height: 28px; border-radius: 999px; font-size: 1.15rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px dashed var(--rt-pop-border); background: transparent; color: inherit; cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+.rt-pop--reminder .gk-chip-edit-add:hover { border-color: var(--gk-chrome-accent); color: var(--gk-chrome-accent); }
+.rt-pop--reminder .gk-chip-edit-done {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.78rem; font-weight: 600; padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--gk-chrome-accent);
+  background: color-mix(in srgb, var(--gk-chrome-accent) 14%, transparent);
+  color: var(--gk-chrome-accent); cursor: pointer;
+}
+html.dark .rt-pop--reminder .gk-chip-edit-done { color: #fff; background: color-mix(in srgb, var(--gk-chrome-accent) 32%, transparent); }
 
 .rt-pop--reminder .gk-reminder-past-hint { font-size: 0.72rem; color: #dc2626; padding: 0 4px 4px; text-align: center; }
 html.dark .rt-pop--reminder .gk-reminder-past-hint { color: #f87171; }
@@ -3701,6 +3783,46 @@ html.dark .rt-pop--reminder .gk-reminder-past-hint { color: #f87171; }
 html.dark .rt-pop--reminder .gk-reminder-remove { color: #f87171; }
 .rt-pop--reminder .gk-reminder-remove:hover { background: color-mix(in srgb, #ef4444 14%, transparent); }
 .rt-pop--reminder .gk-reminder-set { margin-left: auto; }
+
+/* Full-screen popover sheet (mobile only, opt-in via the popover's
+   fullscreenOnMobile prop). Used by the reminder picker so it gets room
+   to breathe on phones instead of a cramped anchored bubble. The backdrop
+   sits above everything; the panel fills the viewport with a thin header
+   carrying the title + a ✕ close button. The Android back button closes it
+   through the central overlay stack. */
+.rt-pop-fs-backdrop {
+  position: fixed; inset: 0; z-index: 100000;
+  display: flex; align-items: stretch; justify-content: stretch;
+  background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+}
+.rt-pop.rt-pop--fs {
+  position: static;
+  inset: 0; width: 100%; max-width: 100%; height: 100%; max-height: 100%;
+  margin: 0; padding: 0; border: 0; border-radius: 0;
+  display: flex; flex-direction: column;
+}
+.rt-pop-fs-header {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: calc(var(--safe-top, 0px) + 10px) 10px 10px 16px;
+  border-bottom: 1px solid var(--rt-pop-border);
+}
+.rt-pop-fs-title { font-size: 1rem; font-weight: 700; }
+.rt-pop-fs-close {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; flex: 0 0 auto;
+  border: 0; border-radius: 10px; background: transparent; color: inherit;
+  cursor: pointer; transition: background 0.12s ease;
+}
+.rt-pop-fs-close:hover { background: var(--rt-btn-hover); }
+.rt-pop-fs-body {
+  flex: 1 1 auto; overflow-y: auto;
+  padding: 8px 14px calc(var(--safe-bottom, 0px) + 18px);
+}
+/* The mini-calendar / chips have more room on the full-screen sheet. */
+.rt-pop--fs .gk-cal-day { min-height: 38px; font-size: 0.92rem; }
+.rt-pop--fs .gk-time-chip { font-size: 0.86rem; padding: 7px 13px; }
 
 /* Font-size popover — default row gets the ghost "Default" label after the
    number so the numeric size still reads cleanly. */

@@ -169,6 +169,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   reminderMinUp: "Increase minutes by 5",
   reminderMinDown: "Decrease minutes by 5",
   reminderPastHint: "Pick a date and time in the future.",
+  reminderEditSuggestions: "Edit quick times",
   noRemindersYet: "No reminders yet.",
   // Push notifications (PWA Web Push for reminders)
   pushNotifTitle: "Push notifications (reminders)",
