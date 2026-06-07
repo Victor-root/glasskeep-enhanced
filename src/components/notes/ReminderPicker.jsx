@@ -40,11 +40,10 @@ function presetTomorrow() {
 
 const intlLocale = locale === "fr" ? "fr-FR" : "en-US";
 
-// ---------- Custom time suggestions (user-editable, persisted) ----------
-// Quick-pick time chips shown under the stepper. The defaults match the
-// old hard-coded list; the user can edit them (max 5) via the pencil
-// button and the override is stored per-device in localStorage.
-const CHIP_STORAGE_KEY = "gk-reminder-time-chips";
+// ---------- Custom time suggestions (user-editable, server-persisted) ----------
+// Quick-pick time chips shown under the stepper. The user can edit them
+// (max 5) via the pencil button; changes are saved to user settings on the
+// server so they sync across all devices.
 const DEFAULT_TIME_CHIPS = ["09:00", "12:00", "15:00", "18:00", "20:00"];
 const MAX_TIME_CHIPS = 5;
 
@@ -65,20 +64,6 @@ function normalizeChip(s) {
 function formatChipInput(s) {
   const digits = String(s).replace(/[^0-9]/g, "").slice(0, 4);
   return digits.length <= 2 ? digits : `${digits.slice(0, 2)}:${digits.slice(2)}`;
-}
-function loadChips() {
-  try {
-    const raw = localStorage.getItem(CHIP_STORAGE_KEY);
-    if (!raw) return DEFAULT_TIME_CHIPS;
-    const arr = JSON.parse(raw);
-    const clean = Array.isArray(arr) ? arr.filter(isValidHHMM).slice(0, MAX_TIME_CHIPS) : [];
-    return clean.length ? clean : DEFAULT_TIME_CHIPS;
-  } catch {
-    return DEFAULT_TIME_CHIPS;
-  }
-}
-function saveChips(arr) {
-  try { localStorage.setItem(CHIP_STORAGE_KEY, JSON.stringify(arr)); } catch {}
 }
 
 // ---------- Custom mini calendar (no native picker) ----------
@@ -218,12 +203,16 @@ function TimeStepperCol({ children, onUp, onDown, upLabel, downLabel }) {
 // ---------- Custom time picker (no native picker) ----------
 // Editable HH:MM stepper (hour ±1, minute ±5, both wrap) plus the
 // user-editable quick chips.
-function TimePicker({ value, onChange }) {
+function TimePicker({ value, onChange, serverChips, onServerChipsChange }) {
   const [hh, mm] = (value || "09:00").split(":").map((n) => Number(n) || 0);
   const setHour = (h) => onChange(`${pad((h + 24) % 24)}:${pad(mm)}`);
   const setMinute = (m) => onChange(`${pad(hh)}:${pad((m + 60) % 60)}`);
 
-  const [chips, setChips] = useState(loadChips);
+  // Use server-provided chips if available, otherwise fall back to defaults.
+  const resolvedChips = (Array.isArray(serverChips) && serverChips.length > 0) ? serverChips : DEFAULT_TIME_CHIPS;
+  const [chips, setChips] = useState(resolvedChips);
+  // Keep local edit state in sync if the server value arrives after mount.
+  useEffect(() => { setChips(resolvedChips); }, [serverChips]); // eslint-disable-line react-hooks/exhaustive-deps
   const [editing, setEditing] = useState(false);
 
   const updateChip = (i, v) => setChips((prev) => prev.map((c, idx) => (idx === i ? v : c)));
@@ -238,7 +227,7 @@ function TimePicker({ value, onChange }) {
     }
     const final = (clean.length ? clean : DEFAULT_TIME_CHIPS).slice(0, MAX_TIME_CHIPS);
     setChips(final);
-    saveChips(final);
+    onServerChipsChange?.(final);
     setEditing(false);
   };
 
@@ -333,7 +322,7 @@ function TimePicker({ value, onChange }) {
  *   onClear  — () => void   (remove the reminder)
  *   onClose  — () => void
  */
-export default function ReminderPicker({ value, onSave, onClear, onClose }) {
+export default function ReminderPicker({ value, onSave, onClear, onClose, timeChips, onTimeChipsChange }) {
   const initial = useMemo(() => {
     const base = value ? new Date(value) : presetTomorrow();
     return Number.isNaN(base?.getTime?.()) ? presetTomorrow() : base;
@@ -364,7 +353,7 @@ export default function ReminderPicker({ value, onSave, onClear, onClose }) {
     <>
       <div className="rt-pop-label">{t("reminderPickDateTime")}</div>
       <MiniCalendar valueDate={valueDate} onPick={(d) => setDateStr(toDateInput(d))} />
-      <TimePicker value={timeStr} onChange={setTimeStr} />
+      <TimePicker value={timeStr} onChange={setTimeStr} serverChips={timeChips} onServerChipsChange={onTimeChipsChange} />
 
       {isPast && <div className="gk-reminder-past-hint">{t("reminderPastHint")}</div>}
 

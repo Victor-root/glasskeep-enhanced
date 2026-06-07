@@ -94,6 +94,8 @@ export default function ModalFooter({
   // and the mobile full-screen panel hook into the central overlay stack)
   reminderPopOpen,
   setReminderPopOpen,
+  reminderTimeChips,
+  onReminderTimeChipsChange,
   // kebab menu (state lifted to App)
   modalKebabOpen,
   setModalKebabOpen,
@@ -818,6 +820,8 @@ export default function ModalFooter({
               onSave={(iso) => onSetReminder(activeId, iso)}
               onClear={() => onSetReminder(activeId, null)}
               onClose={() => setReminderPopOpen(false)}
+              timeChips={reminderTimeChips}
+              onTimeChipsChange={onReminderTimeChipsChange}
             />
           </RichTextPopover>
         )}

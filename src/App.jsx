@@ -388,6 +388,18 @@ export default function App() {
   useEffect(() => {
     applyTypographyPresets(typographyPresets);
   }, [typographyPresets]);
+  // Quick-time suggestion chips for the reminder picker — null until loaded
+  // from the server; TimePicker falls back to DEFAULT_TIME_CHIPS while null.
+  const [reminderTimeChips, setReminderTimeChips] = useState(null);
+  const handleReminderTimeChipsChange = (chips) => {
+    setReminderTimeChips(chips);
+    api("/user/settings", {
+      method: "PATCH",
+      token,
+      body: { reminderTimeChips: chips },
+    }).catch(() => {});
+  };
+
   const [aiResponse, setAiResponse] = useState(null);
   const [aiCitedNoteIds, setAiCitedNoteIds] = useState([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -1129,6 +1141,9 @@ export default function App() {
         if (typeof settings?.qrQuickEnabled === "boolean") {
           setQrQuickEnabledState(settings.qrQuickEnabled);
           try { localStorage.setItem("glass-keep-qr-quick", settings.qrQuickEnabled ? "1" : "0"); } catch (e) {}
+        }
+        if (Array.isArray(settings?.reminderTimeChips) && settings.reminderTimeChips.length > 0) {
+          setReminderTimeChips(settings.reminderTimeChips);
         }
       } catch (e) {
         // Network error — default to true
@@ -6664,6 +6679,8 @@ export default function App() {
       setShowModalColorPop={setShowModalColorPop}
       reminderPopOpen={reminderPopOpen}
       setReminderPopOpen={setReminderPopOpen}
+      reminderTimeChips={reminderTimeChips}
+      onReminderTimeChipsChange={handleReminderTimeChipsChange}
       modalKebabOpen={modalKebabOpen}
       setModalKebabOpen={setModalKebabOpen}
       confirmDeleteOpen={confirmDeleteOpen}

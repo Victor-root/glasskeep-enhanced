@@ -157,6 +157,8 @@ export default function NoteModal({
   // the central overlay stack)
   reminderPopOpen,
   setReminderPopOpen,
+  reminderTimeChips,
+  onReminderTimeChipsChange,
   // kebab menu
   modalKebabOpen,
   setModalKebabOpen,
@@ -982,6 +984,8 @@ export default function NoteModal({
             onSetReminder={onSetReminder}
             reminderPopOpen={reminderPopOpen}
             setReminderPopOpen={setReminderPopOpen}
+            reminderTimeChips={reminderTimeChips}
+            onReminderTimeChipsChange={onReminderTimeChipsChange}
             onOpenConfirmDelete={() => setConfirmDeleteOpen(true)}
             modalKebabOpen={modalKebabOpen}
             setModalKebabOpen={setModalKebabOpen}
