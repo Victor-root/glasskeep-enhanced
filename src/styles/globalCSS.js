@@ -1718,14 +1718,20 @@ html.dark .modal-footer-toolbar {
 }
 
 /* Paragraph super-group on mobile: the desktop ribbon centres "Increase
-   indent" over the "Justify / Decrease indent" join with margin tricks.
+   indent" over the "Justify / Decrease indent" join with margin tricks
+   (margin-left:auto + a margin-right nudge on each row's last button).
    On the phone sheet that single flat wrapping line reads better as:
      row 1 → lists + Increase/Decrease indent together
      row 2 → the four alignment buttons
-   We reset the desktop margins and reorder with flex order, forcing a
+   We reset those desktop margins and reorder with flex order, forcing a
    full-width break before the alignment buttons so they drop to their own
-   line. Desktop layout is untouched. */
-.mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"] .rt-sg-row > .rt-btn:last-child {
+   line. The leading .mobile-fmt-sheet ancestor (always the parent of
+   .mobile-fmt-sheet-content) is here only to out-specify the desktop
+   margin-trick rules of the same shape that appear LATER in this stylesheet
+   — without it their margin-right nudge ties on specificity, wins on source
+   order, and leaves a visible gap between Increase and Decrease indent.
+   Desktop layout is untouched. */
+.mobile-fmt-sheet .mobile-fmt-sheet-content .rt-sg[data-sg="paragraph"] .rt-sg-row > .rt-btn:last-child {
   margin-left: 0;
   margin-right: 0;
 }
