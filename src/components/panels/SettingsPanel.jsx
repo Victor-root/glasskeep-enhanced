@@ -282,7 +282,7 @@ export default function SettingsPanel({
           paddingBottom: "var(--safe-bottom)",
           paddingRight: "var(--safe-right)",
         }}
-        aria-hidden={!open}
+        inert={!open}
       >
         <div className="p-4 flex items-center justify-between border-b border-[var(--border-light)]">
           <h3 className="text-lg font-semibold flex items-center gap-2">

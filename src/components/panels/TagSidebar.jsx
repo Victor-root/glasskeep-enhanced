@@ -76,7 +76,7 @@ export default function TagSidebar({
           paddingBottom: "var(--safe-bottom)",
           paddingLeft: "var(--safe-left)",
         }}
-        aria-hidden={!(permanent || open)}
+        inert={!(permanent || open)}
       >
         <div className="px-4 flex items-center justify-between h-[var(--gk-header-h,56px)] shrink-0">
           <h3 className="text-lg font-semibold">{t("tags")}</h3>
