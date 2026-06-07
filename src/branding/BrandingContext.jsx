@@ -184,6 +184,16 @@ export function BrandingProvider({ children }) {
         };
         setBranding(next);
         writeCachedBranding(next);
+        // Keep the boot global in sync so AuthShell's fallback
+        // (branding.loginBackground || bootBg.url) always reflects the
+        // current state. Without this, removing or replacing the
+        // background and then logging out would show the stale URL that
+        // was server-injected at page-load time.
+        if (typeof window !== "undefined") {
+          window.__GK_LOGIN_BG__ = next.loginBackground
+            ? { ...(window.__GK_LOGIN_BG__ || {}), url: next.loginBackground, color: next.loginBackgroundColor || null }
+            : null;
+        }
       }
     } catch (e) {
       // Non-fatal — the app keeps the cached / bundled default branding.
