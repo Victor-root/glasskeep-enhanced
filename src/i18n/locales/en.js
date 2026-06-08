@@ -1363,4 +1363,86 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   audioReadFailed: "Audio read failed",
   syncRateLimited: "Rate limited (HTTP {status})",
   syncUnknownError: "Unknown error",
+
+  // ── Cross-server collaboration (federation) ──
+  fedSectionTitle: "Cross-server collaboration",
+  fedIntro:
+    "Pair this server with another GlassKeep server you trust so your users can collaborate on notes across both instances. Both servers must be reachable over HTTPS with a valid certificate.",
+  fedHttpsRequired:
+    "Federation requires HTTPS with a valid certificate. This server is currently served over plain http, so pairing will fail until it sits behind HTTPS.",
+  fedThisServer: "This server's address",
+  fedThisServerHint:
+    "This is the address the other server will use to reach you. Make sure it is correct and publicly reachable over HTTPS.",
+  fedPairTitle: "Pair a server",
+  fedPairHint:
+    "Enter the address of the server you want to pair with (e.g. notes.friend.com). Its admin receives a request and must accept it. If their server is offline, the request is delivered automatically once it is back online.",
+  fedLabelPlaceholder: "Friendly name (optional)",
+  fedInviteSend: "Send invitation",
+  fedInviteSending: "Sending…",
+  fedInviteSent: "Invitation sent. Waiting for the other admin to accept.",
+  fedInviteReceived: "{peer} wants to pair with your server",
+  fedInvitesPending: "{count} servers are waiting to pair with you",
+  fedIncomingHeading: "Pairing requests",
+  fedLinkedHeading: "Linked servers",
+  fedNoLinks: "No linked servers yet.",
+  fedLoading: "Loading…",
+
+  // federation link states
+  fedStateOnline: "Online",
+  fedStateOnlineDesc:
+    "The peer server is reachable and compatible. Shared notes can be edited normally.",
+  fedStateOffline: "Offline",
+  fedStateOfflineDesc:
+    "The peer server is unreachable. Notes it owns stay visible but read-only until it is back online — nothing is lost.",
+  fedStateIncompatible: "Out of date",
+  fedStateIncompatibleDesc:
+    "The two servers run incompatible versions of the sharing feature. Shared notes are read-only until both servers are updated.",
+  fedStateLocked: "Locked",
+  fedStateLockedDesc:
+    "The peer server is reachable but its encryption vault is locked. Its admin must unlock it before syncing can resume.",
+  fedStateChecking: "Checking…",
+  fedStateCheckingDesc: "Checking the peer server's status…",
+  fedStateOutgoing: "Invitation sent",
+  fedStateOutgoingDesc:
+    "Waiting for the other admin to accept. If their server is offline, the invitation is delivered automatically when it comes back.",
+  fedStateIncoming: "Pairing request",
+  fedStateIncomingDesc:
+    "This server is asking to pair with you. Accept to let your users collaborate across both servers.",
+  fedStateAccepting: "Finalising…",
+  fedStateAcceptingDesc: "Finishing the pairing with the other server…",
+  fedStateRefused: "Declined",
+  fedStateRefusedDesc: "This invitation was declined.",
+  fedStateRevoked: "Unpaired",
+  fedStateRevokedDesc: "This link was removed.",
+
+  // federation link card
+  fedPeerVersion: "Peer version",
+  fedProtocol: "protocol",
+  fedLastContact: "Last contact",
+  fedNever: "never",
+  fedAccept: "Accept",
+  fedRefuse: "Decline",
+  fedRefuseTitle: "Decline pairing request?",
+  fedRefuseConfirm: "Decline the pairing request from {peer}?",
+  fedCancelInvite: "Cancel",
+  fedCancelInviteTitle: "Cancel invitation?",
+  fedCancelInviteConfirm: "Cancel the pairing invitation to {peer}?",
+  fedRecheck: "Re-check",
+  fedChangeAddress: "Change address",
+  fedRename: "Rename",
+  fedUnpair: "Unpair",
+  fedUnpairTitle: "Unpair this server?",
+  fedUnpairConfirm:
+    "Unpair from {peer}? Shared notes will stop syncing between the two servers.",
+  fedRemove: "Remove",
+
+  // federation invite errors
+  fedErrInvalidPeerUrl:
+    "That server address is not valid. Use a domain like notes.example.com (HTTPS).",
+  fedErrInvalidLocalUrl:
+    "This server's own address could not be determined. Make sure you are using GlassKeep over HTTPS.",
+  fedErrSelf: "You can't pair a server with itself.",
+  fedErrAlready: "There is already a link (or a pending one) with that server.",
+  fedErrGeneric:
+    "Could not send the invitation. Check the address and try again.",
 };

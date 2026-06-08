@@ -57,6 +57,7 @@ import ChangePasswordModal from "./components/auth/ChangePasswordModal.jsx";
 import TagSidebar from "./components/panels/TagSidebar.jsx";
 import SettingsPanel from "./components/panels/SettingsPanel.jsx";
 import AdminPanel from "./components/panels/AdminPanel.jsx";
+import FederationInviteWatcher from "./components/admin/federation/FederationInviteWatcher.jsx";
 import { useUpdateCheck } from "./hooks/useUpdateCheck.js";
 import { useSelfUpdate } from "./hooks/useSelfUpdate.js";
 import SelfUpdateProgress from "./components/admin/SelfUpdateProgress.jsx";
@@ -3710,6 +3711,14 @@ export default function App() {
                   forceCloseModalForRemoteDelete(nid);
                 }
               }
+            } else if (msg && typeof msg.type === "string" && msg.type.startsWith("federation_")) {
+              // Cross-server collaboration (federation) events. App.jsx
+              // stays out of the feature's logic: it just forwards the
+              // event on a window bus that the Federation admin section
+              // (useFederation hook) listens to.
+              try {
+                window.dispatchEvent(new CustomEvent("federation-event", { detail: msg }));
+              } catch (_) {}
             }
           } catch (_) {}
         };
@@ -7135,6 +7144,13 @@ export default function App() {
         updateInfo={updateInfo}
         syncStatus={syncStatus}
       />
+
+      {/* Headless: toasts incoming cross-server pairing requests for
+          admins, even with the admin panel closed (and on next login for
+          any that arrived while they were away). */}
+      {currentUser?.is_admin && (
+        <FederationInviteWatcher token={token} showToast={showToast} />
+      )}
 
       <NotesUI
         currentUser={currentUser}

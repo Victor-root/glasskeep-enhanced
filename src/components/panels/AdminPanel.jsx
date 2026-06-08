@@ -6,6 +6,7 @@ import TI from "../../icons/editor/index.jsx";
 import EncryptionAdminSection from "../lock/EncryptionAdminSection.jsx";
 import AiAdminSection from "./AiAdminSection.jsx";
 import AdminUpdateSection from "../admin/AdminUpdateSection.jsx";
+import FederationSection from "../admin/federation/FederationSection.jsx";
 import LoginBrandingSection from "./LoginBrandingSection.jsx";
 import { localizeServerError } from "../../utils/serverErrors.js";
 import { RowIcon, SettingsSection } from "../common/SettingsAccordion.jsx";
@@ -750,6 +751,27 @@ export default function AdminPanel({
             >
             <div className="pl-3">
               <EncryptionAdminSection token={authToken} showToast={showToast} />
+            </div>
+            </SettingsSection>
+          </div>
+
+          {/* Cross-server collaboration — pair this server with another
+              GlassKeep instance so their users can share notes. The
+              section component owns the pairing + link-management UI. */}
+          <div className="mb-2">
+            <SettingsSection
+              icon={TI.World}
+              title={t("fedSectionTitle")}
+              open={openSections.federation}
+              onToggle={() => toggleSection("federation")}
+            >
+            <div className="pl-3">
+              <FederationSection
+                open={!!openSections.federation}
+                authToken={authToken}
+                showToast={showToast}
+                showGenericConfirm={showGenericConfirm}
+              />
             </div>
             </SettingsSection>
           </div>

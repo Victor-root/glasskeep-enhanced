@@ -1366,4 +1366,86 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   audioReadFailed: "Échec de lecture audio",
   syncRateLimited: "Limite atteinte (HTTP {status})",
   syncUnknownError: "Erreur inconnue",
+
+  // ── Collaboration entre serveurs (fédération) ──
+  fedSectionTitle: "Collaboration entre serveurs",
+  fedIntro:
+    "Associez ce serveur à un autre serveur GlassKeep de confiance pour que vos utilisateurs puissent collaborer sur des notes entre les deux instances. Les deux serveurs doivent être joignables en HTTPS avec un certificat valide.",
+  fedHttpsRequired:
+    "La fédération nécessite le HTTPS avec un certificat valide. Ce serveur est actuellement servi en http simple : l'appairage échouera tant qu'il ne sera pas derrière HTTPS.",
+  fedThisServer: "Adresse de ce serveur",
+  fedThisServerHint:
+    "C'est l'adresse que l'autre serveur utilisera pour vous joindre. Vérifiez qu'elle est correcte et joignable publiquement en HTTPS.",
+  fedPairTitle: "Associer un serveur",
+  fedPairHint:
+    "Entrez l'adresse du serveur à associer (ex. notes.ami.com). Son administrateur reçoit une demande et doit l'accepter. Si son serveur est hors ligne, la demande est livrée automatiquement dès qu'il revient en ligne.",
+  fedLabelPlaceholder: "Nom convivial (facultatif)",
+  fedInviteSend: "Envoyer l'invitation",
+  fedInviteSending: "Envoi…",
+  fedInviteSent: "Invitation envoyée. En attente de l'acceptation de l'autre administrateur.",
+  fedInviteReceived: "{peer} souhaite s'associer à votre serveur",
+  fedInvitesPending: "{count} serveurs attendent de s'associer à vous",
+  fedIncomingHeading: "Demandes d'appairage",
+  fedLinkedHeading: "Serveurs associés",
+  fedNoLinks: "Aucun serveur associé pour le moment.",
+  fedLoading: "Chargement…",
+
+  // états des liaisons de fédération
+  fedStateOnline: "En ligne",
+  fedStateOnlineDesc:
+    "Le serveur pair est joignable et compatible. Les notes partagées peuvent être modifiées normalement.",
+  fedStateOffline: "Hors ligne",
+  fedStateOfflineDesc:
+    "Le serveur pair est injoignable. Les notes dont il est propriétaire restent visibles mais en lecture seule jusqu'à son retour en ligne — rien n'est perdu.",
+  fedStateIncompatible: "Pas à jour",
+  fedStateIncompatibleDesc:
+    "Les deux serveurs utilisent des versions incompatibles de la fonctionnalité de partage. Les notes partagées sont en lecture seule tant que les deux serveurs ne sont pas mis à jour.",
+  fedStateLocked: "Verrouillé",
+  fedStateLockedDesc:
+    "Le serveur pair est joignable mais son coffre-fort de chiffrement est verrouillé. Son administrateur doit le déverrouiller avant que la synchronisation puisse reprendre.",
+  fedStateChecking: "Vérification…",
+  fedStateCheckingDesc: "Vérification de l'état du serveur pair…",
+  fedStateOutgoing: "Invitation envoyée",
+  fedStateOutgoingDesc:
+    "En attente de l'acceptation de l'autre administrateur. Si son serveur est hors ligne, l'invitation sera livrée automatiquement à son retour.",
+  fedStateIncoming: "Demande d'appairage",
+  fedStateIncomingDesc:
+    "Ce serveur demande à s'associer avec vous. Acceptez pour permettre à vos utilisateurs de collaborer entre les deux serveurs.",
+  fedStateAccepting: "Finalisation…",
+  fedStateAcceptingDesc: "Finalisation de l'appairage avec l'autre serveur…",
+  fedStateRefused: "Refusée",
+  fedStateRefusedDesc: "Cette invitation a été refusée.",
+  fedStateRevoked: "Dissocié",
+  fedStateRevokedDesc: "Cette liaison a été supprimée.",
+
+  // carte de liaison de fédération
+  fedPeerVersion: "Version du pair",
+  fedProtocol: "protocole",
+  fedLastContact: "Dernier contact",
+  fedNever: "jamais",
+  fedAccept: "Accepter",
+  fedRefuse: "Refuser",
+  fedRefuseTitle: "Refuser la demande d'appairage ?",
+  fedRefuseConfirm: "Refuser la demande d'appairage de {peer} ?",
+  fedCancelInvite: "Annuler",
+  fedCancelInviteTitle: "Annuler l'invitation ?",
+  fedCancelInviteConfirm: "Annuler l'invitation d'appairage envoyée à {peer} ?",
+  fedRecheck: "Revérifier",
+  fedChangeAddress: "Changer l'adresse",
+  fedRename: "Renommer",
+  fedUnpair: "Dissocier",
+  fedUnpairTitle: "Dissocier ce serveur ?",
+  fedUnpairConfirm:
+    "Dissocier de {peer} ? Les notes partagées cesseront de se synchroniser entre les deux serveurs.",
+  fedRemove: "Supprimer",
+
+  // erreurs d'invitation de fédération
+  fedErrInvalidPeerUrl:
+    "Cette adresse de serveur n'est pas valide. Utilisez un domaine comme notes.exemple.com (HTTPS).",
+  fedErrInvalidLocalUrl:
+    "Impossible de déterminer l'adresse de ce serveur. Assurez-vous d'utiliser GlassKeep en HTTPS.",
+  fedErrSelf: "Vous ne pouvez pas associer un serveur avec lui-même.",
+  fedErrAlready: "Il existe déjà une liaison (ou une liaison en attente) avec ce serveur.",
+  fedErrGeneric:
+    "Impossible d'envoyer l'invitation. Vérifiez l'adresse et réessayez.",
 };

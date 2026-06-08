@@ -57,7 +57,20 @@ const JWT_SECRET = (() => {
 })();
 
 // ---------- Body parsing ----------
-app.use(express.json({ limit: "160mb" }));
+// `verify` stashes the raw request body, but ONLY for the
+// server-to-server federation endpoints, which HMAC-sign the exact
+// bytes they sent. Capturing it everywhere would needlessly hold a copy
+// of every (up to 160 MB) upload; federation payloads are tiny.
+app.use(
+  express.json({
+    limit: "160mb",
+    verify: (req, _res, buf) => {
+      if (req.url && req.url.startsWith("/api/federation/")) {
+        req.rawBody = buf.toString("utf8");
+      }
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true, limit: "160mb" }));
 
 // Trust proxy headers (X-Forwarded-Proto / X-Forwarded-For) when:
@@ -526,6 +539,7 @@ const { attachUpdateRoutes } = require("./routes/updateRoutes");
 const { attachSelfUpdateRoutes } = require("./routes/selfUpdateRoutes");
 const { attachAssetLinksRoutes } = require("./routes/assetLinksRoutes");
 const { attachDeviceLinkRoutes } = require("./routes/deviceLinkRoutes");
+const { attachFederationRoutes } = require("./routes/federationRoutes");
 const { requireUnlocked } = require("./routes/lockMiddleware");
 const { t: serverT } = require("./i18n");
 const pushService = require("./services/pushNotifications");
@@ -1370,6 +1384,26 @@ attachAssetLinksRoutes(app, { log: console });
 // phone scans + approves, the PC trades the token for a JWT on its
 // next poll). Schema is created lazily inside the route module.
 attachDeviceLinkRoutes(app, { db, auth, signToken, getUserById, log: console });
+
+// Cross-server collaboration ("federation"). Pairs two GlassKeep
+// servers so their users can share notes across instances. The returned
+// `tick` drives the pairing handshake retries and the per-link health
+// probes; we run it on an interval (unref'd so it never keeps the
+// process alive on its own) and the routes also kick it on demand.
+const federation = attachFederationRoutes(app, {
+  db,
+  auth,
+  adminOnly,
+  log: console,
+  broadcastToAdmins,
+});
+const FEDERATION_TICK_MS = (() => {
+  const raw = parseInt(process.env.FEDERATION_TICK_MS, 10);
+  return Number.isFinite(raw) && raw >= 5000 ? raw : 20000;
+})();
+setInterval(() => {
+  federation.tick().catch((e) => console.warn("[federation] tick error:", e?.message));
+}, FEDERATION_TICK_MS).unref();
 
 const LOCK_ALLOW_PATHS = [
   /^\/api\/instance(\/|$)/,
