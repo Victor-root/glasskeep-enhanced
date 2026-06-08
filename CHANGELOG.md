@@ -1,5 +1,10 @@
 # 📋 Changelog
 
+## v2.5.1 — 2026-06-08
+
+### ➕ Added
+- 🎨 **Login page theme (admin)** — from Admin → *Login page settings*, choose the colour theme applied to the login screen for all visitors (**GlassKeep**, **Emerald**, **Amber**, **Ruby**, **Graphite**, **Blush**). Completely independent of each user's own workspace theme — logged-in users keep their personal choice untouched.
+
 ## v2.5.0 — 2026-06-06
 
 ### ➕ Added
