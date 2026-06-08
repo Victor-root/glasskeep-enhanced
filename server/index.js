@@ -3298,6 +3298,10 @@ app.post("/api/notes/import", auth, (req, res) => {
 app.get("/api/user/settings", auth, (req, res) => {
   const row = getUserSettings.get(req.user.id);
   const settings = row ? JSON.parse(row.settings_json) : {};
+  // Include language from the users table so the client can apply it at
+  // boot without a separate profile fetch (cross-device language sync).
+  const user = getUserById.get(req.user.id);
+  if (user?.language) settings.language = user.language;
   res.json(settings);
 });
 

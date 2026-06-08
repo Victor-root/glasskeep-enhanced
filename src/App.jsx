@@ -8,7 +8,7 @@ import React, {
   useDeferredValue,
 } from "react";
 import { askAI, askNoteAIStream } from "./ai";
-import { t } from "./i18n";
+import { t, syncLanguageFromServer } from "./i18n";
 import Masonry from "react-masonry-css";
 import SyncStatusIcon from "./sync/SyncStatusIcon.jsx";
 import { SyncEngine } from "./sync/syncEngine.js";
@@ -30,6 +30,7 @@ import { localizeServerError } from "./utils/serverErrors.js";
 import { mdForDownload } from "./utils/markdown.jsx";
 import { uid, sanitizeFilename, downloadText, triggerBlobDownload, ensureJSZip, imageExtFromDataURL, fileToCompressedDataURL, setThemeColor, currentStatusBarColor } from "./utils/helpers.js";
 import { setShellTheme, isValidShellTheme } from "./theme/shellTheme.js";
+import { applyTaskStrikeClass, getStoredTaskStrike, TASK_STRIKE_EVENT } from "./theme/taskListStrike.js";
 import { textToChecklistItems, checklistItemsToText } from "./utils/noteConversion.js";
 import { isRichContent, contentToPlain, serializeRichContent, legacyMarkdownToRichDoc } from "./utils/richText.js";
 import {
@@ -993,11 +994,27 @@ export default function App() {
     }
   });
   useEffect(() => {
-    try {
-      localStorage.setItem("viewMode", listView ? "list" : "grid");
-    } catch (e) {}
-  }, [listView]);
+    try { localStorage.setItem("viewMode", listView ? "list" : "grid"); } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (remoteSyncedKeysRef.current.has("viewMode")) {
+      remoteSyncedKeysRef.current.delete("viewMode");
+      return;
+    }
+    if (token) {
+      api("/user/settings", { method: "PATCH", token, body: { viewMode: listView ? "list" : "grid" } }).catch(() => {});
+    }
+  }, [listView, token]);
   const onToggleViewMode = () => setListView((v) => !v);
+
+  // Mirror taskStrikeEnabled as React state so the PATCH useEffect fires on change.
+  // The actual class toggle + localStorage write live in taskListStrike.js (called
+  // by the toolbar and by applyRemoteUserSettings); we only watch the event here.
+  const [taskStrikeEnabled, setTaskStrikeEnabled] = useState(() => getStoredTaskStrike());
+  useEffect(() => {
+    const sync = (e) => setTaskStrikeEnabled(e.detail);
+    document.addEventListener(TASK_STRIKE_EVENT, sync);
+    return () => document.removeEventListener(TASK_STRIKE_EVENT, sync);
+  }, []);
 
   // Load user settings from server on login
   const sidebarSettingsLoadedRef = useRef(false);
@@ -1145,6 +1162,22 @@ export default function App() {
         if (Array.isArray(settings?.reminderTimeChips) && settings.reminderTimeChips.length > 0) {
           setReminderTimeChips(settings.reminderTimeChips);
         }
+        if (settings?.viewMode === "list" || settings?.viewMode === "grid") {
+          setListView(settings.viewMode === "list");
+          try { localStorage.setItem("viewMode", settings.viewMode); } catch (_) {}
+        }
+        if (typeof settings?.sidebarWidth === "number" && Number.isFinite(settings.sidebarWidth)) {
+          const w = Math.max(200, Math.min(600, Math.round(settings.sidebarWidth)));
+          setSidebarWidth(w);
+          try { localStorage.setItem("sidebarWidth", String(w)); } catch (_) {}
+        }
+        if (typeof settings?.taskStrikeEnabled === "boolean") {
+          applyTaskStrikeClass(settings.taskStrikeEnabled);
+          try { localStorage.setItem("gk:taskStrikeChecked", settings.taskStrikeEnabled ? "1" : "0"); } catch (_) {}
+        }
+        if (typeof settings?.language === "string") {
+          if (syncLanguageFromServer(settings.language)) window.location.reload();
+        }
       } catch (e) {
         // Network error — default to true
         setAlwaysShowSidebarOnWide((prev) => prev === null ? true : prev);
@@ -1219,11 +1252,32 @@ export default function App() {
     }
   }, [floatingCardsEnabled]);
 
+  const sidebarWidthPatchTimerRef = useRef(null);
   useEffect(() => {
-    try {
-      localStorage.setItem("sidebarWidth", String(sidebarWidth));
-    } catch (e) {}
-  }, [sidebarWidth]);
+    try { localStorage.setItem("sidebarWidth", String(sidebarWidth)); } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (remoteSyncedKeysRef.current.has("sidebarWidth")) {
+      remoteSyncedKeysRef.current.delete("sidebarWidth");
+      return;
+    }
+    if (!token) return;
+    // Debounce: sidebarWidth changes on every drag pixel, so only PATCH on settle.
+    clearTimeout(sidebarWidthPatchTimerRef.current);
+    sidebarWidthPatchTimerRef.current = setTimeout(() => {
+      api("/user/settings", { method: "PATCH", token, body: { sidebarWidth } }).catch(() => {});
+    }, 600);
+  }, [sidebarWidth, token]);
+
+  useEffect(() => {
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (remoteSyncedKeysRef.current.has("taskStrikeEnabled")) {
+      remoteSyncedKeysRef.current.delete("taskStrikeEnabled");
+      return;
+    }
+    if (token) {
+      api("/user/settings", { method: "PATCH", token, body: { taskStrikeEnabled } }).catch(() => {});
+    }
+  }, [taskStrikeEnabled, token]);
 
   useEffect(() => {
     if (!aiAssistantEnabled) {
@@ -3365,6 +3419,31 @@ export default function App() {
                   mark("readModeEnabled");
                   setReadModeEnabled(v);
                   try { localStorage.setItem("readModeEnabled", String(v)); } catch (_) {}
+                }
+              }
+              if (keys.has("viewMode")) {
+                const v = settings.viewMode;
+                if (v === "list" || v === "grid") {
+                  mark("viewMode");
+                  setListView(v === "list");
+                  try { localStorage.setItem("viewMode", v); } catch (_) {}
+                }
+              }
+              if (keys.has("sidebarWidth")) {
+                const v = settings.sidebarWidth;
+                if (typeof v === "number" && Number.isFinite(v)) {
+                  const w = Math.max(200, Math.min(600, Math.round(v)));
+                  mark("sidebarWidth");
+                  setSidebarWidth(w);
+                  try { localStorage.setItem("sidebarWidth", String(w)); } catch (_) {}
+                }
+              }
+              if (keys.has("taskStrikeEnabled")) {
+                const v = settings.taskStrikeEnabled;
+                if (typeof v === "boolean") {
+                  mark("taskStrikeEnabled");
+                  applyTaskStrikeClass(v);
+                  try { localStorage.setItem("gk:taskStrikeChecked", v ? "1" : "0"); } catch (_) {}
                 }
               }
             };
