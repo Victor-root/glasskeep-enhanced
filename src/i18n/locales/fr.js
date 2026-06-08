@@ -1391,7 +1391,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedConnTitle: "Liaison entre serveurs",
   fedPeerOffline: "{peer} est hors ligne",
   fedPeerOnline: "{peer} est de nouveau en ligne",
-  fedPeerLocked: "{peer} est verrouillé (coffre-fort scellé)",
+  fedPeerLocked: "{peer} est verrouillé (chiffrement non déverrouillé)",
   fedPeerIncompatible: "{peer} n'est pas à jour",
   fedInvitesPending: "{count} serveurs attendent de s'associer à vous",
   fedIncomingHeading: "Demandes d'appairage",
@@ -1411,7 +1411,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
     "Les deux serveurs utilisent des versions incompatibles de la fonctionnalité de partage. Les notes partagées sont en lecture seule tant que les deux serveurs ne sont pas mis à jour.",
   fedStateLocked: "Verrouillé",
   fedStateLockedDesc:
-    "Le serveur pair est joignable mais son coffre-fort de chiffrement est verrouillé. Son administrateur doit le déverrouiller avant que la synchronisation puisse reprendre.",
+    "Le serveur pair est joignable mais son chiffrement n'a pas été déverrouillé. Son administrateur doit le déverrouiller avant que la synchronisation puisse reprendre.",
   fedStateChecking: "Vérification…",
   fedStateCheckingDesc: "Vérification de l'état du serveur pair…",
   fedStateOutgoing: "Invitation envoyée",

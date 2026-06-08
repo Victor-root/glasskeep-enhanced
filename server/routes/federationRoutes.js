@@ -57,10 +57,10 @@ function attachFederationRoutes(
       return null;
     }
   }
-  // "Locked" = at-rest encryption is enabled but the vault hasn't been
-  // unlocked, so this instance currently can't read or write note
-  // content. Reported truthfully to peers so they show the precise
-  // "reachable but locked" state rather than a vague "offline".
+  // "Locked" = at-rest encryption is enabled but hasn't been unlocked,
+  // so this instance currently can't read or write note content.
+  // Reported truthfully to peers so they show the precise "reachable
+  // but locked" state rather than a vague "offline".
   function isLocked() {
     return runtime.isEnabled() && !runtime.isUnlocked();
   }

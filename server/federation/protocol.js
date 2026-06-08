@@ -68,7 +68,7 @@ const STATUS = Object.freeze({
 // refined by what the last health handshake learned about the peer, in
 // priority order: unreachable first (nothing else can be trusted), then
 // protocol mismatch (we literally can't speak), then locked (reachable
-// but its at-rest vault is sealed), otherwise everything is healthy.
+// but its at-rest encryption is still locked), otherwise it's healthy.
 //
 // This is the single source of truth behind the status pill shown both
 // on a shared note and in the admin Federation panel — the whole point
