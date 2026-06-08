@@ -1,5 +1,25 @@
 # 📋 Changelog
 
+## v2.5.0 — 2026-06-08
+
+### ➕ Added
+- 🎨 **Login page theme (admin)** — from Admin → *Login page settings*, choose the colour theme applied to the login screen for all visitors (**GlassKeep**, **Emerald**, **Amber**, **Ruby**, **Graphite**, **Blush**). Completely independent of each user's own workspace theme — logged-in users keep their personal choice untouched.
+- ⏰ **Note reminders** — set a date/time on any note via quick presets or a date picker. Fires once; changing the time to a future value re-arms it. Reminded notes show a bell pill on their card. Shared notes notify both owner and all collaborators.
+- 📋 **Reminders sidebar view** — dedicated "Reminders" section in the sidebar listing all upcoming reminders ordered by date.
+- 🔔 **In-app reminder delivery (SSE)** — reminder card delivered in real time over the existing SSE connection when the app is open.
+- 🌐 **Web Push reminders** — browser/PWA push notification when the app is backgrounded or closed. VAPID keys are auto-generated and persisted on first boot (`~/.vapid.json` next to the DB, mode 0600); set `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` env vars to override.
+- 🤖 **Android native reminders (no FCM)** — exact on-device alarms (`AlarmManager.setExactAndAllowWhileIdle`, re-armed after reboot via `ReminderBootReceiver`). A `WorkManager` periodic job (~15 min, `NetworkType.CONNECTED`) polls `GET /api/reminders/upcoming` and re-arms alarms for reminders created on other devices. No Firebase / Google Play Services dependency.
+- 🔋 **Battery optimization onboarding card** (Android) — optional `WelcomeScreen` card requesting `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`; never blocks setup.
+- 👥 **`shared_note_deleted_with_copy` notification** — collaborators receive a notification (with an "Open" action targeting the copy) when an owner deletes a shared note but leaves them a personal copy.
+
+### 🐛 Fixed
+- **Login-screen flash on cold load** — background renders a placeholder (mean colour + BlurHash) before first paint, dark mode applied early, decorative cards no longer stack at the top on load.
+- **Checklist section collapsed state now syncs across devices** — collapsed/expanded state was kept in `localStorage` (device-local). It's now persisted on the section entry (`collapsed: true`) in the note's items, so it follows the note across devices and survives refresh. Old checklists default to expanded.
+
+### 🛠️ Upgrade
+
+VAPID keys are generated on first boot — no manual setup needed. To enable browser/PWA push: Settings → Notifications (requires HTTPS with domain name). For Android native reminders, install APK **1.4.6** (build it or download the release). See [`REMINDERS.md`](./REMINDERS.md) for architecture and test tooling.
+
 ## 🚀 v2.4.5 — 2026-05-31
 
 Two headline features: fully **customisable branding** (each instance can theme its login page from the UI, nothing hard-coded) and **interface colour themes** — pick a workspace theme and the whole app chrome (header, sidebar, notes background, scrollbars, panels, icons, buttons and editor highlights) recolours coherently in light **and** dark mode, while your notes stay exactly as they are. The release also lands a big **desktop performance pass**, a **seamless desktop-PWA title bar**, a round of **mobile chrome polish**, and fixes one-click in-app updates on **Synology Container Manager / DSM**.

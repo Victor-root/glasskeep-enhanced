@@ -114,19 +114,25 @@ function buildHistoryEntry(n) {
     type === "note_access_revoked_with_copy" ||
     type === "collaborator_removed" ||
     type === "collaborator_removed_with_copy" ||
-    type === "collaborator_left"
+    type === "collaborator_left" ||
+    type === "shared_note_deleted" ||
+    type === "shared_note_deleted_with_copy"
   ) {
     const titleKeyMap = {
       collaborator_removed: "collaboratorRemovedTitle",
       collaborator_removed_with_copy: "collaboratorRemovedTitle",
       collaborator_left: "collaboratorLeftTitle",
       note_access_revoked_with_copy: "noteAccessRevokedTitle",
+      shared_note_deleted: "sharedNoteDeletedTitle",
+      shared_note_deleted_with_copy: "sharedNoteDeletedTitle",
     };
     const msgKeyMap = {
       collaborator_removed: "collaboratorRemovedToast",
       collaborator_removed_with_copy: "collaboratorRemovedWithCopyToast",
       collaborator_left: "collaboratorLeftToast",
       note_access_revoked_with_copy: "noteAccessRevokedWithCopyToast",
+      shared_note_deleted: "sharedNoteDeletedToast",
+      shared_note_deleted_with_copy: "sharedNoteDeletedWithCopyToast",
     };
     title = t(titleKeyMap[type] || "noteAccessRevokedTitle");
     message = buildHighlightedMessage(
@@ -139,7 +145,11 @@ function buildHistoryEntry(n) {
     // points to the copy. The server persists the copy's id in the
     // note_id column for this type so we can read it straight off
     // the history row.
-    if (type === "note_access_revoked_with_copy" && noteId) {
+    if (
+      (type === "note_access_revoked_with_copy" ||
+        type === "shared_note_deleted_with_copy") &&
+      noteId
+    ) {
       action = { label: t("noteSharedAction"), noteId: String(noteId) };
     }
   } else if (type === "user_deleted") {
@@ -179,6 +189,15 @@ function buildHistoryEntry(n) {
         { label: t("reject"), kind: "reject_pending_user", pendingUserId: pendingId },
       ];
     }
+  } else if (type === "reminder") {
+    // Reminder: render the title in the viewer's locale (the stored
+    // note_title can be English when the recipient's language is on
+    // "auto"). The note's own title/preview lives in `message`.
+    title = t("reminderNotificationTitle");
+    message = n.message || "";
+    variant = "info";
+    icon = icon || "reminder";
+    action = noteId ? { label: t("reminderOpenNoteAction"), noteId: String(noteId) } : null;
   } else if (n.message) {
     // Generic / test notification — use stored fields directly.
     title = n.note_title || null;
@@ -394,6 +413,12 @@ export function useShareNotifications({ token, userId }) {
     } else if (typeKey === "note_access_revoked_with_copy") {
       titleKey = "noteAccessRevokedTitle";
       messageKey = "noteAccessRevokedWithCopyToast";
+    } else if (typeKey === "shared_note_deleted") {
+      titleKey = "sharedNoteDeletedTitle";
+      messageKey = "sharedNoteDeletedToast";
+    } else if (typeKey === "shared_note_deleted_with_copy") {
+      titleKey = "sharedNoteDeletedTitle";
+      messageKey = "sharedNoteDeletedWithCopyToast";
     } else {
       titleKey = "noteAccessRevokedTitle";
       messageKey = "noteAccessRevokedToast";
@@ -411,7 +436,8 @@ export function useShareNotifications({ token, userId }) {
       // Same as the share toast: defer to the user's duration pref.
       dismissible: true,
       action:
-        typeKey === "note_access_revoked_with_copy" && noteId
+        (typeKey === "note_access_revoked_with_copy" ||
+          typeKey === "shared_note_deleted_with_copy") && noteId
           ? { label: t("noteSharedAction"), noteId: String(noteId) }
           : null,
       metadata: { serverNotificationId: id, noteId },
@@ -458,7 +484,8 @@ export function useShareNotifications({ token, userId }) {
             n.type === "note_access_revoked_with_copy" ||
             n.type === "collaborator_removed" ||
             n.type === "collaborator_removed_with_copy" ||
-            n.type === "collaborator_left"
+            n.type === "collaborator_left" ||
+            n.type === "shared_note_deleted"
           ) {
             showRevokeToast(payload);
           } else if (n.type === "pending_user_registered") {
@@ -479,6 +506,28 @@ export function useShareNotifications({ token, userId }) {
               deletedName: n.note_title,
               adminName: n.sender_name,
             });
+          } else if (n.type === "reminder") {
+            // Reminder replayed after being offline. Title rendered in
+            // this client's locale (stored note_title can be English for
+            // "auto"-language users); body is the note title/preview.
+            const fn = notifyRef.current;
+            if (typeof fn === "function") {
+              fn({
+                type: "reminder",
+                variant: "info",
+                title: t("reminderNotificationTitle"),
+                message: n.message || "",
+                persistent: !!n.persistent,
+                icon: n.icon || "reminder",
+                action: n.note_id
+                  ? { label: t("reminderOpenNoteAction"), noteId: String(n.note_id) }
+                  : null,
+                metadata: {
+                  serverNotificationId: n.id,
+                  ...(n.note_id ? { noteId: n.note_id } : {}),
+                },
+              });
+            }
           } else if (n.variant || n.message) {
             // Generic persisted notification (test-CLI, future events).
             const fn = notifyRef.current;

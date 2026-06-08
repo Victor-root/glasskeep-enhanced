@@ -10,6 +10,7 @@ import { fileToCompressedDataURL } from "../../utils/helpers.js";
 import TypographyModal from "./TypographyModal.jsx";
 import PasskeySettingsSection from "../settings/PasskeySettingsSection.jsx";
 import UserAiSettingsSection from "../settings/UserAiSettingsSection.jsx";
+import PushNotificationToggle from "../settings/PushNotificationToggle.jsx";
 import WorkspaceThemeSection from "../settings/WorkspaceThemeSection.jsx";
 import { RowIcon, SettingsSection, SettingsSubHeading as UISubHeading } from "../common/SettingsAccordion.jsx";
 
@@ -281,7 +282,7 @@ export default function SettingsPanel({
           paddingBottom: "var(--safe-bottom)",
           paddingRight: "var(--safe-right)",
         }}
-        aria-hidden={!open}
+        inert={!open}
       >
         <div className="p-4 flex items-center justify-between border-b border-[var(--border-light)]">
           <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -940,6 +941,9 @@ export default function SettingsPanel({
                   </Popover>
                 </div>
               </div>
+
+              {/* Push notifications — system reminders on installed PWAs. */}
+              <PushNotificationToggle token={token} />
             </SettingsSection>
           </div>
 

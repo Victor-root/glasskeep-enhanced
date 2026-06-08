@@ -72,6 +72,23 @@ services:
       # passkeys with your custom build too. Comma-separated for several.
       # Run ./gradlew signingReport inside android/ to find your value.
       # ANDROID_EXTRA_FINGERPRINTS: "AA:BB:CC:DD:...,11:22:33:44:..."
+
+      # --- Optional: Web Push for reminders (PWA push notifications) --------
+      # Lets note reminders fire as a SYSTEM notification on installed PWAs,
+      # even when the app is closed. OPTIONAL — without these keys, reminders
+      # still appear in-app (over SSE) when the app is open; only the
+      # background system push is disabled. Requires HTTPS (see above).
+      #
+      # Generate a key pair ONCE (keep the private key secret):
+      #   docker compose run --rm glass-keep npx web-push generate-vapid-keys
+      #   (or, outside Docker:  npx web-push generate-vapid-keys)
+      #
+      # VAPID_PUBLIC_KEY: ""
+      # VAPID_PRIVATE_KEY: ""
+      # VAPID_SUBJECT: "mailto:admin@example.com"
+      #
+      # Optional: reminder scheduler sweep cadence in ms (default 30000).
+      # REMINDER_SWEEP_MS: "30000"
     volumes:
       # Persistent data: SQLite DB + auto-generated JWT secret.
       # Back this directory up to preserve your notes.

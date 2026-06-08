@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect } from "react";
+import React, { useMemo, useRef } from "react";
 import { t } from "../../i18n";
 import { bgFor, solid } from "../../utils/colors.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
@@ -104,23 +104,6 @@ function NoteCard({
 
   const total = countItems(n.items);
   const done = countChecked(n.items);
-  // Collapsed section ids — mirrors what ChecklistEditor writes to localStorage.
-  // useState so it updates in real-time when the modal dispatches checklist-collapse-change.
-  const [collapsedSections, setCollapsedSections] = useState(() => {
-    try {
-      const stored = localStorage.getItem(`ck-sec-${n.id}`);
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch { return new Set(); }
-  });
-  useEffect(() => {
-    const onCollapse = (e) => {
-      if (e.detail?.noteId !== n.id) return;
-      setCollapsedSections(new Set(e.detail.ids));
-    };
-    window.addEventListener("checklist-collapse-change", onCollapse);
-    return () => window.removeEventListener("checklist-collapse-change", onCollapse);
-  }, [n.id]);
-
   // Preview: walk sections in order, emit unchecked items first, then
   // checked. Section headers only appear when the note actually has any.
   // Collapsed sections show the header but no items (same as in the modal).
@@ -130,7 +113,7 @@ function NoteCard({
     let remaining = maxPreviewItems;
     for (const s of secs) {
       if (remaining <= 0) break;
-      const isCollapsed = s.id !== DEFAULT_SECTION_ID && collapsedSections.has(s.id);
+      const isCollapsed = s.id !== DEFAULT_SECTION_ID && !!s.collapsed;
       const uncheckedRaw = isCollapsed ? [] : s.items.filter((it) => !it.done);
       const take = uncheckedRaw.slice(0, remaining);
       remaining -= take.length;
@@ -139,7 +122,7 @@ function NoteCard({
       }
     }
     return out;
-  }, [n.items, maxPreviewItems, collapsedSections]);
+  }, [n.items, maxPreviewItems]);
   const visibleCount = previewSections.reduce((n2, s) => n2 + s.items.length, 0);
   const uncheckedTotal = (n.items || []).filter((it) => isItem(it) && !it.done).length;
   const extraCount = Math.max(0, uncheckedTotal - visibleCount);
@@ -420,6 +403,7 @@ function NoteCard({
             collabs={collabs}
             isCollab={isCollab}
             dark={dark}
+            reminderAt={n.reminderAt}
           />
         );
       })()}

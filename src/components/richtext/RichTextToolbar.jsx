@@ -810,24 +810,24 @@ export default function RichTextToolbar({ editor, compact = false, mode = "simpl
             </button>
             <TaskListPopover anchorRef={taskListBtnRef} open={openMenu === "taskList"} onClose={closeMenu} />
           </div>
-          <ToolbarButton title={t("fmtIndent")} disabled={!canIndent} onClick={doIndent}>
+          <ToolbarButton className="rt-btn--indent" title={t("fmtIndent")} disabled={!canIndent} onClick={doIndent}>
             <RichIcons.Indent />
           </ToolbarButton>
         </div>
         <div className="rt-sg-row">
-          <ToolbarButton active={isAlignLeft} title={t("fmtAlignLeft")} onClick={() => chain().setTextAlign("left").run()}>
+          <ToolbarButton className="rt-btn--align" active={isAlignLeft} title={t("fmtAlignLeft")} onClick={() => chain().setTextAlign("left").run()}>
             <RichIcons.AlignLeft />
           </ToolbarButton>
-          <ToolbarButton active={isAlignCenter} title={t("fmtAlignCenter")} onClick={() => chain().setTextAlign("center").run()}>
+          <ToolbarButton className="rt-btn--align" active={isAlignCenter} title={t("fmtAlignCenter")} onClick={() => chain().setTextAlign("center").run()}>
             <RichIcons.AlignCenter />
           </ToolbarButton>
-          <ToolbarButton active={isAlignRight} title={t("fmtAlignRight")} onClick={() => chain().setTextAlign("right").run()}>
+          <ToolbarButton className="rt-btn--align" active={isAlignRight} title={t("fmtAlignRight")} onClick={() => chain().setTextAlign("right").run()}>
             <RichIcons.AlignRight />
           </ToolbarButton>
-          <ToolbarButton active={isAlignJustify} title={t("fmtAlignJustify")} onClick={() => chain().setTextAlign("justify").run()}>
+          <ToolbarButton className="rt-btn--align" active={isAlignJustify} title={t("fmtAlignJustify")} onClick={() => chain().setTextAlign("justify").run()}>
             <RichIcons.AlignJustify />
           </ToolbarButton>
-          <ToolbarButton title={t("fmtOutdent")} disabled={!canOutdent} onClick={doOutdent}>
+          <ToolbarButton className="rt-btn--outdent" title={t("fmtOutdent")} disabled={!canOutdent} onClick={doOutdent}>
             <RichIcons.Outdent />
           </ToolbarButton>
         </div>

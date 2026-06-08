@@ -859,6 +859,12 @@ export class SyncEngine {
           body: JSON.stringify(item.payload),
         });
 
+      case "reminder":
+        return doFetch(`/notes/${item.noteId}/reminder`, {
+          method: "POST",
+          body: JSON.stringify(item.payload),
+        });
+
       case "trash":
         return doFetch(`/notes/${item.noteId}/trash`, {
           method: "POST",

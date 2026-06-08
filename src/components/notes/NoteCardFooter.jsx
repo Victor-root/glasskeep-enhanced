@@ -1,6 +1,7 @@
 import React from "react";
 import { t } from "../../i18n";
 import UserAvatar from "../common/UserAvatar.jsx";
+import NoteReminderChip from "./NoteReminderChip.jsx";
 
 /**
  * Compact footer rendered at the bottom of a closed note card.
@@ -19,12 +20,14 @@ export default function NoteCardFooter({
   collabs = [],
   isCollab = false,
   dark = false,
+  reminderAt = null,
 }) {
   const safeTags = Array.isArray(tags) ? tags : [];
   const hasTags = safeTags.length > 0;
   const hasCollabs = isCollab;
+  const hasReminder = !!reminderAt;
 
-  if (!hasTags && !hasCollabs) return null;
+  if (!hasTags && !hasCollabs && !hasReminder) return null;
 
   const visible = safeTags.slice(0, maxChips);
   const overflow = safeTags.length - visible.length;
@@ -35,6 +38,14 @@ export default function NoteCardFooter({
 
   return (
     <div className="note-card-footer mt-2 pt-1 space-y-2">
+      {/* Reminder pill — its own row so the date stays readable and never
+          competes with tags for horizontal space. */}
+      {hasReminder && (
+        <div className="flex flex-wrap">
+          <NoteReminderChip reminderAt={reminderAt} />
+        </div>
+      )}
+
       {/* Row 1: tag chips */}
       {hasTags && (
         <div className="flex flex-wrap gap-1 items-center">

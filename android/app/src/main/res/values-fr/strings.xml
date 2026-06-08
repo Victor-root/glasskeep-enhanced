@@ -27,6 +27,8 @@
     <string name="shortcut_new_audio_long">Nouvelle note audio</string>
 
     <string name="update_notification_channel">Mises à jour</string>
+    <string name="reminder_notification_channel">Rappels</string>
+    <string name="reminder_open_action">Ouvrir</string>
     <string name="update_notification_title">Mise à jour GlassKeep disponible</string>
     <string name="update_notification_text">Version %1$s — toucher pour télécharger et installer</string>
     <string name="update_notification_bigtext">La version %1$s est disponible. Touchez pour télécharger et installer. Pensez à mettre aussi votre serveur GlassKeep à jour, sinon certaines fonctionnalités ne marcheront pas.</string>
@@ -50,4 +52,6 @@
     <string name="welcome_notif_desc">Une notification système discrète quand une nouvelle version de l\'app est publiée, pour éviter d\'avoir à vérifier GitHub manuellement.</string>
     <string name="welcome_install_title">Installer les mises à jour</string>
     <string name="welcome_install_desc">GlassKeep n\'est pas sur le Play Store, Android a donc besoin de votre autorisation pour installer le nouvel APK que nous téléchargeons pour vous.</string>
+    <string name="welcome_battery_title">Optimisation de la batterie (optionnel)</string>
+    <string name="welcome_battery_desc">Pour que vos rappels se déclenchent à l\'heure même quand l\'app est complètement fermée, autorisez GlassKeep à ignorer l\'optimisation de la batterie. Sans ça, Android peut retarder ou bloquer les rappels en arrière-plan. C\'est facultatif : vous pouvez refuser, les rappels fonctionneront quand même la plupart du temps.</string>
 </resources>

@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { t } from "../../i18n";
 import { SearchIcon, CloseIcon } from "../../icons/index.jsx";
-import { ALL_IMAGES } from "../../utils/constants.js";
+import { ALL_IMAGES, REMINDERS } from "../../utils/constants.js";
 
-import { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon } from "../../icons/sidebarIcons.jsx";
-export { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon };
+import { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon, RemindersSidebarIcon } from "../../icons/sidebarIcons.jsx";
+export { NotesIcon, ImagesIcon, ArchiveSidebarIcon, TrashSidebarIcon, TagIcon, RemindersSidebarIcon };
 
 export default function TagSidebar({
   open,
@@ -76,7 +76,7 @@ export default function TagSidebar({
           paddingBottom: "var(--safe-bottom)",
           paddingLeft: "var(--safe-left)",
         }}
-        aria-hidden={!(permanent || open)}
+        inert={!(permanent || open)}
       >
         <div className="px-4 flex items-center justify-between h-[var(--gk-header-h,56px)] shrink-0">
           <h3 className="text-lg font-semibold">{t("tags")}</h3>
@@ -152,6 +152,16 @@ export default function TagSidebar({
               if (!permanent) onClose();
             }}
           ><ArchiveSidebarIcon />{t("archivedNotes")}</button>
+
+          {/* Reminders — a filtered view over the regular notes (notes
+              that carry a reminder), not a separate folder. */}
+          <button
+            className={`w-full text-left px-3 py-2 rounded-md mb-2 flex items-center gap-3 transition-colors ${itemClass(activeTag === REMINDERS)}`}
+            onClick={() => {
+              onSelect(REMINDERS);
+              if (!permanent) onClose();
+            }}
+          ><RemindersSidebarIcon />{t("remindersNotes")}</button>
 
           {/* Trash */}
           <button

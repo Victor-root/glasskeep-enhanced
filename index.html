@@ -24,6 +24,24 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Glass Keep</title>
   <script>
+    /* Dark mode BEFORE first paint. The app otherwise toggles `.dark` from a
+       React effect (App.jsx), so a dark-mode user gets a white flash on every
+       cold load. Mirror that effect's decision here, synchronously: a manual
+       session preference wins, else follow the OS (prefers-color-scheme) —
+       the same source the app falls back to (incognito has no session pref,
+       so it correctly follows the OS). With `.dark` set now, body paints with
+       the dark --gk-app-bg straight away. */
+    (function () {
+      try {
+        var pref = sessionStorage.getItem('glass-keep-dark-mode-manual');
+        var dark = pref !== null
+          ? pref === 'true'
+          : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.classList.add('dark');
+      } catch (e) {}
+    })();
+  </script>
+  <script>
     /* Boot-time branding: apply the cached custom app name + logo to the
        tab title and favicon BEFORE React mounts, so a reload doesn't
        flash the default name/logo. The BrandingProvider reads the same
@@ -55,6 +73,90 @@
 
 <body>
   <div id="root"></div>
+  <script>
+    /* Login-background boot: paint an instant placeholder (mean colour, then
+       the decoded BlurHash) BEFORE React mounts, and preload the real image
+       so AuthShell can cross-fade it in (colour → blurhash → sharp image).
+       Runs synchronously at the top of <body> so document.body exists and it
+       executes before the deferred React module — no flash of the default
+       backdrop, even on a cold/incognito load.
+
+       Only on the login screen: a logged-in user (auth token present) must
+       not see the login backdrop behind the app. Source order: the server
+       injects window.__GK_LOGIN_BG__ on a cold load; otherwise we reuse the
+       cached branding placeholders (warm reload / offline PWA shell). */
+    (function () {
+      try {
+        var auth = JSON.parse(localStorage.getItem('glass-keep-auth') || 'null');
+        if (auth && auth.token) return; // logged in — not the login page
+        var bg = window.__GK_LOGIN_BG__ || null;
+        if (!bg) {
+          var c = JSON.parse(localStorage.getItem('gk:branding') || 'null');
+          if (c && c.loginBackground && c.loginBackgroundColor) {
+            bg = { url: c.loginBackground, color: c.loginBackgroundColor, hash: c.loginBackgroundHash };
+          }
+        }
+        if (!bg || !bg.color) return;
+        document.documentElement.classList.add('gk-has-login-bg');
+        if (bg.url) {
+          var pre = document.createElement('link');
+          pre.rel = 'preload'; pre.as = 'image'; pre.href = bg.url;
+          document.head.appendChild(pre);
+        }
+
+        /* Minimal standard BlurHash decoder (returns RGBA pixels, or null). */
+        function decodeBlurhash(hash, width, height) {
+          var D = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~";
+          function d83(s, a, b) { var v = 0; for (var i = a; i < b; i++) { var p = D.indexOf(s[i]); if (p < 0) return -1; v = v * 83 + p; } return v; }
+          function toLin(x) { var v = x / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+          function toSRGB(x) { var v = Math.max(0, Math.min(1, x)); return v <= 0.0031308 ? Math.round(v * 12.92 * 255 + 0.5) : Math.round((1.055 * Math.pow(v, 1 / 2.4) - 0.055) * 255 + 0.5); }
+          function sp(v, e) { return (v < 0 ? -1 : 1) * Math.pow(Math.abs(v), e); }
+          if (!hash || hash.length < 6) return null;
+          var sf = d83(hash, 0, 1), numY = Math.floor(sf / 9) + 1, numX = (sf % 9) + 1;
+          if (hash.length !== 4 + 2 * numX * numY) return null;
+          var maxV = (d83(hash, 1, 2) + 1) / 166, colors = [], n = numX * numY;
+          for (var i = 0; i < n; i++) {
+            if (i === 0) { var v = d83(hash, 2, 6); colors.push([toLin(v >> 16), toLin((v >> 8) & 255), toLin(v & 255)]); }
+            else { var w = d83(hash, 4 + i * 2, 6 + i * 2), r = Math.floor(w / 361), g = Math.floor(w / 19) % 19, b = w % 19; colors.push([sp((r - 9) / 9, 2) * maxV, sp((g - 9) / 9, 2) * maxV, sp((b - 9) / 9, 2) * maxV]); }
+          }
+          var px = new Uint8ClampedArray(width * height * 4);
+          for (var y = 0; y < height; y++) for (var x = 0; x < width; x++) {
+            var rr = 0, gg = 0, bb = 0;
+            for (var j = 0; j < numY; j++) for (var k = 0; k < numX; k++) {
+              var basis = Math.cos(Math.PI * x * k / width) * Math.cos(Math.PI * y * j / height), cc = colors[k + j * numX];
+              rr += cc[0] * basis; gg += cc[1] * basis; bb += cc[2] * basis;
+            }
+            var o = 4 * (x + y * width);
+            px[o] = toSRGB(rr); px[o + 1] = toSRGB(gg); px[o + 2] = toSRGB(bb); px[o + 3] = 255;
+          }
+          return px;
+        }
+
+        // Paint the placeholder on the BODY background (the page canvas).
+        // It propagates to the whole viewport and sits behind ALL content,
+        // with none of the cross-stacking-context surprises an overlay <div>
+        // hits — an opaque wrapper inside #root would silently hide a
+        // z-index:-1 layer, which is exactly the kind of thing that only
+        // breaks in the real app. AuthShell fades the sharp image in over it
+        // and then clears these inline styles.
+        var bs = document.body.style;
+        bs.backgroundColor = bg.color;
+        bs.backgroundSize = 'cover';
+        bs.backgroundPosition = 'center';
+        bs.backgroundRepeat = 'no-repeat';
+        if (bg.hash) {
+          try {
+            var px = decodeBlurhash(bg.hash, 32, 32);
+            if (px) {
+              var cv = document.createElement('canvas'); cv.width = 32; cv.height = 32;
+              cv.getContext('2d').putImageData(new ImageData(px, 32, 32), 0, 0);
+              bs.backgroundImage = 'url(' + cv.toDataURL() + ')';
+            }
+          } catch (e) { /* canvas/ImageData unavailable — colour-only fallback */ }
+        }
+      } catch (e) { /* never let the backdrop break boot */ }
+    })();
+  </script>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 

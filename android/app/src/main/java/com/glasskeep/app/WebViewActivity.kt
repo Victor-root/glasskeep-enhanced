@@ -39,6 +39,12 @@ class WebViewActivity : AppCompatActivity() {
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
     private lateinit var webAuthnBridge: WebAuthnBridge
 
+    // Reminder notification deep-link: the target note id (from a tap) plus a
+    // flag for whether the web app has finished loading, so we only fire the
+    // window.__glasskeepOpenNote hook when the page can actually handle it.
+    private var pendingOpenNoteId: String? = null
+    private var pageLoaded = false
+
     // Held while we wait for the POST_NOTIFICATIONS runtime grant on
     // Android 13+. Once the user replies, we re-attempt the notif post
     // for this release (or drop it on the floor if denied).
@@ -50,6 +56,14 @@ class WebViewActivity : AppCompatActivity() {
         pendingUpdateRelease = null
         if (granted) com.glasskeep.app.update.UpdateNotifier.show(this, release)
     }
+
+    // POST_NOTIFICATIONS grant for reminder alarms. Requested once (per
+    // session) the first time the web app schedules a reminder; the grant
+    // persists, so later reminder notifications just work.
+    private var reminderPermissionAsked = false
+    private val reminderNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* grant persists; nothing to retry here */ }
 
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -394,6 +408,17 @@ class WebViewActivity : AppCompatActivity() {
             ?: getSharedPreferences("glasskeep", MODE_PRIVATE).getString("server_url", null)
             ?: run { finish(); return }
 
+        // Deep-link target if we were launched by a reminder notification tap.
+        pendingOpenNoteId = intent.getStringExtra(EXTRA_OPEN_NOTE_ID)
+
+        // Returning user with a stored token → ensure the background reminder
+        // sync is scheduled (covers reboots / updates where the web layer might
+        // not immediately re-hand the token).
+        if (!getSharedPreferences("glasskeep", MODE_PRIVATE)
+                .getString("auth_token", null).isNullOrBlank()) {
+            com.glasskeep.app.reminders.ReminderSyncWorker.schedulePeriodic(applicationContext)
+        }
+
         webView = findViewById(R.id.webview)
 
         // Pull-to-refresh
@@ -479,6 +504,11 @@ class WebViewActivity : AppCompatActivity() {
             // it into the Promise-friendly window.GlassKeepAndroidPasskey
             // that passkeyClient.js looks for.
             addJavascriptInterface(webAuthnBridge, WebAuthnBridge.JS_INTERFACE_NAME)
+            // window.AndroidReminders — lets the web app schedule LOCAL
+            // alarms for note reminders (Web Push isn't available in a
+            // WebView). The web app calls schedule/cancel when a reminder
+            // changes and syncAll on load. See ReminderScheduler.
+            addJavascriptInterface(RemindersBridge(), "AndroidReminders")
 
             settings.apply {
                 javaScriptEnabled = true
@@ -613,6 +643,9 @@ class WebViewActivity : AppCompatActivity() {
                           sync();
                         })()
                     """.trimIndent(), null)
+                    // Web app is ready — replay any pending reminder deep-link.
+                    pageLoaded = true
+                    maybeDispatchOpenNote()
                 }
             }
 
@@ -749,6 +782,17 @@ class WebViewActivity : AppCompatActivity() {
         webView.evaluateJavascript(
             "if(window.__setDarkMode)window.__setDarkMode($isDark)", null
         )
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // singleTask: a reminder tap on the already-running app lands here.
+        // Adopt the new intent and deep-link to the note it carries.
+        setIntent(intent)
+        intent.getStringExtra(EXTRA_OPEN_NOTE_ID)?.let {
+            pendingOpenNoteId = it
+            maybeDispatchOpenNote()
+        }
     }
 
     /** Open `uri` via the user's default browser using Android Custom
@@ -1048,5 +1092,145 @@ class WebViewActivity : AppCompatActivity() {
             return
         }
         com.glasskeep.app.update.UpdateNotifier.show(this, release)
+    }
+
+    // Track foreground state so ReminderAlarmReceiver can skip the system
+    // notification while the app is open (the in-app/SSE notification
+    // already shows it) — avoids a visible duplicate.
+    override fun onResume() {
+        super.onResume()
+        isForeground = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isForeground = false
+    }
+
+    // Ensure the POST_NOTIFICATIONS grant (Android 13+) so a fired reminder
+    // can actually post its notification. Asked at most once per session.
+    private fun ensureReminderNotificationPermission() {
+        if (isFinishing || isDestroyed || reminderPermissionAsked) return
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+        ) {
+            reminderPermissionAsked = true
+            try {
+                reminderNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } catch (e: Exception) {
+                // launcher unavailable (activity tearing down) — ignore
+            }
+        }
+    }
+
+    /**
+     * Fire the web app's reminder deep-link hook for any pending note id,
+     * but only once the page is loaded (so the React handler exists). The
+     * hook itself tolerates a not-yet-hydrated notes list — it stashes the
+     * id and opens the modal when the note appears — so a single shot here
+     * is enough for both warm taps and cold starts.
+     */
+    private fun maybeDispatchOpenNote() {
+        val id = pendingOpenNoteId ?: return
+        if (!pageLoaded || !this::webView.isInitialized) return
+        pendingOpenNoteId = null
+        val esc = id.replace("\\", "\\\\").replace("'", "\\'")
+        webView.post {
+            webView.evaluateJavascript(
+                "if(window.__glasskeepOpenNote){try{window.__glasskeepOpenNote('$esc')}catch(e){}}",
+                null,
+            )
+        }
+    }
+
+    /**
+     * window.AndroidReminders — local reminder scheduling for the WebView
+     * (Web Push is unavailable here). Methods run on a binder thread;
+     * AlarmManager + SharedPreferences are thread-safe, but any UI work
+     * (permission prompt) is marshalled back to the main thread.
+     */
+    inner class RemindersBridge {
+        @JavascriptInterface
+        fun isSupported(): Boolean = true
+
+        @JavascriptInterface
+        fun schedule(noteId: String?, triggerAtMillis: String?, title: String?, body: String?) {
+            val id = noteId ?: return
+            val at = triggerAtMillis?.toLongOrNull() ?: return
+            com.glasskeep.app.reminders.ReminderScheduler.schedule(
+                applicationContext, id, at, title ?: "", body ?: "",
+            )
+            runOnUiThread { ensureReminderNotificationPermission() }
+        }
+
+        @JavascriptInterface
+        fun cancel(noteId: String?) {
+            val id = noteId ?: return
+            com.glasskeep.app.reminders.ReminderScheduler.cancel(applicationContext, id)
+        }
+
+        @JavascriptInterface
+        fun syncAll(json: String?) {
+            val raw = json ?: return
+            val items = ArrayList<com.glasskeep.app.reminders.ReminderScheduler.ReminderItem>()
+            try {
+                val arr = org.json.JSONArray(raw)
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val id = o.optString("noteId")
+                    val at = o.optLong("t")
+                    if (id.isBlank() || at <= 0L) continue
+                    items.add(
+                        com.glasskeep.app.reminders.ReminderScheduler.ReminderItem(
+                            id, at, o.optString("title"), o.optString("body"),
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                return
+            }
+            com.glasskeep.app.reminders.ReminderScheduler.syncAll(applicationContext, items)
+            if (items.isNotEmpty()) runOnUiThread { ensureReminderNotificationPermission() }
+        }
+
+        /**
+         * Hand the current auth token to native so the background sync
+         * (ReminderSyncWorker) can poll the server while the app is closed.
+         * Empty string on sign-out. Stored in SharedPreferences; the worker
+         * reads it alongside server_url.
+         */
+        @JavascriptInterface
+        fun setAuth(token: String?) {
+            com.glasskeep.app.reminders.ReminderSyncWorker.setAuthToken(applicationContext, token ?: "")
+        }
+
+        /**
+         * Post a reminder's system notification immediately. Called from the
+         * web app's SSE handler when a reminder arrives while the app is
+         * BACKGROUNDED (not foreground) — the in-app card would be invisible,
+         * so we surface a real system notification instead, driven by the live
+         * SSE connection (no push service / no Google needed). Foreground stays
+         * in-app only. Uses the same note id as the local-alarm path, so the
+         * two collapse into one if both ever fire.
+         */
+        @JavascriptInterface
+        fun notifyNow(noteId: String?, title: String?, body: String?) {
+            val id = noteId ?: return
+            if (id.isBlank()) return
+            com.glasskeep.app.reminders.ReminderNotifier.show(
+                applicationContext, id, title ?: "", body ?: "",
+            )
+        }
+    }
+
+    companion object {
+        // Read by ReminderAlarmReceiver (possibly from another thread).
+        @Volatile
+        var isForeground: Boolean = false
+
+        // Reminder notification deep-link: ReminderNotifier stashes the target
+        // note id here; we forward it to window.__glasskeepOpenNote once loaded.
+        const val EXTRA_OPEN_NOTE_ID = "openNoteId"
     }
 }

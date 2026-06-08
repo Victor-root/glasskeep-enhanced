@@ -30,8 +30,8 @@ android {
         applicationId = "com.glasskeep.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 8
-        versionName = "1.4.5"
+        versionCode = 9
+        versionName = "1.4.6"
     }
 
     signingConfigs {
@@ -114,6 +114,11 @@ android {
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.01.00"))
     implementation("androidx.core:core-ktx:1.12.0")
+    // WorkManager: periodic background reminder sync so reminders created on
+    // another device still fire on a closed phone — without any push service.
+    // AndroidX → JobScheduler (AOSP), NOT Google Play Services. See
+    // ReminderSyncWorker. (Keeps the app Google-free.)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")

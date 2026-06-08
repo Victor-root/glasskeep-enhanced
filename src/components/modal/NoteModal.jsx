@@ -134,6 +134,7 @@ export default function NoteModal({
   savedModalScrollRatioRef,
   // derived
   activeNoteObj,
+  onSetReminder,
   editedStamp,
   modalHasChanges,
   modalScrollable,
@@ -152,6 +153,12 @@ export default function NoteModal({
   // color popover
   showModalColorPop,
   setShowModalColorPop,
+  // reminder picker (lifted so Android back + mobile full-screen hook into
+  // the central overlay stack)
+  reminderPopOpen,
+  setReminderPopOpen,
+  reminderTimeChips,
+  onReminderTimeChipsChange,
   // kebab menu
   modalKebabOpen,
   setModalKebabOpen,
@@ -885,7 +892,7 @@ export default function NoteModal({
               className={`mobile-fmt-sheet${showModalFmt ? " is-open" : ""}${dark ? " mobile-fmt-sheet--dark" : ""}`}
               role="dialog"
               aria-label={t("formatting")}
-              aria-hidden={showModalFmt ? "false" : "true"}
+              inert={!showModalFmt}
               style={{ backgroundColor: modalBgFor(mColor, dark) }}
             >
               <div
@@ -974,6 +981,11 @@ export default function NoteModal({
             onDownloadNote={handleDownloadNote}
             onRestoreFromTrash={restoreFromTrash}
             onArchiveNote={handleArchiveNote}
+            onSetReminder={onSetReminder}
+            reminderPopOpen={reminderPopOpen}
+            setReminderPopOpen={setReminderPopOpen}
+            reminderTimeChips={reminderTimeChips}
+            onReminderTimeChipsChange={onReminderTimeChipsChange}
             onOpenConfirmDelete={() => setConfirmDeleteOpen(true)}
             modalKebabOpen={modalKebabOpen}
             setModalKebabOpen={setModalKebabOpen}

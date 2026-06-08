@@ -32,6 +32,8 @@
     <!-- In-app self-update prompts (English). update_notification_text
          interpolates the new version as %1$s. -->
     <string name="update_notification_channel">App updates</string>
+    <string name="reminder_notification_channel">Reminders</string>
+    <string name="reminder_open_action">Open</string>
     <string name="update_notification_title">GlassKeep update available</string>
     <string name="update_notification_text">Version %1$s — tap to download and install</string>
     <string name="update_notification_bigtext">Version %1$s is available. Tap to download and install. Make sure the GlassKeep server is also on the latest version, otherwise some features won\'t work.</string>
@@ -57,4 +59,6 @@
     <string name="welcome_notif_desc">A discreet system notification when a new version of the app is available, so you don\'t have to keep checking GitHub.</string>
     <string name="welcome_install_title">Install updates</string>
     <string name="welcome_install_desc">GlassKeep isn\'t on the Play Store, so Android needs your permission to install the updated APK we download for you.</string>
+    <string name="welcome_battery_title">Battery optimization (optional)</string>
+    <string name="welcome_battery_desc">So your reminders fire on time even when the app is fully closed, allow GlassKeep to ignore battery optimization. Without it, Android may delay or block reminders in the background. It\'s optional — you can decline, and reminders will still work most of the time.</string>
 </resources>

@@ -18,15 +18,21 @@ const DEFAULT_BRANDING = {
   appName: "",
   logo: null,
   loginBackground: null,
+  loginBackgroundColor: null,
+  loginBackgroundHash: null,
   loginBackgroundBlur: 0,
+  loginTheme: null,
 };
 
 // Last-known branding is cached in localStorage so a reload paints the
 // correct name/logo (and favicon/tab title) on the very first render,
 // instead of flashing the bundled defaults until GET /api/branding
-// resolves. The login background is intentionally NOT cached: it can be
-// several MB (localStorage quota) and it's only a login backdrop, so a
-// brief default backdrop before it loads is acceptable.
+// resolves. The login background IMAGE is never cached (it can be several
+// MB — localStorage quota), but its tiny placeholders are: the image URL is
+// just a versioned path, and the mean colour + BlurHash are a few bytes.
+// Caching those lets the boot script repaint the right backdrop instantly
+// on reload (and offline, when the service worker serves a non-injected
+// index.html), then the browser-cached image loads over it.
 const CACHE_KEY = "gk:branding";
 
 function readCachedBranding() {
@@ -37,8 +43,11 @@ function readCachedBranding() {
     return {
       appName: typeof c.appName === "string" ? c.appName : "",
       logo: c.logo || null,
-      loginBackground: null,
+      loginBackground: c.loginBackground || null,
+      loginBackgroundColor: c.loginBackgroundColor || null,
+      loginBackgroundHash: c.loginBackgroundHash || null,
       loginBackgroundBlur: Number.isFinite(c.loginBackgroundBlur) ? c.loginBackgroundBlur : 0,
+      loginTheme: typeof c.loginTheme === "string" ? c.loginTheme : null,
     };
   } catch {
     return DEFAULT_BRANDING;
@@ -52,7 +61,11 @@ function writeCachedBranding(b) {
       JSON.stringify({
         appName: b.appName || "",
         logo: b.logo || null,
+        loginBackground: b.loginBackground || null,
+        loginBackgroundColor: b.loginBackgroundColor || null,
+        loginBackgroundHash: b.loginBackgroundHash || null,
         loginBackgroundBlur: b.loginBackgroundBlur || 0,
+        loginTheme: b.loginTheme || null,
       }),
     );
   } catch {
@@ -166,12 +179,25 @@ export function BrandingProvider({ children }) {
           appName: typeof data.appName === "string" ? data.appName : "",
           logo: data.logo || null,
           loginBackground: data.loginBackground || null,
+          loginBackgroundColor: data.loginBackgroundColor || null,
+          loginBackgroundHash: data.loginBackgroundHash || null,
           loginBackgroundBlur: Number.isFinite(data.loginBackgroundBlur)
             ? data.loginBackgroundBlur
             : 0,
+          loginTheme: typeof data.loginTheme === "string" ? data.loginTheme : null,
         };
         setBranding(next);
         writeCachedBranding(next);
+        // Keep the boot global in sync so AuthShell's fallback
+        // (branding.loginBackground || bootBg.url) always reflects the
+        // current state. Without this, removing or replacing the
+        // background and then logging out would show the stale URL that
+        // was server-injected at page-load time.
+        if (typeof window !== "undefined") {
+          window.__GK_LOGIN_BG__ = next.loginBackground
+            ? { ...(window.__GK_LOGIN_BG__ || {}), url: next.loginBackground, color: next.loginBackgroundColor || null }
+            : null;
+        }
       }
     } catch (e) {
       // Non-fatal — the app keeps the cached / bundled default branding.

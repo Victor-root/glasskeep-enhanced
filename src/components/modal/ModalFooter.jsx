@@ -6,6 +6,8 @@ import Popover from "../common/Popover.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
 import AddImageMenu from "./AddImageMenu.jsx";
 import LogoPickerPopover from "./LogoPickerPopover.jsx";
+import ReminderPicker from "../notes/ReminderPicker.jsx";
+import { Popover as RichTextPopover } from "../richtext/Popover.jsx";
 import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon, LogoIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
@@ -86,6 +88,14 @@ export default function ModalFooter({
   onRestoreFromTrash,
   onArchiveNote,
   onOpenConfirmDelete,
+  // reminders — onSetReminder(noteId, isoStringOrNull)
+  onSetReminder,
+  // reminder picker open state (lifted to App so the Android back button
+  // and the mobile full-screen panel hook into the central overlay stack)
+  reminderPopOpen,
+  setReminderPopOpen,
+  reminderTimeChips,
+  onReminderTimeChipsChange,
   // kebab menu (state lifted to App)
   modalKebabOpen,
   setModalKebabOpen,
@@ -148,6 +158,12 @@ export default function ModalFooter({
     setMImages((prev) => setNoteIcon(prev, { id: uid(), src: logo.src, name: logo.name }));
   };
 
+  /* Reminder picker popover — the bell lives in the kebab menu; the picker
+     anchors to the kebab trigger. */
+  const reminderAt = activeNoteObj?.reminderAt || null;
+  const hasReminder = !!reminderAt;
+  const canRemind = !isTrashed && typeof onSetReminder === "function";
+
   /* Kebab menu (download + collaborate) */
   const kebabRef = useRef(null);
 
@@ -189,6 +205,9 @@ export default function ModalFooter({
           darkMode={dark}
           onSelect={(name) => setMColor(name)}
         />
+
+        {/* ── Reminder ── The bell lives in the kebab menu (see below); the
+            picker popover is rendered once, anchored to the kebab trigger. */}
 
         {/* ── Add image / logo (hidden in view mode for draw notes, hidden in draw canvas) ──
               Clicking the button opens a small sub-menu offering either
@@ -668,6 +687,23 @@ export default function ModalFooter({
               style={{ backgroundColor: dark ? "#222222" : undefined }}
               onClick={(e) => e.stopPropagation()}
             >
+            {/* Reminder — lives in the kebab. Opens the picker anchored to
+                the kebab trigger. Uses a dedicated orange so it reads
+                distinctly from the other coloured menu entries. */}
+            {canRemind && (
+              <button
+                className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                style={{ color: dark ? "#fb923c" : "#ea580c" }}
+                onClick={() => { setModalKebabOpen(false); setReminderPopOpen(true); }}
+              >
+                {hasReminder ? (
+                  <TI.BellRingingFilled className="tabler-icon tabler-icon--filled" style={{ width: 18, height: 18 }} />
+                ) : (
+                  <TI.Bell className="tabler-icon" style={{ width: 18, height: 18 }} />
+                )}
+                {t("reminder")}
+              </button>
+            )}
             {/* Archive / Restore */}
             {isTrashed ? (
               <button
@@ -738,11 +774,13 @@ export default function ModalFooter({
                 {t("noteAiChatMenuItem")}
               </button>
             )}
-            {/* Collaborate — shown in kebab on mobile text edit mode & draw edit mode */}
+            {/* Collaborate — shown in kebab on mobile text edit mode & draw edit mode.
+                Keeps the footer button's purple so the colour doesn't change
+                when it folds into the kebab. */}
             {((!isDesktop && mType === "text" && !viewMode) || (mType === "draw" && drawMode !== "draw" && !viewMode)) && (
               <button
                 className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
-                style={{ color: dark ? "#93c5fd" : "#2563eb" }}
+                style={{ color: dark ? "#c4b5fd" : "#7c3aed" }}
                 onClick={() => { onOpenCollaboration(); setModalKebabOpen(false); }}
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" /></svg>
@@ -762,6 +800,31 @@ export default function ModalFooter({
             )}
           </div>
         </Popover>
+
+        {/* Reminder picker — rendered once, anchored to whichever trigger is
+            active (footer bell in read mode, kebab in edit mode). Uses the
+            rich-text menu shell so it matches the editor's font/block-type
+            dropdowns. */}
+        {canRemind && (
+          <RichTextPopover
+            open={reminderPopOpen}
+            onClose={() => setReminderPopOpen(false)}
+            anchorRef={kebabRef}
+            className="rt-pop--reminder"
+            preferredWidth={286}
+            fullscreenOnMobile
+            title={t("reminder")}
+          >
+            <ReminderPicker
+              value={reminderAt}
+              onSave={(iso) => onSetReminder(activeId, iso)}
+              onClear={() => onSetReminder(activeId, null)}
+              onClose={() => setReminderPopOpen(false)}
+              timeChips={reminderTimeChips}
+              onTimeChipsChange={onReminderTimeChipsChange}
+            />
+          </RichTextPopover>
+        )}
 
         {/* ── Edit/View toggle — text notes ── */}
         {mType === "text" && readModeEnabled && (

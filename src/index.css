@@ -40,6 +40,15 @@ body {
 /* Hide floating background cards until JS-injected CSS positions them */
 .floating-cards-bg { opacity: 0; }
 
+/* Same problem for the login screen's decorative cards: their full styling
+   (position:absolute + opacity:0.55 + float animation) lives in the
+   JS-injected globalCSS (App.jsx appends it in an effect, AFTER first paint).
+   Until that lands, `.login-deco-card` is unstyled, so the cards pile up in
+   normal flow at the top of the page and flash their coloured top-borders.
+   Keep them out of flow + invisible from first paint; globalCSS then restores
+   position + opacity. */
+.login-deco-card { position: absolute; opacity: 0; }
+
 /* Shimmer / light-sweep animation for gradient buttons (dark mode hover) */
 @keyframes btn-shimmer {
   0% {

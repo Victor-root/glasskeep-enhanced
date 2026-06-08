@@ -61,7 +61,7 @@ export function normalizeItems(raw) {
       const id = e.id || uid();
       if (seen.has(id)) continue;
       seen.add(id);
-      out.push({ id, kind: SECTION_KIND, title: typeof e.title === "string" ? e.title : "", ...(e.color ? { color: e.color } : {}) });
+      out.push({ id, kind: SECTION_KIND, title: typeof e.title === "string" ? e.title : "", ...(e.color ? { color: e.color } : {}), ...(e.collapsed ? { collapsed: true } : {}) });
     } else {
       const id = e.id || uid();
       if (seen.has(id)) continue;
@@ -88,7 +88,7 @@ export function getSections(entries) {
   const sections = [{ id: DEFAULT_SECTION_ID, title: "", items: [] }];
   for (const e of arr) {
     if (isSection(e)) {
-      sections.push({ id: e.id, title: e.title || "", color: e.color || undefined, items: [] });
+      sections.push({ id: e.id, title: e.title || "", color: e.color || undefined, collapsed: !!e.collapsed, items: [] });
     } else if (isItem(e)) {
       sections[sections.length - 1].items.push(e);
     }

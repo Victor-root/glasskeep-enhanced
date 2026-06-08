@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG-ONLY manifest overlay. Merged into the app manifest for the `debug`
+  build type only (./gradlew assembleDebug) and absent from any release APK,
+  so the exported test receiver below never ships to users.
+
+  It registers ReminderDebugReceiver (see src/debug/java/...) as an exported
+  broadcast target so you can fire a real reminder notification on demand
+  from adb — handy for testing the notification look + tap-to-open-note
+  without setting a reminder and waiting. See scripts/test-reminder-native.sh.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <receiver
+            android:name=".reminders.ReminderDebugReceiver"
+            android:exported="true" />
+    </application>
+</manifest>

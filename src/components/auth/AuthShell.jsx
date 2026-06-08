@@ -1,18 +1,56 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Sun, Moon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
 import { useBranding, DEFAULT_APP_NAME } from "../../branding/BrandingContext.jsx";
+import { applyShellThemeClass, applyStoredShellTheme, DEFAULT_SHELL_THEME } from "../../theme/shellTheme.js";
+
+// Clear the boot-time placeholder (colour + BlurHash painted on the body
+// background by the inline script in index.html) once React owns the
+// backdrop. Restores the stylesheet's --gk-app-bg. Safe to call repeatedly /
+// when nothing was painted.
+function removeBootBgLayer() {
+  if (typeof document === "undefined" || !document.body) return;
+  const s = document.body.style;
+  s.backgroundColor = "";
+  s.backgroundImage = "";
+  s.backgroundSize = "";
+  s.backgroundPosition = "";
+  s.backgroundRepeat = "";
+  // Older boot script used an overlay element — remove it if present.
+  const el = document.getElementById("gk-login-bg-boot");
+  if (el) el.remove();
+}
 
 export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnabled = true, loginSlogan, children, sidePanel }) {
   const { branding } = useBranding();
   const appName = branding.appName || DEFAULT_APP_NAME;
+
+  // Apply the admin-configured login page theme while this shell is visible.
+  // Restores the user's own saved theme on unmount (when they log in).
+  const loginTheme = branding.loginTheme || DEFAULT_SHELL_THEME;
+  useEffect(() => {
+    applyShellThemeClass(loginTheme);
+    return () => applyStoredShellTheme();
+  }, [loginTheme]);
   const logoSrc = branding.logo || "/pwa-192.png";
   // A custom logo is shown raw (no rounded clip / shadow) so a
   // transparent PNG doesn't get an ugly box behind it; the bundled
   // default icon keeps its rounded-tile + shadow look.
   const isCustomLogo = !!branding.logo;
-  const hasCustomBg = !!branding.loginBackground;
+  // The login background's URL. Prefer the live branding value; before that
+  // resolves, fall back to the boot global the server injected (cold load)
+  // so we render the SAME versioned URL the boot script already preloaded —
+  // no flash, no double fetch. `hasCustomBg` is then known on first paint,
+  // so the decorative cards never appear when a background is configured.
+  const bootBg = (typeof window !== "undefined" && window.__GK_LOGIN_BG__) || null;
+  const bgUrl = branding.loginBackground || (bootBg && bootBg.url) || null;
+  const hasCustomBg = !!bgUrl;
+  // Only cross-fade when there's a placeholder to fade FROM (mean colour /
+  // BlurHash). Backgrounds uploaded before placeholders existed have none,
+  // so we show the image the moment it loads (the prior behaviour) rather
+  // than fading in from a blank frame.
+  const hasPlaceholder = !!(branding.loginBackgroundColor || (bootBg && bootBg.color));
   const blur = branding.loginBackgroundBlur || 0;
   // A custom background replaces the decorative floating cards — showing
   // both would clutter the backdrop and fight for attention.
@@ -27,6 +65,28 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
     return () => el.classList.remove("gk-custom-bg");
   }, [hasCustomBg]);
 
+  // Fade the real image in over the boot placeholder (colour → BlurHash →
+  // sharp image), then drop the placeholder layer. We preload via an Image
+  // so we know exactly when it's painted; the boot layer stays visible
+  // underneath until the fade completes, so there's never a bare frame.
+  const [bgReady, setBgReady] = useState(false);
+  useEffect(() => {
+    if (!bgUrl) { removeBootBgLayer(); return undefined; }
+    setBgReady(false);
+    const img = new Image();
+    let timer;
+    img.onload = () => {
+      setBgReady(true);
+      timer = setTimeout(removeBootBgLayer, 450); // after the opacity fade
+    };
+    img.onerror = removeBootBgLayer;
+    img.src = bgUrl;
+    return () => { clearTimeout(timer); };
+  }, [bgUrl]);
+  // If this shell ever unmounts (e.g. login succeeds) before the fade, make
+  // sure the placeholder doesn't linger behind the app.
+  useEffect(() => removeBootBgLayer, []);
+
   return (
     <div className="min-h-screen flex flex-col px-4 relative overflow-hidden">
       {/* Admin-configured login background. Fixed + behind everything
@@ -38,13 +98,25 @@ export default function AuthShell({ title, dark, onToggleDark, floatingCardsEnab
         <div
           aria-hidden="true"
           className="login-custom-bg"
-          style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden" }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 0,
+            pointerEvents: "none",
+            overflow: "hidden",
+            // Fade in over the boot placeholder (colour + BlurHash, painted
+            // behind at z-index -1) so the sharp image arrives as a soft
+            // cross-fade rather than a pop. With no placeholder there's
+            // nothing to fade from, so render at full opacity immediately.
+            opacity: bgReady || !hasPlaceholder ? 1 : 0,
+            transition: hasPlaceholder ? "opacity 0.4s ease" : "none",
+          }}
         >
           <div
             style={{
               position: "absolute",
               inset: blur > 0 ? `-${blur * 2}px` : 0,
-              backgroundImage: `url(${branding.loginBackground})`,
+              backgroundImage: `url(${bgUrl})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
               filter: blur > 0 ? `blur(${blur}px)` : "none",

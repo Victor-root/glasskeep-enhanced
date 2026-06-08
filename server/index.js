@@ -239,8 +239,35 @@ CREATE TABLE IF NOT EXISTS app_settings (
   custom_logo TEXT,
   login_bg_image TEXT,
   login_bg_blur INTEGER NOT NULL DEFAULT 0,
-  custom_logo_pwa TEXT
+  custom_logo_pwa TEXT,
+  -- Tiny placeholders derived from the login background at upload time so
+  -- the login page can paint instantly (no flash of the default backdrop)
+  -- while the full image downloads: a mean colour (#rrggbb) and a BlurHash
+  -- string (~30 chars). login_bg_version is a cache-buster bumped on every
+  -- background change so the (otherwise constant) image URL is re-fetched.
+  login_bg_color TEXT,
+  login_bg_hash TEXT,
+  login_bg_version TEXT
 );
+
+-- Web Push subscriptions (PWA push notifications for reminders). One row
+-- per browser/device endpoint. The endpoint is unique so re-subscribing
+-- the same device upserts instead of duplicating. p256dh / auth are the
+-- subscription's encryption keys (base64url). Rows are pruned when the
+-- push service reports the endpoint as gone (HTTP 404/410).
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  user_agent TEXT,
+  lang TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
+  ON push_subscriptions(user_id);
 `);
 
 // Tiny migrations (safe to run repeatedly)
@@ -337,10 +364,53 @@ CREATE TABLE IF NOT EXISTS app_settings (
         // Backfill: set position = creation timestamp (ms) so notes sort by creation date
         db.exec(`UPDATE notes SET position = CAST(strftime('%s', COALESCE(timestamp, '1970-01-01')) AS REAL) * 1000`);
       }
+      // Reminders (note-reminders feature). `reminder_at` is the due
+      // instant as an ISO-8601 UTC string (NULL = no reminder).
+      // `reminder_fired_at` records when the scheduler dispatched the
+      // notification (NULL = still pending) so a due reminder fires
+      // exactly once and survives a server restart. Both are kept in
+      // the clear (NOT inside enc_payload): they carry no note content,
+      // and the scheduler must be able to query them with plain SQL
+      // regardless of the at-rest encryption unlock state.
+      if (!names.has("reminder_at")) {
+        db.exec(`ALTER TABLE notes ADD COLUMN reminder_at TEXT`);
+      }
+      if (!names.has("reminder_fired_at")) {
+        db.exec(`ALTER TABLE notes ADD COLUMN reminder_fired_at TEXT`);
+      }
     });
     tx();
   } catch {
     // ignore if ALTER not supported or already applied
+  }
+})();
+
+// Partial index so the reminder scheduler's "what's due now" sweep stays
+// a cheap index scan even as the notes table grows: only rows that
+// actually carry a pending reminder are indexed.
+(function ensureReminderIndex() {
+  try {
+    db.exec(
+      `CREATE INDEX IF NOT EXISTS idx_notes_pending_reminders
+         ON notes(reminder_at)
+         WHERE reminder_at IS NOT NULL AND reminder_fired_at IS NULL`,
+    );
+  } catch {
+    // ignore if partial indexes unsupported (very old SQLite)
+  }
+})();
+
+// push_subscriptions migration: the `lang` column was added after the
+// initial reminders release so the Web Push payload (title) can be
+// localized per device — installs created before it need the ALTER.
+(function ensurePushSubscriptionColumns() {
+  try {
+    const cols = db.prepare(`PRAGMA table_info(push_subscriptions)`).all();
+    if (!cols.some((c) => c.name === "lang")) {
+      db.exec(`ALTER TABLE push_subscriptions ADD COLUMN lang TEXT`);
+    }
+  } catch {
+    // table may not exist yet (fresh boot creates it with the column)
   }
 })();
 
@@ -404,6 +474,20 @@ CREATE TABLE IF NOT EXISTS app_settings (
       if (!names.has("custom_logo_pwa")) {
         db.exec(`ALTER TABLE app_settings ADD COLUMN custom_logo_pwa TEXT`);
       }
+      // Login-background placeholders (mean colour + BlurHash) and a
+      // cache-buster version. Added after the initial branding release.
+      if (!names.has("login_bg_color")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN login_bg_color TEXT`);
+      }
+      if (!names.has("login_bg_hash")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN login_bg_hash TEXT`);
+      }
+      if (!names.has("login_bg_version")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN login_bg_version TEXT`);
+      }
+      if (!names.has("login_theme")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN login_theme TEXT NOT NULL DEFAULT 'glasskeep'`);
+      }
     });
     tx();
   } catch {
@@ -443,6 +527,9 @@ const { attachSelfUpdateRoutes } = require("./routes/selfUpdateRoutes");
 const { attachAssetLinksRoutes } = require("./routes/assetLinksRoutes");
 const { attachDeviceLinkRoutes } = require("./routes/deviceLinkRoutes");
 const { requireUnlocked } = require("./routes/lockMiddleware");
+const { t: serverT } = require("./i18n");
+const pushService = require("./services/pushNotifications");
+const { startReminderScheduler } = require("./services/reminderScheduler");
 
 instanceVault.ensureSchema(db);
 {
@@ -628,6 +715,11 @@ function serializeNote(r, userId) {
     lastEditedAt: r.last_edited_at,
     archived: !!r.archived,
     trashed: !!r.trashed,
+    // Reminders: ISO-8601 UTC due instant (null = none) and the moment
+    // the scheduler dispatched it (null = still pending). Plain columns,
+    // never encrypted — see the ensureNoteColumns migration.
+    reminderAt: r.reminder_at || null,
+    reminderFiredAt: r.reminder_fired_at || null,
   };
 }
 
@@ -1203,6 +1295,53 @@ function createShareNotification({ recipientId, senderId, senderName, noteId, no
   }
 }
 
+// Persist + push a "shared_note_deleted" notification: the owner deleted a
+// note that was shared with this collaborator. The transient note_deleted
+// SSE event only removes the note from a CONNECTED client's view and leaves
+// no trace — so an offline collaborator never learns the shared note is
+// gone. This persisted row fixes that: it replays on reconnect and lands in
+// the notification history. By default note_id is null (no note to open after
+// a full delete, and it keeps the FK happy when the row outlives a permanent
+// delete); the owner-left-with-copy case passes noteId so the recipient can
+// open the note they kept. It rides the same envelope as revoke notices so the
+// client routes it via showRevokeToast.
+function createSharedNoteDeletedNotification({
+  recipientId,
+  senderId,
+  senderName,
+  noteTitle,
+  noteId = null,
+  notificationType = "shared_note_deleted",
+}) {
+  try {
+    const createdAt = nowISO();
+    const row = insertNotification.run(
+      recipientId,
+      senderId,
+      notificationType,
+      noteId,
+      noteTitle || "",
+      senderName || "",
+      null,
+      null,
+      0,
+      null,
+      createdAt,
+    );
+    sendEventToUser(recipientId, {
+      type: "note_access_revoked_notification",
+      notificationType,
+      notificationId: row.lastInsertRowid,
+      senderName: senderName || "",
+      noteTitle: noteTitle || "",
+      noteId: noteId ?? undefined,
+      createdAt,
+    });
+  } catch (e) {
+    console.warn("[notifications] createSharedNoteDeletedNotification failed:", e?.message);
+  }
+}
+
 // ---------- At-rest encryption: unlock routes + lock gate ----------
 // These have to be registered BEFORE the bulk of the API so the lock
 // middleware can short-circuit everything else with HTTP 423 while
@@ -1619,6 +1758,8 @@ app.get("/api/notes", auth, (req, res) => {
       lastEditedBy: r.last_edited_by,
       lastEditedAt: r.last_edited_at,
       archived: !!r.archived,
+      reminderAt: r.reminder_at || null,
+      reminderFiredAt: r.reminder_fired_at || null,
       collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
     }))
   );
@@ -2459,6 +2600,185 @@ app.get("/api/notes/archived", auth, (req, res) => {
   res.json(rows.map((r) => serializeNote(r, req.user.id)));
 });
 
+// ---------- Reminders ----------
+// Set, update, or clear a note's reminder. Body:
+//   { reminderAt: ISO-8601 string | null, client_updated_at: ISO }
+// Passing a date sets/updates the reminder and re-arms it (clears
+// reminder_fired_at) so a previously-fired reminder moved to a future
+// time fires again. Passing null clears the reminder entirely.
+//
+// Reminder columns are plain (never encrypted), so this dedicated route
+// stays out of the sensitive-field write path (buildWriteRow / cipher).
+// Owner OR collaborator may set it — a reminder is a property of the
+// shared note, and when it fires every participant is notified.
+const updateReminderStmt = db.prepare(`
+  UPDATE notes SET
+    reminder_at = @reminder_at,
+    reminder_fired_at = NULL,
+    client_updated_at = @client_updated_at
+  WHERE id = @id AND (user_id = @user_id OR EXISTS(
+    SELECT 1 FROM note_collaborators nc
+    WHERE nc.note_id = @id AND nc.user_id = @user_id
+  ))
+`);
+app.post("/api/notes/:id/reminder", auth, (req, res) => {
+  const id = req.params.id;
+  const { reminderAt } = req.body || {};
+  if (!req.body?.client_updated_at) {
+    return res.status(400).json({ error: "client_updated_at is required" });
+  }
+  const tsResult = validateLwwTimestamp(req.body.client_updated_at);
+  if (tsResult.error) {
+    return res.status(400).json({ error: tsResult.error });
+  }
+
+  // Normalise the reminder instant to ISO-8601 UTC. null/"" clears it.
+  let reminderIso = null;
+  if (reminderAt != null && reminderAt !== "") {
+    const d = new Date(reminderAt);
+    if (Number.isNaN(d.getTime())) {
+      return res.status(400).json({ error: "Invalid reminderAt" });
+    }
+    reminderIso = d.toISOString();
+  }
+
+  const existing = getNoteWithCollaboration.get(req.user.id, id, req.user.id);
+  if (!existing) {
+    return res.status(404).json({ error: "Note not found" });
+  }
+
+  // LWW: reject stale writes (compare milliseconds)
+  if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
+    return res.json({ ok: true, stale: true, note: serializeNote(existing, req.user.id) });
+  }
+
+  const result = updateReminderStmt.run({
+    reminder_at: reminderIso,
+    client_updated_at: tsResult.iso,
+    id,
+    user_id: req.user.id,
+  });
+  if (result.changes === 0) {
+    return res.status(404).json({ error: "Note not found or access denied" });
+  }
+
+  updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+  broadcastNoteUpdated(id);
+  const fresh = getNoteById.get(id);
+  res.json({ ok: true, note: serializeNote(fresh || existing, req.user.id) });
+});
+
+// Dev/test: SET a note's reminder programmatically — exactly what the UI
+// "set reminder" action does (writes reminder_at, clears reminder_fired_at,
+// bumps client_updated_at and broadcasts the note update so every device —
+// including the Android app, which then re-arms its local alarm — picks it
+// up). It's "as if you'd set it by hand", minus the typing and the wait.
+//
+//   - inSeconds <= 0 (default): the reminder is due NOW, and we run the real
+//     scheduler sweep immediately so it fires through the normal pipeline in
+//     ~1s instead of waiting up to REMINDER_SWEEP_MS. The atomic claim means
+//     the next scheduled sweep won't double-fire it.
+//   - inSeconds > 0: scheduled that far out and left to fire naturally on the
+//     next sweep — handy for "set it, background the app, get the native
+//     notification" tests.
+//
+// Admin-only, like /notifications/test; driven by scripts/test-reminder.cjs.
+let reminderScheduler = null; // handle from startReminderScheduler (assigned below)
+const setReminderForTest = db.prepare(
+  `UPDATE notes SET reminder_at = @at, reminder_fired_at = NULL,
+     client_updated_at = @cua WHERE id = @id`,
+);
+app.post("/api/notes/:id/test-reminder", auth, adminOnly, async (req, res) => {
+  const id = String(req.params.id);
+  const note = getNoteById.get(id);
+  if (!note) return res.status(404).json({ error: "Note not found" });
+
+  const inSeconds = Number(req.body?.inSeconds) || 0;
+  const when = new Date(Date.now() + inSeconds * 1000);
+  try {
+    setReminderForTest.run({ at: when.toISOString(), cua: nowISO(), id });
+    // Mirror the real reminder route: stamp the editor + fan out the note
+    // update so open sessions (and the APK's alarm scheduler) re-sync.
+    updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+    broadcastNoteUpdated(id);
+    if (inSeconds <= 0 && reminderScheduler?.sweepNow) {
+      await reminderScheduler.sweepNow();
+    }
+  } catch (e) {
+    console.warn("[reminders] test set/fire failed:", e?.message);
+    return res.status(500).json({ error: "test reminder failed" });
+  }
+  res.json({ ok: true, noteId: id, reminderAt: when.toISOString(), inSeconds, fired: inSeconds <= 0 });
+});
+
+// Upcoming (future, not-yet-fired) reminders for the signed-in user — owned
+// or collaborated. The Android app's background sync (WorkManager) polls this
+// while the app is closed to (re)arm its on-device local alarms, so a reminder
+// created on another device still fires on the phone with the app shut — and
+// without any push service (no Google/FCM dependency). Returns exactly the
+// shape the native ReminderScheduler wants: { noteId, t (epoch ms), title, body }.
+const selectUpcomingReminders = db.prepare(`
+  SELECT id, reminder_at FROM notes
+   WHERE reminder_at IS NOT NULL
+     AND reminder_fired_at IS NULL
+     AND reminder_at > @now
+     AND (user_id = @uid OR EXISTS(
+       SELECT 1 FROM note_collaborators nc
+        WHERE nc.note_id = notes.id AND nc.user_id = @uid))
+   ORDER BY reminder_at ASC
+   LIMIT 200
+`);
+app.get("/api/reminders/upcoming", auth, (req, res) => {
+  const now = new Date().toISOString();
+  const lang = getUserLanguage(req.user.id);
+  const title = serverT(lang, "reminderNotificationTitle");
+  let rows;
+  try {
+    rows = selectUpcomingReminders.all({ now, uid: req.user.id });
+  } catch (e) {
+    console.warn("[reminders] upcoming query failed:", e?.message);
+    return res.status(500).json({ error: "query failed" });
+  }
+  const reminders = [];
+  for (const r of rows) {
+    const ts = Date.parse(r.reminder_at);
+    if (Number.isNaN(ts)) continue;
+    const note = getNoteById.get(r.id);
+    const body = (note && notePreviewText(note)) || serverT(lang, "reminderNotificationUntitled");
+    reminders.push({ noteId: String(r.id), t: ts, title, body });
+  }
+  res.json({ reminders });
+});
+
+// ---------- Web Push subscriptions (PWA push notifications) ----------
+// The public VAPID key is needed by the browser to subscribe. It is NOT
+// a secret (it's the applicationServerKey). Returns { key: null } when
+// push isn't configured so the client can hide the toggle gracefully.
+app.get("/api/push/vapid-public-key", auth, (req, res) => {
+  res.json({ key: pushService.getPublicKey() });
+});
+
+// Register (or refresh) this device's push subscription.
+app.post("/api/push/subscribe", auth, (req, res) => {
+  if (!pushService.isConfigured()) {
+    return res.status(503).json({ error: "Push notifications are not configured on this server" });
+  }
+  const { subscription, lang } = req.body || {};
+  try {
+    pushService.saveSubscription(db, req.user.id, subscription, req.headers["user-agent"], lang);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: e?.message || "Invalid subscription" });
+  }
+});
+
+// Drop this device's push subscription (toggle off / sign-out).
+app.post("/api/push/unsubscribe", auth, (req, res) => {
+  const { endpoint } = req.body || {};
+  pushService.removeSubscription(db, endpoint);
+  res.json({ ok: true });
+});
+
 // Trash/Restore notes
 app.post("/api/notes/:id/trash", auth, (req, res) => {
   const id = req.params.id;
@@ -2574,6 +2894,18 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
       // without it landing in their trash view.
       const evt = { type: "note_deleted", noteId: id };
       for (const cid of collabIds) sendEventToUser(cid, evt);
+      // ...and a persisted notice so each collaborator actually learns the
+      // shared note was removed (the note_deleted event above is transient —
+      // an offline collaborator would otherwise never find out).
+      const ownerName = req.user.name || req.user.email || "";
+      for (const cid of collabIds) {
+        createSharedNoteDeletedNotification({
+          recipientId: cid,
+          senderId: req.user.id,
+          senderName: ownerName,
+          noteTitle: existing.title || "",
+        });
+      }
       const fresh = getNoteById.get(id);
       return res.json({ ok: true, deletedForAll: true, note: serializeNote(fresh || existing, req.user.id) });
     }
@@ -2604,6 +2936,18 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     broadcastNoteUpdated(id);
+    // The note was handed over to this collaborator (they keep it / become its
+    // owner). Persist a notice so they actually learn the owner deleted the
+    // shared note and left them a copy — broadcastNoteUpdated above is
+    // transient (an offline collaborator would otherwise never find out).
+    createSharedNoteDeletedNotification({
+      recipientId: newOwner.id,
+      senderId: req.user.id,
+      senderName: req.user.name || req.user.email || "",
+      noteTitle: existing.title || "",
+      noteId: id,
+      notificationType: "shared_note_deleted_with_copy",
+    });
     const trashedCopy = getNoteById.get(trashedCopyId);
     return res.json({ ok: true, left: true, trashedCopy: trashedCopy ? serializeNote(trashedCopy, req.user.id) : null });
   }
@@ -2736,6 +3080,22 @@ app.delete("/api/notes/:id/permanent", auth, (req, res) => {
   const evt = { type: "note_deleted", noteId: id };
   for (const uid of recipientIds) sendEventToUser(uid, evt);
 
+  // Any collaborator still attached at permanent-delete time (rare — a
+  // delete-for-all usually detaches them first) gets a persisted notice so
+  // the removal survives offline rather than vanishing with a transient sync
+  // event. Self-deletion of one's own (non-shared) note notifies nobody.
+  const ownerName = req.user.name || req.user.email || "";
+  for (const uid of recipientIds) {
+    if (uid !== existing.user_id) {
+      createSharedNoteDeletedNotification({
+        recipientId: uid,
+        senderId: req.user.id,
+        senderName: ownerName,
+        noteTitle: existing.title || "",
+      });
+    }
+  }
+
   res.json({ ok: true });
 });
 
@@ -2788,6 +3148,8 @@ app.get("/api/notes/:id", auth, (req, res) => {
     lastEditedAt: r.last_edited_at,
     archived: !!r.archived,
     trashed: !!r.trashed,
+    reminderAt: r.reminder_at || null,
+    reminderFiredAt: r.reminder_fired_at || null,
     collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
   });
 });
@@ -2936,6 +3298,10 @@ app.post("/api/notes/import", auth, (req, res) => {
 app.get("/api/user/settings", auth, (req, res) => {
   const row = getUserSettings.get(req.user.id);
   const settings = row ? JSON.parse(row.settings_json) : {};
+  // Include language from the users table so the client can apply it at
+  // boot without a separate profile fetch (cross-device language sync).
+  const user = getUserById.get(req.user.id);
+  if (user?.language) settings.language = user.language;
   res.json(settings);
 });
 
@@ -3033,17 +3399,23 @@ app.delete("/api/logos/:id", auth, (req, res) => {
 // on every login page hit, allowNewAccounts on every signup attempt)
 // don't hit SQLite repeatedly. The mirror is updated on every PATCH so
 // it stays in sync.
-const getAppSettingsRow = db.prepare(`SELECT allow_new_accounts, login_slogan, custom_app_name, login_bg_blur FROM app_settings WHERE id = 1`);
+const getAppSettingsRow = db.prepare(`SELECT allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme FROM app_settings WHERE id = 1`);
 const upsertAppSettings = db.prepare(
-  `INSERT INTO app_settings (id, allow_new_accounts, login_slogan, custom_app_name, login_bg_blur) VALUES (1, ?, ?, ?, ?)
-   ON CONFLICT(id) DO UPDATE SET allow_new_accounts=excluded.allow_new_accounts, login_slogan=excluded.login_slogan, custom_app_name=excluded.custom_app_name, login_bg_blur=excluded.login_bg_blur`,
+  `INSERT INTO app_settings (id, allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme) VALUES (1, ?, ?, ?, ?, ?)
+   ON CONFLICT(id) DO UPDATE SET allow_new_accounts=excluded.allow_new_accounts, login_slogan=excluded.login_slogan, custom_app_name=excluded.custom_app_name, login_bg_blur=excluded.login_bg_blur, login_theme=excluded.login_theme`,
 );
 // Branding images live in their own read/write statements so the
 // (potentially multi-MB) data URLs never get held in the in-memory
 // mirror — which is broadcast to admins on every settings change.
-const getBrandingImagesRow = db.prepare(`SELECT custom_logo, login_bg_image FROM app_settings WHERE id = 1`);
+const getBrandingImagesRow = db.prepare(`SELECT custom_logo, login_bg_image, login_bg_color, login_bg_hash, login_bg_version FROM app_settings WHERE id = 1`);
 const setCustomLogoStmt = db.prepare(`UPDATE app_settings SET custom_logo = ? WHERE id = 1`);
 const setLoginBgStmt = db.prepare(`UPDATE app_settings SET login_bg_image = ? WHERE id = 1`);
+// The login-background placeholders (mean colour + BlurHash) and the
+// cache-buster version are written together with the image: an explicit
+// background change always refreshes all three (or clears them on remove).
+const setLoginBgMetaStmt = db.prepare(`UPDATE app_settings SET login_bg_color = ?, login_bg_hash = ?, login_bg_version = ? WHERE id = 1`);
+// Raw login-background bytes for GET /api/branding/login-bg.
+const getLoginBgRow = db.prepare(`SELECT login_bg_image FROM app_settings WHERE id = 1`);
 // Square PWA icon (PNG data URL) derived from the custom logo.
 const getPwaIconRow = db.prepare(`SELECT custom_logo_pwa FROM app_settings WHERE id = 1`);
 const setPwaIconStmt = db.prepare(`UPDATE app_settings SET custom_logo_pwa = ? WHERE id = 1`);
@@ -3054,6 +3426,12 @@ const setPwaIconStmt = db.prepare(`UPDATE app_settings SET custom_logo_pwa = ? W
 // the primary limit. Only raster formats are allowed; SVG is rejected to
 // avoid the script-injection surface that inline SVG carries.
 const BRANDING_IMAGE_RE = /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/]+=*$/;
+// Placeholder formats: a 6-digit hex colour and a BlurHash (base83, capped
+// well above any 9×9-component hash). Both are tiny and client-supplied, so
+// they're validated before storage and simply dropped if malformed.
+const BRANDING_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+const BRANDING_HASH_RE = /^[0-9A-Za-z#$%*+,\-.:;=?@[\]^_{|}~]{6,200}$/;
+const VALID_LOGIN_THEMES = new Set(["glasskeep", "emerald", "amber", "rosewood", "graphite", "blush"]);
 const MAX_LOGO_BYTES = 2 * 1024 * 1024; // ~2 MB data URL (≈1.5 MB decoded)
 const MAX_LOGIN_BG_BYTES = 4 * 1024 * 1024; // ~4 MB data URL (≈3 MB decoded)
 const MAX_APP_NAME_LEN = 10;
@@ -3067,6 +3445,7 @@ let adminSettings = (function loadAdminSettings() {
       loginSlogan: row.login_slogan || "",
       appName: row.custom_app_name || "",
       loginBackgroundBlur: row.login_bg_blur || 0,
+      loginTheme: VALID_LOGIN_THEMES.has(row.login_theme) ? row.login_theme : "glasskeep",
     };
   }
   // Fresh install — seed the row from the env var default so subsequent
@@ -3076,8 +3455,9 @@ let adminSettings = (function loadAdminSettings() {
     loginSlogan: "",
     appName: "",
     loginBackgroundBlur: 0,
+    loginTheme: "glasskeep",
   };
-  upsertAppSettings.run(seed.allowNewAccounts ? 1 : 0, seed.loginSlogan, seed.appName, seed.loginBackgroundBlur);
+  upsertAppSettings.run(seed.allowNewAccounts ? 1 : 0, seed.loginSlogan, seed.appName, seed.loginBackgroundBlur, seed.loginTheme);
   return seed;
 })();
 
@@ -3089,7 +3469,18 @@ function brandingSettingsPayload() {
     ...adminSettings,
     logo: images.custom_logo || null,
     loginBackground: images.login_bg_image || null,
+    loginBackgroundColor: images.login_bg_color || null,
+    loginBackgroundHash: images.login_bg_hash || null,
   };
+}
+
+// Public, cacheable URL for the login background, or null when none is set.
+// Versioned (?v=) so changing the background busts the browser HTTP cache
+// even though the path is constant. `row` is a getBrandingImagesRow result.
+function loginBgUrl(row) {
+  if (!row || !row.login_bg_image) return null;
+  const v = row.login_bg_version || "1";
+  return `/api/branding/login-bg?v=${encodeURIComponent(v)}`;
 }
 
 // Get admin settings
@@ -3099,7 +3490,7 @@ app.get("/api/admin/settings", auth, adminOnly, (_req, res) => {
 
 // Update admin settings
 app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
-  const { allowNewAccounts, loginSlogan, appName, loginBackgroundBlur, logo, logoPwa, loginBackground } = req.body || {};
+  const { allowNewAccounts, loginSlogan, appName, loginBackgroundBlur, loginTheme, logo, logoPwa, loginBackground, loginBackgroundColor, loginBackgroundHash } = req.body || {};
 
   if (typeof allowNewAccounts === 'boolean') {
     adminSettings.allowNewAccounts = allowNewAccounts;
@@ -3112,6 +3503,9 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
   }
   if (typeof loginBackgroundBlur === 'number' && Number.isFinite(loginBackgroundBlur)) {
     adminSettings.loginBackgroundBlur = Math.max(0, Math.min(MAX_LOGIN_BLUR, Math.round(loginBackgroundBlur)));
+  }
+  if (typeof loginTheme === 'string' && VALID_LOGIN_THEMES.has(loginTheme)) {
+    adminSettings.loginTheme = loginTheme;
   }
 
   // Image fields use a tri-state contract: an explicit `null` clears the
@@ -3145,6 +3539,8 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
 
   if (loginBackground === null) {
     setLoginBgStmt.run(null);
+    // Clearing the image clears its derived placeholders + version too.
+    setLoginBgMetaStmt.run(null, null, null);
   } else if (typeof loginBackground === 'string' && loginBackground) {
     if (!BRANDING_IMAGE_RE.test(loginBackground)) {
       return res.status(400).json({ error: "Background must be a PNG, JPEG or WebP image data URL." });
@@ -3153,6 +3549,12 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
       return res.status(413).json({ error: "Background image is too large." });
     }
     setLoginBgStmt.run(loginBackground);
+    // Store the client-derived placeholders (best-effort: drop them if
+    // malformed rather than failing the whole upload) and bump the
+    // cache-buster so clients re-fetch the new image at /login-bg.
+    const color = BRANDING_COLOR_RE.test(loginBackgroundColor || "") ? loginBackgroundColor : null;
+    const hash = BRANDING_HASH_RE.test(loginBackgroundHash || "") ? loginBackgroundHash : null;
+    setLoginBgMetaStmt.run(color, hash, Date.now().toString(36));
   }
 
   upsertAppSettings.run(
@@ -3160,6 +3562,7 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
     adminSettings.loginSlogan,
     adminSettings.appName,
     adminSettings.loginBackgroundBlur,
+    adminSettings.loginTheme,
   );
   // Live-sync the scalar settings to every other admin so their
   // AdminPanel toggles / slogan / app name / blur reflect the change
@@ -3184,8 +3587,16 @@ app.get("/api/branding", (_req, res) => {
   res.json({
     appName: adminSettings.appName || "",
     logo: images.custom_logo || null,
-    loginBackground: images.login_bg_image || null,
+    // The (multi-MB) background is NOT inlined here anymore: clients load
+    // it from the cacheable /login-bg endpoint instead, so this payload
+    // stays small and the browser HTTP-caches the image across reloads.
+    // The URL is versioned so a background change busts that cache. The
+    // mean colour + BlurHash let the login page paint instantly.
+    loginBackground: loginBgUrl(images),
+    loginBackgroundColor: images.login_bg_color || null,
+    loginBackgroundHash: images.login_bg_hash || null,
     loginBackgroundBlur: adminSettings.loginBackgroundBlur || 0,
+    loginTheme: adminSettings.loginTheme || "glasskeep",
   });
 });
 
@@ -3199,6 +3610,22 @@ app.get("/api/branding/pwa-icon", (_req, res) => {
   const buf = Buffer.from(m[1], "base64");
   res.setHeader("Content-Type", "image/png");
   res.setHeader("Cache-Control", "no-cache");
+  res.end(buf);
+});
+
+// Login background as a real (cacheable) image, decoded from the stored
+// data URL. 404 when none is set. Public — the login page fetches it before
+// any token exists. The URL is versioned (?v=) by the caller, so a long
+// immutable cache is safe: a new background gets a new URL.
+app.get("/api/branding/login-bg", (req, res) => {
+  const dataUrl = getLoginBgRow.get()?.login_bg_image;
+  const m = /^data:image\/(png|jpe?g|webp);base64,([A-Za-z0-9+/]+=*)$/.exec(dataUrl || "");
+  if (!m) return res.status(404).end();
+  const buf = Buffer.from(m[2], "base64");
+  res.setHeader("Content-Type", `image/${m[1] === "jpg" ? "jpeg" : m[1]}`);
+  // Immutable only when a version was supplied (cache-bustable); otherwise
+  // revalidate so an unversioned hit can't pin a stale image forever.
+  res.setHeader("Cache-Control", req.query.v ? "public, max-age=31536000, immutable" : "public, max-age=0, must-revalidate");
   res.end(buf);
 });
 
@@ -3635,27 +4062,228 @@ app.get("/api/health", (_req, res) => res.json({
 // ---------- Static (production) ----------
 if (NODE_ENV === "production") {
   const dist = path.join(__dirname, "..", "dist");
+  const INDEX_CACHE_CONTROL = "public, max-age=0, must-revalidate, stale-while-revalidate=86400, stale-if-error=604800";
 
-  // Hashed assets (JS/CSS bundles, images) — content-addressed so they
-  // can be cached for a very long time.
+  // The built index.html is read once and cached; per request we inject a
+  // tiny global with the login background's placeholder (mean colour +
+  // BlurHash + versioned image URL). This is what lets the login page paint
+  // instantly on a cold/incognito load — no client cache or service worker
+  // is involved, exactly like a server-rendered page. The payload is a few
+  // bytes (NOT the multi-MB image), so it doesn't bloat the HTML or the PWA
+  // precache. A service-worker-served (offline) index.html skips this and
+  // falls back to the localStorage branding cache instead.
+  let indexTemplate = null;
+  function renderIndexHtml() {
+    if (indexTemplate == null) {
+      try { indexTemplate = fs.readFileSync(path.join(dist, "index.html"), "utf8"); }
+      catch { indexTemplate = ""; }
+    }
+    const images = getBrandingImagesRow.get() || {};
+    let inject = "";
+    if (images.login_bg_image) {
+      // base83 (hash) and hex (colour) can't contain "<" or "/", so the
+      // JSON can't break out of the <script> — values are also validated
+      // on write. The URL is a fixed path plus a base36 version token.
+      const data = JSON.stringify({
+        url: loginBgUrl(images),
+        color: images.login_bg_color || null,
+        hash: images.login_bg_hash || null,
+      });
+      inject = `<script>window.__GK_LOGIN_BG__=${data};</script>`;
+    }
+    return indexTemplate.replace("<head>", "<head>" + inject);
+  }
+  function sendIndex(res) {
+    res.setHeader("Cache-Control", INDEX_CACHE_CONTROL);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(renderIndexHtml());
+  }
+
+  // index.html (root + explicit path) is always injected, never served raw.
+  app.get(["/", "/index.html"], (_req, res) => sendIndex(res));
+
+  // Hashed assets (JS/CSS bundles, images) — content-addressed so they can
+  // be cached for a very long time. `index: false` so this never serves the
+  // un-injected index.html for "/"; that's handled above + the SPA fallback.
   app.use(express.static(dist, {
+    index: false,
     setHeaders(res, filePath) {
       if (/\.[0-9a-f]{8,}\.(js|css|woff2?|png|svg|ico|webp)$/i.test(filePath)) {
         res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       } else if (filePath.endsWith("index.html")) {
-        // index.html: revalidate when online, serve stale when offline.
-        // stale-if-error lets the WebView fall back to the cached copy
-        // when the server is unreachable (no-network / server stopped).
-        res.setHeader("Cache-Control", "public, max-age=0, must-revalidate, stale-while-revalidate=86400, stale-if-error=604800");
+        res.setHeader("Cache-Control", INDEX_CACHE_CONTROL);
       }
     },
   }));
 
-  app.get("*", (_req, res) => {
-    res.setHeader("Cache-Control", "public, max-age=0, must-revalidate, stale-while-revalidate=86400, stale-if-error=604800");
-    res.sendFile(path.join(dist, "index.html"));
-  });
+  app.get("*", (_req, res) => sendIndex(res));
 }
+
+// ---------- Reminders: scheduler + delivery ----------
+// Per-recipient language for the localized reminder text. NULL ("auto")
+// has no server-visible browser hint, so we fall back to English (the
+// app's canonical fallback). Users who set their language explicitly in
+// Settings get their reminder text in that language.
+const getUserLanguageStmt = db.prepare("SELECT language FROM users WHERE id = ?");
+const getLatestPushLangStmt = db.prepare(
+  "SELECT lang FROM push_subscriptions WHERE user_id = ? AND lang IS NOT NULL ORDER BY id DESC LIMIT 1",
+);
+function getUserLanguage(userId) {
+  try {
+    // 1. Explicit profile language wins.
+    const profileLang = getUserLanguageStmt.get(userId)?.language;
+    if (profileLang === "fr" || profileLang === "en") return profileLang;
+    // 2. "auto"-language users have no server-visible browser hint, so
+    //    fall back to the locale reported by their most recent push
+    //    subscription (the device's UI language).
+    const subLang = getLatestPushLangStmt.get(userId)?.lang;
+    if (subLang === "fr" || subLang === "en") return subLang;
+  } catch {
+    /* fall through to default */
+  }
+  return "en";
+}
+
+// Build a short, plain-text preview for a note that has no title, used as
+// the reminder notification body. Defensive throughout: rich-text JSON,
+// checklist items, draw-note text and legacy markdown are all reduced to
+// a trimmed one-liner; anything unparseable just yields "".
+function notePreviewText(note) {
+  const title = (note.title || "").trim();
+  if (title) return title.slice(0, 120);
+  try {
+    if (note.type === "checklist") {
+      const items = JSON.parse(note.items_json || "[]");
+      const texts = (Array.isArray(items) ? items : [])
+        .map((i) => (i && typeof i.text === "string" ? i.text.trim() : ""))
+        .filter(Boolean);
+      if (texts.length) return texts.slice(0, 4).join(", ").slice(0, 120);
+    }
+  } catch {
+    /* fall through */
+  }
+  let raw = note.content || "";
+  if (note.type === "draw") {
+    try {
+      const p = typeof raw === "string" ? JSON.parse(raw) : raw;
+      raw = (p && p.text) || "";
+    } catch {
+      raw = "";
+    }
+  }
+  raw = String(raw);
+  if (raw.trim().startsWith("{")) {
+    // Rich-text (TipTap) JSON — walk the tree collecting text nodes.
+    try {
+      const json = JSON.parse(raw);
+      const parts = [];
+      const walk = (node) => {
+        if (!node || typeof node !== "object") return;
+        if (typeof node.text === "string") parts.push(node.text);
+        if (Array.isArray(node.content)) node.content.forEach(walk);
+      };
+      walk(json);
+      raw = parts.join(" ");
+    } catch {
+      /* leave raw as-is */
+    }
+  }
+  // Strip light markdown punctuation and collapse whitespace.
+  raw = raw.replace(/[#*_>`~]/g, " ").replace(/\s+/g, " ").trim();
+  return raw.slice(0, 120);
+}
+
+// Deliver a due reminder: one in-app notification (persisted + live SSE)
+// and one Web Push per recipient (owner + collaborators). Reuses the
+// existing notification pipeline so the card, history and unread badge
+// all work unchanged. Called by the scheduler once per reminder.
+async function dispatchReminder(noteId) {
+  const note = getNoteById.get(noteId);
+  if (!note) {
+    console.log(`[reminders] dispatch skipped — note ${noteId} not found (deleted?)`);
+    return;
+  }
+  const recipientIds = new Set([
+    note.user_id,
+    ...getCollaboratorUserIdsForNote(noteId),
+  ]);
+  const createdAt = nowISO();
+  const preview = notePreviewText(note);
+  console.log(
+    `[reminders] dispatching note ${noteId} to ${recipientIds.size} recipient(s); push=${pushService.isConfigured() ? "on" : "off"}`,
+  );
+
+  for (const uid of recipientIds) {
+    const lang = getUserLanguage(uid);
+    const title = serverT(lang, "reminderNotificationTitle");
+    const message = preview || serverT(lang, "reminderNotificationUntitled");
+
+    // Persist so the reminder survives the recipient being offline: the
+    // /notifications/pending replay (generic branch) renders it from
+    // note_title (→ card title) + message + variant + icon. persistent=1
+    // so it stays until the user closes it (a reminder shouldn't auto-
+    // dismiss the way a transient "saved" toast does).
+    let notificationId = null;
+    try {
+      const r = insertNotification.run(
+        uid,
+        note.user_id,
+        "reminder",
+        noteId,
+        title,
+        "",
+        "info",
+        message,
+        1,
+        "reminder",
+        createdAt,
+      );
+      notificationId = r.lastInsertRowid;
+    } catch (e) {
+      console.warn("[reminders] persist failed:", e?.message);
+    }
+
+    // Live in-app card for any currently-connected session. persistent so
+    // it stays on screen (no timer bar) until manually dismissed.
+    sendEventToUser(uid, {
+      type: "reminder_due",
+      notificationId,
+      variant: "info",
+      persistent: true,
+      title,
+      message,
+      noteId,
+      icon: "reminder",
+      createdAt,
+    });
+
+    // System push for installed PWAs (fires even when the app is closed).
+    // Best-effort: a push failure must never break the in-app reminder.
+    pushService
+      .sendToUser(
+        db,
+        uid,
+        { title, body: message, noteId: String(noteId), tag: `reminder-${noteId}` },
+        console,
+      )
+      .then((n) => {
+        if (n > 0) console.log(`[reminders] push sent to user ${uid} (${n} device(s))`);
+      })
+      .catch((e) => console.warn("[reminders] push failed:", e?.message));
+  }
+}
+
+// Resolve VAPID keys with auto-generation: env -> persisted file (next to
+// the DB) -> freshly generated + persisted. Push thus works with no manual
+// setup on a fresh install or after an upgrade; an explicit env pair wins.
+pushService.init(console, { persistFile: path.join(path.dirname(dbFile), ".vapid.json") });
+reminderScheduler = startReminderScheduler({
+  db,
+  dispatch: dispatchReminder,
+  log: console,
+  // Sweep cadence (ms). Default 30s; override with REMINDER_SWEEP_MS.
+  intervalMs: Number(process.env.REMINDER_SWEEP_MS) || undefined,
+});
 
 // ---------- Listen ----------
 const SSL_CERT    = process.env.SSL_CERT;
