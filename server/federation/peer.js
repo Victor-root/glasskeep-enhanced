@@ -291,6 +291,7 @@ module.exports = {
   sendAccept,
   probeHealth,
   runTick,
+  tlsAwareMessage,
   REQUEST_TIMEOUT_MS,
   SIGNATURE_WINDOW_MS,
 };

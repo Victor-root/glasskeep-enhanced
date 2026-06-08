@@ -34,6 +34,7 @@ const runtime = require("../encryption/runtimeUnlockState");
 const protocol = require("../federation/protocol");
 const peer = require("../federation/peer");
 const { createFederationStore } = require("../federation/store");
+const { createNoteFederation } = require("../federation/notes");
 
 const NON_TERMINAL = new Set([
   protocol.STATUS.ACTIVE,
@@ -44,9 +45,14 @@ const NON_TERMINAL = new Set([
 
 function attachFederationRoutes(
   app,
-  { db, auth, adminOnly, log = console, broadcastToAdmins } = {},
+  { db, auth, adminOnly, log = console, broadcastToAdmins, noteDeps } = {},
 ) {
   const store = createFederationStore(db);
+  // Note-level federation (sharing notes across a paired link). Only
+  // wired when the host passes the note helpers it needs.
+  const noteFederation = noteDeps
+    ? createNoteFederation({ db, store, peer, deps: noteDeps, log })
+    : null;
   const getLabelStmt = db.prepare(`SELECT custom_app_name FROM app_settings WHERE id = 1`);
 
   function localLabel() {
@@ -105,6 +111,9 @@ function attachFederationRoutes(
           }
         },
       });
+      // After connectivity is refreshed, reconcile federated note
+      // content with each reachable peer (push our changed copies).
+      if (noteFederation) await noteFederation.syncTick();
     } finally {
       tickRunning = false;
     }
@@ -261,6 +270,51 @@ function attachFederationRoutes(
     res.json(selfReport({ locked: isLocked() }));
   });
 
+  // Verify a signed server-to-server request; returns the active link or
+  // null. Shared by the note endpoints below.
+  function verifyS2S(req) {
+    const linkId = req.headers["x-gk-fed-link"];
+    if (!linkId) return null;
+    const link = store.getById(String(linkId));
+    if (!link || link.status !== protocol.STATUS.ACTIVE) return null;
+    const ok = peer.verifySignedRequest(link, {
+      method: "POST",
+      path: req.path,
+      headers: req.headers,
+      rawBody: req.rawBody ?? "",
+    });
+    return ok ? link : null;
+  }
+
+  // A peer shares one of its notes with one of OUR users → create the
+  // local mirror.
+  app.post("/api/federation/notes/share", (req, res) => {
+    const link = verifyS2S(req);
+    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
+    const b = req.body || {};
+    const result = noteFederation.handleIncomingShare({
+      linkId: link.id,
+      targetRef: b.targetRef,
+      ownerRef: b.ownerRef,
+      ownerName: b.ownerName,
+      note: b.note || {},
+    });
+    res.status(result.ok ? 200 : 409).json(result);
+  });
+
+  // A peer pushes an updated copy of a note we both share → LWW-apply.
+  app.post("/api/federation/notes/apply", (req, res) => {
+    const link = verifyS2S(req);
+    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
+    const result = noteFederation.handleIncomingApply({
+      linkId: link.id,
+      note: (req.body || {}).note || {},
+    });
+    res.status(result.ok ? 200 : 409).json(result);
+  });
+
   // ─────────────────────────────────────────────────────────────────
   //  ADMIN PANEL
   // ─────────────────────────────────────────────────────────────────
@@ -381,7 +435,7 @@ function attachFederationRoutes(
     log.log("[federation] routes ready (protocol v" + protocol.PROTOCOL_VERSION + ")");
   }
 
-  return { store, tick, kickTick };
+  return { store, tick, kickTick, noteFederation };
 }
 
 module.exports = { attachFederationRoutes };

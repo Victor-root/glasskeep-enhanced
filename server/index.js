@@ -1396,6 +1396,26 @@ const federation = attachFederationRoutes(app, {
   adminOnly,
   log: console,
   broadcastToAdmins,
+  // Note helpers the note-federation engine reuses, so mirrored notes go
+  // through the SAME encryption-aware write path as local notes.
+  noteDeps: {
+    nowISO,
+    isLocked: () => runtimeUnlock.isEnabled() && !runtimeUnlock.isUnlocked(),
+    getUserById,
+    getUserByEmail,
+    getUserByName,
+    getNoteById,
+    runInsertNote,
+    runUpdateNoteFullCollab,
+    addCollaborator,
+    getMaxUserEffectivePosition,
+    upsertUserPosition,
+    updateNoteWithEditor,
+    createShareNotification,
+    broadcastNoteUpdated,
+    isNewerOrEqual,
+    parseIsoTimestamp,
+  },
 });
 const FEDERATION_TICK_MS = (() => {
   const raw = parseInt(process.env.FEDERATION_TICK_MS, 10);
@@ -1543,6 +1563,11 @@ app.post("/api/login", (req, res) => {
     user = email ? getUserByEmail.get(email) : null;
   }
   if (!user) return res.status(401).json({ error: "No account found." });
+  // Federation stand-in accounts (local mirrors of a remote server's
+  // users) must never authenticate — they exist only to own/participate
+  // in mirrored notes. Same generic message so they're indistinguishable
+  // from a missing account.
+  if (user.federated_origin) return res.status(401).json({ error: "No account found." });
   if (!bcrypt.compareSync(password || "", user.password_hash)) {
     return res.status(401).json({ error: "Incorrect password." });
   }
@@ -2077,7 +2102,7 @@ app.post("/api/notes/reorder", auth, (req, res) => {
 });
 
 // ---------- Collaboration ----------
-app.post("/api/notes/:id/collaborate", auth, (req, res) => {
+app.post("/api/notes/:id/collaborate", auth, async (req, res) => {
   const noteId = req.params.id;
   const { username } = req.body || {};
 
@@ -2089,6 +2114,38 @@ app.post("/api/notes/:id/collaborate", auth, (req, res) => {
   const note = getNote.get(noteId, req.user.id);
   if (!note) {
     return res.status(404).json({ error: "Note not found" });
+  }
+
+  // Cross-server share: "user@peer-host" where peer-host (incl. :port if
+  // non-standard) is a currently-paired server. Route to the federation
+  // engine, which mirrors the note onto the peer and adds a stand-in
+  // collaborator here. Anything else falls through to the local lookup.
+  const atIdx = username.lastIndexOf("@");
+  if (atIdx > 0 && federation?.noteFederation) {
+    const peerHost = username.slice(atIdx + 1).trim().toLowerCase();
+    if (federation.noteFederation.isPeerHost(peerHost)) {
+      const targetRef = username.slice(0, atIdx).trim();
+      try {
+        const owner = getUserById.get(req.user.id);
+        const result = await federation.noteFederation.shareWithRemote({
+          note, owner, targetRef, peerHost,
+        });
+        if (!result.ok) {
+          const codeMap = { peer_not_paired: 400, user_not_found: 404 };
+          return res
+            .status(codeMap[result.error] || 502)
+            .json({ error: result.error || "federation_failed" });
+        }
+        return res.json({
+          ok: true,
+          message: `Shared with ${result.collaborator?.name || targetRef}`,
+          collaborator: result.collaborator,
+        });
+      } catch (e) {
+        console.warn("[federation/notes] shareWithRemote failed:", e?.message);
+        return res.status(500).json({ error: "federation_failed" });
+      }
+    }
   }
 
   // Find user to collaborate with (by email or name)
@@ -3853,8 +3910,9 @@ app.post("/api/admin/pending-users/:id/reject", auth, adminOnly, (req, res) => {
 // Search users endpoint for collaboration
 const searchUsersStmt = db.prepare(`
   SELECT id, name, email, avatar_url
-  FROM users 
+  FROM users
   WHERE (name LIKE ? OR email LIKE ?)
+    AND federated_origin IS NULL
   ORDER BY name ASC
   LIMIT 50
 `);
