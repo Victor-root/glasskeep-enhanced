@@ -1,13 +1,9 @@
 # 📋 Changelog
 
-## v2.5.1 — 2026-06-08
+## v2.5.0 — 2026-06-08
 
 ### ➕ Added
 - 🎨 **Login page theme (admin)** — from Admin → *Login page settings*, choose the colour theme applied to the login screen for all visitors (**GlassKeep**, **Emerald**, **Amber**, **Ruby**, **Graphite**, **Blush**). Completely independent of each user's own workspace theme — logged-in users keep their personal choice untouched.
-
-## v2.5.0 — 2026-06-06
-
-### ➕ Added
 - ⏰ **Note reminders** — set a date/time on any note via quick presets or a date picker. Fires once; changing the time to a future value re-arms it. Reminded notes show a bell pill on their card. Shared notes notify both owner and all collaborators.
 - 📋 **Reminders sidebar view** — dedicated "Reminders" section in the sidebar listing all upcoming reminders ordered by date.
 - 🔔 **In-app reminder delivery (SSE)** — reminder card delivered in real time over the existing SSE connection when the app is open.
