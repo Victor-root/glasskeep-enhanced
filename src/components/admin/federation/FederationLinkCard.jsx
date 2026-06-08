@@ -76,6 +76,29 @@ function InlineEdit({ initial, placeholder, onSave, onCancel, disabled }) {
   );
 }
 
+// A muted, icon-led caption for a stat block.
+function StatLabel({ icon: Icon, label }) {
+  return (
+    <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+      {Icon && <Icon className="tabler-icon w-3.5 h-3.5 opacity-70 shrink-0" />}
+      <span className="truncate">{label}</span>
+    </div>
+  );
+}
+
+// One aligned "label on top, value below" cell — keeps the health facts
+// in tidy columns instead of inline label:value pairs that wrap unevenly.
+function Stat({ icon, label, children }) {
+  return (
+    <div className="min-w-0">
+      <StatLabel icon={icon} label={label} />
+      <div className="mt-0.5 text-sm text-gray-800 dark:text-gray-100 truncate">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function FederationLinkCard({
   link,
   busy,
@@ -142,39 +165,36 @@ export default function FederationLinkCard({
         </p>
       )}
 
-      {/* Health facts (active links). Versions are surfaced for
-          diagnostics even though compatibility is decided by protocol. */}
+      {/* Health facts (active links), as aligned stat blocks. Versions
+          are surfaced for diagnostics even though compatibility is
+          decided by protocol. */}
       {isActive && (
-        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
-          <div className="flex items-center gap-1.5">
-            <TI.InfoCircleFilled className="tabler-icon w-3.5 h-3.5 opacity-60" />
-            {t("fedPeerVersion")}:{" "}
-            <span className="font-medium">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+          <Stat icon={TI.InfoCircleFilled} label={t("fedPeerVersion")}>
+            <span className="font-semibold">
               {link.peerAppVersion ? `v${link.peerAppVersion}` : "—"}
             </span>
             {Number.isInteger(link.peerProtocol) && (
-              <span className="opacity-70">
-                · {t("fedProtocol")} {link.peerProtocol}
+              <span className="text-gray-400 dark:text-gray-500">
+                {" · "}
+                {t("fedProtocol")} {link.peerProtocol}
               </span>
             )}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <TI.Clock className="tabler-icon w-3.5 h-3.5 opacity-60" />
-            {t("fedLastContact")}:{" "}
-            <span className="font-medium">{lastSeen || t("fedNever")}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <TI.Refresh className="tabler-icon w-3.5 h-3.5 opacity-60" />
-            {t("fedLastCheck")}:{" "}
-            <span className="font-medium">{lastCheck || t("fedNever")}</span>
-          </div>
+          </Stat>
+          <Stat icon={TI.Clock} label={t("fedLastContact")}>
+            {lastSeen || t("fedNever")}
+          </Stat>
+          <Stat icon={TI.Refresh} label={t("fedLastCheck")}>
+            {lastCheck || t("fedNever")}
+          </Stat>
           {/* Raw technical reason of the last failure — surfaced for
               self-hosters debugging proxy / certificate / DNS issues. */}
           {link.lastError && link.state !== "online" && (
-            <div className="flex items-center gap-1.5 sm:col-span-2 text-gray-500 dark:text-gray-400">
-              <TI.InfoCircleFilled className="tabler-icon w-3.5 h-3.5 opacity-60" />
-              {t("fedDetail")}:{" "}
-              <code className="font-mono text-[11px]">{link.lastError}</code>
+            <div className="min-w-0 sm:col-span-2">
+              <StatLabel icon={TI.InfoCircleFilled} label={t("fedDetail")} />
+              <code className="mt-0.5 block font-mono text-[11px] text-gray-700 dark:text-gray-200 break-all">
+                {link.lastError}
+              </code>
             </div>
           )}
         </div>
@@ -208,7 +228,7 @@ export default function FederationLinkCard({
 
       {/* Actions */}
       {edit === null && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           {isIncoming && (
             <>
               <ActionButton

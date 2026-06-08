@@ -160,7 +160,10 @@ function probeHealth(link) {
 // ── The tick ─────────────────────────────────────────────────────────
 // Drives every link that still needs outbound work. Safe to call as
 // often as we like; it only touches links in a non-terminal state.
-async function runTick({ store, label, log = console }) {
+// `onStateChange(link, prevState, nextState)` fires whenever an active
+// link's live state flips (e.g. online → offline), so the caller can
+// proactively tell the admins instead of waiting for them to look.
+async function runTick({ store, label, log = console, onStateChange }) {
   let links;
   try {
     links = [...store.listHandshakePending(), ...store.listActive()];
@@ -184,7 +187,7 @@ async function runTick({ store, label, log = console }) {
         continue;
       }
       if (link.status === protocol.STATUS.ACTIVE) {
-        await healthCheckOne(link, store, log);
+        await healthCheckOne(link, store, log, onStateChange);
       }
     } catch (e) {
       log.warn?.(`[federation] tick: link ${link.id} failed:`, e?.message);
@@ -192,7 +195,8 @@ async function runTick({ store, label, log = console }) {
   }
 }
 
-async function healthCheckOne(link, store, log = console) {
+async function healthCheckOne(link, store, log = console, onStateChange) {
+  const prevState = protocol.deriveLinkState(link);
   const attemptedAt = new Date().toISOString();
   const host = link.peer_base_url;
   try {
@@ -218,25 +222,24 @@ async function healthCheckOne(link, store, log = console) {
         agreed_protocol: null,
         last_error: err,
       });
-      return;
+    } else {
+      const body = r.json;
+      const neg = protocol.negotiateProtocol(body.protocol, body.protocolMin);
+      log.log?.(
+        `[federation] health ${host} → OK (locked=${!!body.locked}, ver=${body.appVersion || "?"}, proto=${body.protocol}, compatible=${neg.compatible})`,
+      );
+      store.updateHealth(link.id, {
+        last_attempt_at: attemptedAt,
+        last_seen_at: attemptedAt,
+        peer_reachable: 1,
+        peer_locked: body.locked ? 1 : 0,
+        peer_app_version: body.appVersion || null,
+        peer_protocol: Number.isInteger(body.protocol) ? body.protocol : null,
+        protocol_compatible: neg.compatible ? 1 : 0,
+        agreed_protocol: neg.agreed,
+        last_error: neg.compatible ? null : "protocol-incompatible",
+      });
     }
-
-    const body = r.json;
-    const neg = protocol.negotiateProtocol(body.protocol, body.protocolMin);
-    log.log?.(
-      `[federation] health ${host} → OK (locked=${!!body.locked}, ver=${body.appVersion || "?"}, proto=${body.protocol}, compatible=${neg.compatible})`,
-    );
-    store.updateHealth(link.id, {
-      last_attempt_at: attemptedAt,
-      last_seen_at: attemptedAt,
-      peer_reachable: 1,
-      peer_locked: body.locked ? 1 : 0,
-      peer_app_version: body.appVersion || null,
-      peer_protocol: Number.isInteger(body.protocol) ? body.protocol : null,
-      protocol_compatible: neg.compatible ? 1 : 0,
-      agreed_protocol: neg.agreed,
-      last_error: neg.compatible ? null : "protocol-incompatible",
-    });
   } catch (e) {
     // Network / TLS failure → peer is offline (or its certificate can't
     // be verified). Keep the message so the panel can explain it.
@@ -250,6 +253,20 @@ async function healthCheckOne(link, store, log = console) {
       agreed_protocol: null,
       last_error: err,
     });
+  }
+
+  // Did the live state flip? If so, let the caller notify the admins.
+  const updated = store.getById(link.id);
+  const nextState = updated ? protocol.deriveLinkState(updated) : prevState;
+  if (updated && nextState !== prevState) {
+    log.log?.(`[federation] state change ${host}: ${prevState} → ${nextState}`);
+    if (typeof onStateChange === "function") {
+      try {
+        onStateChange(updated, prevState, nextState);
+      } catch (e) {
+        log.warn?.("[federation] onStateChange failed:", e?.message);
+      }
+    }
   }
 }
 

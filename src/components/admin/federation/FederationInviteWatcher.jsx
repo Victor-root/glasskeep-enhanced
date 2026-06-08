@@ -1,22 +1,28 @@
 // src/components/admin/federation/FederationInviteWatcher.jsx
 //
-// A headless (renders nothing) admin-only watcher that surfaces incoming
-// pairing requests as ACTIONABLE notifications — the admin can Accept or
-// Decline straight from the toast, without opening the admin panel (the
-// panel keeps its own accept/decline too). It works in two ways:
+// A headless (renders nothing) admin-only watcher for cross-server
+// federation events. Two jobs:
 //
-//   - durable catch-up: on mount / login it fetches the current links
-//     once and raises a request notification for anything already
-//     waiting — so an invitation that arrived while this admin was
-//     offline is still actionable the next time they sign in.
-//   - live: it listens to the `federation-event` window bus (App.jsx
-//     forwards the server's SSE federation_* events there) and raises
-//     the notification the moment a new invitation lands.
+//   1. Pairing requests, as ACTIONABLE notifications — the admin can
+//      Accept or Decline straight from the toast, without opening the
+//      admin panel (the panel keeps its own accept/decline too):
+//        - durable catch-up: on mount / login it fetches the current
+//          links once and raises a request for anything already waiting,
+//          so an invitation that arrived while this admin was offline is
+//          still actionable next time they sign in;
+//        - live: it raises the notification the moment a new invitation
+//          arrives.
+//      The Accept / Decline buttons carry a `kind` + `linkId`; the API
+//      call is dispatched centrally by App.jsx's handleNotificationAction
+//      (mirroring the existing pending-user approve/reject toasts).
 //
-// The Accept / Decline buttons carry a `kind` + `linkId`; the actual API
-// call is dispatched centrally by App.jsx's handleNotificationAction
-// (mirroring the existing pending-user approve/reject toasts), keeping
-// this component decoupled.
+//   2. Connectivity changes — when an active link flips (peer goes
+//      offline / comes back / gets locked / falls out of date), the
+//      server pushes a federation_link_state event and we toast it, so
+//      admins learn fast without staring at the panel.
+//
+// Both arrive via the `federation-event` window bus (App.jsx forwards the
+// server's SSE federation_* events there), keeping this decoupled.
 
 import { useEffect, useRef } from "react";
 import { t } from "../../../i18n";
@@ -77,11 +83,33 @@ export default function FederationInviteWatcher({ token }) {
       }
     })();
 
+    // A connectivity flip on an active link → a brief status toast.
+    const announceState = (msg) => {
+      const who = msg.peerLabel || hostOf(msg.peerBaseUrl);
+      const base = { type: "toast", title: t("fedConnTitle") };
+      if (msg.state === "offline") {
+        notify({ ...base, variant: "warning", message: t("fedPeerOffline").replace("{peer}", who) });
+      } else if (msg.state === "online" && msg.previousState === "offline") {
+        notify({ ...base, variant: "success", message: t("fedPeerOnline").replace("{peer}", who) });
+      } else if (msg.state === "locked") {
+        notify({ ...base, variant: "warning", message: t("fedPeerLocked").replace("{peer}", who) });
+      } else if (msg.state === "incompatible") {
+        notify({ ...base, variant: "warning", message: t("fedPeerIncompatible").replace("{peer}", who) });
+      }
+      console.info(
+        `[federation] state change: ${who} ${msg.previousState} → ${msg.state}`,
+      );
+    };
+
     // Live arrivals.
     const onEvent = (e) => {
       const msg = e?.detail;
-      if (!msg || msg.type !== "federation_invitation") return;
-      raiseRequest(msg.linkId, msg.peerBaseUrl, msg.peerLabel);
+      if (!msg) return;
+      if (msg.type === "federation_invitation") {
+        raiseRequest(msg.linkId, msg.peerBaseUrl, msg.peerLabel);
+      } else if (msg.type === "federation_link_state") {
+        announceState(msg);
+      }
     };
     window.addEventListener("federation-event", onEvent);
 

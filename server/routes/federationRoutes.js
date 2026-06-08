@@ -83,7 +83,28 @@ function attachFederationRoutes(
     if (tickRunning) return;
     tickRunning = true;
     try {
-      await peer.runTick({ store, label: localLabel(), log });
+      await peer.runTick({
+        store,
+        label: localLabel(),
+        log,
+        // Proactively tell every admin the moment a link's connectivity
+        // flips, so they don't have to be staring at the panel to learn
+        // the peer went down (or came back).
+        onStateChange: (link, previousState, state) => {
+          try {
+            broadcastToAdmins?.({
+              type: "federation_link_state",
+              linkId: link.id,
+              peerBaseUrl: link.peer_base_url,
+              peerLabel: link.peer_label || null,
+              state,
+              previousState,
+            });
+          } catch {
+            /* SSE best-effort */
+          }
+        },
+      });
     } finally {
       tickRunning = false;
     }

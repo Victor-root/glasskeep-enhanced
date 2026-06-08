@@ -1399,7 +1399,7 @@ const federation = attachFederationRoutes(app, {
 });
 const FEDERATION_TICK_MS = (() => {
   const raw = parseInt(process.env.FEDERATION_TICK_MS, 10);
-  return Number.isFinite(raw) && raw >= 5000 ? raw : 20000;
+  return Number.isFinite(raw) && raw >= 5000 ? raw : 15000;
 })();
 setInterval(() => {
   federation.tick().catch((e) => console.warn("[federation] tick error:", e?.message));
