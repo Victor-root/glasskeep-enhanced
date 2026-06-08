@@ -110,6 +110,7 @@ function attachFederationRoutes(
       protocolCompatible: link.protocol_compatible,
       agreedProtocol: link.agreed_protocol,
       lastSeenAt: link.last_seen_at || null,
+      lastAttemptAt: link.last_attempt_at || null,
       lastError: link.last_error || null,
       createdAt: link.created_at,
       updatedAt: link.updated_at || null,

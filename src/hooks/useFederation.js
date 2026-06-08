@@ -16,6 +16,23 @@ import { api } from "../utils/api";
 
 const POLL_INTERVAL_MS = 12000;
 
+// Compact, copy-pasteable view of the links for the browser console —
+// makes diagnosing a peer (state / reachability / last error / timings)
+// a matter of pasting one log line.
+function fedDebugSummary(links) {
+  return (links || []).map((l) => ({
+    peer: l.peerBaseUrl,
+    status: l.status,
+    state: l.state,
+    reachable: l.peerReachable,
+    locked: l.peerLocked,
+    peerVersion: l.peerAppVersion,
+    error: l.lastError,
+    lastContact: l.lastSeenAt,
+    lastCheck: l.lastAttemptAt,
+  }));
+}
+
 export function useFederation({ token, enabled = false } = {}) {
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -35,11 +52,14 @@ export function useFederation({ token, enabled = false } = {}) {
       if (!silent) setLoading(true);
       try {
         const data = await api("/admin/federation/links", { token });
-        setLinks(Array.isArray(data?.links) ? data.links : []);
+        const next = Array.isArray(data?.links) ? data.links : [];
+        setLinks(next);
         setError(null);
         setLoaded(true);
+        console.info("[federation] links:", fedDebugSummary(next));
       } catch (e) {
         setError(e?.message || "error");
+        console.warn("[federation] load failed:", e?.message);
       } finally {
         inFlight.current = false;
         if (!silent) setLoading(false);
@@ -130,14 +150,19 @@ export function useFederation({ token, enabled = false } = {}) {
 
   const recheck = useCallback(
     (id) =>
-      run(id, () =>
-        api(`/admin/federation/links/${id}/recheck`, {
+      run(id, async () => {
+        // a recheck awaits a network round trip on the server
+        const res = await api(`/admin/federation/links/${id}/recheck`, {
           method: "POST",
           token,
-          // a recheck awaits a network round trip on the server
           timeoutMs: 15000,
-        }),
-      ),
+        });
+        console.info(
+          "[federation] recheck result:",
+          res?.link ? fedDebugSummary([res.link])[0] : res,
+        );
+        return res;
+      }),
     [run, token],
   );
 

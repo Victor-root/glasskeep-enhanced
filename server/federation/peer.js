@@ -184,7 +184,7 @@ async function runTick({ store, label, log = console }) {
         continue;
       }
       if (link.status === protocol.STATUS.ACTIVE) {
-        await healthCheckOne(link, store);
+        await healthCheckOne(link, store, log);
       }
     } catch (e) {
       log.warn?.(`[federation] tick: link ${link.id} failed:`, e?.message);
@@ -192,26 +192,40 @@ async function runTick({ store, label, log = console }) {
   }
 }
 
-async function healthCheckOne(link, store) {
+async function healthCheckOne(link, store, log = console) {
   const attemptedAt = new Date().toISOString();
+  const host = link.peer_base_url;
   try {
     const r = await probeHealth(link);
+
+    // A health check only counts as "online" when we get our OWN signed
+    // 200 with { ok:true } back. Anything else — a 5xx from a reverse
+    // proxy whose GlassKeep backend is actually DOWN, a proxy "service
+    // unavailable" HTML page (200 but no JSON), a 403/404 because the
+    // link/secret no longer matches — means the peer GlassKeep is not
+    // healthily answering, so we must treat it as unreachable. (This is
+    // the fix for "proxy up + LXC down still showed Online".)
     if (!r.ok || !r.json || r.json.ok !== true) {
-      // Reachable HTTP-wise but the peer rejected us (e.g. signature /
-      // unknown link), or returned an error body. Treat as unreachable
-      // for editing purposes but keep the specific reason.
+      const err = r.json?.error || `http ${r.status || "no-response"}`;
+      log.log?.(
+        `[federation] health ${host} → DOWN (status=${r.status || "none"}, err=${err})`,
+      );
       store.updateHealth(link.id, {
         last_attempt_at: attemptedAt,
-        peer_reachable: r.status ? 1 : 0,
+        peer_reachable: 0,
         peer_locked: null,
         protocol_compatible: null,
         agreed_protocol: null,
-        last_error: r.json?.error || `http ${r.status || "no-response"}`,
+        last_error: err,
       });
       return;
     }
+
     const body = r.json;
     const neg = protocol.negotiateProtocol(body.protocol, body.protocolMin);
+    log.log?.(
+      `[federation] health ${host} → OK (locked=${!!body.locked}, ver=${body.appVersion || "?"}, proto=${body.protocol}, compatible=${neg.compatible})`,
+    );
     store.updateHealth(link.id, {
       last_attempt_at: attemptedAt,
       last_seen_at: attemptedAt,
@@ -226,13 +240,15 @@ async function healthCheckOne(link, store) {
   } catch (e) {
     // Network / TLS failure → peer is offline (or its certificate can't
     // be verified). Keep the message so the panel can explain it.
+    const err = tlsAwareMessage(e);
+    log.log?.(`[federation] health ${host} → UNREACHABLE (${err})`);
     store.updateHealth(link.id, {
       last_attempt_at: attemptedAt,
       peer_reachable: 0,
       peer_locked: null,
       protocol_compatible: null,
       agreed_protocol: null,
-      last_error: tlsAwareMessage(e),
+      last_error: err,
     });
   }
 }

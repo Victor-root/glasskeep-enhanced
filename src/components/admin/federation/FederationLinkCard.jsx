@@ -93,6 +93,7 @@ export default function FederationLinkCard({
 
   const title = link.peerLabel || hostOf(link.peerBaseUrl);
   const lastSeen = formatWhen(link.lastSeenAt);
+  const lastCheck = formatWhen(link.lastAttemptAt);
 
   const confirmDanger = (opts, onConfirm) => {
     if (typeof showGenericConfirm === "function") {
@@ -162,6 +163,20 @@ export default function FederationLinkCard({
             {t("fedLastContact")}:{" "}
             <span className="font-medium">{lastSeen || t("fedNever")}</span>
           </div>
+          <div className="flex items-center gap-1.5">
+            <TI.Refresh className="tabler-icon w-3.5 h-3.5 opacity-60" />
+            {t("fedLastCheck")}:{" "}
+            <span className="font-medium">{lastCheck || t("fedNever")}</span>
+          </div>
+          {/* Raw technical reason of the last failure — surfaced for
+              self-hosters debugging proxy / certificate / DNS issues. */}
+          {link.lastError && link.state !== "online" && (
+            <div className="flex items-center gap-1.5 sm:col-span-2 text-gray-500 dark:text-gray-400">
+              <TI.InfoCircleFilled className="tabler-icon w-3.5 h-3.5 opacity-60" />
+              {t("fedDetail")}:{" "}
+              <code className="font-mono text-[11px]">{link.lastError}</code>
+            </div>
+          )}
         </div>
       )}
 
