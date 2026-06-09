@@ -440,22 +440,44 @@ function createNoteFederation(ctx) {
       q.deleteMapping.run(noteId); // tidy any stray mapping regardless
       return { ok: true };
     }
+    // Identify the local participants + the remote owner (a shadow user)
+    // BEFORE deleting, so we can both drop the note and tell them why —
+    // exactly like a normal "owner deleted the shared note" notice. The
+    // shadow lookup avoids needing to decrypt the note (works while
+    // locked); the title is best-effort.
     let recipients = [];
     try {
       recipients = q.realParticipants.all(noteId).map((r) => r.user_id);
     } catch { /* ignore */ }
+    const shadow = q.getShadowByOrigin.get(`${linkId}|${m.remote_owner_ref}`);
+    let title = "";
+    try {
+      title = deps.getNoteById.get(noteId)?.title || "";
+    } catch { /* locked: no title, still remove */ }
+
     try {
       q.deleteMapping.run(noteId);
       q.deleteNoteRow.run(noteId); // cascades collaborators / positions / tags
     } catch (e) {
       log.warn?.("[federation/notes] remove mirror:", e?.message);
     }
-    // Drop it from each local participant's open view immediately; an
-    // offline one simply won't get it back on their next notes fetch.
     for (const uid of recipients) {
+      // Drop it from the open view immediately…
       try {
         deps.sendEventToUser?.(uid, { type: "note_deleted", noteId });
       } catch { /* SSE best-effort */ }
+      // …and leave a persisted notice so it reads like a local deletion
+      // (and an offline participant still learns about it on reconnect).
+      try {
+        if (shadow) {
+          deps.createSharedNoteDeletedNotification?.({
+            recipientId: uid,
+            senderId: shadow.id,
+            senderName: shadow.name || m.remote_owner_ref || "",
+            noteTitle: title,
+          });
+        }
+      } catch { /* notification best-effort */ }
     }
     return { ok: true };
   }

@@ -1373,6 +1373,13 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
     "Pair this server with another GlassKeep server you trust so your users can collaborate on notes across both instances. Both servers must be reachable over HTTPS with a valid certificate.",
   fedHttpsRequired:
     "Federation requires HTTPS with a valid certificate. This server is currently served over plain http, so pairing will fail until it sits behind HTTPS.",
+  fedSelfNameTitle: "This server's name",
+  fedSelfNameHint:
+    "The name other servers' users see on notes shared from here. Required before you can pair.",
+  fedSelfNamePlaceholder: "e.g. Home server",
+  fedSelfNameSaved: "Server name saved",
+  fedSelfNameRequired:
+    "Set this server's name first (above) — it's shown to the other server's users.",
   fedThisServer: "This server's address",
   fedThisServerHint:
     "This is the address the other server will use to reach you. Make sure it is correct and publicly reachable over HTTPS.",

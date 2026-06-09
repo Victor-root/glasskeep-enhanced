@@ -173,7 +173,7 @@ export default function NoteModal({
   collaboratorUsername,
   setCollaboratorUsername,
   addModalCollaborators,
-  peers,
+  remoteUsers,
   showUserDropdown,
   setShowUserDropdown,
   filteredUsers,
@@ -1028,7 +1028,7 @@ export default function NoteModal({
             collaboratorUsername={collaboratorUsername}
             setCollaboratorUsername={setCollaboratorUsername}
             addModalCollaborators={addModalCollaborators}
-            peers={peers}
+            remoteUsers={remoteUsers}
             showUserDropdown={showUserDropdown}
             setShowUserDropdown={setShowUserDropdown}
             filteredUsers={filteredUsers}

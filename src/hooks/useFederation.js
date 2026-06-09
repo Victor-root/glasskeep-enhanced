@@ -39,6 +39,9 @@ export function useFederation({ token, enabled = false } = {}) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  // This server's own federation display name + the max length allowed.
+  const [selfName, setSelfName] = useState("");
+  const [maxLabelLen, setMaxLabelLen] = useState(24);
   const inFlight = useRef(false);
 
   const localBaseUrl =
@@ -54,6 +57,8 @@ export function useFederation({ token, enabled = false } = {}) {
         const data = await api("/admin/federation/links", { token });
         const next = Array.isArray(data?.links) ? data.links : [];
         setLinks(next);
+        if (typeof data?.selfName === "string") setSelfName(data.selfName);
+        if (Number.isFinite(data?.maxLabelLen)) setMaxLabelLen(data.maxLabelLen);
         setError(null);
         setLoaded(true);
         console.info("[federation] links:", fedDebugSummary(next));
@@ -182,6 +187,19 @@ export function useFederation({ token, enabled = false } = {}) {
     return () => window.removeEventListener("federation-event", onEvent);
   }, [token, load]);
 
+  const saveSelfName = useCallback(
+    async (name) => {
+      const res = await api("/admin/federation/self-name", {
+        method: "PUT",
+        token,
+        body: { name },
+      });
+      if (typeof res?.selfName === "string") setSelfName(res.selfName);
+      return res;
+    },
+    [token],
+  );
+
   const incoming = links.filter((l) => l.status === "incoming_pending");
 
   return {
@@ -192,6 +210,8 @@ export function useFederation({ token, enabled = false } = {}) {
     error,
     busyId,
     localBaseUrl,
+    selfName,
+    maxLabelLen,
     load,
     invite,
     accept,
@@ -200,5 +220,6 @@ export function useFederation({ token, enabled = false } = {}) {
     rename,
     unpair,
     recheck,
+    saveSelfName,
   };
 }

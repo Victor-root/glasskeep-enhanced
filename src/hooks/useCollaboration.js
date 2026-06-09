@@ -31,8 +31,8 @@ export default function useCollaboration(token, {
   const [collaboratorUsername, setCollaboratorUsername] = useState("");
   const [addModalCollaborators, setAddModalCollaborators] = useState([]);
   const [availableUsers, setAvailableUsers] = useState([]);
-  // Active paired servers (for cross-server "share with user@server").
-  const [peers, setPeers] = useState([]);
+  // Real users on paired servers matching the search (cross-server share).
+  const [remoteUsers, setRemoteUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -94,17 +94,6 @@ export default function useCollaboration(token, {
     [token],
   );
 
-  // Paired servers, so the modal can offer "share with <user> on <server>"
-  // without the user ever typing a URL. Best-effort: empty list just means
-  // no cross-server option is shown.
-  const loadPeers = useCallback(async () => {
-    try {
-      const data = await api("/federation/peers", { token });
-      setPeers(Array.isArray(data?.peers) ? data.peers : []);
-    } catch {
-      setPeers([]);
-    }
-  }, [token]);
 
   const removeCollaborator = async (collaboratorId, noteId = null, mode = null) => {
     try {
@@ -136,32 +125,43 @@ export default function useCollaboration(token, {
       try {
         const searchQuery =
           query && query.trim().length > 0 ? query.trim() : "";
-        const users = await api(
-          `/users/search?q=${encodeURIComponent(searchQuery)}`,
-          { token },
-        );
         const existingCollaboratorIds = new Set(
           addModalCollaborators.map((c) => c.id),
         );
-        const filtered = users.filter(
+        // Local users AND real users on every paired server, in parallel.
+        // The federation search proxies to each peer; a peer being down
+        // just yields no remote results, never an error.
+        const [localRes, remoteRes] = await Promise.allSettled([
+          api(`/users/search?q=${encodeURIComponent(searchQuery)}`, { token }),
+          api(`/federation/users/search?q=${encodeURIComponent(searchQuery)}`, {
+            token,
+          }),
+        ]);
+        const localUsers =
+          localRes.status === "fulfilled" && Array.isArray(localRes.value)
+            ? localRes.value
+            : [];
+        const filtered = localUsers.filter(
           (u) => u.id !== currentUser?.id && !existingCollaboratorIds.has(u.id),
         );
+        const remote =
+          remoteRes.status === "fulfilled" &&
+          Array.isArray(remoteRes.value?.users)
+            ? remoteRes.value.users
+            : [];
         setFilteredUsers(filtered);
-        // Keep the dropdown open when there's text and at least one paired
-        // server, so the cross-server "share with <user> on <server>"
-        // option is reachable even with no local match.
-        setShowUserDropdown(
-          filtered.length > 0 || (peers.length > 0 && searchQuery.length > 0),
-        );
+        setRemoteUsers(remote);
+        setShowUserDropdown(filtered.length > 0 || remote.length > 0);
       } catch (e) {
         console.error("Failed to search users:", e);
         setFilteredUsers([]);
+        setRemoteUsers([]);
         setShowUserDropdown(false);
       } finally {
         setLoadingUsers(false);
       }
     },
-    [token, addModalCollaborators, currentUser, peers],
+    [token, addModalCollaborators, currentUser],
   );
 
   const updateDropdownPosition = useCallback(() => {
@@ -250,9 +250,8 @@ export default function useCollaboration(token, {
   useEffect(() => {
     if (collaborationModalOpen && activeId) {
       loadCollaboratorsForAddModal(activeId);
-      loadPeers();
     }
-  }, [collaborationModalOpen, activeId, loadCollaboratorsForAddModal, loadPeers]);
+  }, [collaborationModalOpen, activeId, loadCollaboratorsForAddModal]);
 
   return {
     // Dialog state
@@ -265,7 +264,7 @@ export default function useCollaboration(token, {
     collaboratorUsername, setCollaboratorUsername,
     addModalCollaborators,
     availableUsers,
-    peers,
+    remoteUsers,
     filteredUsers, setFilteredUsers,
     showUserDropdown, setShowUserDropdown,
     loadingUsers,

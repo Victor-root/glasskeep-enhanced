@@ -501,6 +501,11 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
       if (!names.has("login_theme")) {
         db.exec(`ALTER TABLE app_settings ADD COLUMN login_theme TEXT NOT NULL DEFAULT 'glasskeep'`);
       }
+      // The name THIS server advertises to federation peers (shown in the
+      // cross-server collaborator badge). Empty until the admin sets it.
+      if (!names.has("federation_self_name")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN federation_self_name TEXT NOT NULL DEFAULT ''`);
+      }
     });
     tx();
   } catch {
@@ -1433,6 +1438,7 @@ const federation = attachFederationRoutes(app, {
     upsertUserPosition,
     updateNoteWithEditor,
     createShareNotification,
+    createSharedNoteDeletedNotification,
     broadcastNoteUpdated,
     isNewerOrEqual,
     parseIsoTimestamp,
