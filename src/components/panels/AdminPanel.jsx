@@ -490,7 +490,7 @@ export default function AdminPanel({
           {/* Site settings (login slogan, registration toggle) */}
           <div className="mb-2">
             <SettingsSection
-              icon={TI.World}
+              icon={TI.HomeLock}
               title={t("siteSettings")}
               open={openSections.site}
               onToggle={() => toggleSection("site")}
@@ -760,7 +760,7 @@ export default function AdminPanel({
               section component owns the pairing + link-management UI. */}
           <div className="mb-2">
             <SettingsSection
-              icon={TI.World}
+              icon={TI.Server}
               title={t("fedSectionTitle")}
               open={openSections.federation}
               onToggle={() => toggleSection("federation")}

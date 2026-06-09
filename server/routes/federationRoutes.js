@@ -53,16 +53,34 @@ function attachFederationRoutes(
   const noteFederation = noteDeps
     ? createNoteFederation({ db, store, peer, deps: noteDeps, log })
     : null;
-  const getLabelStmt = db.prepare(`SELECT custom_app_name FROM app_settings WHERE id = 1`);
+  const getLabelStmt = db.prepare(
+    `SELECT federation_self_name, custom_app_name FROM app_settings WHERE id = 1`,
+  );
+  const setSelfNameStmt = db.prepare(
+    `UPDATE app_settings SET federation_self_name = ? WHERE id = 1`,
+  );
+  // Friendly names must fit the collaborator badge; keep them short.
+  const MAX_LABEL_LEN = 24;
 
   function localLabel() {
     try {
-      const name = (getLabelStmt.get()?.custom_app_name || "").trim();
+      const row = getLabelStmt.get() || {};
+      // Prefer the dedicated federation name; fall back to the app's
+      // display name so an existing pairing keeps a sensible label.
+      const name = (row.federation_self_name || row.custom_app_name || "").trim();
       return name || null;
     } catch {
       return null;
     }
   }
+
+  // Local user search for the federation share UI (real names, never
+  // shadow rows). `ref` is what the peer passes back to share with them.
+  const searchLocalUsersStmt = db.prepare(`
+    SELECT name, email FROM users
+    WHERE (name LIKE ? OR email LIKE ?) AND federated_origin IS NULL
+    ORDER BY name ASC LIMIT 10
+  `);
   // "Locked" = at-rest encryption is enabled but hasn't been unlocked,
   // so this instance currently can't read or write note content.
   // Reported truthfully to peers so they show the precise "reachable
@@ -180,7 +198,10 @@ function attachFederationRoutes(
     }
     // Flood guard: never let an unauthenticated caller grow the table
     // without bound.
-    if (store.listByStatus(protocol.STATUS.INCOMING_PENDING).length > 50) {
+    // Anti-spam only — caps UNACCEPTED incoming invitations, never the
+    // number of servers you can actually pair with (active links are
+    // unlimited). Set high so it's effectively invisible in normal use.
+    if (store.listByStatus(protocol.STATUS.INCOMING_PENDING).length > 500) {
       return res.status(429).json({ error: "too many pending invitations" });
     }
     const now = store.nowIso();
@@ -343,13 +364,80 @@ function attachFederationRoutes(
     res.json({ peers });
   });
 
+  // A peer searches OUR users for its share UI (real users, never shadow
+  // rows). `ref` is the identity it passes back to actually share.
+  app.post("/api/federation/users/search", (req, res) => {
+    const link = verifyS2S(req);
+    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    const query = String((req.body || {}).query || "").trim().slice(0, 100);
+    const term = `%${query}%`;
+    let users = [];
+    try {
+      users = searchLocalUsersStmt.all(term, term).map((u) => ({ name: u.name, ref: u.email }));
+    } catch {
+      users = [];
+    }
+    res.json({ ok: true, users });
+  });
+
+  // Proxy: aggregate REAL users from every paired peer for the share UI,
+  // so the dropdown shows actual people on the other server (not an echo
+  // of whatever was typed). One signed call per peer, run in parallel;
+  // an unreachable peer is simply skipped.
+  app.get("/api/federation/users/search", auth, async (req, res) => {
+    const query = String(req.query.q || "").trim();
+    const links = store.listActive();
+    const results = [];
+    await Promise.all(
+      links.map(async (link) => {
+        try {
+          const path = "/api/federation/users/search";
+          const r = await peer.httpJson(link.peer_base_url + path, {
+            method: "POST",
+            secret: link.shared_secret,
+            linkId: link.id,
+            path,
+            body: { query },
+          });
+          if (r.ok && r.json && Array.isArray(r.json.users)) {
+            let host = link.peer_base_url;
+            try {
+              host = new URL(link.peer_base_url).host;
+            } catch {
+              /* keep raw */
+            }
+            const label = link.peer_label || host;
+            for (const u of r.json.users) {
+              results.push({ name: u.name, ref: u.ref, host, serverLabel: label });
+            }
+          }
+        } catch {
+          /* peer unreachable: skip its results */
+        }
+      }),
+    );
+    res.json({ users: results });
+  });
+
   // ─────────────────────────────────────────────────────────────────
   //  ADMIN PANEL
   // ─────────────────────────────────────────────────────────────────
 
+  // This server's own federation display name (mandatory before pairing,
+  // since it becomes the badge the peer's users see).
+  app.put("/api/admin/federation/self-name", auth, adminOnly, (req, res) => {
+    const name =
+      typeof req.body?.name === "string" ? req.body.name.trim().slice(0, MAX_LABEL_LEN) : "";
+    if (!name) return res.status(400).json({ error: "name_required" });
+    setSelfNameStmt.run(name);
+    res.json({ ok: true, selfName: name });
+  });
+
   app.get("/api/admin/federation/links", auth, adminOnly, (_req, res) => {
     res.json({
       links: store.listAll().map(publicLink),
+      selfName: localLabel(),
+      maxLabelLen: MAX_LABEL_LEN,
       localProtocol: protocol.PROTOCOL_VERSION,
       localAppVersion: pkg.version,
     });
@@ -359,6 +447,8 @@ function attachFederationRoutes(
   // window.location.origin) — the public address THIS server is reached
   // at — so we never have to guess it behind a reverse proxy.
   app.post("/api/admin/federation/invite", auth, adminOnly, (req, res) => {
+    // A self-name is mandatory: it becomes the badge the peer's users see.
+    if (!localLabel()) return res.status(400).json({ error: "self_name_required" });
     const peerUrl = peer.normalizeBaseUrl(req.body?.peerBaseUrl);
     const localUrl = peer.normalizeBaseUrl(req.body?.localBaseUrl);
     const label = typeof req.body?.label === "string" ? req.body.label.trim() || null : null;
@@ -389,6 +479,7 @@ function attachFederationRoutes(
   // Accept an incoming invitation. We mint the shared secret here and
   // record the address the initiator should reach us at.
   app.post("/api/admin/federation/links/:id/accept", auth, adminOnly, (req, res) => {
+    if (!localLabel()) return res.status(400).json({ error: "self_name_required" });
     const link = store.getById(req.params.id);
     if (!link) return res.status(404).json({ error: "not_found" });
     if (link.status !== protocol.STATUS.INCOMING_PENDING) {

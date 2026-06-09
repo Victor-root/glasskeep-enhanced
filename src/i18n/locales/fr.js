@@ -1376,6 +1376,13 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
     "Associez ce serveur à un autre serveur GlassKeep de confiance pour que vos utilisateurs puissent collaborer sur des notes entre les deux instances. Les deux serveurs doivent être joignables en HTTPS avec un certificat valide.",
   fedHttpsRequired:
     "La fédération nécessite le HTTPS avec un certificat valide. Ce serveur est actuellement servi en http simple : l'appairage échouera tant qu'il ne sera pas derrière HTTPS.",
+  fedSelfNameTitle: "Nom de ce serveur",
+  fedSelfNameHint:
+    "Le nom que les utilisateurs des autres serveurs voient sur les notes partagées depuis ici. Obligatoire avant tout appairage.",
+  fedSelfNamePlaceholder: "ex. Serveur maison",
+  fedSelfNameSaved: "Nom du serveur enregistré",
+  fedSelfNameRequired:
+    "Définissez d'abord le nom de ce serveur (ci-dessus) — il est montré aux utilisateurs de l'autre serveur.",
   fedThisServer: "Adresse de ce serveur",
   fedThisServerHint:
     "C'est l'adresse que l'autre serveur utilisera pour vous joindre. Vérifiez qu'elle est correcte et joignable publiquement en HTTPS.",

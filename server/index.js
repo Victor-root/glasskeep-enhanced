@@ -501,6 +501,11 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
       if (!names.has("login_theme")) {
         db.exec(`ALTER TABLE app_settings ADD COLUMN login_theme TEXT NOT NULL DEFAULT 'glasskeep'`);
       }
+      // The name THIS server advertises to federation peers (shown in the
+      // cross-server collaborator badge). Empty until the admin sets it.
+      if (!names.has("federation_self_name")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN federation_self_name TEXT NOT NULL DEFAULT ''`);
+      }
     });
     tx();
   } catch {
@@ -1165,11 +1170,36 @@ function setUserPinOrPosition(noteId, userId, { pinned, position }) {
 // For the owner: shows collaborators. For a collaborator: shows the owner + other collaborators.
 // Federation badge info for a participant: whether they're a stand-in
 // for a remote-server user and, if so, that server's friendly name.
-function participantFedInfo(federatedOrigin) {
-  if (!federatedOrigin) return { federated: false, serverLabel: null };
+function participantFedInfo(u) {
+  const federatedOrigin = u && u.federated_origin;
+  if (!federatedOrigin) return { federated: false, serverLabel: null, remoteRef: null };
+  // federated_origin is "<linkId>|<remoteRef>"; the remoteRef is the
+  // participant's own identity on the peer (clean — no server URL).
+  const idx = String(federatedOrigin).indexOf("|");
+  const remoteRef = idx >= 0 ? String(federatedOrigin).slice(idx + 1) : null;
+  // The shadow's synthetic email ends in the peer host — a robust hint
+  // for resolving the server name even if the link id changed.
+  const hostHint = u.email ? String(u.email).split("@").pop() : null;
   return {
     federated: true,
-    serverLabel: noteFederationRef?.serverLabelForOrigin(federatedOrigin) || null,
+    serverLabel: noteFederationRef?.serverLabelForOrigin(federatedOrigin, hostHint) || null,
+    remoteRef,
+  };
+}
+
+// Build a participant object for collaborator lists. For a remote
+// stand-in, the secondary line shows their clean identity on the peer
+// (remoteRef), NOT the synthetic local email that embeds the server URL.
+function participantObj(u, extra = {}) {
+  const fed = participantFedInfo(u);
+  return {
+    id: u.id,
+    name: u.name,
+    email: fed.federated ? fed.remoteRef || u.email : u.email,
+    avatar_url: u.avatar_url || null,
+    federated: fed.federated,
+    serverLabel: fed.serverLabel,
+    ...extra,
   };
 }
 
@@ -1177,13 +1207,11 @@ function getNoteParticipants(noteId, noteOwnerId, requestingUserId) {
   const collabList = getNoteCollaborators.all(noteId);
   if (collabList.length === 0) return null;
   const others = collabList
-    .filter(c => c.id !== requestingUserId)
-    .map(c => ({ id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url || null, ...participantFedInfo(c.federated_origin) }));
+    .filter((c) => c.id !== requestingUserId)
+    .map((c) => participantObj(c));
   if (noteOwnerId !== requestingUserId) {
     const owner = getUserById.get(noteOwnerId);
-    if (owner) {
-      others.unshift({ id: owner.id, name: owner.name, email: owner.email, avatar_url: owner.avatar_url || null, ...participantFedInfo(owner.federated_origin) });
-    }
+    if (owner) others.unshift(participantObj(owner));
   }
   return others.length > 0 ? others : null;
 }
@@ -1433,6 +1461,7 @@ const federation = attachFederationRoutes(app, {
     upsertUserPosition,
     updateNoteWithEditor,
     createShareNotification,
+    createSharedNoteDeletedNotification,
     broadcastNoteUpdated,
     isNewerOrEqual,
     parseIsoTimestamp,
@@ -2245,26 +2274,13 @@ app.get("/api/notes/:id/collaborators", auth, (req, res) => {
   }
 
   const collaborators = getNoteCollaborators.all(noteId);
-  const result = collaborators.map(c => ({
-    id: c.id,
-    name: c.name,
-    email: c.email,
-    avatar_url: c.avatar_url || null,
-    added_at: c.added_at,
-    added_by: c.added_by,
-    ...participantFedInfo(c.federated_origin),
-  }));
+  const result = collaborators.map((c) =>
+    participantObj(c, { added_at: c.added_at, added_by: c.added_by }),
+  );
 
   const owner = getUserById.get(note.user_id);
   if (owner) {
-    result.unshift({
-      id: owner.id,
-      name: owner.name,
-      email: owner.email,
-      avatar_url: owner.avatar_url || null,
-      isOwner: true,
-      ...participantFedInfo(owner.federated_origin),
-    });
+    result.unshift(participantObj(owner, { isOwner: true }));
   }
 
   res.json(result);
