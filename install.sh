@@ -1256,7 +1256,7 @@ action_update() {
         systemctl stop "$SERVICE_NAME"
 
     step "$MSG_STEP_PULL" \
-        bash -c "cd '${INSTALL_DIR}' && git pull origin main"
+        bash -c "cd '${INSTALL_DIR}' && git fetch origin && git reset --hard && git checkout main && git pull origin main"
 
     info "${DIM}${MSG_HINT_LONG}${RESET}"
     step "$MSG_STEP_NPM_UPDATE" \
