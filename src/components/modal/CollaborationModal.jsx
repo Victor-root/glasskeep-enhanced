@@ -10,9 +10,9 @@ import { t } from "../../i18n";
 // colours come from the active shell theme, so it follows every theme.
 function ServerBadge({ label }) {
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)] border border-[var(--gk-accent-soft-border)]">
-      <TI.Server className="tabler-icon w-3 h-3" />
-      {label || t("fedRemoteServer")}
+    <span className="inline-flex items-center gap-1 align-middle text-[11px] font-medium pl-1 pr-1.5 py-0.5 rounded-md bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)] border border-[var(--gk-accent-soft-border)]">
+      <TI.Server className="tabler-icon w-3.5 h-3.5 shrink-0" />
+      <span className="truncate max-w-[10rem]">{label || t("fedRemoteServer")}</span>
     </span>
   );
 }
