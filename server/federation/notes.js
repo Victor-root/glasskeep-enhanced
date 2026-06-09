@@ -504,10 +504,18 @@ function createNoteFederation(ctx) {
     isPeerHost: (host) => !!activeLinkForHost(host),
     getMapping: (noteId) => q.getMapping.get(noteId),
     // Friendly name of the server a shadow user belongs to, for badges.
-    serverLabelForOrigin(federatedOrigin) {
+    // Resolves by the (stable) link id embedded in federated_origin, and
+    // falls back to matching an active link by host — so a re-paired link
+    // (new id) still resolves the name. `hostHint` is the peer host, e.g.
+    // recovered from the shadow's synthetic email.
+    serverLabelForOrigin(federatedOrigin, hostHint) {
       if (!federatedOrigin) return null;
       const linkId = String(federatedOrigin).split("|")[0];
-      const link = store.getById(linkId);
+      let link = store.getById(linkId);
+      if (!link && hostHint) {
+        link =
+          store.listAll().find((l) => hostOf(l.peer_base_url) === hostHint) || null;
+      }
       if (!link) return null;
       return link.peer_label || hostOf(link.peer_base_url);
     },

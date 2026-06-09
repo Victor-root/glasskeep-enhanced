@@ -1170,15 +1170,19 @@ function setUserPinOrPosition(noteId, userId, { pinned, position }) {
 // For the owner: shows collaborators. For a collaborator: shows the owner + other collaborators.
 // Federation badge info for a participant: whether they're a stand-in
 // for a remote-server user and, if so, that server's friendly name.
-function participantFedInfo(federatedOrigin) {
+function participantFedInfo(u) {
+  const federatedOrigin = u && u.federated_origin;
   if (!federatedOrigin) return { federated: false, serverLabel: null, remoteRef: null };
   // federated_origin is "<linkId>|<remoteRef>"; the remoteRef is the
   // participant's own identity on the peer (clean — no server URL).
   const idx = String(federatedOrigin).indexOf("|");
   const remoteRef = idx >= 0 ? String(federatedOrigin).slice(idx + 1) : null;
+  // The shadow's synthetic email ends in the peer host — a robust hint
+  // for resolving the server name even if the link id changed.
+  const hostHint = u.email ? String(u.email).split("@").pop() : null;
   return {
     federated: true,
-    serverLabel: noteFederationRef?.serverLabelForOrigin(federatedOrigin) || null,
+    serverLabel: noteFederationRef?.serverLabelForOrigin(federatedOrigin, hostHint) || null,
     remoteRef,
   };
 }
@@ -1187,7 +1191,7 @@ function participantFedInfo(federatedOrigin) {
 // stand-in, the secondary line shows their clean identity on the peer
 // (remoteRef), NOT the synthetic local email that embeds the server URL.
 function participantObj(u, extra = {}) {
-  const fed = participantFedInfo(u.federated_origin);
+  const fed = participantFedInfo(u);
   return {
     id: u.id,
     name: u.name,

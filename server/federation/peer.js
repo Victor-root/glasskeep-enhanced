@@ -239,6 +239,15 @@ async function healthCheckOne(link, store, log = console, onStateChange) {
         agreed_protocol: neg.agreed,
         last_error: neg.compatible ? null : "protocol-incompatible",
       });
+      // Adopt the peer's self-chosen name as our label for it when we
+      // don't have one yet — so the cross-server badge shows a real name
+      // even on links paired before the name became mandatory. A manual
+      // rename (non-empty label) is left untouched.
+      if (body.label && !link.peer_label) {
+        try {
+          store.updatePeerLabel(link.id, String(body.label).slice(0, 24));
+        } catch { /* best-effort */ }
+      }
     }
   } catch (e) {
     // Network / TLS failure → peer is offline (or its certificate can't
