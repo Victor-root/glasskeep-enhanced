@@ -111,12 +111,12 @@ export default function CollaborationModal({
                         <div className="min-w-0">
                           <p className="font-medium text-sm flex items-center gap-2 flex-wrap">
                             <span className="truncate">{collab.name || collab.email}</span>
+                            {collab.federated && <ServerBadge label={collab.serverLabel} />}
                             {collab.isOwner && (
                               <span className="text-xs text-indigo-500 dark:text-indigo-400 font-normal">
                                 {t("owner")}
                               </span>
                             )}
-                            {collab.federated && <ServerBadge label={collab.serverLabel} />}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                             {collab.email}
