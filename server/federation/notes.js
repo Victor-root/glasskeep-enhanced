@@ -501,6 +501,22 @@ function createNoteFederation(ctx) {
     syncTick,
     onNoteChangedLocally,
     isReadOnly,
+    // Federation status of a note, for serialization to the client: the
+    // role, the live link state, whether it's currently read-only (a
+    // MIRROR whose authority link isn't writable), and the peer's name —
+    // everything the note UI needs to show the right banner.
+    noteFederationInfo(noteId) {
+      const m = q.getMapping.get(noteId);
+      if (!m) return null;
+      const link = store.getById(m.link_id);
+      const writable = link ? require("./protocol").isLinkWritable(link) : false;
+      return {
+        role: m.role,
+        state: require("./protocol").deriveLinkState(link),
+        readOnly: m.role === "mirror" && !writable,
+        peerLabel: link ? link.peer_label || hostOf(link.peer_base_url) : null,
+      };
+    },
     isPeerHost: (host) => !!activeLinkForHost(host),
     getMapping: (noteId) => q.getMapping.get(noteId),
     // Friendly name of the server a shadow user belongs to, for badges.

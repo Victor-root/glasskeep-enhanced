@@ -1370,6 +1370,10 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   // ── Collaboration entre serveurs (fédération) ──
   fedSectionTitle: "Collaboration entre serveurs",
   fedRemoteServer: "Serveur distant",
+  fedReadOnlyOffline: "{peer} est hors ligne — modification désactivée le temps qu'il revienne en ligne.",
+  fedReadOnlyLocked: "{peer} est verrouillé — modification désactivée tant que son administrateur ne l'a pas déverrouillé.",
+  fedReadOnlyIncompatible: "{peer} n'est pas à jour — modification désactivée tant que les deux serveurs ne sont pas mis à jour.",
+  fedReadOnlyUnknown: "Connexion à {peer}… — modification temporairement désactivée.",
   fedOnServer: "sur {server}",
   fedOtherServers: "Autres serveurs",
   fedIntro:

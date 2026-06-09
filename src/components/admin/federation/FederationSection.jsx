@@ -41,6 +41,31 @@ export default function FederationSection({
   const [submitting, setSubmitting] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [copiedAddr, setCopiedAddr] = useState(false);
+
+  const copyAddress = async () => {
+    const value = fed.localBaseUrl || "";
+    if (!value) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = value;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "absolute";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopiedAddr(true);
+      window.setTimeout(() => setCopiedAddr(false), 1800);
+    } catch {
+      /* clipboard blocked — silent */
+    }
+  };
 
   // Keep the name field in sync with what the server reports.
   useEffect(() => {
@@ -156,16 +181,32 @@ export default function FederationSection({
         </div>
       </div>
 
-      {/* This server's public address (what the peer will see). */}
+      {/* This server's public address — copy-ready so it's easy to send
+          to the other server's admin to pair from their side. */}
       <div className="rounded-lg border border-[var(--border-light)] bg-gray-50 dark:bg-black/30 p-3">
-        <div className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300 mb-1 flex items-center gap-1.5">
+        <div className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300 mb-2 flex items-center gap-1.5">
           <TI.WorldWww className="tabler-icon w-4 h-4" />
           {t("fedThisServer")}
         </div>
-        <code className="block text-xs font-mono text-gray-800 dark:text-gray-100 break-all">
-          {fed.localBaseUrl}
-        </code>
-        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+        <div className="flex items-center gap-2">
+          <code className="flex-1 min-w-0 text-xs font-mono text-gray-800 dark:text-gray-100 bg-white dark:bg-black/40 border border-[var(--border-light)] rounded-md px-2 py-1.5 whitespace-nowrap overflow-x-auto">
+            {fed.localBaseUrl}
+          </code>
+          <button
+            type="button"
+            onClick={copyAddress}
+            aria-label={t("copy")}
+            className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-1.5 rounded-md bg-white dark:bg-white/10 border border-[var(--border-light)] hover:bg-gray-100 dark:hover:bg-white/15"
+          >
+            {copiedAddr ? (
+              <TI.Check className="tabler-icon w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" />
+            ) : (
+              <TI.Copy className="tabler-icon w-3.5 h-3.5 opacity-70" />
+            )}
+            {copiedAddr ? t("copied") : t("copy")}
+          </button>
+        </div>
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2">
           {t("fedThisServerHint")}
         </p>
       </div>

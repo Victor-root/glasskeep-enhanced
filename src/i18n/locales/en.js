@@ -1367,6 +1367,10 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   // ── Cross-server collaboration (federation) ──
   fedSectionTitle: "Cross-server collaboration",
   fedRemoteServer: "Remote server",
+  fedReadOnlyOffline: "{peer} is offline — editing is disabled until it's back online.",
+  fedReadOnlyLocked: "{peer} is locked — editing is disabled until its admin unlocks it.",
+  fedReadOnlyIncompatible: "{peer} is out of date — editing is disabled until both servers are updated.",
+  fedReadOnlyUnknown: "Connecting to {peer}… — editing is temporarily disabled.",
   fedOnServer: "on {server}",
   fedOtherServers: "Other servers",
   fedIntro:
