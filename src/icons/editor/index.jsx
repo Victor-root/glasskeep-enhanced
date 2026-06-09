@@ -89,6 +89,7 @@ import userPlusSvg        from "./tabler/user-plus.svg?raw";
 import userClockSvg       from "./tabler/user-clock.svg?raw";
 import shieldLockSvg      from "./tabler/shield-lock.svg?raw";
 import worldSvg           from "./tabler/world.svg?raw";
+import worldWwwSvg        from "./tabler/world-www.svg?raw";
 import serverSvg          from "./tabler/server.svg?raw";
 import pencilSvg          from "./tabler/pencil.svg?raw";
 import trashSvg           from "./tabler/trash.svg?raw";
@@ -245,6 +246,7 @@ export const TI = {
   UserClock:            (p) => <TablerIcon svg={userClockSvg} {...p} />,
   ShieldLock:           (p) => <TablerIcon svg={shieldLockSvg} {...p} />,
   World:                (p) => <TablerIcon svg={worldSvg} {...p} />,
+  WorldWww:             (p) => <TablerIcon svg={worldWwwSvg} {...p} />,
   Server:               (p) => <TablerIcon svg={serverSvg} {...p} />,
   Pencil:               (p) => <TablerIcon svg={pencilSvg} {...p} />,
   Trash:                (p) => <TablerIcon svg={trashSvg} {...p} />,

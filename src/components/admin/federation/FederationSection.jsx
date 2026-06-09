@@ -15,6 +15,7 @@ import TI from "../../../icons/editor/index.jsx";
 import { SettingsSubHeading } from "../../common/SettingsAccordion.jsx";
 import { useFederation } from "../../../hooks/useFederation.js";
 import FederationLinkCard from "./FederationLinkCard.jsx";
+import { ServerShareIcon } from "./FederationIcons.jsx";
 
 // Map a server error code to a friendly, translated sentence.
 function inviteErrorMessage(err) {
@@ -158,7 +159,7 @@ export default function FederationSection({
       {/* This server's public address (what the peer will see). */}
       <div className="rounded-lg border border-[var(--border-light)] bg-gray-50 dark:bg-black/30 p-3">
         <div className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300 mb-1 flex items-center gap-1.5">
-          <TI.World className="tabler-icon w-4 h-4" />
+          <TI.WorldWww className="tabler-icon w-4 h-4" />
           {t("fedThisServer")}
         </div>
         <code className="block text-xs font-mono text-gray-800 dark:text-gray-100 break-all">
@@ -172,7 +173,7 @@ export default function FederationSection({
       {/* Invite form */}
       <div className="rounded-xl border border-[var(--border-light)] bg-white/60 dark:bg-white/5 p-4">
         <div className="text-sm font-semibold mb-2 flex items-center gap-2">
-          <TI.UserPlus className="tabler-icon w-4 h-4 text-[var(--gk-chrome-accent)]" />
+          <ServerShareIcon className="w-5 h-5 text-[var(--gk-chrome-accent)]" />
           {t("fedPairTitle")}
         </div>
         <p className="text-xs text-gray-600 dark:text-gray-300 mb-3">

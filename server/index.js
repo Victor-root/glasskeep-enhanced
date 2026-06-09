@@ -1171,10 +1171,31 @@ function setUserPinOrPosition(noteId, userId, { pinned, position }) {
 // Federation badge info for a participant: whether they're a stand-in
 // for a remote-server user and, if so, that server's friendly name.
 function participantFedInfo(federatedOrigin) {
-  if (!federatedOrigin) return { federated: false, serverLabel: null };
+  if (!federatedOrigin) return { federated: false, serverLabel: null, remoteRef: null };
+  // federated_origin is "<linkId>|<remoteRef>"; the remoteRef is the
+  // participant's own identity on the peer (clean — no server URL).
+  const idx = String(federatedOrigin).indexOf("|");
+  const remoteRef = idx >= 0 ? String(federatedOrigin).slice(idx + 1) : null;
   return {
     federated: true,
     serverLabel: noteFederationRef?.serverLabelForOrigin(federatedOrigin) || null,
+    remoteRef,
+  };
+}
+
+// Build a participant object for collaborator lists. For a remote
+// stand-in, the secondary line shows their clean identity on the peer
+// (remoteRef), NOT the synthetic local email that embeds the server URL.
+function participantObj(u, extra = {}) {
+  const fed = participantFedInfo(u.federated_origin);
+  return {
+    id: u.id,
+    name: u.name,
+    email: fed.federated ? fed.remoteRef || u.email : u.email,
+    avatar_url: u.avatar_url || null,
+    federated: fed.federated,
+    serverLabel: fed.serverLabel,
+    ...extra,
   };
 }
 
@@ -1182,13 +1203,11 @@ function getNoteParticipants(noteId, noteOwnerId, requestingUserId) {
   const collabList = getNoteCollaborators.all(noteId);
   if (collabList.length === 0) return null;
   const others = collabList
-    .filter(c => c.id !== requestingUserId)
-    .map(c => ({ id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url || null, ...participantFedInfo(c.federated_origin) }));
+    .filter((c) => c.id !== requestingUserId)
+    .map((c) => participantObj(c));
   if (noteOwnerId !== requestingUserId) {
     const owner = getUserById.get(noteOwnerId);
-    if (owner) {
-      others.unshift({ id: owner.id, name: owner.name, email: owner.email, avatar_url: owner.avatar_url || null, ...participantFedInfo(owner.federated_origin) });
-    }
+    if (owner) others.unshift(participantObj(owner));
   }
   return others.length > 0 ? others : null;
 }
@@ -2251,26 +2270,13 @@ app.get("/api/notes/:id/collaborators", auth, (req, res) => {
   }
 
   const collaborators = getNoteCollaborators.all(noteId);
-  const result = collaborators.map(c => ({
-    id: c.id,
-    name: c.name,
-    email: c.email,
-    avatar_url: c.avatar_url || null,
-    added_at: c.added_at,
-    added_by: c.added_by,
-    ...participantFedInfo(c.federated_origin),
-  }));
+  const result = collaborators.map((c) =>
+    participantObj(c, { added_at: c.added_at, added_by: c.added_by }),
+  );
 
   const owner = getUserById.get(note.user_id);
   if (owner) {
-    result.unshift({
-      id: owner.id,
-      name: owner.name,
-      email: owner.email,
-      avatar_url: owner.avatar_url || null,
-      isOwner: true,
-      ...participantFedInfo(owner.federated_origin),
-    });
+    result.unshift(participantObj(owner, { isOwner: true }));
   }
 
   res.json(result);

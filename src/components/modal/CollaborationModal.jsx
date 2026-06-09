@@ -118,11 +118,9 @@ export default function CollaborationModal({
                             )}
                             {collab.federated && <ServerBadge label={collab.serverLabel} />}
                           </p>
-                          {!collab.federated && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                              {collab.email}
-                            </p>
-                          )}
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {collab.email}
+                          </p>
                         </div>
                       </div>
                       {canRemove && (
@@ -291,34 +289,31 @@ export default function CollaborationModal({
                   </div>
                 ))}
 
-                {remoteList.length > 0 && (
-                  <>
-                    {filteredUsers.length > 0 && (
-                      <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 border-t border-gray-200 dark:border-gray-700">
-                        {t("fedOtherServers")}
+                {remoteList.map((u) => (
+                  <div
+                    key={`${u.host}|${u.ref}`}
+                    className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0 flex items-center gap-2.5"
+                    onClick={() => onAddCollaborator(`${u.ref}@${u.host}`)}
+                  >
+                    <UserAvatar
+                      name={u.name}
+                      email={u.ref}
+                      avatarUrl={null}
+                      size="w-7 h-7"
+                      textSize="text-[10px]"
+                      dark={dark}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <span className="truncate">{u.name || u.ref}</span>
+                        <ServerBadge label={u.serverLabel} />
                       </div>
-                    )}
-                    {remoteList.map((u) => (
-                      <div
-                        key={`${u.host}|${u.ref}`}
-                        className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0 flex items-center gap-2.5"
-                        onClick={() => onAddCollaborator(`${u.ref}@${u.host}`)}
-                      >
-                        <span className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)]">
-                          <TI.Server className="tabler-icon w-4 h-4" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">
-                            {u.name || u.ref}
-                          </div>
-                          <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                            {t("fedOnServer").replace("{server}", u.serverLabel || u.host)}
-                          </div>
-                        </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                        {u.ref}
                       </div>
-                    ))}
-                  </>
-                )}
+                    </div>
+                  </div>
+                ))}
               </>
             )}
           </div>,
