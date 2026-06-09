@@ -91,6 +91,7 @@ import shieldLockSvg      from "./tabler/shield-lock.svg?raw";
 import worldSvg           from "./tabler/world.svg?raw";
 import worldWwwSvg        from "./tabler/world-www.svg?raw";
 import serverSvg          from "./tabler/server.svg?raw";
+import homeLockSvg        from "./tabler/home-lock.svg?raw";
 import pencilSvg          from "./tabler/pencil.svg?raw";
 import trashSvg           from "./tabler/trash.svg?raw";
 import checkSvg           from "./tabler/check.svg?raw";
@@ -248,6 +249,7 @@ export const TI = {
   World:                (p) => <TablerIcon svg={worldSvg} {...p} />,
   WorldWww:             (p) => <TablerIcon svg={worldWwwSvg} {...p} />,
   Server:               (p) => <TablerIcon svg={serverSvg} {...p} />,
+  HomeLock:             (p) => <TablerIcon svg={homeLockSvg} {...p} />,
   Pencil:               (p) => <TablerIcon svg={pencilSvg} {...p} />,
   Trash:                (p) => <TablerIcon svg={trashSvg} {...p} />,
   Check:                (p) => <TablerIcon svg={checkSvg} {...p} />,

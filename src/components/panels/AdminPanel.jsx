@@ -7,7 +7,6 @@ import EncryptionAdminSection from "../lock/EncryptionAdminSection.jsx";
 import AiAdminSection from "./AiAdminSection.jsx";
 import AdminUpdateSection from "../admin/AdminUpdateSection.jsx";
 import FederationSection from "../admin/federation/FederationSection.jsx";
-import { ServerShareIcon } from "../admin/federation/FederationIcons.jsx";
 import LoginBrandingSection from "./LoginBrandingSection.jsx";
 import { localizeServerError } from "../../utils/serverErrors.js";
 import { RowIcon, SettingsSection } from "../common/SettingsAccordion.jsx";
@@ -491,7 +490,7 @@ export default function AdminPanel({
           {/* Site settings (login slogan, registration toggle) */}
           <div className="mb-2">
             <SettingsSection
-              icon={TI.World}
+              icon={TI.HomeLock}
               title={t("siteSettings")}
               open={openSections.site}
               onToggle={() => toggleSection("site")}
@@ -761,7 +760,7 @@ export default function AdminPanel({
               section component owns the pairing + link-management UI. */}
           <div className="mb-2">
             <SettingsSection
-              icon={ServerShareIcon}
+              icon={TI.Server}
               title={t("fedSectionTitle")}
               open={openSections.federation}
               onToggle={() => toggleSection("federation")}
