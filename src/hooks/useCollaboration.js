@@ -31,6 +31,8 @@ export default function useCollaboration(token, {
   const [collaboratorUsername, setCollaboratorUsername] = useState("");
   const [addModalCollaborators, setAddModalCollaborators] = useState([]);
   const [availableUsers, setAvailableUsers] = useState([]);
+  // Active paired servers (for cross-server "share with user@server").
+  const [peers, setPeers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -92,6 +94,18 @@ export default function useCollaboration(token, {
     [token],
   );
 
+  // Paired servers, so the modal can offer "share with <user> on <server>"
+  // without the user ever typing a URL. Best-effort: empty list just means
+  // no cross-server option is shown.
+  const loadPeers = useCallback(async () => {
+    try {
+      const data = await api("/federation/peers", { token });
+      setPeers(Array.isArray(data?.peers) ? data.peers : []);
+    } catch {
+      setPeers([]);
+    }
+  }, [token]);
+
   const removeCollaborator = async (collaboratorId, noteId = null, mode = null) => {
     try {
       const targetNoteId = noteId || collaborationDialogNoteId || activeId;
@@ -133,7 +147,12 @@ export default function useCollaboration(token, {
           (u) => u.id !== currentUser?.id && !existingCollaboratorIds.has(u.id),
         );
         setFilteredUsers(filtered);
-        setShowUserDropdown(filtered.length > 0);
+        // Keep the dropdown open when there's text and at least one paired
+        // server, so the cross-server "share with <user> on <server>"
+        // option is reachable even with no local match.
+        setShowUserDropdown(
+          filtered.length > 0 || (peers.length > 0 && searchQuery.length > 0),
+        );
       } catch (e) {
         console.error("Failed to search users:", e);
         setFilteredUsers([]);
@@ -142,7 +161,7 @@ export default function useCollaboration(token, {
         setLoadingUsers(false);
       }
     },
-    [token, addModalCollaborators, currentUser],
+    [token, addModalCollaborators, currentUser, peers],
   );
 
   const updateDropdownPosition = useCallback(() => {
@@ -231,8 +250,9 @@ export default function useCollaboration(token, {
   useEffect(() => {
     if (collaborationModalOpen && activeId) {
       loadCollaboratorsForAddModal(activeId);
+      loadPeers();
     }
-  }, [collaborationModalOpen, activeId, loadCollaboratorsForAddModal]);
+  }, [collaborationModalOpen, activeId, loadCollaboratorsForAddModal, loadPeers]);
 
   return {
     // Dialog state
@@ -245,6 +265,7 @@ export default function useCollaboration(token, {
     collaboratorUsername, setCollaboratorUsername,
     addModalCollaborators,
     availableUsers,
+    peers,
     filteredUsers, setFilteredUsers,
     showUserDropdown, setShowUserDropdown,
     loadingUsers,

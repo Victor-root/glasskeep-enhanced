@@ -57,7 +57,20 @@ const JWT_SECRET = (() => {
 })();
 
 // ---------- Body parsing ----------
-app.use(express.json({ limit: "160mb" }));
+// `verify` stashes the raw request body, but ONLY for the
+// server-to-server federation endpoints, which HMAC-sign the exact
+// bytes they sent. Capturing it everywhere would needlessly hold a copy
+// of every (up to 160 MB) upload; federation payloads are tiny.
+app.use(
+  express.json({
+    limit: "160mb",
+    verify: (req, _res, buf) => {
+      if (req.url && req.url.startsWith("/api/federation/")) {
+        req.rawBody = buf.toString("utf8");
+      }
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true, limit: "160mb" }));
 
 // Trust proxy headers (X-Forwarded-Proto / X-Forwarded-For) when:
@@ -526,6 +539,7 @@ const { attachUpdateRoutes } = require("./routes/updateRoutes");
 const { attachSelfUpdateRoutes } = require("./routes/selfUpdateRoutes");
 const { attachAssetLinksRoutes } = require("./routes/assetLinksRoutes");
 const { attachDeviceLinkRoutes } = require("./routes/deviceLinkRoutes");
+const { attachFederationRoutes } = require("./routes/federationRoutes");
 const { requireUnlocked } = require("./routes/lockMiddleware");
 const { t: serverT } = require("./i18n");
 const pushService = require("./services/pushNotifications");
@@ -990,7 +1004,7 @@ const addCollaborator = db.prepare(`
   VALUES (?, ?, ?, ?)
 `);
 const getNoteCollaborators = db.prepare(`
-  SELECT u.id, u.name, u.email, u.avatar_url, nc.added_at, nc.added_by
+  SELECT u.id, u.name, u.email, u.avatar_url, u.federated_origin, nc.added_at, nc.added_by
   FROM note_collaborators nc
   JOIN users u ON nc.user_id = u.id
   WHERE nc.note_id = ?
@@ -1149,16 +1163,26 @@ function setUserPinOrPosition(noteId, userId, { pinned, position }) {
 
 // Build participant list for a note: shows the OTHER users, not the requesting user.
 // For the owner: shows collaborators. For a collaborator: shows the owner + other collaborators.
+// Federation badge info for a participant: whether they're a stand-in
+// for a remote-server user and, if so, that server's friendly name.
+function participantFedInfo(federatedOrigin) {
+  if (!federatedOrigin) return { federated: false, serverLabel: null };
+  return {
+    federated: true,
+    serverLabel: noteFederationRef?.serverLabelForOrigin(federatedOrigin) || null,
+  };
+}
+
 function getNoteParticipants(noteId, noteOwnerId, requestingUserId) {
   const collabList = getNoteCollaborators.all(noteId);
   if (collabList.length === 0) return null;
   const others = collabList
     .filter(c => c.id !== requestingUserId)
-    .map(c => ({ id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url || null }));
+    .map(c => ({ id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url || null, ...participantFedInfo(c.federated_origin) }));
   if (noteOwnerId !== requestingUserId) {
     const owner = getUserById.get(noteOwnerId);
     if (owner) {
-      others.unshift({ id: owner.id, name: owner.name, email: owner.email, avatar_url: owner.avatar_url || null });
+      others.unshift({ id: owner.id, name: owner.name, email: owner.email, avatar_url: owner.avatar_url || null, ...participantFedInfo(owner.federated_origin) });
     }
   }
   return others.length > 0 ? others : null;
@@ -1246,6 +1270,11 @@ function getCollaboratorUserIdsForNote(noteId) {
   }
 }
 
+// Set once the federation engine is attached (below). Lets
+// broadcastNoteUpdated push an edit to the peer the instant it lands,
+// without a forward reference to `federation`.
+let noteFederationRef = null;
+
 function broadcastNoteUpdated(noteId) {
   try {
     const note = getNoteById.get(noteId);
@@ -1254,6 +1283,11 @@ function broadcastNoteUpdated(noteId) {
     const evt = { type: "note_updated", noteId };
     for (const uid of recipientIds) sendEventToUser(uid, evt);
   } catch { }
+  // If this note is shared across a federation link, push the change to
+  // the peer immediately (the periodic tick remains the retry/safety
+  // net). Guarded + fire-and-forget so it can never disturb the local
+  // note operation that triggered this broadcast.
+  try { noteFederationRef?.onNoteChangedLocally(noteId); } catch { }
 }
 
 // Persist a "note_shared" notification and push it over SSE if the
@@ -1370,6 +1404,49 @@ attachAssetLinksRoutes(app, { log: console });
 // phone scans + approves, the PC trades the token for a JWT on its
 // next poll). Schema is created lazily inside the route module.
 attachDeviceLinkRoutes(app, { db, auth, signToken, getUserById, log: console });
+
+// Cross-server collaboration ("federation"). Pairs two GlassKeep
+// servers so their users can share notes across instances. The returned
+// `tick` drives the pairing handshake retries and the per-link health
+// probes; we run it on an interval (unref'd so it never keeps the
+// process alive on its own) and the routes also kick it on demand.
+const federation = attachFederationRoutes(app, {
+  db,
+  auth,
+  adminOnly,
+  log: console,
+  broadcastToAdmins,
+  // Note helpers the note-federation engine reuses, so mirrored notes go
+  // through the SAME encryption-aware write path as local notes.
+  noteDeps: {
+    nowISO,
+    isLocked: () => runtimeUnlock.isEnabled() && !runtimeUnlock.isUnlocked(),
+    sendEventToUser,
+    getUserById,
+    getUserByEmail,
+    getUserByName,
+    getNoteById,
+    runInsertNote,
+    runUpdateNoteFullCollab,
+    addCollaborator,
+    getMaxUserEffectivePosition,
+    upsertUserPosition,
+    updateNoteWithEditor,
+    createShareNotification,
+    broadcastNoteUpdated,
+    isNewerOrEqual,
+    parseIsoTimestamp,
+  },
+});
+// Wire the instant-push hook used by broadcastNoteUpdated (declared above).
+noteFederationRef = federation.noteFederation;
+const FEDERATION_TICK_MS = (() => {
+  const raw = parseInt(process.env.FEDERATION_TICK_MS, 10);
+  return Number.isFinite(raw) && raw >= 5000 ? raw : 15000;
+})();
+setInterval(() => {
+  federation.tick().catch((e) => console.warn("[federation] tick error:", e?.message));
+}, FEDERATION_TICK_MS).unref();
 
 const LOCK_ALLOW_PATHS = [
   /^\/api\/instance(\/|$)/,
@@ -1509,6 +1586,11 @@ app.post("/api/login", (req, res) => {
     user = email ? getUserByEmail.get(email) : null;
   }
   if (!user) return res.status(401).json({ error: "No account found." });
+  // Federation stand-in accounts (local mirrors of a remote server's
+  // users) must never authenticate — they exist only to own/participate
+  // in mirrored notes. Same generic message so they're indistinguishable
+  // from a missing account.
+  if (user.federated_origin) return res.status(401).json({ error: "No account found." });
   if (!bcrypt.compareSync(password || "", user.password_hash)) {
     return res.status(401).json({ error: "Incorrect password." });
   }
@@ -2043,7 +2125,7 @@ app.post("/api/notes/reorder", auth, (req, res) => {
 });
 
 // ---------- Collaboration ----------
-app.post("/api/notes/:id/collaborate", auth, (req, res) => {
+app.post("/api/notes/:id/collaborate", auth, async (req, res) => {
   const noteId = req.params.id;
   const { username } = req.body || {};
 
@@ -2055,6 +2137,38 @@ app.post("/api/notes/:id/collaborate", auth, (req, res) => {
   const note = getNote.get(noteId, req.user.id);
   if (!note) {
     return res.status(404).json({ error: "Note not found" });
+  }
+
+  // Cross-server share: "user@peer-host" where peer-host (incl. :port if
+  // non-standard) is a currently-paired server. Route to the federation
+  // engine, which mirrors the note onto the peer and adds a stand-in
+  // collaborator here. Anything else falls through to the local lookup.
+  const atIdx = username.lastIndexOf("@");
+  if (atIdx > 0 && federation?.noteFederation) {
+    const peerHost = username.slice(atIdx + 1).trim().toLowerCase();
+    if (federation.noteFederation.isPeerHost(peerHost)) {
+      const targetRef = username.slice(0, atIdx).trim();
+      try {
+        const owner = getUserById.get(req.user.id);
+        const result = await federation.noteFederation.shareWithRemote({
+          note, owner, targetRef, peerHost,
+        });
+        if (!result.ok) {
+          const codeMap = { peer_not_paired: 400, user_not_found: 404 };
+          return res
+            .status(codeMap[result.error] || 502)
+            .json({ error: result.error || "federation_failed" });
+        }
+        return res.json({
+          ok: true,
+          message: `Shared with ${result.collaborator?.name || targetRef}`,
+          collaborator: result.collaborator,
+        });
+      } catch (e) {
+        console.warn("[federation/notes] shareWithRemote failed:", e?.message);
+        return res.status(500).json({ error: "federation_failed" });
+      }
+    }
   }
 
   // Find user to collaborate with (by email or name)
@@ -2137,7 +2251,8 @@ app.get("/api/notes/:id/collaborators", auth, (req, res) => {
     email: c.email,
     avatar_url: c.avatar_url || null,
     added_at: c.added_at,
-    added_by: c.added_by
+    added_by: c.added_by,
+    ...participantFedInfo(c.federated_origin),
   }));
 
   const owner = getUserById.get(note.user_id);
@@ -2147,7 +2262,8 @@ app.get("/api/notes/:id/collaborators", auth, (req, res) => {
       name: owner.name,
       email: owner.email,
       avatar_url: owner.avatar_url || null,
-      isOwner: true
+      isOwner: true,
+      ...participantFedInfo(owner.federated_origin),
     });
   }
 
@@ -3819,8 +3935,9 @@ app.post("/api/admin/pending-users/:id/reject", auth, adminOnly, (req, res) => {
 // Search users endpoint for collaboration
 const searchUsersStmt = db.prepare(`
   SELECT id, name, email, avatar_url
-  FROM users 
+  FROM users
   WHERE (name LIKE ? OR email LIKE ?)
+    AND federated_origin IS NULL
   ORDER BY name ASC
   LIMIT 50
 `);
