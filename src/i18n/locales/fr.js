@@ -1369,6 +1369,9 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
 
   // ── Collaboration entre serveurs (fédération) ──
   fedSectionTitle: "Collaboration entre serveurs",
+  fedRemoteServer: "Serveur distant",
+  fedOnServer: "sur {server}",
+  fedOtherServers: "Autres serveurs",
   fedIntro:
     "Associez ce serveur à un autre serveur GlassKeep de confiance pour que vos utilisateurs puissent collaborer sur des notes entre les deux instances. Les deux serveurs doivent être joignables en HTTPS avec un certificat valide.",
   fedHttpsRequired:

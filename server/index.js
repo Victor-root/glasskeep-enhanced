@@ -1004,7 +1004,7 @@ const addCollaborator = db.prepare(`
   VALUES (?, ?, ?, ?)
 `);
 const getNoteCollaborators = db.prepare(`
-  SELECT u.id, u.name, u.email, u.avatar_url, nc.added_at, nc.added_by
+  SELECT u.id, u.name, u.email, u.avatar_url, u.federated_origin, nc.added_at, nc.added_by
   FROM note_collaborators nc
   JOIN users u ON nc.user_id = u.id
   WHERE nc.note_id = ?
@@ -1163,16 +1163,26 @@ function setUserPinOrPosition(noteId, userId, { pinned, position }) {
 
 // Build participant list for a note: shows the OTHER users, not the requesting user.
 // For the owner: shows collaborators. For a collaborator: shows the owner + other collaborators.
+// Federation badge info for a participant: whether they're a stand-in
+// for a remote-server user and, if so, that server's friendly name.
+function participantFedInfo(federatedOrigin) {
+  if (!federatedOrigin) return { federated: false, serverLabel: null };
+  return {
+    federated: true,
+    serverLabel: noteFederationRef?.serverLabelForOrigin(federatedOrigin) || null,
+  };
+}
+
 function getNoteParticipants(noteId, noteOwnerId, requestingUserId) {
   const collabList = getNoteCollaborators.all(noteId);
   if (collabList.length === 0) return null;
   const others = collabList
     .filter(c => c.id !== requestingUserId)
-    .map(c => ({ id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url || null }));
+    .map(c => ({ id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url || null, ...participantFedInfo(c.federated_origin) }));
   if (noteOwnerId !== requestingUserId) {
     const owner = getUserById.get(noteOwnerId);
     if (owner) {
-      others.unshift({ id: owner.id, name: owner.name, email: owner.email, avatar_url: owner.avatar_url || null });
+      others.unshift({ id: owner.id, name: owner.name, email: owner.email, avatar_url: owner.avatar_url || null, ...participantFedInfo(owner.federated_origin) });
     }
   }
   return others.length > 0 ? others : null;
@@ -1260,6 +1270,11 @@ function getCollaboratorUserIdsForNote(noteId) {
   }
 }
 
+// Set once the federation engine is attached (below). Lets
+// broadcastNoteUpdated push an edit to the peer the instant it lands,
+// without a forward reference to `federation`.
+let noteFederationRef = null;
+
 function broadcastNoteUpdated(noteId) {
   try {
     const note = getNoteById.get(noteId);
@@ -1268,6 +1283,11 @@ function broadcastNoteUpdated(noteId) {
     const evt = { type: "note_updated", noteId };
     for (const uid of recipientIds) sendEventToUser(uid, evt);
   } catch { }
+  // If this note is shared across a federation link, push the change to
+  // the peer immediately (the periodic tick remains the retry/safety
+  // net). Guarded + fire-and-forget so it can never disturb the local
+  // note operation that triggered this broadcast.
+  try { noteFederationRef?.onNoteChangedLocally(noteId); } catch { }
 }
 
 // Persist a "note_shared" notification and push it over SSE if the
@@ -1401,6 +1421,7 @@ const federation = attachFederationRoutes(app, {
   noteDeps: {
     nowISO,
     isLocked: () => runtimeUnlock.isEnabled() && !runtimeUnlock.isUnlocked(),
+    sendEventToUser,
     getUserById,
     getUserByEmail,
     getUserByName,
@@ -1417,6 +1438,8 @@ const federation = attachFederationRoutes(app, {
     parseIsoTimestamp,
   },
 });
+// Wire the instant-push hook used by broadcastNoteUpdated (declared above).
+noteFederationRef = federation.noteFederation;
 const FEDERATION_TICK_MS = (() => {
   const raw = parseInt(process.env.FEDERATION_TICK_MS, 10);
   return Number.isFinite(raw) && raw >= 5000 ? raw : 15000;
@@ -2228,7 +2251,8 @@ app.get("/api/notes/:id/collaborators", auth, (req, res) => {
     email: c.email,
     avatar_url: c.avatar_url || null,
     added_at: c.added_at,
-    added_by: c.added_by
+    added_by: c.added_by,
+    ...participantFedInfo(c.federated_origin),
   }));
 
   const owner = getUserById.get(note.user_id);
@@ -2238,7 +2262,8 @@ app.get("/api/notes/:id/collaborators", auth, (req, res) => {
       name: owner.name,
       email: owner.email,
       avatar_url: owner.avatar_url || null,
-      isOwner: true
+      isOwner: true,
+      ...participantFedInfo(owner.federated_origin),
     });
   }
 

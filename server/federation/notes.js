@@ -44,6 +44,10 @@ function createNoteFederation(ctx) {
   } catch (e) {
     log.warn?.("[federation/notes] users migration:", e?.message);
   }
+  // federated_notes intentionally has NO "ON DELETE CASCADE": when a home
+  // note is deleted the mapping must SURVIVE so the next sync can tell the
+  // peer to remove its mirror, then drop the mapping itself. Early builds
+  // shipped a cascade; migrate it away in place.
   db.exec(`
     CREATE TABLE IF NOT EXISTS federated_notes (
       note_id TEXT PRIMARY KEY,
@@ -51,11 +55,30 @@ function createNoteFederation(ctx) {
       role TEXT NOT NULL,                 -- 'home' (we own) | 'mirror' (peer owns)
       remote_owner_ref TEXT,              -- the owner's identity on the peer
       last_pushed_cua TEXT,               -- client_updated_at last pushed to the peer
-      created_at TEXT NOT NULL,
-      FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE
+      created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_federated_notes_link ON federated_notes(link_id);
   `);
+  try {
+    const def = db
+      .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='federated_notes'")
+      .get();
+    if (def && /ON DELETE CASCADE/i.test(def.sql)) {
+      db.exec(`
+        CREATE TABLE federated_notes_new (
+          note_id TEXT PRIMARY KEY, link_id TEXT NOT NULL, role TEXT NOT NULL,
+          remote_owner_ref TEXT, last_pushed_cua TEXT, created_at TEXT NOT NULL
+        );
+        INSERT INTO federated_notes_new
+          SELECT note_id, link_id, role, remote_owner_ref, last_pushed_cua, created_at FROM federated_notes;
+        DROP TABLE federated_notes;
+        ALTER TABLE federated_notes_new RENAME TO federated_notes;
+        CREATE INDEX IF NOT EXISTS idx_federated_notes_link ON federated_notes(link_id);
+      `);
+    }
+  } catch (e) {
+    log.warn?.("[federation/notes] cascade migration:", e?.message);
+  }
 
   const q = {
     getMapping: db.prepare(`SELECT * FROM federated_notes WHERE note_id = ?`),
@@ -73,6 +96,21 @@ function createNoteFederation(ctx) {
       INSERT INTO users (name, email, password_hash, created_at, is_admin, federated_origin)
       VALUES (?, ?, ?, ?, 0, ?)
     `),
+    // Does this note still carry the shadow collaborator that represents
+    // the peer side of the given link? (i.e. is it still shared there?)
+    hasShadowCollab: db.prepare(`
+      SELECT 1 FROM note_collaborators nc
+      JOIN users u ON nc.user_id = u.id
+      WHERE nc.note_id = ? AND u.federated_origin LIKE ?
+      LIMIT 1
+    `),
+    // Real (non-shadow) participants of a note, to notify on removal.
+    realParticipants: db.prepare(`
+      SELECT nc.user_id FROM note_collaborators nc
+      JOIN users u ON nc.user_id = u.id
+      WHERE nc.note_id = ? AND u.federated_origin IS NULL
+    `),
+    deleteNoteRow: db.prepare(`DELETE FROM notes WHERE id = ?`),
   };
 
   // ── Helpers ─────────────────────────────────────────────────────────
@@ -310,10 +348,63 @@ function createNoteFederation(ctx) {
     return { ok: true };
   }
 
-  // ── Tick: push our changed federated notes to each peer ─────────────
+  // Push one note's current content to its peer (LWW on the other side).
+  async function pushNoteContent(link, note) {
+    const path = "/api/federation/notes/apply";
+    const resp = await peer.httpJson(link.peer_base_url + path, {
+      method: "POST",
+      secret: link.shared_secret,
+      linkId: link.id,
+      path,
+      body: { linkId: link.id, note: contentFromNote(note) },
+    });
+    if (resp.ok && resp.json && resp.json.ok === true) {
+      q.setPushed.run(note.client_updated_at, note.id);
+      return true;
+    }
+    return false;
+  }
+
+  // Tell the peer to tear down its mirror of a note we no longer share.
+  async function pushRemoval(link, noteId) {
+    const path = "/api/federation/notes/remove";
+    const resp = await peer.httpJson(link.peer_base_url + path, {
+      method: "POST",
+      secret: link.shared_secret,
+      linkId: link.id,
+      path,
+      body: { linkId: link.id, noteId },
+    });
+    return !!(resp.ok && resp.json && resp.json.ok === true);
+  }
+
+  // Has a HOME note's share been revoked locally? (the note was deleted,
+  // trashed, or the remote participant removed) → the mirror must go.
+  function homeShareRevoked(m, note) {
+    if (!note) return true;
+    if (note.trashed) return true;
+    return !q.hasShadowCollab.get(m.note_id, `${m.link_id}|%`);
+  }
+
+  async function reconcileMapping(m) {
+    const link = store.getById(m.link_id);
+    if (!link || link.status !== "active" || link.peer_reachable !== 1) return;
+    const note = deps.getNoteById.get(m.note_id);
+
+    // Revoked home share → remove the mirror, then forget the mapping.
+    if (m.role === "home" && homeShareRevoked(m, note)) {
+      if (await pushRemoval(link, m.note_id)) q.deleteMapping.run(m.note_id);
+      return;
+    }
+    if (!note) return;
+    if (note.client_updated_at && note.client_updated_at === m.last_pushed_cua) return; // unchanged
+    await pushNoteContent(link, note);
+  }
+
+  // ── Tick: reconcile every federated note with its peer ──────────────
+  // While locked we can't decrypt our own notes to push them; resume
+  // automatically once unlocked.
   async function syncTick() {
-    // While locked we can't decrypt our own notes to push them; resume
-    // automatically once unlocked.
     if (deps.isLocked?.()) return;
     let rows;
     try {
@@ -323,27 +414,50 @@ function createNoteFederation(ctx) {
     }
     for (const m of rows) {
       try {
-        const link = store.getById(m.link_id);
-        if (!link || link.status !== "active" || link.peer_reachable !== 1) continue;
-        const note = deps.getNoteById.get(m.note_id);
-        if (!note) continue;
-        if (note.client_updated_at && note.client_updated_at === m.last_pushed_cua) continue; // unchanged
-
-        const path = "/api/federation/notes/apply";
-        const resp = await peer.httpJson(link.peer_base_url + path, {
-          method: "POST",
-          secret: link.shared_secret,
-          linkId: link.id,
-          path,
-          body: { linkId: link.id, note: contentFromNote(note) },
-        });
-        if (resp.ok && resp.json && resp.json.ok === true) {
-          q.setPushed.run(note.client_updated_at, note.id);
-        }
+        await reconcileMapping(m);
       } catch (e) {
-        log.warn?.(`[federation/notes] push ${m.note_id} failed:`, e?.message);
+        log.warn?.(`[federation/notes] reconcile ${m.note_id} failed:`, e?.message);
       }
     }
+  }
+
+  // Instant path: an edit just landed on a federated note → push it now
+  // (the tick stays the retry/safety net). Fire-and-forget; loop-safe via
+  // last_pushed_cua (an applied incoming write records its version first).
+  function onNoteChangedLocally(noteId) {
+    if (deps.isLocked?.()) return;
+    const m = q.getMapping.get(noteId);
+    if (!m) return;
+    Promise.resolve()
+      .then(() => reconcileMapping(m))
+      .catch((e) => log.warn?.("[federation/notes] instant push:", e?.message));
+  }
+
+  // ── Inbound: the peer removed/unshared a note we mirror ─────────────
+  function handleIncomingRemove({ linkId, noteId }) {
+    const m = q.getMapping.get(noteId);
+    if (!m || m.link_id !== linkId || m.role !== "mirror") {
+      q.deleteMapping.run(noteId); // tidy any stray mapping regardless
+      return { ok: true };
+    }
+    let recipients = [];
+    try {
+      recipients = q.realParticipants.all(noteId).map((r) => r.user_id);
+    } catch { /* ignore */ }
+    try {
+      q.deleteMapping.run(noteId);
+      q.deleteNoteRow.run(noteId); // cascades collaborators / positions / tags
+    } catch (e) {
+      log.warn?.("[federation/notes] remove mirror:", e?.message);
+    }
+    // Drop it from each local participant's open view immediately; an
+    // offline one simply won't get it back on their next notes fetch.
+    for (const uid of recipients) {
+      try {
+        deps.sendEventToUser?.(uid, { type: "note_deleted", noteId });
+      } catch { /* SSE best-effort */ }
+    }
+    return { ok: true };
   }
 
   // A federated MIRROR note is read-only while its home link can't be
@@ -360,11 +474,21 @@ function createNoteFederation(ctx) {
   return {
     handleIncomingShare,
     handleIncomingApply,
+    handleIncomingRemove,
     shareWithRemote,
     syncTick,
+    onNoteChangedLocally,
     isReadOnly,
     isPeerHost: (host) => !!activeLinkForHost(host),
     getMapping: (noteId) => q.getMapping.get(noteId),
+    // Friendly name of the server a shadow user belongs to, for badges.
+    serverLabelForOrigin(federatedOrigin) {
+      if (!federatedOrigin) return null;
+      const linkId = String(federatedOrigin).split("|")[0];
+      const link = store.getById(linkId);
+      if (!link) return null;
+      return link.peer_label || hostOf(link.peer_base_url);
+    },
   };
 }
 

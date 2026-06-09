@@ -4481,6 +4481,7 @@ export default function App() {
     collaborationModalOpen, setCollaborationModalOpen,
     collaboratorUsername, setCollaboratorUsername,
     addModalCollaborators,
+    peers,
     filteredUsers, setFilteredUsers,
     showUserDropdown, setShowUserDropdown,
     loadingUsers,
@@ -6801,6 +6802,7 @@ export default function App() {
       collaboratorUsername={collaboratorUsername}
       setCollaboratorUsername={setCollaboratorUsername}
       addModalCollaborators={addModalCollaborators}
+      peers={peers}
       showUserDropdown={showUserDropdown}
       setShowUserDropdown={setShowUserDropdown}
       filteredUsers={filteredUsers}

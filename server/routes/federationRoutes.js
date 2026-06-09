@@ -315,6 +315,34 @@ function attachFederationRoutes(
     res.status(result.ok ? 200 : 409).json(result);
   });
 
+  // A peer unshared/deleted a note we mirror → tear down the mirror.
+  app.post("/api/federation/notes/remove", (req, res) => {
+    const link = verifyS2S(req);
+    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
+    const result = noteFederation.handleIncomingRemove({
+      linkId: link.id,
+      noteId: (req.body || {}).noteId,
+    });
+    res.status(result.ok ? 200 : 409).json(result);
+  });
+
+  // Active paired peers, for the share UI — ANY signed-in user (not just
+  // admins) needs this to offer "share with <user> on <server>". Exposes
+  // only the friendly label + host, never a secret or pairing detail.
+  app.get("/api/federation/peers", auth, (_req, res) => {
+    const peers = store.listActive().map((l) => {
+      let host = l.peer_base_url;
+      try {
+        host = new URL(l.peer_base_url).host;
+      } catch {
+        /* keep raw */
+      }
+      return { host, label: l.peer_label || host };
+    });
+    res.json({ peers });
+  });
+
   // ─────────────────────────────────────────────────────────────────
   //  ADMIN PANEL
   // ─────────────────────────────────────────────────────────────────

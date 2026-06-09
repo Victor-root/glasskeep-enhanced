@@ -1366,6 +1366,9 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
 
   // ── Cross-server collaboration (federation) ──
   fedSectionTitle: "Cross-server collaboration",
+  fedRemoteServer: "Remote server",
+  fedOnServer: "on {server}",
+  fedOtherServers: "Other servers",
   fedIntro:
     "Pair this server with another GlassKeep server you trust so your users can collaborate on notes across both instances. Both servers must be reachable over HTTPS with a valid certificate.",
   fedHttpsRequired:
