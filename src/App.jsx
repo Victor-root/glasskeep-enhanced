@@ -143,6 +143,36 @@ export default function App() {
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
 
+  // Refresh the cached profile (avatar / name / language) from the server
+  // on boot and whenever the tab regains focus. The user object is
+  // otherwise only set at login and cached in localStorage, so a profile
+  // change made on ANOTHER device (e.g. a new avatar) never showed up here
+  // — not even after Ctrl+F5, which doesn't clear localStorage. Best
+  // effort: a failure (locked instance, offline) just keeps the cache.
+  useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
+    const refreshProfile = async () => {
+      try {
+        const me = await api("/user/me", { token });
+        if (cancelled || !me || !me.id) return;
+        setSession((prev) =>
+          prev ? { ...prev, user: { ...prev.user, ...me } } : prev,
+        );
+        try {
+          const cur = getAuth();
+          if (cur) setAuth({ ...cur, user: { ...cur.user, ...me } });
+        } catch { /* localStorage unavailable */ }
+      } catch { /* offline / locked — keep the cached profile */ }
+    };
+    refreshProfile();
+    window.addEventListener("focus", refreshProfile);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshProfile);
+    };
+  }, [token]);
+
   // Tag filter & sidebar
   const [tagFilter, setTagFilter] = useState(null); // null = all, ALL_IMAGES = only notes with images
   const tagFilterRef = useRef(tagFilter);
