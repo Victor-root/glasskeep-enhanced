@@ -1,5 +1,21 @@
 # 📋 Changelog
 
+## 🚀 v2.6.0 — 2026-06-10
+
+Headline feature: **cross-server collaboration** — pair two independent, self-hosted GlassKeep servers and let their users share notes across instances, in real time. Each note's owning server stays the source of truth while the other keeps a synced mirror, with clear handling for when a peer is offline, locked or out of date. The release also fixes cross-device profile sync and removes a redundant lock notification.
+
+### ➕ Added
+- 🌐 **Cross-server collaboration (federation)** — from Admin → *Cross-server collaboration*, pair this server with another GlassKeep instance you trust (HTTPS with a valid certificate required). The other admin receives a **durable pairing request** — delivered even if their server was offline at the time — and accepts it once. After that, **any user can share a note with any user on the peer**: the share box lists the **real people on the other server** with a server badge (no URL to type), and edits sync **both ways, instantly**. Unsharing/deletes propagate across the link, and avatars carry over.
+- 🛡️ **Built to stay reliable** — the feature has its **own protocol version**, independent of the app version, so a normal GlassKeep update never breaks an existing link. Each link's state is always explicit — **online / offline / locked / out of date** — shown both on the note and in the admin panel, and a peer can change domain/port without losing the link (or its notes). When a peer can't be reached, its shared notes stay fully visible but go **read-only with a clear banner** until it's back, so the two copies never diverge.
+
+### 🐛 Fixed
+- 🖼️ **Your profile (avatar / name) now syncs across your devices** — the user profile was cached at login and never re-read, so an avatar set on one device never appeared on another — not even after Ctrl+F5 (which doesn't clear `localStorage`); only a fresh/incognito session showed it. The app now refreshes your profile from the server on boot and on window focus.
+- 🔒 **No more redundant "instance locked" toast** — when an instance is at-rest-locked, the dedicated unlock banner already says so, so the extra error toast(s) that any in-flight request could raise are now suppressed.
+
+### 🛠️ Upgrade
+
+Cross-server collaboration needs **both servers on HTTPS with a valid certificate and a stable domain**, plus an admin on each side to accept the one-time pairing. Set this server's display name in Admin → *Cross-server collaboration* before pairing. No new dependencies; the database migrates automatically on restart.
+
 ## v2.5.0 — 2026-06-08
 
 ### ➕ Added
