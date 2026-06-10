@@ -3073,6 +3073,11 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
       }
       db.prepare("UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ?").run(tsResult.iso, id);
       updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+      // Push the revocation to a federation peer right away: the note is now
+      // trashed, so its mirror must go. Every other deletion path calls this;
+      // without it "delete for all" only reached the peer on the next sync
+      // tick (~10s), lagging visibly behind "remove collaborator".
+      broadcastNoteUpdated(id);
       // Collaborators lose access entirely — they must drop the note locally
       // without it landing in their trash view.
       const evt = { type: "note_deleted", noteId: id };
