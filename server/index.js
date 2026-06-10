@@ -1876,6 +1876,7 @@ app.get("/api/notes", auth, (req, res) => {
       reminderAt: r.reminder_at || null,
       reminderFiredAt: r.reminder_fired_at || null,
       collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
+      federation: noteFederationRef?.noteFederationInfo(r.id) || null,
     }))
   );
 });
@@ -3316,6 +3317,7 @@ app.get("/api/notes/:id", auth, (req, res) => {
     reminderAt: r.reminder_at || null,
     reminderFiredAt: r.reminder_fired_at || null,
     collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
+    federation: noteFederationRef?.noteFederationInfo(r.id) || null,
   });
 });
 
