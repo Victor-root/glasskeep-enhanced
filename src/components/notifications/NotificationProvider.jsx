@@ -389,6 +389,12 @@ export function NotificationProvider({ children }) {
   const notify = useCallback((spec) => {
     if (!spec) return null;
     const input = typeof spec === "string" ? { message: spec } : spec;
+    // The dedicated unlock banner/screen already communicates the locked
+    // state, so drop redundant "instance locked" error toasts that an
+    // in-flight request can otherwise raise (matches EN + FR wording).
+    if (typeof input.message === "string" && /^instance\s+(is\s+)?(locked|verrouill)/i.test(input.message.trim())) {
+      return null;
+    }
     const id = uid();
     const variant = input.variant || "info";
     const isPersistent =

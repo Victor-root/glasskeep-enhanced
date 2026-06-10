@@ -249,7 +249,15 @@ function createNoteFederation(ctx) {
       last_pushed_cua: note.client_updated_at || null,
       created_at: deps.nowISO(),
     });
-    return { ok: true, collaborator: { id: shadow.id, name: shadow.name, email: shadow.email } };
+    return {
+      ok: true,
+      collaborator: {
+        id: shadow.id,
+        name: shadow.name,
+        email: shadow.email,
+        serverLabel: link.peer_label || hostOf(link.peer_base_url),
+      },
+    };
   }
 
   // ── Inbound: a peer shares a note with one of our users ─────────────
@@ -524,6 +532,19 @@ function createNoteFederation(ctx) {
     shareWithRemote,
     syncTick,
     onNoteChangedLocally,
+    // A link's connectivity flipped → nudge every note riding it so each
+    // participant's OPEN copy re-fetches and reflects the new state at
+    // once (e.g. authority went offline → mirror goes read-only now, not
+    // only once the user tries to type).
+    onLinkStateChanged(linkId) {
+      try {
+        for (const m of q.listByLink.all(linkId)) {
+          try {
+            deps.broadcastNoteUpdated?.(m.note_id);
+          } catch { /* per-note best-effort */ }
+        }
+      } catch { /* ignore */ }
+    },
     isReadOnly,
     // Federation status of a note, for serialization to the client: the
     // role, the live link state, whether it's currently read-only (a

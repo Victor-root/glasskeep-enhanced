@@ -179,18 +179,23 @@ export default function useCollaboration(token, {
     try {
       if (!activeId) return;
 
-      await api(`/notes/${activeId}/collaborate`, {
+      const res = await api(`/notes/${activeId}/collaborate`, {
         method: "POST",
         token,
         body: { username },
       });
+
+      // Prefer the clean name the server resolved (e.g. "Victor") over the
+      // raw "user@host" the dropdown sent, and note the server for remotes.
+      const collab = res?.collaborator || {};
+      const displayName = collab.name || username;
 
       setNotes((prev) =>
         prev.map((n) =>
           String(n.id) === String(activeId)
             ? {
                 ...n,
-                collaborators: [...(n.collaborators || []), username],
+                collaborators: [...(n.collaborators || []), displayName],
                 lastEditedBy: currentUser?.email || currentUser?.name,
                 lastEditedAt: new Date().toISOString(),
               }
@@ -198,7 +203,23 @@ export default function useCollaboration(token, {
         ),
       );
 
-      showToast(t("addedCollaboratorSuccessfully").replace("{username}", String(username)), "success", undefined, "share");
+      if (collab.serverLabel) {
+        showToast(
+          t("addedRemoteCollaborator")
+            .replace("{name}", displayName)
+            .replace("{server}", collab.serverLabel),
+          "success",
+          undefined,
+          "share",
+        );
+      } else {
+        showToast(
+          t("addedCollaboratorSuccessfully").replace("{username}", displayName),
+          "success",
+          undefined,
+          "share",
+        );
+      }
       setCollaboratorUsername("");
       setShowUserDropdown(false);
       setFilteredUsers([]);

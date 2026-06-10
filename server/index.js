@@ -1475,7 +1475,7 @@ const federation = attachFederationRoutes(app, {
 noteFederationRef = federation.noteFederation;
 const FEDERATION_TICK_MS = (() => {
   const raw = parseInt(process.env.FEDERATION_TICK_MS, 10);
-  return Number.isFinite(raw) && raw >= 5000 ? raw : 15000;
+  return Number.isFinite(raw) && raw >= 5000 ? raw : 10000;
 })();
 setInterval(() => {
   federation.tick().catch((e) => console.warn("[federation] tick error:", e?.message));
@@ -2216,6 +2216,11 @@ app.post("/api/notes/:id/collaborate", auth, async (req, res) => {
             .status(codeMap[result.error] || 502)
             .json({ error: result.error || "federation_failed" });
         }
+        // Same post-share housekeeping as the local path, so the owner's
+        // open card/list refresh over SSE and pick up the new (avatar-
+        // bearing) collaborator without a manual reload.
+        updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
+        broadcastNoteUpdated(noteId);
         return res.json({
           ok: true,
           message: `Shared with ${result.collaborator?.name || targetRef}`,

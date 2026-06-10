@@ -127,6 +127,13 @@ function attachFederationRoutes(
           } catch {
             /* SSE best-effort */
           }
+          // Re-broadcast the notes on this link so every participant's
+          // open copy re-fetches and flips to/from read-only immediately.
+          try {
+            noteFederation?.onLinkStateChanged(link.id);
+          } catch {
+            /* best-effort */
+          }
         },
       });
       // After connectivity is refreshed, reconcile federated note
