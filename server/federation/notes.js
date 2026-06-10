@@ -93,9 +93,11 @@ function createNoteFederation(ctx) {
     deleteMapping: db.prepare(`DELETE FROM federated_notes WHERE note_id = ?`),
     getShadowByOrigin: db.prepare(`SELECT * FROM users WHERE federated_origin = ?`),
     insertShadow: db.prepare(`
-      INSERT INTO users (name, email, password_hash, created_at, is_admin, federated_origin)
-      VALUES (?, ?, ?, ?, 0, ?)
+      INSERT INTO users (name, email, password_hash, created_at, is_admin, federated_origin, avatar_url)
+      VALUES (?, ?, ?, ?, 0, ?, ?)
     `),
+    // Keep a shadow's display name + avatar fresh with the remote user.
+    updateShadow: db.prepare(`UPDATE users SET name = ?, avatar_url = ? WHERE id = ?`),
     // Does this note still carry the shadow collaborator that represents
     // the peer side of the given link? (i.e. is it still shared there?)
     hasShadowCollab: db.prepare(`
@@ -127,20 +129,32 @@ function createNoteFederation(ctx) {
   // (their email or username); the synthetic local email keeps the row
   // unique without ever colliding with a real account that could log in
   // (the login path refuses any row with federated_origin set).
-  function ensureShadowUser(linkId, ref, displayName, peerHost) {
+  // `avatarUrl` (when provided) is carried over so the cross-server
+  // collaborator shows their real avatar, and is refreshed on re-share.
+  function ensureShadowUser(linkId, ref, displayName, peerHost, avatarUrl) {
     const origin = `${linkId}|${ref}`;
     const existing = q.getShadowByOrigin.get(origin);
-    if (existing) return existing;
+    if (existing) {
+      // Refresh the display name / avatar if they changed on the peer.
+      const nextName = displayName || existing.name;
+      const nextAvatar = avatarUrl !== undefined ? avatarUrl || null : existing.avatar_url;
+      if (nextName !== existing.name || nextAvatar !== existing.avatar_url) {
+        try {
+          q.updateShadow.run(nextName, nextAvatar, existing.id);
+        } catch { /* best-effort */ }
+      }
+      return q.getShadowByOrigin.get(origin);
+    }
     const email = `${ref}@${peerHost}`;
     // An unusable password hash (random, not derived from any input) so
     // even if the login guard were bypassed the row could never match.
     const junk = crypto.randomBytes(24).toString("base64");
     try {
-      q.insertShadow.run(displayName || ref, email, junk, deps.nowISO(), origin);
+      q.insertShadow.run(displayName || ref, email, junk, deps.nowISO(), origin, avatarUrl || null);
     } catch {
       // email clash with an unrelated row → fall back to an origin-tagged
       // address that cannot collide.
-      q.insertShadow.run(displayName || ref, `${origin}@federated.invalid`, junk, deps.nowISO(), origin);
+      q.insertShadow.run(displayName || ref, `${origin}@federated.invalid`, junk, deps.nowISO(), origin, avatarUrl || null);
     }
     return q.getShadowByOrigin.get(origin);
   }
@@ -202,6 +216,7 @@ function createNoteFederation(ctx) {
           targetRef,                         // who on the peer to share with
           ownerRef: owner.email || owner.name, // who we are (the note owner)
           ownerName: owner.name || owner.email,
+          ownerAvatar: owner.avatar_url || null, // so the peer shows our avatar
           note: contentFromNote(note),
         },
       });
@@ -212,9 +227,15 @@ function createNoteFederation(ctx) {
       return { ok: false, error: resp.json?.error || `http ${resp.status}` };
     }
 
-    // The peer accepted and told us the matched user's display name.
+    // The peer accepted and told us the matched user's name + avatar.
     const remote = resp.json.user || {};
-    const shadow = ensureShadowUser(link.id, targetRef, remote.name || targetRef, peerHost);
+    const shadow = ensureShadowUser(
+      link.id,
+      targetRef,
+      remote.name || targetRef,
+      peerHost,
+      remote.avatar_url ?? null,
+    );
     try {
       deps.addCollaborator.run(note.id, shadow.id, owner.id, deps.nowISO());
     } catch (e) {
@@ -232,7 +253,7 @@ function createNoteFederation(ctx) {
   }
 
   // ── Inbound: a peer shares a note with one of our users ─────────────
-  function handleIncomingShare({ linkId, targetRef, ownerRef, ownerName, note }) {
+  function handleIncomingShare({ linkId, targetRef, ownerRef, ownerName, ownerAvatar, note }) {
     // Can't read/write encrypted note content while this instance is
     // locked. Tell the peer to retry once we're unlocked.
     if (deps.isLocked?.()) return { ok: false, error: "locked" };
@@ -248,7 +269,7 @@ function createNoteFederation(ctx) {
     }
 
     // The remote owner becomes a local shadow user that OWNS the mirror.
-    const shadowOwner = ensureShadowUser(linkId, ownerRef, ownerName, peerHost);
+    const shadowOwner = ensureShadowUser(linkId, ownerRef, ownerName, peerHost, ownerAvatar);
 
     const cua = note.client_updated_at || deps.nowISO();
     const row = {
@@ -308,7 +329,10 @@ function createNoteFederation(ctx) {
     } catch (e) {
       log.warn?.("[federation/notes] post-share:", e?.message);
     }
-    return { ok: true, user: { name: target.name, email: target.email } };
+    return {
+      ok: true,
+      user: { name: target.name, email: target.email, avatar_url: target.avatar_url || null },
+    };
   }
 
   // ── Inbound: a peer pushes an updated copy of a federated note ──────
