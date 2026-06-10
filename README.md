@@ -16,7 +16,7 @@
 
 # ✨ GlassKeep
 
-> A self-hosted, local-first notes app focused on offline support, safer note management, mobile usability, simpler self-hosting, and a native Android companion app.
+> A self-hosted, local-first notes app focused on offline support, safer note management, mobile usability, straightforward self-hosting, and a native Android companion app.
 >
 > Originally based on [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep).
 
@@ -76,6 +76,7 @@
 GlassKeep brings together:
 
 * **🔄 local-first usage and offline support**
+* **🌐 cross-server collaboration** — pair two GlassKeep servers and share notes across them in real time
 * **🗑️ safer note deletion with Trash / restore**
 * **📱 first-class mobile usability**
 * **✏️ a WYSIWYG / live-formatting editor for text notes**
