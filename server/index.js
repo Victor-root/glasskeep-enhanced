@@ -739,6 +739,10 @@ function serializeNote(r, userId) {
     // never encrypted — see the ensureNoteColumns migration.
     reminderAt: r.reminder_at || null,
     reminderFiredAt: r.reminder_fired_at || null,
+    // Cross-server status (null for ordinary notes): role + live link
+    // state + whether this copy is currently read-only because its
+    // authority peer is unreachable / locked / out of date.
+    federation: noteFederationRef?.noteFederationInfo(r.id) || null,
   };
 }
 
@@ -1471,7 +1475,7 @@ const federation = attachFederationRoutes(app, {
 noteFederationRef = federation.noteFederation;
 const FEDERATION_TICK_MS = (() => {
   const raw = parseInt(process.env.FEDERATION_TICK_MS, 10);
-  return Number.isFinite(raw) && raw >= 5000 ? raw : 15000;
+  return Number.isFinite(raw) && raw >= 5000 ? raw : 10000;
 })();
 setInterval(() => {
   federation.tick().catch((e) => console.warn("[federation] tick error:", e?.message));
@@ -1872,6 +1876,7 @@ app.get("/api/notes", auth, (req, res) => {
       reminderAt: r.reminder_at || null,
       reminderFiredAt: r.reminder_fired_at || null,
       collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
+      federation: noteFederationRef?.noteFederationInfo(r.id) || null,
     }))
   );
 });
@@ -1930,6 +1935,15 @@ app.put("/api/notes/:id", auth, (req, res) => {
   const id = req.params.id;
   const existing = getNoteWithCollaboration.get(req.user.id, id, req.user.id);
   if (!existing) return res.status(404).json({ error: "Note not found" });
+
+  // Cross-server safety: a mirror note is read-only while its authority
+  // peer can't be reached, so an edit made there can't diverge. Mirror
+  // the LWW "stale" shape so the client just reconciles to the server's
+  // copy (it already shows the read-only banner). Avoid 423 — that
+  // triggers the global instance-locked flow.
+  if (noteFederationRef?.isReadOnly(id)) {
+    return res.json({ ok: true, readOnly: true, note: serializeNote(existing, req.user.id) });
+  }
 
   const b = req.body || {};
   if (!b.client_updated_at) {
@@ -2018,6 +2032,21 @@ app.patch("/api/notes/:id", auth, (req, res) => {
     // Notify only the requester's other sessions so multi-device stays in sync.
     sendEventToUser(req.user.id, { type: "notes_reordered", noteIds: [id] });
     return res.json({ ok: true, note: serializeNote(existing, req.user.id) });
+  }
+
+  // Cross-server safety: block edits to the SHARED CONTENT of a mirror
+  // note while its authority peer is unreachable (per-user tags / pin
+  // stay editable). The client already shows the read-only banner.
+  const hasContentChange = (
+    typeof req.body.title === "string" ||
+    typeof req.body.content === "string" ||
+    Array.isArray(req.body.items) ||
+    Array.isArray(req.body.images) ||
+    typeof req.body.color === "string" ||
+    typeof req.body.timestamp === "string"
+  );
+  if (hasContentChange && noteFederationRef?.isReadOnly(id)) {
+    return res.json({ ok: true, readOnly: true, note: serializeNote(existing, req.user.id) });
   }
 
   if (!req.body.client_updated_at) {
@@ -2188,6 +2217,11 @@ app.post("/api/notes/:id/collaborate", auth, async (req, res) => {
             .status(codeMap[result.error] || 502)
             .json({ error: result.error || "federation_failed" });
         }
+        // Same post-share housekeeping as the local path, so the owner's
+        // open card/list refresh over SSE and pick up the new (avatar-
+        // bearing) collaborator without a manual reload.
+        updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
+        broadcastNoteUpdated(noteId);
         return res.json({
           ok: true,
           message: `Shared with ${result.collaborator?.name || targetRef}`,
@@ -3283,6 +3317,7 @@ app.get("/api/notes/:id", auth, (req, res) => {
     reminderAt: r.reminder_at || null,
     reminderFiredAt: r.reminder_fired_at || null,
     collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
+    federation: noteFederationRef?.noteFederationInfo(r.id) || null,
   });
 });
 

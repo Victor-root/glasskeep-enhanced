@@ -36,6 +36,9 @@ function hostOf(url) {
 export default function FederationInviteWatcher({ token }) {
   const { notify } = useNotifications();
   const seen = useRef(new Set());
+  // Collapse duplicate connectivity toasts (e.g. two links to the same
+  // peer, or a re-delivered event) within a short window.
+  const stateSeen = useRef(new Map());
 
   useEffect(() => {
     if (!token) return undefined;
@@ -86,6 +89,12 @@ export default function FederationInviteWatcher({ token }) {
     // A connectivity flip on an active link → a brief status toast.
     const announceState = (msg) => {
       const who = msg.peerLabel || hostOf(msg.peerBaseUrl);
+      // Dedup: same peer + state within 8 s shows once (covers duplicate
+      // links to one peer and any re-delivered event).
+      const sig = `${who}|${msg.state}`;
+      const now = Date.now();
+      if ((stateSeen.current.get(sig) || 0) > now - 8000) return;
+      stateSeen.current.set(sig, now);
       const base = { type: "toast", title: t("fedConnTitle") };
       if (msg.state === "offline") {
         notify({ ...base, variant: "warning", message: t("fedPeerOffline").replace("{peer}", who) });

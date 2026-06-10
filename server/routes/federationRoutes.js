@@ -77,7 +77,7 @@ function attachFederationRoutes(
   // Local user search for the federation share UI (real names, never
   // shadow rows). `ref` is what the peer passes back to share with them.
   const searchLocalUsersStmt = db.prepare(`
-    SELECT name, email FROM users
+    SELECT name, email, avatar_url FROM users
     WHERE (name LIKE ? OR email LIKE ?) AND federated_origin IS NULL
     ORDER BY name ASC LIMIT 10
   `);
@@ -126,6 +126,13 @@ function attachFederationRoutes(
             });
           } catch {
             /* SSE best-effort */
+          }
+          // Re-broadcast the notes on this link so every participant's
+          // open copy re-fetches and flips to/from read-only immediately.
+          try {
+            noteFederation?.onLinkStateChanged(link.id);
+          } catch {
+            /* best-effort */
           }
         },
       });
@@ -319,6 +326,7 @@ function attachFederationRoutes(
       targetRef: b.targetRef,
       ownerRef: b.ownerRef,
       ownerName: b.ownerName,
+      ownerAvatar: b.ownerAvatar || null,
       note: b.note || {},
     });
     res.status(result.ok ? 200 : 409).json(result);
@@ -373,7 +381,11 @@ function attachFederationRoutes(
     const term = `%${query}%`;
     let users = [];
     try {
-      users = searchLocalUsersStmt.all(term, term).map((u) => ({ name: u.name, ref: u.email }));
+      users = searchLocalUsersStmt.all(term, term).map((u) => ({
+        name: u.name,
+        ref: u.email,
+        avatar: u.avatar_url || null,
+      }));
     } catch {
       users = [];
     }
@@ -408,7 +420,13 @@ function attachFederationRoutes(
             }
             const label = link.peer_label || host;
             for (const u of r.json.users) {
-              results.push({ name: u.name, ref: u.ref, host, serverLabel: label });
+              results.push({
+                name: u.name,
+                ref: u.ref,
+                avatar: u.avatar || null,
+                host,
+                serverLabel: label,
+              });
             }
           }
         } catch {

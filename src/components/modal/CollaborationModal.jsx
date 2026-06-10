@@ -298,7 +298,7 @@ export default function CollaborationModal({
                     <UserAvatar
                       name={u.name}
                       email={u.ref}
-                      avatarUrl={null}
+                      avatarUrl={u.avatar || null}
                       size="w-7 h-7"
                       textSize="text-[10px]"
                       dark={dark}

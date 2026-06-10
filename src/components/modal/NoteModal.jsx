@@ -48,6 +48,7 @@ import ConfirmDeleteDialog from "./ConfirmDeleteDialog.jsx";
 import CollaborationModal from "./CollaborationModal.jsx";
 import FullscreenImageViewer from "./FullscreenImageViewer.jsx";
 import OfflineCollabBanner from "./OfflineCollabBanner.jsx";
+import FederationReadOnlyBanner from "./FederationReadOnlyBanner.jsx";
 import ChecklistEditor from "../checklist/ChecklistEditor.jsx";
 import useModalHistory from "../../hooks/useModalHistory.js";
 import { getContentImages } from "../../utils/noteIcon.js";
@@ -253,6 +254,13 @@ export default function NoteModal({
   const isDrawEdit = mType === 'draw' && drawMode === 'draw';
   const isDrawView = mType === 'draw' && drawMode !== 'draw';
   const isAudio = mType === 'audio';
+  // Cross-server: a mirrored note whose authority peer is unreachable /
+  // locked / out of date is read-only. The note stays fully visible; only
+  // editing is paused. (The server also rejects content edits as a
+  // safety net.)
+  const fedInfo = activeNoteObj?.federation || null;
+  const fedReadOnly = !!fedInfo?.readOnly;
+  const effViewMode = viewMode || fedReadOnly;
 
   // Track draw mode transitions for animation
   const prevDrawEditRef = React.useRef(false);
@@ -647,7 +655,7 @@ export default function NoteModal({
               mTitle={mTitle}
               setMTitle={setMTitle}
               mType={mType}
-              viewMode={viewMode}
+              viewMode={effViewMode}
               windowWidth={windowWidth}
               isLandscapeMobile={isLandscapeMobile}
               isWebView={isWebView}
@@ -716,6 +724,7 @@ export default function NoteModal({
             )}
 
             <OfflineCollabBanner visible={isCollaborativeNote(activeId) && syncState === "offline"} />
+            <FederationReadOnlyBanner info={fedInfo} />
 
             {/* Content area */}
             <div
@@ -740,6 +749,7 @@ export default function NoteModal({
                   <div className="relative min-h-[160px]">
                     <RichTextEditor
                       key={activeId || "new"}
+                      editable={!fedReadOnly}
                       value={mBody}
                       onDocChange={handleRichDocChange}
                       placeholder={t("writeYourNoteEllipsis")}
@@ -773,7 +783,7 @@ export default function NoteModal({
                   onChange={setMDrawingData}
                   width={1200}
                   height={800}
-                  readOnly={false}
+                  readOnly={fedReadOnly}
                   darkMode={dark}
                   hideModeToggle
                   externalMode={drawMode}
@@ -803,6 +813,7 @@ export default function NoteModal({
                 <>
                   <RichTextEditor
                     key={`draw-${activeId || "new"}`}
+                    editable={!fedReadOnly}
                     value={mBody}
                     onDocChange={handleRichDocChange}
                     placeholder={t("writeYourNoteEllipsis")}
