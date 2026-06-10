@@ -16,7 +16,7 @@
 
 # ✨ GlassKeep
 
-> A self-hosted, local-first notes app focused on offline support, safer note management, mobile usability, simpler self-hosting, and a native Android companion app.
+> A self-hosted, local-first notes app focused on offline support, safer note management, mobile usability, straightforward self-hosting, and a native Android companion app.
 >
 > Originally based on [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep).
 
@@ -71,29 +71,30 @@
 
 ---
 
-## 🎯 What makes GlassKeep different
+## 🎯 Highlights
 
-GlassKeep focuses more strongly on:
+GlassKeep brings together:
 
 * **🔄 local-first usage and offline support**
+* **🌐 cross-server collaboration** — pair two GlassKeep servers and share notes across them in real time
 * **🗑️ safer note deletion with Trash / restore**
-* **📱 better mobile usability**
-* **✏️ a real WYSIWYG / live-formatting editor for text notes**
+* **📱 first-class mobile usability**
+* **✏️ a WYSIWYG / live-formatting editor for text notes**
 * **🪟 side-by-side note reading and comparison**
 * **🤖 a native Android companion app**
 * **📺 an Android TV layout designed for couch use and remote control**
-* **🌍 a cleaner and more extensible i18n foundation**
-* **🛠️ simpler self-hosting**
-* **✨ a broad polish / stability pass**
-* **🎨 a deeper overhaul of the drawing mode**
+* **🌍 a clean, extensible i18n foundation**
+* **🛠️ straightforward self-hosting**
+* **✨ a polished, stable experience**
+* **🎨 a full-featured drawing mode**
 * **💬 configurable AI assistant with local or remote endpoints**
 * **🔐 server-side encryption & passkeys**
 * **🔔 in-app update notifications**
 * **🚀 one-click in-app updates** from the admin panel — live progress, cancel/rollback, AI-translatable changelog after install
 * **🎙️ audio notes**
-* **🖼️ refreshed branding and icons** across the web app, PWA, favicon, Android launcher, and TV banner
+* **🖼️ cohesive branding and icons** across the web app, PWA, favicon, Android launcher, and TV banner
 
-For a more complete and structured overview of the changes made over time, see:
+For a more complete and structured overview, see:
 
 👉 [`IMPROVEMENTS.md`](./IMPROVEMENTS.md)
 
