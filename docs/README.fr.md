@@ -69,29 +69,29 @@
 
 ---
 
-## 🎯 Ce qui distingue GlassKeep
+## 🎯 Points forts
 
-GlassKeep met l'accent sur :
+GlassKeep réunit :
 
 * **🔄 l'utilisation local-first et le support hors-ligne**
 * **🗑️ une suppression de notes plus sûre avec la corbeille / restauration**
-* **📱 une meilleure utilisabilité mobile**
-* **✏️ un véritable éditeur WYSIWYG / formatage en direct pour les notes texte**
+* **📱 une expérience mobile de premier ordre**
+* **✏️ un éditeur WYSIWYG / formatage en direct pour les notes texte**
 * **🪟 la lecture et la comparaison de notes côte à côte**
 * **🤖 une application Android native**
 * **📺 une interface Android TV conçue pour le canapé et la télécommande**
-* **🌍 une base i18n plus propre et extensible**
-* **🛠️ un auto-hébergement simplifié**
-* **✨ une passe globale de polish et de stabilité**
-* **🎨 une refonte approfondie du mode dessin**
+* **🌍 une base i18n propre et extensible**
+* **🛠️ un auto-hébergement simple**
+* **✨ stabilité et finitions soignées**
+* **🎨 un mode dessin complet**
 * **💬 un assistant IA configurable avec des endpoints locaux ou distants**
 * **🔐 chiffrement côté serveur & passkeys**
 * **🔔 notifications de mises à jour dans l'application**
 * **🚀 mises à jour en un clic depuis le panneau d'administration** — progression en direct, annulation/rollback, changelog traduisible par l'IA après installation
 * **🎙️ notes audio**
-* **🖼️ identité visuelle et icônes rafraîchies** sur l'application web, la PWA, le favicon, le launcher Android et la bannière TV
+* **🖼️ une identité visuelle et des icônes cohérentes** sur l'application web, la PWA, le favicon, le launcher Android et la bannière TV
 
-Pour un aperçu plus complet et structuré des changements apportés au fil du temps, voir :
+Pour un aperçu plus complet et structuré, voir :
 
 👉 [`IMPROVEMENTS.md`](../IMPROVEMENTS.md)
 
