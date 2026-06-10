@@ -1724,6 +1724,23 @@ app.delete("/api/user/avatar", auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Current user's profile, fresh from the DB. The client caches the user
+// object from login in localStorage and otherwise never re-reads it, so a
+// profile change made on ANOTHER device (e.g. a new avatar) never showed
+// up here. The client calls this on boot/focus to refresh its cache.
+app.get("/api/user/me", auth, (req, res) => {
+  const u = getUserById.get(req.user.id);
+  if (!u) return res.status(404).json({ error: "User not found" });
+  res.json({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    is_admin: !!u.is_admin,
+    avatar_url: u.avatar_url || null,
+    language: u.language || null,
+  });
+});
+
 // Get current user profile info (authenticated)
 app.get("/api/user/profile", auth, (req, res) => {
   const user = getUserById.get(req.user.id);
