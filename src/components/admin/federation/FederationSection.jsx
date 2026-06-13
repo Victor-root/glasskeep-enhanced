@@ -15,7 +15,7 @@ import TI from "../../../icons/editor/index.jsx";
 import { SettingsSubHeading } from "../../common/SettingsAccordion.jsx";
 import { useFederation } from "../../../hooks/useFederation.js";
 import FederationLinkCard from "./FederationLinkCard.jsx";
-import { ServerShareIcon } from "./FederationIcons.jsx";
+import { ServerPlusIcon } from "./FederationIcons.jsx";
 
 // Map a server error code to a friendly, translated sentence.
 function inviteErrorMessage(err) {
@@ -29,6 +29,16 @@ function inviteErrorMessage(err) {
   };
   return t(map[code] || "fedErrGeneric");
 }
+
+// The app's primary themed button — the exact gradient / theme / hover
+// treatment of the admin panel's "Create user" button. `.btn-gradient`
+// swaps the indigo->violet base for the active shell theme's gradient, so
+// it follows the user theme. Inline variant: icon + label on one line.
+const PRIMARY_BTN =
+  "inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-200 " +
+  "bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 " +
+  "shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none " +
+  "hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none";
 
 export default function FederationSection({
   open,
@@ -148,7 +158,7 @@ export default function FederationSection({
         }`}
       >
         <div className="text-sm font-semibold mb-1 flex items-center gap-2">
-          <TI.Server className="tabler-icon w-4 h-4 text-[var(--gk-chrome-accent)]" />
+          <TI.Server className="tabler-icon w-6 h-6 text-gray-600 dark:text-gray-300" />
           {t("fedSelfNameTitle")}
         </div>
         <p className="text-xs text-gray-600 dark:text-gray-300 mb-3">
@@ -173,7 +183,7 @@ export default function FederationSection({
             type="button"
             onClick={onSaveName}
             disabled={!nameDraft.trim() || !nameChanged || savingName}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg text-white bg-[var(--gk-chrome-accent)] hover:opacity-90 transition-opacity disabled:opacity-50 disabled:pointer-events-none"
+            className={PRIMARY_BTN}
           >
             <TI.Check className="tabler-icon w-4 h-4" />
             {t("save")}
@@ -196,12 +206,12 @@ export default function FederationSection({
             type="button"
             onClick={copyAddress}
             aria-label={t("copy")}
-            className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-1.5 rounded-md bg-white dark:bg-white/10 border border-[var(--border-light)] hover:bg-gray-100 dark:hover:bg-white/15"
+            className={`shrink-0 ${PRIMARY_BTN}`}
           >
             {copiedAddr ? (
-              <TI.Check className="tabler-icon w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" />
+              <TI.Check className="tabler-icon w-4 h-4" />
             ) : (
-              <TI.Copy className="tabler-icon w-3.5 h-3.5 opacity-70" />
+              <TI.Copy className="tabler-icon w-4 h-4" />
             )}
             {copiedAddr ? t("copied") : t("copy")}
           </button>
@@ -214,7 +224,7 @@ export default function FederationSection({
       {/* Invite form */}
       <div className="rounded-xl border border-[var(--border-light)] bg-white/60 dark:bg-white/5 p-4">
         <div className="text-sm font-semibold mb-2 flex items-center gap-2">
-          <ServerShareIcon className="w-5 h-5 text-[var(--gk-chrome-accent)]" />
+          <ServerPlusIcon className="w-6 h-6 text-gray-600 dark:text-gray-300" />
           {t("fedPairTitle")}
         </div>
         <p className="text-xs text-gray-600 dark:text-gray-300 mb-3">
@@ -235,7 +245,7 @@ export default function FederationSection({
             type="button"
             onClick={onInvite}
             disabled={!peerInput.trim() || submitting || !hasSelfName}
-            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg text-white bg-[var(--gk-chrome-accent)] hover:opacity-90 transition-opacity disabled:opacity-50 disabled:pointer-events-none"
+            className={PRIMARY_BTN}
           >
             <TI.Link className="tabler-icon w-4 h-4" />
             {submitting ? t("fedInviteSending") : t("fedInviteSend")}

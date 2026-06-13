@@ -132,7 +132,9 @@ export default function FederationLinkCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <span className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center bg-[var(--gk-icon2-bg)] text-[var(--gk-icon2-fg)]">
-            <TI.World className="tabler-icon w-5 h-5" />
+            {/* `.tabler-icon` pins width/height to 20px and (loading after
+                Tailwind) overrides any w-* class, so size it inline. */}
+            <TI.WorldCheck className="tabler-icon" style={{ width: 22, height: 22 }} />
           </span>
           <div className="min-w-0">
             <div className="font-semibold truncate">{title}</div>
