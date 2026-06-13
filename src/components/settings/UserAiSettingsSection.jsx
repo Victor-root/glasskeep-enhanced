@@ -52,10 +52,6 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
 
   // Pinned in a ref to keep the load effect independent from each
   // parent re-render.
-  const showToastRef = useRef(showToast);
-  useEffect(() => {
-    showToastRef.current = showToast;
-  }, [showToast]);
   const onEnabledChangeRef = useRef(onEnabledChange);
   useEffect(() => {
     onEnabledChangeRef.current = onEnabledChange;
@@ -87,12 +83,14 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
           !!data.enabled && data.adminAiEnabled !== false,
         );
       } catch (err) {
-        if (!cancelled && !err?.isNetworkError) {
-          showToastRef.current?.(
-            localizeServerError(err?.message, "genericError"),
-            "error",
-          );
-        }
+        // Background load: this panel mounts (and fetches) even while the
+        // Settings panel is closed, so a failed initial fetch must stay
+        // silent — never pop a toast the user didn't ask for. A server
+        // that's down/restarting answers 503, which is NOT classed as a
+        // network error and so previously slipped through to a raw
+        // "HTTP 503" toast on a plain refresh. Match every other loader:
+        // fail silently and keep the current defaults.
+        if (!cancelled) console.warn("[ai] user settings load failed:", err?.message);
       } finally {
         if (!cancelled) setLoading(false);
       }
