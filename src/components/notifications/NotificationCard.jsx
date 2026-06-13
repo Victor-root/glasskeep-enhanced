@@ -331,11 +331,36 @@ export default function NotificationCard({
   // CSS animation and re-create the very desync this fixes).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
-    if (!showCountdown) return;
-    const el = countdownFillRef.current;
-    if (!el || !createdAt || typeof duration !== "number" || duration <= 0) return;
-    const elapsed = Math.max(0, Math.min(duration, Date.now() - createdAt));
-    el.style.animationDelay = `-${elapsed}ms`;
+    if (!showCountdown) return undefined;
+    const anchor = () => {
+      const el = countdownFillRef.current;
+      if (!el || !createdAt || typeof duration !== "number" || duration <= 0) return;
+      const elapsed = Math.max(0, Math.min(duration, Date.now() - createdAt));
+      // Restart the animation so the recomputed negative delay re-seeks
+      // the bar — animation-delay is only sampled when an animation
+      // begins. Toggle the name off (+ reflow) then back on; touch only
+      // animation-name/-delay and leave animation-duration to React's
+      // inline style so we don't fight its reconciliation.
+      el.style.animationName = "none";
+      void el.offsetWidth; // force reflow so the restart registers
+      el.style.animationName = "";
+      el.style.animationDelay = `-${elapsed}ms`;
+    };
+    anchor();
+    // A backgrounded tab PAUSES the animation timeline, so a toast that
+    // appeared (or sat) while the tab was unfocused would otherwise resume
+    // from where it froze and lag the provider's wall-clock setTimeout —
+    // the bar visibly "starts" only on focus. Re-anchor whenever the tab
+    // comes back so the bar jumps to the true elapsed time.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") anchor();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, []);
 
   const card = (
