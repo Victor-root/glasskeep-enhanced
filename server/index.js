@@ -3886,6 +3886,11 @@ const listAllUsers = db.prepare(`
     ), 0) AS storage_bytes
   FROM users u
   LEFT JOIN notes n ON n.user_id = u.id
+  -- Federated collaborators are mirrored locally as shadow rows
+  -- (federated_origin set, email "<origin>@federated.invalid"). They
+  -- belong to the remote server, which manages its own accounts, so
+  -- they must never surface in this server's admin user list.
+  WHERE u.federated_origin IS NULL
   GROUP BY u.id
   ORDER BY u.created_at DESC
 `);
