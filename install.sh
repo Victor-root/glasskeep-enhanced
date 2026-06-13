@@ -64,15 +64,29 @@ setup_i18n() {
         MSG_EXISTING="Installation existante détectée dans"
         MSG_NO_INSTALL="Aucune installation existante détectée."
         MSG_MENU_TITLE="Que souhaitez-vous faire ?"
-        MSG_OPT_INSTALL="Installer GlassKeep"
+        MSG_OPT_INSTALL="Nouvelle installation"
+        MSG_OPT_RESTORE="Installer depuis une sauvegarde existante"
         MSG_OPT_UPDATE="Mettre à jour GlassKeep"
         MSG_OPT_UNINSTALL="Désinstaller GlassKeep"
-        MSG_PROMPT_CHOICE="Votre choix [1/2/3] : "
-        MSG_INVALID_CHOICE="Choix invalide : '%s'. Entrez 1, 2 ou 3."
+        MSG_PROMPT_CHOICE="Votre choix [1/2/3/4] : "
+        MSG_INVALID_CHOICE="Choix invalide : '%s'. Entrez 1, 2, 3 ou 4."
 
         MSG_HDR_INSTALL="Installation de GlassKeep"
         MSG_HDR_UPDATE="Mise à jour de GlassKeep"
         MSG_HDR_UNINSTALL="Désinstallation de GlassKeep"
+        MSG_HDR_RESTORE="Restauration de GlassKeep"
+        MSG_RESTORE_INTRO="Ce mode réinstalle GlassKeep puis réutilise une sauvegarde existante de votre dossier de données (notes, comptes, paramètres, chiffrement). Aucun compte admin ni chiffrement à reconfigurer : tout est repris depuis votre base.\n  Préparez la sauvegarde de votre ancien dossier ${BOLD}${DATA_DIR}${RESET} (le fichier ${CYAN}notes.db${RESET} et, s'ils existent, ${CYAN}notes.db-wal${RESET}, ${CYAN}notes.db-shm${RESET} et ${CYAN}.vapid.json${RESET})."
+        MSG_RESTORE_PLACE_TITLE="Placez votre dossier de données"
+        MSG_RESTORE_PLACE_BODY="Copiez le contenu de votre ancienne sauvegarde dans :\n  ${BOLD}${DATA_DIR}/${RESET}\n\n  Une fois copié, le dossier doit ressembler à ceci :\n    ${CYAN}${DATA_DIR}/notes.db${RESET}\n    ${CYAN}${DATA_DIR}/notes.db-wal${RESET}   ${GRAY}(si présent)${RESET}\n    ${CYAN}${DATA_DIR}/notes.db-shm${RESET}   ${GRAY}(si présent)${RESET}\n    ${CYAN}${DATA_DIR}/.vapid.json${RESET}    ${GRAY}(si présent)${RESET}\n\n  Seul ${BOLD}notes.db${RESET} est obligatoire. Exemple de copie depuis une autre machine :\n    ${CYAN}scp -r root@ancien-serveur:/opt/glass-keep/data/. ${DATA_DIR}/${RESET}"
+        MSG_RESTORE_MENU1="Quitter le script maintenant pour copier mes fichiers"
+        MSG_RESTORE_MENU2="C'est fait — mes fichiers sont en place, continuer"
+        MSG_RESTORE_PROMPT="Votre choix [1/2] : "
+        MSG_RESTORE_INVALID="Choix invalide. Entrez 1 ou 2."
+        MSG_RESTORE_QUIT_INFO="Le dossier ${BOLD}${DATA_DIR}${RESET} a été créé. Copiez-y vos fichiers, puis relancez ce script et choisissez à nouveau la restauration pour terminer."
+        MSG_RESTORE_NOT_FOUND="notes.db introuvable dans %s. Copiez d'abord votre dossier de données, puis réessayez."
+        MSG_RESTORE_FOUND="Base de données détectée : %s"
+        MSG_RESTORE_ENC_HINT="Si le chiffrement au repos était activé, l'instance démarre verrouillée : déverrouillez-la depuis la page de connexion avec votre passphrase ou votre recovery key."
+        MSG_PRESS_KEY_RESTORE="Appuyez sur une touche pour lancer la restauration..."
 
         MSG_PROMPT_PORT="Port à utiliser [8080] : "
         MSG_INVALID_PORT="Port invalide : %s"
@@ -196,15 +210,29 @@ setup_i18n() {
         MSG_EXISTING="Existing installation detected in"
         MSG_NO_INSTALL="No existing installation detected."
         MSG_MENU_TITLE="What do you want to do?"
-        MSG_OPT_INSTALL="Install GlassKeep"
+        MSG_OPT_INSTALL="Fresh installation"
+        MSG_OPT_RESTORE="Install from an existing backup"
         MSG_OPT_UPDATE="Update GlassKeep"
         MSG_OPT_UNINSTALL="Uninstall GlassKeep"
-        MSG_PROMPT_CHOICE="Your choice [1/2/3]: "
-        MSG_INVALID_CHOICE="Invalid choice: '%s'. Enter 1, 2 or 3."
+        MSG_PROMPT_CHOICE="Your choice [1/2/3/4]: "
+        MSG_INVALID_CHOICE="Invalid choice: '%s'. Enter 1, 2, 3 or 4."
 
         MSG_HDR_INSTALL="Installing GlassKeep"
         MSG_HDR_UPDATE="Updating GlassKeep"
         MSG_HDR_UNINSTALL="Uninstalling GlassKeep"
+        MSG_HDR_RESTORE="Restoring GlassKeep"
+        MSG_RESTORE_INTRO="This mode reinstalls GlassKeep and reuses an existing backup of your data folder (notes, accounts, settings, encryption). No admin account or encryption to reconfigure — everything is taken from your database.\n  Have a backup of your old ${BOLD}${DATA_DIR}${RESET} folder ready (the ${CYAN}notes.db${RESET} file and, if present, ${CYAN}notes.db-wal${RESET}, ${CYAN}notes.db-shm${RESET} and ${CYAN}.vapid.json${RESET})."
+        MSG_RESTORE_PLACE_TITLE="Place your data files"
+        MSG_RESTORE_PLACE_BODY="Copy the contents of your old backup into:\n  ${BOLD}${DATA_DIR}/${RESET}\n\n  Once copied, the folder should look like this:\n    ${CYAN}${DATA_DIR}/notes.db${RESET}\n    ${CYAN}${DATA_DIR}/notes.db-wal${RESET}   ${GRAY}(if present)${RESET}\n    ${CYAN}${DATA_DIR}/notes.db-shm${RESET}   ${GRAY}(if present)${RESET}\n    ${CYAN}${DATA_DIR}/.vapid.json${RESET}    ${GRAY}(if present)${RESET}\n\n  Only ${BOLD}notes.db${RESET} is required. Example copy from another machine:\n    ${CYAN}scp -r root@old-server:/opt/glass-keep/data/. ${DATA_DIR}/${RESET}"
+        MSG_RESTORE_MENU1="Quit the script now so I can copy my files"
+        MSG_RESTORE_MENU2="Done — my files are in place, continue"
+        MSG_RESTORE_PROMPT="Your choice [1/2]: "
+        MSG_RESTORE_INVALID="Invalid choice. Enter 1 or 2."
+        MSG_RESTORE_QUIT_INFO="The ${BOLD}${DATA_DIR}${RESET} folder has been created. Copy your files there, then re-run this script and pick restore again to finish."
+        MSG_RESTORE_NOT_FOUND="notes.db not found in %s. Copy your data folder first, then try again."
+        MSG_RESTORE_FOUND="Database detected: %s"
+        MSG_RESTORE_ENC_HINT="If at-rest encryption was enabled, the instance starts locked: unlock it from the login page with your passphrase or recovery key."
+        MSG_PRESS_KEY_RESTORE="Press any key to start the restore..."
 
         MSG_PROMPT_PORT="Port to use [8080]: "
         MSG_INVALID_PORT="Invalid port: %s"
@@ -1256,7 +1284,7 @@ action_update() {
         systemctl stop "$SERVICE_NAME"
 
     step "$MSG_STEP_PULL" \
-        bash -c "cd '${INSTALL_DIR}' && git fetch origin && git reset --hard && git checkout main && git pull origin main"
+        bash -c "cd '${INSTALL_DIR}' && git fetch origin && git checkout main && git reset --hard origin/main && git branch | grep -v '^\* ' | xargs git branch -D 2>/dev/null || true"
 
     info "${DIM}${MSG_HINT_LONG}${RESET}"
     step "$MSG_STEP_NPM_UPDATE" \
@@ -1300,6 +1328,186 @@ EOF
     sleep 2
     if systemctl is-active --quiet "$SERVICE_NAME"; then
         show_install_summary
+        show_access_info "$port"
+    else
+        warn "$MSG_WARN_SERVICE"
+        info "${CYAN}journalctl -u ${SERVICE_NAME} -n 30 --no-pager${RESET}"
+    fi
+}
+
+# Reinstall the app while reusing a user-supplied backup of the data
+# folder. Everything user-specific (accounts, notes, settings and the
+# at-rest encryption vault) lives inside notes.db, so this path skips
+# the admin-account and encryption questions entirely — it only asks
+# the host-specific bits (port + HTTPS) that are NOT part of the backup
+# because they live in .env, not in data/.
+action_restore() {
+    section "$MSG_HDR_RESTORE"
+    _print_info_block "$MSG_RESTORE_INTRO"
+
+    # Create the base paths first so the user has somewhere to drop the
+    # backup. mkdir -p is idempotent, so re-running after a "quit to copy"
+    # round-trip is safe.
+    mkdir -p "$DATA_DIR"
+
+    # Data placement is the priority: loop until the user confirms AND
+    # notes.db is actually present. Choosing "1" lets them leave the
+    # script to copy the files, then re-run and pick restore again.
+    while true; do
+        section "$MSG_RESTORE_PLACE_TITLE"
+        _print_info_block "$MSG_RESTORE_PLACE_BODY"
+        echo
+        menu_item "1" "$AMBER" "$MSG_RESTORE_MENU1"
+        menu_item "2" "$GREEN" "$MSG_RESTORE_MENU2"
+        echo
+        local rchoice
+        read -rp "$(prompt_text "$MSG_RESTORE_PROMPT")" rchoice </dev/tty
+        case "$rchoice" in
+            1)
+                info "$MSG_RESTORE_QUIT_INFO"
+                exit 0 ;;
+            2)
+                if [[ -f "${DATA_DIR}/notes.db" ]]; then
+                    # shellcheck disable=SC2059
+                    success "$(printf "$MSG_RESTORE_FOUND" "${DATA_DIR}/notes.db")"
+                    break
+                fi
+                # shellcheck disable=SC2059
+                warn "$(printf "$MSG_RESTORE_NOT_FOUND" "$DATA_DIR")" ;;
+            *)
+                warn "$MSG_RESTORE_INVALID" ;;
+        esac
+    done
+
+    # Host-specific config — not part of the backup, so still asked.
+    local port
+    read -rp "$(prompt_text "$MSG_PROMPT_PORT")" port </dev/tty
+    port="${port:-8080}"
+    if ! [[ "$port" =~ ^[0-9]+$ ]] || [[ "$port" -lt 1 || "$port" -gt 65535 ]]; then
+        # shellcheck disable=SC2059
+        die "$(printf "$MSG_INVALID_PORT" "$port")"
+    fi
+
+    ask_ssl_config
+
+    echo
+    read -rsn1 -p "$(printf "${DIM}${CYAN}${MSG_PRESS_KEY_RESTORE}${RESET}")" </dev/tty
+    echo
+
+    panel "$INDIGO" "$MSG_HDR_RESTORE" \
+        "${TEAL}${MSG_INFO_DIR}${RESET}${BOLD}${INSTALL_DIR}${RESET}" \
+        "${TEAL}${MSG_INFO_PORT}${RESET}${BOLD}${port}${RESET}" \
+        "${TEAL}${MSG_INFO_SERVICE}${RESET}${BOLD}${SERVICE_NAME}${RESET}"
+
+    step "$MSG_STEP_APT"     apt-get update -qq
+    step "$MSG_STEP_PREREQ"  apt-get install -y git curl gnupg ca-certificates
+
+    install_nodejs
+
+    if [[ -d "$INSTALL_DIR" ]]; then
+        # shellcheck disable=SC2059
+        warn "$(printf "$MSG_WARN_DIR_EXISTS" "$INSTALL_DIR")"
+        rm -rf "$INSTALL_DIR"
+    fi
+
+    # shellcheck disable=SC2059
+    step "$(printf "$MSG_STEP_CLONE" "$INSTALL_DIR")" \
+        git clone --depth=1 --no-single-branch "$REPO_URL" "$INSTALL_DIR"
+
+    info "${DIM}${MSG_HINT_LONG}${RESET}"
+    step "$MSG_STEP_NPM" \
+        bash -c "cd '${INSTALL_DIR}' && npm install --silent"
+
+    info "${DIM}${MSG_HINT_LONG}${RESET}"
+    local build_heap_mb
+    build_heap_mb=$(compute_build_heap_mb)
+    step "$MSG_STEP_BUILD" \
+        bash -c "cd '${INSTALL_DIR}' && NODE_OPTIONS='--max-old-space-size=${build_heap_mb}' npm run build"
+
+    # NB: no setup_admin, no activate_encryption — the restored notes.db
+    # already carries users, settings and (if any) the encryption vault.
+
+    local jwt_secret
+    jwt_secret=$(openssl rand -hex 32 2>/dev/null || cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 64)
+
+    local ssl_dir="/opt/glass-keep/ssl"
+    [[ "$SSL_MODE" == "selfsigned" ]] && generate_selfsigned_cert
+
+    # ADMIN_EMAILS left empty: the restored DB already flags the admin
+    # account (is_admin=1), so no email-based promotion is needed.
+    cat > "$ENV_FILE" <<EOF
+NODE_ENV=production
+API_PORT=${port}
+JWT_SECRET=${jwt_secret}
+DB_FILE=${DATA_DIR}/notes.db
+ADMIN_EMAILS=
+ALLOW_REGISTRATION=false
+HTTPS_ENABLED=$([[ "$SSL_MODE" == "proxy" ]] && echo "false" || echo "true")
+TRUST_PROXY=$([[ "$SSL_MODE" == "proxy" ]] && echo "true" || echo "false")
+# Optional: pull self-updates from a different branch (default: main).
+# Useful for tracking a pre-release branch or a custom fork. Restart the
+# service after changing this. Leave commented for the standard behavior.
+# UPDATE_BRANCH=main
+# Optional: cap Node's V8 heap during the in-app update's vite build.
+# Default is auto-detected from RAM + swap (50 %, between 512 MB and
+# 1 GB). Raise it if your build is unusually large; lower it if your
+# host has very little memory AND no swap.
+# UPDATE_BUILD_HEAP_MB=1024
+EOF
+    case "$SSL_MODE" in
+        selfsigned) printf 'SSL_CERT=%s/cert.pem\nSSL_KEY=%s/key.pem\n' "$ssl_dir" "$ssl_dir" >> "$ENV_FILE" ;;
+        custom)     printf 'SSL_CERT=%s\nSSL_KEY=%s\n' "$CUSTOM_CERT_PATH" "$CUSTOM_KEY_PATH"  >> "$ENV_FILE" ;;
+    esac
+    chmod 600 "$ENV_FILE"
+    # shellcheck disable=SC2059
+    success "$(printf "$MSG_ENV_CREATED" "$ENV_FILE")"
+
+    cat > "$SERVICE_FILE" <<EOF
+[Unit]
+Description=GlassKeep — Note Manager
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=${INSTALL_DIR}
+EnvironmentFile=${ENV_FILE}
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    cat > "$UPDATER_SERVICE_FILE" <<EOF
+[Unit]
+Description=GlassKeep — Self-Update (one-shot)
+
+[Service]
+Type=oneshot
+WorkingDirectory=${INSTALL_DIR}
+EnvironmentFile=-${ENV_FILE}
+Environment=INSTALL_DIR=${INSTALL_DIR}
+Environment=DATA_DIR=${DATA_DIR}
+Environment=SERVICE_NAME=${SERVICE_NAME}
+ExecStart=/usr/bin/env bash ${INSTALL_DIR}/scripts/self-update.sh
+StandardOutput=journal
+StandardError=journal
+EOF
+
+    chmod +x "${INSTALL_DIR}/scripts/self-update.sh" 2>/dev/null || true
+
+    step "$MSG_STEP_DAEMON" systemctl daemon-reload
+    # shellcheck disable=SC2059
+    step "$(printf "$MSG_STEP_SERVICE" "$SERVICE_NAME")" \
+        systemctl enable --now "$SERVICE_NAME"
+
+    sleep 2
+    if systemctl is-active --quiet "$SERVICE_NAME"; then
+        show_install_summary
+        panel "$AMBER" "$MSG_HDR_RESTORE" "$MSG_RESTORE_ENC_HINT"
         show_access_info "$port"
     else
         warn "$MSG_WARN_SERVICE"
@@ -1554,16 +1762,18 @@ main() {
     printf "${BOLD}%s${RESET}\n" "$MSG_MENU_TITLE"
     echo
     menu_item "1" "$GREEN"  "$MSG_OPT_INSTALL"   ""
-    menu_item "2" "$AMBER"  "$MSG_OPT_UPDATE"    ""
-    menu_item "3" "$RED"    "$MSG_OPT_UNINSTALL" ""
+    menu_item "2" "$TEAL"   "$MSG_OPT_RESTORE"   ""
+    menu_item "3" "$AMBER"  "$MSG_OPT_UPDATE"    ""
+    menu_item "4" "$RED"    "$MSG_OPT_UNINSTALL" ""
     echo
     local choice
     read -rp "$(prompt_text "$MSG_PROMPT_CHOICE")" choice </dev/tty
 
     case "$choice" in
         1) action_install   ;;
-        2) action_update    ;;
-        3) action_uninstall ;;
+        2) action_restore   ;;
+        3) action_update    ;;
+        4) action_uninstall ;;
         # shellcheck disable=SC2059
         *) die "$(printf "$MSG_INVALID_CHOICE" "$choice")" ;;
     esac
