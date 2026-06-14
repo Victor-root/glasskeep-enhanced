@@ -330,6 +330,7 @@ function attachFederationRoutes(
       ownerName: b.ownerName,
       ownerAvatar: b.ownerAvatar || null,
       note: b.note || {},
+      canWrite: b.canWrite === 0 ? 0 : 1,
     });
     res.status(result.ok ? 200 : 409).json(result);
   });

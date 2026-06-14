@@ -85,6 +85,9 @@ export default function CollaborationModal({
 }) {
   const [confirmRemove, setConfirmRemove] = React.useState(null);
   const [accessBusyId, setAccessBusyId] = React.useState(null);
+  // Access level for the NEXT collaborator added — chosen before adding so
+  // a note can be shared read-only from the very first invite.
+  const [newAccess, setNewAccess] = React.useState("write");
   if (!open) return null;
 
   // Real users living on paired servers (fetched as you type); each can
@@ -248,12 +251,23 @@ export default function CollaborationModal({
                       } else {
                         onAddCollaborator(
                           collaboratorUsername.trim(),
+                          newAccess,
                         );
                       }
                     } else if (e.key === "Escape") {
                       setShowUserDropdown(false);
                     }
                   }}
+                />
+              </div>
+              {/* Access level for the collaborator being added */}
+              <div className="mt-4 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                  {t("accessLabel")}
+                </span>
+                <AccessToggle
+                  canWrite={newAccess === "write" ? 1 : 0}
+                  onChange={(a) => setNewAccess(a)}
                 />
               </div>
               <div className="mt-5 flex justify-end gap-3">
@@ -267,6 +281,7 @@ export default function CollaborationModal({
                     if (collaboratorUsername.trim()) {
                       await onAddCollaborator(
                         collaboratorUsername.trim(),
+                        newAccess,
                       );
                     }
                   }}
@@ -354,7 +369,7 @@ export default function CollaborationModal({
                   <div
                     key={`${u.host}|${u.ref}`}
                     className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0 flex items-center gap-2.5"
-                    onClick={() => onAddCollaborator(`${u.ref}@${u.host}`)}
+                    onClick={() => onAddCollaborator(`${u.ref}@${u.host}`, newAccess)}
                   >
                     <UserAvatar
                       name={u.name}

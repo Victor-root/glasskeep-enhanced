@@ -49,7 +49,6 @@ import CollaborationModal from "./CollaborationModal.jsx";
 import FullscreenImageViewer from "./FullscreenImageViewer.jsx";
 import OfflineCollabBanner from "./OfflineCollabBanner.jsx";
 import FederationReadOnlyBanner from "./FederationReadOnlyBanner.jsx";
-import ReadOnlyAccessBanner from "./ReadOnlyAccessBanner.jsx";
 import ChecklistEditor from "../checklist/ChecklistEditor.jsx";
 import useModalHistory from "../../hooks/useModalHistory.js";
 import { getContentImages } from "../../utils/noteIcon.js";
@@ -732,7 +731,6 @@ export default function NoteModal({
 
             <OfflineCollabBanner visible={isCollaborativeNote(activeId) && syncState === "offline"} />
             <FederationReadOnlyBanner info={fedInfo} />
-            <ReadOnlyAccessBanner visible={!fedReadOnly && accessReadOnly} />
 
             {/* Content area */}
             <div
@@ -981,6 +979,7 @@ export default function NoteModal({
             mType={mType}
             viewMode={viewMode}
             readModeEnabled={readModeEnabled}
+            readOnlyBadge={accessReadOnly && !fedReadOnly}
             onToggleViewMode={() => {
               setViewMode((v) => !v);
               setShowModalFmt(false);

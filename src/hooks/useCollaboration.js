@@ -175,14 +175,14 @@ export default function useCollaboration(token, {
     }
   }, [collaboratorInputRef]);
 
-  const addCollaborator = async (username) => {
+  const addCollaborator = async (username, access = "write") => {
     try {
       if (!activeId) return;
 
       const res = await api(`/notes/${activeId}/collaborate`, {
         method: "POST",
         token,
-        body: { username },
+        body: { username, access },
       });
 
       // Prefer the clean name the server resolved (e.g. "Victor") over the

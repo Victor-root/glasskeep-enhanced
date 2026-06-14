@@ -207,7 +207,7 @@ function createNoteFederation(ctx) {
   // ── Outbound: share a local note with a remote user ─────────────────
   // Returns { ok, error?, collaborator? }. Called by the host's
   // /collaborate route when the target looks like user@peer-host.
-  async function shareWithRemote({ note, owner, targetRef, peerHost }) {
+  async function shareWithRemote({ note, owner, targetRef, peerHost, canWrite = 1 }) {
     const link = activeLinkForHost(peerHost);
     if (!link) return { ok: false, error: "peer_not_paired" };
     if (!peer && false) return { ok: false, error: "internal" };
@@ -226,6 +226,7 @@ function createNoteFederation(ctx) {
           ownerRef: owner.email || owner.name, // who we are (the note owner)
           ownerName: owner.name || owner.email,
           ownerAvatar: owner.avatar_url || null, // so the peer shows our avatar
+          canWrite: canWrite ? 1 : 0,        // read-only vs read-write share
           note: contentFromNote(note),
         },
       });
@@ -250,6 +251,11 @@ function createNoteFederation(ctx) {
     } catch (e) {
       if (e.code !== "SQLITE_CONSTRAINT_UNIQUE") throw e;
     }
+    // Mirror the chosen access onto our shadow collaborator row so the
+    // owner-side read-only enforcement + UI reflect it from the start.
+    if (canWrite === 0) {
+      try { deps.setCollaboratorCanWrite.run(0, note.id, shadow.id); } catch { /* best-effort */ }
+    }
     q.insertMapping.run({
       note_id: note.id,
       link_id: link.id,
@@ -270,7 +276,7 @@ function createNoteFederation(ctx) {
   }
 
   // ── Inbound: a peer shares a note with one of our users ─────────────
-  function handleIncomingShare({ linkId, targetRef, ownerRef, ownerName, ownerAvatar, note }) {
+  function handleIncomingShare({ linkId, targetRef, ownerRef, ownerName, ownerAvatar, note, canWrite = 1 }) {
     // Can't read/write encrypted note content while this instance is
     // locked. Tell the peer to retry once we're unlocked.
     if (deps.isLocked?.()) return { ok: false, error: "locked" };
@@ -318,6 +324,10 @@ function createNoteFederation(ctx) {
     try {
       deps.addCollaborator.run(note.id, target.id, shadowOwner.id, deps.nowISO());
       seedPosition(note.id, target.id);
+      // Honour the owner's chosen access: a read-only recipient can open
+      // the mirror but not edit it (enforced locally like any read-only
+      // collaborator).
+      if (canWrite === 0) deps.setCollaboratorCanWrite.run(0, note.id, target.id);
     } catch (e) {
       if (e.code !== "SQLITE_CONSTRAINT_UNIQUE") {
         log.warn?.("[federation/notes] addCollaborator:", e?.message);
@@ -341,6 +351,7 @@ function createNoteFederation(ctx) {
         senderName: ownerName || ownerRef || "",
         noteId: note.id,
         noteTitle: note.title || "",
+        readOnly: canWrite === 0,
       });
       deps.broadcastNoteUpdated(note.id);
     } catch (e) {

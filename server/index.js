@@ -1369,15 +1369,15 @@ function broadcastNoteUpdated(noteId) {
 // recipient is currently connected. The frontend marks pending rows
 // delivered after showing the toast, so a row only fires once across
 // reloads even though it lives in the DB until then.
-function createShareNotification({ recipientId, senderId, senderName, noteId, noteTitle }) {
+function createShareNotification({ recipientId, senderId, senderName, noteId, noteTitle, readOnly = false }) {
   try {
     const createdAt = nowISO();
     // Share notifications regenerate their text client-side from
-    // sender_name + note_title via i18n, so variant/message stay
-    // null. is_persistent=0 because the client (showShareToast)
-    // defers duration to the user's notification-duration pref —
-    // storing 1 here would be misleading if a future replay path
-    // ever started honouring n.persistent for share/revoke rows.
+    // sender_name + note_title via i18n. The `variant` column carries
+    // "read_only" when the share is read-only so the pending-replay and
+    // history paths pick the right wording (the live SSE also sends a
+    // `readOnly` flag). is_persistent=0 because the client (showShareToast)
+    // defers duration to the user's notification-duration pref.
     const result = insertNotification.run(
       recipientId,
       senderId,
@@ -1385,7 +1385,7 @@ function createShareNotification({ recipientId, senderId, senderName, noteId, no
       noteId,
       noteTitle || "",
       senderName || "",
-      null,
+      readOnly ? "read_only" : null,
       null,
       0,
       null,
@@ -1397,6 +1397,7 @@ function createShareNotification({ recipientId, senderId, senderName, noteId, no
       senderName: senderName || "",
       noteId,
       noteTitle: noteTitle || "",
+      readOnly: !!readOnly,
       createdAt,
     });
   } catch (e) {
@@ -2250,6 +2251,9 @@ app.post("/api/notes/reorder", auth, (req, res) => {
 app.post("/api/notes/:id/collaborate", auth, async (req, res) => {
   const noteId = req.params.id;
   const { username } = req.body || {};
+  // Access level chosen at add time. Defaults to "write" (read-write) to
+  // preserve prior behaviour; "read" shares the note read-only.
+  const access = req.body?.access === "read" ? "read" : "write";
 
   if (!username || typeof username !== "string") {
     return res.status(400).json({ error: "Username is required" });
@@ -2274,6 +2278,7 @@ app.post("/api/notes/:id/collaborate", auth, async (req, res) => {
         const owner = getUserById.get(req.user.id);
         const result = await federation.noteFederation.shareWithRemote({
           note, owner, targetRef, peerHost,
+          canWrite: access === "write" ? 1 : 0,
         });
         if (!result.ok) {
           const codeMap = { peer_not_paired: 400, user_not_found: 404 };
@@ -2310,8 +2315,12 @@ app.post("/api/notes/:id/collaborate", auth, async (req, res) => {
   }
 
   try {
-    // Add collaborator
+    // Add collaborator (defaults to read-write); downgrade to read-only
+    // immediately if the owner chose that at add time.
     addCollaborator.run(noteId, collaborator.id, req.user.id, nowISO());
+    if (access === "read") {
+      setCollaboratorCanWrite.run(0, noteId, collaborator.id);
+    }
 
     // Seed the collaborator's per-user position so the shared note lands
     // at the top of their list instead of inheriting the owner's (possibly
@@ -2343,6 +2352,7 @@ app.post("/api/notes/:id/collaborate", auth, async (req, res) => {
       senderName: req.user.name || req.user.email || "",
       noteId,
       noteTitle: note.title || "",
+      readOnly: access === "read",
     });
 
     res.json({

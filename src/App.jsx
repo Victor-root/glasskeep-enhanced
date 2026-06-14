@@ -3523,6 +3523,7 @@ export default function App() {
                 senderName: msg.senderName,
                 noteTitle: msg.noteTitle,
                 noteId: msg.noteId,
+                readOnly: msg.readOnly,
               });
             } else if (msg && msg.type === "note_access_revoked_notification") {
               // Live notification for either side of a revoke. The
