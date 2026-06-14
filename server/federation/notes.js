@@ -106,6 +106,15 @@ function createNoteFederation(ctx) {
       WHERE nc.note_id = ? AND u.federated_origin LIKE ?
       LIMIT 1
     `),
+    // Is there at least one READ-WRITE shadow collaborator for this link on
+    // the note? The home side uses it to refuse an edit pushed on behalf of
+    // a remote recipient the owner limited to read-only.
+    hasWritableShadowCollab: db.prepare(`
+      SELECT 1 FROM note_collaborators nc
+      JOIN users u ON nc.user_id = u.id
+      WHERE nc.note_id = ? AND u.federated_origin LIKE ? AND nc.can_write = 1
+      LIMIT 1
+    `),
     // Real (non-shadow) participants of a note, to notify on removal.
     realParticipants: db.prepare(`
       SELECT nc.user_id FROM note_collaborators nc
@@ -198,7 +207,7 @@ function createNoteFederation(ctx) {
   // ── Outbound: share a local note with a remote user ─────────────────
   // Returns { ok, error?, collaborator? }. Called by the host's
   // /collaborate route when the target looks like user@peer-host.
-  async function shareWithRemote({ note, owner, targetRef, peerHost }) {
+  async function shareWithRemote({ note, owner, targetRef, peerHost, canWrite = 1 }) {
     const link = activeLinkForHost(peerHost);
     if (!link) return { ok: false, error: "peer_not_paired" };
     if (!peer && false) return { ok: false, error: "internal" };
@@ -217,6 +226,7 @@ function createNoteFederation(ctx) {
           ownerRef: owner.email || owner.name, // who we are (the note owner)
           ownerName: owner.name || owner.email,
           ownerAvatar: owner.avatar_url || null, // so the peer shows our avatar
+          canWrite: canWrite ? 1 : 0,        // read-only vs read-write share
           note: contentFromNote(note),
         },
       });
@@ -241,6 +251,11 @@ function createNoteFederation(ctx) {
     } catch (e) {
       if (e.code !== "SQLITE_CONSTRAINT_UNIQUE") throw e;
     }
+    // Mirror the chosen access onto our shadow collaborator row so the
+    // owner-side read-only enforcement + UI reflect it from the start.
+    if (canWrite === 0) {
+      try { deps.setCollaboratorCanWrite.run(0, note.id, shadow.id); } catch { /* best-effort */ }
+    }
     q.insertMapping.run({
       note_id: note.id,
       link_id: link.id,
@@ -261,7 +276,7 @@ function createNoteFederation(ctx) {
   }
 
   // ── Inbound: a peer shares a note with one of our users ─────────────
-  function handleIncomingShare({ linkId, targetRef, ownerRef, ownerName, ownerAvatar, note }) {
+  function handleIncomingShare({ linkId, targetRef, ownerRef, ownerName, ownerAvatar, note, canWrite = 1 }) {
     // Can't read/write encrypted note content while this instance is
     // locked. Tell the peer to retry once we're unlocked.
     if (deps.isLocked?.()) return { ok: false, error: "locked" };
@@ -309,6 +324,10 @@ function createNoteFederation(ctx) {
     try {
       deps.addCollaborator.run(note.id, target.id, shadowOwner.id, deps.nowISO());
       seedPosition(note.id, target.id);
+      // Honour the owner's chosen access: a read-only recipient can open
+      // the mirror but not edit it (enforced locally like any read-only
+      // collaborator).
+      if (canWrite === 0) deps.setCollaboratorCanWrite.run(0, note.id, target.id);
     } catch (e) {
       if (e.code !== "SQLITE_CONSTRAINT_UNIQUE") {
         log.warn?.("[federation/notes] addCollaborator:", e?.message);
@@ -332,6 +351,7 @@ function createNoteFederation(ctx) {
         senderName: ownerName || ownerRef || "",
         noteId: note.id,
         noteTitle: note.title || "",
+        readOnly: canWrite === 0,
       });
       deps.broadcastNoteUpdated(note.id);
     } catch (e) {
@@ -350,6 +370,18 @@ function createNoteFederation(ctx) {
     if (!mapping || mapping.link_id !== linkId) return { ok: false, error: "unknown_note" };
     const existing = deps.getNoteById.get(note.id);
     if (!existing) return { ok: false, error: "unknown_note" };
+
+    // Defense-in-depth: when WE are the authority (home), an incoming edit
+    // is made on behalf of a remote recipient. If every remote recipient on
+    // this link is read-only, refuse it — a read-only collaborator must
+    // never change the note even if their server tried to push it. (The
+    // mirror already blocks them locally; this guards a misbehaving peer.)
+    // ok:true so the peer stops retrying; its divergent copy reconciles on
+    // our next authoritative push.
+    if (mapping.role === "home" &&
+        !q.hasWritableShadowCollab.get(note.id, `${linkId}|%`)) {
+      return { ok: true, readOnly: true };
+    }
 
     const incomingMs = deps.parseIsoTimestamp(note.client_updated_at)?.ms;
     if (!deps.isNewerOrEqual(incomingMs, existing.client_updated_at)) {
@@ -514,6 +546,62 @@ function createNoteFederation(ctx) {
     return { ok: true };
   }
 
+  // ── Outbound: tell the peer a remote collaborator's access changed ───
+  // The owner toggled a federated recipient between read-only / read-write;
+  // push it so their mirror copy flips immediately. `shadow` is our local
+  // stand-in for that recipient (federated_origin = `${linkId}|${ref}`).
+  async function setRemotePermission({ note, shadow, canWrite }) {
+    const origin = shadow?.federated_origin || "";
+    const sep = origin.indexOf("|");
+    if (sep < 0) return { ok: false, error: "not_federated" };
+    const linkId = origin.slice(0, sep);
+    const targetRef = origin.slice(sep + 1);
+    const link = store.getById(linkId);
+    if (!link || link.status !== "active") return { ok: false, error: "peer_not_paired" };
+    const path = "/api/federation/notes/permission";
+    try {
+      const resp = await peer.httpJson(link.peer_base_url + path, {
+        method: "POST",
+        secret: link.shared_secret,
+        linkId: link.id,
+        path,
+        body: { linkId: link.id, noteId: note.id, targetRef, canWrite: canWrite ? 1 : 0 },
+      });
+      return { ok: !!(resp.ok && resp.json && resp.json.ok === true) };
+    } catch (e) {
+      return { ok: false, error: peer.tlsAwareMessage ? peer.tlsAwareMessage(e) : "unreachable" };
+    }
+  }
+
+  // ── Inbound: the peer changed a recipient's access on a note we mirror ─
+  // Flip the local recipient's read/write bit; no note content is touched,
+  // so this works even while the instance is locked.
+  function handleIncomingPermission({ linkId, noteId, targetRef, canWrite }) {
+    const m = q.getMapping.get(noteId);
+    if (!m || m.link_id !== linkId || m.role !== "mirror") {
+      return { ok: false, error: "unknown_note" };
+    }
+    const target =
+      deps.getUserByEmail.get(targetRef) || deps.getUserByName.get(targetRef);
+    if (!target || target.federated_origin) return { ok: false, error: "user_not_found" };
+    try {
+      deps.setCollaboratorCanWrite.run(canWrite ? 1 : 0, noteId, target.id);
+      // Re-broadcast for any non-open surfaces, plus a dedicated access
+      // event that flips the recipient's OPEN editor instantly (the generic
+      // patch is suppressed while they hold a local lease / pending edits).
+      deps.broadcastNoteUpdated(noteId);
+      deps.sendEventToUser?.(target.id, {
+        type: "note_access_changed",
+        noteId,
+        access: canWrite ? "write" : "read",
+      });
+    } catch (e) {
+      log.warn?.("[federation/notes] apply permission:", e?.message);
+      return { ok: false, error: "apply_failed" };
+    }
+    return { ok: true };
+  }
+
   // A federated MIRROR note is read-only while its home link can't be
   // trusted to accept the write (offline / locked / out of date). The
   // host write path consults this so an edit is refused server-side, and
@@ -529,7 +617,9 @@ function createNoteFederation(ctx) {
     handleIncomingShare,
     handleIncomingApply,
     handleIncomingRemove,
+    handleIncomingPermission,
     shareWithRemote,
+    setRemotePermission,
     syncTick,
     onNoteChangedLocally,
     // A link's connectivity flipped → nudge every note riding it so each

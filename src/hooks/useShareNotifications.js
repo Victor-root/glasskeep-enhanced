@@ -101,9 +101,10 @@ function buildHistoryEntry(n) {
   let icon = n.icon || null;
 
   if (type === "note_shared") {
+    const isReadOnly = n.variant === "read_only";
     title = t("noteSharedTitle");
     message = buildHighlightedMessage(
-      "noteSharedToast",
+      isReadOnly ? "noteSharedReadOnlyToast" : "noteSharedToast",
       { sender, title: noteTitle },
       ["title"],
     );
@@ -282,6 +283,9 @@ export function useShareNotifications({ token, userId }) {
     const rawTitle = String(n.noteTitle ?? n.note_title ?? "").trim();
     const noteTitle = rawTitle || t("untitledNote");
     const noteId = n.noteId ?? n.note_id ?? null;
+    // Read-only shares (live `readOnly`, or persisted via variant on replay)
+    // get wording that makes the read-only state explicit.
+    const readOnly = !!(n.readOnly ?? (n.variant === "read_only"));
     const fn = notifyRef.current;
     if (typeof fn !== "function") return;
     // Wrap the note title with the `**...**` marker the card's message
@@ -293,7 +297,7 @@ export function useShareNotifications({ token, userId }) {
       variant: "info",
       title: t("noteSharedTitle"),
       message: buildHighlightedMessage(
-        "noteSharedToast",
+        readOnly ? "noteSharedReadOnlyToast" : "noteSharedToast",
         { sender, title: noteTitle },
         ["title"],
       ),
@@ -476,6 +480,7 @@ export function useShareNotifications({ token, userId }) {
             senderName: n.sender_name,
             noteTitle: n.note_title,
             noteId: n.note_id,
+            variant: n.variant,
           };
           if (n.type === "note_shared") {
             showShareToast(payload);

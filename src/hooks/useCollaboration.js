@@ -175,14 +175,14 @@ export default function useCollaboration(token, {
     }
   }, [collaboratorInputRef]);
 
-  const addCollaborator = async (username) => {
+  const addCollaborator = async (username, access = "write") => {
     try {
       if (!activeId) return;
 
       const res = await api(`/notes/${activeId}/collaborate`, {
         method: "POST",
         token,
-        body: { username },
+        body: { username, access },
       });
 
       // Prefer the clean name the server resolved (e.g. "Victor") over the
@@ -229,6 +229,30 @@ export default function useCollaboration(token, {
       }
     } catch (e) {
       showToast(localizeServerError(e.message, "failedAddCollaborator"), "error");
+    }
+  };
+
+  // Owner-only: set a collaborator's access level ("read" | "write").
+  // Optimistic — the modal row flips at once; on failure we revert by
+  // reloading the authoritative list. The note list refreshes so the
+  // collaborator's own editor locks/unlocks (also pushed live over SSE).
+  const setCollaboratorAccess = async (collaboratorId, access) => {
+    const targetNoteId = activeId;
+    if (!targetNoteId) return;
+    const canWrite = access === "write" ? 1 : 0;
+    setAddModalCollaborators((prev) =>
+      prev.map((c) => (c.id === collaboratorId ? { ...c, canWrite } : c)),
+    );
+    try {
+      await api(`/notes/${targetNoteId}/collaborate/${collaboratorId}`, {
+        method: "PATCH",
+        token,
+        body: { access },
+      });
+      invalidateNotesCache();
+    } catch (e) {
+      showToast(localizeServerError(e.message, "genericError"), "error");
+      await loadCollaboratorsForAddModal(targetNoteId);
     }
   };
 
@@ -298,5 +322,6 @@ export default function useCollaboration(token, {
     searchUsers,
     updateDropdownPosition,
     addCollaborator,
+    setCollaboratorAccess,
   };
 }

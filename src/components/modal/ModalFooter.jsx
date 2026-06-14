@@ -70,6 +70,7 @@ export default function ModalFooter({
   mType,
   viewMode,
   readModeEnabled = true,
+  readOnlyBadge = false,
   onToggleViewMode,
   // drawing mode toggle
   drawMode,
@@ -826,8 +827,23 @@ export default function ModalFooter({
           </RichTextPopover>
         )}
 
+        {/* ── Read-only access badge — shown (instead of the view/edit
+            toggle) when the owner limited this collaborator to read-only.
+            Independent of the read-mode preference so the status is always
+            visible; the offline-peer read-only case keeps its own banner. ── */}
+        {readOnlyBadge && (
+          <div
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5 border border-[var(--border-light)] cursor-default select-none"
+            data-tooltip={!isDesktop ? t("accessReadOnly") : undefined}
+            aria-label={t("accessReadOnly")}
+          >
+            <TI.Eye className="tabler-icon w-4 h-4" />
+            {isDesktop && <span>{t("accessReadOnly")}</span>}
+          </div>
+        )}
+
         {/* ── Edit/View toggle — text notes ── */}
-        {mType === "text" && readModeEnabled && (
+        {mType === "text" && !readOnlyBadge && readModeEnabled && (
           <button
             className={`${isDesktop ? "modal-footer-labeled-btn" : "modal-footer-btn"} modal-footer-btn--mode btn-gradient hover:scale-[1.03] active:scale-[0.98]`}
             onClick={handleToggleViewMode}
@@ -850,7 +866,7 @@ export default function ModalFooter({
         )}
 
         {/* ── Mode buttons for drawing notes (grouped) ── */}
-        {mType === "draw" && (
+        {mType === "draw" && !readOnlyBadge && (
           <div className={`flex items-center ${isDesktop ? "gap-1" : "gap-2"}`}>
             {/* Edit/View toggle (hidden in draw canvas mode, or when the
                 user disabled the read-mode preference globally) */}
