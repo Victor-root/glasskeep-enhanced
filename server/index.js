@@ -340,6 +340,9 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
       if (!names.has("app_bg_enabled")) {
         db.exec(`ALTER TABLE users ADD COLUMN app_bg_enabled INTEGER NOT NULL DEFAULT 1`);
       }
+      if (!names.has("federated_origin")) {
+        db.exec(`ALTER TABLE users ADD COLUMN federated_origin TEXT`);
+      }
     });
     tx();
   } catch {
