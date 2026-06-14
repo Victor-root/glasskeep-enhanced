@@ -15,7 +15,7 @@ import TI from "../../../icons/editor/index.jsx";
 import { SettingsSubHeading } from "../../common/SettingsAccordion.jsx";
 import { useFederation } from "../../../hooks/useFederation.js";
 import FederationLinkCard from "./FederationLinkCard.jsx";
-import { ServerPlusIcon } from "./FederationIcons.jsx";
+import { ServerPlusIcon, ServerUserIcon } from "./FederationIcons.jsx";
 
 // Map a server error code to a friendly, translated sentence.
 function inviteErrorMessage(err) {
@@ -158,7 +158,7 @@ export default function FederationSection({
         }`}
       >
         <div className="text-sm font-semibold mb-1 flex items-center gap-2">
-          <TI.Server className="tabler-icon w-6 h-6 text-gray-600 dark:text-gray-300" />
+          <ServerUserIcon className="w-6 h-6 text-gray-600 dark:text-gray-300" />
           {t("fedSelfNameTitle")}
         </div>
         <p className="text-xs text-gray-600 dark:text-gray-300 mb-3">
@@ -206,12 +206,12 @@ export default function FederationSection({
             type="button"
             onClick={copyAddress}
             aria-label={t("copy")}
-            className={`shrink-0 ${PRIMARY_BTN}`}
+            className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-500/10 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           >
             {copiedAddr ? (
-              <TI.Check className="tabler-icon w-4 h-4" />
+              <TI.Check className="tabler-icon w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             ) : (
-              <TI.Copy className="tabler-icon w-4 h-4" />
+              <TI.Copy className="tabler-icon w-3.5 h-3.5" />
             )}
             {copiedAddr ? t("copied") : t("copy")}
           </button>

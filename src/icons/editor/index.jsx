@@ -91,6 +91,9 @@ import shieldLockSvg      from "./tabler/shield-lock.svg?raw";
 import worldSvg           from "./tabler/world.svg?raw";
 import worldWwwSvg        from "./tabler/world-www.svg?raw";
 import worldCheckSvg      from "./tabler/world-check.svg?raw";
+import tagSvg             from "./tabler/tag.svg?raw";
+import circleCheckSvg     from "./tabler/circle-check.svg?raw";
+import alertTriangleSvg   from "./tabler/alert-triangle.svg?raw";
 import serverSvg          from "./tabler/server.svg?raw";
 import homeLockSvg        from "./tabler/home-lock.svg?raw";
 import pencilSvg          from "./tabler/pencil.svg?raw";
@@ -270,8 +273,11 @@ export const TI = {
   BellFilled:           (p) => <TablerIcon svg={bellFilledSvg} {...p} />,
   BellRingingFilled:    (p) => <TablerIcon svg={bellRingingFilledSvg} {...p} />,
   InfoCircleFilled:     (p) => <TablerIcon svg={infoCircleFilledSvg} {...p} />,
+  Tag:                  (p) => <TablerIcon svg={tagSvg} {...p} />,
   CircleCheckFilled:    (p) => <TablerIcon svg={circleCheckFilledSvg} {...p} />,
+  CircleCheck:          (p) => <TablerIcon svg={circleCheckSvg} {...p} />,
   AlertTriangleFilled:  (p) => <TablerIcon svg={alertTriangleFilledSvg} {...p} />,
+  AlertTriangle:        (p) => <TablerIcon svg={alertTriangleSvg} {...p} />,
   AlertCircleFilled:    (p) => <TablerIcon svg={alertCircleFilledSvg} {...p} />,
   AppWindow:            (p) => <TablerIcon svg={appWindowSvg} {...p} />,
   Volume:               (p) => <TablerIcon svg={volumeSvg} {...p} />,

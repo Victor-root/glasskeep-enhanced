@@ -30,9 +30,9 @@ export const FED_STATE = Object.freeze({
 });
 
 const META = {
-  [FED_STATE.ONLINE]: { tone: "ok", icon: TI.CircleCheckFilled, labelKey: "fedStateOnline", descKey: "fedStateOnlineDesc" },
-  [FED_STATE.OFFLINE]: { tone: "down", icon: TI.AlertTriangleFilled, labelKey: "fedStateOffline", descKey: "fedStateOfflineDesc" },
-  [FED_STATE.INCOMPATIBLE]: { tone: "warn", icon: TI.AlertTriangleFilled, labelKey: "fedStateIncompatible", descKey: "fedStateIncompatibleDesc" },
+  [FED_STATE.ONLINE]: { tone: "ok", icon: TI.CircleCheck, labelKey: "fedStateOnline", descKey: "fedStateOnlineDesc" },
+  [FED_STATE.OFFLINE]: { tone: "down", icon: TI.AlertTriangle, labelKey: "fedStateOffline", descKey: "fedStateOfflineDesc" },
+  [FED_STATE.INCOMPATIBLE]: { tone: "warn", icon: TI.AlertTriangle, labelKey: "fedStateIncompatible", descKey: "fedStateIncompatibleDesc" },
   [FED_STATE.LOCKED]: { tone: "warn", icon: TI.ShieldLock, labelKey: "fedStateLocked", descKey: "fedStateLockedDesc" },
   [FED_STATE.UNKNOWN]: { tone: "pending", icon: TI.Clock, labelKey: "fedStateChecking", descKey: "fedStateCheckingDesc" },
   [FED_STATE.OUTGOING_PENDING]: { tone: "pending", icon: TI.Clock, labelKey: "fedStateOutgoing", descKey: "fedStateOutgoingDesc" },
