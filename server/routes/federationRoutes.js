@@ -79,7 +79,7 @@ function attachFederationRoutes(
   const searchLocalUsersStmt = db.prepare(`
     SELECT name, email, avatar_url FROM users
     WHERE (name LIKE ? OR email LIKE ?) AND federated_origin IS NULL
-    ORDER BY name ASC LIMIT 10
+    ORDER BY name ASC LIMIT 100
   `);
   // "Locked" = at-rest encryption is enabled but hasn't been unlocked,
   // so this instance currently can't read or write note content.
