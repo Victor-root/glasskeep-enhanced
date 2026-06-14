@@ -48,6 +48,9 @@ function attachFederationRoutes(
   { db, auth, adminOnly, log = console, broadcastToAdmins, noteDeps } = {},
 ) {
   const store = createFederationStore(db);
+  // Friendly host (no scheme) for labels/log lines when a link has no
+  // admin-given peer_label yet.
+  const hostOf = (url) => String(url || "").replace(/^https?:\/\//i, "");
   // Note-level federation (sharing notes across a paired link). Only
   // wired when the host passes the note helpers it needs.
   const noteFederation = noteDeps
@@ -124,6 +127,22 @@ function attachFederationRoutes(
     }
   }
 
+  // The peer removed this link (detected via a 404 "unknown link" health
+  // probe, i.e. we were offline when they unpaired). The store row is
+  // already gone; just tell our admins so the panel drops it and they learn.
+  function onLinkDissociated(link) {
+    try {
+      broadcastToAdmins?.({
+        type: "federation_dissociated",
+        linkId: link.id,
+        peerBaseUrl: link.peer_base_url,
+        peerLabel: link.peer_label || hostOf(link.peer_base_url),
+      });
+    } catch {
+      /* SSE best-effort */
+    }
+  }
+
   // Single-flight tick: the interval and the on-demand kicks share one
   // in-flight guard so a slow network round can't pile up overlapping
   // runs.
@@ -137,6 +156,7 @@ function attachFederationRoutes(
         label: localLabel(),
         log,
         onStateChange: onLinkStateFlip,
+        onDissociated: onLinkDissociated,
       });
       // After connectivity is refreshed, reconcile federated note
       // content with each reachable peer (push our changed copies).
@@ -295,12 +315,51 @@ function attachFederationRoutes(
       peer_label: acceptorLabel || link.peer_label || null,
     });
     try {
-      broadcastToAdmins?.({ type: "federation_linked", linkId, peerBaseUrl: peerUrl });
+      broadcastToAdmins?.({
+        type: "federation_linked",
+        linkId,
+        peerBaseUrl: peerUrl,
+        peerLabel: acceptorLabel || link.peer_label || hostOf(peerUrl),
+      });
     } catch {
       /* best-effort */
     }
     kickTick(); // health-check the freshly active link promptly
     res.json(selfReport());
+  });
+
+  // The peer refused (or cancelled) a pending pairing. Resolve our side to
+  // REFUSED and tell our admins, instead of retrying the invite forever.
+  // Unsigned — a pending link has no shared secret; validated by linkId +
+  // nonce, exactly like /pair/accept.
+  app.post("/api/federation/pair/refused", (req, res) => {
+    const { linkId, nonce, refusedByLabel } = req.body || {};
+    if (!linkId || !nonce) {
+      return res.status(400).json({ error: "missing fields" });
+    }
+    const link = store.getById(linkId);
+    if (
+      !link ||
+      (link.status !== protocol.STATUS.OUTGOING_PENDING &&
+        link.status !== protocol.STATUS.INCOMING_PENDING)
+    ) {
+      return res.status(409).json({ error: "no matching pending invitation" });
+    }
+    if (!timingSafeEqualStr(nonce, link.nonce)) {
+      return res.status(403).json({ error: "nonce mismatch" });
+    }
+    store.setStatus(link.id, protocol.STATUS.REFUSED);
+    try {
+      broadcastToAdmins?.({
+        type: "federation_refused",
+        linkId: link.id,
+        peerBaseUrl: link.peer_base_url,
+        peerLabel: refusedByLabel || link.peer_label || hostOf(link.peer_base_url),
+      });
+    } catch {
+      /* SSE best-effort */
+    }
+    res.json({ ok: true });
   });
 
   // Signed liveness probe. Answers even while locked — that's the whole
@@ -330,6 +389,26 @@ function attachFederationRoutes(
     const link = verifyS2S(req);
     if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
     kickTick();
+    res.json({ ok: true });
+  });
+
+  // The peer unpaired from us. Drop our side too and tell our admins, so
+  // the link doesn't linger forever showing "offline". Signed with the
+  // (still valid) shared secret — only the real peer can trigger this.
+  app.post("/api/federation/pair/unpair", (req, res) => {
+    const link = verifyS2S(req);
+    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    const peerLabel = link.peer_label || hostOf(link.peer_base_url);
+    try { store.remove(link.id); } catch { /* best-effort */ }
+    try {
+      broadcastToAdmins?.({
+        type: "federation_dissociated",
+        linkId: link.id,
+        peerBaseUrl: link.peer_base_url,
+        peerLabel,
+      });
+    } catch { /* SSE best-effort */ }
+    log.log?.(`[federation] peer ${peerLabel} unpaired from us; link removed`);
     res.json({ ok: true });
   });
 
@@ -593,6 +672,19 @@ function attachFederationRoutes(
       return res.status(409).json({ error: "not_pending" });
     }
     store.setStatus(link.id, protocol.STATUS.REFUSED);
+    // Tell the other side, so its pending request resolves to "refused"
+    // instead of the initiator retrying the invite forever (and never
+    // learning the outcome). Unsigned — a pending link has no shared
+    // secret yet; the peer validates by linkId + nonce. Best-effort.
+    if (link.peer_base_url && link.nonce) {
+      const path = "/api/federation/pair/refused";
+      Promise.resolve()
+        .then(() => peer.httpJson(link.peer_base_url + path, {
+          method: "POST",
+          body: { linkId: link.id, nonce: link.nonce, refusedByLabel: localLabel() || null },
+        }))
+        .catch(() => { /* best-effort */ });
+    }
     res.json({ ok: true, link: publicLink(store.getById(link.id)) });
   });
 
@@ -625,6 +717,24 @@ function attachFederationRoutes(
   app.delete("/api/admin/federation/links/:id", auth, adminOnly, (req, res) => {
     const link = store.getById(req.params.id);
     if (!link) return res.status(404).json({ error: "not_found" });
+    // Tell the peer we're unpairing BEFORE we forget the secret, so it can
+    // drop its side too instead of being left with a dead link that just
+    // shows "offline" forever. Best-effort + fire-and-forget — if the peer
+    // is down, its own health probe will get a 404 "unknown link" from us
+    // and treat that as a dissociation (see healthCheckOne). Only active
+    // links have a shared secret to sign with.
+    if (link.status === protocol.STATUS.ACTIVE && link.shared_secret) {
+      const path = "/api/federation/pair/unpair";
+      Promise.resolve()
+        .then(() => peer.httpJson(link.peer_base_url + path, {
+          method: "POST",
+          secret: link.shared_secret,
+          linkId: link.id,
+          path,
+          body: { linkId: link.id },
+        }))
+        .catch(() => { /* best-effort; durable 404 detection is the fallback */ });
+    }
     store.remove(link.id);
     res.json({ ok: true });
   });
