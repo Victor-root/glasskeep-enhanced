@@ -15,7 +15,7 @@ import TI from "../../../icons/editor/index.jsx";
 import { SettingsSubHeading } from "../../common/SettingsAccordion.jsx";
 import { useFederation } from "../../../hooks/useFederation.js";
 import FederationLinkCard from "./FederationLinkCard.jsx";
-import { ServerPlusIcon, ServerUserIcon } from "./FederationIcons.jsx";
+import { ServerPlusIcon, ServerUserIcon, WorldWwwIcon } from "./FederationIcons.jsx";
 
 // Map a server error code to a friendly, translated sentence.
 function inviteErrorMessage(err) {
@@ -174,7 +174,7 @@ export default function FederationSection({
             onKeyDown={(e) => {
               if (e.key === "Enter") onSaveName();
             }}
-            className="flex-1 min-w-[12rem] text-sm px-3 py-2 rounded-lg bg-white dark:bg-black/30 border border-[var(--border-light)] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
+            className="flex-1 min-w-[12rem] text-sm px-3 py-2 rounded-lg bg-white dark:bg-black/30 border border-[var(--border-light)] text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
           />
           <span className="text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
             {nameDraft.length}/{fed.maxLabelLen}
@@ -195,7 +195,7 @@ export default function FederationSection({
           to the other server's admin to pair from their side. */}
       <div className="rounded-lg border border-[var(--border-light)] bg-gray-50 dark:bg-black/30 p-3">
         <div className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300 mb-2 flex items-center gap-1.5">
-          <TI.WorldWww className="tabler-icon w-4 h-4" />
+          <WorldWwwIcon className="shrink-0" />
           {t("fedThisServer")}
         </div>
         <div className="flex items-center gap-2">
@@ -239,7 +239,7 @@ export default function FederationSection({
             onKeyDown={(e) => {
               if (e.key === "Enter") onInvite();
             }}
-            className="flex-1 min-w-[12rem] text-sm px-3 py-2 rounded-lg bg-white dark:bg-black/30 border border-[var(--border-light)] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
+            className="flex-1 min-w-[12rem] text-sm px-3 py-2 rounded-lg bg-white dark:bg-black/30 border border-[var(--border-light)] text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
           />
           <button
             type="button"
