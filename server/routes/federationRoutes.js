@@ -331,6 +331,7 @@ function attachFederationRoutes(
       ownerAvatar: b.ownerAvatar || null,
       note: b.note || {},
       canWrite: b.canWrite === 0 ? 0 : 1,
+      roster: Array.isArray(b.roster) ? b.roster : null,
     });
     res.status(result.ok ? 200 : 409).json(result);
   });
@@ -343,6 +344,7 @@ function attachFederationRoutes(
     const result = noteFederation.handleIncomingApply({
       linkId: link.id,
       note: (req.body || {}).note || {},
+      roster: Array.isArray((req.body || {}).roster) ? req.body.roster : null,
     });
     res.status(result.ok ? 200 : 409).json(result);
   });

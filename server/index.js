@@ -1044,6 +1044,11 @@ const getNoteCollaborators = db.prepare(`
 const setCollaboratorCanWrite = db.prepare(`
   UPDATE note_collaborators SET can_write = ? WHERE note_id = ? AND user_id = ?
 `);
+// Drop a single collaborator from a note. Used by the federation roster
+// sync to prune display stand-ins for participants who have left.
+const removeCollaboratorRow = db.prepare(
+  "DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?"
+);
 const getCollaboratorAccess = db.prepare(
   "SELECT can_write FROM note_collaborators WHERE note_id = ? AND user_id = ?"
 );
@@ -1264,6 +1269,45 @@ function getNoteParticipants(noteId, noteOwnerId, requestingUserId) {
     if (owner) others.unshift(participantObj(owner));
   }
   return others.length > 0 ? others : null;
+}
+
+// Flat roster of EVERY participant on a note (owner + all collaborators),
+// for the federation engine to propagate to mirrors so each peer can show
+// the complete active-collaborator list — including participants who live
+// on a third server it isn't directly linked to. Each entry carries a
+// stable `ref` (the participant's own identity on their home server, so a
+// shadow stand-in is keyed by its clean remoteRef, never the synthetic
+// local email) plus the display fields a mirror needs.
+function rosterRefFor(u) {
+  const origin = u && u.federated_origin;
+  if (origin) {
+    const i = String(origin).indexOf("|");
+    if (i >= 0) return String(origin).slice(i + 1); // clean remote identity
+  }
+  return u.email || u.name;
+}
+function getNoteRoster(noteId, noteOwnerId) {
+  const out = [];
+  const owner = getUserById.get(noteOwnerId);
+  if (owner) {
+    out.push({
+      ref: rosterRefFor(owner),
+      name: owner.name,
+      avatar_url: owner.avatar_url || null,
+      canWrite: 1,
+      isOwner: true,
+    });
+  }
+  for (const c of getNoteCollaborators.all(noteId)) {
+    out.push({
+      ref: rosterRefFor(c),
+      name: c.name,
+      avatar_url: c.avatar_url || null,
+      canWrite: c.can_write === 0 ? 0 : 1,
+      isOwner: false,
+    });
+  }
+  return out;
 }
 
 // ---------- Realtime (SSE) ----------
@@ -1509,6 +1553,9 @@ const federation = attachFederationRoutes(app, {
     runUpdateNoteFullCollab,
     addCollaborator,
     setCollaboratorCanWrite,
+    removeCollaborator: removeCollaboratorRow,
+    getNoteRoster,
+    getNoteCollaborators,
     getMaxUserEffectivePosition,
     upsertUserPosition,
     updateNoteWithEditor,
@@ -2294,6 +2341,9 @@ app.post("/api/notes/:id/collaborate", auth, async (req, res) => {
         // bearing) collaborator without a manual reload.
         updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
         broadcastNoteUpdated(noteId);
+        // Tell the OTHER peers about the new participant so their rosters
+        // update too (the new peer already got the roster via the share).
+        try { noteFederationRef?.onParticipantsChangedLocally(noteId); } catch { /* best-effort */ }
         return res.json({
           ok: true,
           message: `Shared with ${result.collaborator?.name || targetRef}`,
@@ -2344,6 +2394,9 @@ app.post("/api/notes/:id/collaborate", auth, async (req, res) => {
     // Update note with editor info
     updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
     broadcastNoteUpdated(noteId);
+    // Propagate the new local collaborator to any federated peers so their
+    // displayed roster includes them.
+    try { noteFederationRef?.onParticipantsChangedLocally(noteId); } catch { /* best-effort */ }
 
     // Persist + push a "note_shared" notification for the new
     // collaborator. Only runs on a fresh insert above — the 409
@@ -2448,6 +2501,9 @@ app.patch("/api/notes/:id/collaborate/:userId", auth, async (req, res) => {
   }
 
   broadcastNoteUpdated(noteId);
+  // An access toggle changes a participant's canWrite in the roster — push
+  // it so every peer's displayed roster reflects the new permission.
+  try { noteFederationRef?.onParticipantsChangedLocally(noteId); } catch { /* best-effort */ }
   res.json({ ok: true, access });
 });
 
@@ -2658,6 +2714,9 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
   // Update note with editor info and notify remaining participants
   updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), noteId);
   broadcastNoteUpdated(noteId);
+  // Removing a participant shrinks the roster — push it so every peer prunes
+  // the departed collaborator from their displayed list.
+  try { noteFederationRef?.onParticipantsChangedLocally(noteId); } catch { /* best-effort */ }
 
   res.json({ ok: true, message: "Collaborator removed", copyNoteId });
 });
