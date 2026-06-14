@@ -120,6 +120,10 @@ function createNoteFederation(ctx) {
     `),
     // Keep a shadow's display name + avatar fresh with the remote user.
     updateShadow: db.prepare(`UPDATE users SET name = ?, avatar_url = ? WHERE id = ?`),
+    // The authority server's friendly name for a stand-in's origin server,
+    // so a third-server participant badges correctly on a mirror that has no
+    // direct link to resolve it. NULL means "resolve via our own link".
+    setShadowServerLabel: db.prepare(`UPDATE users SET federated_server_label = ? WHERE id = ?`),
     // Does this note still carry the shadow collaborator that represents
     // the peer side of the given link? (i.e. is it still shared there?)
     hasShadowCollab: db.prepare(`
@@ -251,16 +255,45 @@ function createNoteFederation(ctx) {
     if (!Array.isArray(roster) || roster.length === 0) return;
     const link = store.getById(linkId);
     const peerHost = link ? hostOf(link.peer_base_url) : "";
-    const expected = new Set();
+    // The mirror's own name for the home server — used to badge participants
+    // who live on the home (the owner and home-local collaborators).
+    const homeLabel = link ? (link.peer_label || hostOf(link.peer_base_url)) : null;
+    // Heal the shadow owner's badge to our name for the home link. applyRoster
+    // skips owner entries, so this is where a stale label (left by older
+    // versions where two same-named participants shared the owner row) gets
+    // corrected on the next sync — no re-share required.
+    try {
+      const note = deps.getNoteById.get(noteId);
+      const ownerRow = note ? deps.getUserById?.get(note.user_id) : null;
+      if (ownerRow?.federated_origin && homeLabel) {
+        q.setShadowServerLabel.run(homeLabel, ownerRow.id);
+      }
+    } catch { /* best-effort */ }
+    // Origins of the display stand-ins the roster says should exist on this
+    // link. We reconcile ONLY shadow stand-ins here — never real local users.
+    // Real recipients are managed exclusively by share / unshare messages, so
+    // a roster quirk (e.g. two people sharing a name) can never strip a real
+    // collaborator and make their note vanish.
+    const expectedShadowOrigins = new Set();
     for (const p of roster) {
       if (!p || !p.ref) continue;
-      if (p.isOwner) continue; // owner is mirrored as the note's shadow owner
-      // A roster entry that resolves to a REAL local user is this server's
-      // own recipient — already a real collaborator, never a stand-in.
-      const local = deps.getUserByEmail.get(p.ref) || deps.getUserByName.get(p.ref);
-      if (local && !local.federated_origin) continue;
-      const shadow = ensureShadowUser(linkId, p.ref, p.name || p.ref, peerHost, p.avatar_url ?? null);
-      expected.add(`${linkId}|${p.ref}`);
+      if (p.isOwner) continue; // owner is the mirror's note owner, not a collab row
+      // A roster entry that resolves to a REAL local account is this server's
+      // own recipient — owned by the share/unshare flow, not the display
+      // roster. Leave it completely untouched.
+      const local =
+        deps.getRealUserByEmail?.get(p.ref) || deps.getRealUserByName?.get(p.ref);
+      if (local) continue;
+      // Remote participant → display stand-in. Key it by the participant's
+      // globally-unique uid (not their name) so two different people who share
+      // a name never collapse into one row — nor collide with the shadow owner.
+      const key = p.uid || p.ref;
+      const shadow = ensureShadowUser(linkId, key, p.name || p.ref, peerHost, p.avatar_url ?? null);
+      expectedShadowOrigins.add(`${linkId}|${key}`);
+      // Explicit badge: the authority's name for a third server, or the home
+      // label for a home-local participant. Always set, so display never
+      // depends on fragile origin-link resolution.
+      try { q.setShadowServerLabel.run(p.serverLabel || homeLabel || null, shadow.id); } catch { /* best-effort */ }
       try {
         deps.addCollaborator.run(noteId, shadow.id, shadow.id, deps.nowISO());
       } catch (e) {
@@ -268,10 +301,13 @@ function createNoteFederation(ctx) {
       }
       try { deps.setCollaboratorCanWrite.run(p.canWrite ? 1 : 0, noteId, shadow.id); } catch { /* best-effort */ }
     }
-    // Prune stand-ins under this link that are no longer in the roster.
+    // Prune ONLY shadow stand-ins on this link that are no longer in the
+    // roster (e.g. a participant left, or a stale ref-keyed stand-in from an
+    // older version). The shadow owner is the note's user_id, not a collab
+    // row, so it is never returned here; real recipients are never touched.
     try {
       for (const row of q.listShadowCollabsForNote.all(noteId, `${linkId}|%`)) {
-        if (!expected.has(row.federated_origin)) {
+        if (!expectedShadowOrigins.has(row.federated_origin)) {
           deps.removeCollaborator?.run(noteId, row.id);
         }
       }
@@ -361,15 +397,23 @@ function createNoteFederation(ctx) {
     if (!link || link.status !== "active") return { ok: false, error: "unknown_link" };
     const peerHost = hostOf(link.peer_base_url);
 
-    // Resolve the local recipient. Never match a shadow row.
+    // Resolve the local recipient. Real accounts only — never a shadow row,
+    // even one that happens to share a name with the target.
     const target =
-      deps.getUserByEmail.get(targetRef) || deps.getUserByName.get(targetRef);
-    if (!target || target.federated_origin) {
+      deps.getRealUserByEmail?.get(targetRef) || deps.getRealUserByName?.get(targetRef);
+    if (!target) {
       return { ok: false, error: "user_not_found" };
     }
 
     // The remote owner becomes a local shadow user that OWNS the mirror.
     const shadowOwner = ensureShadowUser(linkId, ownerRef, ownerName, peerHost, ownerAvatar);
+    // Badge the owner with OUR name for the home link, authoritatively. This
+    // also heals any stale label left on the owner row by older versions
+    // (applyRoster skips owners, so it would otherwise never be corrected).
+    try {
+      const homeLabel = link.peer_label || hostOf(link.peer_base_url);
+      q.setShadowServerLabel.run(homeLabel, shadowOwner.id);
+    } catch { /* best-effort */ }
 
     const cua = note.client_updated_at || deps.nowISO();
     const row = {
@@ -421,7 +465,9 @@ function createNoteFederation(ctx) {
     });
 
     // Mirror the full participant roster so the recipient sees every active
-    // collaborator from the start, not just the owner.
+    // collaborator from the start. applyRoster only manages display stand-ins
+    // for remote participants; the recipient we just added is a real local
+    // user and is left untouched, so no special injection is needed.
     try { applyRoster(note.id, linkId, roster); } catch (e) { log.warn?.("[federation/notes] share roster:", e?.message); }
 
     try {
@@ -702,8 +748,8 @@ function createNoteFederation(ctx) {
       return { ok: false, error: "unknown_note" };
     }
     const target =
-      deps.getUserByEmail.get(targetRef) || deps.getUserByName.get(targetRef);
-    if (!target || target.federated_origin) return { ok: false, error: "user_not_found" };
+      deps.getRealUserByEmail?.get(targetRef) || deps.getRealUserByName?.get(targetRef);
+    if (!target) return { ok: false, error: "user_not_found" };
     try {
       deps.setCollaboratorCanWrite.run(canWrite ? 1 : 0, noteId, target.id);
       // Re-broadcast for any non-open surfaces, plus a dedicated access
@@ -717,6 +763,53 @@ function createNoteFederation(ctx) {
       });
     } catch (e) {
       log.warn?.("[federation/notes] apply permission:", e?.message);
+      return { ok: false, error: "apply_failed" };
+    }
+    return { ok: true };
+  }
+
+  // ── Outbound: the owner removed a single federated recipient ─────────
+  // Tell that recipient's peer to drop just THAT user from the note, leaving
+  // any other recipients on the same peer (and the mirror itself) intact.
+  // `shadow` is our local stand-in for the removed recipient
+  // (federated_origin = `${linkId}|${remoteRef}`).
+  async function unshareFromRemote({ shadow, noteId }) {
+    const origin = shadow?.federated_origin || "";
+    const sep = origin.indexOf("|");
+    if (sep < 0) return { ok: false, error: "not_federated" };
+    const linkId = origin.slice(0, sep);
+    const targetRef = origin.slice(sep + 1);
+    const link = store.getById(linkId);
+    if (!link || link.status !== "active") return { ok: false, error: "peer_not_paired" };
+    const path = "/api/federation/notes/unshare-recipient";
+    try {
+      const resp = await peer.httpJson(link.peer_base_url + path, {
+        method: "POST",
+        secret: link.shared_secret,
+        linkId: link.id,
+        path,
+        body: { linkId: link.id, noteId, targetRef },
+      });
+      return { ok: !!(resp.ok && resp.json && resp.json.ok === true) };
+    } catch (e) {
+      return { ok: false, error: peer.tlsAwareMessage ? peer.tlsAwareMessage(e) : "unreachable" };
+    }
+  }
+
+  // ── Inbound: the authority removed one of our local users from a note ─
+  // Drop just that recipient's collaborator row (not the whole mirror) and
+  // tell their open session so the note disappears without a manual refresh.
+  function handleIncomingUnshareRecipient({ linkId, noteId, targetRef }) {
+    const m = q.getMappingForLink.get(noteId, linkId);
+    if (!m || m.role !== "mirror") return { ok: false, error: "unknown_note" };
+    const target =
+      deps.getRealUserByEmail?.get(targetRef) || deps.getRealUserByName?.get(targetRef);
+    if (!target) return { ok: true }; // already gone — nothing to do
+    try {
+      deps.removeCollaborator?.run(noteId, target.id);
+      deps.sendEventToUser?.(target.id, { type: "note_deleted", noteId });
+    } catch (e) {
+      log.warn?.("[federation/notes] unshare recipient:", e?.message);
       return { ok: false, error: "apply_failed" };
     }
     return { ok: true };
@@ -738,8 +831,10 @@ function createNoteFederation(ctx) {
     handleIncomingApply,
     handleIncomingRemove,
     handleIncomingPermission,
+    handleIncomingUnshareRecipient,
     shareWithRemote,
     setRemotePermission,
+    unshareFromRemote,
     syncTick,
     onNoteChangedLocally,
     onParticipantsChangedLocally,
