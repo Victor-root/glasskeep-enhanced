@@ -358,6 +358,22 @@ function attachFederationRoutes(
     res.status(result.ok ? 200 : 409).json(result);
   });
 
+  // A peer changed a remote collaborator's access on a note WE mirror →
+  // flip the local recipient's read-only / read-write state instantly.
+  app.post("/api/federation/notes/permission", (req, res) => {
+    const link = verifyS2S(req);
+    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
+    const b = req.body || {};
+    const result = noteFederation.handleIncomingPermission({
+      linkId: link.id,
+      noteId: b.noteId,
+      targetRef: b.targetRef,
+      canWrite: b.canWrite ? 1 : 0,
+    });
+    res.status(result.ok ? 200 : 409).json(result);
+  });
+
   // Active paired peers, for the share UI — ANY signed-in user (not just
   // admins) needs this to offer "share with <user> on <server>". Exposes
   // only the friendly label + host, never a secret or pairing detail.

@@ -121,6 +121,7 @@ export default function SecondaryNoteInstance({
     searchUsers,
     updateDropdownPosition,
     addCollaborator,
+    setCollaboratorAccess,
   } = useCollaboration(token, {
     notes, currentUser, activeId,
     showToast, invalidateNotesCache, setNotes,
@@ -1235,6 +1236,7 @@ export default function SecondaryNoteInstance({
       collaboratorInputRef={collaboratorInputRef}
       addCollaborator={addCollaborator}
       removeCollaborator={removeCollaborator}
+      setCollaboratorAccess={setCollaboratorAccess}
       searchUsers={searchUsers}
       updateDropdownPosition={updateDropdownPosition}
       loadCollaboratorsForAddModal={loadCollaboratorsForAddModal}

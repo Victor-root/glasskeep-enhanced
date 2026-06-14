@@ -4523,6 +4523,7 @@ export default function App() {
     searchUsers,
     updateDropdownPosition,
     addCollaborator,
+    setCollaboratorAccess,
   } = useCollaboration(token, {
     notes, currentUser, activeId,
     showToast, invalidateNotesCache, setNotes,
@@ -6842,6 +6843,7 @@ export default function App() {
       collaboratorInputRef={collaboratorInputRef}
       addCollaborator={addCollaborator}
       removeCollaborator={removeCollaborator}
+      setCollaboratorAccess={setCollaboratorAccess}
       searchUsers={searchUsers}
       updateDropdownPosition={updateDropdownPosition}
       loadCollaboratorsForAddModal={loadCollaboratorsForAddModal}

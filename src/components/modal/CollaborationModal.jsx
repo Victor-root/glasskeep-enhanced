@@ -17,6 +17,44 @@ function ServerBadge({ label }) {
   );
 }
 
+// Per-collaborator read-only / read-write chooser (owner only). A compact
+// segmented control: the active half is filled with the soft theme accent,
+// matching the app's other two-option pickers. Eye = read-only, Pencil =
+// can edit; tooltips/aria carry the labels so it stays small in the row.
+function AccessToggle({ canWrite, busy, onChange }) {
+  const ro = canWrite === 0;
+  const cell =
+    "inline-flex items-center justify-center px-2 py-1 transition-colors disabled:opacity-50";
+  const active = "bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)]";
+  const idle = "text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/10";
+  return (
+    <div className="inline-flex rounded-lg border border-[var(--border-light)] overflow-hidden">
+      <button
+        type="button"
+        disabled={busy}
+        aria-pressed={ro}
+        aria-label={t("accessReadOnly")}
+        data-tooltip={t("accessReadOnly")}
+        onClick={() => !ro && onChange("read")}
+        className={`${cell} ${ro ? active : idle}`}
+      >
+        <TI.Eye className="tabler-icon w-3.5 h-3.5" />
+      </button>
+      <button
+        type="button"
+        disabled={busy}
+        aria-pressed={!ro}
+        aria-label={t("accessReadWrite")}
+        data-tooltip={t("accessReadWrite")}
+        onClick={() => ro && onChange("write")}
+        className={`${cell} border-l border-[var(--border-light)] ${!ro ? active : idle}`}
+      >
+        <TI.Pencil className="tabler-icon w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
 /**
  * Collaboration modal — allows adding/removing collaborators on a note.
  * Includes the user search dropdown portal.
@@ -41,10 +79,12 @@ export default function CollaborationModal({
   onClose,
   onAddCollaborator,
   onRemoveCollaborator,
+  onSetCollaboratorAccess,
   searchUsers,
   updateDropdownPosition,
 }) {
   const [confirmRemove, setConfirmRemove] = React.useState(null);
+  const [accessBusyId, setAccessBusyId] = React.useState(null);
   if (!open) return null;
 
   // Real users living on paired servers (fetched as you type); each can
@@ -93,13 +133,18 @@ export default function CollaborationModal({
                   .map((collab) => {
                   const canRemove =
                     !collab.isOwner && (isOwner || collab.id === currentUser?.id);
+                  // The owner can set each other collaborator's access level
+                  // (never the owner's own row).
+                  const showAccess =
+                    isOwner && !collab.isOwner &&
+                    typeof onSetCollaboratorAccess === "function";
 
                   return (
                     <div
                       key={collab.id}
-                      className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"
+                      className="flex items-center justify-between gap-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"
                     >
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <UserAvatar
                           name={collab.name}
                           email={collab.email}
@@ -123,24 +168,40 @@ export default function CollaborationModal({
                           </p>
                         </div>
                       </div>
-                      {canRemove && (
-                        <button
-                          onClick={async () => {
-                            // Self-remove (collaborator leaving themselves)
-                            // keeps the current one-step flow. Owner removing
-                            // a specific collaborator gets the explicit choice.
-                            if (collab.id === currentUser?.id) {
-                              await onRemoveCollaborator(collab.id, activeId);
-                            } else {
-                              setConfirmRemove(collab);
-                            }
-                          }}
-                          className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                          data-tooltip={t("removeCollaborator")}
-                        >
-                          {t("remove")}
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {showAccess && (
+                          <AccessToggle
+                            canWrite={collab.canWrite}
+                            busy={accessBusyId === collab.id}
+                            onChange={async (access) => {
+                              setAccessBusyId(collab.id);
+                              try {
+                                await onSetCollaboratorAccess(collab.id, access);
+                              } finally {
+                                setAccessBusyId(null);
+                              }
+                            }}
+                          />
+                        )}
+                        {canRemove && (
+                          <button
+                            onClick={async () => {
+                              // Self-remove (collaborator leaving themselves)
+                              // keeps the current one-step flow. Owner removing
+                              // a specific collaborator gets the explicit choice.
+                              if (collab.id === currentUser?.id) {
+                                await onRemoveCollaborator(collab.id, activeId);
+                              } else {
+                                setConfirmRemove(collab);
+                              }
+                            }}
+                            className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                            data-tooltip={t("removeCollaborator")}
+                          >
+                            {t("remove")}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

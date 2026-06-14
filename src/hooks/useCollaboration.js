@@ -232,6 +232,30 @@ export default function useCollaboration(token, {
     }
   };
 
+  // Owner-only: set a collaborator's access level ("read" | "write").
+  // Optimistic — the modal row flips at once; on failure we revert by
+  // reloading the authoritative list. The note list refreshes so the
+  // collaborator's own editor locks/unlocks (also pushed live over SSE).
+  const setCollaboratorAccess = async (collaboratorId, access) => {
+    const targetNoteId = activeId;
+    if (!targetNoteId) return;
+    const canWrite = access === "write" ? 1 : 0;
+    setAddModalCollaborators((prev) =>
+      prev.map((c) => (c.id === collaboratorId ? { ...c, canWrite } : c)),
+    );
+    try {
+      await api(`/notes/${targetNoteId}/collaborate/${collaboratorId}`, {
+        method: "PATCH",
+        token,
+        body: { access },
+      });
+      invalidateNotesCache();
+    } catch (e) {
+      showToast(localizeServerError(e.message, "genericError"), "error");
+      await loadCollaboratorsForAddModal(targetNoteId);
+    }
+  };
+
   // ── Effects ──
 
   // Close dropdown when clicking outside
@@ -298,5 +322,6 @@ export default function useCollaboration(token, {
     searchUsers,
     updateDropdownPosition,
     addCollaborator,
+    setCollaboratorAccess,
   };
 }

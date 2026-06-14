@@ -156,6 +156,7 @@ CREATE TABLE IF NOT EXISTS note_collaborators (
   user_id INTEGER NOT NULL,
   added_by INTEGER NOT NULL,
   added_at TEXT NOT NULL,
+  can_write INTEGER NOT NULL DEFAULT 1,
   FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY(added_by) REFERENCES users(id) ON DELETE CASCADE,
@@ -421,6 +422,20 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
     const cols = db.prepare(`PRAGMA table_info(push_subscriptions)`).all();
     if (!cols.some((c) => c.name === "lang")) {
       db.exec(`ALTER TABLE push_subscriptions ADD COLUMN lang TEXT`);
+    }
+  } catch {
+    // table may not exist yet (fresh boot creates it with the column)
+  }
+})();
+
+// note_collaborators migration: the `can_write` column (1 = read-write,
+// 0 = read-only) backs per-collaborator share permissions. Rows created
+// before it default to 1 so every existing share keeps full write access.
+(function ensureCollaboratorColumns() {
+  try {
+    const cols = db.prepare(`PRAGMA table_info(note_collaborators)`).all();
+    if (!cols.some((c) => c.name === "can_write")) {
+      db.exec(`ALTER TABLE note_collaborators ADD COLUMN can_write INTEGER NOT NULL DEFAULT 1`);
     }
   } catch {
     // table may not exist yet (fresh boot creates it with the column)
@@ -739,6 +754,9 @@ function serializeNote(r, userId) {
     // never encrypted — see the ensureNoteColumns migration.
     reminderAt: r.reminder_at || null,
     reminderFiredAt: r.reminder_fired_at || null,
+    // This user's access level: "owner" | "write" | "read". Read-only
+    // collaborators get "read" so the client locks the editor for them.
+    access: noteAccessFor(r.id, r.user_id, userId),
     // Cross-server status (null for ordinary notes): role + live link
     // state + whether this copy is currently read-only because its
     // authority peer is unreachable / locked / out of date.
@@ -1013,11 +1031,35 @@ const addCollaborator = db.prepare(`
   VALUES (?, ?, ?, ?)
 `);
 const getNoteCollaborators = db.prepare(`
-  SELECT u.id, u.name, u.email, u.avatar_url, u.federated_origin, nc.added_at, nc.added_by
+  SELECT u.id, u.name, u.email, u.avatar_url, u.federated_origin, nc.added_at, nc.added_by, nc.can_write
   FROM note_collaborators nc
   JOIN users u ON nc.user_id = u.id
   WHERE nc.note_id = ?
 `);
+// Per-collaborator write permission. `can_write` defaults to 1 (read-write);
+// 0 means read-only — they can open the note but not change shared content.
+const setCollaboratorCanWrite = db.prepare(`
+  UPDATE note_collaborators SET can_write = ? WHERE note_id = ? AND user_id = ?
+`);
+const getCollaboratorAccess = db.prepare(
+  "SELECT can_write FROM note_collaborators WHERE note_id = ? AND user_id = ?"
+);
+// True when `userId` is a collaborator on `noteId` who has been limited to
+// read-only. The owner never has a collaborator row, so this is false for
+// them (owners always keep write). Used to gate the shared-content write
+// path exactly like the federation read-only check.
+function isCollabReadOnly(noteId, userId) {
+  const row = getCollaboratorAccess.get(noteId, userId);
+  return !!row && row.can_write === 0;
+}
+// The requesting user's access level on a note: "owner" (their own note),
+// "write" (a read-write collaborator) or "read" (a read-only collaborator).
+// The client uses this to lock the editor for non-writers.
+function noteAccessFor(noteId, ownerId, userId) {
+  if (!userId || ownerId === userId) return "owner";
+  const row = getCollaboratorAccess.get(noteId, userId);
+  return row && row.can_write === 0 ? "read" : "write";
+}
 const updateNoteWithEditor = db.prepare(`
   UPDATE notes SET
     updated_at = ?,
@@ -1203,6 +1245,7 @@ function participantObj(u, extra = {}) {
     avatar_url: u.avatar_url || null,
     federated: fed.federated,
     serverLabel: fed.serverLabel,
+    canWrite: u.can_write === 0 ? 0 : 1,
     ...extra,
   };
 }
@@ -1461,6 +1504,7 @@ const federation = attachFederationRoutes(app, {
     runInsertNote,
     runUpdateNoteFullCollab,
     addCollaborator,
+    setCollaboratorCanWrite,
     getMaxUserEffectivePosition,
     upsertUserPosition,
     updateNoteWithEditor,
@@ -1893,6 +1937,7 @@ app.get("/api/notes", auth, (req, res) => {
       reminderAt: r.reminder_at || null,
       reminderFiredAt: r.reminder_fired_at || null,
       collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
+      access: noteAccessFor(r.id, r.user_id, req.user.id),
       federation: noteFederationRef?.noteFederationInfo(r.id) || null,
     }))
   );
@@ -1953,12 +1998,13 @@ app.put("/api/notes/:id", auth, (req, res) => {
   const existing = getNoteWithCollaboration.get(req.user.id, id, req.user.id);
   if (!existing) return res.status(404).json({ error: "Note not found" });
 
-  // Cross-server safety: a mirror note is read-only while its authority
-  // peer can't be reached, so an edit made there can't diverge. Mirror
-  // the LWW "stale" shape so the client just reconciles to the server's
-  // copy (it already shows the read-only banner). Avoid 423 — that
-  // triggers the global instance-locked flow.
-  if (noteFederationRef?.isReadOnly(id)) {
+  // Read-only gate: (a) a mirror note is read-only while its authority
+  // peer can't be reached, so an edit made there can't diverge; (b) a
+  // collaborator the owner limited to read-only may not change shared
+  // content. Either way mirror the LWW "stale" shape so the client just
+  // reconciles to the server's copy (it already shows the read-only
+  // banner). Avoid 423 — that triggers the global instance-locked flow.
+  if (noteFederationRef?.isReadOnly(id) || isCollabReadOnly(id, req.user.id)) {
     return res.json({ ok: true, readOnly: true, note: serializeNote(existing, req.user.id) });
   }
 
@@ -2051,9 +2097,10 @@ app.patch("/api/notes/:id", auth, (req, res) => {
     return res.json({ ok: true, note: serializeNote(existing, req.user.id) });
   }
 
-  // Cross-server safety: block edits to the SHARED CONTENT of a mirror
-  // note while its authority peer is unreachable (per-user tags / pin
-  // stay editable). The client already shows the read-only banner.
+  // Read-only gate for SHARED CONTENT: blocked when the mirror's authority
+  // peer is unreachable OR when the owner limited this collaborator to
+  // read-only (per-user tags / pin stay editable either way). The client
+  // already shows the read-only banner.
   const hasContentChange = (
     typeof req.body.title === "string" ||
     typeof req.body.content === "string" ||
@@ -2062,7 +2109,7 @@ app.patch("/api/notes/:id", auth, (req, res) => {
     typeof req.body.color === "string" ||
     typeof req.body.timestamp === "string"
   );
-  if (hasContentChange && noteFederationRef?.isReadOnly(id)) {
+  if (hasContentChange && (noteFederationRef?.isReadOnly(id) || isCollabReadOnly(id, req.user.id))) {
     return res.json({ ok: true, readOnly: true, note: serializeNote(existing, req.user.id) });
   }
 
@@ -2335,6 +2382,52 @@ app.get("/api/notes/:id/collaborators", auth, (req, res) => {
   }
 
   res.json(result);
+});
+
+// Change a collaborator's access level. Owner-only. `access` is
+// "read" (read-only) or "write" (read-write). For a federated stand-in
+// the change is also pushed to the peer so the remote user's mirror flips
+// read-only/read-write instantly; locally we re-broadcast so the
+// collaborator's open sessions re-fetch and lock/unlock their editor.
+app.patch("/api/notes/:id/collaborate/:userId", auth, async (req, res) => {
+  const noteId = req.params.id;
+  const userIdToSet = Number(req.params.userId);
+  if (!Number.isInteger(userIdToSet)) {
+    return res.status(400).json({ error: "Invalid user id" });
+  }
+  const access = req.body?.access;
+  if (access !== "read" && access !== "write") {
+    return res.status(400).json({ error: "access must be 'read' or 'write'" });
+  }
+
+  // Owner-only: getNote scopes to notes the requester owns.
+  const note = getNote.get(noteId, req.user.id);
+  if (!note) {
+    return res.status(404).json({ error: "Note not found" });
+  }
+
+  // Must already be a collaborator on this note.
+  const target = getUserById.get(userIdToSet);
+  const current = getCollaboratorAccess.get(noteId, userIdToSet);
+  if (!target || !current) {
+    return res.status(404).json({ error: "Collaborator not found" });
+  }
+
+  const canWrite = access === "write" ? 1 : 0;
+  setCollaboratorCanWrite.run(canWrite, noteId, userIdToSet);
+
+  // Federated stand-in (a shadow user): tell the peer so the remote
+  // recipient's mirror copy flips immediately.
+  if (target.federated_origin && federation?.noteFederation?.setRemotePermission) {
+    try {
+      await federation.noteFederation.setRemotePermission({ note, shadow: target, canWrite });
+    } catch (e) {
+      console.warn("[federation/notes] setRemotePermission failed:", e?.message);
+    }
+  }
+
+  broadcastNoteUpdated(noteId);
+  res.json({ ok: true, access });
 });
 
 app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
@@ -3339,6 +3432,7 @@ app.get("/api/notes/:id", auth, (req, res) => {
     reminderAt: r.reminder_at || null,
     reminderFiredAt: r.reminder_fired_at || null,
     collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
+    access: noteAccessFor(r.id, r.user_id, req.user.id),
     federation: noteFederationRef?.noteFederationInfo(r.id) || null,
   });
 });
