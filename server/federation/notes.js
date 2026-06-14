@@ -586,8 +586,15 @@ function createNoteFederation(ctx) {
     if (!target || target.federated_origin) return { ok: false, error: "user_not_found" };
     try {
       deps.setCollaboratorCanWrite.run(canWrite ? 1 : 0, noteId, target.id);
-      // Re-broadcast so the recipient's open editor locks/unlocks at once.
+      // Re-broadcast for any non-open surfaces, plus a dedicated access
+      // event that flips the recipient's OPEN editor instantly (the generic
+      // patch is suppressed while they hold a local lease / pending edits).
       deps.broadcastNoteUpdated(noteId);
+      deps.sendEventToUser?.(target.id, {
+        type: "note_access_changed",
+        noteId,
+        access: canWrite ? "write" : "read",
+      });
     } catch (e) {
       log.warn?.("[federation/notes] apply permission:", e?.message);
       return { ok: false, error: "apply_failed" };

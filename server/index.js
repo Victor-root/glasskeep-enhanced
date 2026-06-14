@@ -2429,11 +2429,19 @@ app.patch("/api/notes/:id/collaborate/:userId", auth, async (req, res) => {
   // Federated stand-in (a shadow user): tell the peer so the remote
   // recipient's mirror copy flips immediately.
   if (target.federated_origin && federation?.noteFederation?.setRemotePermission) {
+    // Federated stand-in: the real user lives on the peer, which relays the
+    // change to them over its own SSE. Nothing to push on this side.
     try {
       await federation.noteFederation.setRemotePermission({ note, shadow: target, canWrite });
     } catch (e) {
       console.warn("[federation/notes] setRemotePermission failed:", e?.message);
     }
+  } else {
+    // Local collaborator: push a dedicated access-change event so their open
+    // note flips read-only/read-write instantly — even mid-edit, where the
+    // generic note_updated patch is suppressed because they hold a local
+    // lease / have pending changes.
+    sendEventToUser(userIdToSet, { type: "note_access_changed", noteId, access });
   }
 
   broadcastNoteUpdated(noteId);

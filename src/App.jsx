@@ -3489,6 +3489,20 @@ export default function App() {
               window.dispatchEvent(new CustomEvent("instance-locked"));
             } else if (msg && msg.type === "note_updated" && msg.noteId) {
               debouncedPatch(msg.noteId);
+            } else if (msg && msg.type === "note_access_changed" && msg.noteId) {
+              // The owner changed THIS user's read/write permission on a
+              // shared note. Apply it immediately — even when the note is open
+              // and locally protected (which suppresses the generic patch) —
+              // by updating ONLY the `access` field, so the editor locks /
+              // unlocks live without a reload and without touching content.
+              const nid = String(msg.noteId);
+              const nextAccess = msg.access === "read" ? "read" : "write";
+              setNotes((prev) => prev.map((n) => {
+                if (String(n.id) !== nid || n.access === nextAccess) return n;
+                const updated = { ...n, access: nextAccess };
+                idbPutNote(updated, currentUser?.id, sessionId).catch(() => {});
+                return updated;
+              }));
             } else if (msg && msg.type === "logo_added" && msg.logo) {
               setLogoLibrary((prev) => {
                 if (prev.some((l) => l.id === msg.logo.id)) return prev;
