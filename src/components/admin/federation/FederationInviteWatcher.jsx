@@ -98,7 +98,13 @@ export default function FederationInviteWatcher({ token }) {
       const base = { type: "toast", title: t("fedConnTitle") };
       if (msg.state === "offline") {
         notify({ ...base, variant: "warning", message: t("fedPeerOffline").replace("{peer}", who) });
-      } else if (msg.state === "online" && msg.previousState === "offline") {
+      } else if (msg.state === "online" && msg.previousState === "locked") {
+        // Peer unlocked its at-rest encryption — distinct from a plain
+        // reconnect, and previously NOT toasted (the online branch only
+        // fired when coming back from "offline"), which is why an unlock
+        // went unannounced while a lock did not.
+        notify({ ...base, variant: "success", message: t("fedPeerUnlocked").replace("{peer}", who) });
+      } else if (msg.state === "online" && (msg.previousState === "offline" || msg.previousState === "incompatible" || msg.previousState === "unknown")) {
         notify({ ...base, variant: "success", message: t("fedPeerOnline").replace("{peer}", who) });
       } else if (msg.state === "locked") {
         notify({ ...base, variant: "warning", message: t("fedPeerLocked").replace("{peer}", who) });
@@ -114,10 +120,20 @@ export default function FederationInviteWatcher({ token }) {
     const onEvent = (e) => {
       const msg = e?.detail;
       if (!msg) return;
+      const who = msg.peerLabel || hostOf(msg.peerBaseUrl);
       if (msg.type === "federation_invitation") {
         raiseRequest(msg.linkId, msg.peerBaseUrl, msg.peerLabel);
       } else if (msg.type === "federation_link_state") {
         announceState(msg);
+      } else if (msg.type === "federation_linked") {
+        // The peer accepted a request WE sent → we're now paired.
+        notify({ type: "toast", variant: "success", title: t("fedConnTitle"), message: t("fedLinkedToast").replace("{peer}", who) });
+      } else if (msg.type === "federation_refused") {
+        // The peer declined (or cancelled) the pending pairing.
+        notify({ type: "toast", variant: "warning", title: t("fedConnTitle"), message: t("fedRefusedToast").replace("{peer}", who) });
+      } else if (msg.type === "federation_dissociated") {
+        // The peer unpaired from us; the link is gone on our side too.
+        notify({ type: "toast", variant: "warning", title: t("fedConnTitle"), message: t("fedDissociatedToast").replace("{peer}", who) });
       }
     };
     window.addEventListener("federation-event", onEvent);

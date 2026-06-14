@@ -163,7 +163,7 @@ function probeHealth(link) {
 // `onStateChange(link, prevState, nextState)` fires whenever an active
 // link's live state flips (e.g. online → offline), so the caller can
 // proactively tell the admins instead of waiting for them to look.
-async function runTick({ store, label, log = console, onStateChange }) {
+async function runTick({ store, label, log = console, onStateChange, onDissociated }) {
   let links;
   try {
     links = [...store.listHandshakePending(), ...store.listActive()];
@@ -187,7 +187,7 @@ async function runTick({ store, label, log = console, onStateChange }) {
         continue;
       }
       if (link.status === protocol.STATUS.ACTIVE) {
-        await healthCheckOne(link, store, log, onStateChange);
+        await healthCheckOne(link, store, log, onStateChange, onDissociated);
       }
     } catch (e) {
       log.warn?.(`[federation] tick: link ${link.id} failed:`, e?.message);
@@ -195,12 +195,25 @@ async function runTick({ store, label, log = console, onStateChange }) {
   }
 }
 
-async function healthCheckOne(link, store, log = console, onStateChange) {
+async function healthCheckOne(link, store, log = console, onStateChange, onDissociated) {
   const prevState = protocol.deriveLinkState(link);
   const attemptedAt = new Date().toISOString();
   const host = link.peer_base_url;
   try {
     const r = await probeHealth(link);
+
+    // Durable dissociation detection: a clean 404 "unknown link" means the
+    // peer deliberately removed this link (unpaired) — distinct from a
+    // generic outage. Drop our side too and let the caller notify, so a
+    // unpair that happened while WE were offline is still picked up here.
+    if (r.status === 404 && r.json && r.json.error === "unknown link") {
+      log.log?.(`[federation] health ${host} → DISSOCIATED (peer unpaired us)`);
+      try { store.remove(link.id); } catch { /* best-effort */ }
+      if (typeof onDissociated === "function") {
+        try { onDissociated(link); } catch (e) { log.warn?.("[federation] onDissociated failed:", e?.message); }
+      }
+      return;
+    }
 
     // A health check only counts as "online" when we get our OWN signed
     // 200 with { ok:true } back. Anything else — a 5xx from a reverse

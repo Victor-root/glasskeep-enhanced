@@ -1552,7 +1552,13 @@ function createSharedNoteDeletedNotification({
 // middleware can short-circuit everything else with HTTP 423 while
 // still letting unlock attempts and the public lock-status endpoint
 // through. See server/encryption/* and server/routes/unlockRoutes.js.
-attachUnlockRoutes(app, { db, auth, adminOnly, log: console, broadcastToAll });
+// Late-bound: the federation engine is attached further down, so the
+// unlock routes reach it through this ref to ping peers on lock/unlock.
+let federationNotifyPeersRef = null;
+attachUnlockRoutes(app, {
+  db, auth, adminOnly, log: console, broadcastToAll,
+  onLockStateChanged: () => { try { federationNotifyPeersRef?.(); } catch {} },
+});
 
 // Passkey schema is created up-front (idempotent) so registration + login
 // work even before encryption is activated. Routes attach next to the
@@ -1618,6 +1624,8 @@ const federation = attachFederationRoutes(app, {
 });
 // Wire the instant-push hook used by broadcastNoteUpdated (declared above).
 noteFederationRef = federation.noteFederation;
+// Wire the late-bound ref the unlock routes use to ping peers on lock/unlock.
+federationNotifyPeersRef = federation.notifyPeersStateChanged;
 const FEDERATION_TICK_MS = (() => {
   const raw = parseInt(process.env.FEDERATION_TICK_MS, 10);
   return Number.isFinite(raw) && raw >= 5000 ? raw : 10000;

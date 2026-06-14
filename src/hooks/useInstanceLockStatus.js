@@ -89,5 +89,15 @@ export default function useInstanceLockStatus() {
     return () => window.removeEventListener("instance-locked", onLocked);
   }, []);
 
+  // Symmetric with the lock event: the server pushes an SSE
+  // 'instance_unlocked' (forwarded by App.jsx as this custom event) when an
+  // admin unlocks elsewhere, so a waiting client leaves the unlock screen
+  // immediately instead of waiting up to 3 s for the next status poll.
+  useEffect(() => {
+    const onUnlocked = () => { refresh(); };
+    window.addEventListener("instance-unlocked", onUnlocked);
+    return () => window.removeEventListener("instance-unlocked", onUnlocked);
+  }, [refresh]);
+
   return { status, loading, refresh };
 }

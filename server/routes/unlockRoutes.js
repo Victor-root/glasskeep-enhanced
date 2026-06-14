@@ -173,7 +173,7 @@ async function paceFailure(ms) {
 }
 
 function attachUnlockRoutes(app, deps) {
-  const { db, auth, adminOnly, log = console, broadcastToAll } = deps;
+  const { db, auth, adminOnly, log = console, broadcastToAll, onLockStateChanged } = deps;
 
   app.get("/api/instance/status", (_req, res) => {
     res.json({
@@ -240,6 +240,17 @@ function attachUnlockRoutes(app, deps) {
       runtime.recordAttempt(id, true);
       log.info?.(`[unlock] success via passphrase from ${id}`);
       runUpgradeMigrations(db, log);
+      // Symmetric with the lock route: tell every connected client the
+      // instance is back so other sessions leave the unlock screen without
+      // waiting for the next status poll.
+      if (typeof broadcastToAll === "function") {
+        try { broadcastToAll({ type: "instance_unlocked" }); } catch {}
+      }
+      // Nudge federation so peers re-probe us promptly (our /health now
+      // reports unlocked) and our paused note-sync resumes.
+      if (typeof onLockStateChanged === "function") {
+        try { onLockStateChanged(); } catch {}
+      }
       return res.json({ ok: true });
     } finally {
       // The runtime made its own copy — zero ours.
@@ -290,6 +301,12 @@ function attachUnlockRoutes(app, deps) {
       runtime.recordAttempt(id, true);
       log.info?.(`[unlock] success via recovery key from ${id}`);
       runUpgradeMigrations(db, log);
+      if (typeof broadcastToAll === "function") {
+        try { broadcastToAll({ type: "instance_unlocked" }); } catch {}
+      }
+      if (typeof onLockStateChanged === "function") {
+        try { onLockStateChanged(); } catch {}
+      }
       return res.json({ ok: true });
     } finally {
       try { dek.fill(0); } catch {}
@@ -312,6 +329,12 @@ function attachUnlockRoutes(app, deps) {
     }
     runtime.lock();
     log.info?.("[unlock] instance manually re-locked");
+    // Ping federation peers so they re-probe us promptly and learn we're
+    // locked now — symmetric with unlock (otherwise they'd only notice on
+    // their next periodic health poll).
+    if (typeof onLockStateChanged === "function") {
+      try { onLockStateChanged(); } catch {}
+    }
     res.json({ ok: true });
   });
 
