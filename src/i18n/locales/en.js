@@ -1421,6 +1421,10 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedStateIncompatible: "Out of date",
   fedStateIncompatibleDesc:
     "The two servers run incompatible versions of the sharing feature. Shared notes are read-only until both servers are updated.",
+  fedStateIncompatibleSelf:
+    "Your server is out of date (older version than {peer}). Update it to restore note sharing.",
+  fedStateIncompatiblePeer:
+    "{peer} is out of date (older version than yours). It needs to be updated to restore note sharing.",
   fedStateLocked: "Locked",
   fedStateLockedDesc:
     "The peer server is reachable but its encryption is locked. Its admin must unlock it before syncing can resume.",
@@ -1445,6 +1449,13 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedLastContact: "Last contact",
   fedLastCheck: "Last check",
   fedDetail: "Detail",
+  fedErrTls:
+    "Peer's TLS certificate can't be verified (self-signed, expired, or incomplete certificate chain).",
+  fedErrDns: "Peer address not found (DNS).",
+  fedErrConn: "Connection to the peer was refused or timed out.",
+  fedErrProtocol: "Incompatible protocol version between the servers.",
+  fedErrUnreachable: "Peer unreachable.",
+  fedErrHttp: "The peer returned HTTP error {status}.",
   fedNever: "never",
   fedAccept: "Accept",
   fedRefuse: "Decline",

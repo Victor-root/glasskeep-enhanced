@@ -1424,6 +1424,10 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedStateIncompatible: "Pas à jour",
   fedStateIncompatibleDesc:
     "Les deux serveurs utilisent des versions incompatibles de la fonctionnalité de partage. Les notes partagées sont en lecture seule tant que les deux serveurs ne sont pas mis à jour.",
+  fedStateIncompatibleSelf:
+    "Votre serveur n'est pas à jour (version plus ancienne que {peer}). Mettez-le à jour pour rétablir le partage des notes.",
+  fedStateIncompatiblePeer:
+    "{peer} n'est pas à jour (version plus ancienne que le vôtre). Il doit être mis à jour pour rétablir le partage des notes.",
   fedStateLocked: "Verrouillé",
   fedStateLockedDesc:
     "Le serveur pair est joignable mais son chiffrement n'a pas été déverrouillé. Son administrateur doit le déverrouiller avant que la synchronisation puisse reprendre.",
@@ -1448,6 +1452,13 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedLastContact: "Dernier contact",
   fedLastCheck: "Dernière vérification",
   fedDetail: "Détail",
+  fedErrTls:
+    "Certificat TLS du pair non vérifiable (auto-signé, expiré ou chaîne de certification incomplète).",
+  fedErrDns: "Adresse du pair introuvable (DNS).",
+  fedErrConn: "Connexion au pair refusée ou expirée.",
+  fedErrProtocol: "Version de protocole incompatible entre les serveurs.",
+  fedErrUnreachable: "Pair injoignable.",
+  fedErrHttp: "Erreur HTTP {status} renvoyée par le pair.",
   fedNever: "jamais",
   fedAccept: "Accepter",
   fedRefuse: "Refuser",

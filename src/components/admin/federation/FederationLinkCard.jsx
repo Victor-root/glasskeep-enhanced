@@ -13,6 +13,7 @@
 import React, { useState } from "react";
 import { t } from "../../../i18n";
 import TI from "../../../icons/editor/index.jsx";
+import { ServerCheckIcon } from "./FederationIcons.jsx";
 import { getFederationStateMeta, fedToneClasses } from "./federationStatus.js";
 
 function hostOf(url) {
@@ -26,6 +27,45 @@ function formatWhen(iso) {
   } catch {
     return null;
   }
+}
+
+// Turn the raw last_error (an English slug or a bare OpenSSL code recorded
+// by the server) into a localized, human-readable reason for the panel.
+// Unknown technical strings are surfaced as-is so nothing is hidden.
+function federationErrorLabel(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return s;
+  const slugs = {
+    "tls-certificate-invalid": "fedErrTls",
+    "dns-not-found": "fedErrDns",
+    "connection-refused": "fedErrConn",
+    "protocol-incompatible": "fedErrProtocol",
+    unreachable: "fedErrUnreachable",
+  };
+  if (slugs[s]) return t(slugs[s]);
+  // OpenSSL certificate-verification failures can surface as a bare
+  // numeric code (e.g. "20") — treat any pure number as a TLS cert issue.
+  if (/^\d+$/.test(s)) return t("fedErrTls");
+  const http = s.match(/^http\s+(.+)$/i);
+  if (http) return t("fedErrHttp").replace("{status}", http[1]);
+  return s;
+}
+
+// For an "incompatible" link, say explicitly WHICH side is out of date by
+// comparing the two protocol versions each server advertises in the health
+// handshake. Peer protocol higher than ours → we're behind; lower (or
+// absent, i.e. a build predating protocol versioning) → the peer is behind.
+function incompatibleDesc(link) {
+  const peerName = link.peerLabel || hostOf(link.peerBaseUrl);
+  const fill = (key) => t(key).replace("{peer}", peerName);
+  const local = link.localProtocol;
+  const peer = link.peerProtocol;
+  if (!Number.isInteger(peer)) return fill("fedStateIncompatiblePeer");
+  if (Number.isInteger(local)) {
+    if (peer > local) return fill("fedStateIncompatibleSelf");
+    if (peer < local) return fill("fedStateIncompatiblePeer");
+  }
+  return t("fedStateIncompatibleDesc");
 }
 
 // A neutral action button shared by most controls; variant tweaks the
@@ -116,7 +156,6 @@ export default function FederationLinkCard({
 
   const title = link.peerLabel || hostOf(link.peerBaseUrl);
   const lastSeen = formatWhen(link.lastSeenAt);
-  const lastCheck = formatWhen(link.lastAttemptAt);
 
   const confirmDanger = (opts, onConfirm) => {
     if (typeof showGenericConfirm === "function") {
@@ -132,9 +171,7 @@ export default function FederationLinkCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <span className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center bg-[var(--gk-icon2-bg)] text-[var(--gk-icon2-fg)]">
-            {/* `.tabler-icon` pins width/height to 20px and (loading after
-                Tailwind) overrides any w-* class, so size it inline. */}
-            <TI.WorldCheck className="tabler-icon" style={{ width: 22, height: 22 }} />
+            <ServerCheckIcon size={22} />
           </span>
           <div className="min-w-0">
             <div className="font-semibold truncate">{title}</div>
@@ -163,7 +200,9 @@ export default function FederationLinkCard({
                 : "text-gray-600 dark:text-gray-300"
           }`}
         >
-          {t(meta.descKey)}
+          {link.state === "incompatible"
+            ? incompatibleDesc(link)
+            : t(meta.descKey)}
         </p>
       )}
 
@@ -172,7 +211,7 @@ export default function FederationLinkCard({
           decided by protocol. */}
       {isActive && (
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-          <Stat icon={TI.InfoCircleFilled} label={t("fedPeerVersion")}>
+          <Stat icon={TI.Tag} label={t("fedPeerVersion")}>
             <span className="font-semibold">
               {link.peerAppVersion ? `v${link.peerAppVersion}` : "—"}
             </span>
@@ -186,17 +225,17 @@ export default function FederationLinkCard({
           <Stat icon={TI.Clock} label={t("fedLastContact")}>
             {lastSeen || t("fedNever")}
           </Stat>
-          <Stat icon={TI.Refresh} label={t("fedLastCheck")}>
-            {lastCheck || t("fedNever")}
-          </Stat>
           {/* Raw technical reason of the last failure — surfaced for
               self-hosters debugging proxy / certificate / DNS issues. */}
           {link.lastError && link.state !== "online" && (
             <div className="min-w-0 sm:col-span-2">
-              <StatLabel icon={TI.InfoCircleFilled} label={t("fedDetail")} />
-              <code className="mt-0.5 block font-mono text-[11px] text-gray-700 dark:text-gray-200 break-all">
-                {link.lastError}
-              </code>
+              <StatLabel icon={TI.AlertTriangle} label={t("fedDetail")} />
+              <p
+                className="mt-0.5 text-xs leading-relaxed text-gray-700 dark:text-gray-200"
+                title={link.lastError}
+              >
+                {federationErrorLabel(link.lastError)}
+              </p>
             </div>
           )}
         </div>
