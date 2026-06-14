@@ -183,6 +183,9 @@ export default function NoteModal({
   dropdownPosition,
   collaboratorInputRef,
   addCollaborator,
+  addCollaboratorsBatch,
+  availableUsers,
+  availableLoading,
   removeCollaborator,
   setCollaboratorAccess,
   searchUsers,
@@ -1056,6 +1059,9 @@ export default function NoteModal({
             collaboratorInputRef={collaboratorInputRef}
             onClose={() => setCollaborationModalOpen(false)}
             onAddCollaborator={addCollaborator}
+            onAddCollaborators={addCollaboratorsBatch}
+            availableUsers={availableUsers}
+            availableLoading={availableLoading}
             onRemoveCollaborator={removeCollaborator}
             onSetCollaboratorAccess={setCollaboratorAccess}
             searchUsers={searchUsers}

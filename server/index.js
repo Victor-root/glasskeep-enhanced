@@ -4129,7 +4129,7 @@ const searchUsersStmt = db.prepare(`
   WHERE (name LIKE ? OR email LIKE ?)
     AND federated_origin IS NULL
   ORDER BY name ASC
-  LIMIT 50
+  LIMIT 500
 `);
 app.get("/api/users/search", auth, (req, res) => {
   const query = req.query.q || "";

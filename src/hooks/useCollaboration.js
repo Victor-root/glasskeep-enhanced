@@ -31,6 +31,7 @@ export default function useCollaboration(token, {
   const [collaboratorUsername, setCollaboratorUsername] = useState("");
   const [addModalCollaborators, setAddModalCollaborators] = useState([]);
   const [availableUsers, setAvailableUsers] = useState([]);
+  const [availableLoading, setAvailableLoading] = useState(false);
   // Real users on paired servers matching the search (cross-server share).
   const [remoteUsers, setRemoteUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -93,6 +94,56 @@ export default function useCollaboration(token, {
     },
     [token],
   );
+
+  // Load EVERY shareable person (local users + real users on paired peers)
+  // so the add-collaborator picker shows them directly — no search required.
+  // Only friendly fields surface; `username` is the opaque string the POST
+  // route understands (a bare name/email locally, ref@host for a peer) and
+  // is NEVER shown in the UI.
+  const loadAvailableUsers = useCallback(async () => {
+    setAvailableLoading(true);
+    // Local users first — instant, so the picker is usable immediately.
+    try {
+      const localRes = await api(`/users/search?q=`, { token });
+      const locals = (Array.isArray(localRes) ? localRes : [])
+        .filter((u) => u.id !== currentUser?.id)
+        .map((u) => ({
+          key: `local:${u.id}`,
+          id: u.id,
+          name: u.name || u.email,
+          email: u.email,
+          avatar: u.avatar_url || null,
+          federated: false,
+          serverLabel: null,
+          ref: null,
+          username: u.name || u.email,
+        }));
+      setAvailableUsers(locals);
+    } catch {
+      setAvailableUsers([]);
+    } finally {
+      setAvailableLoading(false);
+    }
+    // Real users on paired peers — appended when they arrive, so a slow or
+    // offline peer never blocks the local list.
+    try {
+      const remoteRes = await api(`/federation/users/search?q=`, { token });
+      const remotes = (Array.isArray(remoteRes?.users) ? remoteRes.users : []).map((u) => ({
+        key: `remote:${u.host}|${u.ref}`,
+        id: null,
+        name: u.name || u.ref,
+        email: null,
+        avatar: u.avatar || null,
+        federated: true,
+        serverLabel: u.serverLabel,
+        ref: u.ref,
+        username: `${u.ref}@${u.host}`,
+      }));
+      if (remotes.length > 0) setAvailableUsers((prev) => [...prev, ...remotes]);
+    } catch {
+      /* peers unreachable — local list stands on its own */
+    }
+  }, [token, currentUser]);
 
 
   const removeCollaborator = async (collaboratorId, noteId = null, mode = null) => {
@@ -256,6 +307,40 @@ export default function useCollaboration(token, {
     }
   };
 
+  // Add SEVERAL collaborators at once with one access level, then a single
+  // summary toast — used by the picker's "confirm" step.
+  const addCollaboratorsBatch = async (users, access = "write") => {
+    if (!activeId || !Array.isArray(users) || users.length === 0) return;
+    let added = 0;
+    for (const u of users) {
+      try {
+        await api(`/notes/${activeId}/collaborate`, {
+          method: "POST",
+          token,
+          body: { username: u.username, access },
+        });
+        added += 1;
+      } catch (e) {
+        // 409 = already a collaborator (raced) → skip quietly; surface others.
+        if (e.status !== 409) {
+          showToast(localizeServerError(e.message, "failedAddCollaborator"), "error");
+        }
+      }
+    }
+    if (added > 0) {
+      showToast(
+        added === 1
+          ? t("addedCollaboratorsOne")
+          : t("addedCollaboratorsMany").replace("{n}", String(added)),
+        "success",
+        undefined,
+        "share",
+      );
+      invalidateNotesCache();
+      await loadCollaboratorsForAddModal(activeId);
+    }
+  };
+
   // ── Effects ──
 
   // Close dropdown when clicking outside
@@ -295,8 +380,9 @@ export default function useCollaboration(token, {
   useEffect(() => {
     if (collaborationModalOpen && activeId) {
       loadCollaboratorsForAddModal(activeId);
+      loadAvailableUsers();
     }
-  }, [collaborationModalOpen, activeId, loadCollaboratorsForAddModal]);
+  }, [collaborationModalOpen, activeId, loadCollaboratorsForAddModal, loadAvailableUsers]);
 
   return {
     // Dialog state
@@ -322,6 +408,9 @@ export default function useCollaboration(token, {
     searchUsers,
     updateDropdownPosition,
     addCollaborator,
+    addCollaboratorsBatch,
     setCollaboratorAccess,
+    availableLoading,
+    loadAvailableUsers,
   };
 }
