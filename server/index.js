@@ -1037,6 +1037,16 @@ const deleteNote = db.prepare("DELETE FROM notes WHERE id = ? AND user_id = ?");
 // Collaboration statements
 const getUserByEmail = db.prepare("SELECT * FROM users WHERE lower(email)=lower(?)");
 const getUserByName = db.prepare("SELECT * FROM users WHERE lower(name)=lower(?)");
+// Real-account lookups that EXCLUDE federated shadow stand-ins. The roster
+// reconcile uses these to resolve a real local recipient by ref without ever
+// matching a shadow that happens to share a name (e.g. two different people
+// both called "Victor" on different servers).
+const getRealUserByEmail = db.prepare(
+  "SELECT * FROM users WHERE lower(email)=lower(?) AND federated_origin IS NULL"
+);
+const getRealUserByName = db.prepare(
+  "SELECT * FROM users WHERE lower(name)=lower(?) AND federated_origin IS NULL"
+);
 const addCollaborator = db.prepare(`
   INSERT INTO note_collaborators (note_id, user_id, added_by, added_at)
   VALUES (?, ?, ?, ?)
@@ -1311,12 +1321,22 @@ function rosterServerLabelFor(u) {
   const hostHint = u.email ? String(u.email).split("@").pop() : null;
   return noteFederationRef?.serverLabelForOrigin(u.federated_origin, hostHint) || null;
 }
+// A key that is unique PER PARTICIPANT from this (home) server's point of
+// view, so a mirror can key each stand-in distinctly and never collapse two
+// different people who happen to share a name. For a shadow it's their
+// federated origin (already globally distinct); for a real local user it's
+// their local id, which is unique here. `ref` stays the human identity used
+// to match a real local recipient on the mirror.
+function rosterUidFor(u) {
+  return (u && u.federated_origin) || `local:${u.id}`;
+}
 function getNoteRoster(noteId, noteOwnerId) {
   const out = [];
   const owner = getUserById.get(noteOwnerId);
   if (owner) {
     out.push({
       ref: rosterRefFor(owner),
+      uid: rosterUidFor(owner),
       name: owner.name,
       avatar_url: owner.avatar_url || null,
       canWrite: 1,
@@ -1327,6 +1347,7 @@ function getNoteRoster(noteId, noteOwnerId) {
   for (const c of getNoteCollaborators.all(noteId)) {
     out.push({
       ref: rosterRefFor(c),
+      uid: rosterUidFor(c),
       name: c.name,
       avatar_url: c.avatar_url || null,
       canWrite: c.can_write === 0 ? 0 : 1,
@@ -1575,6 +1596,8 @@ const federation = attachFederationRoutes(app, {
     getUserById,
     getUserByEmail,
     getUserByName,
+    getRealUserByEmail,
+    getRealUserByName,
     getNoteById,
     runInsertNote,
     runUpdateNoteFullCollab,

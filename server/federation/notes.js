@@ -263,15 +263,21 @@ function createNoteFederation(ctx) {
     for (const p of roster) {
       if (!p || !p.ref) continue;
       if (p.isOwner) continue; // owner is the mirror's note owner, not a collab row
-      // A roster entry that resolves to a REAL local user is this server's
-      // own recipient — keep them as a real collaborator, not a stand-in.
-      const local = deps.getUserByEmail.get(p.ref) || deps.getUserByName.get(p.ref);
-      if (local && !local.federated_origin) {
+      // A roster entry that resolves to a REAL local account (never a shadow)
+      // is this server's own recipient — keep them as a real collaborator.
+      // Matching real-only avoids latching onto a shadow that shares a name.
+      const local =
+        deps.getRealUserByEmail?.get(p.ref) || deps.getRealUserByName?.get(p.ref);
+      if (local) {
         expectedIds.add(local.id);
         try { deps.setCollaboratorCanWrite.run(p.canWrite ? 1 : 0, noteId, local.id); } catch { /* best-effort */ }
         continue;
       }
-      const shadow = ensureShadowUser(linkId, p.ref, p.name || p.ref, peerHost, p.avatar_url ?? null);
+      // Display stand-in. Key it by the participant's globally-unique uid (not
+      // their name) so two different people who share a name never collapse
+      // into one row — and never collide with the note's shadow owner.
+      const key = p.uid || p.ref;
+      const shadow = ensureShadowUser(linkId, key, p.name || p.ref, peerHost, p.avatar_url ?? null);
       expectedIds.add(shadow.id);
       // Badge with the authority's name for this participant's origin server.
       // null → they live on the home server, which this mirror already knows
@@ -385,10 +391,11 @@ function createNoteFederation(ctx) {
     if (!link || link.status !== "active") return { ok: false, error: "unknown_link" };
     const peerHost = hostOf(link.peer_base_url);
 
-    // Resolve the local recipient. Never match a shadow row.
+    // Resolve the local recipient. Real accounts only — never a shadow row,
+    // even one that happens to share a name with the target.
     const target =
-      deps.getUserByEmail.get(targetRef) || deps.getUserByName.get(targetRef);
-    if (!target || target.federated_origin) {
+      deps.getRealUserByEmail?.get(targetRef) || deps.getRealUserByName?.get(targetRef);
+    if (!target) {
       return { ok: false, error: "user_not_found" };
     }
 
@@ -453,6 +460,7 @@ function createNoteFederation(ctx) {
     if (!shareRoster.some((p) => p && p.ref === targetRef)) {
       shareRoster.push({
         ref: targetRef,
+        uid: `local:${target.id}`,
         name: target.name,
         avatar_url: target.avatar_url || null,
         canWrite: canWrite === 0 ? 0 : 1,
@@ -740,8 +748,8 @@ function createNoteFederation(ctx) {
       return { ok: false, error: "unknown_note" };
     }
     const target =
-      deps.getUserByEmail.get(targetRef) || deps.getUserByName.get(targetRef);
-    if (!target || target.federated_origin) return { ok: false, error: "user_not_found" };
+      deps.getRealUserByEmail?.get(targetRef) || deps.getRealUserByName?.get(targetRef);
+    if (!target) return { ok: false, error: "user_not_found" };
     try {
       deps.setCollaboratorCanWrite.run(canWrite ? 1 : 0, noteId, target.id);
       // Re-broadcast for any non-open surfaces, plus a dedicated access
