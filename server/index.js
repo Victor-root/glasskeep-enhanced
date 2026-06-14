@@ -3213,8 +3213,35 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     }
     // Default: "remove_self" — owner leaves the collaboration but keeps a
     // trashed copy of the note so they can restore it later. The live note
-    // is handed over to the first collaborator so it stays available for
-    // remaining participants.
+    // is handed over to the first REAL collaborator so it stays available
+    // for remaining participants.
+    //
+    // Federated shadow stand-ins (federated_origin set) must never inherit:
+    // they are not loginable users, so handing the note to one orphans it —
+    // getNoteWithCollaboration then returns null for every real participant,
+    // the note 404s and vanishes on reload, and the federation engine tears
+    // the mirror down. Skip shadows and pick the first real local collaborator.
+    const newOwner = collaborators.find((c) => !c.federated_origin) || null;
+
+    if (!newOwner) {
+      // Only federated shadow collaborators remain — there is no real local
+      // user to hand the note to. Drop the remote share and keep the note in
+      // the owner's own trash (still restorable). Removing the shadow
+      // collaborator row makes the next federation reconcile treat the share
+      // as revoked and tear the mirror down cleanly, instead of orphaning the
+      // live note under a non-loginable shadow owner.
+      for (const c of collaborators) {
+        db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, c.id);
+      }
+      db.prepare("UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ?").run(tsResult.iso, id);
+      updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
+      db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
+      db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
+      broadcastNoteUpdated(id);
+      const trashedSelf = getNoteById.get(id);
+      return res.json({ ok: true, left: true, trashedCopy: trashedSelf ? serializeNote(trashedSelf, req.user.id) : null });
+    }
+
     const trashedCopyId = uid();
     runInsertNote({
       id: trashedCopyId,
@@ -3232,7 +3259,6 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
       client_updated_at: tsResult.iso,
     });
     db.prepare("UPDATE notes SET trashed = 1 WHERE id = ?").run(trashedCopyId);
-    const newOwner = collaborators[0];
     db.prepare("UPDATE notes SET user_id = ? WHERE id = ?").run(newOwner.id, id);
     db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, newOwner.id);
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
