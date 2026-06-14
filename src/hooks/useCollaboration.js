@@ -307,17 +307,18 @@ export default function useCollaboration(token, {
     }
   };
 
-  // Add SEVERAL collaborators at once with one access level, then a single
-  // summary toast — used by the picker's "confirm" step.
-  const addCollaboratorsBatch = async (users, access = "write") => {
-    if (!activeId || !Array.isArray(users) || users.length === 0) return;
+  // Add SEVERAL collaborators at once, each with its own access level, then
+  // a single summary toast — used by the picker's "confirm" step. `items`
+  // is [{ username, access }].
+  const addCollaboratorsBatch = async (items) => {
+    if (!activeId || !Array.isArray(items) || items.length === 0) return;
     let added = 0;
-    for (const u of users) {
+    for (const it of items) {
       try {
         await api(`/notes/${activeId}/collaborate`, {
           method: "POST",
           token,
-          body: { username: u.username, access },
+          body: { username: it.username, access: it.access === "read" ? "read" : "write" },
         });
         added += 1;
       } catch (e) {

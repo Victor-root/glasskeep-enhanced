@@ -5,6 +5,9 @@ import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+// Only surface the A–Z index once the candidate list is long enough that
+// scrolling becomes tedious; below this it just gets in the way.
+const LETTER_INDEX_MIN = 15;
 
 // Bucket a display name under A–Z, or "#" for anything else (digits,
 // accents that don't normalise, symbols), so the alphabet index is total.
@@ -43,7 +46,7 @@ function AccessToggle({ canWrite, busy, onChange }) {
         aria-pressed={ro}
         aria-label={t("accessReadOnly")}
         data-tooltip={t("accessReadOnly")}
-        onClick={() => !ro && onChange("read")}
+        onClick={(e) => { e.stopPropagation(); if (!ro) onChange("read"); }}
         className={`${cell} ${ro ? active : idle}`}
       >
         <TI.Eye className="tabler-icon w-3.5 h-3.5" />
@@ -54,7 +57,7 @@ function AccessToggle({ canWrite, busy, onChange }) {
         aria-pressed={!ro}
         aria-label={t("accessReadWrite")}
         data-tooltip={t("accessReadWrite")}
-        onClick={() => ro && onChange("write")}
+        onClick={(e) => { e.stopPropagation(); if (ro) onChange("write"); }}
         className={`${cell} border-l border-[var(--border-light)] ${!ro ? active : idle}`}
       >
         <TI.Pencil className="tabler-icon w-3.5 h-3.5" />
@@ -91,7 +94,7 @@ export default function CollaborationModal({
   // Picker state
   const [search, setSearch] = React.useState("");
   const [letter, setLetter] = React.useState(null);
-  const [selected, setSelected] = React.useState(() => new Set());
+  const [selected, setSelected] = React.useState(() => new Map());
   const [newAccess, setNewAccess] = React.useState("write");
   const [adding, setAdding] = React.useState(false);
 
@@ -105,7 +108,7 @@ export default function CollaborationModal({
   const handleClose = () => {
     setSearch("");
     setLetter(null);
-    setSelected(new Set());
+    setSelected(new Map());
     onClose();
   };
 
@@ -137,11 +140,34 @@ export default function CollaborationModal({
 
   const selectedUsers = candidates.filter((u) => selected.has(u.key));
 
+  // Selection is a Map<key, access>. Picking a user defaults them to the
+  // current "Accès" value; their row toggle overrides it individually.
   const toggleSelect = (key) => {
     setSelected((prev) => {
-      const next = new Set(prev);
+      const next = new Map(prev);
       if (next.has(key)) next.delete(key);
-      else next.add(key);
+      else next.set(key, newAccess);
+      return next;
+    });
+  };
+
+  const setAccessFor = (key, access) => {
+    setSelected((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Map(prev);
+      next.set(key, access);
+      return next;
+    });
+  };
+
+  // The global "Accès" control sets the default for new picks AND, in one
+  // go, the access of everyone already selected.
+  const setAllAccess = (access) => {
+    setNewAccess(access);
+    setSelected((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Map();
+      for (const k of prev.keys()) next.set(k, access);
       return next;
     });
   };
@@ -150,8 +176,13 @@ export default function CollaborationModal({
     if (selectedUsers.length === 0 || adding) return;
     setAdding(true);
     try {
-      await onAddCollaborators?.(selectedUsers, newAccess);
-      setSelected(new Set());
+      await onAddCollaborators?.(
+        selectedUsers.map((u) => ({
+          username: u.username,
+          access: selected.get(u.key) || newAccess,
+        })),
+      );
+      setSelected(new Map());
       setSearch("");
       setLetter(null);
     } finally {
@@ -293,7 +324,7 @@ export default function CollaborationModal({
               </div>
 
               {/* Alphabet index — only meaningful when not searching */}
-              {candidates.length > 0 && !q && (
+              {candidates.length >= LETTER_INDEX_MIN && !q && (
                 <div className="flex flex-wrap items-center gap-0.5 mb-2">
                   <button type="button" onClick={() => setLetter(null)} className={chipCls(letter === null, false)}>
                     {t("letterAll")}
@@ -334,14 +365,22 @@ export default function CollaborationModal({
                   <div className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">—</div>
                 ) : (
                   visible.map((u) => {
-                    const isSel = selected.has(u.key);
+                    const sel = selected.has(u.key);
+                    const access = selected.get(u.key);
                     return (
-                      <button
+                      <div
                         key={u.key}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => toggleSelect(u.key)}
-                        className={`w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors border ${
-                          isSel
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleSelect(u.key);
+                          }
+                        }}
+                        className={`w-full flex items-center gap-2 p-2 rounded-lg text-left cursor-pointer transition-colors border ${
+                          sel
                             ? "bg-[var(--gk-accent-soft-bg)] border-[var(--gk-accent-soft-border)]"
                             : "border-transparent hover:bg-black/5 dark:hover:bg-white/10"
                         }`}
@@ -365,16 +404,22 @@ export default function CollaborationModal({
                             </div>
                           )}
                         </div>
+                        {sel && (
+                          <AccessToggle
+                            canWrite={access === "write" ? 1 : 0}
+                            onChange={(a) => setAccessFor(u.key, a)}
+                          />
+                        )}
                         <span
                           className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
-                            isSel
+                            sel
                               ? "bg-[var(--gk-chrome-accent)] border-[var(--gk-chrome-accent)] text-white"
                               : "border-gray-300 dark:border-gray-600"
                           }`}
                         >
-                          {isSel && <TI.Check className="tabler-icon w-3.5 h-3.5" />}
+                          {sel && <TI.Check className="tabler-icon w-3.5 h-3.5" />}
                         </span>
-                      </button>
+                      </div>
                     );
                   })
                 )}
@@ -385,7 +430,7 @@ export default function CollaborationModal({
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
                   {t("accessLabel")}
                 </span>
-                <AccessToggle canWrite={newAccess === "write" ? 1 : 0} onChange={setNewAccess} />
+                <AccessToggle canWrite={newAccess === "write" ? 1 : 0} onChange={setAllAccess} />
               </div>
 
               {/* Actions */}
