@@ -120,6 +120,10 @@ function createNoteFederation(ctx) {
     `),
     // Keep a shadow's display name + avatar fresh with the remote user.
     updateShadow: db.prepare(`UPDATE users SET name = ?, avatar_url = ? WHERE id = ?`),
+    // The authority server's friendly name for a stand-in's origin server,
+    // so a third-server participant badges correctly on a mirror that has no
+    // direct link to resolve it. NULL means "resolve via our own link".
+    setShadowServerLabel: db.prepare(`UPDATE users SET federated_server_label = ? WHERE id = ?`),
     // Does this note still carry the shadow collaborator that represents
     // the peer side of the given link? (i.e. is it still shared there?)
     hasShadowCollab: db.prepare(`
@@ -251,16 +255,29 @@ function createNoteFederation(ctx) {
     if (!Array.isArray(roster) || roster.length === 0) return;
     const link = store.getById(linkId);
     const peerHost = link ? hostOf(link.peer_base_url) : "";
-    const expected = new Set();
+    const note = deps.getNoteById.get(noteId);
+    const ownerId = note ? note.user_id : null;
+    // Local user ids the roster says belong on this note. Everything else
+    // currently attached gets pruned below — the roster is authoritative.
+    const expectedIds = new Set();
     for (const p of roster) {
       if (!p || !p.ref) continue;
-      if (p.isOwner) continue; // owner is mirrored as the note's shadow owner
+      if (p.isOwner) continue; // owner is the mirror's note owner, not a collab row
       // A roster entry that resolves to a REAL local user is this server's
-      // own recipient — already a real collaborator, never a stand-in.
+      // own recipient — keep them as a real collaborator, not a stand-in.
       const local = deps.getUserByEmail.get(p.ref) || deps.getUserByName.get(p.ref);
-      if (local && !local.federated_origin) continue;
+      if (local && !local.federated_origin) {
+        expectedIds.add(local.id);
+        try { deps.setCollaboratorCanWrite.run(p.canWrite ? 1 : 0, noteId, local.id); } catch { /* best-effort */ }
+        continue;
+      }
       const shadow = ensureShadowUser(linkId, p.ref, p.name || p.ref, peerHost, p.avatar_url ?? null);
-      expected.add(`${linkId}|${p.ref}`);
+      expectedIds.add(shadow.id);
+      // Badge with the authority's name for this participant's origin server.
+      // null → they live on the home server, which this mirror already knows
+      // by its own name for the shared link (resolved on read). A non-null
+      // value names a server we can't otherwise see (a third peer).
+      try { q.setShadowServerLabel.run(p.serverLabel || null, shadow.id); } catch { /* best-effort */ }
       try {
         deps.addCollaborator.run(noteId, shadow.id, shadow.id, deps.nowISO());
       } catch (e) {
@@ -268,11 +285,18 @@ function createNoteFederation(ctx) {
       }
       try { deps.setCollaboratorCanWrite.run(p.canWrite ? 1 : 0, noteId, shadow.id); } catch { /* best-effort */ }
     }
-    // Prune stand-ins under this link that are no longer in the roster.
+    // Prune every collaborator the roster no longer lists — both display
+    // stand-ins AND real local recipients the owner removed. Never the owner.
+    // On a mirror all collaborators come from the authority's roster, so the
+    // roster is the source of truth for who should be attached.
     try {
-      for (const row of q.listShadowCollabsForNote.all(noteId, `${linkId}|%`)) {
-        if (!expected.has(row.federated_origin)) {
-          deps.removeCollaborator?.run(noteId, row.id);
+      for (const c of deps.getNoteCollaborators.all(noteId)) {
+        if (c.id === ownerId || expectedIds.has(c.id)) continue;
+        deps.removeCollaborator?.run(noteId, c.id);
+        // A removed real local user loses access: drop the note from their
+        // open session immediately so it disappears without a manual refresh.
+        if (!c.federated_origin) {
+          try { deps.sendEventToUser?.(c.id, { type: "note_deleted", noteId }); } catch { /* SSE best-effort */ }
         }
       }
     } catch (e) {
@@ -421,8 +445,22 @@ function createNoteFederation(ctx) {
     });
 
     // Mirror the full participant roster so the recipient sees every active
-    // collaborator from the start, not just the owner.
-    try { applyRoster(note.id, linkId, roster); } catch (e) { log.warn?.("[federation/notes] share roster:", e?.message); }
+    // collaborator from the start, not just the owner. The home builds the
+    // roster BEFORE it records this new recipient locally, so it may be
+    // missing from `roster` — inject them here so the reconcile (which prunes
+    // anyone not listed) never drops the very recipient we just added.
+    const shareRoster = Array.isArray(roster) ? roster.slice() : [];
+    if (!shareRoster.some((p) => p && p.ref === targetRef)) {
+      shareRoster.push({
+        ref: targetRef,
+        name: target.name,
+        avatar_url: target.avatar_url || null,
+        canWrite: canWrite === 0 ? 0 : 1,
+        isOwner: false,
+        serverLabel: null,
+      });
+    }
+    try { applyRoster(note.id, linkId, shareRoster); } catch (e) { log.warn?.("[federation/notes] share roster:", e?.message); }
 
     try {
       deps.updateNoteWithEditor.run(deps.nowISO(), ownerName || ownerRef, deps.nowISO(), note.id);

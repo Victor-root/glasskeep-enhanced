@@ -343,6 +343,14 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
       if (!names.has("federated_origin")) {
         db.exec(`ALTER TABLE users ADD COLUMN federated_origin TEXT`);
       }
+      // For federated shadow stand-ins that represent a participant on a
+      // server THIS instance isn't directly linked to (e.g. a third server
+      // in a multi-peer share), the home/authority server tells us the
+      // friendly name of their origin server. We store it here so the badge
+      // shows the right server instead of falling back to the hub's name.
+      if (!names.has("federated_server_label")) {
+        db.exec(`ALTER TABLE users ADD COLUMN federated_server_label TEXT`);
+      }
     });
     tx();
   } catch {
@@ -1034,7 +1042,7 @@ const addCollaborator = db.prepare(`
   VALUES (?, ?, ?, ?)
 `);
 const getNoteCollaborators = db.prepare(`
-  SELECT u.id, u.name, u.email, u.avatar_url, u.federated_origin, nc.added_at, nc.added_by, nc.can_write
+  SELECT u.id, u.name, u.email, u.avatar_url, u.federated_origin, u.federated_server_label, nc.added_at, nc.added_by, nc.can_write
   FROM note_collaborators nc
   JOIN users u ON nc.user_id = u.id
   WHERE nc.note_id = ?
@@ -1236,7 +1244,13 @@ function participantFedInfo(u) {
   const hostHint = u.email ? String(u.email).split("@").pop() : null;
   return {
     federated: true,
-    serverLabel: noteFederationRef?.serverLabelForOrigin(federatedOrigin, hostHint) || null,
+    // A stored label wins: it's the authority server's name for a participant
+    // whose origin server we can't resolve via our own links (a third server
+    // in a multi-peer share). Otherwise resolve it from the link we share.
+    serverLabel:
+      u.federated_server_label ||
+      noteFederationRef?.serverLabelForOrigin(federatedOrigin, hostHint) ||
+      null,
     remoteRef,
   };
 }
@@ -1286,6 +1300,17 @@ function rosterRefFor(u) {
   }
   return u.email || u.name;
 }
+// The friendly name of the server a participant lives on, as known to THIS
+// (home/authority) server — propagated so every mirror can badge that person
+// with their true origin server, even one the mirror isn't linked to.
+//   - real local user (no federated_origin) → null: they live on us, the home,
+//     and each mirror already knows us by its own name for the shared link.
+//   - shadow collaborator → our friendly name for their origin server.
+function rosterServerLabelFor(u) {
+  if (!u || !u.federated_origin) return null;
+  const hostHint = u.email ? String(u.email).split("@").pop() : null;
+  return noteFederationRef?.serverLabelForOrigin(u.federated_origin, hostHint) || null;
+}
 function getNoteRoster(noteId, noteOwnerId) {
   const out = [];
   const owner = getUserById.get(noteOwnerId);
@@ -1296,6 +1321,7 @@ function getNoteRoster(noteId, noteOwnerId) {
       avatar_url: owner.avatar_url || null,
       canWrite: 1,
       isOwner: true,
+      serverLabel: rosterServerLabelFor(owner),
     });
   }
   for (const c of getNoteCollaborators.all(noteId)) {
@@ -1305,6 +1331,7 @@ function getNoteRoster(noteId, noteOwnerId) {
       avatar_url: c.avatar_url || null,
       canWrite: c.can_write === 0 ? 0 : 1,
       isOwner: false,
+      serverLabel: rosterServerLabelFor(c),
     });
   }
   return out;
