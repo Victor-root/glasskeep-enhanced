@@ -369,7 +369,10 @@ export default function CollaborationModal({
                   <div
                     key={`${u.host}|${u.ref}`}
                     className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0 flex items-center gap-2.5"
-                    onClick={() => onAddCollaborator(`${u.ref}@${u.host}`, newAccess)}
+                    onClick={() => {
+                      setCollaboratorUsername(`${u.ref}@${u.host}`);
+                      setShowUserDropdown(false);
+                    }}
                   >
                     <UserAvatar
                       name={u.name}
