@@ -204,13 +204,17 @@ export default function CollaborationModal({
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 bg-black/40" onClick={handleClose} />
         <div
-          className="glass-card rounded-xl shadow-2xl w-[90%] max-w-md p-6 relative max-h-[90vh] overflow-y-auto"
+          className="glass-card rounded-xl shadow-2xl w-[90%] max-w-md p-6 relative max-h-[90vh] flex flex-col overflow-hidden"
           style={{ backgroundColor: dark ? "#282828" : "#ffffff" }}
           onClick={(e) => e.stopPropagation()}
         >
-          <h3 className="text-lg font-semibold mb-4">
+          <h3 className="text-lg font-semibold mb-4 shrink-0">
             {isOwner ? t("addCollaborator") : t("collaborators")}
           </h3>
+
+          {/* Scrollable body — the modal frame (title) and footer (access +
+              actions) stay put; only this region (the lists) scrolls. */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
 
           {/* ── Current collaborators (with per-row access + remove) ── */}
           {addModalCollaborators.length > 0 && (
@@ -218,7 +222,7 @@ export default function CollaborationModal({
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 {t("currentCollaborators")}
               </p>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
+              <div className="space-y-2">
                 {addModalCollaborators
                   .filter((c) => c.id !== currentUser?.id)
                   .map((collab) => {
@@ -352,7 +356,7 @@ export default function CollaborationModal({
               )}
 
               {/* People list */}
-              <div className="min-h-[6rem] max-h-56 overflow-y-auto space-y-1 rounded-lg border border-[var(--border-light)] p-1.5 bg-gray-50/50 dark:bg-black/20">
+              <div className="min-h-[6rem] space-y-1 rounded-lg border border-[var(--border-light)] p-1.5 bg-gray-50/50 dark:bg-black/20">
                 {availableLoading ? (
                   <div className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                     {t("searching")}
@@ -425,8 +429,17 @@ export default function CollaborationModal({
                 )}
               </div>
 
+            </>
+          )}
+
+          </div>
+          {/* ── end scrollable body ── */}
+
+          {/* Footer: access + actions stay fixed below the scroll area. */}
+          {isOwner && (
+            <div className="shrink-0 pt-4">
               {/* Access level applied to the people being added */}
-              <div className="mt-3 flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
                   {t("accessLabel")}
                 </span>
@@ -450,12 +463,12 @@ export default function CollaborationModal({
                   {selectedUsers.length > 0 ? ` (${selectedUsers.length})` : ""}
                 </button>
               </div>
-            </>
+            </div>
           )}
 
           {/* Non-owner: read-only participant view */}
           {!isOwner && (
-            <div className="mt-5 flex justify-end gap-3">
+            <div className="mt-5 flex justify-end gap-3 shrink-0">
               <button
                 className="px-4 py-2 rounded-lg border border-[var(--border-light)] hover:bg-black/5 dark:hover:bg-white/10"
                 onClick={handleClose}
