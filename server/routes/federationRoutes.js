@@ -99,6 +99,31 @@ function attachFederationRoutes(
     };
   }
 
+  // Proactively tell every admin the moment a link's connectivity flips
+  // (so they don't have to be staring at the panel to learn the peer went
+  // down or came back), and re-broadcast the notes riding the link so
+  // every open copy flips to/from read-only at once. Shared by the
+  // periodic tick AND the on-demand "Re-check".
+  function onLinkStateFlip(link, previousState, state) {
+    try {
+      broadcastToAdmins?.({
+        type: "federation_link_state",
+        linkId: link.id,
+        peerBaseUrl: link.peer_base_url,
+        peerLabel: link.peer_label || null,
+        state,
+        previousState,
+      });
+    } catch {
+      /* SSE best-effort */
+    }
+    try {
+      noteFederation?.onLinkStateChanged(link.id);
+    } catch {
+      /* best-effort */
+    }
+  }
+
   // Single-flight tick: the interval and the on-demand kicks share one
   // in-flight guard so a slow network round can't pile up overlapping
   // runs.
@@ -111,30 +136,7 @@ function attachFederationRoutes(
         store,
         label: localLabel(),
         log,
-        // Proactively tell every admin the moment a link's connectivity
-        // flips, so they don't have to be staring at the panel to learn
-        // the peer went down (or came back).
-        onStateChange: (link, previousState, state) => {
-          try {
-            broadcastToAdmins?.({
-              type: "federation_link_state",
-              linkId: link.id,
-              peerBaseUrl: link.peer_base_url,
-              peerLabel: link.peer_label || null,
-              state,
-              previousState,
-            });
-          } catch {
-            /* SSE best-effort */
-          }
-          // Re-broadcast the notes on this link so every participant's
-          // open copy re-fetches and flips to/from read-only immediately.
-          try {
-            noteFederation?.onLinkStateChanged(link.id);
-          } catch {
-            /* best-effort */
-          }
-        },
+        onStateChange: onLinkStateFlip,
       });
       // After connectivity is refreshed, reconcile federated note
       // content with each reachable peer (push our changed copies).
@@ -564,7 +566,17 @@ function attachFederationRoutes(
   app.post("/api/admin/federation/links/:id/recheck", auth, adminOnly, async (req, res) => {
     const link = store.getById(req.params.id);
     if (!link) return res.status(404).json({ error: "not_found" });
-    await tick();
+    // Probe THIS link directly instead of going through the shared tick.
+    // tick() is single-flight, so while a periodic run is mid-probe (up to
+    // the 8 s timeout when a peer is unreachable) "Re-check" would no-op
+    // and hand back the STALE state — which is exactly why the button felt
+    // like it did nothing. An active link gets its own fresh health
+    // handshake now; a still-pending one rides the handshake tick.
+    if (link.status === protocol.STATUS.ACTIVE) {
+      await peer.healthCheckOne(link, store, log, onLinkStateFlip);
+    } else {
+      await tick();
+    }
     res.json({ ok: true, link: publicLink(store.getById(link.id)) });
   });
 
