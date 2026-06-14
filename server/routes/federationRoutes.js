@@ -361,6 +361,21 @@ function attachFederationRoutes(
     res.status(result.ok ? 200 : 409).json(result);
   });
 
+  // A peer removed ONE of our local users from a note we mirror → drop just
+  // that recipient's access (leaving the rest of the mirror intact).
+  app.post("/api/federation/notes/unshare-recipient", (req, res) => {
+    const link = verifyS2S(req);
+    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
+    const b = req.body || {};
+    const result = noteFederation.handleIncomingUnshareRecipient({
+      linkId: link.id,
+      noteId: b.noteId,
+      targetRef: b.targetRef,
+    });
+    res.status(result.ok ? 200 : 409).json(result);
+  });
+
   // A peer changed a remote collaborator's access on a note WE mirror →
   // flip the local recipient's read-only / read-write state instantly.
   app.post("/api/federation/notes/permission", (req, res) => {

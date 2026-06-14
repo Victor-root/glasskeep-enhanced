@@ -2639,6 +2639,16 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
   db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(noteId, userIdToRemove);
   db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(noteId, userIdToRemove);
 
+  // If the removed collaborator was a FEDERATED stand-in, tell their peer to
+  // drop that specific recipient from the mirror — an explicit, deterministic
+  // signal (the display roster never removes real recipients on its own).
+  const removedUser = getUserById.get(userIdToRemove);
+  if (removedUser?.federated_origin && federation?.noteFederation?.unshareFromRemote) {
+    Promise.resolve()
+      .then(() => federation.noteFederation.unshareFromRemote({ shadow: removedUser, noteId }))
+      .catch((e) => console.warn("[federation/notes] unshareFromRemote failed:", e?.message));
+  }
+
   // Notify the removed user FIRST — they are no longer in the collaborator list
   // so broadcastNoteUpdated won't reach them. Send a dedicated event so their
   // client can remove the note immediately without a full reload. If a copy
