@@ -143,6 +143,14 @@ function createNoteFederation(ctx) {
       JOIN users u ON nc.user_id = u.id
       WHERE nc.note_id = ? AND u.federated_origin IS NULL
     `),
+    // Shadow collaborator rows on a note that belong to a given link
+    // (federated_origin LIKE "<linkId>|%"). Used by roster sync to prune
+    // display stand-ins for participants who have left the note.
+    listShadowCollabsForNote: db.prepare(`
+      SELECT u.id, u.federated_origin FROM note_collaborators nc
+      JOIN users u ON nc.user_id = u.id
+      WHERE nc.note_id = ? AND u.federated_origin LIKE ?
+    `),
     deleteNoteRow: db.prepare(`DELETE FROM notes WHERE id = ?`),
   };
 
@@ -226,6 +234,52 @@ function createNoteFederation(ctx) {
     }
   }
 
+  // ── Mirror: reconcile the displayed participant list ────────────────
+  // The home server (the authority) sends the full roster of a note's
+  // participants alongside every share/apply. We mirror it locally as
+  // display-only stand-ins so this peer's user sees EVERY active
+  // collaborator — the owner, this server's own collaborators, and people
+  // who live on a third server we aren't directly linked to. Edits still
+  // hub through the home server; these rows are purely for visibility.
+  //
+  // Stand-ins are keyed under the home link (federated_origin
+  // "<homeLinkId>|<ref>"), so they badge as "via the home server" and are
+  // pruned here the moment the roster no longer lists them (someone left).
+  // The owner is the note's user_id (not a collaborator row) and real
+  // local users (this server's own recipients) are left untouched.
+  function applyRoster(noteId, linkId, roster) {
+    if (!Array.isArray(roster) || roster.length === 0) return;
+    const link = store.getById(linkId);
+    const peerHost = link ? hostOf(link.peer_base_url) : "";
+    const expected = new Set();
+    for (const p of roster) {
+      if (!p || !p.ref) continue;
+      if (p.isOwner) continue; // owner is mirrored as the note's shadow owner
+      // A roster entry that resolves to a REAL local user is this server's
+      // own recipient — already a real collaborator, never a stand-in.
+      const local = deps.getUserByEmail.get(p.ref) || deps.getUserByName.get(p.ref);
+      if (local && !local.federated_origin) continue;
+      const shadow = ensureShadowUser(linkId, p.ref, p.name || p.ref, peerHost, p.avatar_url ?? null);
+      expected.add(`${linkId}|${p.ref}`);
+      try {
+        deps.addCollaborator.run(noteId, shadow.id, shadow.id, deps.nowISO());
+      } catch (e) {
+        if (e.code !== "SQLITE_CONSTRAINT_UNIQUE") throw e;
+      }
+      try { deps.setCollaboratorCanWrite.run(p.canWrite ? 1 : 0, noteId, shadow.id); } catch { /* best-effort */ }
+    }
+    // Prune stand-ins under this link that are no longer in the roster.
+    try {
+      for (const row of q.listShadowCollabsForNote.all(noteId, `${linkId}|%`)) {
+        if (!expected.has(row.federated_origin)) {
+          deps.removeCollaborator?.run(noteId, row.id);
+        }
+      }
+    } catch (e) {
+      log.warn?.("[federation/notes] roster prune:", e?.message);
+    }
+  }
+
   // ── Outbound: share a local note with a remote user ─────────────────
   // Returns { ok, error?, collaborator? }. Called by the host's
   // /collaborate route when the target looks like user@peer-host.
@@ -250,6 +304,7 @@ function createNoteFederation(ctx) {
           ownerAvatar: owner.avatar_url || null, // so the peer shows our avatar
           canWrite: canWrite ? 1 : 0,        // read-only vs read-write share
           note: contentFromNote(note),
+          roster: deps.getNoteRoster?.(note.id, owner.id) || null,
         },
       });
     } catch (e) {
@@ -298,7 +353,7 @@ function createNoteFederation(ctx) {
   }
 
   // ── Inbound: a peer shares a note with one of our users ─────────────
-  function handleIncomingShare({ linkId, targetRef, ownerRef, ownerName, ownerAvatar, note, canWrite = 1 }) {
+  function handleIncomingShare({ linkId, targetRef, ownerRef, ownerName, ownerAvatar, note, canWrite = 1, roster = null }) {
     // Can't read/write encrypted note content while this instance is
     // locked. Tell the peer to retry once we're unlocked.
     if (deps.isLocked?.()) return { ok: false, error: "locked" };
@@ -365,6 +420,10 @@ function createNoteFederation(ctx) {
       created_at: deps.nowISO(),
     });
 
+    // Mirror the full participant roster so the recipient sees every active
+    // collaborator from the start, not just the owner.
+    try { applyRoster(note.id, linkId, roster); } catch (e) { log.warn?.("[federation/notes] share roster:", e?.message); }
+
     try {
       deps.updateNoteWithEditor.run(deps.nowISO(), ownerName || ownerRef, deps.nowISO(), note.id);
       deps.createShareNotification({
@@ -386,12 +445,19 @@ function createNoteFederation(ctx) {
   }
 
   // ── Inbound: a peer pushes an updated copy of a federated note ──────
-  function handleIncomingApply({ linkId, note }) {
+  function handleIncomingApply({ linkId, note, roster = null }) {
     if (deps.isLocked?.()) return { ok: false, error: "locked" };
     const mapping = q.getMappingForLink.get(note.id, linkId);
     if (!mapping) return { ok: false, error: "unknown_note" };
     const existing = deps.getNoteById.get(note.id);
     if (!existing) return { ok: false, error: "unknown_note" };
+
+    // Sync the participant roster first, regardless of the content LWW
+    // outcome below — a collaborator can be added/removed without the note
+    // body changing, and a mirror only ever receives the roster here.
+    if (mapping.role === "mirror") {
+      try { applyRoster(note.id, linkId, roster); } catch (e) { log.warn?.("[federation/notes] apply roster:", e?.message); }
+    }
 
     // Defense-in-depth: when WE are the authority (home), an incoming edit
     // is made on behalf of a remote recipient. If every remote recipient on
@@ -443,7 +509,12 @@ function createNoteFederation(ctx) {
       secret: link.shared_secret,
       linkId: link.id,
       path,
-      body: { linkId: link.id, note: contentFromNote(note) },
+      body: {
+        linkId: link.id,
+        note: contentFromNote(note),
+        // Keep the peer's participant list in sync with ours (the authority).
+        roster: deps.getNoteRoster?.(note.id, note.user_id) || null,
+      },
     });
     if (resp.ok && resp.json && resp.json.ok === true) {
       q.setPushed.run(note.client_updated_at, note.id, link.id);
@@ -522,6 +593,25 @@ function createNoteFederation(ctx) {
       Promise.resolve()
         .then(() => reconcileMapping(m))
         .catch((e) => log.warn?.("[federation/notes] instant push:", e?.message));
+    }
+  }
+
+  // The participant list changed on a HOME note (collaborator added/removed
+  // or an access toggle) without necessarily touching the body. Push the
+  // current content + roster to every peer so their displayed roster updates
+  // even when the LWW content is unchanged (a same-cua apply is a content
+  // no-op on the peer, but the roster is always applied).
+  function onParticipantsChangedLocally(noteId) {
+    if (deps.isLocked?.()) return;
+    const note = deps.getNoteById.get(noteId);
+    if (!note) return;
+    for (const m of q.listByNote.all(noteId)) {
+      if (m.role !== "home") continue;
+      const link = store.getById(m.link_id);
+      if (!link || link.status !== "active" || link.peer_reachable !== 1) continue;
+      Promise.resolve()
+        .then(() => pushNoteContent(link, note))
+        .catch((e) => log.warn?.("[federation/notes] roster push:", e?.message));
     }
   }
 
@@ -652,6 +742,7 @@ function createNoteFederation(ctx) {
     setRemotePermission,
     syncTick,
     onNoteChangedLocally,
+    onParticipantsChangedLocally,
     // A link's connectivity flipped → nudge every note riding it so each
     // participant's OPEN copy re-fetches and reflects the new state at
     // once (e.g. authority went offline → mirror goes read-only now, not
