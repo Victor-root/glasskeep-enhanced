@@ -3487,6 +3487,10 @@ export default function App() {
               // already fires `instance-locked` on a 423 response;
               // this just makes the redirect immediate.
               window.dispatchEvent(new CustomEvent("instance-locked"));
+            } else if (msg && msg.type === "instance_unlocked") {
+              // An admin unlocked the instance elsewhere — leave the unlock
+              // screen at once (mirror of instance_locked above).
+              window.dispatchEvent(new CustomEvent("instance-unlocked"));
             } else if (msg && msg.type === "note_updated" && msg.noteId) {
               debouncedPatch(msg.noteId);
             } else if (msg && msg.type === "note_access_changed" && msg.noteId) {

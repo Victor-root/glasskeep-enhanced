@@ -1416,6 +1416,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedPeerOffline: "{peer} est hors ligne",
   fedPeerOnline: "{peer} est de nouveau en ligne",
   fedPeerLocked: "{peer} est verrouillé (chiffrement non déverrouillé)",
+  fedPeerUnlocked: "{peer} a été déverrouillé",
   fedPeerIncompatible: "{peer} n'est pas à jour",
   fedInvitesPending: "{count} serveurs attendent de s'associer à vous",
   fedIncomingHeading: "Demandes d'appairage",

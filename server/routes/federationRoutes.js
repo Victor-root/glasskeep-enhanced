@@ -149,6 +149,28 @@ function attachFederationRoutes(
     setTimeout(() => tick().catch(() => {}), 150);
   }
 
+  // Ping every active peer so they re-probe US right away (instead of
+  // waiting for their periodic health poll). Called when our own state
+  // changes in a way peers can't otherwise learn promptly — e.g. the
+  // instance was just locked or unlocked. Best-effort: if a peer is
+  // unreachable, their periodic poll remains the fallback.
+  async function notifyPeersStateChanged() {
+    let links = [];
+    try { links = store.listActive(); } catch { return; }
+    const path = "/api/federation/peer-changed";
+    await Promise.all(links.map(async (link) => {
+      try {
+        await peer.httpJson(link.peer_base_url + path, {
+          method: "POST",
+          secret: link.shared_secret,
+          linkId: link.id,
+          path,
+          body: { linkId: link.id },
+        });
+      } catch { /* best-effort */ }
+    }));
+  }
+
   // Strip secrets; expose the derived state the UI keys off.
   function publicLink(link) {
     return {
@@ -298,6 +320,17 @@ function attachFederationRoutes(
     });
     if (!valid) return res.status(403).json({ ok: false, error: "bad signature" });
     res.json(selfReport({ locked: isLocked() }));
+  });
+
+  // A peer tells us its own state just changed (locked/unlocked, etc.) and
+  // asks us to re-probe it now rather than at our next periodic poll. We
+  // kick the tick; the resulting health handshake refreshes the link and,
+  // if its derived state flipped, onLinkStateFlip notifies our admins.
+  app.post("/api/federation/peer-changed", (req, res) => {
+    const link = verifyS2S(req);
+    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    kickTick();
+    res.json({ ok: true });
   });
 
   // Verify a signed server-to-server request; returns the active link or
@@ -618,7 +651,7 @@ function attachFederationRoutes(
     log.log("[federation] routes ready (protocol v" + protocol.PROTOCOL_VERSION + ")");
   }
 
-  return { store, tick, kickTick, noteFederation };
+  return { store, tick, kickTick, notifyPeersStateChanged, noteFederation };
 }
 
 module.exports = { attachFederationRoutes };

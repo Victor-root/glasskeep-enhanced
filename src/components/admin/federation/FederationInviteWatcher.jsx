@@ -98,7 +98,13 @@ export default function FederationInviteWatcher({ token }) {
       const base = { type: "toast", title: t("fedConnTitle") };
       if (msg.state === "offline") {
         notify({ ...base, variant: "warning", message: t("fedPeerOffline").replace("{peer}", who) });
-      } else if (msg.state === "online" && msg.previousState === "offline") {
+      } else if (msg.state === "online" && msg.previousState === "locked") {
+        // Peer unlocked its at-rest encryption — distinct from a plain
+        // reconnect, and previously NOT toasted (the online branch only
+        // fired when coming back from "offline"), which is why an unlock
+        // went unannounced while a lock did not.
+        notify({ ...base, variant: "success", message: t("fedPeerUnlocked").replace("{peer}", who) });
+      } else if (msg.state === "online" && (msg.previousState === "offline" || msg.previousState === "incompatible" || msg.previousState === "unknown")) {
         notify({ ...base, variant: "success", message: t("fedPeerOnline").replace("{peer}", who) });
       } else if (msg.state === "locked") {
         notify({ ...base, variant: "warning", message: t("fedPeerLocked").replace("{peer}", who) });
