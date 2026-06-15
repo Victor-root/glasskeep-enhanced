@@ -209,7 +209,9 @@ export default function CollaborationModal({
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 bg-black/40" onClick={handleClose} />
         <div
-          className="glass-card rounded-xl shadow-2xl w-[90%] max-w-md p-6 relative max-h-[90vh] flex flex-col overflow-hidden"
+          // Full-screen on mobile (more width for the collaborator rows);
+          // a centred card from sm: up where there's already room.
+          className="glass-card relative flex flex-col overflow-hidden shadow-2xl w-full h-full max-h-full rounded-none p-4 sm:w-[90%] sm:max-w-md sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:p-6"
           style={{ backgroundColor: dark ? "#282828" : "#ffffff" }}
           onClick={(e) => e.stopPropagation()}
         >
