@@ -863,6 +863,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   passkeyUnlockEnabled: "Déverrouillage d'instance activé.",
   passkeyUnlockDisabled: "Droit de déverrouillage retiré.",
   passkeyUnlockToggleDisabledHint: "L'instance doit être déverrouillée et le chiffrement activé pour modifier ce réglage.",
+  passkeyEnableUnlockExplain: "Pour autoriser cette clé d'accès à déverrouiller l'instance chiffrée, vous devez l'utiliser une fois maintenant : une demande de votre clé (empreinte, code PIN ou clé physique) va apparaître. C'est ce qui permet d'y associer la clé de déchiffrement. À refaire pour chaque clé que vous voulez autoriser.",
   passkeyNoPrfNotice: "Cette clé d'accès vous permet de vous connecter, mais ne peut pas déverrouiller l'instance chiffrée sur cet appareil (le facteur PRF n'est pas disponible).",
   passkeyNoPrfRow: "Sans support PRF — utilisable uniquement pour la connexion.",
   passkeyHttpsRequired: "Les clés d'accès nécessitent une connexion HTTPS sécurisée. Configurez un reverse proxy HTTPS pour activer cette fonctionnalité.",
