@@ -89,7 +89,7 @@ export default function NoteCardFooter({
                 />
               ))}
               {collabs.length > 2 && (
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-600 text-[8px] font-bold text-gray-600 dark:text-gray-300">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-600 text-[11px] font-bold text-gray-600 dark:text-gray-300">
                   +{collabs.length - 2}
                 </span>
               )}

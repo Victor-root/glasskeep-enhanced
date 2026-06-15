@@ -643,7 +643,7 @@ export default function ModalFooter({
                   ))}
                   {collabs.length > 3 && (
                     <span
-                      className="text-[10px] font-semibold opacity-70 pl-1.5"
+                      className="text-[13px] font-bold opacity-90 pl-1.5"
                       data-tooltip={collabs.slice(3).map((c) => c.name || c.email).join(", ")}
                     >+{collabs.length - 3}</span>
                   )}
