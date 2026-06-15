@@ -327,12 +327,13 @@ export default function PasskeySettingsSection({
           {list.map((p) => (
             <li
               key={p.credentialId}
-              // md:+ flips to a row so the action buttons fill the
-              // empty band on the right; mobile stays stacked because
-              // the action row otherwise wraps awkwardly.
-              className="rounded-lg border border-[var(--border-light)] p-3 flex flex-col gap-3 md:flex-row md:items-center md:gap-4"
+              // One wrapping row: info + actions sit side by side when there's
+              // room and the actions drop to their own line when there isn't.
+              // The info column keeps a min width so it can never collapse to
+              // ~0 (which made its badges overflow on top of the buttons).
+              className="rounded-lg border border-[var(--border-light)] p-3 flex flex-wrap items-center gap-x-4 gap-y-3"
             >
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-[14rem]">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium truncate">
                     {p.name || t("passkeyUnnamed")}
@@ -357,7 +358,12 @@ export default function PasskeySettingsSection({
                 )}
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap md:flex-nowrap md:shrink-0 md:justify-end">
+              {/* Actions stay wrappable and shrinkable: with the extra
+                  "allow unlock" button (long label) the old md:flex-nowrap +
+                  md:shrink-0 forced a fixed-width block that crushed the info
+                  column to ~0, so its badges overflowed on top of the buttons.
+                  Letting the buttons wrap keeps the info column from collapsing. */}
+              <div className="flex items-center gap-2 flex-wrap md:justify-end">
                 {/* Instance-unlock toggle (admins, PRF-capable, unlocked vault) */}
                 {isAdmin && encryptionEnabled && p.prfSupported && (
                   <button
