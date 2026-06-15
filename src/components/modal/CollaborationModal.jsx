@@ -21,7 +21,7 @@ function firstLetter(name) {
 // colours come from the active shell theme, so it follows every theme.
 function ServerBadge({ label }) {
   return (
-    <span className="inline-flex items-center gap-1 align-middle text-[11px] font-medium pl-1 pr-1.5 py-0.5 rounded-md bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)] border border-[var(--gk-accent-soft-border)]">
+    <span className="shrink-0 inline-flex items-center gap-1 align-middle text-[11px] font-medium pl-1 pr-1.5 py-0.5 rounded-md bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)] border border-[var(--gk-accent-soft-border)]">
       <TI.Server className="tabler-icon w-3.5 h-3.5 shrink-0" />
       <span className="truncate max-w-[10rem]">{label || t("fedRemoteServer")}</span>
     </span>
@@ -245,13 +245,13 @@ export default function CollaborationModal({
                     return (
                       <div
                         key={collab.id}
-                        // Wrapping row so the action controls drop to their own
-                        // line on narrow (mobile) widths instead of crushing the
-                        // identity block — which flattened the avatar and made
-                        // the server badge overlap the buttons.
-                        className="flex flex-wrap items-center gap-x-2 gap-y-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"
+                        // Single aligned row: fixed square avatar, the name
+                        // truncates (badge stays beside it), actions pinned
+                        // right and vertically centred. No wrapping — that
+                        // looked unbalanced on mobile.
+                        className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0 grow basis-[12rem]">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <UserAvatar
                             name={collab.name}
                             email={collab.email}
@@ -262,20 +262,20 @@ export default function CollaborationModal({
                             className="shrink-0"
                           />
                           <div className="min-w-0">
-                            <p className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
-                              <span className="truncate max-w-full">{collab.name || collab.email}</span>
+                            <div className="font-medium text-sm flex items-center gap-1.5 min-w-0">
+                              <span className="truncate">{collab.name || collab.email}</span>
                               {collab.federated && <ServerBadge label={collab.serverLabel} />}
                               {isSelf && (
-                                <span className="inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)] border border-[var(--gk-accent-soft-border)]">
+                                <span className="shrink-0 inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)] border border-[var(--gk-accent-soft-border)]">
                                   {t("youLabel")}
                                 </span>
                               )}
                               {collab.isOwner && (
-                                <span className="text-xs text-indigo-500 dark:text-indigo-400 font-normal">
+                                <span className="shrink-0 text-xs text-indigo-500 dark:text-indigo-400 font-normal">
                                   {t("owner")}
                                 </span>
                               )}
-                            </p>
+                            </div>
                             {!collab.federated && collab.email && (
                               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                 {collab.email}
@@ -283,7 +283,7 @@ export default function CollaborationModal({
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           {showAccess && (
                             <AccessToggle
                               canWrite={collab.canWrite}
