@@ -7,8 +7,41 @@ import { readFileSync } from "node:fs";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8"));
 
+// Trim Vite's per-file asset table out of the build report. Every emitted file
+// (the app chunk, the CSS, the qr-scanner worker, ~30 @fontsource .woff files,
+// the manifest, index.html…) prints its own "… kB" line — pure noise on every
+// build. Vite has no native filter, so we wrap the build logger and drop those
+// size lines, matched on Vite's exact "kB" size token: the PWA summary uses
+// "KiB" and the "✓ built in" line has no size, so both are left intact, as are
+// "modules transformed", warnings and errors. ANSI colour codes are stripped
+// before matching so the test isn't fooled by Vite dimming the size unit. Only
+// log output is filtered; the build artifacts are never touched.
+function quietAssetReport() {
+  const ANSI = /\x1b\[[0-9;]*m/g;
+  const SIZE_LINE = /\d\s*kB\b/; // e.g. "363.03 kB" — not the PWA "KiB"
+  const isAssetLine = (line) => SIZE_LINE.test(line.replace(ANSI, ""));
+  return {
+    name: "quiet-asset-report",
+    apply: "build",
+    configResolved(config) {
+      const logger = config.logger;
+      const origInfo = logger.info.bind(logger);
+      logger.info = (msg, opts) => {
+        if (typeof msg !== "string") return origInfo(msg, opts);
+        const lines = msg.split("\n");
+        if (!lines.some(isAssetLine)) return origInfo(msg, opts);
+        // Keep every non-asset line; swallow the message only if nothing's left.
+        const kept = lines.filter((line) => !isAssetLine(line)).join("\n");
+        if (!kept.trim()) return;
+        return origInfo(kept, opts);
+      };
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
+    quietAssetReport(),
     react(),
     tailwindcss(),
     VitePWA({
@@ -78,6 +111,16 @@ export default defineConfig({
       // devOptions: { enabled: true } // ← uncomment to test SW in dev (remember to disable later)
     })
   ],
+  build: {
+    // We deliberately ship a single app bundle (~2 MB) rather than
+    // code-splitting: the PWA service worker precaches the whole shell so the
+    // app loads instantly and works fully offline (see the workbox config
+    // above). At ~4 updates/month the "re-download everything on update" cost
+    // is negligible, so the single-bundle trade-off is the one we want. Raise
+    // Vite's 500 kB advisory ceiling past our actual chunk size so the (purely
+    // cosmetic) "chunks larger than 500 kB" warning stops firing on every build.
+    chunkSizeWarningLimit: 2500,
+  },
   define: {
     __APP_VERSION__: JSON.stringify(version),
   },
