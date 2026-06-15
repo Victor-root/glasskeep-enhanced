@@ -93,18 +93,19 @@ export default function NotesHeader({
     };
   }, [signOutArmed]);
 
-  // Header instance-lock button: shown only for admins on an
-  // encryption-enabled server. POST /api/instance/lock is admin-only, so a
-  // non-admin tap would just 403 — gate the affordance on both conditions.
+  // Header instance-lock: shown only for admins on an encryption-enabled
+  // server. POST /api/instance/lock is admin-only, so a non-admin tap would
+  // just 403 — gate the affordance on both conditions. On desktop it's an
+  // icon button beside the bell; on mobile it lives in the kebab menu (an
+  // extra header icon overflowed narrow phones and pushed the kebab off-screen).
   const showLockBtn = !!encryptionEnabled && !!currentUser?.is_admin;
-  const renderLockBtn = (mobile) => {
+  const renderLockBtn = () => {
     if (!showLockBtn) return null;
-    const pad = mobile ? (qrQuickEnabled ? "p-1.5" : "p-2") : "p-2";
     return (
       <button
         type="button"
         onClick={() => onLockInstance?.()}
-        className={`${pad} rounded-full cursor-pointer ${mobile ? "hover:bg-gray-200 dark:hover:bg-gray-700" : "gk-header-icon-btn"} focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-red-400 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300`}
+        className="p-2 rounded-full cursor-pointer gk-header-icon-btn focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-red-400 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
         data-tooltip={t("lockInstanceTooltip")}
         aria-label={t("lockInstanceTooltip")}
       >
@@ -430,7 +431,7 @@ export default function NotesHeader({
         <div className="relative flex items-center gap-3 shrink-0">
           {/* Desktop: icon buttons directly in header bar */}
           <div className={`${desktopOnly} items-center gap-1`}>
-            {renderLockBtn(false)}
+            {renderLockBtn()}
             {notificationBellDesktop}
             <button
               onClick={() => onToggleViewMode?.()}
@@ -557,7 +558,6 @@ export default function NotesHeader({
               and per-button padding ONLY in that case. Without the QR,
               the row keeps the original looser spacing. */}
           <div className={`${mobileOnly} flex items-center ${qrQuickEnabled ? "gap-0" : "gap-1"}`}>
-            {renderLockBtn(true)}
             {notificationBellMobile}
             <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} syncDropdownOpen={syncDropdownOpen} setSyncDropdownOpen={setSyncDropdownOpen} instanceLocked={instanceLocked} />
             {qrQuickEnabled && (
@@ -703,6 +703,16 @@ export default function NotesHeader({
                       </span>
                       <span>{t("adminPanel")}</span>
                     </button>
+                  )}
+                  {showLockBtn && (
+                    <button
+                      className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        onLockInstance?.();
+                      }}
+                    >
+                      <LockIcon />{t("lockInstanceTooltip")}</button>
                   )}
                   <button
                     className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
