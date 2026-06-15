@@ -706,13 +706,13 @@ export default function NotesHeader({
                   )}
                   {showLockBtn && (
                     <button
-                      className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
+                      className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
                       onClick={() => {
                         setHeaderMenuOpen(false);
                         onLockInstance?.();
                       }}
                     >
-                      <LockIcon />{t("lockInstanceTooltip")}</button>
+                      <span className={dark ? "text-red-400" : "text-red-600"}><LockIcon /></span>{t("lockInstanceTooltip")}</button>
                   )}
                   <button
                     className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
