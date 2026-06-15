@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "concurrently -k -n WEB,API -c auto \"vite\" \"npm:api\"",
     "api": "cross-env NODE_ENV=development API_PORT=8080 nodemon server/index.js",
-    "build": "vite build",
+    "build": "vite build --logLevel warn",
     "preview": "vite preview",
     "unlock-instance": "node scripts/unlock-instance.cjs",
     "unlock-instance-recovery": "node scripts/unlock-instance.cjs --recovery",
