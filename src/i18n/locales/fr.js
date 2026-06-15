@@ -187,6 +187,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   currentCollaborators: "Collaborateurs actuels :",
   accessLabel: "Accès",
   accessReadOnly: "Lecture seule",
+  readOnlySetBy: "{owner} a mis cette note en lecture seule",
   accessReadWrite: "Peut modifier",
   selectCollaboratorsHint: "Sélectionnez les personnes avec qui partager cette note.",
   addedCollaboratorsOne: "Collaborateur ajouté",

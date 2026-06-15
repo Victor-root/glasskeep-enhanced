@@ -834,16 +834,25 @@ export default function ModalFooter({
             toggle) when the owner limited this collaborator to read-only.
             Independent of the read-mode preference so the status is always
             visible; the offline-peer read-only case keeps its own banner. ── */}
-        {readOnlyBadge && (
-          <div
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--gk-chrome-accent)] bg-[var(--gk-accent-soft-bg)] border border-[var(--gk-accent-soft-border)] cursor-default select-none"
-            data-tooltip={!isDesktop ? t("accessReadOnly") : undefined}
-            aria-label={t("accessReadOnly")}
-          >
-            <TI.Eye className="tabler-icon w-4 h-4" />
-            {isDesktop && <span>{t("accessReadOnly")}</span>}
-          </div>
-        )}
+        {readOnlyBadge && (() => {
+          // The owner is who limited this collaborator to read-only — name
+          // them in the (app-wide custom) tooltip so it's clear who to ask.
+          const roOwner = (addModalCollaborators || []).find((c) => c && c.isOwner);
+          const roOwnerName = roOwner?.name || roOwner?.email || "";
+          const roTooltip = roOwnerName
+            ? t("readOnlySetBy").replace("{owner}", roOwnerName)
+            : t("accessReadOnly");
+          return (
+            <div
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--gk-chrome-accent)] bg-[var(--gk-accent-soft-bg)] border border-[var(--gk-accent-soft-border)] cursor-default select-none"
+              data-tooltip={roTooltip}
+              aria-label={roTooltip}
+            >
+              <TI.Eye className="tabler-icon w-4 h-4" />
+              {isDesktop && <span>{t("accessReadOnly")}</span>}
+            </div>
+          );
+        })()}
 
         {/* ── Edit/View toggle — text notes ── */}
         {mType === "text" && !readOnlyBadge && readModeEnabled && (
