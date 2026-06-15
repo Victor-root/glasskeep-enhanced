@@ -7,8 +7,36 @@ import { readFileSync } from "node:fs";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8"));
 
+// Trim the per-file font assets out of Vite's build report. The app ships
+// ~30 @fontsource .woff files, each printed as its own line, which buried the
+// lines that actually matter (the app chunk, CSS, "built in", PWA summary)
+// under font noise. Vite has no native filter for the report, so we wrap the
+// build logger and drop only the font-asset lines (matched on font
+// extensions); every other line — including warnings and errors — passes
+// through untouched. Build artifacts are never affected, only what's logged.
+function quietFontAssetReport() {
+  const FONT_LINE = /\.(?:woff2?|ttf|otf|eot)\b/i;
+  return {
+    name: "quiet-font-asset-report",
+    apply: "build",
+    configResolved(config) {
+      const logger = config.logger;
+      const origInfo = logger.info.bind(logger);
+      logger.info = (msg, opts) => {
+        if (typeof msg !== "string" || !FONT_LINE.test(msg)) return origInfo(msg, opts);
+        // Handle both per-line logging and a batched multi-line report: keep
+        // every non-font line, swallow the message only if nothing remains.
+        const kept = msg.split("\n").filter((line) => !FONT_LINE.test(line)).join("\n");
+        if (!kept.trim()) return;
+        return origInfo(kept, opts);
+      };
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
+    quietFontAssetReport(),
     react(),
     tailwindcss(),
     VitePWA({
