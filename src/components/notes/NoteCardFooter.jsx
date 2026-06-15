@@ -86,6 +86,9 @@ export default function NoteCardFooter({
                   size="w-6 h-6"
                   textSize="text-[8px]"
                   dark={dark}
+                  // Solid backing so transparent-PNG avatars stay legible in
+                  // this dense stack (collaboration footer only).
+                  imgClassName="bg-white"
                 />
               ))}
               {collabs.length > 2 && (
