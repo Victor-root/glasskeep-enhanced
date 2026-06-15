@@ -198,25 +198,44 @@ export default function PasskeySettingsSection({
   };
 
   const handleToggleUnlock = async (p) => {
-    setBusyId(p.credentialId);
-    try {
-      if (p.canUnlockInstance) {
+    // Disabling just drops the wrapped DEK — no passkey ceremony needed.
+    if (p.canUnlockInstance) {
+      setBusyId(p.credentialId);
+      try {
         await disableInstanceUnlock(token, p.credentialId);
         toast(t("passkeyUnlockDisabled"), "success");
-      } else {
-        await enableInstanceUnlock(token, p.credentialId);
-        toast(t("passkeyUnlockEnabled"), "success");
+        await refresh();
+      } catch (e) {
+        toast(localizeServerError(e?.message || "", "passkeyToggleFailed"), "error");
+      } finally {
+        setBusyId(null);
       }
-      await refresh();
-    } catch (e) {
-      const msg = (e && e.message) || "";
-      const cancelled = e?.name === "NotAllowedError" || /not[\s_-]*allowed|cancel|abort|interrupt|annul/i.test(msg);
-      if (!cancelled) {
-        toast(localizeServerError(msg, "passkeyToggleFailed"), "error");
-      }
-    } finally {
-      setBusyId(null);
+      return;
     }
+    // Enabling REQUIRES authenticating with the passkey (PRF) so the DEK can
+    // be wrapped under it — explain that up front so the WebAuthn prompt
+    // that follows isn't a surprise.
+    setConfirmPrompt({
+      title: t("passkeyEnableUnlock"),
+      message: t("passkeyEnableUnlockExplain"),
+      confirmText: t("passkeyEnableUnlock"),
+      onConfirm: async () => {
+        setBusyId(p.credentialId);
+        try {
+          await enableInstanceUnlock(token, p.credentialId);
+          toast(t("passkeyUnlockEnabled"), "success");
+          await refresh();
+        } catch (e) {
+          const msg = (e && e.message) || "";
+          const cancelled = e?.name === "NotAllowedError" || /not[\s_-]*allowed|cancel|abort|interrupt|annul/i.test(msg);
+          if (!cancelled) {
+            toast(localizeServerError(msg, "passkeyToggleFailed"), "error");
+          }
+        } finally {
+          setBusyId(null);
+        }
+      },
+    });
   };
 
   // Inside the Android app we route passkeys through Credential Manager
