@@ -1,10 +1,11 @@
 import React from "react";
 import { createPortal, flushSync } from "react-dom";
 import { t } from "../../i18n";
-import { Hamburger, SearchIcon, CloseIcon, GridIcon, ListIcon, SunIcon, MoonIcon, CheckSquareIcon, SettingsIcon, ShieldIcon, LogOutIcon, Kebab } from "../../icons/index.jsx";
+import { Hamburger, SearchIcon, CloseIcon, GridIcon, ListIcon, SunIcon, MoonIcon, CheckSquareIcon, SettingsIcon, ShieldIcon, LogOutIcon, LockIcon, Kebab } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import SyncStatusIcon from "../../sync/SyncStatusIcon.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
+import Popover from "../common/Popover.jsx";
 import { useBranding, DEFAULT_APP_NAME } from "../../branding/BrandingContext.jsx";
 
 export default function NotesHeader({
@@ -34,6 +35,10 @@ export default function NotesHeader({
   hasUpdate = false,
   currentUser,
   signOut,
+  // Header instance-lock (admin + at-rest encryption only). onLockInstance
+  // re-locks the server; encryptionEnabled gates the whole affordance.
+  onLockInstance,
+  encryptionEnabled = false,
   headerMenuOpen,
   setHeaderMenuOpen,
   headerMenuRef,
@@ -62,6 +67,33 @@ export default function NotesHeader({
 }) {
   const { branding } = useBranding();
   const appName = branding.appName || DEFAULT_APP_NAME;
+
+  // Desktop account popover. The "Sign out" button used to sit bare in the
+  // header; it now lives behind the username (click the pseudo → popover with
+  // the labelled button + icon), which declutters the header and makes room
+  // for the lock button beside the bell. Mobile keeps sign-out in the kebab.
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+  const userBtnRef = React.useRef(null);
+
+  // Header instance-lock button: shown only for admins on an
+  // encryption-enabled server. POST /api/instance/lock is admin-only, so a
+  // non-admin tap would just 403 — gate the affordance on both conditions.
+  const showLockBtn = !!encryptionEnabled && !!currentUser?.is_admin;
+  const renderLockBtn = (mobile) => {
+    if (!showLockBtn) return null;
+    const pad = mobile ? (qrQuickEnabled ? "p-1.5" : "p-2") : "p-2";
+    return (
+      <button
+        type="button"
+        onClick={() => onLockInstance?.()}
+        className={`${pad} rounded-full cursor-pointer ${mobile ? "hover:bg-gray-200 dark:hover:bg-gray-700" : "gk-header-icon-btn"} focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-red-400 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300`}
+        data-tooltip={t("lockInstanceTooltip")}
+        aria-label={t("lockInstanceTooltip")}
+      >
+        <LockIcon />
+      </button>
+    );
+  };
 
   // The kebab dropdown can't rely on the typical "fixed inset-0
   // backdrop captures the click" pattern: the host <header> has a
@@ -380,6 +412,7 @@ export default function NotesHeader({
         <div className="relative flex items-center gap-3 shrink-0">
           {/* Desktop: icon buttons directly in header bar */}
           <div className={`${desktopOnly} items-center gap-1`}>
+            {renderLockBtn(false)}
             {notificationBellDesktop}
             <button
               onClick={() => onToggleViewMode?.()}
@@ -438,7 +471,18 @@ export default function NotesHeader({
                 </button>
               </div>
             )}
-            <span className="flex items-center gap-2">
+            {/* Account button: click the avatar + pseudo to open a popover
+                holding the labelled "Sign out" action. Replaces the old bare
+                logout icon so the header reads cleaner. */}
+            <button
+              ref={userBtnRef}
+              type="button"
+              onClick={() => setUserMenuOpen((v) => !v)}
+              className="flex items-center gap-2 rounded-full pl-1 pr-2.5 py-1 hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              aria-haspopup="menu"
+              aria-expanded={userMenuOpen}
+              aria-label={currentUser?.name || currentUser?.email}
+            >
               <UserAvatar
                 name={currentUser?.name}
                 email={currentUser?.email}
@@ -450,15 +494,21 @@ export default function NotesHeader({
               <span className={`text-sm font-medium ${dark ? "text-gray-200" : "text-gray-700"}`}>
                 {currentUser?.name || currentUser?.email}
               </span>
-            </span>
-            <button
-              onClick={() => signOut?.()}
-              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 text-red-500 dark:text-red-400"
-              data-tooltip={t("signOut")}
-              aria-label={t("signOut")}
-            >
-              <LogOutIcon />
             </button>
+            <Popover anchorRef={userBtnRef} open={userMenuOpen} onClose={() => setUserMenuOpen(false)} showArrow>
+              <div
+                className={`min-w-[180px] border border-[var(--border-light)] rounded-lg shadow-lg ${dark ? "text-gray-100" : "bg-white text-gray-800"}`}
+                style={{ backgroundColor: dark ? "#222222" : undefined }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm rounded-lg ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
+                  onClick={() => { setUserMenuOpen(false); signOut?.(); }}
+                >
+                  <LogOutIcon />{t("signOut")}
+                </button>
+              </div>
+            </Popover>
           </div>
 
           {/* Mobile: bell + sync + (optional QR) + 3-dot menu. When the
@@ -467,6 +517,7 @@ export default function NotesHeader({
               and per-button padding ONLY in that case. Without the QR,
               the row keeps the original looser spacing. */}
           <div className={`${mobileOnly} flex items-center ${qrQuickEnabled ? "gap-0" : "gap-1"}`}>
+            {renderLockBtn(true)}
             {notificationBellMobile}
             <SyncStatusIcon dark={dark} syncStatus={syncStatus} onSyncNow={handleSyncNow} syncDropdownOpen={syncDropdownOpen} setSyncDropdownOpen={setSyncDropdownOpen} instanceLocked={instanceLocked} />
             {qrQuickEnabled && (

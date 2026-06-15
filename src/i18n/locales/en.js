@@ -963,6 +963,8 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   encryptionNewPassphraseLabel: "New passphrase",
   encryptionLockNowCta: "Lock instance now",
   encryptionLockNowExplain: "Drops the encryption key from the server's RAM. The next request will require an admin to unlock again.",
+  lockInstanceTooltip: "Lock the instance — clears the encryption key from the server's memory",
+  lockInstanceFailed: "Failed to lock the instance.",
   encryptionDisableNotSupportedV1: "Disabling at-rest encryption is not supported in this version. Re-create the instance from a fresh backup if you need to roll back.",
 
   encryptionDeactivateCta: "Disable at-rest encryption",
