@@ -362,24 +362,9 @@ export default function PasskeySettingsSection({
                   "allow unlock" button (long label) the old md:flex-nowrap +
                   md:shrink-0 forced a fixed-width block that crushed the info
                   column to ~0, so its badges overflowed on top of the buttons.
-                  Letting the buttons wrap keeps the info column from collapsing. */}
-              <div className="flex items-center gap-2 flex-wrap md:justify-end">
-                {/* Instance-unlock toggle (admins, PRF-capable, unlocked vault) */}
-                {isAdmin && encryptionEnabled && p.prfSupported && (
-                  <button
-                    type="button"
-                    onClick={() => handleToggleUnlock(p)}
-                    disabled={busyId === p.credentialId || !unlockToggleAllowed}
-                    title={!unlockToggleAllowed ? t("passkeyUnlockToggleDisabledHint") : undefined}
-                    className={`px-2.5 py-1 rounded text-xs font-medium border ${
-                      p.canUnlockInstance
-                        ? "border-amber-500 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30"
-                        : "border-[var(--border-light)] text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"
-                    } disabled:opacity-50`}
-                  >
-                    {p.canUnlockInstance ? t("passkeyDisableUnlock") : t("passkeyEnableUnlock")}
-                  </button>
-                )}
+                  Letting the buttons wrap keeps the info column from collapsing.
+                  Left-aligned; the long "(dis)allow unlock" button goes last. */}
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => handleTest(p)}
@@ -400,6 +385,22 @@ export default function PasskeySettingsSection({
                   disabled={busyId === p.credentialId}
                   className="px-2.5 py-1 rounded text-xs border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-50"
                 >{t("delete")}</button>
+                {/* Instance-unlock toggle (admins, PRF-capable, unlocked vault) — last */}
+                {isAdmin && encryptionEnabled && p.prfSupported && (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleUnlock(p)}
+                    disabled={busyId === p.credentialId || !unlockToggleAllowed}
+                    title={!unlockToggleAllowed ? t("passkeyUnlockToggleDisabledHint") : undefined}
+                    className={`px-2.5 py-1 rounded text-xs font-medium border ${
+                      p.canUnlockInstance
+                        ? "border-amber-500 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30"
+                        : "border-[var(--border-light)] text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"
+                    } disabled:opacity-50`}
+                  >
+                    {p.canUnlockInstance ? t("passkeyDisableUnlock") : t("passkeyEnableUnlock")}
+                  </button>
+                )}
               </div>
             </li>
           ))}
