@@ -216,6 +216,8 @@ export default function NoteModal({
   addImagesToState,
   setNoteIconFromFile,
   removeNoteIcon,
+  noteIcon,
+  onPickIcon,
   logoLibrary,
   addLogoToLibrary,
   deleteLogoFromLibrary,
@@ -964,6 +966,8 @@ export default function NoteModal({
             modalIconFileRef={modalIconFileRef}
             setNoteIconFromFile={setNoteIconFromFile}
             removeNoteIcon={removeNoteIcon}
+            noteIcon={noteIcon}
+            onPickIcon={onPickIcon}
             logoLibrary={logoLibrary}
             addLogoToLibrary={addLogoToLibrary}
             deleteLogoFromLibrary={deleteLogoFromLibrary}

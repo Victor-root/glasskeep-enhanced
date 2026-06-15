@@ -83,6 +83,31 @@ function runUpgradeMigrations(db, log) {
     log.warn?.(`[encrypt] tag encryption migration aborted: ${e.message}`);
   }
 
+  // Safety net: encrypt any per-user icon rows that are still plaintext
+  // (e.g. created while the instance was briefly unlocked-but-not-yet-
+  // re-encrypted). Mirrors the tag pass above.
+  try {
+    const plainIcons = db.prepare(
+      "SELECT note_id, user_id, icon_json FROM note_user_icons WHERE is_encrypted = 0 AND icon_json IS NOT NULL AND icon_json != ''"
+    ).all();
+    const updIcon = db.prepare(
+      "UPDATE note_user_icons SET icon_json = '', is_encrypted = 1, enc_payload = ? WHERE note_id = ? AND user_id = ?"
+    );
+    const iconTx = db.transaction(() => {
+      for (const r of plainIcons) {
+        const enc = noteCipher.encryptTagsJson(r.icon_json, {
+          noteId: r.note_id,
+          userId: r.user_id,
+        });
+        updIcon.run(enc, r.note_id, r.user_id);
+        touchedTags++;
+      }
+    });
+    iconTx();
+  } catch (e) {
+    log.warn?.(`[encrypt] icon encryption migration aborted: ${e.message}`);
+  }
+
   if (touchedNotes > 0 || touchedTags > 0) {
     log.info?.(`[encrypt] upgrade migration: notes=${touchedNotes} tags=${touchedTags}`);
     try {
@@ -417,6 +442,22 @@ function attachUnlockRoutes(app, deps) {
           });
           updTag.run(enc, r.note_id, r.user_id);
         }
+        // Encrypt per-user note icons in the same transaction (an icon can
+        // be a custom image — same at-rest protection as tags/content).
+        const iconRows = db.prepare(
+          "SELECT note_id, user_id, icon_json FROM note_user_icons WHERE is_encrypted = 0"
+        ).all();
+        const updIcon = db.prepare(
+          "UPDATE note_user_icons SET icon_json = '', is_encrypted = 1, enc_payload = ? WHERE note_id = ? AND user_id = ?"
+        );
+        for (const r of iconRows) {
+          if (!r.icon_json) continue;
+          const enc = noteCipher.encryptTagsJson(r.icon_json, {
+            noteId: r.note_id,
+            userId: r.user_id,
+          });
+          updIcon.run(enc, r.note_id, r.user_id);
+        }
         vault.markMigrated(db);
       });
       migrate();
@@ -560,6 +601,27 @@ function attachUnlockRoutes(app, deps) {
             }
           }
           updTag.run(plain, r.note_id, r.user_id);
+        }
+        // Per-user icons symmetrically: decrypt back into icon_json.
+        const encIconRows = db.prepare(
+          "SELECT note_id, user_id, enc_payload FROM note_user_icons WHERE is_encrypted = 1"
+        ).all();
+        const updIcon = db.prepare(
+          "UPDATE note_user_icons SET icon_json = ?, is_encrypted = 0, enc_payload = NULL WHERE note_id = ? AND user_id = ?"
+        );
+        for (const r of encIconRows) {
+          let plain = "";
+          if (r.enc_payload) {
+            try {
+              plain = noteCipher.decryptTagsPayload(r.enc_payload, {
+                noteId: r.note_id,
+                userId: r.user_id,
+              });
+            } catch (err) {
+              log.warn?.(`[encrypt] could not decrypt icon during deactivation note=${r.note_id} user=${r.user_id}: ${err.message}`);
+            }
+          }
+          updIcon.run(plain, r.note_id, r.user_id);
         }
         vault.disable(db);
       });

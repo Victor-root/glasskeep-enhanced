@@ -11,8 +11,6 @@ import { Popover as RichTextPopover } from "../richtext/Popover.jsx";
 import { DownloadIcon, ArchiveIcon, Trash, AddImageIcon, Kebab, TextNoteIcon, ChecklistIcon, LogoIcon } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { COLOR_ORDER, LIGHT_COLORS } from "../../utils/colors.js";
-import { getNoteIcon, setNoteIcon } from "../../utils/noteIcon.js";
-import { uid } from "../../utils/helpers.js";
 import { t } from "../../i18n";
 
 /**
@@ -56,6 +54,11 @@ export default function ModalFooter({
   modalIconFileRef,
   setNoteIconFromFile,
   removeNoteIcon,
+  // Per-user note icon: the current icon object (or null) + a setter that
+  // persists it through the dedicated per-user endpoint. The icon is NOT in
+  // mImages anymore (it's personal, never synced with the note body).
+  noteIcon = null,
+  onPickIcon,
   // logo library (persistent, per-user)
   logoLibrary = [],
   addLogoToLibrary,
@@ -152,11 +155,11 @@ export default function ModalFooter({
   const imageBtnRef = useRef(null);
   const [imageMenuOpen, setImageMenuOpen] = useState(false);
   const [logoPickerOpen, setLogoPickerOpen] = useState(false);
-  const currentNoteIcon = getNoteIcon(mImages);
+  const currentNoteIcon = noteIcon;
 
   const handlePickExistingLogo = (logo) => {
     if (!logo?.src) return;
-    setMImages((prev) => setNoteIcon(prev, { id: uid(), src: logo.src, name: logo.name }));
+    onPickIcon?.(logo);
   };
 
   /* Reminder picker popover — the bell lives in the kebab menu; the picker

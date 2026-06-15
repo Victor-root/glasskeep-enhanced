@@ -205,6 +205,23 @@ CREATE TABLE IF NOT EXISTS note_user_tags (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Per-user note icon (logo badge). The icon is PERSONAL to each user and
+-- never synced to collaborators, so it lives here rather than in the shared
+-- note's images_json. icon_json holds the JSON icon object ({id,src,name})
+-- or '' for none; when at-rest encryption is active it is stored encrypted
+-- (is_encrypted=1, enc_payload set, icon_json kept as '' as a placeholder),
+-- exactly like note_user_tags.
+CREATE TABLE IF NOT EXISTS note_user_icons (
+  note_id TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  icon_json TEXT NOT NULL DEFAULT '',
+  is_encrypted INTEGER NOT NULL DEFAULT 0,
+  enc_payload TEXT,
+  PRIMARY KEY (note_id, user_id),
+  FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS user_reorder_state (
   user_id INTEGER PRIMARY KEY,
   last_reorder_at TEXT NOT NULL,
@@ -741,6 +758,12 @@ function serializeNote(r, userId) {
       position = ov.position;
     }
   }
+  // Note icon (logo) is now PER-USER and never synced. Pull it from the
+  // per-user table, and defensively strip any legacy role:"icon" entry that
+  // may still sit in the shared images_json (those are being retired) so a
+  // collaborator never inherits someone else's icon.
+  let images = JSON.parse(r.images_json || "[]");
+  if (Array.isArray(images)) images = images.filter((im) => !(im && im.role === "icon"));
   return {
     id: r.id,
     user_id: r.user_id,
@@ -749,7 +772,8 @@ function serializeNote(r, userId) {
     content: r.content,
     items: JSON.parse(r.items_json || "[]"),
     tags: JSON.parse(tagsJson),
-    images: JSON.parse(r.images_json || "[]"),
+    images,
+    icon: userId ? getUserIcon(r.id, userId) : null,
     color: r.color,
     pinned,
     position,
@@ -1174,6 +1198,78 @@ function runUpsertUserTags(noteId, userId, tagsJson) {
     upsertUserTagsEncStmt.run(noteId, userId, enc);
   } else {
     upsertUserTagsPlainStmt.run(noteId, userId, tagsJson);
+  }
+}
+
+// ── Per-user note icon (logo) ────────────────────────────────────────
+// Mirrors the per-user tag helpers above: a personal, never-synced icon
+// stored per (noteId, userId), encrypted at rest with the same primitives
+// as tags (an icon can be a custom uploaded image, so it gets the same
+// at-rest protection note content has).
+const getUserIconRowStmt = db.prepare(
+  "SELECT icon_json, is_encrypted, enc_payload FROM note_user_icons WHERE note_id = ? AND user_id = ?"
+);
+const upsertUserIconPlainStmt = db.prepare(
+  `INSERT INTO note_user_icons (note_id, user_id, icon_json, is_encrypted, enc_payload)
+   VALUES (?, ?, ?, 0, NULL)
+   ON CONFLICT(note_id, user_id) DO UPDATE SET
+     icon_json = excluded.icon_json,
+     is_encrypted = 0,
+     enc_payload = NULL`
+);
+const upsertUserIconEncStmt = db.prepare(
+  `INSERT INTO note_user_icons (note_id, user_id, icon_json, is_encrypted, enc_payload)
+   VALUES (?, ?, '', 1, ?)
+   ON CONFLICT(note_id, user_id) DO UPDATE SET
+     icon_json = '',
+     is_encrypted = 1,
+     enc_payload = excluded.enc_payload`
+);
+const deleteUserIconStmt = db.prepare(
+  "DELETE FROM note_user_icons WHERE note_id = ? AND user_id = ?"
+);
+
+// Returns the user's icon object for a note, or null. Transparently
+// decrypts an encrypted row; returns null on missing row / decrypt failure.
+function getUserIcon(noteId, userId) {
+  if (!userId) return null;
+  const row = getUserIconRowStmt.get(noteId, userId);
+  if (!row) return null;
+  let raw;
+  if (!row.is_encrypted) {
+    raw = row.icon_json || "";
+  } else if (!row.enc_payload) {
+    return null;
+  } else {
+    try {
+      raw = noteCipher.decryptTagsPayload(row.enc_payload, { noteId, userId });
+    } catch (e) {
+      console.warn(`[encrypt] failed to decrypt icon for note=${noteId} user=${userId}: ${e.message}`);
+      return null;
+    }
+  }
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+// Set or clear the user's personal icon for a note. `icon` is the icon
+// object ({id,src,name}) or null/undefined to remove it.
+function runSetUserIcon(noteId, userId, icon) {
+  if (!icon) {
+    deleteUserIconStmt.run(noteId, userId);
+    return;
+  }
+  const iconJson = JSON.stringify(icon);
+  if (noteCipher.isActive()) {
+    const enc = noteCipher.encryptTagsJson(iconJson, { noteId, userId });
+    upsertUserIconEncStmt.run(noteId, userId, enc);
+  } else {
+    upsertUserIconPlainStmt.run(noteId, userId, iconJson);
   }
 }
 
@@ -2033,7 +2129,10 @@ app.get("/api/notes", auth, (req, res) => {
       content: r.content,
       items: JSON.parse(r.items_json || "[]"),
       tags: JSON.parse(getUserTags(r.id, req.user.id)),
-      images: JSON.parse(r.images_json || "[]"),
+      // Per-user icon (logo), and strip any legacy role:"icon" from the
+      // shared images so it's never inherited across collaborators.
+      images: (JSON.parse(r.images_json || "[]") || []).filter((im) => !(im && im.role === "icon")),
+      icon: getUserIcon(r.id, req.user.id),
       color: r.color,
       pinned: !!r.eff_pinned,
       position: r.eff_position,
@@ -2285,6 +2384,31 @@ app.patch("/api/notes/:id", auth, (req, res) => {
 // Modern client uses POST /api/notes/:id/trash with LWW protection instead.
 app.delete("/api/notes/:id", auth, (req, res) => {
   return res.status(410).json({ error: "Deprecated: use POST /api/notes/:id/trash with client_updated_at" });
+});
+
+// ---------- Per-user note icon (logo) ----------
+// The icon is personal to each participant and never shared, so it has its
+// own endpoints (rather than riding the synced note body). Any participant
+// (owner or collaborator) may set/clear THEIR OWN icon for a note.
+app.put("/api/notes/:id/icon", auth, (req, res) => {
+  const noteId = req.params.id;
+  const note = getNoteWithCollaboration.get(req.user.id, noteId, req.user.id);
+  if (!note) return res.status(404).json({ error: "Note not found" });
+  const icon = req.body?.icon;
+  if (icon != null && (typeof icon !== "object" || typeof icon.src !== "string" || !icon.src)) {
+    return res.status(400).json({ error: "Invalid icon" });
+  }
+  runSetUserIcon(noteId, req.user.id, icon || null);
+  // No broadcast: this is a private, per-user marker — nobody else sees it.
+  res.json({ ok: true, icon: getUserIcon(noteId, req.user.id) });
+});
+
+app.delete("/api/notes/:id/icon", auth, (req, res) => {
+  const noteId = req.params.id;
+  const note = getNoteWithCollaboration.get(req.user.id, noteId, req.user.id);
+  if (!note) return res.status(404).json({ error: "Note not found" });
+  runSetUserIcon(noteId, req.user.id, null);
+  res.json({ ok: true });
 });
 
 // Reorder within sections (LWW-protected)
@@ -3569,7 +3693,8 @@ app.get("/api/notes/export", auth, (req, res) => {
       content: r.content,
       items: JSON.parse(r.items_json || "[]"),
       tags: JSON.parse(getUserTags(r.id, req.user.id)),
-      images: JSON.parse(r.images_json || "[]"),
+      images: (JSON.parse(r.images_json || "[]") || []).filter((im) => !(im && im.role === "icon")),
+      icon: getUserIcon(r.id, req.user.id),
       color: r.color,
       pinned: !!r.pinned,
       position: r.position,
@@ -3592,7 +3717,8 @@ app.get("/api/notes/:id", auth, (req, res) => {
     content: r.content,
     items: JSON.parse(r.items_json || "[]"),
     tags: JSON.parse(getUserTags(r.id, req.user.id)),
-    images: JSON.parse(r.images_json || "[]"),
+    images: (JSON.parse(r.images_json || "[]") || []).filter((im) => !(im && im.role === "icon")),
+    icon: getUserIcon(r.id, req.user.id),
     color: r.color,
     pinned: ov ? !!ov.pinned : !!r.pinned,
     position: ov ? ov.position : r.position,

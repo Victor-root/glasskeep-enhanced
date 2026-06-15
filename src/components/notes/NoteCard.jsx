@@ -8,7 +8,7 @@ import ChecklistRow from "../common/ChecklistRow.jsx";
 import DrawingPreview from "../common/DrawingPreview.jsx";
 import useNoteTouchDrag from "../../hooks/useNoteTouchDrag.js";
 import { getSections, isItem, countItems, countChecked, DEFAULT_SECTION_ID } from "../../utils/checklist.js";
-import { getNoteIcon, getContentImages } from "../../utils/noteIcon.js";
+import { getContentImages } from "../../utils/noteIcon.js";
 import NoteCardFooter from "./NoteCardFooter.jsx";
 import { SECTION_COLORS, hexAlpha } from "../checklist/SectionHeader.jsx";
 import { parseAudioContent, formatDuration } from "../../utils/audioNote.js";
@@ -131,7 +131,8 @@ function NoteCard({
   // Content images = everything in n.images except the optional note icon
   // (which is rendered separately in the footer). See utils/noteIcon.js.
   const imgs = useMemo(() => getContentImages(n.images), [n.images]);
-  const noteIcon = useMemo(() => getNoteIcon(n.images), [n.images]);
+  // The note icon is per-user (server-provided n.icon), not part of images.
+  const noteIcon = n.icon || null;
 
   const allTags = Array.isArray(n.tags) ? n.tags : [];
 

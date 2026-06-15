@@ -4,7 +4,7 @@ import { bgFor, solid, parseRGBA } from "../../utils/colors.js";
 import { isRichContent, contentToHTML } from "../../utils/richText.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { getSections, isItem, DEFAULT_SECTION_ID } from "../../utils/checklist.js";
-import { getContentImages, getNoteIcon } from "../../utils/noteIcon.js";
+import { getContentImages } from "../../utils/noteIcon.js";
 import { parseAudioContent, formatDuration } from "../../utils/audioNote.js";
 import { Mic } from "lucide-react";
 import DrawingPreview from "../common/DrawingPreview.jsx";
@@ -54,7 +54,7 @@ export default function TvNoteDetail({ note /* , onClose */ }) {
 
   const bodyHtml = useMemo(() => (note ? buildBodyHtml(note) : ""), [note]);
   const imgs = useMemo(() => (note ? getContentImages(note.images) : []), [note]);
-  const icon = useMemo(() => (note ? getNoteIcon(note.images) : null), [note]);
+  const icon = note?.icon || null;
   const audioClips = useMemo(() => {
     if (!note || note.type !== "audio") return [];
     try { return parseAudioContent(note.content).clips; } catch { return []; }
