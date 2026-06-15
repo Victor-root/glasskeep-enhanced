@@ -963,7 +963,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   encryptionNewPassphraseLabel: "Nouvelle passphrase",
   encryptionLockNowCta: "Verrouiller l'instance maintenant",
   encryptionLockNowExplain: "Efface la clé de chiffrement de la mémoire du serveur. La prochaine requête nécessitera un nouveau déverrouillage.",
-  lockInstanceTooltip: "Verrouiller l'instance — efface la clé de chiffrement de la mémoire du serveur",
+  lockInstanceTooltip: "Verrouiller l'instance",
   lockInstanceFailed: "Échec du verrouillage de l'instance.",
   encryptionDisableNotSupportedV1: "La désactivation du chiffrement au repos n'est pas supportée dans cette version. Re-créez l'instance depuis une sauvegarde en clair si vous devez revenir en arrière.",
 
