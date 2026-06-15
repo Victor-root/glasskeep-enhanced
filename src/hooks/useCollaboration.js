@@ -226,6 +226,26 @@ export default function useCollaboration(token, {
     }
   }, [collaboratorInputRef]);
 
+  // Turn a collaborate failure into a human message. A "locked" error from
+  // the federation path means the TARGET peer's instance is at-rest-locked
+  // and can't accept the share yet. Prefer the friendly display name + the
+  // admin-assigned server label (passed from the picker); fall back to
+  // parsing the raw "ref@host" only when those aren't available.
+  const describeAddError = (e, ctx) => {
+    if (e?.message === "locked") {
+      const username = typeof ctx === "string" ? ctx : ctx?.username || "";
+      const atIdx = String(username).lastIndexOf("@");
+      const rawName = atIdx > 0 ? username.slice(0, atIdx) : username;
+      const rawServer = atIdx > 0 ? username.slice(atIdx + 1) : username;
+      const name = (typeof ctx === "object" && ctx?.name) || rawName;
+      const server = (typeof ctx === "object" && ctx?.serverLabel) || rawServer;
+      return t("collabPeerLocked")
+        .replace("{server}", server)
+        .replace("{name}", name);
+    }
+    return localizeServerError(e.message, "failedAddCollaborator");
+  };
+
   const addCollaborator = async (username, access = "write") => {
     try {
       if (!activeId) return;
@@ -279,7 +299,7 @@ export default function useCollaboration(token, {
         loadNoteCollaborators(activeId);
       }
     } catch (e) {
-      showToast(localizeServerError(e.message, "failedAddCollaborator"), "error");
+      showToast(describeAddError(e, username), "error");
     }
   };
 
@@ -324,7 +344,7 @@ export default function useCollaboration(token, {
       } catch (e) {
         // 409 = already a collaborator (raced) → skip quietly; surface others.
         if (e.status !== 409) {
-          showToast(localizeServerError(e.message, "failedAddCollaborator"), "error");
+          showToast(describeAddError(e, it), "error");
         }
       }
     }

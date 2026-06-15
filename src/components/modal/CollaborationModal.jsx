@@ -180,6 +180,11 @@ export default function CollaborationModal({
         selectedUsers.map((u) => ({
           username: u.username,
           access: selected.get(u.key) || newAccess,
+          // Carry the friendly display name + server label so any error
+          // (e.g. the peer being locked) can name them as shown in the list,
+          // not the raw ref/host parsed from `username`.
+          name: u.name,
+          serverLabel: u.serverLabel || null,
         })),
       );
       setSelected(new Map());
