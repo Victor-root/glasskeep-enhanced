@@ -215,9 +215,26 @@ export default function CollaborationModal({
           style={{ backgroundColor: dark ? "#282828" : "#ffffff" }}
           onClick={(e) => e.stopPropagation()}
         >
-          <h3 className="text-lg font-semibold mb-4 shrink-0">
-            {isOwner ? t("addCollaborator") : t("collaborators")}
-          </h3>
+          {/* Header — title + a mobile-only close ✕. On phones the modal is
+              full-screen (no visible backdrop to tap), so it needs an explicit
+              way out; from sm: up it's a centred card with a clickable backdrop
+              and the Cancel/Close button, so the ✕ is hidden there — desktop
+              is left exactly as it was. */}
+          <div className="flex items-center justify-between gap-3 mb-4 shrink-0">
+            <h3 className="text-lg font-semibold min-w-0 truncate">
+              {isOwner ? t("addCollaborator") : t("collaborators")}
+            </h3>
+            <button
+              type="button"
+              onClick={handleClose}
+              aria-label={t("close")}
+              className="sm:hidden shrink-0 -mr-1.5 p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none"
+            >
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
 
           {/* Scrollable body — the modal frame (title) and footer (access +
               actions) stay put; only this region (the lists) scrolls.
