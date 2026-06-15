@@ -66,6 +66,8 @@ function NotesUI({
   gkeepFileRef,
   mdFileRef,
   signOut,
+  onLockInstance,
+  encryptionEnabled = false,
   filteredEmptyWithSearch,
   allEmpty,
   headerMenuOpen,
@@ -270,6 +272,8 @@ function NotesUI({
         hasUpdate={hasUpdate}
         currentUser={currentUser}
         signOut={signOut}
+        onLockInstance={onLockInstance}
+        encryptionEnabled={encryptionEnabled}
         headerMenuOpen={headerMenuOpen}
         setHeaderMenuOpen={setHeaderMenuOpen}
         headerMenuRef={headerMenuRef}

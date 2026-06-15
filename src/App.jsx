@@ -4221,6 +4221,20 @@ export default function App() {
   const signOut = () => {
     cleanupClientSession(true); // explicit sign-out → purge queue
   };
+
+  // Admin-only quick lock for the header: drop the at-rest-encryption DEK from
+  // the server's RAM so the instance returns to its locked state immediately.
+  // Same action as the Admin Panel's "Lock now"; the next non-allowlisted
+  // request would 423 anyway, but firing `instance-locked` now drops every
+  // tab to the unlock screen instantly. Only surfaced when encryption is on.
+  const lockInstanceNow = useCallback(async () => {
+    try {
+      await api("/instance/lock", { method: "POST", token });
+      window.dispatchEvent(new CustomEvent("instance-locked"));
+    } catch (e) {
+      showToast(localizeServerError(e?.message, "lockInstanceFailed"), "error");
+    }
+  }, [token, showToast]);
   const completeLogin = (res) => {
     const sessionId = crypto.randomUUID?.() ??
       'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -7228,6 +7242,8 @@ export default function App() {
         instanceLocked={isLocked}
         toggleDark={toggleDark}
         signOut={signOut}
+        onLockInstance={lockInstanceNow}
+        encryptionEnabled={!!instanceLockStatus?.enabled}
         notes={notes}
         search={search}
         setSearch={setSearch}

@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal, flushSync } from "react-dom";
 import { t } from "../../i18n";
-import { Hamburger, SearchIcon, CloseIcon, GridIcon, ListIcon, SunIcon, MoonIcon, CheckSquareIcon, SettingsIcon, ShieldIcon, LogOutIcon, Kebab } from "../../icons/index.jsx";
+import { Hamburger, SearchIcon, CloseIcon, GridIcon, ListIcon, SunIcon, MoonIcon, CheckSquareIcon, SettingsIcon, ShieldIcon, LogOutIcon, LockIcon, Kebab } from "../../icons/index.jsx";
 import TI from "../../icons/editor/index.jsx";
 import SyncStatusIcon from "../../sync/SyncStatusIcon.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
@@ -34,6 +34,10 @@ export default function NotesHeader({
   hasUpdate = false,
   currentUser,
   signOut,
+  // Header instance-lock (admin + at-rest encryption only). onLockInstance
+  // re-locks the server; encryptionEnabled gates the whole affordance.
+  onLockInstance,
+  encryptionEnabled = false,
   headerMenuOpen,
   setHeaderMenuOpen,
   headerMenuRef,
@@ -62,6 +66,53 @@ export default function NotesHeader({
 }) {
   const { branding } = useBranding();
   const appName = branding.appName || DEFAULT_APP_NAME;
+
+  // Desktop sign-out, two-step in place: the first click "arms" the account
+  // button — the avatar crossfades into a red logout glyph (and the pseudo
+  // turns red) — and the second click signs out. It disarms on an outside
+  // click or after a few idle seconds so it never gets stuck. This keeps the
+  // header clean (no bare logout icon) while making room for the lock button.
+  // Mobile keeps sign-out in the kebab menu.
+  const [signOutArmed, setSignOutArmed] = React.useState(false);
+  const userBtnRef = React.useRef(null);
+  const signOutDisarmTimerRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!signOutArmed) return undefined;
+    // Auto-disarm after a short idle window.
+    signOutDisarmTimerRef.current = setTimeout(() => setSignOutArmed(false), 3500);
+    // Disarm on any pointer-down outside the account button.
+    const onDown = (e) => {
+      if (userBtnRef.current?.contains(e.target)) return;
+      setSignOutArmed(false);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => {
+      clearTimeout(signOutDisarmTimerRef.current);
+      document.removeEventListener("pointerdown", onDown, true);
+    };
+  }, [signOutArmed]);
+
+  // Header instance-lock: shown only for admins on an encryption-enabled
+  // server. POST /api/instance/lock is admin-only, so a non-admin tap would
+  // just 403 — gate the affordance on both conditions. On desktop it's an
+  // icon button beside the bell; on mobile it lives in the kebab menu (an
+  // extra header icon overflowed narrow phones and pushed the kebab off-screen).
+  const showLockBtn = !!encryptionEnabled && !!currentUser?.is_admin;
+  const renderLockBtn = () => {
+    if (!showLockBtn) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => onLockInstance?.()}
+        className="p-2 rounded-full cursor-pointer gk-header-icon-btn focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-red-400 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+        data-tooltip={t("lockInstanceTooltip")}
+        aria-label={t("lockInstanceTooltip")}
+      >
+        <LockIcon />
+      </button>
+    );
+  };
 
   // The kebab dropdown can't rely on the typical "fixed inset-0
   // backdrop captures the click" pattern: the host <header> has a
@@ -380,6 +431,7 @@ export default function NotesHeader({
         <div className="relative flex items-center gap-3 shrink-0">
           {/* Desktop: icon buttons directly in header bar */}
           <div className={`${desktopOnly} items-center gap-1`}>
+            {renderLockBtn()}
             {notificationBellDesktop}
             <button
               onClick={() => onToggleViewMode?.()}
@@ -438,26 +490,65 @@ export default function NotesHeader({
                 </button>
               </div>
             )}
-            <span className="flex items-center gap-2">
-              <UserAvatar
-                name={currentUser?.name}
-                email={currentUser?.email}
-                avatarUrl={currentUser?.avatar_url}
-                size="w-7 h-7"
-                textSize="text-xs"
-                dark={dark}
-              />
-              <span className={`text-sm font-medium ${dark ? "text-gray-200" : "text-gray-700"}`}>
+            {/* Account button with two-step in-place sign-out. First click
+                arms it: the avatar crossfades into a red logout glyph and the
+                pseudo turns red. Second click signs out. Disarms on outside
+                click / idle timeout (handled in the effect above). */}
+            <button
+              ref={userBtnRef}
+              type="button"
+              onClick={() => {
+                if (signOutArmed) { signOut?.(); return; }
+                setSignOutArmed(true);
+              }}
+              className={`flex items-center gap-2 rounded-full pl-1 pr-2.5 py-1 transition-colors duration-200 focus:outline-none focus:ring-2 ${
+                signOutArmed
+                  ? "bg-red-500/10 hover:bg-red-500/[0.15] focus:ring-red-400"
+                  : "hover:bg-black/5 dark:hover:bg-white/10 focus:ring-indigo-500"
+              }`}
+              aria-label={signOutArmed ? t("signOut") : (currentUser?.name || currentUser?.email)}
+              data-tooltip={signOutArmed ? t("signOut") : undefined}
+            >
+              {/* Fixed-size slot: avatar and logout glyph are layered and
+                  crossfade + scale between the two states for a smooth swap. */}
+              <span className="relative w-7 h-7 shrink-0">
+                <span
+                  className="absolute inset-0 transition-all duration-300 ease-out"
+                  style={{
+                    opacity: signOutArmed ? 0 : 1,
+                    transform: signOutArmed ? "scale(0.8)" : "scale(1)",
+                  }}
+                  aria-hidden={signOutArmed}
+                >
+                  <UserAvatar
+                    name={currentUser?.name}
+                    email={currentUser?.email}
+                    avatarUrl={currentUser?.avatar_url}
+                    size="w-7 h-7"
+                    textSize="text-xs"
+                    dark={dark}
+                  />
+                </span>
+                <span
+                  className="absolute inset-0 flex items-center justify-center text-red-500 dark:text-red-400 transition-all duration-300 ease-out pointer-events-none"
+                  style={{
+                    opacity: signOutArmed ? 1 : 0,
+                    transform: signOutArmed ? "scale(1)" : "scale(0.8)",
+                  }}
+                  aria-hidden={!signOutArmed}
+                >
+                  <LogOutIcon />
+                </span>
+              </span>
+              <span
+                className={`text-sm font-medium transition-colors duration-200 ${
+                  signOutArmed
+                    ? "text-red-500 dark:text-red-400"
+                    : (dark ? "text-gray-200" : "text-gray-700")
+                }`}
+              >
                 {currentUser?.name || currentUser?.email}
               </span>
-            </span>
-            <button
-              onClick={() => signOut?.()}
-              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 text-red-500 dark:text-red-400"
-              data-tooltip={t("signOut")}
-              aria-label={t("signOut")}
-            >
-              <LogOutIcon />
             </button>
           </div>
 
@@ -612,6 +703,16 @@ export default function NotesHeader({
                       </span>
                       <span>{t("adminPanel")}</span>
                     </button>
+                  )}
+                  {showLockBtn && (
+                    <button
+                      className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        onLockInstance?.();
+                      }}
+                    >
+                      <span className={dark ? "text-red-400" : "text-red-600"}><LockIcon /></span>{t("lockInstanceTooltip")}</button>
                   )}
                   <button
                     className={`flex items-center gap-3 sm:gap-2 w-full text-left px-4 sm:px-3 py-3.5 sm:py-2 text-base sm:text-sm whitespace-nowrap ${dark ? "text-red-400 hover:bg-white/10" : "text-red-600 hover:bg-gray-100"}`}
