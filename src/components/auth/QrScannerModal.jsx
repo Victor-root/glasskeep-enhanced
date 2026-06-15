@@ -402,7 +402,7 @@ function Row({ label, value, mono }) {
         {label}
       </span>
       <span className={`text-sm truncate text-gray-800 dark:text-gray-100 ${mono ? "font-mono" : ""}`}>
-        {value || "—"}
+        {value || "-"}
       </span>
     </div>
   );

@@ -213,7 +213,7 @@ export default function FederationLinkCard({
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
           <Stat icon={TI.Tag} label={t("fedPeerVersion")}>
             <span className="font-semibold">
-              {link.peerAppVersion ? `v${link.peerAppVersion}` : "—"}
+              {link.peerAppVersion ? `v${link.peerAppVersion}` : "-"}
             </span>
             {Number.isInteger(link.peerProtocol) && (
               <span className="text-gray-400 dark:text-gray-500">
