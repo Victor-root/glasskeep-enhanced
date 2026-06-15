@@ -245,9 +245,13 @@ export default function CollaborationModal({
                     return (
                       <div
                         key={collab.id}
-                        className="flex items-center justify-between gap-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"
+                        // Wrapping row so the action controls drop to their own
+                        // line on narrow (mobile) widths instead of crushing the
+                        // identity block — which flattened the avatar and made
+                        // the server badge overlap the buttons.
+                        className="flex flex-wrap items-center gap-x-2 gap-y-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0 grow basis-[12rem]">
                           <UserAvatar
                             name={collab.name}
                             email={collab.email}
@@ -255,10 +259,11 @@ export default function CollaborationModal({
                             size="w-8 h-8"
                             textSize="text-xs"
                             dark={dark}
+                            className="shrink-0"
                           />
                           <div className="min-w-0">
-                            <p className="font-medium text-sm flex items-center gap-2 flex-wrap">
-                              <span className="truncate">{collab.name || collab.email}</span>
+                            <p className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
+                              <span className="truncate max-w-full">{collab.name || collab.email}</span>
                               {collab.federated && <ServerBadge label={collab.serverLabel} />}
                               {isSelf && (
                                 <span className="inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)] border border-[var(--gk-accent-soft-border)]">
@@ -278,7 +283,7 @@ export default function CollaborationModal({
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                           {showAccess && (
                             <AccessToggle
                               canWrite={collab.canWrite}
