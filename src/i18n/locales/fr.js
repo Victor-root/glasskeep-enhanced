@@ -87,6 +87,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   restore: "Restaurer",
   remove: "Retirer",
   owner: "Propriétaire",
+  youLabel: "Moi",
   leaveCollaboration: "Quitter",
   removeYourself: "Se retirer",
   removeCollaborator: "Retirer le collaborateur",
