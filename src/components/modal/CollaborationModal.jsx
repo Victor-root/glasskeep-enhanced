@@ -229,10 +229,15 @@ export default function CollaborationModal({
               </p>
               <div className="space-y-2">
                 {addModalCollaborators
-                  .filter((c) => c.id !== currentUser?.id)
+                  // The owner doesn't need to see their own row when managing;
+                  // but a collaborator viewing the list SHOULD see themselves
+                  // (with a "Moi" badge) so it's clear they're on the note.
+                  .filter((c) => (isOwner ? c.id !== currentUser?.id : true))
                   .map((collab) => {
-                    const canRemove =
-                      !collab.isOwner && (isOwner || collab.id === currentUser?.id);
+                    const isSelf = collab.id === currentUser?.id;
+                    // Owner removes collaborators; a non-owner can't remove
+                    // anyone (their own row is display-only).
+                    const canRemove = isOwner && !collab.isOwner;
                     const showAccess =
                       isOwner && !collab.isOwner &&
                       typeof onSetCollaboratorAccess === "function";
@@ -255,6 +260,11 @@ export default function CollaborationModal({
                             <p className="font-medium text-sm flex items-center gap-2 flex-wrap">
                               <span className="truncate">{collab.name || collab.email}</span>
                               {collab.federated && <ServerBadge label={collab.serverLabel} />}
+                              {isSelf && (
+                                <span className="inline-flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)] border border-[var(--gk-accent-soft-border)]">
+                                  {t("youLabel")}
+                                </span>
+                              )}
                               {collab.isOwner && (
                                 <span className="text-xs text-indigo-500 dark:text-indigo-400 font-normal">
                                   {t("owner")}
