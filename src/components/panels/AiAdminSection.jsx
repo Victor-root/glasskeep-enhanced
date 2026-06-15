@@ -209,7 +209,7 @@ export default function AiAdminSection({ token, showToast }) {
       setTestResult({
         ok: true,
         message: data?.reply
-          ? `${t("aiTestOk")} — ${data.reply}`
+          ? `${t("aiTestOk")} : ${data.reply}`
           : t("aiTestOk"),
       });
     } catch (err) {
@@ -223,7 +223,7 @@ export default function AiAdminSection({ token, showToast }) {
         null;
       setTestResult({
         ok: false,
-        message: detail && !localized.includes(detail) ? `${localized} — ${detail}` : localized,
+        message: detail && !localized.includes(detail) ? `${localized} : ${detail}` : localized,
       });
     } finally {
       setTesting(false);

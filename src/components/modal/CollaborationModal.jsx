@@ -220,8 +220,12 @@ export default function CollaborationModal({
           </h3>
 
           {/* Scrollable body — the modal frame (title) and footer (access +
-              actions) stay put; only this region (the lists) scrolls. */}
-          <div className="flex-1 min-h-0 overflow-y-auto">
+              actions) stay put; only this region (the lists) scrolls.
+              -mx-1.5/px-1.5: overflow-y:auto also clips on the X axis, which
+              cut off the search input's focus ring on the left/right edges.
+              The negative-margin+padding keeps content aligned while giving
+              the ring room to render inside the scroll box. */}
+          <div className="flex-1 min-h-0 overflow-y-auto -mx-1.5 px-1.5">
 
           {/* ── Current collaborators (with per-row access + remove) ── */}
           {addModalCollaborators.length > 0 && (

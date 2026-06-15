@@ -202,7 +202,7 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
       setTestResult({
         ok: true,
         message: data?.reply
-          ? `${t("aiTestOk")} — ${data.reply}`
+          ? `${t("aiTestOk")} : ${data.reply}`
           : t("aiTestOk"),
       });
     } catch (err) {
@@ -216,7 +216,7 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
         null;
       setTestResult({
         ok: false,
-        message: detail && !localized.includes(detail) ? `${localized} — ${detail}` : localized,
+        message: detail && !localized.includes(detail) ? `${localized} : ${detail}` : localized,
       });
     } finally {
       setTesting(false);

@@ -79,7 +79,7 @@ const HIGH_RAM_THRESHOLD = 90; // % — flips the bar to red + warning
 const ELEVATED_RAM_THRESHOLD = 75; // % — flips the bar to amber
 
 function formatBytes(bytes) {
-    if (!Number.isFinite(bytes) || bytes < 0) return "—";
+    if (!Number.isFinite(bytes) || bytes < 0) return "-";
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
     if (bytes < 1024 * 1024 * 1024)
         return `${Math.round(bytes / (1024 * 1024))} MB`;
