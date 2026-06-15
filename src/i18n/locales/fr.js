@@ -519,7 +519,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   failedRemoveCollaborator: "Échec de la suppression du collaborateur",
   addedCollaboratorSuccessfully: "{username} a bien été ajouté comme collaborateur !",
   failedAddCollaborator: "Échec de l’ajout du collaborateur",
-  collabPeerLocked: "L’instance du serveur {server} est verrouillée (chiffrement non déverrouillé) — impossible de partager avec {name} pour l’instant.",
+  collabPeerLocked: "L’instance du serveur {server} est verrouillée (chiffrement non déverrouillé). Impossible de partager avec {name} pour l’instant.",
   cannotDeleteNotOwner: "Vous ne pouvez pas supprimer cette note car elle ne vous appartient pas",
   deleteFailed: "Échec de la suppression",
   failedLoadAdminData: "Échec du chargement des données d’administration",
