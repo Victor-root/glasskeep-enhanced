@@ -78,6 +78,16 @@ export default defineConfig({
       // devOptions: { enabled: true } // ← uncomment to test SW in dev (remember to disable later)
     })
   ],
+  build: {
+    // We deliberately ship a single app bundle (~2 MB) rather than
+    // code-splitting: the PWA service worker precaches the whole shell so the
+    // app loads instantly and works fully offline (see the workbox config
+    // above). At ~4 updates/month the "re-download everything on update" cost
+    // is negligible, so the single-bundle trade-off is the one we want. Raise
+    // Vite's 500 kB advisory ceiling past our actual chunk size so the (purely
+    // cosmetic) "chunks larger than 500 kB" warning stops firing on every build.
+    chunkSizeWarningLimit: 2500,
+  },
   define: {
     __APP_VERSION__: JSON.stringify(version),
   },
