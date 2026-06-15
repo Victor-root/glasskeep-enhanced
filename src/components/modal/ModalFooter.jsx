@@ -836,7 +836,7 @@ export default function ModalFooter({
             visible; the offline-peer read-only case keeps its own banner. ── */}
         {readOnlyBadge && (
           <div
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5 border border-[var(--border-light)] cursor-default select-none"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[var(--gk-chrome-accent)] bg-[var(--gk-accent-soft-bg)] border border-[var(--gk-accent-soft-border)] cursor-default select-none"
             data-tooltip={!isDesktop ? t("accessReadOnly") : undefined}
             aria-label={t("accessReadOnly")}
           >
