@@ -315,14 +315,14 @@ export default function PasskeySettingsSection({
           {t("passkeyNoneYet")}
         </p>
       ) : (
-        <div
-          className={`grid transition-[grid-template-rows] duration-300 ease-out ${
-            listOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-          }`}
-          aria-hidden={!listOpen}
-          inert={!listOpen}
-        >
-        <div className="overflow-hidden">
+        // Render the list only when expanded. We deliberately DON'T use the
+        // grid-rows-[0fr/1fr] expand trick here: this section already sits
+        // inside SettingsAccordion's own grid-rows-[1fr] animation, and two
+        // nested `grid-template-rows: 1fr` containers can't both resolve to
+        // content height — the inner one collapses and its rows paint on top
+        // of each other (the overlap bug). A plain conditional render is
+        // immune to that.
+        <div hidden={!listOpen} aria-hidden={!listOpen} inert={!listOpen}>
         <ul className="space-y-2 pt-1">
           {list.map((p) => (
             <li
@@ -398,7 +398,6 @@ export default function PasskeySettingsSection({
             </li>
           ))}
         </ul>
-        </div>
         </div>
       )}
 
