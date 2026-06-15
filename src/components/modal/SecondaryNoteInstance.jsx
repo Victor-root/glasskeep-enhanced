@@ -11,7 +11,7 @@ import {
   legacyMarkdownToRichDoc,
 } from "../../utils/richText.js";
 import { textToChecklistItems, checklistItemsToText } from "../../utils/noteConversion.js";
-import { setNoteIcon } from "../../utils/noteIcon.js";
+import { api } from "../../utils/api.js";
 import { mdForDownload } from "../../utils/markdown.jsx";
 import { askNoteAIStream } from "../../ai.js";
 import { localizeServerError } from "../../utils/serverErrors.js";
@@ -1031,20 +1031,36 @@ export default function SecondaryNoteInstance({
     if (results.length) setter((prev) => [...prev, ...results]);
   };
 
-  // ─── Note icon ─────────────────────────────────────────────────────────
+  // ─── Note icon (PER-USER, never synced) ────────────────────────────────
+  // Persisted via the dedicated per-user endpoint and stored on note.icon,
+  // not in the shared images_json — mirrors App.jsx's applyNoteIcon.
+  const applyNoteIcon = useCallback(async (icon) => {
+    if (!activeId) return;
+    const nid = String(activeId);
+    setNotes((prev) => prev.map((n) => (String(n.id) === nid ? { ...n, icon: icon || null } : n)));
+    try {
+      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
+      if (existing) await idbPutNote({ ...existing, icon: icon || null }, currentUser?.id, sessionId);
+    } catch { /* IDB best-effort */ }
+    try {
+      if (icon) await api(`/notes/${nid}/icon`, { method: "PUT", token, body: { icon } });
+      else await api(`/notes/${nid}/icon`, { method: "DELETE", token });
+    } catch (e) { console.error("[SBS] icon save failed", e); }
+  }, [activeId, setNotes, currentUser, sessionId, token]);
+
   const setNoteIconFromFile = useCallback(async (file) => {
     if (!file) return;
     try {
       const src = await fileToCompressedDataURL(file);
-      const iconEntry = { id: uid(), src, name: file.name };
-      setMImages((prev) => setNoteIcon(prev, iconEntry));
+      await applyNoteIcon({ id: uid(), src, name: file.name });
       addLogoToLibrary?.({ src, name: file.name });
     } catch (e) { console.error("[SBS] icon load failed", e); }
-  }, [setMImages, addLogoToLibrary]);
+  }, [applyNoteIcon, addLogoToLibrary]);
 
-  const removeNoteIconCb = useCallback(() => {
-    setMImages((prev) => setNoteIcon(prev, null));
-  }, [setMImages]);
+  const removeNoteIconCb = useCallback(() => { applyNoteIcon(null); }, [applyNoteIcon]);
+  const pickNoteIconCb = useCallback((logo) => {
+    if (logo?.src) applyNoteIcon({ id: uid(), src: logo.src, name: logo.name });
+  }, [applyNoteIcon]);
 
   // ─── Convert note type ─────────────────────────────────────────────────
   const performConvertNoteType = async () => {
@@ -1267,6 +1283,8 @@ export default function SecondaryNoteInstance({
       addImagesToState={addImagesToState}
       setNoteIconFromFile={setNoteIconFromFile}
       removeNoteIcon={removeNoteIconCb}
+      noteIcon={activeNoteObj?.icon || null}
+      onPickIcon={pickNoteIconCb}
       logoLibrary={logoLibrary}
       addLogoToLibrary={addLogoToLibrary}
       deleteLogoFromLibrary={deleteLogoFromLibrary}

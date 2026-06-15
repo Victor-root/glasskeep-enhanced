@@ -42,7 +42,6 @@ import {
 import { globalCSS } from "./styles/globalCSS.js";
 import { ALL_IMAGES, REMINDERS } from "./utils/constants.js";
 import { hasAndroidReminders, syncAndroidReminders, setAndroidReminderAuth, notifyAndroidNow } from "./utils/androidReminders.js";
-import { setNoteIcon } from "./utils/noteIcon.js";
 import { fetchLogoLibrary, createLogo, deleteLogo as apiDeleteLogo } from "./utils/logoLibrary.js";
 import { ColorDot } from "./components/common/ColorDot.jsx";
 import { handleSmartEnter } from "./components/common/FormatToolbar.jsx";
@@ -1784,48 +1783,13 @@ export default function App() {
     }
   };
 
-  // Apply a note-icon (logo) to every selected note. Each note gets its
-  // own fresh image entry (own uid) so they aren't aliasing the same row
-  // — same as the modal's setNoteIconFromFile path.
+  // Apply a note-icon (logo) to every selected note. The icon is per-user
+  // (never synced), so each note's icon is saved through the dedicated
+  // per-user endpoint via applyNoteIcon — not written into images_json.
   const onBulkSetIcon = async (logo) => {
     if (!selectedIds.length || !logo?.src) return;
-    const nowIso = new Date().toISOString();
-    const idsSet = new Set(selectedIds.map(String));
-
-    // Compute new images per note synchronously inside the updater so we
-    // can reuse the result for IDB / queue without racing React state.
-    const newImagesByNoteId = {};
-    setNotes((prev) =>
-      prev.map((n) => {
-        const nid = String(n.id);
-        if (!idsSet.has(nid)) return n;
-        const iconEntry = { id: uid(), src: logo.src, name: logo.name };
-        const nextImages = setNoteIcon(n.images, iconEntry);
-        newImagesByNoteId[nid] = nextImages;
-        return { ...n, images: nextImages, updated_at: nowIso, client_updated_at: nowIso };
-      }),
-    );
-
     for (const id of selectedIds) {
-      const nid = String(id);
-      const newImages = newImagesByNoteId[nid];
-      if (!newImages) continue;
-      const leaseId = acquireLocalLease(nid);
-      try {
-        const existing = await idbGetNote(nid, currentUser?.id, sessionId);
-        if (existing) {
-          await idbPutNote(
-            { ...existing, images: newImages, updated_at: nowIso, client_updated_at: nowIso },
-            currentUser?.id,
-            sessionId,
-          );
-        }
-      } catch (e) { console.error(e); }
-      await enqueueWithLease(
-        nid,
-        { type: "patch", noteId: nid, payload: { images: newImages, client_updated_at: nowIso } },
-        leaseId,
-      );
+      await applyNoteIcon(id, { id: uid(), src: logo.src, name: logo.name });
     }
   };
 
@@ -4720,26 +4684,50 @@ export default function App() {
     }
   }, []);
 
-  // Note icon (logo badge) — reuses the regular image compression
-  // pipeline, then stamps role:"icon" via setNoteIcon helper. Stored
-  // in the same `images` array so the existing sync / encryption /
-  // offline-queue paths handle it for free. Uploaded logos are also
-  // persisted to the user's logo library on the server.
+  // Note icon (logo badge) — PER-USER and never synced to collaborators.
+  // It lives on note.icon and persists through its own endpoint, NOT in the
+  // shared images_json. applyNoteIcon updates local state optimistically,
+  // mirrors to IndexedDB, then saves to the per-user endpoint (best-effort).
+  const applyNoteIcon = useCallback(async (noteId, icon) => {
+    if (!noteId) return;
+    const nid = String(noteId);
+    setNotes((prev) => prev.map((n) => (String(n.id) === nid ? { ...n, icon: icon || null } : n)));
+    try {
+      const existing = await idbGetNote(nid, currentUser?.id, sessionId);
+      if (existing) await idbPutNote({ ...existing, icon: icon || null }, currentUser?.id, sessionId);
+    } catch { /* IDB best-effort */ }
+    try {
+      if (icon) {
+        await api(`/notes/${nid}/icon`, { method: "PUT", token, body: { icon } });
+      } else {
+        await api(`/notes/${nid}/icon`, { method: "DELETE", token });
+      }
+    } catch (e) {
+      console.error("Note icon save failed", e);
+    }
+  }, [token, currentUser, sessionId, setNotes]);
+
   const setNoteIconFromFile = useCallback(async (file) => {
-    if (!file) return;
+    if (!file || !activeId) return;
     try {
       const src = await fileToCompressedDataURL(file);
       const iconEntry = { id: uid(), src, name: file.name };
-      setMImages((prev) => setNoteIcon(prev, iconEntry));
+      await applyNoteIcon(activeId, iconEntry);
       addLogoToLibrary({ src, name: file.name });
     } catch (e) {
       console.error("Note icon load failed", e);
     }
-  }, [setMImages, addLogoToLibrary]);
+  }, [activeId, applyNoteIcon, addLogoToLibrary]);
 
   const removeNoteIcon = useCallback(() => {
-    setMImages((prev) => setNoteIcon(prev, null));
-  }, [setMImages]);
+    if (activeId) applyNoteIcon(activeId, null);
+  }, [activeId, applyNoteIcon]);
+
+  // Pick an existing logo from the library as the active note's icon.
+  const pickNoteIcon = useCallback((logo) => {
+    if (!activeId || !logo?.src) return;
+    applyNoteIcon(activeId, { id: uid(), src: logo.src, name: logo.name });
+  }, [activeId, applyNoteIcon]);
 
   // Track initial state when opening modal to detect if user actually edited
   // Must be defined before openModal
@@ -6894,6 +6882,8 @@ export default function App() {
       addImagesToState={addImagesToState}
       setNoteIconFromFile={setNoteIconFromFile}
       removeNoteIcon={removeNoteIcon}
+      noteIcon={activeNoteObj?.icon || null}
+      onPickIcon={pickNoteIcon}
       logoLibrary={logoLibrary}
       addLogoToLibrary={addLogoToLibrary}
       deleteLogoFromLibrary={deleteLogoFromLibrary}

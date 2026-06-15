@@ -3,7 +3,7 @@ import { t } from "../../i18n";
 import { bgFor, solid, parseRGBA } from "../../utils/colors.js";
 import { renderSafeMarkdown } from "../../utils/markdown.jsx";
 import { isRichContent, contentToHTML } from "../../utils/richText.js";
-import { getNoteIcon, getContentImages } from "../../utils/noteIcon.js";
+import { getContentImages } from "../../utils/noteIcon.js";
 import { Image as ImageLucide, Mic, Pencil, CheckSquare } from "lucide-react";
 import { countItems, countChecked, isItem } from "../../utils/checklist.js";
 import { parseAudioContent } from "../../utils/audioNote.js";
@@ -49,7 +49,7 @@ function TvNoteCardImpl({ note, variant = "grid", onActivate }) {
   const isDark = isColorDark(bg);
 
   const imgs = useMemo(() => getContentImages(note.images), [note.images]);
-  const icon = useMemo(() => getNoteIcon(note.images), [note.images]);
+  const icon = note.icon || null;
   const previewHtml = useMemo(() => buildPreviewHtml(note), [note]);
   const isChecklist = note.type === "checklist";
   const isDraw = note.type === "draw";
