@@ -638,6 +638,9 @@ export default function ModalFooter({
                         textSize="text-[9px]"
                         dark={dark}
                         className="ring-1 ring-white dark:ring-gray-800"
+                        // Solid backing so transparent-PNG avatars stay
+                        // legible in this dense stack (collaboration footer only).
+                        imgClassName="bg-white"
                       />
                     </span>
                   ))}

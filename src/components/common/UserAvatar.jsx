@@ -1,13 +1,13 @@
 import React from "react";
 
 /** ---------- Avatar helper (reusable) ---------- */
-export default function UserAvatar({ name, email, avatarUrl, size = "w-7 h-7", textSize = "text-xs", dark, className = "" }) {
+export default function UserAvatar({ name, email, avatarUrl, size = "w-7 h-7", textSize = "text-xs", dark, className = "", imgClassName = "" }) {
   if (avatarUrl) {
     return (
       <img
         src={avatarUrl}
         alt={name || email || "?"}
-        className={`${size} rounded-full object-cover select-none ${className}`}
+        className={`${size} rounded-full object-cover select-none ${className} ${imgClassName}`}
         draggable="false"
       />
     );
