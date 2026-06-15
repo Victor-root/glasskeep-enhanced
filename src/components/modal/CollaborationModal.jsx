@@ -251,7 +251,7 @@ export default function CollaborationModal({
                         // looked unbalanced on mobile.
                         className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
                           <UserAvatar
                             name={collab.name}
                             email={collab.email}
@@ -307,10 +307,14 @@ export default function CollaborationModal({
                                   setConfirmRemove(collab);
                                 }
                               }}
-                              className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                              className="shrink-0 p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
                               data-tooltip={t("removeCollaborator")}
+                              aria-label={t("remove")}
                             >
-                              {t("remove")}
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M6 6l12 12" />
+                                <path d="M6 18L18 6" />
+                              </svg>
                             </button>
                           )}
                         </div>
