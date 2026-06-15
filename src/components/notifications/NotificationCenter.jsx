@@ -16,10 +16,12 @@ import NotificationCard from "./NotificationCard.jsx";
 import { t } from "../../i18n";
 
 const SHEET_BREAKPOINT_PX = 640;
-// Mobile open/close animation duration. Mirrors the editor's
-// .mobile-fmt-sheet transition curve / timing so the two surfaces
-// feel like they belong to the same design system.
-const MOBILE_ANIM_MS = 480;
+// Mobile open/close animation duration — the deferred-unmount window that lets
+// the slide-out finish before the DOM is removed. Must stay >= the CSS
+// transition on .gk-notif-center--mobile (0.6s); this sheet runs a touch
+// longer than the compact sync sheet on purpose so a tall panel doesn't whip
+// down (its longer translateY(-100%) travel would otherwise feel too fast).
+const MOBILE_ANIM_MS = 650;
 // Px the bottom edge has to travel upward (via the grabber drag)
 // before release closes the panel. Same threshold the editor's
 // formatting sheet uses for swipe-to-close.

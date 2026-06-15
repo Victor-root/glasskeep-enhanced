@@ -5696,8 +5696,13 @@ html.dark .gk-notif-bell-dot {
 .gk-notif-center--mobile {
   animation: none;
   transform: translateY(-100%);
-  /* Match the sync sheet's open/close timing (was 0.48s). */
-  transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+  /* This sheet is much taller than the compact sync sheet, so at an identical
+     duration its translateY(-100%) slide covers far more distance per frame
+     and reads as a faster, snappier "deploy". Give it a slightly longer
+     duration to bring the perceived velocity back in line with the sync
+     sheet's gentle slide. Keep MOBILE_ANIM_MS (NotificationCenter.jsx) >= this
+     so the close animation isn't cut short before unmount. */
+  transition: transform 0.6s cubic-bezier(0.32, 0.72, 0, 1);
   will-change: transform;
   /* Flat opaque header colour + NO backdrop blur. The sheet slides via
      transform; a live backdrop-filter forced the GPU to re-rasterise the
