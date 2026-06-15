@@ -464,11 +464,20 @@ export default function CollaborationModal({
           {/* Footer: access + actions stay fixed below the scroll area. */}
           {isOwner && (
             <div className="shrink-0 pt-4">
-              {/* Access level applied to the people being added */}
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                  {t("accessLabel")}
-                </span>
+              {/* Access level applied to the people being ADDED — spelled out
+                  (and distinguished from the per-row toggles, which change an
+                  existing collaborator) so it isn't mysterious. */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-medium text-gray-700 dark:text-gray-200">
+                    {selectedUsers.length > 0
+                      ? t("accessForSelected").replace("{n}", String(selectedUsers.length))
+                      : t("accessForNew")}
+                  </div>
+                  <div className="text-[11px] text-gray-500 dark:text-gray-400">
+                    {t("accessForNewHint")}
+                  </div>
+                </div>
                 <AccessToggle canWrite={newAccess === "write" ? 1 : 0} onChange={setAllAccess} />
               </div>
 
