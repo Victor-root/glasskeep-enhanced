@@ -5735,14 +5735,15 @@ html.dark .gk-notif-center--mobile {
    CSS so it overrides the desktop popover's Tailwind positioning without
    touching it; the sheet's own transform-animation also supersedes the
    centring -translate-x utility. Desktop (>=640px) keeps the anchored popover. */
-/* Soft floating shadow — the exact same recipe as .gk-notif-center so the sync
-   sheet and the notification sheet read identically. Replaces the Tailwind
-   shadow-lg the sheet used to ship with. */
+/* Soft floating shadow — the same outer drop shadow as .gk-notif-center so the
+   sync sheet and the notification sheet read identically. We deliberately drop
+   the notif's inset top-highlight (0 1px 0 white): on the salmon
+   (--gk-statusbar) sheet it showed as a hard white liseret along the very top
+   edge of the screen. Replaces the Tailwind shadow-lg the sheet shipped with. */
 .gk-sync-sheet {
   box-shadow:
     0 4px 6px -1px rgba(15, 23, 42, 0.07),
-    0 10px 28px -4px rgba(15, 23, 42, 0.12),
-    0 1px 0 rgba(255, 255, 255, 0.90) inset;
+    0 10px 28px -4px rgba(15, 23, 42, 0.12);
 }
 /* Status header: no hard divider line — a soft 6px gradient fade that bleeds
    into the body below, identical to the notification sheet's header (which
