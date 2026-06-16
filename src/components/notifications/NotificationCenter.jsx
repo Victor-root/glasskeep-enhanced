@@ -71,13 +71,19 @@ export default function NotificationCenter({
     if (open) {
       setRendering(true);
       if (mobileNow) {
-        // Double requestAnimationFrame: rAF #1 fires before the next
-        // paint (when the panel has been committed but maybe not yet
-        // rendered), rAF #2 fires the frame AFTER, which is reliably
-        // past the first paint at translateY(-100%). Adding .is-open
-        // then gives the transform transition a real from-frame to
-        // animate from — a single rAF was sometimes batched in the
-        // same paint and the slide-in skipped silently.
+        // Force the closed from-state BEFORE flipping to open. On a quick
+        // close→reopen the panel is still mounted (its unmount is deferred for
+        // the slide-out), and animOpen can linger true — without this reset,
+        // re-adding .is-open is a no-op and the slide-in silently skips (the
+        // "sometimes no animation on reopen" bug). The sync sheet never hits
+        // this because it mounts a fresh node on every open.
+        setAnimOpen(false);
+        // Double requestAnimationFrame: rAF #1 fires before the next paint
+        // (panel committed at translateY(-100%) but maybe not yet painted),
+        // rAF #2 fires the frame AFTER — reliably past that first paint — so
+        // adding .is-open then gives the transform transition a real from-frame
+        // to animate from. A single rAF was sometimes batched into the same
+        // paint and the slide-in skipped.
         let r2 = 0;
         const r1 = requestAnimationFrame(() => {
           r2 = requestAnimationFrame(() => setAnimOpen(true));
