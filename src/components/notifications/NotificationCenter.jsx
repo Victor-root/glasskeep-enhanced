@@ -60,9 +60,19 @@ export default function NotificationCenter({
   // be applied with no transition (the from-state never existed).
   const [rendering, setRendering] = useState(false);
   const [animOpen, setAnimOpen] = useState(false);
-  // Bumped on every open so the sheet remounts as a fresh DOM node — see the
-  // open effect for why (reliable slide on a quick close→reopen).
-  const [mountId, setMountId] = useState(0);
+
+  // Mount the panel synchronously when it opens — during render, NOT from an
+  // effect. (Conditionally setting state during render is React's sanctioned
+  // "adjust state when a prop changes" bailout: it re-renders before committing,
+  // so there's no extra paint.) This is the crux of a reliable slide-in: the
+  // panel is committed AND painted in its closed state in the same commit as
+  // open=true, BEFORE the effect's rAF flips on .is-open a frame later — so the
+  // transform transition always has a real from-frame. The old code mounted
+  // from the effect, a tick late, so the mount and the .is-open class could
+  // land in the same paint and the slide silently skipped (intermittently).
+  // The sync sheet mounts in render too, which is exactly why it never skips.
+  if (open && !rendering) setRendering(true);
+
   const isMobile =
     rendering &&
     typeof window !== "undefined" &&
@@ -72,19 +82,17 @@ export default function NotificationCenter({
     const mobileNow =
       typeof window !== "undefined" && window.innerWidth < SHEET_BREAKPOINT_PX;
     if (open) {
-      setRendering(true);
-      // Remount the sheet as a brand-new DOM node on every open. Its unmount is
-      // deferred (to play the slide-out) and the grabber can leave an inline
-      // transform: translateY(-100%) on the node — which, being inline, beats
-      // the .is-open class — so reusing it on a quick close→reopen left the
-      // panel stuck open (no slide) or pinned off-screen. A fresh node carries
-      // no leftover inline style and reliably paints its closed state before
-      // .is-open is added — the same reason the sync sheet (fresh node per
-      // open) never skips its slide.
-      setMountId((n) => n + 1);
+      // The panel is already mounted (render-time, above) in its closed state.
+      // Wipe any inline transform/transition the grabber left on the node from
+      // a previous drag-to-close — an inline style beats the .is-open class and
+      // would otherwise pin a reused node off-screen with no slide. Then flip
+      // to open one paint later so it slides translateY(-100%) → 0.
+      const panel = panelRef.current;
+      if (panel) {
+        panel.style.transition = "";
+        panel.style.transform = "";
+      }
       if (mobileNow) {
-        // Mount closed, then flip to open one paint later so the transform
-        // transition always has a real from-frame (translateY(-100%)).
         setAnimOpen(false);
         // Double requestAnimationFrame: rAF #1 fires before the next paint
         // (panel committed at translateY(-100%) but maybe not yet painted),
@@ -298,7 +306,6 @@ export default function NotificationCenter({
 
   const node = (
     <div
-      key={mountId}
       ref={panelRef}
       className={`gk-notif-center${isMobile ? " gk-notif-center--mobile" : ""}${isMobile && animOpen ? " is-open" : ""}`}
       style={style}
