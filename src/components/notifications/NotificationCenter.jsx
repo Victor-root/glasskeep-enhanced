@@ -60,6 +60,9 @@ export default function NotificationCenter({
   // be applied with no transition (the from-state never existed).
   const [rendering, setRendering] = useState(false);
   const [animOpen, setAnimOpen] = useState(false);
+  // Bumped on every open so the sheet remounts as a fresh DOM node — see the
+  // open effect for why (reliable slide on a quick close→reopen).
+  const [mountId, setMountId] = useState(0);
   const isMobile =
     rendering &&
     typeof window !== "undefined" &&
@@ -70,13 +73,18 @@ export default function NotificationCenter({
       typeof window !== "undefined" && window.innerWidth < SHEET_BREAKPOINT_PX;
     if (open) {
       setRendering(true);
+      // Remount the sheet as a brand-new DOM node on every open. Its unmount is
+      // deferred (to play the slide-out) and the grabber can leave an inline
+      // transform: translateY(-100%) on the node — which, being inline, beats
+      // the .is-open class — so reusing it on a quick close→reopen left the
+      // panel stuck open (no slide) or pinned off-screen. A fresh node carries
+      // no leftover inline style and reliably paints its closed state before
+      // .is-open is added — the same reason the sync sheet (fresh node per
+      // open) never skips its slide.
+      setMountId((n) => n + 1);
       if (mobileNow) {
-        // Force the closed from-state BEFORE flipping to open. On a quick
-        // close→reopen the panel is still mounted (its unmount is deferred for
-        // the slide-out), and animOpen can linger true — without this reset,
-        // re-adding .is-open is a no-op and the slide-in silently skips (the
-        // "sometimes no animation on reopen" bug). The sync sheet never hits
-        // this because it mounts a fresh node on every open.
+        // Mount closed, then flip to open one paint later so the transform
+        // transition always has a real from-frame (translateY(-100%)).
         setAnimOpen(false);
         // Double requestAnimationFrame: rAF #1 fires before the next paint
         // (panel committed at translateY(-100%) but maybe not yet painted),
@@ -290,6 +298,7 @@ export default function NotificationCenter({
 
   const node = (
     <div
+      key={mountId}
       ref={panelRef}
       className={`gk-notif-center${isMobile ? " gk-notif-center--mobile" : ""}${isMobile && animOpen ? " is-open" : ""}`}
       style={style}
