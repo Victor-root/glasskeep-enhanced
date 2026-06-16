@@ -420,7 +420,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
               </button>
             )}
             {/* ── Section 1: Status header ── */}
-            <div className={`px-4 py-3 border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
+            <div className={`px-4 py-3 border-b ${dark ? "border-[rgba(255,255,255,0.06)]" : "border-[rgba(0,0,0,0.06)]"}`}>
               <div className="flex items-center gap-2">
                 <Icon className={`w-5 h-5 ${color}`} />
                 <span className="font-semibold text-sm">{label}</span>
@@ -469,7 +469,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
 
             {/* ── Section 2: Queue summary (pending + processing) ── */}
             {pendingAndProcessing > 0 && (
-              <div className={`px-4 py-2.5 border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
+              <div className={`px-4 py-2.5 border-b ${dark ? "border-[rgba(255,255,255,0.06)]" : "border-[rgba(0,0,0,0.06)]"}`}>
                 <div className="flex items-center gap-2 text-xs">
                   <span className={`w-2 h-2 rounded-full ${processing > 0 ? "bg-blue-500 animate-pulse" : "bg-amber-500"}`} />
                   <span className={dark ? "text-gray-300" : "text-gray-600"}>
@@ -484,7 +484,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
 
             {/* ── Section 3a: Retrying (amber — transient, will be retried) ── */}
             {retryItems.length > 0 && (
-              <div className={`border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
+              <div className={`border-b ${dark ? "border-[rgba(255,255,255,0.06)]" : "border-[rgba(0,0,0,0.06)]"}`}>
                 <div className={`px-4 pt-2.5 pb-1.5 flex items-center gap-1.5 text-xs font-medium ${dark ? "text-amber-400" : "text-amber-600"}`}>
                   <RefreshIcon className="w-3 h-3" />
                   {t("syncRetryingTitle")}
@@ -517,7 +517,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
 
             {/* ── Section 3b: Failed (red — permanent, max retries reached) ── */}
             {(failed > 0 || (lastSyncError && syncState === "error")) && (
-              <div className={`border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
+              <div className={`border-b ${dark ? "border-[rgba(255,255,255,0.06)]" : "border-[rgba(0,0,0,0.06)]"}`}>
                 <div className={`px-4 pt-2.5 pb-1.5 flex items-center gap-1.5 text-xs font-medium ${dark ? "text-red-400" : "text-red-600"}`}>
                   <WarningIcon className="w-3.5 h-3.5" />
                   {t("syncErrorsTitle")}
