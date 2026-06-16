@@ -378,11 +378,33 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
         const sheet = (
           <div
             ref={menuRef}
-            className={`gk-sync-sheet ${animIn ? "is-open" : ""} fixed top-14 left-1/2 -translate-x-1/2 sm:absolute sm:top-12 sm:left-auto sm:right-0 sm:translate-x-0 w-[calc(100vw-1rem)] max-w-[340px] sm:w-auto sm:min-w-[280px] z-[1100] border rounded-lg shadow-lg overflow-hidden ${
+            className={`gk-sync-sheet ${animIn ? "is-open" : ""} fixed top-14 left-1/2 -translate-x-1/2 sm:absolute sm:top-12 sm:left-auto sm:right-0 sm:translate-x-0 w-[calc(100vw-1rem)] max-w-[340px] sm:w-auto sm:min-w-[280px] z-[1100] border rounded-lg overflow-hidden ${
               dark
                 ? "bg-[var(--gk-statusbar)] sm:bg-[#222] border-gray-700 text-gray-100"
                 : "bg-[var(--gk-statusbar)] sm:bg-[#f9f6ff] border-gray-200 text-gray-800"
             }`}
+            // Mobile sheet layout is driven inline off the same JS flag that
+            // decides to render the sheet — exactly like the notification sheet
+            // — so it never desyncs from the CSS media query at the 639/640px
+            // boundary (which left the Tailwind rounded top corners poking out
+            // as white notches under the header). Square top + no top/side
+            // border = flush with the header; rounded bottom only.
+            style={isMobileSheet ? {
+              position: "fixed",
+              top: "var(--safe-top, 0px)",
+              left: 0,
+              right: 0,
+              width: "100%",
+              maxWidth: "none",
+              translate: "none",
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              borderBottomLeftRadius: "1rem",
+              borderBottomRightRadius: "1rem",
+              borderTopWidth: 0,
+              borderLeftWidth: 0,
+              borderRightWidth: 0,
+            } : undefined}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Phone sheet: small close affordance, below the status bar. */}
@@ -398,7 +420,10 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
               </button>
             )}
             {/* ── Section 1: Status header ── */}
-            <div className={`px-4 py-3 border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
+            {/* No hard divider line — a soft 6px gradient fade bleeds into the
+                body below (see .gk-sync-sheet__header in globalCSS), identical
+                to the notification sheet's header. */}
+            <div className="gk-sync-sheet__header px-4 py-3">
               <div className="flex items-center gap-2">
                 <Icon className={`w-5 h-5 ${color}`} />
                 <span className="font-semibold text-sm">{label}</span>
@@ -447,7 +472,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
 
             {/* ── Section 2: Queue summary (pending + processing) ── */}
             {pendingAndProcessing > 0 && (
-              <div className={`px-4 py-2.5 border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
+              <div className={`px-4 py-2.5 border-b ${dark ? "border-[rgba(255,255,255,0.06)]" : "border-[rgba(0,0,0,0.06)]"}`}>
                 <div className="flex items-center gap-2 text-xs">
                   <span className={`w-2 h-2 rounded-full ${processing > 0 ? "bg-blue-500 animate-pulse" : "bg-amber-500"}`} />
                   <span className={dark ? "text-gray-300" : "text-gray-600"}>
@@ -462,7 +487,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
 
             {/* ── Section 3a: Retrying (amber — transient, will be retried) ── */}
             {retryItems.length > 0 && (
-              <div className={`border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
+              <div className={`border-b ${dark ? "border-[rgba(255,255,255,0.06)]" : "border-[rgba(0,0,0,0.06)]"}`}>
                 <div className={`px-4 pt-2.5 pb-1.5 flex items-center gap-1.5 text-xs font-medium ${dark ? "text-amber-400" : "text-amber-600"}`}>
                   <RefreshIcon className="w-3 h-3" />
                   {t("syncRetryingTitle")}
@@ -495,7 +520,7 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
 
             {/* ── Section 3b: Failed (red — permanent, max retries reached) ── */}
             {(failed > 0 || (lastSyncError && syncState === "error")) && (
-              <div className={`border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
+              <div className={`border-b ${dark ? "border-[rgba(255,255,255,0.06)]" : "border-[rgba(0,0,0,0.06)]"}`}>
                 <div className={`px-4 pt-2.5 pb-1.5 flex items-center gap-1.5 text-xs font-medium ${dark ? "text-red-400" : "text-red-600"}`}>
                   <WarningIcon className="w-3.5 h-3.5" />
                   {t("syncErrorsTitle")}

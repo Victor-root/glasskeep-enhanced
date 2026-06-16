@@ -5696,8 +5696,13 @@ html.dark .gk-notif-bell-dot {
 .gk-notif-center--mobile {
   animation: none;
   transform: translateY(-100%);
-  /* Match the sync sheet's open/close timing (was 0.48s). */
-  transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+  /* This sheet is much taller than the compact sync sheet, so at an identical
+     duration its translateY(-100%) slide covers far more distance per frame
+     and reads as a faster, snappier "deploy". Give it a slightly longer
+     duration to bring the perceived velocity back in line with the sync
+     sheet's gentle slide. Keep MOBILE_ANIM_MS (NotificationCenter.jsx) >= this
+     so the close animation isn't cut short before unmount. */
+  transition: transform 0.6s cubic-bezier(0.32, 0.72, 0, 1);
   will-change: transform;
   /* Flat opaque header colour + NO backdrop blur. The sheet slides via
      transform; a live backdrop-filter forced the GPU to re-rasterise the
@@ -5730,23 +5735,47 @@ html.dark .gk-notif-center--mobile {
    CSS so it overrides the desktop popover's Tailwind positioning without
    touching it; the sheet's own transform-animation also supersedes the
    centring -translate-x utility. Desktop (>=640px) keeps the anchored popover. */
+/* Soft floating shadow — the same outer drop shadow as .gk-notif-center so the
+   sync sheet and the notification sheet read identically. We deliberately drop
+   the notif's inset top-highlight (0 1px 0 white): on the salmon
+   (--gk-statusbar) sheet it showed as a hard white liseret along the very top
+   edge of the screen. Replaces the Tailwind shadow-lg the sheet shipped with. */
+.gk-sync-sheet {
+  box-shadow:
+    0 4px 6px -1px rgba(15, 23, 42, 0.07),
+    0 10px 28px -4px rgba(15, 23, 42, 0.12);
+}
+/* Status header: no hard divider line — a soft 6px gradient fade that bleeds
+   into the body below, identical to the notification sheet's header (which
+   dropped its 1px border for exactly this reason). This is the soft "shadow"
+   between the status text and the Sync button. */
+.gk-sync-sheet__header {
+  position: relative;
+}
+.gk-sync-sheet__header::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.05), transparent);
+  pointer-events: none;
+}
+html.dark .gk-sync-sheet__header::after {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.20), transparent);
+}
 @media (max-width: 639px) {
   .gk-sync-sheet {
-    position: fixed !important;
-    top: var(--safe-top, 0px) !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    max-width: none !important;
-    /* Tailwind v4's -translate-x-1/2 sets the translate property (not
-       transform), so kill it or the full-width sheet is shoved off-screen. */
-    translate: none !important;
-    border-radius: 0 0 1rem 1rem !important;
-    border-width: 0 0 1px 0 !important;
     /* Slide via a transition + .is-open class, NOT a keyframe animation: a
        running animation's fill holds transform and would override the
        grabber's inline drag transform, so the tirette wouldn't follow the
-       finger. A transition leaves transform free for the drag. */
+       finger. A transition leaves transform free for the drag.
+       Layout (position, full width, square top / rounded bottom, edge borders)
+       is set INLINE on the element off the same JS isMobileSheet flag —
+       mirroring the notification sheet — so it can't desync from this media
+       query at the 639/640px sub-pixel boundary, which used to leave the
+       Tailwind rounded-lg corners showing as white notches at the top. */
     transform: translateY(-100%);
     transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
     will-change: transform;
