@@ -5737,21 +5737,15 @@ html.dark .gk-notif-center--mobile {
    centring -translate-x utility. Desktop (>=640px) keeps the anchored popover. */
 @media (max-width: 639px) {
   .gk-sync-sheet {
-    position: fixed !important;
-    top: var(--safe-top, 0px) !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    max-width: none !important;
-    /* Tailwind v4's -translate-x-1/2 sets the translate property (not
-       transform), so kill it or the full-width sheet is shoved off-screen. */
-    translate: none !important;
-    border-radius: 0 0 1rem 1rem !important;
-    border-width: 0 0 1px 0 !important;
     /* Slide via a transition + .is-open class, NOT a keyframe animation: a
        running animation's fill holds transform and would override the
        grabber's inline drag transform, so the tirette wouldn't follow the
-       finger. A transition leaves transform free for the drag. */
+       finger. A transition leaves transform free for the drag.
+       Layout (position, full width, square top / rounded bottom, edge borders)
+       is set INLINE on the element off the same JS isMobileSheet flag —
+       mirroring the notification sheet — so it can't desync from this media
+       query at the 639/640px sub-pixel boundary, which used to leave the
+       Tailwind rounded-lg corners showing as white notches at the top. */
     transform: translateY(-100%);
     transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
     will-change: transform;

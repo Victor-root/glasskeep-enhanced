@@ -383,6 +383,28 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
                 ? "bg-[var(--gk-statusbar)] sm:bg-[#222] border-gray-700 text-gray-100"
                 : "bg-[var(--gk-statusbar)] sm:bg-[#f9f6ff] border-gray-200 text-gray-800"
             }`}
+            // Mobile sheet layout is driven inline off the same JS flag that
+            // decides to render the sheet — exactly like the notification sheet
+            // — so it never desyncs from the CSS media query at the 639/640px
+            // boundary (which left the Tailwind rounded top corners poking out
+            // as white notches under the header). Square top + no top/side
+            // border = flush with the header; rounded bottom only.
+            style={isMobileSheet ? {
+              position: "fixed",
+              top: "var(--safe-top, 0px)",
+              left: 0,
+              right: 0,
+              width: "100%",
+              maxWidth: "none",
+              translate: "none",
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              borderBottomLeftRadius: "1rem",
+              borderBottomRightRadius: "1rem",
+              borderTopWidth: 0,
+              borderLeftWidth: 0,
+              borderRightWidth: 0,
+            } : undefined}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Phone sheet: small close affordance, below the status bar. */}
