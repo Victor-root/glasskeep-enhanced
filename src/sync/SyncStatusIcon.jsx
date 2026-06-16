@@ -420,7 +420,10 @@ export default function SyncStatusIcon({ dark, syncStatus, onSyncNow, syncDropdo
               </button>
             )}
             {/* ── Section 1: Status header ── */}
-            <div className={`px-4 py-3 border-b ${dark ? "border-[rgba(255,255,255,0.06)]" : "border-[rgba(0,0,0,0.06)]"}`}>
+            {/* No hard divider line — a soft 6px gradient fade bleeds into the
+                body below (see .gk-sync-sheet__header in globalCSS), identical
+                to the notification sheet's header. */}
+            <div className="gk-sync-sheet__header px-4 py-3">
               <div className="flex items-center gap-2">
                 <Icon className={`w-5 h-5 ${color}`} />
                 <span className="font-semibold text-sm">{label}</span>

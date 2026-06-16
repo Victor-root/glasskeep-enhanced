@@ -5744,6 +5744,26 @@ html.dark .gk-notif-center--mobile {
     0 10px 28px -4px rgba(15, 23, 42, 0.12),
     0 1px 0 rgba(255, 255, 255, 0.90) inset;
 }
+/* Status header: no hard divider line — a soft 6px gradient fade that bleeds
+   into the body below, identical to the notification sheet's header (which
+   dropped its 1px border for exactly this reason). This is the soft "shadow"
+   between the status text and the Sync button. */
+.gk-sync-sheet__header {
+  position: relative;
+}
+.gk-sync-sheet__header::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.05), transparent);
+  pointer-events: none;
+}
+html.dark .gk-sync-sheet__header::after {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.20), transparent);
+}
 @media (max-width: 639px) {
   .gk-sync-sheet {
     /* Slide via a transition + .is-open class, NOT a keyframe animation: a
