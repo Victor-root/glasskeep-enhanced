@@ -1832,6 +1832,19 @@ export default function App() {
   const [sseConnected, setSseConnected] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
+  // navigator.onLine is unreliable in the Android WebView: it can be stuck at
+  // `false` on a cold start (or after a spurious "offline" event) with no
+  // matching "online" event to correct it. That lit the header's offline badge
+  // even though the sync engine had actually reached the server (SSE connected,
+  // health checks 200). The engine's serverReachable comes from real HTTP
+  // health checks, so trust it: once the server is confirmed reachable we ARE
+  // online, regardless of what navigator.onLine claims. (We never force the
+  // flag the other way here — a real disconnect still flows through the
+  // window "offline" event and the engine's own serverReachable === false.)
+  useEffect(() => {
+    if (syncStatus.serverReachable === true) setIsOnline(true);
+  }, [syncStatus.serverReachable]);
+
   // Instance branding (custom app name / logo / login background +
   // blur). The provider owns the fetch; we only need refreshBranding to
   // re-pull after an admin saves so the live header / next login render
