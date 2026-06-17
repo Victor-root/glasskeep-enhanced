@@ -19,7 +19,6 @@ export default function NotesHeader({
   setSearch,
   aiAssistantEnabled,
   onAiSearch,
-  isOnline,
   listView,
   onToggleViewMode,
   toggleDark,
@@ -214,7 +213,15 @@ export default function NotesHeader({
   const desktopOnlyBlock = isLandscapeMobile ? "hidden" : "hidden sm:block";
   const desktopOnlyInline = isLandscapeMobile ? "hidden" : "hidden sm:inline-block";
   const desktopOnlyInlineText = isLandscapeMobile ? "hidden" : "hidden sm:inline";
-  const showOfflineBadge = !isOnline || syncStatus?.syncState === "offline" || syncStatus?.serverReachable === false;
+  // Drive the offline badge from the sync engine's real reachability, NOT
+  // navigator.onLine. The latter is a stale `false` at cold start in the
+  // Android WebView, which flashed the badge on every refresh while the engine
+  // was still doing its first health check ("checking" → serverReachable is
+  // null, not false, so it correctly shows nothing here). A genuine
+  // disconnect sets serverReachable === false immediately (window "offline"
+  // event → engine.notifyOffline → emit), so the badge still appears at once
+  // when we're really offline.
+  const showOfflineBadge = syncStatus?.syncState === "offline" || syncStatus?.serverReachable === false;
   return (
       <header
         ref={headerRef}
