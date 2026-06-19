@@ -194,6 +194,12 @@ export function NotificationProvider({ children }) {
   useEffect(() => {
     notificationsRef.current = notifications;
   }, [notifications]);
+  // App-provided predicate that returns false when a notification
+  // should be silently dropped (category filter). Checked inside
+  // notify() before any state mutation so filtered-out specs never
+  // appear in history or trigger a ding.
+  const notifyFilterRef = useRef(null);
+
   // App-provided delivery-ack POST (markShareNotificationsDelivered).
   // The provider calls it whenever a server-backed notification is
   // resolved on this device (X click, auto-dismiss timer, REMOVE).
@@ -220,6 +226,10 @@ export function NotificationProvider({ children }) {
     if (Number.isFinite(n) && n >= 0) {
       defaultDurationRef.current = n;
     }
+  }, []);
+
+  const setNotifyFilter = useCallback((fn) => {
+    notifyFilterRef.current = typeof fn === "function" ? fn : null;
   }, []);
 
   const setOnMarkDelivered = useCallback((fn) => {
@@ -395,6 +405,11 @@ export function NotificationProvider({ children }) {
     if (typeof input.message === "string" && /^instance\s+(is\s+)?(locked|verrouill)/i.test(input.message.trim())) {
       return null;
     }
+    // Per-category display filter. Returns false → silently drop this
+    // notification before it ever reaches state or the ding logic.
+    if (typeof notifyFilterRef.current === "function") {
+      if (notifyFilterRef.current(input) === false) return null;
+    }
     const id = uid();
     const variant = input.variant || "info";
     const isPersistent =
@@ -497,6 +512,7 @@ export function NotificationProvider({ children }) {
     clear,
     clearServerBacked,
     setDefaultDuration,
+    setNotifyFilter,
     setOnMarkDelivered,
     setOnMarkRemoved,
     markDelivered,
@@ -530,6 +546,7 @@ const NOOP_VALUE = {
   clear: () => {},
   clearServerBacked: () => {},
   setDefaultDuration: () => {},
+  setNotifyFilter: () => {},
   setOnMarkDelivered: () => {},
   setOnMarkRemoved: () => {},
   markDelivered: () => {},

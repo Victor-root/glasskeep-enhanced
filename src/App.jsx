@@ -393,6 +393,40 @@ export default function App() {
     } catch (e) {}
     return DEF;
   });
+  // Per-category display filter. When a category is set to false the
+  // provider silently drops incoming notifications of that type before
+  // they ever reach state or the ding logic. Eight categories:
+  //   federation  → cross-server events (peer online/offline/locked, invites)
+  //   share       → note_shared
+  //   access      → note_access_revoked / collaborator_removed variants
+  //   reminder    → scheduled reminders
+  //   success     → variant=success toasts
+  //   warning     → variant=warning toasts
+  //   error       → variant=error toasts
+  //   info        → everything else
+  // All default to true so a new install shows everything.
+  const [notificationsFilterTypes, setNotificationsFilterTypes] = useState(() => {
+    const DEF = {
+      federation: true,
+      share: true,
+      access: true,
+      reminder: true,
+      success: true,
+      warning: true,
+      error: true,
+      info: true,
+    };
+    try {
+      const stored = localStorage.getItem("notificationsFilterTypes");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          return { ...DEF, ...parsed };
+        }
+      }
+    } catch (e) {}
+    return DEF;
+  });
   // Default duration (ms) for auto-dismissing notifications, or null
   // for "persistent" (stays until the user closes manually). The set
   // of allowed values is locked down in the settings UI; anything
@@ -612,6 +646,7 @@ export default function App() {
     clearServerBacked: clearServerBackedNotifications,
     notifications: allNotifications,
     setDefaultDuration: setNotifDefaultDuration,
+    setNotifyFilter,
     setOnMarkDelivered: setNotifOnMarkDelivered,
     setOnMarkRemoved: setNotifOnMarkRemoved,
   } = useNotifications();
@@ -681,6 +716,46 @@ export default function App() {
     if (variant === "error") return "error";
     return "info";
   };
+
+  // Map a notification spec (as passed to notify()) to one of the
+  // eight display-filter categories. Same precedence as soundCategoryFor
+  // but also handles the `federation` and `reminder` types that the
+  // filter exposes but the sound system doesn't need separately.
+  const filterCategoryFor = (spec) => {
+    const typeKey = spec?.type;
+    if (typeKey === "federation") return "federation";
+    if (typeKey === "reminder") return "reminder";
+    if (typeKey === "note_shared") return "share";
+    if (
+      typeKey === "note_access_revoked" ||
+      typeKey === "note_access_revoked_with_copy" ||
+      typeKey === "collaborator_removed" ||
+      typeKey === "collaborator_removed_with_copy" ||
+      typeKey === "collaborator_left" ||
+      typeKey === "shared_note_deleted" ||
+      typeKey === "shared_note_deleted_with_copy"
+    ) {
+      return "access";
+    }
+    const variant = spec?.variant;
+    if (variant === "success") return "success";
+    if (variant === "warning") return "warning";
+    if (variant === "error") return "error";
+    return "info";
+  };
+
+  // Wire the per-category display filter into the provider. Runs
+  // whenever notificationsFilterTypes changes so the provider's
+  // notify() ref is always up-to-date.
+  useEffect(() => {
+    setNotifyFilter((spec) => {
+      const cat = filterCategoryFor(spec);
+      return notificationsFilterTypes[cat] !== false;
+    });
+  // filterCategoryFor is a stable function defined in this render scope;
+  // only notificationsFilterTypes actually drives re-installation.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notificationsFilterTypes, setNotifyFilter]);
 
   // Discrete ding whenever a NEW notification appears. We compare
   // `createdAt` rather than the array's first id, because closing
@@ -1170,6 +1245,30 @@ export default function App() {
             );
           } catch (e) {}
         }
+        if (
+          settings?.notificationsFilterTypes &&
+          typeof settings.notificationsFilterTypes === "object" &&
+          !Array.isArray(settings.notificationsFilterTypes)
+        ) {
+          const incoming = settings.notificationsFilterTypes;
+          const next = {
+            federation: incoming.federation !== false,
+            share: incoming.share !== false,
+            access: incoming.access !== false,
+            reminder: incoming.reminder !== false,
+            success: incoming.success !== false,
+            warning: incoming.warning !== false,
+            error: incoming.error !== false,
+            info: incoming.info !== false,
+          };
+          setNotificationsFilterTypes(next);
+          try {
+            localStorage.setItem(
+              "notificationsFilterTypes",
+              JSON.stringify(next),
+            );
+          } catch (e) {}
+        }
         if ("notificationsDuration" in (settings || {})) {
           const raw = settings.notificationsDuration;
           const allowed = [5000, 10000, 20000, 30000];
@@ -1474,6 +1573,27 @@ export default function App() {
       }).catch(() => {});
     }
   }, [notificationsSoundTypes]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "notificationsFilterTypes",
+        JSON.stringify(notificationsFilterTypes),
+      );
+    } catch (e) {}
+    if (!sidebarSettingsLoadedRef.current) return;
+    if (remoteSyncedKeysRef.current.has("notificationsFilterTypes")) {
+      remoteSyncedKeysRef.current.delete("notificationsFilterTypes");
+      return;
+    }
+    if (token) {
+      api("/user/settings", {
+        method: "PATCH",
+        token,
+        body: { notificationsFilterTypes },
+      }).catch(() => {});
+    }
+  }, [notificationsFilterTypes]);
 
   useEffect(() => {
     try {
@@ -3399,6 +3519,24 @@ export default function App() {
                   mark("notificationsSoundTypes");
                   setNotificationsSoundTypes(next);
                   try { localStorage.setItem("notificationsSoundTypes", JSON.stringify(next)); } catch (_) {}
+                }
+              }
+              if (keys.has("notificationsFilterTypes")) {
+                const v = settings.notificationsFilterTypes;
+                if (v && typeof v === "object" && !Array.isArray(v)) {
+                  const next = {
+                    federation: v.federation !== false,
+                    share: v.share !== false,
+                    access: v.access !== false,
+                    reminder: v.reminder !== false,
+                    success: v.success !== false,
+                    warning: v.warning !== false,
+                    error: v.error !== false,
+                    info: v.info !== false,
+                  };
+                  mark("notificationsFilterTypes");
+                  setNotificationsFilterTypes(next);
+                  try { localStorage.setItem("notificationsFilterTypes", JSON.stringify(next)); } catch (_) {}
                 }
               }
               if (keys.has("notificationsDuration")) {
@@ -7193,6 +7331,8 @@ export default function App() {
         setNotificationsSound={setNotificationsSound}
         notificationsSoundTypes={notificationsSoundTypes}
         setNotificationsSoundTypes={setNotificationsSoundTypes}
+        notificationsFilterTypes={notificationsFilterTypes}
+        setNotificationsFilterTypes={setNotificationsFilterTypes}
         notificationsDuration={notificationsDuration}
         setNotificationsDuration={setNotificationsDuration}
         typographyPresets={typographyPresets}
