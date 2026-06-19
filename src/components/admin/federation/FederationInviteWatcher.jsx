@@ -53,7 +53,7 @@ export default function FederationInviteWatcher({ token }) {
         peer: peerBaseUrl,
       });
       notify({
-        type: "toast",
+        type: "federation",
         variant: "info",
         title: t("fedInviteReceivedTitle"),
         message: t("fedInviteReceived").replace("{peer}", who),
@@ -95,7 +95,7 @@ export default function FederationInviteWatcher({ token }) {
       const now = Date.now();
       if ((stateSeen.current.get(sig) || 0) > now - 8000) return;
       stateSeen.current.set(sig, now);
-      const base = { type: "toast", title: t("fedConnTitle") };
+      const base = { type: "federation", title: t("fedConnTitle") };
       if (msg.state === "offline") {
         notify({ ...base, variant: "warning", message: t("fedPeerOffline").replace("{peer}", who) });
       } else if (msg.state === "online" && msg.previousState === "locked") {
@@ -127,13 +127,13 @@ export default function FederationInviteWatcher({ token }) {
         announceState(msg);
       } else if (msg.type === "federation_linked") {
         // The peer accepted a request WE sent → we're now paired.
-        notify({ type: "toast", variant: "success", title: t("fedConnTitle"), message: t("fedLinkedToast").replace("{peer}", who) });
+        notify({ type: "federation", variant: "success", title: t("fedConnTitle"), message: t("fedLinkedToast").replace("{peer}", who) });
       } else if (msg.type === "federation_refused") {
         // The peer declined (or cancelled) the pending pairing.
-        notify({ type: "toast", variant: "warning", title: t("fedConnTitle"), message: t("fedRefusedToast").replace("{peer}", who) });
+        notify({ type: "federation", variant: "warning", title: t("fedConnTitle"), message: t("fedRefusedToast").replace("{peer}", who) });
       } else if (msg.type === "federation_dissociated") {
         // The peer unpaired from us; the link is gone on our side too.
-        notify({ type: "toast", variant: "warning", title: t("fedConnTitle"), message: t("fedDissociatedToast").replace("{peer}", who) });
+        notify({ type: "federation", variant: "warning", title: t("fedConnTitle"), message: t("fedDissociatedToast").replace("{peer}", who) });
       }
     };
     window.addEventListener("federation-event", onEvent);

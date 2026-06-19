@@ -63,6 +63,8 @@ export default function SettingsPanel({
   setNotificationsSound,
   notificationsSoundTypes,
   setNotificationsSoundTypes,
+  notificationsFilterTypes,
+  setNotificationsFilterTypes,
   notificationsDuration,
   setNotificationsDuration,
   typographyPresets,
@@ -116,6 +118,7 @@ export default function SettingsPanel({
   const [notifDurMenuOpen, setNotifDurMenuOpen] = useState(false);
   const notifDurBtnRef = useRef(null);
   const [notifSoundTypesOpen, setNotifSoundTypesOpen] = useState(false);
+  const [notifFilterTypesOpen, setNotifFilterTypesOpen] = useState(false);
   // openSections / setOpenSections come from App.jsx so the per-section
   // expansion state is server-synced (defaults to all collapsed).
   const toggleSection = (key) =>
@@ -859,6 +862,94 @@ export default function SettingsPanel({
                                   ? "bg-gradient-to-r from-indigo-500 to-violet-600 btn-gradient"
                                   : "bg-gray-300 dark:bg-gray-600"
                               } ${notificationsSound ? "" : "cursor-not-allowed"}`}
+                            >
+                              <span
+                                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                                  enabled ? "translate-x-[18px]" : "translate-x-[2px]"
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Per-category display filter — same chevron-expand
+                    pattern as the sound types sub-list above. The user
+                    can independently mute entire categories (e.g. "I
+                    don't care about cross-server status changes"). */}
+                <div>
+                  <div className="flex items-center justify-between gap-3 px-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <RowIcon icon={TI.Bell} />
+                      <div className="min-w-0">
+                        <div className="font-medium">{t("notificationsFilterTitle")}</div>
+                        <div className="text-sm text-gray-500">{t("notificationsFilterDesc")}</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label={t("notificationsFilterTypesLabel")}
+                      aria-expanded={notifFilterTypesOpen}
+                      onClick={() => setNotifFilterTypesOpen((v) => !v)}
+                      className={`shrink-0 p-1.5 rounded-md transition-colors ${
+                        notifFilterTypesOpen
+                          ? "bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)]"
+                          : "text-gray-500 hover:bg-black/5 dark:hover:bg-white/10"
+                      }`}
+                    >
+                      <TI.ChevronDown
+                        className={`tabler-icon w-4 h-4 transition-transform ${notifFilterTypesOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                  </div>
+                  {notifFilterTypesOpen ? (
+                    <div className="mt-2 ml-10 mr-3 flex flex-col gap-1 px-3 py-2 rounded-lg border border-[var(--border-light)] bg-black/[0.02] dark:bg-white/[0.03]">
+                      {[
+                        { key: "federation", label: t("filterTypeFederation"), icon: TI.WorldWww,           iconClassName: "" },
+                        { key: "share",      label: t("filterTypeShare"),      icon: TI.UserShare,          iconClassName: "" },
+                        { key: "access",     label: t("filterTypeAccess"),     icon: TI.UserX,              iconClassName: "" },
+                        { key: "reminder",   label: t("filterTypeReminder"),   icon: TI.BellRingingFilled,  iconClassName: "tabler-icon--filled", color: "#6366f1" },
+                        { key: "success",    label: t("filterTypeSuccess"),    icon: TI.CircleCheckFilled,  iconClassName: "tabler-icon--filled", color: "#10b981" },
+                        { key: "warning",    label: t("filterTypeWarning"),    icon: TI.AlertTriangleFilled,iconClassName: "tabler-icon--filled", color: "#f59e0b" },
+                        { key: "error",      label: t("filterTypeError"),      icon: TI.AlertCircleFilled,  iconClassName: "tabler-icon--filled", color: "#ef4444" },
+                        { key: "info",       label: t("filterTypeInfo"),       icon: TI.InfoCircleFilled,   iconClassName: "tabler-icon--filled", color: "#3b82f6" },
+                      ].map((row) => {
+                        const enabled = notificationsFilterTypes?.[row.key] !== false;
+                        const Icon = row.icon;
+                        return (
+                          <div
+                            key={row.key}
+                            className="flex items-center justify-between gap-3 py-1.5 text-sm"
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <Icon
+                                className={`tabler-icon ${row.iconClassName || ""}`}
+                                style={{
+                                  width: 16,
+                                  height: 16,
+                                  ...(row.color ? { color: row.color } : null),
+                                }}
+                              />
+                              <span>{row.label}</span>
+                            </span>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={enabled}
+                              onClick={() =>
+                                setNotificationsFilterTypes?.((prev) => ({
+                                  ...(prev || {}),
+                                  [row.key]: !enabled,
+                                }))
+                              }
+                              className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
+                                enabled
+                                  ? "bg-gradient-to-r from-indigo-500 to-violet-600 btn-gradient"
+                                  : "bg-gray-300 dark:bg-gray-600"
+                              }`}
                             >
                               <span
                                 className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
