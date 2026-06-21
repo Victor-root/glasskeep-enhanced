@@ -125,6 +125,14 @@ function attachFederationRoutes(
     } catch {
       /* best-effort */
     }
+    // Reconnect: the peer was offline and just came back. Re-push every
+    // local user's current profile so shadow stand-ins on the peer catch
+    // up on any avatar / name changes that were missed while it was down.
+    if (previousState === "offline" && (state === "online" || state === "locked")) {
+      try {
+        noteFederation?.pushProfilesToLink?.(link);
+      } catch { /* best-effort */ }
+    }
   }
 
   // The peer removed this link (detected via a 404 "unknown link" health
@@ -500,6 +508,25 @@ function attachFederationRoutes(
       noteId: b.noteId,
       targetRef: b.targetRef,
       canWrite: b.canWrite ? 1 : 0,
+    });
+    res.status(result.ok ? 200 : 409).json(result);
+  });
+
+  // A peer tells us one of ITS users changed their display profile (name /
+  // avatar). Refresh our shadow stand-ins for that user so their new avatar
+  // shows on already-shared notes immediately, without waiting for an edit.
+  app.post("/api/federation/profile", (req, res) => {
+    const link = verifyS2S(req);
+    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
+    const b = req.body || {};
+    const result = noteFederation.applyRemoteProfile({
+      linkId: link.id,
+      ref: typeof b.ref === "string" ? b.ref : null,
+      uid: typeof b.uid === "string" ? b.uid : null,
+      name: typeof b.name === "string" ? b.name : null,
+      // null clears the avatar; a string sets it; anything else = "unknown".
+      avatarUrl: b.avatar_url === null ? null : (typeof b.avatar_url === "string" ? b.avatar_url : undefined),
     });
     res.status(result.ok ? 200 : 409).json(result);
   });
