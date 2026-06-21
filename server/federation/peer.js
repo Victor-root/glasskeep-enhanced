@@ -28,6 +28,14 @@
 const crypto = require("crypto");
 const protocol = require("./protocol");
 
+// Hysteresis: track consecutive probe failures per link in memory so a
+// single transient timeout (e.g. the peer's event-loop blocked by a
+// SQLite VACUUM at unlock time) does not immediately flip the link to
+// OFFLINE and spam state-change notifications. Two consecutive failures
+// in a row are required before we actually declare the peer unreachable.
+const _failCounts = new Map();
+const OFFLINE_THRESHOLD = 2;
+
 const REQUEST_TIMEOUT_MS = 8000;
 const SIGNATURE_WINDOW_MS = 2 * 60 * 1000; // accept timestamps within ±2 min
 
@@ -207,6 +215,7 @@ async function healthCheckOne(link, store, log = console, onStateChange, onDisso
     // generic outage. Drop our side too and let the caller notify, so a
     // unpair that happened while WE were offline is still picked up here.
     if (r.status === 404 && r.json && r.json.error === "unknown link") {
+      _failCounts.delete(link.id);
       log.log?.(`[federation] health ${host} → DISSOCIATED (peer unpaired us)`);
       try { store.remove(link.id); } catch { /* best-effort */ }
       if (typeof onDissociated === "function") {
@@ -224,18 +233,24 @@ async function healthCheckOne(link, store, log = console, onStateChange, onDisso
     // the fix for "proxy up + LXC down still showed Online".)
     if (!r.ok || !r.json || r.json.ok !== true) {
       const err = r.json?.error || `http ${r.status || "no-response"}`;
+      const fails = (_failCounts.get(link.id) || 0) + 1;
+      _failCounts.set(link.id, fails);
       log.log?.(
-        `[federation] health ${host} → DOWN (status=${r.status || "none"}, err=${err})`,
+        `[federation] health ${host} → DOWN (${fails}/${OFFLINE_THRESHOLD}, status=${r.status || "none"}, err=${err})`,
       );
       store.updateHealth(link.id, {
         last_attempt_at: attemptedAt,
-        peer_reachable: 0,
-        peer_locked: null,
-        protocol_compatible: null,
-        agreed_protocol: null,
+        // Only flip to unreachable after OFFLINE_THRESHOLD consecutive failures;
+        // on the first failure keep the last-known health values so a brief
+        // timeout does not immediately trigger an "offline" notification.
+        peer_reachable: fails >= OFFLINE_THRESHOLD ? 0 : link.peer_reachable,
+        peer_locked: fails >= OFFLINE_THRESHOLD ? null : link.peer_locked,
+        protocol_compatible: fails >= OFFLINE_THRESHOLD ? null : link.protocol_compatible,
+        agreed_protocol: fails >= OFFLINE_THRESHOLD ? null : link.agreed_protocol,
         last_error: err,
       });
     } else {
+      _failCounts.delete(link.id);
       const body = r.json;
       const neg = protocol.negotiateProtocol(body.protocol, body.protocolMin);
       log.log?.(
@@ -266,13 +281,15 @@ async function healthCheckOne(link, store, log = console, onStateChange, onDisso
     // Network / TLS failure → peer is offline (or its certificate can't
     // be verified). Keep the message so the panel can explain it.
     const err = tlsAwareMessage(e);
-    log.log?.(`[federation] health ${host} → UNREACHABLE (${err})`);
+    const fails = (_failCounts.get(link.id) || 0) + 1;
+    _failCounts.set(link.id, fails);
+    log.log?.(`[federation] health ${host} → UNREACHABLE (${fails}/${OFFLINE_THRESHOLD}, ${err})`);
     store.updateHealth(link.id, {
       last_attempt_at: attemptedAt,
-      peer_reachable: 0,
-      peer_locked: null,
-      protocol_compatible: null,
-      agreed_protocol: null,
+      peer_reachable: fails >= OFFLINE_THRESHOLD ? 0 : link.peer_reachable,
+      peer_locked: fails >= OFFLINE_THRESHOLD ? null : link.peer_locked,
+      protocol_compatible: fails >= OFFLINE_THRESHOLD ? null : link.protocol_compatible,
+      agreed_protocol: fails >= OFFLINE_THRESHOLD ? null : link.agreed_protocol,
       last_error: err,
     });
   }
