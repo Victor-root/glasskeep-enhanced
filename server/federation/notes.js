@@ -155,6 +155,13 @@ function createNoteFederation(ctx) {
       JOIN users u ON nc.user_id = u.id
       WHERE nc.note_id = ? AND u.federated_origin LIKE ?
     `),
+    // Every note a (shadow) user takes part in — as a collaborator or as the
+    // owner — so a profile refresh can repaint exactly those notes' open views.
+    notesForUser: db.prepare(`
+      SELECT note_id AS id FROM note_collaborators WHERE user_id = ?
+      UNION
+      SELECT id FROM notes WHERE user_id = ?
+    `),
     deleteNoteRow: db.prepare(`DELETE FROM notes WHERE id = ?`),
   };
 
@@ -661,6 +668,81 @@ function createNoteFederation(ctx) {
     }
   }
 
+  // ── Inbound: a peer's user changed their display profile (name/avatar) ─
+  // Refresh every local shadow stand-in for that user on THIS link so their
+  // new avatar/name shows on already-shared notes at once — without waiting
+  // for a note edit. Scoped to the calling link (a shadow's federated_origin
+  // is "<linkId>|<ref>"), so a peer can only ever touch the stand-ins it is
+  // the origin of. Touches only the `users` row, so it works while locked.
+  function applyRemoteProfile({ linkId, ref, uid, name, avatarUrl }) {
+    const link = store.getById(linkId);
+    if (!link) return { ok: false, error: "unknown_link" };
+    // A stand-in may be keyed by the participant's clean ref (an owner or a
+    // direct recipient) or by the home server's uid for them (a third-server
+    // roster stand-in); try both so the refresh lands either way.
+    const origins = [];
+    if (ref) origins.push(`${linkId}|${ref}`);
+    if (uid && uid !== ref) origins.push(`${linkId}|${uid}`);
+    const touched = [];
+    for (const origin of origins) {
+      const shadow = q.getShadowByOrigin.get(origin);
+      if (!shadow) continue;
+      const nextName = name || shadow.name;
+      // avatarUrl is sent as a string (new image) or null (cleared);
+      // undefined means "unknown" and leaves the stored value untouched.
+      const nextAvatar = avatarUrl === undefined ? shadow.avatar_url : (avatarUrl || null);
+      if (nextName !== shadow.name || nextAvatar !== shadow.avatar_url) {
+        try { q.updateShadow.run(nextName, nextAvatar, shadow.id); } catch { /* best-effort */ }
+      }
+      touched.push(shadow.id);
+    }
+    if (touched.length === 0) return { ok: true };
+    // Repaint every note these stand-ins appear on so open footers /
+    // collaborator lists re-fetch and show the new avatar immediately.
+    try {
+      const seen = new Set();
+      for (const sid of touched) {
+        for (const row of q.notesForUser.all(sid, sid)) {
+          if (seen.has(row.id)) continue;
+          seen.add(row.id);
+          try { deps.broadcastNoteUpdated?.(row.id); } catch { /* per-note best-effort */ }
+        }
+      }
+    } catch { /* ignore */ }
+    return { ok: true };
+  }
+
+  // ── Outbound: tell every paired peer OUR user changed their profile ──
+  // Fire-and-forget; a peer that's momentarily down just misses this live
+  // refresh and re-learns the avatar on the next share. `ref` is our user's
+  // stable identity on us (email||name) and `uid` our local key for them, so
+  // the peer can match a stand-in keyed either way.
+  function broadcastProfileToPeers({ ref, uid, name, avatarUrl }) {
+    if (!ref && !uid) return;
+    const path = "/api/federation/profile";
+    let links;
+    try { links = store.listActive(); } catch { return; }
+    for (const link of links) {
+      Promise.resolve()
+        .then(() =>
+          peer.httpJson(link.peer_base_url + path, {
+            method: "POST",
+            secret: link.shared_secret,
+            linkId: link.id,
+            path,
+            body: {
+              linkId: link.id,
+              ref: ref || null,
+              uid: uid || null,
+              name: name || null,
+              avatar_url: avatarUrl ?? null,
+            },
+          }),
+        )
+        .catch((e) => log.warn?.("[federation/notes] profile push:", e?.message));
+    }
+  }
+
   // ── Inbound: the peer removed/unshared a note we mirror ─────────────
   function handleIncomingRemove({ linkId, noteId }) {
     const m = q.getMappingForLink.get(noteId, linkId);
@@ -832,6 +914,8 @@ function createNoteFederation(ctx) {
     handleIncomingRemove,
     handleIncomingPermission,
     handleIncomingUnshareRecipient,
+    applyRemoteProfile,
+    broadcastProfileToPeers,
     shareWithRemote,
     setRemotePermission,
     unshareFromRemote,

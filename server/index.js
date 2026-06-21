@@ -1964,14 +1964,33 @@ app.put("/api/user/avatar", auth, (req, res) => {
     return res.status(400).json({ error: "Avatar image too large (max ~1.5MB)." });
   }
   db.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").run(avatar_url, req.user.id);
+  broadcastAvatarToPeers(req.user.id, avatar_url);
   res.json({ ok: true, avatar_url });
 });
 
 // Delete avatar (authenticated)
 app.delete("/api/user/avatar", auth, (req, res) => {
   db.prepare("UPDATE users SET avatar_url = NULL WHERE id = ?").run(req.user.id);
+  broadcastAvatarToPeers(req.user.id, null);
   res.json({ ok: true });
 });
+
+// Push a just-changed avatar to every paired server so a cross-server
+// collaborator's stand-in (and the note footers showing it) refresh at
+// once instead of staying frozen at the value snapshotted when the note
+// was shared. Fire-and-forget and fully optional — federation may be off.
+function broadcastAvatarToPeers(userId, avatarUrl) {
+  try {
+    const u = getUserById.get(userId);
+    if (!u) return;
+    noteFederationRef?.broadcastProfileToPeers?.({
+      ref: u.email || u.name,
+      uid: `local:${userId}`,
+      name: u.name || null,
+      avatarUrl: avatarUrl ?? null,
+    });
+  } catch { /* federation optional */ }
+}
 
 // Current user's profile, fresh from the DB. The client caches the user
 // object from login in localStorage and otherwise never re-reads it, so a
