@@ -162,6 +162,8 @@ function createNoteFederation(ctx) {
       UNION
       SELECT id FROM notes WHERE user_id = ?
     `),
+    // All real (non-shadow) local users — used to re-push profiles on reconnect.
+    allRealUsers: db.prepare(`SELECT id, name, email, avatar_url FROM users WHERE federated_origin IS NULL`),
     deleteNoteRow: db.prepare(`DELETE FROM notes WHERE id = ?`),
   };
 
@@ -743,6 +745,39 @@ function createNoteFederation(ctx) {
     }
   }
 
+  // ── Reconnect heal: push all local profiles to a single link ────────
+  // Called when a peer that was offline comes back. Sends every real
+  // local user's current name + avatar so the peer's shadow stand-ins
+  // catch up on any changes that were missed while it was down.
+  // Scoped to ONE link so we don't spam every peer on each reconnect.
+  function pushProfilesToLink(link) {
+    if (!link) return;
+    const path = "/api/federation/profile";
+    let users;
+    try { users = q.allRealUsers.all(); } catch { return; }
+    for (const u of users) {
+      const ref = u.email || u.name;
+      if (!ref) continue;
+      Promise.resolve()
+        .then(() =>
+          peer.httpJson(link.peer_base_url + path, {
+            method: "POST",
+            secret: link.shared_secret,
+            linkId: link.id,
+            path,
+            body: {
+              linkId: link.id,
+              ref,
+              uid: `local:${u.id}`,
+              name: u.name || null,
+              avatar_url: u.avatar_url ?? null,
+            },
+          }),
+        )
+        .catch((e) => log.warn?.("[federation/notes] profile reconnect:", e?.message));
+    }
+  }
+
   // ── Inbound: the peer removed/unshared a note we mirror ─────────────
   function handleIncomingRemove({ linkId, noteId }) {
     const m = q.getMappingForLink.get(noteId, linkId);
@@ -916,6 +951,7 @@ function createNoteFederation(ctx) {
     handleIncomingUnshareRecipient,
     applyRemoteProfile,
     broadcastProfileToPeers,
+    pushProfilesToLink,
     shareWithRemote,
     setRemotePermission,
     unshareFromRemote,

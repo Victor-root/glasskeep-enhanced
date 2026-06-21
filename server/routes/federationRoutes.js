@@ -125,6 +125,14 @@ function attachFederationRoutes(
     } catch {
       /* best-effort */
     }
+    // Reconnect: the peer was offline and just came back. Re-push every
+    // local user's current profile so shadow stand-ins on the peer catch
+    // up on any avatar / name changes that were missed while it was down.
+    if (previousState === "offline" && (state === "online" || state === "locked")) {
+      try {
+        noteFederation?.pushProfilesToLink?.(link);
+      } catch { /* best-effort */ }
+    }
   }
 
   // The peer removed this link (detected via a 404 "unknown link" health
