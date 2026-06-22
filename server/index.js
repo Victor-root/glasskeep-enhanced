@@ -800,8 +800,8 @@ function serializeNote(r, userId) {
   };
 }
 
-function signToken(user) {
-  return jwt.sign(
+function signToken(user, reason = "issue") {
+  const token = jwt.sign(
     {
       uid: user.id,
       email: user.email,
@@ -811,6 +811,45 @@ function signToken(user) {
     JWT_SECRET,
     { expiresIn: "7d" }
   );
+  // ── TEMP DIAGNOSTIC (logout investigation) ─────────────────────────
+  // Record every token mint with its creation time + why. Lets us watch
+  // a token be born at login on a device, then get RENEWED (reason=renew)
+  // on each app open — proving the 7-day window keeps sliding and is
+  // never reached. Remove once the renewal fix is confirmed in the wild.
+  try {
+    console.log(
+      `[auth-debug] token-issued reason=${reason} uid=${user.id}` +
+      ` at=${new Date().toISOString()}`,
+    );
+  } catch { /* ignore — diagnostic only */ }
+  return token;
+}
+
+// ── TEMP DIAGNOSTIC (logout investigation) ───────────────────────────
+// Explain EVERY genuine auth failure so we can confirm whether a logout
+// is a real 7-day expiry (reason=TokenExpiredError, tokenAgeH≈168) or
+// something else (JsonWebTokenError = the JWT secret changed → bad
+// signature). Never logs the token or the secret — only its claims and
+// timing. Only fires on a present-but-invalid token (a missing token is
+// just an unauthenticated request and isn't logged). Remove once the
+// renewal fix is verified.
+function logAuthFailure(req, token, err) {
+  try {
+    const nowMs = Date.now();
+    let claims = null;
+    try { claims = jwt.decode(token); } catch { /* malformed */ }
+    const iat = claims?.iat ? claims.iat * 1000 : null;
+    const exp = claims?.exp ? claims.exp * 1000 : null;
+    console.warn(
+      `[auth-debug] 401 ${req.method} ${req.path}` +
+      ` reason=${err?.name || "VERIFY_FAIL"}` +
+      ` uid=${claims?.uid ?? "?"}` +
+      ` tokenAgeH=${iat ? ((nowMs - iat) / 3600000).toFixed(1) : "?"}` +
+      ` expiredAgoS=${exp ? ((nowMs - exp) / 1000).toFixed(0) : "?"}` +
+      (err?.name === "JsonWebTokenError" ? " ⚠️SECRET-MISMATCH/BAD-SIGNATURE" : "") +
+      ` serverNow=${new Date(nowMs).toISOString()}`,
+    );
+  } catch { /* never let diagnostics break auth */ }
 }
 
 function auth(req, res, next) {
@@ -827,6 +866,7 @@ function auth(req, res, next) {
     };
     next();
   } catch (e) {
+    logAuthFailure(req, token, e);
     return res.status(401).json({ error: "Invalid token" });
   }
 }
@@ -848,6 +888,7 @@ function authFromQueryOrHeader(req, res, next) {
     };
     next();
   } catch (e) {
+    logAuthFailure(req, token, e);
     return res.status(401).json({ error: "Invalid token" });
   }
 }
@@ -1877,7 +1918,7 @@ app.post("/api/login", (req, res) => {
   if (!bcrypt.compareSync(password || "", user.password_hash)) {
     return res.status(401).json({ error: "Incorrect password." });
   }
-  const token = signToken(user);
+  const token = signToken(user, "login-password");
   // Always include must_change_password as a boolean for parity with
   // the passkey + QR sign-in responses. Field-presence parity matters
   // because the client stores the response straight into auth state.
@@ -1924,7 +1965,7 @@ app.post("/api/login/secret", (req, res) => {
   for (const u of rows) {
     if (u.secret_key_hash && bcrypt.compareSync(key, u.secret_key_hash)) {
       const fullUser = getUserById.get(u.id);
-      const token = signToken(u);
+      const token = signToken(u, "login-secret-key");
       const response = {
         token,
         user: { id: u.id, name: u.name, email: u.email, is_admin: !!u.is_admin, avatar_url: fullUser?.avatar_url || null, language: fullUser?.language || null },
@@ -2017,7 +2058,7 @@ app.get("/api/user/me", auth, (req, res) => {
 app.get("/api/auth/renew", auth, (req, res) => {
   const user = getUserById.get(req.user.id);
   if (!user || user.federated_origin) return res.status(401).json({ error: "No account found." });
-  const token = signToken(user);
+  const token = signToken(user, "renew");
   res.json({
     token,
     user: {
@@ -2110,7 +2151,7 @@ app.post("/api/user/change-password", auth, (req, res) => {
   // omitting language would wipe the user's language preference from
   // session state on every password change.
   const updatedUser = getUserById.get(user.id);
-  const token = signToken(updatedUser);
+  const token = signToken(updatedUser, "password-change");
   res.json({
     ok: true,
     token,
