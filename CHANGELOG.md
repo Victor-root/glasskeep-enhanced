@@ -1,7 +1,5 @@
 # 📋 Changelog
 
-> ⭐ **Enjoying GlassKeep?** If you have a GitHub account, a quick [star on the repo](https://github.com/Victor-root/glasskeep-enhanced) helps the project a lot — thank you!
-
 ## 🚀 v2.6.0 — 2026-06-10
 
 Headline feature: **cross-server collaboration** — pair two independent, self-hosted GlassKeep servers and let their users share notes across instances, in real time. Each note's owning server stays the source of truth while the other keeps a synced mirror, with clear handling for when a peer is offline, locked or out of date. The release also fixes cross-device profile sync and removes a redundant lock notification.
