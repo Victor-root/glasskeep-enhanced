@@ -22,6 +22,26 @@ import { api, getAuth, API_BASE } from "../../utils/api.js";
 
 const SHOW_FLAG_KEY = "glass-keep-show-changelog-next-mount";
 
+// Set once the user clicks "Already done" on the GitHub star footer, so
+// the prompt is hidden for good on every future changelog view.
+const STAR_DISMISS_KEY = "glass-keep-star-cta-dismissed";
+
+function readStarDismissed() {
+    try {
+        return localStorage.getItem(STAR_DISMISS_KEY) === "1";
+    } catch {
+        return false;
+    }
+}
+
+function dismissStarCta() {
+    try {
+        localStorage.setItem(STAR_DISMISS_KEY, "1");
+    } catch {
+        /* ignore — at worst the prompt shows once more next time */
+    }
+}
+
 function readShowFlag() {
     try {
         return localStorage.getItem(SHOW_FLAG_KEY) === "1";
@@ -158,6 +178,8 @@ export default function ChangelogModal({ open, onClose }) {
     const [translatedRaw, setTranslatedRaw] = useState(null);
     const [translateError, setTranslateError] = useState(null);
     const [showOriginal, setShowOriginal] = useState(false);
+    // Whether the user has permanently dismissed the GitHub star footer.
+    const [starDismissed, setStarDismissed] = useState(readStarDismissed);
     // Holds the AbortController of an in-flight translation stream so
     // closing the modal mid-stream tears the upstream request down
     // (no more tokens wasted after the admin walks away).
@@ -528,18 +550,28 @@ export default function ChangelogModal({ open, onClose }) {
                         openExternalUrl(resolveChangelogHref(href));
                     }}
                 />
-                <div className="shrink-0 flex items-center justify-center gap-1.5 px-5 py-2 border-t border-[var(--border-light)] bg-white/40 dark:bg-white/5">
-                    <span className="text-xs text-gray-400 dark:text-gray-500">
-                        {t("changelogStarUs")}{" "}
+                {!starDismissed && (
+                    <div className="shrink-0 flex items-center justify-center gap-2 px-5 py-2 border-t border-[var(--border-light)] bg-white/40 dark:bg-white/5">
+                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                            {t("changelogStarUs")}{" "}
+                            <button
+                                type="button"
+                                onClick={() => openExternalUrl("https://github.com/Victor-root/glasskeep-enhanced")}
+                                className="underline underline-offset-2 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                            >
+                                {t("changelogStarUsLink")}
+                            </button>
+                        </span>
+                        <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
                         <button
                             type="button"
-                            onClick={() => openExternalUrl("https://github.com/Victor-root/glasskeep-enhanced")}
-                            className="underline underline-offset-2 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                            onClick={() => { dismissStarCta(); setStarDismissed(true); }}
+                            className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                         >
-                            {t("changelogStarUsLink")}
+                            {t("changelogStarUsDone")}
                         </button>
-                    </span>
-                </div>
+                    </div>
+                )}
             </div>
         </div>
     );
