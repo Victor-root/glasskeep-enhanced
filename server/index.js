@@ -56,15 +56,6 @@ const JWT_SECRET = (() => {
   return trimmed;
 })();
 
-// ── TEMP DIAGNOSTIC (logout investigation) ───────────────────────────
-// Log a short, NON-REVERSIBLE fingerprint of the JWT secret at boot.
-// If this value CHANGES between two restarts, every token signed before
-// the change is rejected → mass logout. Reveals nothing about the secret
-// itself (truncated SHA-256). Remove once the logout bug is diagnosed.
-try {
-  const _fp = require("crypto").createHash("sha256").update(JWT_SECRET).digest("hex").slice(0, 12);
-  console.log(`[auth-debug] boot jwt-secret-fp=${_fp} at=${new Date().toISOString()} pid=${process.pid}`);
-} catch { /* ignore — diagnostic only */ }
 
 // ---------- Body parsing ----------
 // `verify` stashes the raw request body, but ONLY for the
@@ -822,43 +813,10 @@ function signToken(user) {
   );
 }
 
-// ── TEMP DIAGNOSTIC (logout investigation) ───────────────────────────
-// Explain EVERY auth 401 so we can pin down the spurious-logout bug:
-//   - MISSING_TOKEN        → the client sent a request with no Bearer
-//   - TokenExpiredError    → token genuinely past its exp (look at age:
-//                            ~7d = normal expiry; tiny/negative = clock skew)
-//   - JsonWebTokenError    → BAD SIGNATURE → the JWT secret changed (!)
-// Never logs the token or the secret — only claims (uid/iat/exp) and
-// timing. Remove once the bug is diagnosed.
-function logAuthFailure(req, token, err) {
-  try {
-    const nowMs = Date.now();
-    let detail;
-    if (!token) {
-      detail = "reason=MISSING_TOKEN";
-    } else {
-      let claims = null;
-      try { claims = jwt.decode(token); } catch { /* malformed */ }
-      const iat = claims?.iat ? claims.iat * 1000 : null;
-      const exp = claims?.exp ? claims.exp * 1000 : null;
-      detail =
-        `reason=${err?.name || "VERIFY_FAIL"}` +
-        ` uid=${claims?.uid ?? "?"}` +
-        ` tokenAgeH=${iat ? ((nowMs - iat) / 3600000).toFixed(1) : "?"}` +
-        ` expiredAgoS=${exp ? ((nowMs - exp) / 1000).toFixed(0) : "?"}` +
-        (err?.name === "JsonWebTokenError" ? " ⚠️SECRET-MISMATCH/BAD-SIGNATURE" : "");
-    }
-    console.warn(
-      `[auth-debug] 401 ${req.method} ${req.path} ${detail}` +
-      ` serverNow=${new Date(nowMs).toISOString()} upSec=${Math.round(process.uptime())}`,
-    );
-  } catch { /* never let diagnostics break auth */ }
-}
-
 function auth(req, res, next) {
   const h = req.headers.authorization || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : null;
-  if (!token) { logAuthFailure(req, null, null); return res.status(401).json({ error: "Missing token" }); }
+  if (!token) return res.status(401).json({ error: "Missing token" });
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     req.user = {
@@ -869,7 +827,6 @@ function auth(req, res, next) {
     };
     next();
   } catch (e) {
-    logAuthFailure(req, token, e);
     return res.status(401).json({ error: "Invalid token" });
   }
 }
@@ -880,7 +837,7 @@ function authFromQueryOrHeader(req, res, next) {
   const headerToken = h.startsWith("Bearer ") ? h.slice(7) : null;
   const queryToken = req.query && typeof req.query.token === "string" ? req.query.token : null;
   const token = headerToken || queryToken;
-  if (!token) { logAuthFailure(req, null, null); return res.status(401).json({ error: "Missing token" }); }
+  if (!token) return res.status(401).json({ error: "Missing token" });
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     req.user = {
@@ -891,7 +848,6 @@ function authFromQueryOrHeader(req, res, next) {
     };
     next();
   } catch (e) {
-    logAuthFailure(req, token, e);
     return res.status(401).json({ error: "Invalid token" });
   }
 }
@@ -2051,6 +2007,27 @@ app.get("/api/user/me", auth, (req, res) => {
     is_admin: !!u.is_admin,
     avatar_url: u.avatar_url || null,
     language: u.language || null,
+  });
+});
+
+// Re-issue a fresh 7-day JWT for an already-authenticated session.
+// The client calls this proactively when the current token is older than
+// 24h — so the 7-day expiry cliff is never hit in practice as long as
+// the user opens the app at least once a week.
+app.get("/api/auth/renew", auth, (req, res) => {
+  const user = getUserById.get(req.user.id);
+  if (!user || user.federated_origin) return res.status(401).json({ error: "No account found." });
+  const token = signToken(user);
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      is_admin: !!user.is_admin,
+      avatar_url: user.avatar_url || null,
+      language: user.language || null,
+    },
   });
 });
 
