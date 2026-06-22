@@ -4447,6 +4447,20 @@ app.get("/api/users/search", auth, (req, res) => {
 });
 
 const deleteUserStmt = db.prepare("DELETE FROM users WHERE id = ?");
+// Federated HOME notes a user collaborates on — queried BEFORE the DELETE
+// so we still see the rows that CASCADE will wipe, letting us re-push the
+// updated roster (without the deleted user) to peer mirrors after.
+const fedHomeCollabsForUser = (() => {
+  try {
+    return db.prepare(`
+      SELECT DISTINCT fn.note_id
+      FROM note_collaborators nc
+      JOIN federated_notes fn ON nc.note_id = fn.note_id
+      WHERE nc.user_id = ? AND fn.role = 'home'
+    `);
+  } catch { return null; }
+})();
+
 app.delete("/api/admin/users/:id", auth, adminOnly, (req, res) => {
   const id = Number(req.params.id);
   if (id === req.user.id) {
@@ -4460,7 +4474,21 @@ app.delete("/api/admin/users/:id", auth, adminOnly, (req, res) => {
     return res.status(400).json({ error: "Cannot delete the last admin." });
   }
 
+  // Capture BEFORE the DELETE cascades away the collaborator rows.
+  let federatedNoteIds = [];
+  try {
+    if (fedHomeCollabsForUser) {
+      federatedNoteIds = fedHomeCollabsForUser.all(id).map((r) => r.note_id);
+    }
+  } catch { /* best-effort */ }
+
   deleteUserStmt.run(id);
+
+  // Push updated rosters (without the deleted user) to peer mirrors so
+  // Victor's view of the note stops showing the now-gone collaborator.
+  for (const noteId of federatedNoteIds) {
+    try { noteFederationRef?.onParticipantsChangedLocally?.(noteId); } catch { /* best-effort */ }
+  }
 
   // Notify every OTHER admin. The acting admin already sees the
   // operation succeed locally, so they get a plain success toast in
