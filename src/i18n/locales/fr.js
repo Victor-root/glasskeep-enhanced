@@ -1311,6 +1311,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   changelogShowTranslated: "Afficher la traduction",
   changelogTranslateUnavailable: "L'IA n'est pas configurée",
   changelogTranslateFailed: "Échec de la traduction, réessayez plus tard.",
+  changelogStarUs: "Vous appréciez GlassKeep ?",
+  changelogStarUsLink: "Laissez une ⭐ sur GitHub",
   selfUpdateKeepOpenHint:
     "Gardez cette fenêtre ouverte jusqu'à la fin.",
   selfUpdateDockerHintIntro:

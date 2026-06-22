@@ -1310,6 +1310,8 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   changelogShowTranslated: "Show translation",
   changelogTranslateUnavailable: "AI is not configured",
   changelogTranslateFailed: "Translation failed, try again later.",
+  changelogStarUs: "Enjoying GlassKeep?",
+  changelogStarUsLink: "Leave a ⭐ on GitHub",
   selfUpdateKeepOpenHint: "Keep this window open until it is over.",
   selfUpdateDockerHintIntro:
     "To enable one-click updates on Docker, add this single line under the 'volumes:' block of your docker-compose.yml, then restart the container once. You will never have to touch this file again.",

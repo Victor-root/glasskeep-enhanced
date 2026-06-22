@@ -528,6 +528,18 @@ export default function ChangelogModal({ open, onClose }) {
                         openExternalUrl(resolveChangelogHref(href));
                     }}
                 />
+                <div className="shrink-0 flex items-center justify-center gap-1.5 px-5 py-2 border-t border-[var(--border-light)] bg-white/40 dark:bg-white/5">
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                        {t("changelogStarUs")}{" "}
+                        <button
+                            type="button"
+                            onClick={() => openExternalUrl("https://github.com/Victor-root/glasskeep-enhanced")}
+                            className="underline underline-offset-2 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                        >
+                            {t("changelogStarUsLink")}
+                        </button>
+                    </span>
+                </div>
             </div>
         </div>
     );
