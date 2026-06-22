@@ -163,6 +163,26 @@ export default function App() {
           if (cur) setAuth({ ...cur, user: { ...cur.user, ...me } });
         } catch { /* localStorage unavailable */ }
       } catch { /* offline / locked — keep the cached profile */ }
+
+      // Proactively renew the JWT when it's older than 24 h so the
+      // 7-day expiry cliff is never reached in normal use. Best-effort:
+      // if the call fails the existing token is still valid until expiry.
+      try {
+        const parts = token.split(".");
+        if (parts.length === 3) {
+          const claims = JSON.parse(atob(parts[1]));
+          if (claims?.iat && Date.now() - claims.iat * 1000 > 24 * 3600 * 1000) {
+            const renewed = await api("/auth/renew", { token });
+            if (!cancelled && renewed?.token) {
+              setSession((prev) => prev ? { ...prev, token: renewed.token } : prev);
+              try {
+                const cur = getAuth();
+                if (cur) setAuth({ ...cur, token: renewed.token });
+              } catch { /* localStorage unavailable */ }
+            }
+          }
+        }
+      } catch { /* renewal best-effort — existing token still valid */ }
     };
     refreshProfile();
     window.addEventListener("focus", refreshProfile);

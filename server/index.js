@@ -56,15 +56,6 @@ const JWT_SECRET = (() => {
   return trimmed;
 })();
 
-// ── TEMP DIAGNOSTIC (logout investigation) ───────────────────────────
-// Log a short, NON-REVERSIBLE fingerprint of the JWT secret at boot.
-// If this value CHANGES between two restarts, every token signed before
-// the change is rejected → mass logout. Reveals nothing about the secret
-// itself (truncated SHA-256). Remove once the logout bug is diagnosed.
-try {
-  const _fp = require("crypto").createHash("sha256").update(JWT_SECRET).digest("hex").slice(0, 12);
-  console.log(`[auth-debug] boot jwt-secret-fp=${_fp} at=${new Date().toISOString()} pid=${process.pid}`);
-} catch { /* ignore — diagnostic only */ }
 
 // ---------- Body parsing ----------
 // `verify` stashes the raw request body, but ONLY for the
@@ -809,8 +800,8 @@ function serializeNote(r, userId) {
   };
 }
 
-function signToken(user) {
-  return jwt.sign(
+function signToken(user, reason = "issue") {
+  const token = jwt.sign(
     {
       uid: user.id,
       email: user.email,
@@ -820,37 +811,43 @@ function signToken(user) {
     JWT_SECRET,
     { expiresIn: "7d" }
   );
+  // ── TEMP DIAGNOSTIC (logout investigation) ─────────────────────────
+  // Record every token mint with its creation time + why. Lets us watch
+  // a token be born at login on a device, then get RENEWED (reason=renew)
+  // on each app open — proving the 7-day window keeps sliding and is
+  // never reached. Remove once the renewal fix is confirmed in the wild.
+  try {
+    console.log(
+      `[auth-debug] token-issued reason=${reason} uid=${user.id}` +
+      ` at=${new Date().toISOString()}`,
+    );
+  } catch { /* ignore — diagnostic only */ }
+  return token;
 }
 
 // ── TEMP DIAGNOSTIC (logout investigation) ───────────────────────────
-// Explain EVERY auth 401 so we can pin down the spurious-logout bug:
-//   - MISSING_TOKEN        → the client sent a request with no Bearer
-//   - TokenExpiredError    → token genuinely past its exp (look at age:
-//                            ~7d = normal expiry; tiny/negative = clock skew)
-//   - JsonWebTokenError    → BAD SIGNATURE → the JWT secret changed (!)
-// Never logs the token or the secret — only claims (uid/iat/exp) and
-// timing. Remove once the bug is diagnosed.
+// Explain EVERY genuine auth failure so we can confirm whether a logout
+// is a real 7-day expiry (reason=TokenExpiredError, tokenAgeH≈168) or
+// something else (JsonWebTokenError = the JWT secret changed → bad
+// signature). Never logs the token or the secret — only its claims and
+// timing. Only fires on a present-but-invalid token (a missing token is
+// just an unauthenticated request and isn't logged). Remove once the
+// renewal fix is verified.
 function logAuthFailure(req, token, err) {
   try {
     const nowMs = Date.now();
-    let detail;
-    if (!token) {
-      detail = "reason=MISSING_TOKEN";
-    } else {
-      let claims = null;
-      try { claims = jwt.decode(token); } catch { /* malformed */ }
-      const iat = claims?.iat ? claims.iat * 1000 : null;
-      const exp = claims?.exp ? claims.exp * 1000 : null;
-      detail =
-        `reason=${err?.name || "VERIFY_FAIL"}` +
-        ` uid=${claims?.uid ?? "?"}` +
-        ` tokenAgeH=${iat ? ((nowMs - iat) / 3600000).toFixed(1) : "?"}` +
-        ` expiredAgoS=${exp ? ((nowMs - exp) / 1000).toFixed(0) : "?"}` +
-        (err?.name === "JsonWebTokenError" ? " ⚠️SECRET-MISMATCH/BAD-SIGNATURE" : "");
-    }
+    let claims = null;
+    try { claims = jwt.decode(token); } catch { /* malformed */ }
+    const iat = claims?.iat ? claims.iat * 1000 : null;
+    const exp = claims?.exp ? claims.exp * 1000 : null;
     console.warn(
-      `[auth-debug] 401 ${req.method} ${req.path} ${detail}` +
-      ` serverNow=${new Date(nowMs).toISOString()} upSec=${Math.round(process.uptime())}`,
+      `[auth-debug] 401 ${req.method} ${req.path}` +
+      ` reason=${err?.name || "VERIFY_FAIL"}` +
+      ` uid=${claims?.uid ?? "?"}` +
+      ` tokenAgeH=${iat ? ((nowMs - iat) / 3600000).toFixed(1) : "?"}` +
+      ` expiredAgoS=${exp ? ((nowMs - exp) / 1000).toFixed(0) : "?"}` +
+      (err?.name === "JsonWebTokenError" ? " ⚠️SECRET-MISMATCH/BAD-SIGNATURE" : "") +
+      ` serverNow=${new Date(nowMs).toISOString()}`,
     );
   } catch { /* never let diagnostics break auth */ }
 }
@@ -858,7 +855,7 @@ function logAuthFailure(req, token, err) {
 function auth(req, res, next) {
   const h = req.headers.authorization || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : null;
-  if (!token) { logAuthFailure(req, null, null); return res.status(401).json({ error: "Missing token" }); }
+  if (!token) return res.status(401).json({ error: "Missing token" });
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     req.user = {
@@ -880,7 +877,7 @@ function authFromQueryOrHeader(req, res, next) {
   const headerToken = h.startsWith("Bearer ") ? h.slice(7) : null;
   const queryToken = req.query && typeof req.query.token === "string" ? req.query.token : null;
   const token = headerToken || queryToken;
-  if (!token) { logAuthFailure(req, null, null); return res.status(401).json({ error: "Missing token" }); }
+  if (!token) return res.status(401).json({ error: "Missing token" });
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     req.user = {
@@ -1921,7 +1918,7 @@ app.post("/api/login", (req, res) => {
   if (!bcrypt.compareSync(password || "", user.password_hash)) {
     return res.status(401).json({ error: "Incorrect password." });
   }
-  const token = signToken(user);
+  const token = signToken(user, "login-password");
   // Always include must_change_password as a boolean for parity with
   // the passkey + QR sign-in responses. Field-presence parity matters
   // because the client stores the response straight into auth state.
@@ -1968,7 +1965,7 @@ app.post("/api/login/secret", (req, res) => {
   for (const u of rows) {
     if (u.secret_key_hash && bcrypt.compareSync(key, u.secret_key_hash)) {
       const fullUser = getUserById.get(u.id);
-      const token = signToken(u);
+      const token = signToken(u, "login-secret-key");
       const response = {
         token,
         user: { id: u.id, name: u.name, email: u.email, is_admin: !!u.is_admin, avatar_url: fullUser?.avatar_url || null, language: fullUser?.language || null },
@@ -2054,6 +2051,27 @@ app.get("/api/user/me", auth, (req, res) => {
   });
 });
 
+// Re-issue a fresh 7-day JWT for an already-authenticated session.
+// The client calls this proactively when the current token is older than
+// 24h — so the 7-day expiry cliff is never hit in practice as long as
+// the user opens the app at least once a week.
+app.get("/api/auth/renew", auth, (req, res) => {
+  const user = getUserById.get(req.user.id);
+  if (!user || user.federated_origin) return res.status(401).json({ error: "No account found." });
+  const token = signToken(user, "renew");
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      is_admin: !!user.is_admin,
+      avatar_url: user.avatar_url || null,
+      language: user.language || null,
+    },
+  });
+});
+
 // Get current user profile info (authenticated)
 app.get("/api/user/profile", auth, (req, res) => {
   const user = getUserById.get(req.user.id);
@@ -2133,7 +2151,7 @@ app.post("/api/user/change-password", auth, (req, res) => {
   // omitting language would wipe the user's language preference from
   // session state on every password change.
   const updatedUser = getUserById.get(user.id);
-  const token = signToken(updatedUser);
+  const token = signToken(updatedUser, "password-change");
   res.json({
     ok: true,
     token,
