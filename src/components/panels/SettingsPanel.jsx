@@ -278,7 +278,7 @@ export default function SettingsPanel({
         />
       )}
       <div
-        className={`gk-side-panel fixed top-0 right-0 z-50 h-full w-full lg:w-[32rem] transition-transform duration-200 ${open ? "translate-x-0 shadow-2xl" : "translate-x-full shadow-none"}`}
+        className={`gk-side-panel fixed top-0 right-0 z-50 h-full w-full lg:w-[32rem] flex flex-col transition-transform duration-200 ${open ? "translate-x-0 shadow-2xl" : "translate-x-full shadow-none"}`}
         style={{
           borderLeft: "1px solid var(--border-light)",
           paddingTop: "var(--safe-top)",
@@ -287,7 +287,7 @@ export default function SettingsPanel({
         }}
         inert={!open}
       >
-        <div className="p-4 flex items-center justify-between border-b border-[var(--border-light)]">
+        <div className="shrink-0 p-4 flex items-center justify-between border-b border-[var(--border-light)]">
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <SettingsIcon />{t("settings")}</h3>
           <button
@@ -299,7 +299,7 @@ export default function SettingsPanel({
           </button>
         </div>
 
-        <div className="p-4 pb-12 overflow-y-auto overflow-x-hidden h-[calc(100%-64px)]">
+        <div className="p-4 pb-4 overflow-y-auto overflow-x-hidden flex-1 min-h-0">
           {/* Profile Section — header (icon + "Profil" title) intentionally
               omitted; the avatar block is self-explanatory. */}
           <div className="mb-8">
@@ -1557,9 +1557,7 @@ export default function SettingsPanel({
           </div>
         </div>
 
-        {/* Pinned panel footer — the app version stays anchored at the
-            bottom-right of the side sheet regardless of scroll. */}
-        <div className="pointer-events-none absolute bottom-2 right-3 select-none">
+        <div className="pointer-events-none shrink-0 flex justify-end pr-3 pb-1.5 pt-0.5 select-none">
           <span className="text-xs text-gray-400 dark:text-gray-600 tabular-nums">
             v{__APP_VERSION__}
           </span>
