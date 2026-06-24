@@ -299,7 +299,7 @@ export default function SettingsPanel({
           </button>
         </div>
 
-        <div className="p-4 pb-4 overflow-y-auto overflow-x-hidden flex-1 min-h-0">
+        <div className="p-4 overflow-y-auto overflow-x-hidden flex-1 min-h-0 flex flex-col">
           {/* Profile Section — header (icon + "Profil" title) intentionally
               omitted; the avatar block is self-explanatory. */}
           <div className="mb-8">
@@ -1555,12 +1555,18 @@ export default function SettingsPanel({
             </div>
             </SettingsSection>
           </div>
-        </div>
 
-        <div className="pointer-events-none shrink-0 flex justify-end pr-3 pb-1.5 pt-0.5 select-none">
-          <span className="text-xs text-gray-400 dark:text-gray-600 tabular-nums">
-            v{__APP_VERSION__}
-          </span>
+          {/* App version — last element of the scrollable flow. mt-auto
+              pins it to the bottom-right while the settings fit without
+              scrolling (e.g. all sections collapsed); once the expanded
+              sections overflow, mt-auto collapses to 0 and the badge flows
+              to the very end, scrolling off-screen until you reach the
+              bottom. */}
+          <div className="mt-auto pt-6 flex justify-end pointer-events-none select-none">
+            <span className="text-xs text-gray-400 dark:text-gray-600 tabular-nums">
+              v{__APP_VERSION__}
+            </span>
+          </div>
         </div>
       </div>
 
