@@ -662,6 +662,19 @@ function createNoteFederation(ctx) {
     if (!note) return;
     for (const m of q.listByNote.all(noteId)) {
       if (m.role !== "home") continue;
+      // A roster change (collaborator added/removed, access toggled, or a
+      // whole user deleted) does NOT bump the note's client_updated_at, so the
+      // reconcile tick's "content unchanged" guard (client_updated_at ===
+      // last_pushed_cua) would skip re-pushing it. Clear this peer's push
+      // watermark FIRST so the change is guaranteed to be delivered: the
+      // instant push below restores the watermark on success, but if the peer
+      // is unreachable right now (or the push fails) the watermark stays empty
+      // and the tick keeps retrying until it lands — making roster changes
+      // self-healing across reconnects, exactly like content edits already are.
+      // Without this, a roster change pushed while the peer is down (or made
+      // before the peer ran this code) is lost forever, leaving a deleted
+      // collaborator stuck on the peer's mirror.
+      try { q.setPushed.run(null, m.note_id, m.link_id); } catch { /* best-effort */ }
       const link = store.getById(m.link_id);
       if (!link || link.status !== "active" || link.peer_reachable !== 1) continue;
       Promise.resolve()
