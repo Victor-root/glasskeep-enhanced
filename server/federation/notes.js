@@ -228,6 +228,11 @@ function createNoteFederation(ctx) {
       color: note.color ?? "default",
       timestamp: note.timestamp,
       client_updated_at: note.client_updated_at,
+      // Carry the "last edited by / at" so the peer's mirror shows who really
+      // made the latest edit and when, instead of freezing on whoever last
+      // touched their own local copy. Older peers simply ignore these fields.
+      last_edited_by: note.last_edited_by ?? null,
+      last_edited_at: note.last_edited_at ?? null,
     };
   }
 
@@ -480,7 +485,10 @@ function createNoteFederation(ctx) {
     try { applyRoster(note.id, linkId, roster); } catch (e) { log.warn?.("[federation/notes] share roster:", e?.message); }
 
     try {
-      deps.updateNoteWithEditor.run(deps.nowISO(), ownerName || ownerRef, deps.nowISO(), note.id);
+      // Seed the mirror's "Modifié le … par …" from the real last-edit info the
+      // owner sent, falling back to owner + now for older peers that omit it.
+      const shareStampAt = note.last_edited_at || note.client_updated_at || deps.nowISO();
+      deps.updateNoteWithEditor.run(shareStampAt, note.last_edited_by || ownerName || ownerRef, shareStampAt, note.id);
       deps.createShareNotification({
         recipientId: target.id,
         senderId: shadowOwner.id,
@@ -546,6 +554,17 @@ function createNoteFederation(ctx) {
       client_updated_at: note.client_updated_at,
     };
     deps.runUpdateNoteFullCollab(row, existing.user_id);
+    // Carry the authoritative "last edited by / at" from the peer so our
+    // mirror's "Modifié le … par …" reflects who actually made this edit on
+    // the owning side — not whoever last touched our local copy. The content
+    // UPDATE above never writes these columns. Older peers omit the fields, so
+    // we skip in that case rather than wiping a good local stamp with nulls.
+    try {
+      if (note.last_edited_by != null || note.last_edited_at != null) {
+        const stampAt = note.last_edited_at || note.client_updated_at || deps.nowISO();
+        deps.updateNoteWithEditor.run(stampAt, note.last_edited_by ?? null, stampAt, note.id);
+      }
+    } catch (e) { log.warn?.("[federation/notes] editor stamp:", e?.message); }
     // Mark this exact version as "already in sync" for THIS peer so our own
     // tick never bounces it straight back (echo-loop guard). Other peers
     // keep their own last_pushed_cua and still receive the update.
