@@ -809,7 +809,10 @@ function signToken(user, reason = "issue") {
       is_admin: !!user.is_admin,
     },
     JWT_SECRET,
-    { expiresIn: "7d" }
+    // 30-day ceiling: an actively-used session is renewed well before this
+    // (see the client's sliding-renewal on focus), so this only bounds how
+    // long a device can sit UNUSED before it must sign in again.
+    { expiresIn: "30d" }
   );
   // ── TEMP DIAGNOSTIC (logout investigation) ─────────────────────────
   // Record every token mint with its creation time + why. Lets us watch

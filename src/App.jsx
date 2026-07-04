@@ -164,22 +164,31 @@ export default function App() {
         } catch { /* localStorage unavailable */ }
       } catch { /* offline / locked — keep the cached profile */ }
 
-      // Proactively renew the JWT when it's older than 24 h so the
-      // 7-day expiry cliff is never reached in normal use. Best-effort:
-      // if the call fails the existing token is still valid until expiry.
+      // Proactively renew the JWT while it's still valid but aging, so an
+      // actively-used session never hits the expiry cliff. We decode the
+      // payload ONLY to skip the call when the token is still fresh (<24 h);
+      // if we can't read the age we renew anyway (fail-open).
+      //
+      // NB: JWT payloads are base64URL. A plain atob() throws on '-'/'_'
+      // (present in ~all tokens), which previously threw here and silently
+      // disabled renewal entirely — so tokens still died at their max age.
       try {
-        const parts = token.split(".");
-        if (parts.length === 3) {
-          const claims = JSON.parse(atob(parts[1]));
-          if (claims?.iat && Date.now() - claims.iat * 1000 > 24 * 3600 * 1000) {
-            const renewed = await api("/auth/renew", { token });
-            if (!cancelled && renewed?.token) {
-              setSession((prev) => prev ? { ...prev, token: renewed.token } : prev);
-              try {
-                const cur = getAuth();
-                if (cur) setAuth({ ...cur, token: renewed.token });
-              } catch { /* localStorage unavailable */ }
-            }
+        let shouldRenew = true;
+        try {
+          const payloadB64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+          const claims = JSON.parse(atob(payloadB64));
+          if (claims?.iat && Date.now() - claims.iat * 1000 < 24 * 3600 * 1000) {
+            shouldRenew = false; // still fresh — nothing to do yet
+          }
+        } catch { /* couldn't read the age → renew anyway */ }
+        if (shouldRenew) {
+          const renewed = await api("/auth/renew", { token });
+          if (!cancelled && renewed?.token) {
+            setSession((prev) => (prev ? { ...prev, token: renewed.token } : prev));
+            try {
+              const cur = getAuth();
+              if (cur) setAuth({ ...cur, token: renewed.token });
+            } catch { /* localStorage unavailable */ }
           }
         }
       } catch { /* renewal best-effort — existing token still valid */ }
