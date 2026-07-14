@@ -76,7 +76,7 @@
 GlassKeep brings together:
 
 * **🔄 local-first usage and offline support**
-* **🌐 cross-server collaboration** — pair two GlassKeep servers and share notes across them in real time
+* **🌐 cross-server collaboration**: pair two GlassKeep servers and share notes across them in real time
 * **🗑️ safer note deletion with Trash / restore**
 * **📱 first-class mobile usability**
 * **✏️ a WYSIWYG / live-formatting editor for text notes**
@@ -90,7 +90,7 @@ GlassKeep brings together:
 * **💬 configurable AI assistant with local or remote endpoints**
 * **🔐 server-side encryption & passkeys**
 * **🔔 in-app update notifications**
-* **🚀 one-click in-app updates** from the admin panel — live progress, cancel/rollback, AI-translatable changelog after install
+* **🚀 one-click in-app updates** from the admin panel: live progress, cancel/rollback, AI-translatable changelog after install
 * **🎙️ audio notes**
 * **🖼️ cohesive branding and icons** across the web app, PWA, favicon, Android launcher, and TV banner
 
@@ -110,10 +110,10 @@ GlassKeep also includes:
 * 📝 Markdown notes, checklists, drawings, and images
 * 👥 real-time collaboration on notes
 * 📦 import / export with cross-device duplicate detection
-* 📥 Google Keep import (Takeout `.zip` — full colour, images, line breaks)
+* 📥 Google Keep import (Takeout `.zip`, full colour, images, line breaks)
 * 🤖 optional AI assistant via any OpenAI-compatible endpoint (Ollama, Open WebUI, LiteLLM, OpenAI, …)
 * 📲 PWA support
-* ⏰ note reminders with notifications everywhere — in-app, browser/PWA push, and on the Android app even when fully closed (no Google, no third-party service)
+* ⏰ note reminders with notifications everywhere: in-app, browser/PWA push, and on the Android app even when fully closed (no Google, no third-party service)
 
 ---
 
@@ -123,7 +123,7 @@ A native Android companion app is available for GlassKeep, making self-hosted mo
 
 The Android app is a WebView wrapper for GlassKeep and does not necessarily change with every project release.
 
-The **same APK also runs on Android TV** — the app detects leanback hardware (or the `?tv=1` URL override) and switches the React frontend to a dedicated TV layout designed for the couch and the D-pad. No separate build, no separate install: phone, tablet and TV all share one codebase. See section **4** of [`IMPROVEMENTS.md`](./IMPROVEMENTS.md) for the full TV layout details.
+The **same APK also runs on Android TV**: the app detects leanback hardware (or the `?tv=1` URL override) and switches the React frontend to a dedicated TV layout designed for the couch and the D-pad. No separate build, no separate install: phone, tablet and TV all share one codebase. See section **4** of [`IMPROVEMENTS.md`](./IMPROVEMENTS.md) for the full TV layout details.
 
 The launcher icon, the Android TV banner, the PWA install icon, and the favicon have all been redrawn from a single master so the app looks coherent across every surface.
 
@@ -135,11 +135,11 @@ Current APK version: `1.4.6`
 
 ### 🔑 Passkeys in the Android app
 
-From APK `1.3.0` onward, the Android app supports passkeys natively (fingerprint, face unlock, hardware security keys, password managers — the same authenticators you'd use from your browser). It works out-of-the-box with the official APK on a regular HTTPS install.
+From APK `1.3.0` onward, the Android app supports passkeys natively (fingerprint, face unlock, hardware security keys, password managers: the same authenticators you'd use from your browser). It works out-of-the-box with the official APK on a regular HTTPS install.
 
 > ⚠️ **Both the APK and the server must be up to date.** Android passkeys and cross-device QR sign-in rely on endpoints introduced in server **v2.3.7**. Pair APK `1.3.0+` with server `v2.3.7+`; mixing an old server with a new APK (or vice-versa) silently falls back to password-only login.
 
-> 📖 **Full setup guide, prerequisites, custom-build instructions and troubleshooting:** see **[`PASSKEYS.md`](./PASSKEYS.md)**. Worth a read even for the smooth path — the non-standard-port and reverse-proxy edge cases trip a lot of self-hosted setups.
+> 📖 **Full setup guide, prerequisites, custom-build instructions and troubleshooting:** see **[`PASSKEYS.md`](./PASSKEYS.md)**. Worth a read even for the smooth path: the non-standard-port and reverse-proxy edge cases trip a lot of self-hosted setups.
 
 ---
 
@@ -173,7 +173,7 @@ The script is designed to make installation as simple as possible:
 
 ### 🐳 Docker installation
 
-Docker is also available, especially for NAS and similar environments. The same `docker-compose.yml` works whether you deploy from a terminal or from a graphical interface — pick the one that matches your setup.
+Docker is also available, especially for NAS and similar environments. The same `docker-compose.yml` works whether you deploy from a terminal or from a graphical interface. Pick the one that matches your setup.
 
 #### 📋 The compose file
 
@@ -201,7 +201,7 @@ Once the container is up, open `http://<your-host>:8080` and sign in with the ad
 <details>
 <summary><b>🖥️ Command line (Linux / macOS / WSL)</b></summary>
 
-Edit the `ADMIN_EMAIL` and `ADMIN_PASSWORD` values below, then paste the whole block into your terminal — it creates the folder, writes the compose file and starts the container in one go.
+Edit the `ADMIN_EMAIL` and `ADMIN_PASSWORD` values below, then paste the whole block into your terminal. It creates the folder, writes the compose file and starts the container in one go.
 
 ```bash
 mkdir -p ~/glasskeep && cd ~/glasskeep && cat > docker-compose.yml <<'EOF'
@@ -225,13 +225,13 @@ docker compose up -d
 
 > 🐳 **Don't have Docker yet?**
 >
-> * **Linux** — one-liner that works on Debian / Ubuntu / Fedora / Arch / …:
+> * **Linux**: one-liner that works on Debian / Ubuntu / Fedora / Arch / …:
 >
 >   ```bash
 >   curl -fsSL https://get.docker.com | sudo sh
 >   ```
 >
-> * **macOS / Windows** — install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and make sure it's running before continuing.
+> * **macOS / Windows**: install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and make sure it's running before continuing.
 
 </details>
 
@@ -257,7 +257,7 @@ The container appears in the **Containers** tab once it's pulled and started.
 4. Edit the `ADMIN_EMAIL` / `ADMIN_PASSWORD` values
 5. Click **Next** → **Done**
 
-On DSM the Docker socket is owned by `root:root` (there is no `docker` group). GlassKeep's entrypoint detects this and grants the in-container `node` user access to it automatically, so the in-app **"Update now"** button works after the container's first start — no extra setup. If you added the socket mount to an **existing** project, recreate the container once (stop then start the project in Container Manager, or `docker compose up -d --force-recreate`) so the entrypoint can apply the permission.
+On DSM the Docker socket is owned by `root:root` (there is no `docker` group). GlassKeep's entrypoint detects this and grants the in-container `node` user access to it automatically, so the in-app **"Update now"** button works after the container's first start, no extra setup. If you added the socket mount to an **existing** project, recreate the container once (stop then start the project in Container Manager, or `docker compose up -d --force-recreate`) so the entrypoint can apply the permission.
 
 </details>
 
@@ -302,7 +302,7 @@ TrueNAS SCALE doesn't ship a generic compose UI, so the simplest route is the bu
 
 #### 🔄 Update
 
-The easiest way is to open the admin panel and click **"Update now"** — the new image is pulled and the container is replaced automatically. Your data is preserved.
+The easiest way is to open the admin panel and click **"Update now"**, the new image is pulled and the container is replaced automatically. Your data is preserved.
 
 If you prefer the command line:
 
@@ -312,8 +312,8 @@ cd ~/glasskeep && docker compose pull && docker compose up -d
 
 > 💡 **Existing install without one-click updates?** You have two options:
 >
-> * **Patch the existing compose** — add `- /var/run/docker.sock:/var/run/docker.sock` under the `volumes:` block of your current `docker-compose.yml`, then re-deploy the stack once.
-> * **Redeploy from the current example** — replace your `docker-compose.yml` with the one at the top of this section (keep your `ADMIN_*` values and your `./data` volume), then re-deploy. The current example already ships the right configuration, so you'll never have to touch the file again.
+> * **Patch the existing compose**, add `- /var/run/docker.sock:/var/run/docker.sock` under the `volumes:` block of your current `docker-compose.yml`, then re-deploy the stack once.
+> * **Redeploy from the current example**, replace your `docker-compose.yml` with the one at the top of this section (keep your `ADMIN_*` values and your `./data` volume), then re-deploy. The current example already ships the right configuration, so you'll never have to touch the file again.
 >
 > Either way, the in-app **Update now** button takes over from there.
 
@@ -321,12 +321,12 @@ cd ~/glasskeep && docker compose pull && docker compose up -d
 
 ## 🤖 AI assistant
 
-GlassKeep no longer ships an embedded local model — it was too small to be genuinely useful. Instead, it connects to any **OpenAI-compatible** chat endpoint, so each instance picks what fits its hardware, privacy needs and budget — fully local with [Ollama](https://ollama.com/) / [Open WebUI](https://github.com/open-webui/open-webui), or remote via OpenAI, OpenRouter, …
+GlassKeep no longer ships an embedded local model, it was too small to be genuinely useful. Instead, it connects to any **OpenAI-compatible** chat endpoint, so each instance picks what fits its hardware, privacy needs and budget, fully local with [Ollama](https://ollama.com/) / [Open WebUI](https://github.com/open-webui/open-webui), or remote via OpenAI, OpenRouter, …
 
 Two AI features are available once configured:
 
-* **🔎 Global AI search** — ask questions across your notes from the search bar. The backend pre-selects relevant notes before calling the model, and only cites notes it actually received (no fabricated sources).
-* **🗒️ Per-note assistant** — discuss the currently opened note with the AI. Conversations are temporary by default; a save button can keep them per note.
+* **🔎 Global AI search**, ask questions across your notes from the search bar. The backend pre-selects relevant notes before calling the model, and only cites notes it actually received (no fabricated sources).
+* **🗒️ Per-note assistant**, discuss the currently opened note with the AI. Conversations are temporary by default; a save button can keep them per note.
 
 Admins control AI at the instance level: disable it entirely, configure a **server-side provider** (optionally shared with users so the API key stays hidden), or let each user bring their **own endpoint** in their settings.
 
@@ -338,7 +338,7 @@ Recommended starter model (light enough to run even on CPU-only setups):
 ollama pull qwen3:4b-instruct-2507-q4_K_M
 ```
 
-> 📘 Full setup guide — base-URL gotchas, model recommendations, privacy notes, admin/user config flows → [`AI_CHANGES.md`](./AI_CHANGES.md)
+> 📘 Full setup guide, base-URL gotchas, model recommendations, privacy notes, admin/user config flows, [`AI_CHANGES.md`](./AI_CHANGES.md)
 
 ---
 
@@ -367,7 +367,7 @@ The language selector in the settings panel will automatically show the new opti
 
 ### 💭 Under consideration
 
-* *(open — suggestions welcome)*
+* *(open, suggestions welcome)*
 
 ---
 
