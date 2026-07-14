@@ -641,16 +641,16 @@ header.glass-card {
     linear-gradient(180deg, var(--gk-statusbar) 0%, transparent 64px),
     linear-gradient(180deg, var(--gk-chrome-1) 0%, var(--gk-chrome-2) 55%, var(--gk-chrome-3) 100%),
     var(--gk-chrome-solid);
-  box-shadow:
-    inset 0 1px 0 var(--gk-chrome-highlight),
-    8px 0 24px -16px var(--gk-chrome-shadow);
+  /* The lateral depth is painted by ::after below the header. Keeping it on
+     the sidebar itself projected a faint vertical shadow through the header
+     strip, even though the divider line was masked there. */
+  box-shadow: inset 0 1px 0 var(--gk-chrome-highlight);
 }
 /* Sidebar right edge drawn as a masked pseudo-element instead of a plain
    border-right: the top ~header-height strip is masked out so the 1px line
-   doesn't cross the header (no "T" intersection at the top-left corner — the
-   sidebar and header tops read as one surface). It fades in below the header
-   and stays solid the rest of the way down. The sidebar is position:fixed, so
-   it's the containing block for this absolute child. */
+   doesn't cross the header. Its opacity ramps in just below the header rather
+   than starting with a hard "T" intersection. The sidebar is position:fixed,
+   so it's the containing block for this absolute child. */
 .gk-sidebar::after {
   content: "";
   position: absolute;
@@ -659,24 +659,28 @@ header.glass-card {
   bottom: 0;
   width: 1px;
   background: var(--gk-chrome-border);
+  box-shadow: 8px 0 24px -16px var(--gk-chrome-shadow);
   pointer-events: none;
-  /* Transparent up to the header's exact bottom edge (safe-top inset + the
-     measured header height published by NotesHeader), then a HARD cut to
-     solid so the line starts crisply right at the corner — no fade that would
-     make it look like it dies before reaching the header/sidebar angle. */
-  --gk-sidebar-edge-cut: calc(var(--safe-top, 0px) + var(--gk-header-h, 84px));
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent var(--gk-sidebar-edge-cut),
-    #000 var(--gk-sidebar-edge-cut)
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent var(--gk-sidebar-edge-cut),
-    #000 var(--gk-sidebar-edge-cut)
-  );
+   /* Transparent through the header's exact bottom edge (safe-top inset + the
+      measured header height published by NotesHeader), then start the divider
+      immediately so it meets the header edge in a crisp right angle. The
+      sidebar shadow is masked separately by this same pseudo-element. */
+   /* The header measurement includes its 1px bottom border. Start the vertical
+      edge one pixel inside that row so both borders share the corner pixel
+      instead of leaving a diagonal gap at their intersection. */
+   --gk-sidebar-edge-cut: calc(var(--safe-top, 0px) + var(--gk-header-h, 84px) - 1px);
+   -webkit-mask-image: linear-gradient(
+     to bottom,
+     transparent 0,
+     transparent var(--gk-sidebar-edge-cut),
+     #000 var(--gk-sidebar-edge-cut)
+   );
+   mask-image: linear-gradient(
+     to bottom,
+     transparent 0,
+     transparent var(--gk-sidebar-edge-cut),
+     #000 var(--gk-sidebar-edge-cut)
+   );
 }
 /* Installed DESKTOP PWA: drop the sidebar's bright inset top rim-highlight so
    its top edge (the title-bar colour) meets the OS title bar with no 1px line.
@@ -685,7 +689,7 @@ header.glass-card {
    silently overridden by the base box-shadow (that was the visible seam). */
 @media (display-mode: standalone) and (pointer: fine) {
   .gk-sidebar {
-    box-shadow: 8px 0 24px -16px var(--gk-chrome-shadow);
+    box-shadow: none;
   }
 }
 /* Sidebar nav entries — hover/active driven by the same chrome tokens so they
