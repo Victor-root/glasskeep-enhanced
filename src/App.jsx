@@ -6783,6 +6783,12 @@ export default function App() {
     );
     invalidateNotesCache();
     enqueueWithLease(newId, { type: "create", noteId: newId, payload: newNote }, leaseId);
+    // The icon (logo badge) is per-user and lives outside the note payload
+    // (its own table + endpoint — see applyNoteIcon), so it isn't carried by
+    // the "create" enqueue above and must be copied over explicitly.
+    if (activeNoteObj?.icon) {
+      applyNoteIcon(newId, activeNoteObj.icon);
+    }
     showToast(t("noteDuplicated"), "success", undefined, "copy");
     closeModal();
   };
