@@ -228,18 +228,55 @@
     for (var j = 0; j < items.length; j++) observer.observe(items[j]);
   }
 
-  /* ── Nav shadow on scroll ─────────────────────────────────────────── */
+  /* ── Nav: shadow on scroll, plus auto-hide on phones ──────────────── */
+  // Headroom pattern: scrolling down retracts the bar, the first upward
+  // scroll brings it straight back. Phones only, so the desktop bar stays
+  // put; the matching .nav-hidden rule lives in the 640px media query.
+  var HIDE_MAX_WIDTH = 640;  // phones only, matches the CSS breakpoint
+  var HIDE_AFTER = 140;      // px scrolled before hiding is allowed at all
+  var DELTA_MIN = 6;         // ignore jitter and sub-pixel scroll noise
+
   function initNav() {
     var nav = document.getElementById("nav");
     if (!nav) return;
+    var lastY = window.scrollY || 0;
     var ticking = false;
+
+    function update() {
+      ticking = false;
+      var y = window.scrollY || 0;
+      if (y < 0) y = 0; // iOS rubber-band overscroll
+
+      nav.classList.toggle("scrolled", y > 20);
+
+      if (window.innerWidth > HIDE_MAX_WIDTH) {
+        nav.classList.remove("nav-hidden");
+        lastY = y;
+        return;
+      }
+
+      // Always visible near the top, whichever way we got there.
+      if (y <= HIDE_AFTER) {
+        nav.classList.remove("nav-hidden");
+        lastY = y;
+        return;
+      }
+
+      var delta = y - lastY;
+      if (Math.abs(delta) < DELTA_MIN) return; // too small to be intent
+      nav.classList.toggle("nav-hidden", delta > 0);
+      lastY = y;
+    }
+
     window.addEventListener("scroll", function () {
       if (ticking) return;
       ticking = true;
-      window.requestAnimationFrame(function () {
-        nav.classList.toggle("scrolled", window.scrollY > 20);
-        ticking = false;
-      });
+      window.requestAnimationFrame(update);
+    }, { passive: true });
+
+    // Rotating to a wider layout mid-scroll must not strand the bar off-screen.
+    window.addEventListener("resize", function () {
+      if (window.innerWidth > HIDE_MAX_WIDTH) nav.classList.remove("nav-hidden");
     }, { passive: true });
   }
 

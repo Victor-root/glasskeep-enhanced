@@ -244,7 +244,8 @@ p { margin: 0; }
   align-items: center;
   gap: 18px;
   border-radius: 999px;
-  transition: box-shadow 0.35s ease, background 0.35s ease;
+  transition: box-shadow 0.35s ease, background 0.35s ease,
+              transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .nav.scrolled { box-shadow: 0 16px 44px -16px var(--shadow-lg); }
 
@@ -972,6 +973,15 @@ img, pre { max-width: 100%; }
   .section-head { margin-bottom: 38px; }
   .foot { justify-content: center; text-align: center; }
   .foot-links { justify-content: center; }
+
+  /* Headroom pattern: the bar retreats while scrolling down and comes back on
+     the first upward scroll, so a small screen keeps its vertical space
+     without losing quick access to the controls. Phones only; the class is
+     never applied above this breakpoint (see initNav). The translateX is what
+     centres the bar, so the hidden state has to carry it too. */
+  .nav.nav-hidden {
+    transform: translateX(-50%) translateY(calc(-100% - 22px));
+  }
 }
 
 /* Below this the nav no longer fits its label, so GitHub becomes an icon
