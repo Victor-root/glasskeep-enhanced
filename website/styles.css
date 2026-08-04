@@ -829,18 +829,10 @@ section { padding: 92px 0; position: relative; }
 .tv-shot { margin-top: 26px; }
 
 /* Light/dark screenshots: both variants sit in the DOM and CSS shows exactly
-   one. Because `display` is not animatable in any browser (listing it in
-   `transition` or not makes no difference), switching mode swaps the image in
-   the same frame regardless of the `transform` transition added below for the
-   zoom-in hover. */
-.shot-media { display: block; line-height: 0; position: relative; cursor: zoom-in; }
-.shot-media img {
-  width: 100%;
-  height: auto;
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.shot-media:hover img,
-.shot-media:focus-visible img { transform: scale(1.015); }
+   one. Because `display` is not animatable in any browser, switching mode
+   swaps the image in the same frame, with no cross-fade. */
+.shot-media { display: block; line-height: 0; position: relative; cursor: pointer; }
+.shot-media img { width: 100%; height: auto; }
 /* `display` is only ever set by the pair below, never by the rule above:
    a shared `display:block` there would out-rank `.shot-dark` on specificity
    and leave both variants visible in light mode. */
