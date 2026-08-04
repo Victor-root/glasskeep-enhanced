@@ -139,7 +139,11 @@ window.GK_I18N = {
     "footer.text": "GlassKeep: self-hosted notes, built in the open.",
     "footer.l1": "Repository",
     "footer.l2": "Releases",
-    "footer.l3": "Discussions"
+    "footer.l3": "Discussions",
+
+    "lightbox.close": "Close",
+    "lightbox.prev": "Previous screenshot",
+    "lightbox.next": "Next screenshot"
   },
 
   fr: {
@@ -278,6 +282,10 @@ window.GK_I18N = {
     "footer.text": "GlassKeep : des notes auto-hébergées, développées à ciel ouvert.",
     "footer.l1": "Dépôt",
     "footer.l2": "Versions",
-    "footer.l3": "Discussions"
+    "footer.l3": "Discussions",
+
+    "lightbox.close": "Fermer",
+    "lightbox.prev": "Capture précédente",
+    "lightbox.next": "Capture suivante"
   }
 };

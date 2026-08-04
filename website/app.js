@@ -176,6 +176,9 @@
     var icon = document.getElementById("modeIcon");
     if (icon) icon.innerHTML = mode === "dark" ? MOON : SUN;
     syncMetaThemeColor();
+    // refreshLightboxMode is declared further down but hoisted (function
+    // declaration), and is a no-op when the lightbox isn't open.
+    refreshLightboxMode();
   }
 
   function initMode() {
@@ -305,6 +308,237 @@
     }
   }
 
+  /* ── Screenshot lightbox ──────────────────────────────────────────── */
+  // Opens each .shot-media at near-fullscreen with a FLIP transform: the
+  // lightbox image is laid out at its final centred size first (plain CSS),
+  // then a `transform` is computed and applied with no transition so it
+  // LOOKS like it's still sitting at the clicked thumbnail's rect, and that
+  // transform is cleared on the next frame: the browser animates the
+  // difference as a single composited transform (smooth, GPU-only, no
+  // layout thrashing). Closing runs the same transform in reverse.
+  var gallery = [];        // [{ media, }] in DOM order
+  var lbIndex = -1;
+  var lbOpenerMedia = null;
+  var lbSwitchTimer = null;
+  var lbCloseTimer = null;
+
+  var lb, lbImg, lbBackdrop, lbCaption, lbCount, lbClose, lbPrev, lbNext;
+
+  function activeImg(media) {
+    var wantDark = root.getAttribute("data-mode") === "dark";
+    var sel = wantDark ? ".shot-dark" : ".shot-light";
+    return media.querySelector(sel) || media.querySelector("img");
+  }
+
+  // Classic "object-fit: contain" math, capped at 1x so UI screenshots never
+  // render past their native resolution (upscaling would soften text/lines).
+  function containFit(natW, natH, maxW, maxH) {
+    var ratio = Math.min(maxW / natW, maxH / natH, 1);
+    return { w: natW * ratio, h: natH * ratio };
+  }
+
+  function layoutFinalBox(img) {
+    var maxW = window.innerWidth * 0.94;
+    var maxH = window.innerHeight * 0.88;
+    var natW = img.naturalWidth || img.width || 1;
+    var natH = img.naturalHeight || img.height || 1;
+    var size = containFit(natW, natH, maxW, maxH);
+    return {
+      w: size.w,
+      h: size.h,
+      left: (window.innerWidth - size.w) / 2,
+      top: (window.innerHeight - size.h) / 2
+    };
+  }
+
+  function applyBox(box) {
+    lbImg.style.width = box.w + "px";
+    lbImg.style.height = box.h + "px";
+    lbImg.style.left = box.left + "px";
+    lbImg.style.top = box.top + "px";
+  }
+
+  // Computes the transform that would make the (already final-positioned)
+  // lightbox image visually overlap `rect` instead.
+  function flipTransformTo(box, rect) {
+    var scaleX = rect.width / box.w;
+    var scaleY = rect.height / box.h;
+    var dx = rect.left + rect.width / 2 - (box.left + box.w / 2);
+    var dy = rect.top + rect.height / 2 - (box.top + box.h / 2);
+    return "translate(" + dx + "px, " + dy + "px) scale(" + scaleX + ", " + scaleY + ")";
+  }
+
+  function updateMeta() {
+    var media = gallery[lbIndex];
+    if (!media) return;
+    var img = activeImg(media);
+    lbCaption.textContent = img.getAttribute("alt") || "";
+    lbCount.textContent = (lbIndex + 1) + " / " + gallery.length;
+  }
+
+  function showAt(index, opts) {
+    var animate = !opts || opts.animate !== false;
+    lbIndex = (index + gallery.length) % gallery.length;
+    var img = activeImg(gallery[lbIndex]);
+
+    var finish = function () {
+      lbImg.src = img.currentSrc || img.src;
+      lbImg.alt = img.getAttribute("alt") || "";
+      applyBox(layoutFinalBox(img));
+      updateMeta();
+      if (animate) {
+        // rAF so the src/box change above paints before the fade-in starts.
+        requestAnimationFrame(function () {
+          lbImg.style.opacity = "1";
+          lbSwitchTimer = setTimeout(function () {
+            lbImg.classList.remove("is-switching");
+          }, 240);
+        });
+      }
+    };
+
+    if (animate) {
+      lbImg.classList.add("is-switching");
+      lbImg.style.opacity = "0";
+      clearTimeout(lbSwitchTimer);
+      lbSwitchTimer = setTimeout(finish, 200);
+    } else {
+      finish();
+    }
+  }
+
+  function open(index, media) {
+    if (!lb || lbIndex !== -1) return;
+    lbOpenerMedia = media;
+    var openerImg = activeImg(media);
+    var rect = openerImg.getBoundingClientRect();
+
+    lb.classList.toggle("single-item", gallery.length <= 1);
+    lb.classList.add("is-open");
+    lb.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+
+    showAt(index, { animate: false });
+
+    // Start the lightbox image pinned exactly over the clicked thumbnail...
+    var box = layoutFinalBox(activeImg(gallery[lbIndex]));
+    lbImg.style.transition = "none";
+    lbImg.style.transform = flipTransformTo(box, rect);
+    lbImg.style.opacity = "1";
+    var _reflow = lbImg.offsetWidth; // force layout: commits the line above as the start state
+    // One rAF is the standard FLIP recipe (the synchronous reflow above is
+    // what actually guarantees the "start" state got painted; the callback
+    // just needs to land on the frame after that, not several frames after).
+    requestAnimationFrame(function () {
+      // ...then let it animate to its natural (transform: none) position:
+      // the CSS `transition: transform …` on .lightbox-img takes it from
+      // here, growing it from the thumbnail into the centred final box.
+      lbImg.style.transition = "";
+      lbImg.style.transform = "none";
+      lb.classList.add("is-visible");
+    });
+
+    document.addEventListener("keydown", onKeydown);
+    lbClose.focus();
+  }
+
+  function close() {
+    if (lbIndex === -1) return;
+    var media = gallery[lbIndex] || lbOpenerMedia;
+    var img = activeImg(media);
+    var rect = img.getBoundingClientRect();
+    var box = { w: parseFloat(lbImg.style.width), h: parseFloat(lbImg.style.height),
+                left: parseFloat(lbImg.style.left), top: parseFloat(lbImg.style.top) };
+
+    lb.classList.remove("is-visible");
+    lbImg.style.transform = flipTransformTo(box, rect);
+
+    var opener = lbOpenerMedia;
+    var done = function () {
+      lb.classList.remove("is-open", "single-item");
+      lb.setAttribute("aria-hidden", "true");
+      lbImg.removeAttribute("style");
+      lbImg.src = "";
+      lbIndex = -1;
+      lbOpenerMedia = null;
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKeydown);
+      if (opener) opener.focus();
+    };
+    clearTimeout(lbCloseTimer);
+    lbImg.addEventListener("transitionend", done, { once: true });
+    lbCloseTimer = setTimeout(done, 500); // safety net if transitionend never fires
+  }
+
+  // Keeps Tab from leaving a dialog that visually covers the whole page.
+  function trapFocus(e) {
+    if (e.key !== "Tab") return;
+    // offsetParent is unusable here: it's always null for position:fixed
+    // elements (which every .lightbox-btn is), regardless of visibility.
+    // getClientRects().length is the standard "is this actually rendered"
+    // check and doesn't have that false-negative.
+    var focusables = Array.prototype.filter.call(
+      lb.querySelectorAll("button"),
+      function (el) { return el.getClientRects().length > 0; }
+    );
+    if (!focusables.length) return;
+    var first = focusables[0], last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  function onKeydown(e) {
+    if (e.key === "Escape") close();
+    else if (e.key === "ArrowLeft") showAt(lbIndex - 1);
+    else if (e.key === "ArrowRight") showAt(lbIndex + 1);
+    else if (e.key === "Tab") trapFocus(e);
+  }
+
+  // Mode toggle while the lightbox is open: swap instantly, same rule as the
+  // inline thumbnails (no cross-fade, see the .shot-media CSS comment).
+  function refreshLightboxMode() {
+    if (lbIndex === -1 || !lbImg) return;
+    var img = activeImg(gallery[lbIndex]);
+    lbImg.src = img.currentSrc || img.src;
+  }
+
+  function initLightbox() {
+    lb = document.getElementById("lightbox");
+    if (!lb) return;
+    lbImg = document.getElementById("lightboxImg");
+    lbBackdrop = document.getElementById("lightboxBackdrop");
+    lbCaption = document.getElementById("lightboxCaption");
+    lbCount = document.getElementById("lightboxCount");
+    lbClose = document.getElementById("lightboxClose");
+    lbPrev = document.getElementById("lightboxPrev");
+    lbNext = document.getElementById("lightboxNext");
+
+    gallery = Array.prototype.slice.call(document.querySelectorAll(".shot-media"));
+    gallery.forEach(function (media, index) {
+      media.setAttribute("role", "button");
+      media.setAttribute("tabindex", "0");
+      media.addEventListener("click", function () { open(index, media); });
+      media.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(index, media); }
+      });
+    });
+
+    lbBackdrop.addEventListener("click", close);
+    lbClose.addEventListener("click", close);
+    lbPrev.addEventListener("click", function () { showAt(lbIndex - 1); });
+    lbNext.addEventListener("click", function () { showAt(lbIndex + 1); });
+
+    window.addEventListener("resize", function () {
+      if (lbIndex === -1) return;
+      applyBox(layoutFinalBox(activeImg(gallery[lbIndex])));
+    });
+  }
+
   /* ── Boot ─────────────────────────────────────────────────────────── */
   buildSwatches();
   setTheme(read(STORE_THEME) || "glasskeep");
@@ -313,6 +547,7 @@
   initNav();
   initReveal();
   initCopy();
+  initLightbox();
 
   var year = document.getElementById("year");
   if (year) year.textContent = new Date().getFullYear();
