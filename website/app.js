@@ -454,7 +454,20 @@
     lbImg.style.transform = flipTransformTo(box, rect);
 
     var opener = lbOpenerMedia;
+    // `{once:true}` alone isn't enough: if the safety timeout fires FIRST
+    // (observed for real: closing the very first thumbnail sometimes never
+    // dispatches a transform transitionend at all, so `done` used to run
+    // only via the timeout), the listener stays armed and silently fires on
+    // some LATER, unrelated transition, e.g. the next open()'s FLIP, which
+    // then yanked a freshly-opened image closed out from under the user.
+    // The guard + explicit removal below make whichever path runs first
+    // cancel the other, so the listener can never fire twice.
+    var finished = false;
     var done = function () {
+      if (finished) return;
+      finished = true;
+      clearTimeout(lbCloseTimer);
+      lbImg.removeEventListener("transitionend", done);
       lb.classList.remove("is-open", "single-item");
       lb.setAttribute("aria-hidden", "true");
       lbImg.removeAttribute("style");
@@ -466,7 +479,7 @@
       if (opener) opener.focus();
     };
     clearTimeout(lbCloseTimer);
-    lbImg.addEventListener("transitionend", done, { once: true });
+    lbImg.addEventListener("transitionend", done);
     lbCloseTimer = setTimeout(done, 500); // safety net if transitionend never fires
   }
 
