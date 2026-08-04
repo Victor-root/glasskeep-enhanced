@@ -69,6 +69,12 @@ window.GK_I18N = {
     "f6.title": "Reminders that arrive",
     "f6.body": "In-app, browser push, and native Android notifications, even with the app fully closed. No Google services in the loop.",
 
+    "f7.title": "Safer deletion",
+    "f7.body": "Deleted notes land in Trash, not gone. Restore them any time, or permanently delete only when you're sure.",
+
+    "f8.title": "One-click updates",
+    "f8.body": "Update straight from the admin panel: live progress, cancel any time, and if something goes wrong, automatic rollback puts the previous version straight back.",
+
     "screens.eyebrow": "A look inside",
     "screens.title": "Designed to be <span class=\"grad-text\">lived in.</span>",
     "screens.lead": "Dense enough to hold a year of notes, calm enough to write in every day.",
@@ -201,6 +207,12 @@ window.GK_I18N = {
 
     "f6.title": "Des rappels qui arrivent",
     "f6.body": "Dans l'app, en push navigateur et en notification Android native, même application complètement fermée. Aucun service Google dans la boucle.",
+
+    "f7.title": "Suppression plus sûre",
+    "f7.body": "Les notes supprimées atterrissent dans la Corbeille, elles ne disparaissent pas. Restaurez-les à tout moment, ou supprimez-les définitivement seulement quand vous en êtes sûr.",
+
+    "f8.title": "Mises à jour en un clic",
+    "f8.body": "Mettez à jour directement depuis le panneau admin : progression en direct, annulation à tout moment, et en cas de souci, un rollback automatique remet la version précédente en place.",
 
     "screens.eyebrow": "Un aperçu",
     "screens.title": "Conçu pour y <span class=\"grad-text\">passer ses journées.</span>",
