@@ -711,31 +711,22 @@ section { padding: 92px 0; position: relative; }
   color: var(--text-soft);
 }
 
-/* Placeholder shown until a real screenshot is dropped in. */
-.shot-ph {
-  aspect-ratio: 16 / 10;
-  display: grid;
-  place-items: center;
-  text-align: center;
-  padding: 26px;
-  background:
-    linear-gradient(135deg,
-      color-mix(in srgb, var(--primary) 8%, transparent),
-      color-mix(in srgb, var(--secondary) 8%, transparent));
-  color: var(--text-soft);
-  font-size: 0.85rem;
-  font-weight: 600;
+/* Light/dark screenshots: both variants sit in the DOM and CSS shows exactly
+   one. Because `display` is not animatable, switching mode swaps the image in
+   the same frame, with no cross-fade and nothing to load first. */
+.shot-media { display: block; line-height: 0; }
+.shot-media img {
+  width: 100%;
+  height: auto;
+  transition: none;
 }
-.shot-ph code {
-  display: block;
-  margin-top: 8px;
-  font-size: 0.75rem;
-  opacity: 0.75;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-}
-.shot-ph svg { width: 34px; height: 34px; margin-bottom: 12px; opacity: 0.5; }
-.shot-ph.tall { aspect-ratio: 9 / 19; }
-.shot-ph.wide { aspect-ratio: 16 / 9; }
+/* `display` is only ever set by the pair below, never by the rule above:
+   a shared `display:block` there would out-rank `.shot-dark` on specificity
+   and leave both variants visible in light mode. */
+.shot-media .shot-light { display: block; }
+.shot-media .shot-dark { display: none; }
+[data-mode="dark"] .shot-media .shot-light { display: none; }
+[data-mode="dark"] .shot-media .shot-dark { display: block; }
 
 .shots-row {
   display: grid;

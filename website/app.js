@@ -305,27 +305,6 @@
     }
   }
 
-  /* ── Screenshots ──────────────────────────────────────────────────── */
-  // Each placeholder names the file it expects in assets/. When that file is
-  // present it replaces the placeholder; otherwise the guidance stays visible.
-  function initShots() {
-    var slots = document.querySelectorAll("[data-shot]");
-    for (var i = 0; i < slots.length; i++) {
-      (function (slot) {
-        var file = slot.dataset.shot;
-        var probe = new Image();
-        probe.onload = function () {
-          var img = document.createElement("img");
-          img.src = "assets/" + file;
-          img.alt = "";
-          img.loading = "lazy";
-          slot.replaceWith(img);
-        };
-        probe.src = "assets/" + file;
-      })(slots[i]);
-    }
-  }
-
   /* ── Boot ─────────────────────────────────────────────────────────── */
   buildSwatches();
   setTheme(read(STORE_THEME) || "glasskeep");
@@ -334,7 +313,6 @@
   initNav();
   initReveal();
   initCopy();
-  initShots();
 
   var year = document.getElementById("year");
   if (year) year.textContent = new Date().getFullYear();
