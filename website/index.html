@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="glasskeep" data-mode="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GlassKeep: Self-hosted notes, in your colours</title>
+<meta name="description" content="A self-hosted notes manager built for privacy and offline use. Local-first sync, at-rest encryption, passkeys, cross-server collaboration, and a native Android & TV app." />
+<meta name="theme-color" content="#6366f1" />
+
+<meta property="og:type" content="website" />
+<meta property="og:title" content="GlassKeep: Self-hosted notes, in your colours" />
+<meta property="og:description" content="Local-first, encrypted, self-hosted notes. Six themes, real offline support, cross-server collaboration, Android & TV apps." />
+<meta property="og:url" content="https://victor-root.github.io/glasskeep-enhanced/" />
+<meta name="twitter:card" content="summary_large_image" />
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236366f1'/%3E%3Cstop offset='1' stop-color='%237c3aed'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg fill='%23fff'%3E%3Crect x='7' y='9' width='18' height='3' rx='1.5'/%3E%3Crect x='7' y='15' width='18' height='3' rx='1.5' opacity='.65'/%3E%3Crect x='7' y='21' width='11' height='3' rx='1.5' opacity='.4'/%3E%3C/g%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+
+<!-- ── Navigation ─────────────────────────────────────────────────────── -->
+<nav class="nav glass" id="nav">
+  <a class="brand" href="#top">
+    <span class="brand-mark" aria-hidden="true"></span>
+    GlassKeep
+  </a>
+  <div class="nav-links">
+    <a href="#themes" data-i18n="nav.themes">Themes</a>
+    <a href="#features" data-i18n="nav.features">Features</a>
+    <a href="#screens" data-i18n="nav.screens">Screenshots</a>
+    <a href="#platforms" data-i18n="nav.platforms">Platforms</a>
+    <a href="#install" data-i18n="nav.install">Install</a>
+  </div>
+  <div class="nav-actions">
+    <button class="lang-btn" id="langToggle" data-i18n-attr="aria-label:nav.langLabel" aria-label="Change language">
+      <span id="langCurrent">EN</span>
+    </button>
+    <button class="icon-btn" id="modeToggle" data-i18n-attr="aria-label:nav.modeLabel;title:nav.modeLabel" aria-label="Toggle dark mode" title="Toggle dark mode">
+      <svg id="modeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/></svg>
+    </button>
+    <a class="btn btn-primary nav-gh" href="https://github.com/Victor-root/glasskeep-enhanced" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.8 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.8-1.5-3.8-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.7 2.7 1.2 3.4.9.1-.7.4-1.2.7-1.5-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0C17.5 4.4 18.5 4.7 18.5 4.7c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.5-1.5 7.8-5.8 7.8-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<!-- ── Hero ───────────────────────────────────────────────────────────── -->
+<header class="hero" id="top">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow" data-i18n="hero.eyebrow">Self-hosted · Local-first · Open source</span>
+      <h1 data-i18n-html="hero.title">Your notes.<br />Your server.<br /><span class="grad-text">Your colours.</span></h1>
+      <p class="hero-sub" data-i18n="hero.sub">
+        GlassKeep is a self-hosted notes manager built for privacy and offline use.
+        Write on the train, sync when you land, and keep every byte on hardware you own.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#install">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          <span data-i18n="hero.cta1">Install in one command</span>
+        </a>
+        <a class="btn btn-ghost" href="#features" data-i18n="hero.cta2">Explore features</a>
+      </div>
+      <div class="hero-meta">
+        <span><i class="dot"></i> <span data-i18n="hero.meta1">Works fully offline</span></span>
+        <span><i class="dot"></i> <span data-i18n="hero.meta2">Encrypted at rest</span></span>
+        <span><i class="dot"></i> <span data-i18n="hero.meta3">No telemetry, ever</span></span>
+      </div>
+    </div>
+
+    <div class="hero-stack" aria-hidden="true">
+      <div class="note-card nc-1">
+        <h4 data-i18n="card1.title">Weekend project</h4>
+        <div class="line" style="width:92%"></div>
+        <div class="line" style="width:74%"></div>
+        <div class="line" style="width:83%"></div>
+        <span class="tag" data-i18n="card1.tag">ideas</span>
+      </div>
+      <div class="note-card nc-2">
+        <h4 data-i18n="card2.title">Groceries</h4>
+        <div class="check-row done"><i class="check-box"></i><span data-i18n="card2.i1">Olive oil</span></div>
+        <div class="check-row done"><i class="check-box"></i><span data-i18n="card2.i2">Coffee beans</span></div>
+        <div class="check-row"><i class="check-box"></i><span data-i18n="card2.i3">Sourdough</span></div>
+        <div class="check-row"><i class="check-box"></i><span data-i18n="card2.i4">Tomatoes</span></div>
+      </div>
+      <div class="note-card nc-3">
+        <h4 data-i18n="card3.title">Shared with Karim</h4>
+        <div class="line" style="width:88%"></div>
+        <div class="line" style="width:62%"></div>
+        <span class="tag" data-i18n="card3.tag">cross-server</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── Themes ─────────────────────────────────────────────────────────── -->
+<section id="themes">
+  <div class="wrap">
+    <div class="theme-panel glass reveal">
+      <div class="theme-layout">
+        <div>
+          <span class="eyebrow" data-i18n="themes.eyebrow">Make it yours</span>
+          <h2 data-i18n-html="themes.title">Six themes.<br /><span class="grad-text">One click.</span></h2>
+          <p class="section-lead" data-i18n="themes.lead">
+            GlassKeep ships with six workspace themes that recolour the header, sidebar
+            and background, while your notes keep their own colours. Pick one below and
+            watch this entire page change with it. That's the real palette, straight from the app.
+          </p>
+          <div class="theme-note" data-i18n="themes.note">
+            💡 Your choice follows your account across every device: desktop, phone and TV.
+          </div>
+        </div>
+        <div class="swatch-grid" id="swatchGrid"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Features ───────────────────────────────────────────────────────── -->
+<section id="features">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow" data-i18n="features.eyebrow">What's inside</span>
+      <h2 data-i18n-html="features.title">Everything a notes app should be,<br /><span class="grad-text">without the cloud.</span></h2>
+      <p class="section-lead" data-i18n="features.lead">
+        Built over hundreds of commits with a bias toward reliability: nothing here
+        depends on a third-party service staying online.
+      </p>
+    </div>
+
+    <div class="bento">
+      <article class="cell glass cell-lg reveal">
+        <div class="cell-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.2-8.6"/><path d="M21 3v6h-6"/></svg>
+        </div>
+        <h3 data-i18n="f1.title">Local-first, genuinely offline</h3>
+        <p data-i18n="f1.body">
+          Notes live in your browser's database first and sync to the server after.
+          Lose Wi-Fi mid-sentence and nothing stops: edits queue up and reconcile
+          automatically when you're back, with conflict handling that keeps the newest edit.
+        </p>
+        <div class="cell-tags">
+          <span class="chip" data-i18n="f1.c1">IndexedDB</span>
+          <span class="chip" data-i18n="f1.c2">Offline queue</span>
+          <span class="chip" data-i18n="f1.c3">Auto-reconcile</span>
+        </div>
+      </article>
+
+      <article class="cell glass cell-lg reveal">
+        <div class="cell-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20"/></svg>
+        </div>
+        <h3 data-i18n="f2.title">Cross-server collaboration</h3>
+        <p data-i18n="f2.body">
+          Pair two independent GlassKeep servers and share notes between them in real time.
+          Your friend keeps their server, you keep yours. No shared account, no middleman.
+          Every request is signed, and rosters heal themselves if a peer goes offline.
+        </p>
+        <div class="fed-viz">
+          <div class="fed-node"><span data-i18n="f2.n1">Your server</span><small>notes.you.tld</small></div>
+          <div class="fed-link"></div>
+          <div class="fed-node"><span data-i18n="f2.n2">Their server</span><small>notes.them.tld</small></div>
+        </div>
+      </article>
+
+      <article class="cell glass cell-md reveal">
+        <div class="cell-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h3 data-i18n="f3.title">Encrypted and passwordless</h3>
+        <p data-i18n="f3.body">
+          Optional at-rest encryption keeps note content unreadable in the database.
+          Sign in with passkeys (fingerprint, face, or a hardware key) on desktop and Android alike.
+        </p>
+        <div class="cell-tags">
+          <span class="chip" data-i18n="f3.c1">At-rest encryption</span>
+          <span class="chip" data-i18n="f3.c2">Passkeys</span>
+        </div>
+      </article>
+
+      <article class="cell glass cell-sm reveal">
+        <div class="cell-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.6 7.6"/><circle cx="11" cy="11" r="2"/></svg>
+        </div>
+        <h3 data-i18n="f4.title">Every kind of note</h3>
+        <p data-i18n="f4.body">
+          Rich text with live formatting, checklists with sections, freehand drawings,
+          images and audio notes, all in one place.
+        </p>
+      </article>
+
+      <article class="cell glass cell-sm reveal">
+        <div class="cell-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg>
+        </div>
+        <h3 data-i18n="f5.title">Your own AI, optional</h3>
+        <p data-i18n="f5.body">
+          Point the assistant at any OpenAI-compatible endpoint: Ollama on your LAN,
+          LiteLLM, or nothing at all. It's off by default.
+        </p>
+      </article>
+
+      <article class="cell glass cell-sm reveal">
+        <div class="cell-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        </div>
+        <h3 data-i18n="f6.title">Reminders that arrive</h3>
+        <p data-i18n="f6.body">
+          In-app, browser push, and native Android notifications, even with the app fully
+          closed. No Google services in the loop.
+        </p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ── Screenshots ────────────────────────────────────────────────────── -->
+<section id="screens">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow" data-i18n="screens.eyebrow">A look inside</span>
+      <h2 data-i18n-html="screens.title">Designed to be <span class="grad-text">lived in.</span></h2>
+      <p class="section-lead" data-i18n="screens.lead">
+        Dense enough to hold a year of notes, calm enough to write in every day.
+      </p>
+    </div>
+
+    <div class="shot reveal" style="margin-bottom:22px">
+      <div class="shot-bar"><i></i><i></i><i></i><span data-i18n="shot.grid">GlassKeep notes</span></div>
+      <div class="shot-ph wide" data-shot="desktop-grid.png">
+        <div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+          <div data-i18n="shot.gridDesc">Main notes grid, desktop</div>
+          <code>assets/desktop-grid.png</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="shots-row">
+      <div class="shot reveal">
+        <div class="shot-bar"><i></i><i></i><i></i><span data-i18n="shot.editor">Editor</span></div>
+        <div class="shot-ph" data-shot="editor.png">
+          <div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+            <div data-i18n="shot.editorDesc">Note editor with live formatting</div>
+            <code>assets/editor.png</code>
+          </div>
+        </div>
+      </div>
+      <div class="shot reveal">
+        <div class="shot-bar"><i></i><i></i><i></i><span data-i18n="shot.draw">Drawing</span></div>
+        <div class="shot-ph" data-shot="drawing.png">
+          <div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+            <div data-i18n="shot.drawDesc">Drawing mode</div>
+            <code>assets/drawing.png</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="phones">
+      <div class="phone reveal"><div class="shot-ph tall" data-shot="mobile-1.png"><div><span data-i18n="shot.mobile">Mobile</span><code>mobile-1.png</code></div></div></div>
+      <div class="phone reveal"><div class="shot-ph tall" data-shot="mobile-2.png"><div><span data-i18n="shot.mobile">Mobile</span><code>mobile-2.png</code></div></div></div>
+      <div class="phone reveal"><div class="shot-ph tall" data-shot="mobile-3.png"><div><span data-i18n="shot.mobile">Mobile</span><code>mobile-3.png</code></div></div></div>
+      <div class="phone reveal"><div class="shot-ph tall" data-shot="mobile-4.png"><div><span data-i18n="shot.mobile">Mobile</span><code>mobile-4.png</code></div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Platforms ──────────────────────────────────────────────────────── -->
+<section id="platforms">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow" data-i18n="platforms.eyebrow">Everywhere you are</span>
+      <h2 data-i18n-html="platforms.title">One codebase,<br /><span class="grad-text">every screen.</span></h2>
+    </div>
+
+    <div class="platforms">
+      <div class="plat glass reveal">
+        <div class="plat-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </div>
+        <h3 data-i18n="p1.title">Web and PWA</h3>
+        <p data-i18n="p1.body">Install it like a native app from any browser. Works offline out of the box.</p>
+      </div>
+      <div class="plat glass reveal">
+        <div class="plat-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+        </div>
+        <h3 data-i18n="p2.title">Android</h3>
+        <p data-i18n="p2.body">A native companion app with passkeys, background reminders and QR sign-in.</p>
+      </div>
+      <div class="plat glass reveal">
+        <div class="plat-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg>
+        </div>
+        <h3 data-i18n="p3.title">Android TV</h3>
+        <p data-i18n="p3.body">The same APK detects your TV and switches to a D-pad layout built for the couch.</p>
+      </div>
+    </div>
+
+    <div class="shot reveal" style="margin-top:22px">
+      <div class="shot-bar"><i></i><i></i><i></i><span data-i18n="shot.tv">Android TV layout</span></div>
+      <div class="shot-ph wide" data-shot="tv.png">
+        <div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg>
+          <div data-i18n="shot.tvDesc">TV interface on a large screen</div>
+          <code>assets/tv.png</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Install ────────────────────────────────────────────────────────── -->
+<section id="install">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow" data-i18n="install.eyebrow">Get started</span>
+      <h2 data-i18n-html="install.title">Running in <span class="grad-text">under a minute.</span></h2>
+      <p class="section-lead" data-i18n="install.lead">
+        Two supported paths. Both create the admin account, generate the config and
+        handle HTTPS. No manual wiring.
+      </p>
+    </div>
+
+    <div class="install-grid">
+      <div class="install-card glass reveal">
+        <h3><span data-i18n="i1.title">Debian / Ubuntu / LXC</span> <span class="install-badge" data-i18n="i1.badge">Recommended</span></h3>
+        <pre><button class="copy-btn" data-i18n="copy" data-copy="curl -fsSL https://raw.githubusercontent.com/Victor-root/glasskeep-enhanced/main/install.sh | sudo bash">Copy</button><code>curl -fsSL https://raw.githubusercontent.com/\
+Victor-root/glasskeep-enhanced/main/install.sh \
+  | sudo bash</code></pre>
+        <ul>
+          <li data-i18n="i1.l1">Install, update and uninstall from one script</li>
+          <li data-i18n="i1.l2">Creates the admin account and systemd service</li>
+          <li data-i18n="i1.l3">Reverse proxy, self-signed or custom SSL</li>
+          <li data-i18n="i1.l4">Optional at-rest encryption setup</li>
+        </ul>
+      </div>
+
+      <div class="install-card glass reveal">
+        <h3><span data-i18n="i2.title">Docker</span> <span class="install-badge" data-i18n="i2.badge">NAS friendly</span></h3>
+        <pre><button class="copy-btn" data-i18n="copy" data-copy="docker compose up -d">Copy</button><code>services:
+  glasskeep:
+    image: ghcr.io/victor-root/glasskeep-enhanced:latest
+    container_name: glasskeep
+    restart: unless-stopped
+    ports: ["8080:8080"]
+    environment:
+      ADMIN_EMAIL: "your-admin-username"
+      ADMIN_PASSWORD: "choose-a-strong-password"
+    volumes:
+      - ./data:/data</code></pre>
+        <ul>
+          <li data-i18n="i2.l1">Same compose file for CLI or a NAS GUI</li>
+          <li data-i18n="i2.l2">Published on GitHub Container Registry</li>
+          <li data-i18n="i2.l3">One-click in-app updates from the admin panel</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA ────────────────────────────────────────────────────────────── -->
+<section style="padding-top:20px">
+  <div class="wrap">
+    <div class="cta glass reveal">
+      <h2 data-i18n="cta.title">Take your notes back.</h2>
+      <p data-i18n="cta.body">
+        Free, open source, and yours to run. Star the repo if GlassKeep earns a place
+        on your server.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="https://github.com/Victor-root/glasskeep-enhanced" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.8 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.8-1.5-3.8-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.7 2.7 1.2 3.4.9.1-.7.4-1.2.7-1.5-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0C17.5 4.4 18.5 4.7 18.5 4.7c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.5-1.5 7.8-5.8 7.8-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+          <span data-i18n="cta.btn1">View on GitHub</span>
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/Victor-root/glasskeep-enhanced/releases" target="_blank" rel="noopener" data-i18n="cta.btn2">Download the APK</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div>© <span id="year"></span> <span data-i18n="footer.text">GlassKeep: self-hosted notes, built in the open.</span></div>
+    <div class="foot-links">
+      <a href="https://github.com/Victor-root/glasskeep-enhanced" target="_blank" rel="noopener" data-i18n="footer.l1">Repository</a>
+      <a href="https://github.com/Victor-root/glasskeep-enhanced/releases" target="_blank" rel="noopener" data-i18n="footer.l2">Releases</a>
+      <a href="https://github.com/Victor-root/glasskeep-enhanced/discussions" target="_blank" rel="noopener" data-i18n="footer.l3">Discussions</a>
+    </div>
+  </div>
+</footer>
+
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
