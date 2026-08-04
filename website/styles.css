@@ -10,6 +10,8 @@
   --primary: #6366f1;
   --secondary: #7c3aed;
   --surface-tint: #dce1fb;
+  --grad-from: #6366f1;
+  --grad-to: #7c3aed;
   --aurora-1: #eee5ff;
   --aurora-2: #e5f3fd;
   --aurora-3: #fde5ee;
@@ -33,26 +35,31 @@
   --primary: #10b981; --secondary: #0d9488; --surface-tint: #d2ecdf;
   --aurora-1: #e8f6ee; --aurora-2: #e3f4f1; --aurora-3: #eafaf0;
   --bg: #f2fbf6;
+  --grad-from: #10b981; --grad-to: #0d9488;
 }
 [data-theme="amber"] {
   --primary: #d97706; --secondary: #b45309; --surface-tint: #f6e3c9;
   --aurora-1: #fdf2e2; --aurora-2: #faecd6; --aurora-3: #fdeede;
   --bg: #fef8ee;
+  --grad-from: #d97706; --grad-to: #b45309;
 }
 [data-theme="rosewood"] {
   --primary: #e11d1d; --secondary: #9f1010; --surface-tint: #f7cccc;
   --aurora-1: #fdeaea; --aurora-2: #fbe0e0; --aurora-3: #fef0f0;
   --bg: #fef4f4;
+  --grad-from: #e11d1d; --grad-to: #9f1010;
 }
 [data-theme="graphite"] {
   --primary: #64748b; --secondary: #475569; --surface-tint: #dde1e7;
   --aurora-1: #eef1f5; --aurora-2: #e9edf2; --aurora-3: #f3f5f8;
   --bg: #f5f7fa;
+  --grad-from: #64748b; --grad-to: #475569;
 }
 [data-theme="blush"] {
   --primary: #ec4899; --secondary: #be185d; --surface-tint: #f7d4ea;
   --aurora-1: #fdeaf4; --aurora-2: #fce1ef; --aurora-3: #fef0f7;
   --bg: #fef5fa;
+  --grad-from: #ec4899; --grad-to: #be185d;
 }
 
 /* ── Dark mode: same hues, app's own dark accents ─────────────────────── */
@@ -88,6 +95,49 @@
 [data-mode="dark"][data-theme="blush"] {
   --primary: #f472b6; --secondary: #ec4899; --bg: #180f15;
   --aurora-1: #431834; --aurora-2: #3d1730; --aurora-3: #481a39;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────── */
+/* Same recipe as the app (see the "Global app scrollbars" block in
+   src/styles/globalCSS.js): a 6px bar with no arrow buttons, a faint track
+   tinted with the accent, and a gradient thumb.
+
+   The split between the two token families mirrors the app exactly:
+   the track follows --primary, which shifts per mode like the app's
+   --gk-chrome-accent, while the thumb uses --grad-from / --grad-to, which the
+   dark blocks deliberately leave alone, just as --gk-chrome-grad-from/-to are
+   assigned only in the app's light blocks. So the thumb keeps one gradient in
+   both modes and only the track lightens. */
+:root {
+  --scroll-track: color-mix(in srgb, var(--primary) 16%, transparent);
+  --scroll-thumb: linear-gradient(180deg, var(--grad-from), var(--grad-to));
+  --scroll-thumb-hover: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--grad-from) 82%, #000),
+    color-mix(in srgb, var(--grad-to) 82%, #000)
+  );
+}
+/* Dark mode lifts the track slightly and brightens the hover instead of
+   darkening it, so the thumb still reads against a dark page. */
+[data-mode="dark"] {
+  --scroll-track: color-mix(in srgb, var(--primary) 22%, transparent);
+  --scroll-thumb-hover: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--grad-from) 80%, #fff),
+    color-mix(in srgb, var(--grad-to) 80%, #fff)
+  );
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
+::-webkit-scrollbar-track { background: var(--scroll-track); }
+::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
+
+/* Firefox has no ::-webkit-scrollbar and scrollbar-color needs solid colours,
+   so it gets the accent rather than the gradient. Mirrors the app's fallback. */
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: var(--primary) var(--scroll-track); }
 }
 
 /* ── Base ─────────────────────────────────────────────────────────────── */
