@@ -16,7 +16,7 @@ window.GK_I18N = {
     "nav.modeLabel": "Toggle dark mode",
 
     "hero.eyebrow": "Self-hosted · Local-first · Open source",
-    "hero.title": "Your notes.<br />Your server.<br /><span class=\"grad-text\">Your colours.</span>",
+    "hero.title": "Your notes.<br />Your server.<br /><span class=\"grad-text\">Your rules.</span>",
     "hero.sub": "GlassKeep is a self-hosted notes manager built for privacy and offline use. Write on the train, sync when you land, and keep every byte on hardware you own.",
     "hero.cta1": "Install in one command",
     "hero.cta2": "Explore features",
@@ -131,7 +131,7 @@ window.GK_I18N = {
     "nav.modeLabel": "Basculer le mode sombre",
 
     "hero.eyebrow": "Auto-hébergé · Local-first · Open source",
-    "hero.title": "Vos notes.<br />Votre serveur.<br /><span class=\"grad-text\">Vos couleurs.</span>",
+    "hero.title": "Vos notes.<br />Votre serveur.<br /><span class=\"grad-text\">Vos règles.</span>",
     "hero.sub": "GlassKeep est un gestionnaire de notes auto-hébergé, pensé pour la confidentialité et l'usage hors-ligne. Écrivez dans le train, synchronisez à l'arrivée, et gardez chaque octet sur votre propre matériel.",
     "hero.cta1": "Installer en une commande",
     "hero.cta2": "Voir les fonctionnalités",

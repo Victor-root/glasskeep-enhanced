@@ -259,23 +259,14 @@ p { margin: 0; }
   text-decoration: none;
   white-space: nowrap;
 }
+/* The app's own launcher icon, so the site and the product share one mark. */
 .brand-mark {
+  display: block;
   width: 32px;
   height: 32px;
-  border-radius: 10px;
-  background: linear-gradient(140deg, var(--primary), var(--secondary));
-  box-shadow: 0 5px 16px -5px var(--primary);
-  position: relative;
+  border-radius: 9px;
   flex-shrink: 0;
-}
-.brand-mark::after {
-  content: "";
-  position: absolute;
-  inset: 6px 6px auto 6px;
-  height: 3px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 6px 0 rgba(255, 255, 255, 0.6), 0 12px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: 0 5px 16px -6px var(--shadow-lg);
 }
 
 .nav-links {
@@ -394,11 +385,12 @@ p { margin: 0; }
   color: var(--text-soft);
   font-weight: 600;
 }
-.hero-meta span { display: inline-flex; align-items: center; gap: 7px; }
-.dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+.hero-meta span { display: inline-flex; align-items: center; gap: 8px; }
+.meta-ico {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--primary);
 }
 
 /* Floating note cards: a live miniature of the app's grid. */
