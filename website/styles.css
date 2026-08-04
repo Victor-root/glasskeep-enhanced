@@ -578,6 +578,10 @@ section { padding: 92px 0; position: relative; }
   border-radius: var(--radius-sm);
   border: 2px solid var(--glass-border);
   background: var(--glass-strong);
+  /* <button> has a UA-stylesheet default color (ButtonText) that does not
+     inherit from the page like a <div> would, so without this it renders
+     black-on-black in dark mode regardless of --text. */
+  color: var(--text);
   cursor: pointer;
   overflow: hidden;
   text-align: left;

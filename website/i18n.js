@@ -41,7 +41,7 @@ window.GK_I18N = {
     "themes.note": "💡 Your choice follows your account across every device: desktop, phone and TV.",
 
     "features.eyebrow": "What's inside",
-    "features.title": "Everything a notes app should be,<br /><span class=\"grad-text\">without the cloud.</span>",
+    "features.title": "Everything a notes app should be,<br /><span class=\"grad-text\">on your own cloud.</span>",
     "features.lead": "Built over hundreds of commits with a bias toward reliability: nothing here depends on a third-party service staying online.",
 
     "f1.title": "Local-first, genuinely offline",
@@ -180,7 +180,7 @@ window.GK_I18N = {
     "themes.note": "💡 Votre choix suit votre compte sur tous vos appareils : ordinateur, téléphone et TV.",
 
     "features.eyebrow": "Au programme",
-    "features.title": "Tout ce qu'une app de notes doit être,<br /><span class=\"grad-text\">sans le cloud.</span>",
+    "features.title": "Tout ce qu'une app de notes doit être,<br /><span class=\"grad-text\">sur votre propre cloud.</span>",
     "features.lead": "Construit au fil de centaines de commits avec une obsession : la fiabilité. Rien ici ne dépend d'un service tiers qui doit rester en ligne.",
 
     "f1.title": "Local-first, vraiment hors-ligne",
