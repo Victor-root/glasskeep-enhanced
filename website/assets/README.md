@@ -1,20 +1,27 @@
 # Screenshots
 
-Drop the files below into this folder and they replace their placeholder on the
-page automatically (the site probes for each file at load time; a missing file
-just keeps the placeholder visible, so partial sets are fine).
+Every slot has a light and a dark version. The page shows whichever matches the
+active mode, swapping instantly with no cross-fade (see `.shot-light` /
+`.shot-dark` in `styles.css`).
 
-| File | What to capture | Suggested size |
-| --- | --- | --- |
-| `desktop-grid.png` | Main notes grid, a good mix of note types (text, checklist, image, drawing), several colours and a couple of tags | 1920x1080 |
-| `editor.png` | A note open in the editor showing live formatting (headings, bold, lists) | 1600x1000 |
-| `drawing.png` | Drawing mode with a sketch in progress and the toolbar visible | 1600x1000 |
-| `mobile-1.png` … `mobile-4.png` | Phone views: notes grid, a note open, the sidebar/menu, and settings or the theme picker | 1080x2340 |
-| `tv.png` | Android TV layout with the D-pad focus ring visible on a note | 1920x1080 |
+| Slot | Files | Size | Framing |
+| --- | --- | --- | --- |
+| Desktop grid | `desktop-grid.webp` / `-dark` | 1920x997 | shown in a window frame drawn by the page |
+| Editor | `editor.webp` / `-dark` | 1400x727 | same |
+| Drawing | `drawing.webp` / `-dark` | 1400x727 | same |
+| Phones | `mobile-1..4.webp` / `-dark` | 850x1796 | the capture carries its own device frame with transparent corners, so the page adds nothing behind it |
+| TV | `tv.webp` / `-dark` | 1955x1177 | the capture carries its own bezel, so the page adds no frame at all |
 
-Tips:
+## Replacing one
 
-- Use the default **GlassKeep** theme in light mode for consistency, except for
-  one mobile shot where a different theme shows off the palette.
-- Real content reads better than lorem ipsum, but avoid anything private.
-- PNG for UI, and keep each file under about 500 KB so the page stays fast.
+Keep the same filename and the light/dark pairing. If the pixel size changes,
+update the matching `width`/`height` attributes in `index.html`: they reserve
+the right space while the image loads and stop the page from jumping.
+
+WebP at quality 85 keeps UI text crisp while staying about a tenth of the PNG
+weight. Preserve the alpha channel on the phone and TV captures, otherwise
+their rounded corners turn into opaque boxes.
+
+Sizes are chosen from the on-page display width, doubled for high-density
+screens: full-width shots stay near 1920, the half-width pair sits at 1400, and
+the phones only ever render about 300px wide.

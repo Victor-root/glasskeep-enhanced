@@ -689,27 +689,47 @@ section { padding: 92px 0; position: relative; }
   box-shadow: 0 26px 60px -24px var(--shadow-lg);
   position: relative;
 }
-.shot img { display: block; width: 100%; height: auto; }
+
+/* Windows-style title bar: caption on the left, window controls on the right. */
 .shot-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 11px 15px;
+  gap: 12px;
+  padding: 0 0 0 14px;
+  height: 36px;
   border-bottom: 1px solid var(--glass-border);
   background: var(--glass);
 }
-.shot-bar i {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.22;
-}
-.shot-bar span {
-  margin-left: 10px;
+.shot-title {
   font-size: 0.74rem;
   font-weight: 600;
   color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.win-btns {
+  margin-left: auto;
+  display: flex;
+  align-self: stretch;
+  color: var(--text-soft);
+}
+.win-btns svg {
+  width: 46px;
+  height: 100%;
+  padding: 0 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.75;
+}
+/* Only the close control gets the red hover, exactly like the real thing. */
+.win-btns svg:hover { background: color-mix(in srgb, var(--text) 10%, transparent); }
+.win-btns .win-close:hover { background: #e81123; stroke: #fff; opacity: 1; }
+
+/* The TV capture already includes its own bezel, so it carries no card frame,
+   no border and no window bar: the artwork sits directly on the page. */
+.tv-shot { margin-top: 26px; }
 
 /* Light/dark screenshots: both variants sit in the DOM and CSS shows exactly
    one. Because `display` is not animatable, switching mode swaps the image in
@@ -740,15 +760,9 @@ section { padding: 92px 0; position: relative; }
   margin-top: 22px;
 }
 .phone {
-  border-radius: 26px;
-  overflow: hidden;
-  border: 1px solid var(--glass-border);
-  background: var(--glass-strong);
-  box-shadow: 0 22px 46px -22px var(--shadow-lg);
   transition: transform 0.3s cubic-bezier(0.34, 1.3, 0.64, 1);
 }
 .phone:hover { transform: translateY(-8px); }
-.phone img { display: block; width: 100%; height: auto; }
 
 /* ── Platforms ────────────────────────────────────────────────────────── */
 .platforms {
