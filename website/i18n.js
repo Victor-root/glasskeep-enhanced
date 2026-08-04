@@ -31,7 +31,7 @@ window.GK_I18N = {
     "card2.i2": "Coffee beans",
     "card2.i3": "Sourdough",
     "card2.i4": "Tomatoes",
-    "card3.title": "Shared with Karim",
+    "card3.title": "Shared with Emma",
     "card3.tag": "cross-server",
 
     "themes.eyebrow": "Make it yours",
@@ -146,7 +146,7 @@ window.GK_I18N = {
     "card2.i2": "Café en grains",
     "card2.i3": "Pain au levain",
     "card2.i4": "Tomates",
-    "card3.title": "Partagé avec Karim",
+    "card3.title": "Partagé avec Emma",
     "card3.tag": "inter-serveurs",
 
     "themes.eyebrow": "À votre image",
