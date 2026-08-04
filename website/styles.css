@@ -620,6 +620,49 @@ section { padding: 92px 0; position: relative; }
   color: var(--text-soft);
 }
 
+/* ── Migrate-from-Google-Keep checklist ──────────────────────────────── */
+/* Reuses .theme-panel / .theme-layout from the theme picker above (same
+   two-column glass card), just with a checklist instead of swatches on the
+   right: fitting, since the point is "what actually survives the import". */
+.migrate-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.migrate-item {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.migrate-check {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(140deg, var(--primary), var(--secondary));
+  box-shadow: 0 6px 14px -6px var(--primary);
+}
+.migrate-check svg { width: 14px; height: 14px; }
+.migrate-item strong {
+  display: block;
+  font-size: 0.94rem;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.migrate-item > span > span {
+  display: block;
+  font-size: 0.86rem;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
 /* ── Bento feature grid ───────────────────────────────────────────────── */
 .bento {
   display: grid;
