@@ -1,0 +1,1117 @@
+/* ==========================================================================
+   GlassKeep presentation site
+   Design language: layered glass, vivid gradients, aurora light.
+   The six themes below mirror the app's own workspace themes 1:1
+   (see src/theme/shellTheme.js + src/styles/globalCSS.js).
+   ========================================================================== */
+
+/* ── Theme tokens ──────────────────────────────────────────────────────── */
+:root {
+  --primary: #6366f1;
+  --secondary: #7c3aed;
+  --surface-tint: #dce1fb;
+  --grad-from: #6366f1;
+  --grad-to: #7c3aed;
+  --aurora-1: #eee5ff;
+  --aurora-2: #e5f3fd;
+  --aurora-3: #fde5ee;
+
+  --bg: #f6f4ff;
+  --text: #16151f;
+  --text-soft: #565273;
+  --glass: rgba(255, 255, 255, 0.55);
+  --glass-strong: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --shadow: rgba(31, 22, 74, 0.1);
+  --shadow-lg: rgba(31, 22, 74, 0.16);
+
+  --radius: 22px;
+  --radius-sm: 14px;
+  --maxw: 1180px;
+  --nav-h: 68px;
+}
+
+[data-theme="emerald"] {
+  --primary: #10b981; --secondary: #0d9488; --surface-tint: #d2ecdf;
+  --aurora-1: #e8f6ee; --aurora-2: #e3f4f1; --aurora-3: #eafaf0;
+  --bg: #f2fbf6;
+  --grad-from: #10b981; --grad-to: #0d9488;
+}
+[data-theme="amber"] {
+  --primary: #d97706; --secondary: #b45309; --surface-tint: #f6e3c9;
+  --aurora-1: #fdf2e2; --aurora-2: #faecd6; --aurora-3: #fdeede;
+  --bg: #fef8ee;
+  --grad-from: #d97706; --grad-to: #b45309;
+}
+[data-theme="rosewood"] {
+  --primary: #e11d1d; --secondary: #9f1010; --surface-tint: #f7cccc;
+  --aurora-1: #fdeaea; --aurora-2: #fbe0e0; --aurora-3: #fef0f0;
+  --bg: #fef4f4;
+  --grad-from: #e11d1d; --grad-to: #9f1010;
+}
+[data-theme="graphite"] {
+  --primary: #64748b; --secondary: #475569; --surface-tint: #dde1e7;
+  --aurora-1: #eef1f5; --aurora-2: #e9edf2; --aurora-3: #f3f5f8;
+  --bg: #f5f7fa;
+  --grad-from: #64748b; --grad-to: #475569;
+}
+[data-theme="blush"] {
+  --primary: #ec4899; --secondary: #be185d; --surface-tint: #f7d4ea;
+  --aurora-1: #fdeaf4; --aurora-2: #fce1ef; --aurora-3: #fef0f7;
+  --bg: #fef5fa;
+  --grad-from: #ec4899; --grad-to: #be185d;
+}
+
+/* ── Dark mode: same hues, app's own dark accents ─────────────────────── */
+[data-mode="dark"] {
+  --primary: #818cf8;
+  --secondary: #a78bfa;
+  --bg: #131218;
+  --text: #f2f0fb;
+  --text-soft: #a7a3c2;
+  --glass: rgba(255, 255, 255, 0.055);
+  --glass-strong: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --shadow: rgba(0, 0, 0, 0.4);
+  --shadow-lg: rgba(0, 0, 0, 0.55);
+  --aurora-1: #2a2150; --aurora-2: #16304d; --aurora-3: #431f38;
+}
+[data-mode="dark"][data-theme="emerald"] {
+  --primary: #34d399; --secondary: #2dd4bf; --bg: #101714;
+  --aurora-1: #10352a; --aurora-2: #0e3733; --aurora-3: #123a2c;
+}
+[data-mode="dark"][data-theme="amber"] {
+  --primary: #fbbf24; --secondary: #f59e0b; --bg: #17130e;
+  --aurora-1: #3d2c10; --aurora-2: #3a2a14; --aurora-3: #40300f;
+}
+[data-mode="dark"][data-theme="rosewood"] {
+  --primary: #f87171; --secondary: #ef4444; --bg: #170f0f;
+  --aurora-1: #431717; --aurora-2: #3d1414; --aurora-3: #47191a;
+}
+[data-mode="dark"][data-theme="graphite"] {
+  --primary: #94a3b8; --secondary: #cbd5e1; --bg: #131416;
+  --aurora-1: #2a303a; --aurora-2: #262c35; --aurora-3: #2e343e;
+}
+[data-mode="dark"][data-theme="blush"] {
+  --primary: #f472b6; --secondary: #ec4899; --bg: #180f15;
+  --aurora-1: #431834; --aurora-2: #3d1730; --aurora-3: #481a39;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────── */
+/* Same recipe as the app (see the "Global app scrollbars" block in
+   src/styles/globalCSS.js): a 6px bar with no arrow buttons, a faint track
+   tinted with the accent, and a gradient thumb.
+
+   The split between the two token families mirrors the app exactly:
+   the track follows --primary, which shifts per mode like the app's
+   --gk-chrome-accent, while the thumb uses --grad-from / --grad-to, which the
+   dark blocks deliberately leave alone, just as --gk-chrome-grad-from/-to are
+   assigned only in the app's light blocks. So the thumb keeps one gradient in
+   both modes and only the track lightens. */
+:root {
+  --scroll-track: color-mix(in srgb, var(--primary) 16%, transparent);
+  --scroll-thumb: linear-gradient(180deg, var(--grad-from), var(--grad-to));
+  --scroll-thumb-hover: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--grad-from) 82%, #000),
+    color-mix(in srgb, var(--grad-to) 82%, #000)
+  );
+}
+/* Dark mode lifts the track slightly and brightens the hover instead of
+   darkening it, so the thumb still reads against a dark page. */
+[data-mode="dark"] {
+  --scroll-track: color-mix(in srgb, var(--primary) 22%, transparent);
+  --scroll-thumb-hover: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--grad-from) 80%, #fff),
+    color-mix(in srgb, var(--grad-to) 80%, #fff)
+  );
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
+::-webkit-scrollbar-track { background: var(--scroll-track); }
+::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
+
+/* Firefox has no ::-webkit-scrollbar and scrollbar-color needs solid colours,
+   so it gets the accent rather than the gradient. Mirrors the app's fallback. */
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: var(--primary) var(--scroll-track); }
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--nav-h) + 20px);
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.6s ease, color 0.4s ease;
+}
+
+/* The aurora: three slow-drifting colour clouds behind everything. */
+.aurora {
+  position: fixed;
+  inset: -25%;
+  z-index: -2;
+  pointer-events: none;
+  filter: blur(90px);
+  opacity: 0.85;
+  transition: opacity 0.6s ease;
+}
+.aurora span {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  transition: background 0.8s ease;
+  will-change: transform;
+}
+.aurora span:nth-child(1) {
+  width: 52vw; height: 52vw; left: 2%; top: 0;
+  background: var(--aurora-1);
+  animation: drift-a 22s ease-in-out infinite alternate;
+}
+.aurora span:nth-child(2) {
+  width: 46vw; height: 46vw; right: 4%; top: 8%;
+  background: var(--aurora-2);
+  animation: drift-b 26s ease-in-out infinite alternate;
+}
+.aurora span:nth-child(3) {
+  width: 44vw; height: 44vw; left: 28%; top: 44%;
+  background: var(--aurora-3);
+  animation: drift-c 30s ease-in-out infinite alternate;
+}
+[data-mode="dark"] .aurora { opacity: 0.55; }
+
+@keyframes drift-a {
+  to { transform: translate3d(10vw, 12vh, 0) scale(1.15); }
+}
+@keyframes drift-b {
+  to { transform: translate3d(-12vw, 16vh, 0) scale(1.2); }
+}
+@keyframes drift-c {
+  to { transform: translate3d(8vw, -14vh, 0) scale(1.1); }
+}
+
+/* Fine grain over the aurora so gradients never band. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.wrap {
+  width: 100%;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ── Typography ───────────────────────────────────────────────────────── */
+h1, h2, h3 {
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  margin: 0;
+  font-weight: 800;
+}
+h2 { font-size: clamp(2rem, 4.4vw, 3.1rem); }
+h3 { font-size: 1.19rem; font-weight: 700; letter-spacing: -0.015em; }
+p { margin: 0; }
+
+.grad-text {
+  background: linear-gradient(115deg, var(--primary), var(--secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.775rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 16px;
+}
+.eyebrow::before {
+  content: "";
+  width: 26px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--primary), transparent);
+}
+
+.section-lead {
+  color: var(--text-soft);
+  font-size: 1.09rem;
+  max-width: 62ch;
+  margin-top: 18px;
+}
+
+/* ── Glass surface ────────────────────────────────────────────────────── */
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(22px) saturate(1.7);
+  -webkit-backdrop-filter: blur(22px) saturate(1.7);
+  box-shadow: 0 10px 34px -12px var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+[data-mode="dark"] .glass {
+  box-shadow: 0 10px 34px -12px var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+/* ── Navigation ───────────────────────────────────────────────────────── */
+.nav {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  width: calc(100% - 32px);
+  max-width: var(--maxw);
+  height: var(--nav-h);
+  padding: 0 10px 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  border-radius: 999px;
+  transition: box-shadow 0.35s ease, background 0.35s ease,
+              transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav.scrolled { box-shadow: 0 16px 44px -16px var(--shadow-lg); }
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-weight: 800;
+  font-size: 1.06rem;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+/* The app's own launcher icon, so the site and the product share one mark. */
+.brand-mark {
+  display: block;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  box-shadow: 0 5px 16px -6px var(--shadow-lg);
+}
+
+.nav-links {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.nav-links a {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.895rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-decoration: none;
+  transition: color 0.2s, background 0.2s;
+}
+.nav-links a:hover { color: var(--text); background: var(--glass-strong); }
+
+.nav-actions { display: flex; align-items: center; gap: 8px; }
+
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-strong);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+}
+.icon-btn:hover { transform: translateY(-2px); border-color: var(--primary); }
+.icon-btn svg { width: 18px; height: 18px; }
+
+.lang-btn {
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-strong);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+}
+.lang-btn:hover { transform: translateY(-2px); border-color: var(--primary); }
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 24px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 0.22s;
+}
+.btn svg { width: 18px; height: 18px; }
+.btn-primary {
+  color: #fff;
+  background: linear-gradient(115deg, var(--primary), var(--secondary));
+  box-shadow: 0 12px 28px -10px var(--primary);
+}
+.btn-primary:hover { transform: translateY(-3px); box-shadow: 0 18px 36px -10px var(--primary); }
+.btn-ghost {
+  color: var(--text);
+  background: var(--glass-strong);
+  border-color: var(--glass-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.btn-ghost:hover { transform: translateY(-3px); border-color: var(--primary); }
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+.hero {
+  padding: calc(var(--nav-h) + 74px) 0 88px;
+  position: relative;
+}
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.06fr 0.94fr;
+  gap: 56px;
+  align-items: center;
+}
+.hero h1 {
+  font-size: clamp(2.9rem, 6.4vw, 4.7rem);
+  font-weight: 850;
+}
+.hero-sub {
+  margin-top: 22px;
+  font-size: 1.16rem;
+  color: var(--text-soft);
+  max-width: 52ch;
+}
+.hero-cta {
+  margin-top: 34px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.hero-meta {
+  margin-top: 30px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+.hero-meta span { display: inline-flex; align-items: center; gap: 8px; }
+.meta-ico {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--primary);
+}
+
+/* Floating note cards: a live miniature of the app's grid. */
+.hero-stack {
+  position: relative;
+  height: 510px;
+  perspective: 1400px;
+}
+/* Each card carries a different note colour, taken from the app's own
+   LIGHT_COLORS / DARK_COLORS (src/utils/colors.js). They deliberately stay
+   fixed across themes: in the app the workspace theme recolours the chrome
+   while the notes keep their own colour. */
+.note-card {
+  position: absolute;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background:
+    linear-gradient(150deg, rgba(var(--note), 0.36), rgba(var(--note), 0.17)),
+    var(--glass-strong);
+  border: 1px solid rgba(var(--note), 0.5);
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: 0 22px 50px -18px var(--shadow-lg);
+  animation: float 7s ease-in-out infinite;
+  will-change: transform;
+}
+[data-mode="dark"] .note-card {
+  background:
+    linear-gradient(150deg, rgba(var(--note-dark), 0.62), rgba(var(--note-dark), 0.34)),
+    var(--glass-strong);
+  border-color: rgba(var(--note), 0.26);
+}
+.note-card h4 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.note-card .line {
+  height: 7px;
+  border-radius: 4px;
+  background: currentColor;
+  opacity: 0.16;
+  margin-bottom: 7px;
+}
+.note-card .tag {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: rgb(var(--note-ink));
+  color: #fff;
+}
+[data-mode="dark"] .note-card .tag {
+  background: rgba(var(--note), 0.9);
+  color: #12121a;
+}
+
+/* Vertical gaps leave room for the float animation (±16px) so the cards
+   never clip each other's text at the extremes of their travel.
+   note / note-dark / note-ink = app colour, dark-mode colour, readable pill. */
+.nc-1 {
+  top: 0; left: 2%; width: 60%; animation-delay: 0s;
+  --note: 255, 214, 51; --note-dark: 140, 110, 25; --note-ink: 146, 102, 8;
+}
+.nc-2 {
+  top: 148px; right: 0; width: 57%; animation-delay: -2.4s;
+  --note: 124, 233, 157; --note-dark: 28, 110, 58; --note-ink: 21, 116, 63;
+}
+.nc-3 {
+  top: 336px; left: 6%; width: 62%; animation-delay: -4.6s;
+  --note: 120, 180, 255; --note-dark: 35, 72, 165; --note-ink: 41, 88, 190;
+}
+/* The checkbox follows its own note's colour rather than the theme accent. */
+.note-card .check-box { border-color: rgb(var(--note-ink)); }
+.note-card .check-row.done .check-box { background: rgb(var(--note-ink)); }
+[data-mode="dark"] .note-card .check-box { border-color: rgba(var(--note), 0.85); }
+[data-mode="dark"] .note-card .check-row.done .check-box { background: rgba(var(--note), 0.85); }
+[data-mode="dark"] .note-card .check-row.done .check-box::after { border-color: #12121a; }
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.83rem;
+  color: var(--text-soft);
+  margin-bottom: 7px;
+}
+.check-box {
+  width: 15px; height: 15px;
+  border-radius: 5px;
+  border: 2px solid var(--primary);
+  flex-shrink: 0;
+  position: relative;
+}
+.check-row.done .check-box { background: var(--primary); }
+.check-row.done .check-box::after {
+  content: "";
+  position: absolute;
+  left: 3.5px; top: 0.5px;
+  width: 4px; height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.check-row.done span { text-decoration: line-through; opacity: 0.55; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(-0.5deg); }
+  50% { transform: translateY(-16px) rotate(0.5deg); }
+}
+
+/* ── Section shell ────────────────────────────────────────────────────── */
+section { padding: 92px 0; position: relative; }
+.section-head { margin-bottom: 52px; max-width: 760px; }
+
+/* ── Theme picker ─────────────────────────────────────────────────────── */
+.theme-panel { padding: 46px; }
+.theme-layout {
+  display: grid;
+  grid-template-columns: 0.92fr 1.08fr;
+  gap: 48px;
+  align-items: center;
+}
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.swatch {
+  padding: 0;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--glass-border);
+  background: var(--glass-strong);
+  /* <button> has a UA-stylesheet default color (ButtonText) that does not
+     inherit from the page like a <div> would, so without this it renders
+     black-on-black in dark mode regardless of --text. */
+  color: var(--text);
+  cursor: pointer;
+  overflow: hidden;
+  text-align: left;
+  transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1), border-color 0.22s, box-shadow 0.22s;
+}
+.swatch:hover { transform: translateY(-4px); box-shadow: 0 16px 30px -14px var(--shadow-lg); }
+.swatch.active { border-color: var(--sw-primary); box-shadow: 0 14px 30px -14px var(--sw-primary); }
+.swatch-top {
+  height: 58px;
+  display: grid;
+  place-items: center;
+  background: var(--sw-surface);
+}
+.swatch-pill {
+  width: 58%;
+  height: 17px;
+  border-radius: 999px;
+  background: linear-gradient(115deg, var(--sw-primary), var(--sw-secondary));
+}
+.swatch-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 11px 13px;
+  font-size: 0.87rem;
+  font-weight: 700;
+}
+.swatch-check { opacity: 0; transition: opacity 0.2s; color: var(--sw-primary); display: flex; }
+.swatch-check svg { width: 16px; height: 16px; }
+.swatch.active .swatch-check { opacity: 1; }
+
+.theme-note {
+  margin-top: 26px;
+  padding: 15px 18px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--primary) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  font-size: 0.87rem;
+  color: var(--text-soft);
+}
+
+/* ── Migrate-from-Google-Keep checklist ──────────────────────────────── */
+/* Reuses .theme-panel / .theme-layout from the theme picker above (same
+   two-column glass card), just with a checklist instead of swatches on the
+   right: fitting, since the point is "what actually survives the import". */
+.migrate-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.migrate-item {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.migrate-check {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(140deg, var(--primary), var(--secondary));
+  box-shadow: 0 6px 14px -6px var(--primary);
+}
+.migrate-check svg { width: 14px; height: 14px; }
+.migrate-item strong {
+  display: block;
+  font-size: 0.94rem;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.migrate-item > span > span {
+  display: block;
+  font-size: 0.86rem;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+/* ── Bento feature grid ───────────────────────────────────────────────── */
+.bento {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 18px;
+}
+.cell {
+  padding: 30px;
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  transition: transform 0.32s cubic-bezier(0.34, 1.3, 0.64, 1), box-shadow 0.32s;
+}
+.cell:hover { transform: translateY(-5px); box-shadow: 0 24px 48px -20px var(--shadow-lg); }
+.cell::before {
+  content: "";
+  position: absolute;
+  top: -50%; right: -30%;
+  width: 260px; height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 26%, transparent), transparent 68%);
+  opacity: 0;
+  transition: opacity 0.42s ease;
+  pointer-events: none;
+}
+.cell:hover::before { opacity: 1; }
+.cell-lg { grid-column: span 3; }
+.cell-md { grid-column: span 2; }
+.cell-sm { grid-column: span 2; }
+
+.cell-icon {
+  width: 46px; height: 46px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 18px;
+  background: linear-gradient(140deg, var(--primary), var(--secondary));
+  box-shadow: 0 9px 22px -8px var(--primary);
+  color: #fff;
+}
+.cell-icon svg { width: 23px; height: 23px; }
+.cell p {
+  margin-top: 10px;
+  color: var(--text-soft);
+  font-size: 0.935rem;
+}
+.cell-tags {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.chip {
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
+}
+
+/* Federation diagram inside its bento cell */
+.fed-viz {
+  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.fed-node {
+  flex: 1;
+  padding: 13px;
+  border-radius: 13px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+}
+.fed-node small {
+  display: block;
+  font-weight: 600;
+  font-size: 0.68rem;
+  color: var(--text-soft);
+  margin-top: 2px;
+}
+.fed-link {
+  width: 54px;
+  height: 2px;
+  position: relative;
+  background: color-mix(in srgb, var(--primary) 30%, transparent);
+  flex-shrink: 0;
+}
+.fed-link::after {
+  content: "";
+  position: absolute;
+  top: -3px; left: 0;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 10px var(--primary);
+  animation: travel 2.4s ease-in-out infinite;
+}
+@keyframes travel {
+  0%, 100% { left: 0; opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { left: calc(100% - 8px); }
+}
+
+/* ── Screenshot frames ────────────────────────────────────────────────── */
+.shot {
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-strong);
+  box-shadow: 0 26px 60px -24px var(--shadow-lg);
+  position: relative;
+}
+
+/* Windows-style title bar: caption on the left, window controls on the right. */
+.shot-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 0 0 14px;
+  height: 36px;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass);
+}
+.shot-title {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.win-btns {
+  margin-left: auto;
+  display: flex;
+  align-self: stretch;
+  color: var(--text-soft);
+}
+.win-btns svg {
+  width: 46px;
+  height: 100%;
+  padding: 0 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.75;
+}
+/* Only the close control gets the red hover, exactly like the real thing. */
+.win-btns svg:hover { background: color-mix(in srgb, var(--text) 10%, transparent); }
+.win-btns .win-close:hover { background: #e81123; stroke: #fff; opacity: 1; }
+
+/* The TV capture already includes its own bezel, so it carries no card frame,
+   no border and no window bar: the artwork sits directly on the page. */
+.tv-shot { margin-top: 26px; }
+
+/* Light/dark screenshots: both variants sit in the DOM and CSS shows exactly
+   one. Because `display` is not animatable, switching mode swaps the image in
+   the same frame, with no cross-fade and nothing to load first. */
+.shot-media { display: block; line-height: 0; }
+.shot-media img {
+  width: 100%;
+  height: auto;
+  transition: none;
+}
+/* `display` is only ever set by the pair below, never by the rule above:
+   a shared `display:block` there would out-rank `.shot-dark` on specificity
+   and leave both variants visible in light mode. */
+.shot-media .shot-light { display: block; }
+.shot-media .shot-dark { display: none; }
+[data-mode="dark"] .shot-media .shot-light { display: none; }
+[data-mode="dark"] .shot-media .shot-dark { display: block; }
+
+.shots-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
+}
+.phones {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-top: 22px;
+}
+.phone {
+  transition: transform 0.3s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+.phone:hover { transform: translateY(-8px); }
+
+/* ── Platforms ────────────────────────────────────────────────────────── */
+.platforms {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+.plat {
+  padding: 30px;
+  text-align: center;
+  transition: transform 0.3s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+.plat:hover { transform: translateY(-6px); }
+.plat-ico {
+  width: 54px; height: 54px;
+  margin: 0 auto 16px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(140deg, var(--primary), var(--secondary));
+  color: #fff;
+  box-shadow: 0 12px 26px -10px var(--primary);
+}
+.plat-ico svg { width: 27px; height: 27px; }
+.plat p { margin-top: 9px; color: var(--text-soft); font-size: 0.9rem; }
+
+/* ── Install ──────────────────────────────────────────────────────────── */
+.install-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+/* min-width:0 defeats the grid item's default `min-width:auto`, which would
+   otherwise refuse to shrink below the <pre>'s intrinsic width and push the
+   whole page into horizontal scroll on narrow screens. */
+.install-card { padding: 32px; min-width: 0; }
+.install-card h3 { display: flex; align-items: center; gap: 10px; }
+.install-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(115deg, var(--primary), var(--secondary));
+}
+pre {
+  margin: 18px 0 0;
+  padding: 17px 19px;
+  border-radius: var(--radius-sm);
+  background: rgba(12, 10, 24, 0.9);
+  color: #e8e6f5;
+  font-size: 0.83rem;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  position: relative;
+}
+pre code { white-space: pre; }
+.copy-btn {
+  position: absolute;
+  top: 10px; right: 10px;
+  padding: 5px 11px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #cfcbe8;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.copy-btn:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
+.install-card ul {
+  margin: 16px 0 0;
+  padding-left: 0;
+  list-style: none;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+.install-card li {
+  display: flex;
+  gap: 9px;
+  margin-bottom: 8px;
+  align-items: flex-start;
+}
+.install-card li::before {
+  content: "";
+  width: 6px; height: 6px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+}
+
+/* ── CTA ──────────────────────────────────────────────────────────────── */
+.cta {
+  padding: 66px 48px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg,
+    color-mix(in srgb, var(--primary) 15%, transparent),
+    color-mix(in srgb, var(--secondary) 15%, transparent));
+  pointer-events: none;
+}
+.cta > * { position: relative; }
+.cta p { margin: 16px auto 0; max-width: 52ch; color: var(--text-soft); font-size: 1.05rem; }
+.cta .hero-cta { justify-content: center; margin-top: 30px; }
+
+/* ── Footer ───────────────────────────────────────────────────────────── */
+footer {
+  padding: 46px 0;
+  border-top: 1px solid var(--glass-border);
+  margin-top: 40px;
+}
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.87rem;
+  color: var(--text-soft);
+}
+.foot a { color: var(--text-soft); text-decoration: none; font-weight: 600; }
+.foot a:hover { color: var(--primary); }
+.foot-links { display: flex; gap: 20px; flex-wrap: wrap; }
+
+/* ── Scroll reveal ────────────────────────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal.in { opacity: 1; transform: none; }
+
+/* ── Responsive ───────────────────────────────────────────── */
+/* Nothing may exceed the viewport width: this page scrolls vertically only. */
+html, body { max-width: 100%; overflow-x: hidden; }
+.wrap, .bento, .platforms, .install-grid, .shots-row, .phones { min-width: 0; }
+img, pre { max-width: 100%; }
+
+/* Tablet landscape and small laptops: keep two columns where they still read
+   well, and tighten the hero rather than breaking it up. */
+@media (max-width: 1024px) {
+  .cell-lg { grid-column: span 6; }
+  .cell-md, .cell-sm { grid-column: span 3; }
+  .hero-grid { gap: 40px; }
+}
+
+@media (max-width: 900px) {
+  .hero-grid, .theme-layout { grid-template-columns: 1fr; }
+  .hero-stack { height: 470px; margin-top: 8px; }
+  .nav-links { display: none; }
+  .nav-actions { margin-left: auto; }
+  .theme-panel { padding: 34px; }
+  section { padding: 74px 0; }
+}
+
+/* Tablet portrait. */
+@media (max-width: 820px) {
+  .install-grid { grid-template-columns: 1fr; }
+  .phones { gap: 14px; }
+}
+
+@media (max-width: 700px) {
+  .cell-lg, .cell-md, .cell-sm { grid-column: span 6; }
+  .platforms, .shots-row { grid-template-columns: 1fr; }
+  .phones { grid-template-columns: repeat(2, 1fr); }
+  section { padding: 60px 0; }
+}
+
+/* Phones: centre the hero and stack the note cards in a single column under
+   it, instead of letting them float in a side column. */
+@media (max-width: 640px) {
+  .wrap { padding: 0 18px; }
+  .hero { padding-top: calc(var(--nav-h) + 40px); }
+  .hero h1 { font-size: clamp(2.25rem, 10.5vw, 3.2rem); }
+  .hero-grid > div:first-child { text-align: center; }
+  /* The leading rule reads as a stray dash once the label wraps, so drop it
+     and let the centred text stand on its own. */
+  .eyebrow { justify-content: center; }
+  .eyebrow::before { display: none; }
+  .hero-sub { margin-left: auto; margin-right: auto; }
+  .hero-cta, .hero-meta { justify-content: center; }
+  .hero-stack { height: 440px; }
+  .nc-1, .nc-2, .nc-3 {
+    left: 50%;
+    right: auto;
+    width: min(340px, 92%);
+    transform: translateX(-50%);
+  }
+  .nc-1 { top: 0; }
+  .nc-2 { top: 146px; }
+  .nc-3 { top: 330px; }
+  /* translateX is load-bearing here, so the float keyframes must preserve it. */
+  @keyframes float {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-14px); }
+  }
+  .theme-panel { padding: 26px 20px; }
+  .swatch-grid { grid-template-columns: repeat(2, 1fr); }
+  .cell, .plat, .install-card { padding: 24px 20px; }
+  .cta { padding: 40px 22px; }
+  .section-head { margin-bottom: 38px; }
+  .foot { justify-content: center; text-align: center; }
+  .foot-links { justify-content: center; }
+
+  /* Headroom pattern: the bar retreats while scrolling down and comes back on
+     the first upward scroll, so a small screen keeps its vertical space
+     without losing quick access to the controls. Phones only; the class is
+     never applied above this breakpoint (see initNav). The translateX is what
+     centres the bar, so the hidden state has to carry it too. */
+  .nav.nav-hidden {
+    transform: translateX(-50%) translateY(calc(-100% - 22px));
+  }
+}
+
+/* Below this the nav no longer fits its label, so GitHub becomes an icon
+   button matching the other two round controls. */
+@media (max-width: 560px) {
+  .gh-label { display: none; }
+  .nav-gh {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  .nav { padding: 0 10px 0 16px; gap: 10px; }
+}
+
+@media (max-width: 420px) {
+  .brand { font-size: 0.98rem; }
+  .swatch-grid { gap: 10px; }
+  .hero-meta { gap: 8px 14px; font-size: 0.8rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; }
+}
