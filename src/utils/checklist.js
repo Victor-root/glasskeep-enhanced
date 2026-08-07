@@ -166,8 +166,17 @@ export function canIndentItem(entries, itemId) {
  * Keep style. Purely positional (derived fresh from the array each time,
  * never stored), so this stays a flat list under the hood: nothing here
  * introduces an actual parent/child data structure. Stops at the first
- * indent:0 item or section marker; returns [] for an item that's itself
- * indented (only top-level items can have children) or doesn't exist.
+ * unchecked indent:0 item or section marker; returns [] for an item
+ * that's itself indented (only top-level items can have children) or
+ * doesn't exist.
+ *
+ * An already-checked, non-indented item is skipped rather than treated
+ * as the end of the run: checked items render separately (grouped under
+ * "Done"), so one sitting between a parent and its indented children is
+ * invisible in the normal view -- it must not silently break the chain.
+ * This matters in practice: a brand-new note never hits this, but any
+ * checklist that's actually been used (checked off, then unchecked to
+ * reuse the list) easily can.
  */
 export function getIndentedChildren(entries, parentId) {
   const arr = Array.isArray(entries) ? entries : [];
@@ -177,8 +186,9 @@ export function getIndentedChildren(entries, parentId) {
   for (let i = idx + 1; i < arr.length; i++) {
     const e = arr[i];
     if (isSection(e)) break;
-    if (!e.indent) break;
-    children.push(e);
+    if (e.indent) { children.push(e); continue; }
+    if (e.done) continue;
+    break;
   }
   return children;
 }
