@@ -1051,13 +1051,22 @@ export default function App() {
   const [multiMode, setMultiMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]); // array of string ids
   const isSelected = (id) => selectedIds.includes(String(id));
+  // On desktop the notes list scrolls inside .notes-scroll-area (so its
+  // scrollbar starts below the sticky header) instead of the document;
+  // on mobile that same element keeps overflow:visible and window scrolls
+  // as before. Pick whichever one is actually the scrolling box.
+  const getNotesScrollTarget = () => {
+    const el = document.querySelector(".notes-scroll-area");
+    return el && getComputedStyle(el).overflowY === "auto" ? el : null;
+  };
   const onStartMulti = () => {
     // Toggle: a second click on the multi-select button closes the bar
     // instead of re-running the open logic (which re-added the dock's padding
     // to the scroll position, so each extra click scrolled the page down).
     if (multiMode) { onExitMulti(); return; }
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
+    const scrollEl = getNotesScrollTarget();
+    const scrollX = scrollEl ? scrollEl.scrollLeft : window.scrollX;
+    const scrollY = scrollEl ? scrollEl.scrollTop : window.scrollY;
     setMultiMode(true);
     setSelectedIds([]);
     setFabOpen(false); // dock lives at bottom; close FAB to avoid overlap
@@ -1068,13 +1077,16 @@ export default function App() {
       const shim = document.querySelector(".multi-select-content-shim");
       const pad = shim ? parseFloat(getComputedStyle(shim).paddingTop) || 0 : 0;
       if (pad > 0) {
-        window.scrollTo({ left: scrollX, top: scrollY + pad, behavior: "instant" });
+        const target = { left: scrollX, top: scrollY + pad, behavior: "instant" };
+        if (scrollEl) scrollEl.scrollTo(target);
+        else window.scrollTo(target);
       }
     });
   };
   const onExitMulti = () => {
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
+    const scrollEl = getNotesScrollTarget();
+    const scrollX = scrollEl ? scrollEl.scrollLeft : window.scrollX;
+    const scrollY = scrollEl ? scrollEl.scrollTop : window.scrollY;
     // Read the padding BEFORE the state change — after the commit it's gone.
     const shim = document.querySelector(".multi-select-content-shim");
     const pad = shim ? parseFloat(getComputedStyle(shim).paddingTop) || 0 : 0;
@@ -1084,7 +1096,9 @@ export default function App() {
     // scrolling up by the same amount so the visible content stays put.
     requestAnimationFrame(() => {
       const targetY = Math.max(0, scrollY - pad);
-      window.scrollTo({ left: scrollX, top: targetY, behavior: "instant" });
+      const target = { left: scrollX, top: targetY, behavior: "instant" };
+      if (scrollEl) scrollEl.scrollTo(target);
+      else window.scrollTo(target);
     });
   };
   const onToggleSelect = (id, checked) => {
