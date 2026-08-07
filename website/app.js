@@ -322,7 +322,7 @@
   var lbSwitchTimer = null;
   var lbCloseTimer = null;
 
-  var lb, lbImg, lbBackdrop, lbCaption, lbCount, lbClose, lbPrev, lbNext;
+  var lb, lbImg, lbBackdrop, lbMeta, lbCaption, lbCount, lbClose, lbPrev, lbNext;
 
   function activeImg(media) {
     var wantDark = root.getAttribute("data-mode") === "dark";
@@ -337,9 +337,24 @@
     return { w: natW * ratio, h: natH * ratio };
   }
 
+  // The caption/counter footer floats at a fixed distance from the viewport
+  // bottom, independent of the image's own size. On a tall/portrait shot
+  // (phone screenshots) the image can otherwise grow tall enough to sit
+  // right under it, so reserve the footer's real on-screen height (measured,
+  // not guessed, since it varies with the caption text and the small-screen
+  // breakpoint) and centre the image in the space above it instead of the
+  // full viewport.
+  function metaReserve() {
+    if (!lbMeta) return 0;
+    var gap = 14;
+    return Math.max(0, window.innerHeight - lbMeta.getBoundingClientRect().top + gap);
+  }
+
   function layoutFinalBox(img) {
+    var reserve = metaReserve();
+    var availH = window.innerHeight - reserve;
     var maxW = window.innerWidth * 0.94;
-    var maxH = window.innerHeight * 0.88;
+    var maxH = availH * 0.88;
     var natW = img.naturalWidth || img.width || 1;
     var natH = img.naturalHeight || img.height || 1;
     var size = containFit(natW, natH, maxW, maxH);
@@ -347,7 +362,7 @@
       w: size.w,
       h: size.h,
       left: (window.innerWidth - size.w) / 2,
-      top: (window.innerHeight - size.h) / 2
+      top: (availH - size.h) / 2
     };
   }
 
@@ -384,8 +399,8 @@
     var finish = function () {
       lbImg.src = img.currentSrc || img.src;
       lbImg.alt = img.getAttribute("alt") || "";
-      applyBox(layoutFinalBox(img));
       updateMeta();
+      applyBox(layoutFinalBox(img));
       if (animate) {
         // rAF so the src/box change above paints before the fade-in starts.
         requestAnimationFrame(function () {
@@ -525,6 +540,7 @@
     if (!lb) return;
     lbImg = document.getElementById("lightboxImg");
     lbBackdrop = document.getElementById("lightboxBackdrop");
+    lbMeta = document.getElementById("lightboxMeta");
     lbCaption = document.getElementById("lightboxCaption");
     lbCount = document.getElementById("lightboxCount");
     lbClose = document.getElementById("lightboxClose");
