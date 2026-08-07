@@ -801,6 +801,29 @@ html.gk-custom-bg:not(.dark) .gk-section-label {
   }
 }
 
+/* ───────── Desktop scroll shell ─────────
+   NotesHeader is sticky, but sticky positioning never changes where the
+   ancestor's native scrollbar begins -- it still spans the full viewport
+   from y=0 unless the scrolling box itself starts below the header. On
+   desktop the shell becomes a fixed-height flex column and the shim
+   (composer + sections) is the real scrolling box, so its scrollbar
+   starts right under the header, matching TagSidebar's own nav. Mobile
+   keeps document-level scrolling: native scrollbars are hidden there
+   (see the max-width:639px rule above) and the header auto-hide effect
+   reads window.scrollY. */
+.notes-shell-desktop {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.notes-shell-desktop > .notes-scroll-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 /* ───────── Multi-select floating dock ─────────
    Premium floating dock anchored at the bottom of the viewport. Fully
    OPAQUE (no backdrop blur / glass) so notes behind never bleed through

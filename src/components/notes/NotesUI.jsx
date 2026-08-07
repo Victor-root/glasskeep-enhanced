@@ -218,7 +218,9 @@ function NotesUI({
     return NotesIcon;
   })();
 
-  // Close header menu when scrolling
+  // Close header menu when scrolling. Capture phase on document catches
+  // scroll events from window (mobile) or from the desktop scroll area
+  // (.notes-scroll-area) alike, since "scroll" doesn't bubble.
   React.useEffect(() => {
     if (!headerMenuOpen) return;
 
@@ -226,19 +228,17 @@ function NotesUI({
       setHeaderMenuOpen(false);
     };
 
-    const scrollContainer = document.querySelector(".min-h-screen");
-    if (scrollContainer) {
-      scrollContainer.addEventListener("scroll", handleScroll, {
-        passive: true,
-      });
-      return () => scrollContainer.removeEventListener("scroll", handleScroll);
-    }
+    document.addEventListener("scroll", handleScroll, {
+      capture: true,
+      passive: true,
+    });
+    return () => document.removeEventListener("scroll", handleScroll, true);
   }, [headerMenuOpen, setHeaderMenuOpen]);
 
 
   return (
     <div
-      className="min-h-screen overflow-x-clip"
+      className={`min-h-screen overflow-x-clip${isMobile ? "" : " notes-shell-desktop"}`}
       style={{ marginLeft: sidebarPermanent ? `${sidebarWidth}px` : "0px", position:"relative", zIndex:2 }}
     >
       <NotesHeader
@@ -300,7 +300,7 @@ function NotesUI({
           slides the content down smoothly when entering multiMode and
           back up on exit. */}
       <div
-        className="multi-select-content-shim"
+        className="multi-select-content-shim notes-scroll-area"
         data-multimode={multiMode ? "true" : undefined}
       >
       <NotesComposer
