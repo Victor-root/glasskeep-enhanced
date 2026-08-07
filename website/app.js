@@ -353,8 +353,15 @@
   function layoutFinalBox(img) {
     var reserve = metaReserve();
     var availH = window.innerHeight - reserve;
-    var maxW = window.innerWidth * 0.94;
-    var maxH = availH * 0.88;
+    // Same near-fullscreen margin on both axes. maxH used to be shrunk much
+    // further (0.88) to keep clear of the caption itself, back when the
+    // image was centred in the full viewport height; now that metaReserve()
+    // already carves out the caption's own space above, that extra shrink
+    // just wasted the room a tall/portrait shot (phone screenshots) had to
+    // grow into.
+    var fill = 0.94;
+    var maxW = window.innerWidth * fill;
+    var maxH = availH * fill;
     var natW = img.naturalWidth || img.width || 1;
     var natH = img.naturalHeight || img.height || 1;
     var size = containFit(natW, natH, maxW, maxH);
