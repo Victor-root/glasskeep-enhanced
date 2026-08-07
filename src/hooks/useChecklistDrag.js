@@ -97,23 +97,24 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
     });
   };
 
-  const handlePointerDown = useCallback((itemId, e) => {
-    if (e.button && e.button !== 0) return;
-    e.preventDefault();
-
-    const handle = e.currentTarget;
-    const rowEl = handle.closest("[data-checklist-item]");
-    if (!rowEl) return;
-
+  // Sets up the "pick up" presentation (floating clone, shadow, scale,
+  // sibling reflow, auto-scroll) -- called lazily from handlePointerMove
+  // ONLY once a gesture actually locks into "vertical". A horizontal
+  // gesture never calls this, which is what keeps the lift animation
+  // from ever playing for a horizontal drag (Google Keep only lifts the
+  // row once you start moving it vertically). Returns false if the row
+  // can't be found in a container (gesture aborts).
+  const beginVerticalLift = useCallback((ds) => {
+    const rowEl = ds.rowEl;
     const containerEl = rowEl.closest("[data-checklist-list]") || rowEl.parentElement;
-    if (!containerEl) return;
+    if (!containerEl) return false;
 
     const scrollEl = rowEl.closest("[data-modal-scroll]") || rowEl.closest(".overflow-y-auto") || rowEl.closest(".glass-card");
 
     // Visual rows = items + section headers + inline "+ list item" buttons.
     const rowEls = Array.from(containerEl.querySelectorAll("[data-checklist-row]"));
     const fromIndex = rowEls.indexOf(rowEl);
-    if (fromIndex === -1) return;
+    if (fromIndex === -1) return false;
 
     const rects = rowEls.map((el) => el.getBoundingClientRect());
     const rowRect = rects[fromIndex];
@@ -149,13 +150,54 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
       }
     });
 
+    Object.assign(ds, {
+      clone, containerEl, rowEls, rects, fromIndex, currentIndex: fromIndex,
+      scrollEl, startScrollTop,
+    });
+
+    const autoScroll = () => {
+      const cur = dragState.current;
+      if (!cur || cur.mode !== "vertical" || !cur.scrollEl) return;
+      const scrollRect = cur.scrollEl.getBoundingClientRect();
+      const edgeZone = 60;
+      const cursorY = cur.lastY;
+      let speed = 0;
+      if (cursorY > scrollRect.bottom - edgeZone) {
+        speed = Math.min(12, ((cursorY - (scrollRect.bottom - edgeZone)) / edgeZone) * 12);
+      } else if (cursorY < scrollRect.top + edgeZone) {
+        speed = -Math.min(12, (((scrollRect.top + edgeZone) - cursorY) / edgeZone) * 12);
+      }
+      if (speed !== 0) {
+        cur.scrollEl.scrollTop += speed;
+        updateDragPosition(cur);
+      }
+      cur.autoScrollRaf = requestAnimationFrame(autoScroll);
+    };
+    ds.autoScrollRaf = requestAnimationFrame(autoScroll);
+    return true;
+  }, []);
+
+  const handlePointerDown = useCallback((itemId, e) => {
+    if (e.button && e.button !== 0) return;
+    e.preventDefault();
+
+    const handle = e.currentTarget;
+    const rowEl = handle.closest("[data-checklist-item]");
+    if (!rowEl) return;
+
     handle.setPointerCapture(e.pointerId);
 
     const draggedItem = entries.find((x) => String(x?.id) === String(itemId));
 
+    // Deliberately minimal: no clone, no DOM measurement, no hiding the
+    // real row yet. Everything vertical-only is populated lazily by
+    // beginVerticalLift() the moment (if ever) this gesture locks into
+    // "vertical" -- see handlePointerMove.
     dragState.current = {
       id: String(itemId),
-      clone,
+      rowEl,
+      handle,
+      pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
       lastY: e.clientY,
@@ -166,38 +208,16 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
       // else can mutate `entries` while a pointer drag is in progress).
       canIndent: canIndentItem(entries, itemId),
       canOutdent: !!draggedItem?.indent,
-      containerEl,
-      rowEls,
-      rects,
-      fromIndex,
-      currentIndex: fromIndex,
-      rowEl,
-      pointerId: e.pointerId,
-      handle,
-      scrollEl,
-      startScrollTop,
+      clone: null,
+      containerEl: null,
+      rowEls: null,
+      rects: null,
+      fromIndex: -1,
+      currentIndex: -1,
+      scrollEl: null,
+      startScrollTop: 0,
       autoScrollRaf: null,
     };
-
-    const autoScroll = () => {
-      const ds = dragState.current;
-      if (!ds || !ds.scrollEl || ds.mode === "horizontal") return;
-      const scrollRect = ds.scrollEl.getBoundingClientRect();
-      const edgeZone = 60;
-      const cursorY = ds.lastY;
-      let speed = 0;
-      if (cursorY > scrollRect.bottom - edgeZone) {
-        speed = Math.min(12, ((cursorY - (scrollRect.bottom - edgeZone)) / edgeZone) * 12);
-      } else if (cursorY < scrollRect.top + edgeZone) {
-        speed = -Math.min(12, (((scrollRect.top + edgeZone) - cursorY) / edgeZone) * 12);
-      }
-      if (speed !== 0) {
-        ds.scrollEl.scrollTop += speed;
-        updateDragPosition(ds);
-      }
-      ds.autoScrollRaf = requestAnimationFrame(autoScroll);
-    };
-    dragState.current.autoScrollRaf = requestAnimationFrame(autoScroll);
   }, [entries]);
 
   const handlePointerMove = useCallback((e) => {
@@ -209,17 +229,18 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
     if (!ds.mode) {
       const deltaY = e.clientY - ds.startY;
       if (Math.abs(deltaX) < AXIS_LOCK_PX && Math.abs(deltaY) < AXIS_LOCK_PX) return;
-      ds.mode = Math.abs(deltaX) > Math.abs(deltaY) ? "horizontal" : "vertical";
-      if (ds.mode === "horizontal") {
-        // Pin vertically for the rest of this gesture -- no reordering,
-        // no auto-scroll, only the horizontal indent/outdent affordance.
-        ds.clone.style.top = `${ds.rects[ds.fromIndex].top}px`;
-        // The clone was created with a 0.2s transition on `transform`
-        // (used for the vertical path's pick-up/drop scale animation).
-        // Drop it here so the live horizontal follow below is instant,
-        // not laggy -- handlePointerUp re-adds a transform transition
-        // just for the release snap-back.
-        ds.clone.style.transition = "box-shadow 0.2s";
+      const wantsVertical = Math.abs(deltaX) <= Math.abs(deltaY);
+      if (wantsVertical) {
+        if (!beginVerticalLift(ds)) { dragState.current = null; return; }
+        ds.mode = "vertical";
+      } else {
+        ds.mode = "horizontal";
+        // Live-follow the real row directly -- no clone, no elevation,
+        // no shadow. It stays exactly where it is in the list; only its
+        // paint position shifts, which is what makes this read as "the
+        // row slides in place" rather than "the row got picked up".
+        ds.rowEl.style.transition = "none";
+        ds.rowEl.style.willChange = "transform";
       }
     }
 
@@ -228,13 +249,13 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
       const allowed = (dir > 0 && ds.canIndent) || (dir < 0 && ds.canOutdent);
       const clamped = allowed ? Math.max(-INDENT_STEP_PX, Math.min(INDENT_STEP_PX, deltaX)) : 0;
       ds.lastDeltaX = deltaX;
-      ds.clone.style.transform = `translateX(${clamped}px) scale(1.03)`;
+      ds.rowEl.style.transform = clamped ? `translateX(${clamped}px)` : "";
       return;
     }
 
     ds.clone.style.top = `${ds.rects[ds.fromIndex].top + (e.clientY - ds.startY)}px`;
     updateDragPosition(ds);
-  }, []);
+  }, [beginVerticalLift]);
 
   const handlePointerUp = useCallback(() => {
     const ds = dragState.current;
@@ -244,32 +265,47 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
     try { ds.handle.releasePointerCapture(ds.pointerId); } catch (_) {}
 
     if (ds.mode === "horizontal") {
-      const draggedId = ds.rowEl.getAttribute("data-checklist-item");
+      const rowEl = ds.rowEl;
+      const draggedId = ds.id;
       const deltaX = ds.lastDeltaX || 0;
       const shouldIndent = ds.canIndent && deltaX >= INDENT_STEP_PX;
       const shouldOutdent = ds.canOutdent && deltaX <= -INDENT_STEP_PX;
 
-      ds.clone.style.transition = "transform 0.15s cubic-bezier(.2,0,0,1), box-shadow 0.2s";
-      ds.clone.style.transform = "scale(1)";
-      ds.clone.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
-
-      setTimeout(() => {
-        ds.clone.remove();
-        ds.rowEl.style.opacity = "";
-        ds.rowEl.style.transition = "";
-        ds.containerEl.style.minHeight = "";
-        ds.rowEls.forEach((el) => {
-          el.style.transition = "";
-          el.style.transform = "";
+      if (shouldIndent || shouldOutdent) {
+        // The row is already sitting at exactly the committed visual
+        // offset (translateX clamps to the same distance the real margin
+        // will apply once React re-renders with the new indent). Commit
+        // now, then wait two paints before dropping the manual transform
+        // -- clearing it any earlier would flash the row back to
+        // unindented for a frame, before the new margin has landed.
+        const next = updateEntry(entries, draggedId, { indent: shouldIndent ? 1 : 0 });
+        setEntries(next);
+        syncEntries(next);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            rowEl.style.transition = "";
+            rowEl.style.transform = "";
+            rowEl.style.willChange = "";
+          });
         });
+      } else {
+        // Didn't cross the commit threshold -- spring back to unindented.
+        rowEl.style.transition = "transform 0.15s cubic-bezier(.2,0,0,1)";
+        rowEl.style.transform = "";
+        setTimeout(() => {
+          rowEl.style.transition = "";
+          rowEl.style.willChange = "";
+        }, 150);
+      }
+      dragState.current = null;
+      return;
+    }
 
-        if ((shouldIndent || shouldOutdent) && draggedId) {
-          const next = updateEntry(entries, draggedId, { indent: shouldIndent ? 1 : 0 });
-          setEntries(next);
-          syncEntries(next);
-        }
-        dragState.current = null;
-      }, 150);
+    if (ds.mode !== "vertical") {
+      // Never crossed the axis-lock threshold (e.g. a stray click on the
+      // handle) -- beginVerticalLift/horizontal setup never ran, so
+      // there's nothing to animate, commit, or tear down.
+      dragState.current = null;
       return;
     }
 
@@ -401,6 +437,18 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
     const ds = dragState.current;
     if (!ds) return;
     if (ds.autoScrollRaf) cancelAnimationFrame(ds.autoScrollRaf);
+
+    if (ds.mode === "horizontal") {
+      ds.rowEl.style.transition = "";
+      ds.rowEl.style.transform = "";
+      ds.rowEl.style.willChange = "";
+      dragState.current = null;
+      return;
+    }
+    if (ds.mode !== "vertical") {
+      dragState.current = null;
+      return;
+    }
     ds.clone.remove();
     ds.rowEl.style.opacity = "";
     ds.rowEl.style.transition = "";

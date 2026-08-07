@@ -160,6 +160,29 @@ export function canIndentItem(entries, itemId) {
   return !isFirstItemInSection(arr, itemId);
 }
 
+/**
+ * The contiguous run of indented items immediately following a
+ * non-indented item -- its "children" for check/uncheck cascading, Google
+ * Keep style. Purely positional (derived fresh from the array each time,
+ * never stored), so this stays a flat list under the hood: nothing here
+ * introduces an actual parent/child data structure. Stops at the first
+ * indent:0 item or section marker; returns [] for an item that's itself
+ * indented (only top-level items can have children) or doesn't exist.
+ */
+export function getIndentedChildren(entries, parentId) {
+  const arr = Array.isArray(entries) ? entries : [];
+  const idx = arr.findIndex((e) => e.id === parentId);
+  if (idx === -1 || isSection(arr[idx]) || arr[idx].indent) return [];
+  const children = [];
+  for (let i = idx + 1; i < arr.length; i++) {
+    const e = arr[i];
+    if (isSection(e)) break;
+    if (!e.indent) break;
+    children.push(e);
+  }
+  return children;
+}
+
 /** Insert a new item right after the entry with id=afterId. */
 export function insertAfter(entries, afterId, newEntry) {
   const arr = entries.slice();

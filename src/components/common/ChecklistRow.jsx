@@ -14,6 +14,13 @@ export default function ChecklistRow({
   size = "md", // "sm" | "md" | "lg"
   preview = false,
   initialEditing = false,
+  // Whether this row should apply its OWN indent margin. Default true
+  // (card previews, the checked/"Done" list -- contexts with no separate
+  // drag handle, so the checkbox+text row IS the whole visible row).
+  // The full editor's unchecked-item wrapper sets this to false because
+  // IT applies the margin one level up instead, to the handle+row
+  // wrapper together, so the drag handle visually travels with the text.
+  indentGutter = true,
   // Keyboard editing callbacks (editor mode only)
   onEnter,           // () => void : Enter (no modifiers) — create next item
   onBackspaceEmpty,  // () => void : Backspace on empty content — delete + focus prev
@@ -152,7 +159,7 @@ export default function ChecklistRow({
   return (
     <div
       className="flex items-center gap-1.5 sm:gap-3 md:gap-2 group min-w-0"
-      style={item.indent ? { marginLeft: indentPx } : undefined}
+      style={item.indent && indentGutter ? { marginLeft: indentPx } : undefined}
     >
       <input
         type="checkbox"

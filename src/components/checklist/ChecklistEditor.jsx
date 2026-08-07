@@ -5,8 +5,10 @@ import SectionHeader, { SECTION_COLORS, DEFAULT_SECTION_COLOR, hexAlpha, useDark
 import useChecklistDrag from "../../hooks/useChecklistDrag.js";
 import {
   DEFAULT_SECTION_ID,
+  INDENT_STEP_PX,
   canIndentItem,
   findPrevItemId,
+  getIndentedChildren,
   getSections,
   hasSections,
   insertAfter,
@@ -95,7 +97,19 @@ export default function ChecklistEditor({
   const toggleItem = (id, checked) => {
     // Preserve order. Checked items stay in place in the array; render
     // code groups them visually at the bottom.
-    commit(updateEntry(items, id, { done: !!checked }));
+    //
+    // Checking/unchecking a parent cascades to its indented children
+    // (Google Keep style) -- getIndentedChildren derives that run fresh
+    // from the array each time, so this is still a flat, one-shot commit,
+    // not a stored parent/child relationship. A no-op for items with no
+    // children (the common case): same single-item update as before.
+    const children = getIndentedChildren(items, id);
+    if (children.length === 0) {
+      commit(updateEntry(items, id, { done: !!checked }));
+      return;
+    }
+    const idsToUpdate = new Set([id, ...children.map((c) => c.id)]);
+    commit(items.map((e) => (idsToUpdate.has(e.id) ? { ...e, done: !!checked } : e)));
   };
 
   const changeText = (id, text) => {
@@ -222,6 +236,7 @@ export default function ChecklistEditor({
       data-checklist-item={it.id}
       data-checklist-row
       className="group flex items-center gap-2"
+      style={it.indent ? { marginLeft: INDENT_STEP_PX } : undefined}
     >
       <div
         onPointerDown={(e) => handlePointerDown(it.id, e)}
@@ -248,6 +263,7 @@ export default function ChecklistEditor({
           disableToggle={false}
           showRemove={true}
           size="lg"
+          indentGutter={false}
           focusItemId={focusItemId}
           focusToken={focusToken}
           focusCaret={focusCaret}
