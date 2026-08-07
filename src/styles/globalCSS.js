@@ -818,10 +818,26 @@ html.gk-custom-bg:not(.dark) .gk-section-label {
   flex-direction: column;
   overflow: hidden;
 }
+/* The header's own mb-6 is a flex-item margin, so it would otherwise leave
+   a gap between the header and the scroll area -- meaning the scrollbar
+   starts 24px below the header instead of flush against it. Zero that
+   margin here and re-create the same 24px breathing room as padding
+   *inside* the scrolling box instead, so the gap scrolls away with the
+   content and the scrollbar itself starts right at the header's edge. */
+.notes-shell-desktop > header.glass-card {
+  margin-bottom: 0;
+}
 .notes-shell-desktop > .notes-scroll-area {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  padding-top: 24px;
+}
+/* The base 24px above replaces the header's own mb-6, so multimode's
+   48px (which assumed mb-6 was still there, see the comment above)
+   needs the same 24px folded back in here: 24 + 48 = 72px. */
+.notes-shell-desktop > .notes-scroll-area[data-multimode="true"] {
+  padding-top: 72px;
 }
 
 /* ───────── Multi-select floating dock ─────────
