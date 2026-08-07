@@ -9,11 +9,15 @@ import { uid } from "./helpers.js";
  *
  * Two entry kinds coexist in the array:
  *
- *   Regular item (legacy shape, still the default):
- *     { id, text, done }
+ *   Regular item:
+ *     { id, text, done, indent }
  *
- *   Section header (new, optional):
+ *   Section header (optional):
  *     { id, kind: "section", title }
+ *
+ * `indent` is 0 or 1 (single level, Google-Keep style: no sub-sub-items).
+ * Old items predating this field simply don't have it — normalizeItems
+ * treats a missing/non-1 value as 0, so nothing needs migrating.
  *
  * Rules:
  *   - The array order IS the logical order. We never reshuffle on
@@ -25,12 +29,22 @@ import { uid } from "./helpers.js";
  *     next section marker.
  *   - Rendering decides where checked items appear (grouped at the
  *     bottom), but the underlying array stays stable.
+ *   - The first item of the list, or of any section, can never be
+ *     indented (there'd be nothing above it, in the same section, to
+ *     nest under) — enforced in normalizeItems so it holds regardless of
+ *     how the array got mutated.
  *
  * This means old notes with only `{id, text, done}` entries load as a
- * single-section checklist with no header — exactly the previous UX.
+ * single-section checklist with no header and no indentation — exactly
+ * the previous UX.
  */
 
 export const SECTION_KIND = "section";
+
+// Single-level indent, Google-Keep style. Shared by the checklist editor's
+// row margin and the drag hook's horizontal commit distance so "how far you
+// drag" and "how far it visually nests" always agree.
+export const INDENT_STEP_PX = 28;
 
 export const isSection = (entry) => !!entry && entry.kind === SECTION_KIND;
 export const isItem = (entry) => !!entry && entry.kind !== SECTION_KIND;
@@ -39,6 +53,7 @@ export const makeItem = (text = "", done = false) => ({
   id: uid(),
   text,
   done: !!done,
+  indent: 0,
 });
 
 export const makeSection = (title = "") => ({
@@ -50,11 +65,20 @@ export const makeSection = (title = "") => ({
 /**
  * Defensive normalization. Accepts anything the server or legacy storage
  * might hand us and returns a clean array of entries.
+ *
+ * Also enforces the one indentation invariant that must hold everywhere,
+ * always: the first item of the list (or of any section) can never be
+ * indented -- it would have no item above it, in the same section, to
+ * nest under. Every mutation in ChecklistEditor operates on this
+ * function's output, so clamping it here (rather than in each individual
+ * operation) makes the invariant self-healing across drag reorders,
+ * section deletes, and cross-section moves.
  */
 export function normalizeItems(raw) {
   if (!Array.isArray(raw)) return [];
   const seen = new Set();
   const out = [];
+  let atSectionStart = true;
   for (const e of raw) {
     if (!e || typeof e !== "object") continue;
     if (isSection(e)) {
@@ -62,6 +86,7 @@ export function normalizeItems(raw) {
       if (seen.has(id)) continue;
       seen.add(id);
       out.push({ id, kind: SECTION_KIND, title: typeof e.title === "string" ? e.title : "", ...(e.color ? { color: e.color } : {}), ...(e.collapsed ? { collapsed: true } : {}) });
+      atSectionStart = true;
     } else {
       const id = e.id || uid();
       if (seen.has(id)) continue;
@@ -70,7 +95,9 @@ export function normalizeItems(raw) {
         id,
         text: typeof e.text === "string" ? e.text : "",
         done: !!e.done,
+        indent: atSectionStart ? 0 : (e.indent === 1 ? 1 : 0),
       });
+      atSectionStart = false;
     }
   }
   return out;
@@ -105,6 +132,111 @@ export function sectionIdForItem(entries, itemId) {
     else if (e.id === itemId) return current;
   }
   return null;
+}
+
+/**
+ * True if the item with the given id is the first item since the start of
+ * the list or since the last section marker before it -- i.e. the one
+ * position that Google-Keep-style single-level indent forbids indenting,
+ * since there would be no item above it in the same section to nest under.
+ */
+export function isFirstItemInSection(entries, itemId) {
+  const arr = Array.isArray(entries) ? entries : [];
+  let atSectionStart = true;
+  for (const e of arr) {
+    if (isSection(e)) { atSectionStart = true; continue; }
+    if (!isItem(e)) continue;
+    if (e.id === itemId) return atSectionStart;
+    atSectionStart = false;
+  }
+  return false;
+}
+
+/** Whether the item can legally be indented right now (not already indented, not first-in-section). */
+export function canIndentItem(entries, itemId) {
+  const arr = Array.isArray(entries) ? entries : [];
+  const item = arr.find((e) => e.id === itemId);
+  if (!item || isSection(item) || item.indent) return false;
+  return !isFirstItemInSection(arr, itemId);
+}
+
+/**
+ * The contiguous run of indented items immediately following a
+ * non-indented item -- its "children" for check/uncheck cascading, Google
+ * Keep style. Purely positional (derived fresh from the array each time,
+ * never stored), so this stays a flat list under the hood: nothing here
+ * introduces an actual parent/child data structure. Stops at the first
+ * unchecked indent:0 item or section marker; returns [] for an item
+ * that's itself indented (only top-level items can have children) or
+ * doesn't exist.
+ *
+ * An already-checked, non-indented item is skipped rather than treated
+ * as the end of the run: checked items render separately (grouped under
+ * "Done"), so one sitting between a parent and its indented children is
+ * invisible in the normal view -- it must not silently break the chain.
+ * This matters in practice: a brand-new note never hits this, but any
+ * checklist that's actually been used (checked off, then unchecked to
+ * reuse the list) easily can.
+ */
+export function getIndentedChildren(entries, parentId) {
+  const arr = Array.isArray(entries) ? entries : [];
+  const idx = arr.findIndex((e) => e.id === parentId);
+  if (idx === -1 || isSection(arr[idx]) || arr[idx].indent) return [];
+  const children = [];
+  for (let i = idx + 1; i < arr.length; i++) {
+    const e = arr[i];
+    if (isSection(e)) break;
+    if (e.indent) { children.push(e); continue; }
+    if (e.done) continue;
+    break;
+  }
+  return children;
+}
+
+/**
+ * Orders one section's checked items for "Done" display so an indented
+ * item always renders right after its own parent, even when an
+ * unrelated checked item happens to sit between them in the raw array
+ * (the same hidden-checked-item situation getIndentedChildren has to
+ * see past). Purely a display transform: never mutates the array, and
+ * has no bearing on where an item lands when it's unchecked again.
+ *
+ * `sectionItems` is one entry from getSections()'s `items` (all items
+ * of that section, checked and unchecked, in original order).
+ */
+export function orderCheckedForDisplay(sectionItems) {
+  const arr = Array.isArray(sectionItems) ? sectionItems : [];
+  const anchorOf = new Map();
+  let currentAnchor = null;
+  for (const it of arr) {
+    if (it.indent) {
+      anchorOf.set(it.id, currentAnchor);
+    } else {
+      anchorOf.set(it.id, it.id);
+      // A checked top-level item is invisible in the normal view, so it
+      // must not steal the anchor role away from an already-established
+      // family (that's what let a stray checked item like "Coffee beans"
+      // wedge itself between "Olive oil" and its children). It only
+      // becomes the anchor if there's nothing else established yet --
+      // e.g. right at the start of a section -- since the item being
+      // grouped (here, "Olive oil" itself) is very often checked too.
+      if (!it.done || currentAnchor === null) currentAnchor = it.id;
+    }
+  }
+  const groups = new Map();
+  const anchorOrder = [];
+  for (const it of arr) {
+    const a = anchorOf.get(it.id);
+    if (!groups.has(a)) { groups.set(a, []); anchorOrder.push(a); }
+    groups.get(a).push(it);
+  }
+  const out = [];
+  for (const a of anchorOrder) {
+    for (const it of groups.get(a)) {
+      if (it.done) out.push(it);
+    }
+  }
+  return out;
 }
 
 /** Insert a new item right after the entry with id=afterId. */

@@ -5,7 +5,10 @@ import SectionHeader, { SECTION_COLORS, DEFAULT_SECTION_COLOR, hexAlpha, useDark
 import useChecklistDrag from "../../hooks/useChecklistDrag.js";
 import {
   DEFAULT_SECTION_ID,
+  INDENT_STEP_PX,
+  canIndentItem,
   findPrevItemId,
+  getIndentedChildren,
   getSections,
   hasSections,
   insertAfter,
@@ -18,10 +21,10 @@ import {
   makeItem,
   makeSection,
   normalizeItems,
+  orderCheckedForDisplay,
   removeEntry,
   removeSectionKeepItems,
   removeSectionWithItems,
-  sectionIdForItem,
   updateEntry,
 } from "../../utils/checklist.js";
 
@@ -94,7 +97,19 @@ export default function ChecklistEditor({
   const toggleItem = (id, checked) => {
     // Preserve order. Checked items stay in place in the array; render
     // code groups them visually at the bottom.
-    commit(updateEntry(items, id, { done: !!checked }));
+    //
+    // Checking/unchecking a parent cascades to its indented children
+    // (Google Keep style) -- getIndentedChildren derives that run fresh
+    // from the array each time, so this is still a flat, one-shot commit,
+    // not a stored parent/child relationship. A no-op for items with no
+    // children (the common case): same single-item update as before.
+    const children = getIndentedChildren(items, id);
+    if (children.length === 0) {
+      commit(updateEntry(items, id, { done: !!checked }));
+      return;
+    }
+    const idsToUpdate = new Set([id, ...children.map((c) => c.id)]);
+    commit(items.map((e) => (idsToUpdate.has(e.id) ? { ...e, done: !!checked } : e)));
   };
 
   const changeText = (id, text) => {
@@ -103,6 +118,23 @@ export default function ChecklistEditor({
 
   const removeItem = (id) => {
     commit(removeEntry(items, id));
+  };
+
+  // Indent/outdent, Google-Keep style (Ctrl+]/Ctrl+[ or the drag handle).
+  // Indenting the first item of a list/section is a no-op: canIndentItem
+  // already encodes that rule (also enforced defensively in
+  // normalizeItems, so it can never actually persist either way).
+  // Outdenting has no precondition beyond "is currently indented" — no-op
+  // otherwise, so this never fires a needless save.
+  const indentItem = (id) => {
+    if (!canIndentItem(items, id)) return;
+    commit(updateEntry(items, id, { indent: 1 }));
+  };
+
+  const outdentItem = (id) => {
+    const item = items.find((e) => e.id === id);
+    if (!item || !item.indent) return;
+    commit(updateEntry(items, id, { indent: 0 }));
   };
 
   // Enter inside an item. Respects the global insert preference so
@@ -185,16 +217,18 @@ export default function ChecklistEditor({
 
   // ---------- Rendering helpers ----------
   const checkedItems = items.filter((e) => isItem(e) && e.done);
-  // Map each checked item to its original section (for the Done group).
+  // Map each section to its checked items, ordered so an indented item
+  // always renders right after its own parent -- orderCheckedForDisplay
+  // handles the case where an unrelated already-checked item happens to
+  // sit between them in the raw array (see its own doc comment).
   const checkedBySection = React.useMemo(() => {
     const map = new Map();
-    for (const it of checkedItems) {
-      const sid = sectionIdForItem(items, it.id) || DEFAULT_SECTION_ID;
-      if (!map.has(sid)) map.set(sid, []);
-      map.get(sid).push(it);
+    for (const section of sections) {
+      const ordered = orderCheckedForDisplay(section.items);
+      if (ordered.length > 0) map.set(section.id, ordered);
     }
     return map;
-  }, [items, checkedItems]);
+  }, [sections]);
 
   const showSectionBreaks = hasSections(items);
 
@@ -204,6 +238,7 @@ export default function ChecklistEditor({
       data-checklist-item={it.id}
       data-checklist-row
       className="group flex items-center gap-2"
+      style={it.indent ? { marginLeft: INDENT_STEP_PX } : undefined}
     >
       <div
         onPointerDown={(e) => handlePointerDown(it.id, e)}
@@ -230,6 +265,7 @@ export default function ChecklistEditor({
           disableToggle={false}
           showRemove={true}
           size="lg"
+          indentGutter={false}
           focusItemId={focusItemId}
           focusToken={focusToken}
           focusCaret={focusCaret}
@@ -241,6 +277,8 @@ export default function ChecklistEditor({
           onRemove={() => removeItem(it.id)}
           onEnter={(opts) => addItemAdjacent(it.id, opts)}
           onBackspaceEmpty={() => removeAndFocusPrev(it.id)}
+          onIndent={() => indentItem(it.id)}
+          onOutdent={() => outdentItem(it.id)}
         />
       </div>
     </div>
@@ -259,7 +297,16 @@ export default function ChecklistEditor({
   );
 
   return (
-    <div className="space-y-4 md:space-y-3 max-sm:-mx-4">
+    // overflow-x-clip: the horizontal drag translates a row past its own
+    // box, and browsers count a transformed element's painted bounds
+    // toward its ancestor's *scrollable* overflow -- without this, that
+    // reads as real overflow on the modal's own overflow-x-auto scroll
+    // container and pops a horizontal scrollbar for the whole modal.
+    // Clipping it here contains that to the checklist itself. Paired
+    // with overflow-y-visible because clipping only one axis makes the
+    // other compute to auto per the CSS overflow spec -- without it this
+    // div would silently gain its own (unwanted) vertical scrollbar.
+    <div className="space-y-4 md:space-y-3 max-sm:-mx-4 overflow-x-clip overflow-y-visible">
       {items.length > 0 ? (
         <div className="space-y-6 md:space-y-4">
           {sections.map((section) => {
@@ -408,7 +455,7 @@ export default function ChecklistEditor({
                     );
                   })
                 ) : (
-                  checkedItems.map((it) => (
+                  (checkedBySection.get(DEFAULT_SECTION_ID) || []).map((it) => (
                     <ChecklistRow
                       key={it.id}
                       item={it}

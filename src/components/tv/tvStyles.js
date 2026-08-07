@@ -739,6 +739,7 @@ html[data-tv="1"] .tv-checklist__item {
   background: rgba(255, 255, 255, 0.04);
 }
 html[data-tv="1"] .tv-checklist__item--done { opacity: 0.45; text-decoration: line-through; }
+html[data-tv="1"] .tv-checklist__item--indent { margin-left: 32px; }
 html[data-tv="1"] .tv-checklist__box {
   width: 20px;
   height: 20px;

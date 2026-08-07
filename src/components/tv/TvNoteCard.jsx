@@ -148,7 +148,7 @@ function TvNoteCardImpl({ note, variant = "grid", onActivate }) {
               {checklistSummary.unchecked.map((it) => (
                 <li
                   key={it.id}
-                  style={{ display: "flex", alignItems: "flex-start", gap: 6, margin: "2px 0" }}
+                  style={{ display: "flex", alignItems: "flex-start", gap: 6, margin: "2px 0", marginLeft: it.indent ? 18 : 0 }}
                 >
                   <span
                     aria-hidden="true"

@@ -1,6 +1,7 @@
 import React from "react";
 import { t } from "../../i18n";
 import { linkifyContacts } from "../../utils/markdown.jsx";
+import { INDENT_STEP_PX } from "../../utils/checklist.js";
 
 export default function ChecklistRow({
   item,
@@ -13,9 +14,18 @@ export default function ChecklistRow({
   size = "md", // "sm" | "md" | "lg"
   preview = false,
   initialEditing = false,
+  // Whether this row should apply its OWN indent margin. Default true
+  // (card previews, the checked/"Done" list -- contexts with no separate
+  // drag handle, so the checkbox+text row IS the whole visible row).
+  // The full editor's unchecked-item wrapper sets this to false because
+  // IT applies the margin one level up instead, to the handle+row
+  // wrapper together, so the drag handle visually travels with the text.
+  indentGutter = true,
   // Keyboard editing callbacks (editor mode only)
   onEnter,           // () => void : Enter (no modifiers) — create next item
   onBackspaceEmpty,  // () => void : Backspace on empty content — delete + focus prev
+  onIndent,          // () => void : Ctrl+] — indent this item
+  onOutdent,         // () => void : Ctrl+[ — outdent this item
   // Imperative focus requests from parent. When focusToken changes and
   // focusItemId matches this item's id, focus this row and place the
   // caret at focusCaret ("start" | "end", default "end").
@@ -96,6 +106,18 @@ export default function ChecklistRow({
     : "opacity-0 group-hover:opacity-100";
 
   const handleKeyDown = (e) => {
+    // Ctrl+]/Ctrl+[ — indent/outdent, Google-Keep style. Cmd is accepted
+    // too (same ctrlKey-or-metaKey convention as the modal's undo/redo).
+    if (
+      (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey &&
+      (e.key === "]" || e.key === "[")
+    ) {
+      e.preventDefault();
+      if (e.key === "]") onIndent?.();
+      else onOutdent?.();
+      return;
+    }
+
     // Enter without modifiers — create a new item. If the caret is at the
     // very start of the text, the item is inserted ABOVE the current one
     // (natural "push down" reflex). Otherwise, respects the global insert
@@ -130,8 +152,15 @@ export default function ChecklistRow({
     }
   };
 
+  // Single-level indent (Google Keep style). Scaled down for compact
+  // contexts (card previews) vs the full "lg" editor row.
+  const indentPx = size === "lg" ? INDENT_STEP_PX : Math.round(INDENT_STEP_PX * 0.7);
+
   return (
-    <div className="flex items-center gap-1.5 sm:gap-3 md:gap-2 group min-w-0">
+    <div
+      className="flex items-center gap-1.5 sm:gap-3 md:gap-2 group min-w-0"
+      style={item.indent && indentGutter ? { marginLeft: indentPx } : undefined}
+    >
       <input
         type="checkbox"
         className={`shrink-0 ${boxSize} ${preview ? "pointer-events-none" : "cursor-pointer"}`}

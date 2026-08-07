@@ -256,7 +256,7 @@ function ChecklistBody({ sections }) {
           {s.items.filter(isItem).map((it) => (
             <div
               key={it.id}
-              className={`tv-checklist__item${it.done ? " tv-checklist__item--done" : ""}`}
+              className={`tv-checklist__item${it.done ? " tv-checklist__item--done" : ""}${it.indent ? " tv-checklist__item--indent" : ""}`}
             >
               <span className="tv-checklist__box" aria-hidden="true">
                 {it.done ? "✓" : ""}
