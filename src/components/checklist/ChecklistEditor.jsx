@@ -295,7 +295,16 @@ export default function ChecklistEditor({
   );
 
   return (
-    <div className="space-y-4 md:space-y-3 max-sm:-mx-4">
+    // overflow-x-clip: the horizontal drag translates a row past its own
+    // box, and browsers count a transformed element's painted bounds
+    // toward its ancestor's *scrollable* overflow -- without this, that
+    // reads as real overflow on the modal's own overflow-x-auto scroll
+    // container and pops a horizontal scrollbar for the whole modal.
+    // Clipping it here contains that to the checklist itself. Paired
+    // with overflow-y-visible because clipping only one axis makes the
+    // other compute to auto per the CSS overflow spec -- without it this
+    // div would silently gain its own (unwanted) vertical scrollbar.
+    <div className="space-y-4 md:space-y-3 max-sm:-mx-4 overflow-x-clip overflow-y-visible">
       {items.length > 0 ? (
         <div className="space-y-6 md:space-y-4">
           {sections.map((section) => {
