@@ -1,5 +1,14 @@
 import { useRef, useCallback, useEffect } from "react";
-import { reorderSections } from "../utils/checklist.js";
+import { reorderSections, canIndentItem, updateEntry, INDENT_STEP_PX } from "../utils/checklist.js";
+
+// Minimum movement (in either axis) before a gesture commits to being a
+// vertical reorder or a horizontal indent/outdent. Below this, a light
+// tremor in either direction does nothing -- this is what stops "a
+// slight horizontal movement during a vertical drag" from ever being
+// misread as an indent attempt: the axis is decided once, from whichever
+// direction first clears this threshold, and locked for the rest of the
+// gesture.
+const AXIS_LOCK_PX = 8;
 
 /**
  * Pointer-based drag & drop for checklist items AND sections.
@@ -10,6 +19,13 @@ import { reorderSections } from "../utils/checklist.js";
  *   section boundary. The commit walks the virtual new row order,
  *   extracts the ordered item IDs, and relocates the dragged entry in
  *   `entries` so its index among unchecked items matches.
+ *
+ *   The same gesture also drives indent/outdent: once the pointer clears
+ *   AXIS_LOCK_PX, the dominant axis at that moment locks the whole
+ *   gesture into either "vertical" (existing reorder behaviour, entirely
+ *   untouched below) or "horizontal" (indent right / outdent left,
+ *   following the pointer up to INDENT_STEP_PX with a commit-on-release
+ *   threshold). The two never mix within one gesture.
  *
  * Section drag (handleSectionPointerDown):
  *   Each section block is wrapped with `data-section-block={id}`. On
@@ -135,11 +151,21 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
 
     handle.setPointerCapture(e.pointerId);
 
+    const draggedItem = entries.find((x) => String(x?.id) === String(itemId));
+
     dragState.current = {
       id: String(itemId),
       clone,
+      startX: e.clientX,
       startY: e.clientY,
       lastY: e.clientY,
+      lastDeltaX: 0,
+      // Decided lazily on the first move past AXIS_LOCK_PX: null | "vertical" | "horizontal".
+      mode: null,
+      // Precomputed once — indent state can't change mid-gesture (nothing
+      // else can mutate `entries` while a pointer drag is in progress).
+      canIndent: canIndentItem(entries, itemId),
+      canOutdent: !!draggedItem?.indent,
       containerEl,
       rowEls,
       rects,
@@ -155,7 +181,7 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
 
     const autoScroll = () => {
       const ds = dragState.current;
-      if (!ds || !ds.scrollEl) return;
+      if (!ds || !ds.scrollEl || ds.mode === "horizontal") return;
       const scrollRect = ds.scrollEl.getBoundingClientRect();
       const edgeZone = 60;
       const cursorY = ds.lastY;
@@ -172,12 +198,40 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
       ds.autoScrollRaf = requestAnimationFrame(autoScroll);
     };
     dragState.current.autoScrollRaf = requestAnimationFrame(autoScroll);
-  }, []);
+  }, [entries]);
 
   const handlePointerMove = useCallback((e) => {
     const ds = dragState.current;
     if (!ds) return;
     ds.lastY = e.clientY;
+    const deltaX = e.clientX - ds.startX;
+
+    if (!ds.mode) {
+      const deltaY = e.clientY - ds.startY;
+      if (Math.abs(deltaX) < AXIS_LOCK_PX && Math.abs(deltaY) < AXIS_LOCK_PX) return;
+      ds.mode = Math.abs(deltaX) > Math.abs(deltaY) ? "horizontal" : "vertical";
+      if (ds.mode === "horizontal") {
+        // Pin vertically for the rest of this gesture -- no reordering,
+        // no auto-scroll, only the horizontal indent/outdent affordance.
+        ds.clone.style.top = `${ds.rects[ds.fromIndex].top}px`;
+        // The clone was created with a 0.2s transition on `transform`
+        // (used for the vertical path's pick-up/drop scale animation).
+        // Drop it here so the live horizontal follow below is instant,
+        // not laggy -- handlePointerUp re-adds a transform transition
+        // just for the release snap-back.
+        ds.clone.style.transition = "box-shadow 0.2s";
+      }
+    }
+
+    if (ds.mode === "horizontal") {
+      const dir = deltaX > 0 ? 1 : deltaX < 0 ? -1 : 0;
+      const allowed = (dir > 0 && ds.canIndent) || (dir < 0 && ds.canOutdent);
+      const clamped = allowed ? Math.max(-INDENT_STEP_PX, Math.min(INDENT_STEP_PX, deltaX)) : 0;
+      ds.lastDeltaX = deltaX;
+      ds.clone.style.transform = `translateX(${clamped}px) scale(1.03)`;
+      return;
+    }
+
     ds.clone.style.top = `${ds.rects[ds.fromIndex].top + (e.clientY - ds.startY)}px`;
     updateDragPosition(ds);
   }, []);
@@ -188,6 +242,36 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
 
     if (ds.autoScrollRaf) cancelAnimationFrame(ds.autoScrollRaf);
     try { ds.handle.releasePointerCapture(ds.pointerId); } catch (_) {}
+
+    if (ds.mode === "horizontal") {
+      const draggedId = ds.rowEl.getAttribute("data-checklist-item");
+      const deltaX = ds.lastDeltaX || 0;
+      const shouldIndent = ds.canIndent && deltaX >= INDENT_STEP_PX;
+      const shouldOutdent = ds.canOutdent && deltaX <= -INDENT_STEP_PX;
+
+      ds.clone.style.transition = "transform 0.15s cubic-bezier(.2,0,0,1), box-shadow 0.2s";
+      ds.clone.style.transform = "scale(1)";
+      ds.clone.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+
+      setTimeout(() => {
+        ds.clone.remove();
+        ds.rowEl.style.opacity = "";
+        ds.rowEl.style.transition = "";
+        ds.containerEl.style.minHeight = "";
+        ds.rowEls.forEach((el) => {
+          el.style.transition = "";
+          el.style.transform = "";
+        });
+
+        if ((shouldIndent || shouldOutdent) && draggedId) {
+          const next = updateEntry(entries, draggedId, { indent: shouldIndent ? 1 : 0 });
+          setEntries(next);
+          syncEntries(next);
+        }
+        dragState.current = null;
+      }, 150);
+      return;
+    }
 
     const scrollDelta = ds.scrollEl ? (ds.scrollEl.scrollTop - ds.startScrollTop) : 0;
     const targetRect = ds.rects[ds.currentIndex];

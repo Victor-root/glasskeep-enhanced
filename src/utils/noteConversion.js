@@ -18,6 +18,10 @@ import {
  *   - Blockquote markers (`>`) are stripped      → item (unchecked)
  *   - Any other non-empty line                   → item (unchecked)
  *   - Empty lines are dropped (checklists have no blank rows).
+ *   - A task line with leading whitespace        → indented item (mirrors
+ *     the 2-space prefix `checklistItemsToText` writes for indented
+ *     items), unless it's the first item of the list/section, matching
+ *     the same rule `normalizeItems` enforces everywhere else.
  *
  * Empty input returns an empty array — caller decides whether to keep
  * the note empty or seed a blank item.
@@ -26,23 +30,29 @@ export function textToChecklistItems(text) {
   if (typeof text !== "string" || !text.trim()) return [];
   const lines = text.split(/\r?\n/);
   const entries = [];
+  let atSectionStart = true;
 
   for (const raw of lines) {
     const line = raw.replace(/\s+$/, "");
     const trimmed = line.trim();
     if (!trimmed) continue;
+    const indented = /^\s/.test(line);
 
     // Markdown heading → section marker.
     const heading = trimmed.match(/^#{1,6}\s+(.+)$/);
     if (heading) {
       entries.push(makeSection(heading[1].trim()));
+      atSectionStart = true;
       continue;
     }
 
     // Task list item — `- [ ] foo`, `* [x] bar`, `+ [X] baz`.
     const task = trimmed.match(/^[-*+]\s+\[([ xX])\]\s*(.*)$/);
     if (task) {
-      entries.push(makeItem(task[2].trim(), task[1].toLowerCase() === "x"));
+      const item = makeItem(task[2].trim(), task[1].toLowerCase() === "x");
+      if (indented && !atSectionStart) item.indent = 1;
+      entries.push(item);
+      atSectionStart = false;
       continue;
     }
 
@@ -50,6 +60,7 @@ export function textToChecklistItems(text) {
     const bullet = trimmed.match(/^[-*+]\s+(.*)$/);
     if (bullet) {
       entries.push(makeItem(bullet[1].trim(), false));
+      atSectionStart = false;
       continue;
     }
 
@@ -57,6 +68,7 @@ export function textToChecklistItems(text) {
     const ordered = trimmed.match(/^\d+[.)]\s+(.*)$/);
     if (ordered) {
       entries.push(makeItem(ordered[1].trim(), false));
+      atSectionStart = false;
       continue;
     }
 
@@ -65,10 +77,12 @@ export function textToChecklistItems(text) {
     if (quote) {
       const inner = quote[1].trim();
       if (inner) entries.push(makeItem(inner, false));
+      atSectionStart = false;
       continue;
     }
 
     entries.push(makeItem(trimmed, false));
+    atSectionStart = false;
   }
 
   return entries;
@@ -77,11 +91,12 @@ export function textToChecklistItems(text) {
 /**
  * Convert a checklist `entries` array back to a markdown-like text body.
  * Round-trips with `textToChecklistItems` (items re-parse to the same
- * done state).
+ * done state, indented items to the same indent).
  *
- *   - Section header            → `## Title`
- *   - Checked item              → `- [x] text`
- *   - Unchecked item            → `- [ ] text`
+ *   - Section header         → `## Title`
+ *   - Checked item           → `- [x] text`
+ *   - Unchecked item         → `- [ ] text`
+ *   - Indented item (either) → same, prefixed with 2 spaces
  *
  * Empty items are skipped so the resulting text stays clean.
  */
@@ -101,7 +116,8 @@ export function checklistItemsToText(entries) {
     if (isItem(e)) {
       const txt = (e.text || "").trim();
       if (!txt) continue;
-      lines.push(`- [${e.done ? "x" : " "}] ${txt}`);
+      const prefix = e.indent ? "  " : "";
+      lines.push(`${prefix}- [${e.done ? "x" : " "}] ${txt}`);
     }
   }
 

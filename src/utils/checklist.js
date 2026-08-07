@@ -9,11 +9,15 @@ import { uid } from "./helpers.js";
  *
  * Two entry kinds coexist in the array:
  *
- *   Regular item (legacy shape, still the default):
- *     { id, text, done }
+ *   Regular item:
+ *     { id, text, done, indent }
  *
- *   Section header (new, optional):
+ *   Section header (optional):
  *     { id, kind: "section", title }
+ *
+ * `indent` is 0 or 1 (single level, Google-Keep style: no sub-sub-items).
+ * Old items predating this field simply don't have it — normalizeItems
+ * treats a missing/non-1 value as 0, so nothing needs migrating.
  *
  * Rules:
  *   - The array order IS the logical order. We never reshuffle on
@@ -25,12 +29,22 @@ import { uid } from "./helpers.js";
  *     next section marker.
  *   - Rendering decides where checked items appear (grouped at the
  *     bottom), but the underlying array stays stable.
+ *   - The first item of the list, or of any section, can never be
+ *     indented (there'd be nothing above it, in the same section, to
+ *     nest under) — enforced in normalizeItems so it holds regardless of
+ *     how the array got mutated.
  *
  * This means old notes with only `{id, text, done}` entries load as a
- * single-section checklist with no header — exactly the previous UX.
+ * single-section checklist with no header and no indentation — exactly
+ * the previous UX.
  */
 
 export const SECTION_KIND = "section";
+
+// Single-level indent, Google-Keep style. Shared by the checklist editor's
+// row margin and the drag hook's horizontal commit distance so "how far you
+// drag" and "how far it visually nests" always agree.
+export const INDENT_STEP_PX = 28;
 
 export const isSection = (entry) => !!entry && entry.kind === SECTION_KIND;
 export const isItem = (entry) => !!entry && entry.kind !== SECTION_KIND;
@@ -39,6 +53,7 @@ export const makeItem = (text = "", done = false) => ({
   id: uid(),
   text,
   done: !!done,
+  indent: 0,
 });
 
 export const makeSection = (title = "") => ({
@@ -50,11 +65,20 @@ export const makeSection = (title = "") => ({
 /**
  * Defensive normalization. Accepts anything the server or legacy storage
  * might hand us and returns a clean array of entries.
+ *
+ * Also enforces the one indentation invariant that must hold everywhere,
+ * always: the first item of the list (or of any section) can never be
+ * indented -- it would have no item above it, in the same section, to
+ * nest under. Every mutation in ChecklistEditor operates on this
+ * function's output, so clamping it here (rather than in each individual
+ * operation) makes the invariant self-healing across drag reorders,
+ * section deletes, and cross-section moves.
  */
 export function normalizeItems(raw) {
   if (!Array.isArray(raw)) return [];
   const seen = new Set();
   const out = [];
+  let atSectionStart = true;
   for (const e of raw) {
     if (!e || typeof e !== "object") continue;
     if (isSection(e)) {
@@ -62,6 +86,7 @@ export function normalizeItems(raw) {
       if (seen.has(id)) continue;
       seen.add(id);
       out.push({ id, kind: SECTION_KIND, title: typeof e.title === "string" ? e.title : "", ...(e.color ? { color: e.color } : {}), ...(e.collapsed ? { collapsed: true } : {}) });
+      atSectionStart = true;
     } else {
       const id = e.id || uid();
       if (seen.has(id)) continue;
@@ -70,7 +95,9 @@ export function normalizeItems(raw) {
         id,
         text: typeof e.text === "string" ? e.text : "",
         done: !!e.done,
+        indent: atSectionStart ? 0 : (e.indent === 1 ? 1 : 0),
       });
+      atSectionStart = false;
     }
   }
   return out;
@@ -105,6 +132,32 @@ export function sectionIdForItem(entries, itemId) {
     else if (e.id === itemId) return current;
   }
   return null;
+}
+
+/**
+ * True if the item with the given id is the first item since the start of
+ * the list or since the last section marker before it -- i.e. the one
+ * position that Google-Keep-style single-level indent forbids indenting,
+ * since there would be no item above it in the same section to nest under.
+ */
+export function isFirstItemInSection(entries, itemId) {
+  const arr = Array.isArray(entries) ? entries : [];
+  let atSectionStart = true;
+  for (const e of arr) {
+    if (isSection(e)) { atSectionStart = true; continue; }
+    if (!isItem(e)) continue;
+    if (e.id === itemId) return atSectionStart;
+    atSectionStart = false;
+  }
+  return false;
+}
+
+/** Whether the item can legally be indented right now (not already indented, not first-in-section). */
+export function canIndentItem(entries, itemId) {
+  const arr = Array.isArray(entries) ? entries : [];
+  const item = arr.find((e) => e.id === itemId);
+  if (!item || isSection(item) || item.indent) return false;
+  return !isFirstItemInSection(arr, itemId);
 }
 
 /** Insert a new item right after the entry with id=afterId. */

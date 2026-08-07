@@ -1,6 +1,7 @@
 import React from "react";
 import { t } from "../../i18n";
 import { linkifyContacts } from "../../utils/markdown.jsx";
+import { INDENT_STEP_PX } from "../../utils/checklist.js";
 
 export default function ChecklistRow({
   item,
@@ -16,6 +17,8 @@ export default function ChecklistRow({
   // Keyboard editing callbacks (editor mode only)
   onEnter,           // () => void : Enter (no modifiers) — create next item
   onBackspaceEmpty,  // () => void : Backspace on empty content — delete + focus prev
+  onIndent,          // () => void : Ctrl+] — indent this item
+  onOutdent,         // () => void : Ctrl+[ — outdent this item
   // Imperative focus requests from parent. When focusToken changes and
   // focusItemId matches this item's id, focus this row and place the
   // caret at focusCaret ("start" | "end", default "end").
@@ -96,6 +99,18 @@ export default function ChecklistRow({
     : "opacity-0 group-hover:opacity-100";
 
   const handleKeyDown = (e) => {
+    // Ctrl+]/Ctrl+[ — indent/outdent, Google-Keep style. Cmd is accepted
+    // too (same ctrlKey-or-metaKey convention as the modal's undo/redo).
+    if (
+      (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey &&
+      (e.key === "]" || e.key === "[")
+    ) {
+      e.preventDefault();
+      if (e.key === "]") onIndent?.();
+      else onOutdent?.();
+      return;
+    }
+
     // Enter without modifiers — create a new item. If the caret is at the
     // very start of the text, the item is inserted ABOVE the current one
     // (natural "push down" reflex). Otherwise, respects the global insert
@@ -130,8 +145,15 @@ export default function ChecklistRow({
     }
   };
 
+  // Single-level indent (Google Keep style). Scaled down for compact
+  // contexts (card previews) vs the full "lg" editor row.
+  const indentPx = size === "lg" ? INDENT_STEP_PX : Math.round(INDENT_STEP_PX * 0.7);
+
   return (
-    <div className="flex items-center gap-1.5 sm:gap-3 md:gap-2 group min-w-0">
+    <div
+      className="flex items-center gap-1.5 sm:gap-3 md:gap-2 group min-w-0"
+      style={item.indent ? { marginLeft: indentPx } : undefined}
+    >
       <input
         type="checkbox"
         className={`shrink-0 ${boxSize} ${preview ? "pointer-events-none" : "cursor-pointer"}`}

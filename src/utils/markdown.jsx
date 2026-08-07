@@ -103,7 +103,8 @@ export const mdForDownload = (n) => {
       if (it && it.kind === "section") {
         lines.push("", `## ${it.title || ""}`, "");
       } else if (it) {
-        lines.push(`- [${it.done ? "x" : " "}] ${it.text || ""}`);
+        const prefix = it.indent ? "  " : "";
+        lines.push(`${prefix}- [${it.done ? "x" : " "}] ${it.text || ""}`);
       }
     }
   }

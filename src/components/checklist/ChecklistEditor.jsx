@@ -5,6 +5,7 @@ import SectionHeader, { SECTION_COLORS, DEFAULT_SECTION_COLOR, hexAlpha, useDark
 import useChecklistDrag from "../../hooks/useChecklistDrag.js";
 import {
   DEFAULT_SECTION_ID,
+  canIndentItem,
   findPrevItemId,
   getSections,
   hasSections,
@@ -103,6 +104,23 @@ export default function ChecklistEditor({
 
   const removeItem = (id) => {
     commit(removeEntry(items, id));
+  };
+
+  // Indent/outdent, Google-Keep style (Ctrl+]/Ctrl+[ or the drag handle).
+  // Indenting the first item of a list/section is a no-op: canIndentItem
+  // already encodes that rule (also enforced defensively in
+  // normalizeItems, so it can never actually persist either way).
+  // Outdenting has no precondition beyond "is currently indented" — no-op
+  // otherwise, so this never fires a needless save.
+  const indentItem = (id) => {
+    if (!canIndentItem(items, id)) return;
+    commit(updateEntry(items, id, { indent: 1 }));
+  };
+
+  const outdentItem = (id) => {
+    const item = items.find((e) => e.id === id);
+    if (!item || !item.indent) return;
+    commit(updateEntry(items, id, { indent: 0 }));
   };
 
   // Enter inside an item. Respects the global insert preference so
@@ -241,6 +259,8 @@ export default function ChecklistEditor({
           onRemove={() => removeItem(it.id)}
           onEnter={(opts) => addItemAdjacent(it.id, opts)}
           onBackspaceEmpty={() => removeAndFocusPrev(it.id)}
+          onIndent={() => indentItem(it.id)}
+          onOutdent={() => outdentItem(it.id)}
         />
       </div>
     </div>
