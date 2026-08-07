@@ -21,10 +21,10 @@ import {
   makeItem,
   makeSection,
   normalizeItems,
+  orderCheckedForDisplay,
   removeEntry,
   removeSectionKeepItems,
   removeSectionWithItems,
-  sectionIdForItem,
   updateEntry,
 } from "../../utils/checklist.js";
 
@@ -217,16 +217,18 @@ export default function ChecklistEditor({
 
   // ---------- Rendering helpers ----------
   const checkedItems = items.filter((e) => isItem(e) && e.done);
-  // Map each checked item to its original section (for the Done group).
+  // Map each section to its checked items, ordered so an indented item
+  // always renders right after its own parent -- orderCheckedForDisplay
+  // handles the case where an unrelated already-checked item happens to
+  // sit between them in the raw array (see its own doc comment).
   const checkedBySection = React.useMemo(() => {
     const map = new Map();
-    for (const it of checkedItems) {
-      const sid = sectionIdForItem(items, it.id) || DEFAULT_SECTION_ID;
-      if (!map.has(sid)) map.set(sid, []);
-      map.get(sid).push(it);
+    for (const section of sections) {
+      const ordered = orderCheckedForDisplay(section.items);
+      if (ordered.length > 0) map.set(section.id, ordered);
     }
     return map;
-  }, [items, checkedItems]);
+  }, [sections]);
 
   const showSectionBreaks = hasSections(items);
 
@@ -453,7 +455,7 @@ export default function ChecklistEditor({
                     );
                   })
                 ) : (
-                  checkedItems.map((it) => (
+                  (checkedBySection.get(DEFAULT_SECTION_ID) || []).map((it) => (
                     <ChecklistRow
                       key={it.id}
                       item={it}

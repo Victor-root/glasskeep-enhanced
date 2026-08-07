@@ -193,6 +193,52 @@ export function getIndentedChildren(entries, parentId) {
   return children;
 }
 
+/**
+ * Orders one section's checked items for "Done" display so an indented
+ * item always renders right after its own parent, even when an
+ * unrelated checked item happens to sit between them in the raw array
+ * (the same hidden-checked-item situation getIndentedChildren has to
+ * see past). Purely a display transform: never mutates the array, and
+ * has no bearing on where an item lands when it's unchecked again.
+ *
+ * `sectionItems` is one entry from getSections()'s `items` (all items
+ * of that section, checked and unchecked, in original order).
+ */
+export function orderCheckedForDisplay(sectionItems) {
+  const arr = Array.isArray(sectionItems) ? sectionItems : [];
+  const anchorOf = new Map();
+  let currentAnchor = null;
+  for (const it of arr) {
+    if (it.indent) {
+      anchorOf.set(it.id, currentAnchor);
+    } else {
+      anchorOf.set(it.id, it.id);
+      // A checked top-level item is invisible in the normal view, so it
+      // must not steal the anchor role away from an already-established
+      // family (that's what let a stray checked item like "Coffee beans"
+      // wedge itself between "Olive oil" and its children). It only
+      // becomes the anchor if there's nothing else established yet --
+      // e.g. right at the start of a section -- since the item being
+      // grouped (here, "Olive oil" itself) is very often checked too.
+      if (!it.done || currentAnchor === null) currentAnchor = it.id;
+    }
+  }
+  const groups = new Map();
+  const anchorOrder = [];
+  for (const it of arr) {
+    const a = anchorOf.get(it.id);
+    if (!groups.has(a)) { groups.set(a, []); anchorOrder.push(a); }
+    groups.get(a).push(it);
+  }
+  const out = [];
+  for (const a of anchorOrder) {
+    for (const it of groups.get(a)) {
+      if (it.done) out.push(it);
+    }
+  }
+  return out;
+}
+
 /** Insert a new item right after the entry with id=afterId. */
 export function insertAfter(entries, afterId, newEntry) {
   const arr = entries.slice();
