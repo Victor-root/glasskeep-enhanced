@@ -1787,6 +1787,7 @@ const federation = attachFederationRoutes(app, {
   // through the SAME encryption-aware write path as local notes.
   noteDeps: {
     nowISO,
+    uid,
     isLocked: () => runtimeUnlock.isEnabled() && !runtimeUnlock.isUnlocked(),
     sendEventToUser,
     getUserById,
@@ -1795,6 +1796,7 @@ const federation = attachFederationRoutes(app, {
     getRealUserByEmail,
     getRealUserByName,
     getNoteById,
+    getUserTags,
     runInsertNote,
     runUpdateNoteFullCollab,
     addCollaborator,
@@ -2852,9 +2854,14 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
   // behavior (clean exit, no copy).
   const mode = typeof req.body?.mode === "string" ? req.body.mode : null;
   const shouldGrantCopy = isOwner && !isRemovingSelf && mode === "keep_copy";
+  // Needed up front: a federated removal skips the LOCAL copy below
+  // entirely (see that call's own comment for why) and instead asks the
+  // recipient's own server to make the copy, over unshareFromRemote.
+  const removedUser = getUserById.get(userIdToRemove);
+  const isFederatedRemoval = !!removedUser?.federated_origin;
   let copyNoteId = null;
 
-  if (shouldGrantCopy) {
+  if (shouldGrantCopy && !isFederatedRemoval) {
     copyNoteId = uid();
     // Preserve the removed user's own per-user tags on the copy instead of
     // inheriting the shared default — those tags are personal to them.
@@ -2909,10 +2916,13 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
   // If the removed collaborator was a FEDERATED stand-in, tell their peer to
   // drop that specific recipient from the mirror — an explicit, deterministic
   // signal (the display roster never removes real recipients on its own).
-  const removedUser = getUserById.get(userIdToRemove);
-  if (removedUser?.federated_origin && federation?.noteFederation?.unshareFromRemote) {
+  // withCopy tells the peer to create the standalone copy itself, from its
+  // own already-synced mirror content and owned by the recipient's real
+  // local account — a copy made HERE would only ever be reachable by the
+  // powerless shadow user that stands in for them on this server.
+  if (isFederatedRemoval && federation?.noteFederation?.unshareFromRemote) {
     Promise.resolve()
-      .then(() => federation.noteFederation.unshareFromRemote({ shadow: removedUser, noteId }))
+      .then(() => federation.noteFederation.unshareFromRemote({ shadow: removedUser, noteId, withCopy: shouldGrantCopy }))
       .catch((e) => console.warn("[federation/notes] unshareFromRemote failed:", e?.message));
   }
 
@@ -2941,17 +2951,21 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
       recipientId: userIdToRemove,
       senderId: req.user.id,
       senderName: req.user.name || req.user.email || "",
-      noteId: shouldGrantCopy ? copyNoteId : noteId,
+      // copyNoteId is only ever set when a copy was actually made HERE
+      // (shouldGrantCopy is true but a federated removal leaves it null,
+      // see above) — falling back to noteId keeps this notification
+      // pointing at a real note either way.
+      noteId: copyNoteId || noteId,
       noteTitle: note.title || "",
-      withCopy: shouldGrantCopy,
+      withCopy: !!copyNoteId,
     }) || nowISO();
 
     // -- Owner confirmation notification --
     // The owner is the one driving the removal, so the sender of the row
     // is the removed user (for the i18n {sender} slot to resolve to
-    // their name).
+    // their name). removedUser was already fetched above for the
+    // isFederatedRemoval check, and nothing since has touched that row.
     try {
-      const removedUser = getUserById.get(userIdToRemove);
       const removedName =
         (removedUser && (removedUser.name || removedUser.email)) || "";
       const ownerType = shouldGrantCopy

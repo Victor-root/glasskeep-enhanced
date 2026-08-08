@@ -501,6 +501,7 @@ function attachFederationRoutes(
       linkId: link.id,
       noteId: b.noteId,
       targetRef: b.targetRef,
+      withCopy: !!b.withCopy,
     });
     res.status(result.ok ? 200 : 409).json(result);
   });
