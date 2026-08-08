@@ -344,7 +344,31 @@ function createNoteFederation(ctx) {
         // A peer too old to send uid gives us nothing better than the old
         // heuristic — still better than duplicating our own user's row.
         : !!(deps.getRealUserByEmail?.get(p.ref) || deps.getRealUserByName?.get(p.ref));
-      if (isOneOfOurs) continue;
+      if (isOneOfOurs) {
+        // WHO our own recipients are belongs to the share / unshare
+        // messages, but WHAT THEY MAY DO is the authority's call, and the
+        // direct permission push is fire-once: when it fails because this
+        // server was down at the moment the owner flipped it, nothing else
+        // ever corrected it and the user kept editing a note the owner had
+        // set to read-only. The roster is re-pushed until it lands (see
+        // onParticipantsChangedLocally), so heal the access from here.
+        //
+        // Only on the precise uid path, and only when the entry actually
+        // carries an access: on the legacy fallback above the match is
+        // itself a name/address guess, and a wrong guess would change the
+        // wrong person's access, while an older peer sending no access at
+        // all must not silently demote everyone to read-only.
+        if (p.uid && p.canWrite != null) {
+          const mine =
+            deps.getRealUserByEmail?.get(p.ref) || deps.getRealUserByName?.get(p.ref);
+          if (mine) {
+            try {
+              deps.setCollaboratorCanWrite.run(p.canWrite ? 1 : 0, noteId, mine.id);
+            } catch { /* best-effort */ }
+          }
+        }
+        continue;
+      }
       // Remote participant → display stand-in. Key it by the participant's
       // globally-unique uid (not their name) so two different people who share
       // a name never collapse into one row — nor collide with the shadow owner.
