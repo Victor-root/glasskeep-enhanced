@@ -1514,13 +1514,15 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedResendInvite: "Resend invitation",
   fedRemove: "Remove",
 
-  // federation invite errors
+  // federation action errors
   fedErrInvalidPeerUrl:
     "That server address is not valid. Use a domain like notes.example.com (HTTPS).",
   fedErrInvalidLocalUrl:
     "This server's own address could not be determined. Make sure you are using GlassKeep over HTTPS.",
   fedErrSelf: "You can't pair a server with itself.",
   fedErrAlready: "There is already a link (or a pending one) with that server.",
+  fedErrLinkGone: "This invitation no longer exists.",
+  fedErrNotPending: "This invitation was already handled.",
   fedErrGeneric:
     "Could not send the invitation. Check the address and try again.",
 };

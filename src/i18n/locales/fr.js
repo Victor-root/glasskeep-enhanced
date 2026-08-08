@@ -1517,13 +1517,15 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedResendInvite: "Renvoyer l'invitation",
   fedRemove: "Supprimer",
 
-  // erreurs d'invitation de fédération
+  // erreurs d'action de fédération
   fedErrInvalidPeerUrl:
     "Cette adresse de serveur n'est pas valide. Utilisez un domaine comme notes.exemple.com (HTTPS).",
   fedErrInvalidLocalUrl:
     "Impossible de déterminer l'adresse de ce serveur. Assurez-vous d'utiliser GlassKeep en HTTPS.",
   fedErrSelf: "Vous ne pouvez pas associer un serveur avec lui-même.",
   fedErrAlready: "Il existe déjà une liaison (ou une liaison en attente) avec ce serveur.",
+  fedErrLinkGone: "Cette invitation n'existe plus.",
+  fedErrNotPending: "Cette invitation a déjà été traitée.",
   fedErrGeneric:
     "Impossible d'envoyer l'invitation. Vérifiez l'adresse et réessayez.",
 };

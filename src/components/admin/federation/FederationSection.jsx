@@ -16,19 +16,7 @@ import { SettingsSubHeading } from "../../common/SettingsAccordion.jsx";
 import { useFederation } from "../../../hooks/useFederation.js";
 import FederationLinkCard from "./FederationLinkCard.jsx";
 import { ServerPlusIcon, ServerUserIcon, WorldWwwIcon } from "./FederationIcons.jsx";
-
-// Map a server error code to a friendly, translated sentence.
-function inviteErrorMessage(err) {
-  const code = err?.message || "";
-  const map = {
-    invalid_peer_url: "fedErrInvalidPeerUrl",
-    invalid_local_url: "fedErrInvalidLocalUrl",
-    cannot_pair_with_self: "fedErrSelf",
-    already_linked_or_pending: "fedErrAlready",
-    self_name_required: "fedSelfNameRequired",
-  };
-  return t(map[code] || "fedErrGeneric");
-}
+import { federationErrorMessage } from "./federationActions.js";
 
 // The app's primary themed button — the exact gradient / theme / hover
 // treatment of the admin panel's "Create user" button. `.btn-gradient`
@@ -117,7 +105,7 @@ export default function FederationSection({
       setPeerInput("");
       showToast?.(t("fedInviteSent"), "success");
     } catch (e) {
-      showToast?.(inviteErrorMessage(e), "error");
+      showToast?.(federationErrorMessage(e, "fedErrGeneric"), "error");
     } finally {
       setSubmitting(false);
     }
