@@ -323,12 +323,28 @@ function createNoteFederation(ctx) {
     for (const p of roster) {
       if (!p || !p.ref) continue;
       if (p.isOwner) continue; // owner is the mirror's note owner, not a collab row
-      // A roster entry that resolves to a REAL local account is this server's
-      // own recipient — owned by the share/unshare flow, not the display
-      // roster. Leave it completely untouched.
-      const local =
-        deps.getRealUserByEmail?.get(p.ref) || deps.getRealUserByName?.get(p.ref);
-      if (local) continue;
+      // Is this entry one of OUR OWN recipients (owned by the share /
+      // unshare flow, so the display roster must leave it alone)? Decide it
+      // from the uid, NEVER by matching the name or address against our
+      // accounts: a roster entry's ref lives in whatever server that person
+      // is on, and two independent servers can each have a "Victor" — with
+      // the same email address, even, since nothing is unique across
+      // servers. Looking it up locally made us mistake the authority's
+      // Victor for our own and silently drop them from the note.
+      //
+      // The authority represents someone living on OUR side of THIS link as
+      // a shadow whose origin is `<thisLinkId>|<their ref here>`, and the
+      // link id is the same on both ends (agreed once at pairing, see
+      // federation/store.js). So that exact shape — and only it — means
+      // "this person is ours". `local:<id>` means they live on the
+      // authority, and any other link id means a third server; both of
+      // those are remote to us and need a display stand-in.
+      const isOneOfOurs = p.uid
+        ? p.uid === `${linkId}|${p.ref}`
+        // A peer too old to send uid gives us nothing better than the old
+        // heuristic — still better than duplicating our own user's row.
+        : !!(deps.getRealUserByEmail?.get(p.ref) || deps.getRealUserByName?.get(p.ref));
+      if (isOneOfOurs) continue;
       // Remote participant → display stand-in. Key it by the participant's
       // globally-unique uid (not their name) so two different people who share
       // a name never collapse into one row — nor collide with the shadow owner.
