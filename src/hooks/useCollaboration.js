@@ -405,6 +405,30 @@ export default function useCollaboration(token, {
     }
   }, [collaborationModalOpen, activeId, loadCollaboratorsForAddModal, loadAvailableUsers]);
 
+  // Keep the open note's participant list live. Until now it was only
+  // loaded when the note or the modal opened, and after actions taken on
+  // THIS device — so a collaborator removed by the owner (or by a peer's
+  // roster sync) stayed on screen until the modal was closed and reopened.
+  // App.jsx forwards the server's note_updated on the "note-updated" bus,
+  // which the server emits for exactly these participant changes.
+  useEffect(() => {
+    if (!activeId) return undefined;
+    let timer = null;
+    const onNoteUpdated = (e) => {
+      if (String(e?.detail?.noteId ?? "") !== String(activeId)) return;
+      // Coalesce: the same event also fires on every content edit, while
+      // the participant list changes far more rarely. One trailing reload
+      // per burst keeps it fresh without a request per keystroke synced.
+      clearTimeout(timer);
+      timer = setTimeout(() => loadCollaboratorsForAddModal(activeId), 600);
+    };
+    window.addEventListener("note-updated", onNoteUpdated);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("note-updated", onNoteUpdated);
+    };
+  }, [activeId, loadCollaboratorsForAddModal]);
+
   return {
     // Dialog state
     collaborationDialogOpen, setCollaborationDialogOpen,
