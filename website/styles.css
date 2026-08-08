@@ -841,28 +841,6 @@ section { padding: 92px 0; position: relative; }
 [data-mode="dark"] .shot-media .shot-light { display: none; }
 [data-mode="dark"] .shot-media .shot-dark { display: block; }
 
-.zoom-hint {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  background: rgba(20, 16, 40, 0.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  opacity: 0;
-  transform: translateY(-4px);
-  transition: opacity 0.22s ease, transform 0.22s ease;
-  pointer-events: none;
-}
-.zoom-hint svg { width: 16px; height: 16px; }
-.shot-media:hover .zoom-hint,
-.shot-media:focus-visible .zoom-hint { opacity: 1; transform: translateY(0); }
-
 /* ── Lightbox ─────────────────────────────────────────────────────────── */
 /* Open/close plays a FLIP transform: app.js sizes/positions .lightbox-img at
    its final centred, near-fullscreen box via plain layout, then computes and
