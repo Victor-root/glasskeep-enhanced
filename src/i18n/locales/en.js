@@ -35,6 +35,8 @@ export const en = {
   sessionExpired: "Session expired. Please log in again.",
   requestTimeout: "Request timeout. Please check your connection.",
   networkError: "Network error.",
+  serverUnreachable:
+    "Server unreachable. It may be offline or restarting, your change was not saved. Try again once it is back.",
   search: "Search...",
   searchOrAskAi: "Search or Ask AI...",
 password: "Password",

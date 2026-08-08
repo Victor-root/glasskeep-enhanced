@@ -87,6 +87,23 @@ export async function api(path, { method = "GET", body, token, timeoutMs } = {})
       throw err;
     }
 
+    // A bodyless 502 / 503 / 504 does not come from GlassKeep: it is the
+    // reverse proxy in front of it answering because the backend is down
+    // or restarting. Say so plainly instead of surfacing a bare
+    // "HTTP 503", and flag it like any other network failure so the sync
+    // engine stops hammering a server it would otherwise consider
+    // reachable, and resumes once it is back.
+    //
+    // Only when the response carries no error of its own: an application
+    // 503 (e.g. "Push notifications are not configured") is a real,
+    // deliberate answer and keeps its message.
+    if ((res.status === 502 || res.status === 503 || res.status === 504) && !data?.error) {
+      const err = new Error(t("serverUnreachable"));
+      err.status = res.status;
+      err.isNetworkError = true;
+      throw err;
+    }
+
     if (!res.ok) {
       const err = new Error(data?.error || `HTTP ${res.status}`);
       err.status = res.status;
