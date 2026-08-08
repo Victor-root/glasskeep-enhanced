@@ -310,7 +310,7 @@ export default function FederationLinkCard({
                   {
                     title: t("fedCancelInviteTitle"),
                     message: t("fedCancelInviteConfirm").replace("{peer}", title),
-                    confirmText: t("fedCancelInvite"),
+                    confirmText: t("fedCancelInviteAction"),
                     cancelText: t("cancel"),
                   },
                   () => actions.refuse(link.id),

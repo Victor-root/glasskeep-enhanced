@@ -1503,6 +1503,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedCancelInvite: "Annuler",
   fedCancelInviteTitle: "Annuler l'invitation ?",
   fedCancelInviteConfirm: "Annuler l'invitation d'appairage envoyée à {peer} ?",
+  fedCancelInviteAction: "Annuler l'invitation",
   fedRecheck: "Revérifier",
   fedChangeAddress: "Changer l'adresse",
   fedRename: "Renommer",
