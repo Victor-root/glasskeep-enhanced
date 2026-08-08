@@ -752,6 +752,7 @@ export default function NoteModal({
                   title={mTitle}
                   color={mColor}
                   dark={dark}
+                  readOnly={noteReadOnly}
                 />
               ) : mType === "text" ? (
                 viewMode ? (
@@ -785,6 +786,7 @@ export default function NoteModal({
                     insertPosition={checklistInsertPosition}
                     removeSectionBehavior={checklistRemoveSectionBehavior}
                     noteId={activeNoteObj?.id}
+                    readOnly={noteReadOnly}
                   />
                 </div>
               ) : drawMode === 'draw' ? (
