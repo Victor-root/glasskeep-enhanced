@@ -34,11 +34,15 @@ function hostOf(url) {
 }
 
 export default function FederationInviteWatcher({ token }) {
-  const { notify } = useNotifications();
+  const { notify, remove } = useNotifications();
   const seen = useRef(new Set());
   // Collapse duplicate connectivity toasts (e.g. two links to the same
   // peer, or a re-delivered event) within a short window.
   const stateSeen = useRef(new Map());
+  // linkId -> this notification's own id, so a federation_invitation_
+  // resolved event (the admin handled it from the panel instead of this
+  // toast) can drop the now-stale card.
+  const notifIdByLink = useRef(new Map());
 
   useEffect(() => {
     if (!token) return undefined;
@@ -52,7 +56,7 @@ export default function FederationInviteWatcher({ token }) {
         linkId,
         peer: peerBaseUrl,
       });
-      notify({
+      const notifId = notify({
         type: "federation",
         variant: "info",
         title: t("fedInviteReceivedTitle"),
@@ -67,6 +71,7 @@ export default function FederationInviteWatcher({ token }) {
           { label: t("fedRefuse"), kind: "federation_refuse", linkId },
         ],
       });
+      if (linkId && notifId) notifIdByLink.current.set(linkId, notifId);
     };
 
     // Durable catch-up: anything already pending when we sign in.
@@ -130,6 +135,15 @@ export default function FederationInviteWatcher({ token }) {
       const who = msg.peerLabel || hostOf(msg.peerBaseUrl);
       if (msg.type === "federation_invitation") {
         raiseRequest(msg.linkId, msg.peerBaseUrl, msg.peerLabel);
+      } else if (msg.type === "federation_invitation_resolved") {
+        // Accepted or declined from the admin panel instead of this
+        // toast's own buttons -- drop the now-stale card so it doesn't
+        // keep offering a decision that was already made.
+        const notifId = notifIdByLink.current.get(msg.linkId);
+        if (notifId) {
+          remove(notifId);
+          notifIdByLink.current.delete(msg.linkId);
+        }
       } else if (msg.type === "federation_link_state") {
         announceState(msg);
       } else if (msg.type === "federation_linked") {
@@ -155,7 +169,7 @@ export default function FederationInviteWatcher({ token }) {
       cancelled = true;
       window.removeEventListener("federation-event", onEvent);
     };
-  }, [token, notify]);
+  }, [token, notify, remove]);
 
   return null;
 }

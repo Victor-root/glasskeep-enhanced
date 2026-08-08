@@ -696,6 +696,15 @@ function attachFederationRoutes(
       local_base_url: localUrl,
       peer_label: label || link.peer_label,
     });
+    // The "pairing request" notification (FederationInviteWatcher) is a
+    // separate UI surface from this panel and has no other way to learn
+    // the invite was just handled here -- without this it lingers,
+    // offering Accept/Decline on a link that's already moving on.
+    try {
+      broadcastToAdmins?.({ type: "federation_invitation_resolved", linkId: link.id });
+    } catch {
+      /* SSE best-effort */
+    }
     kickTick();
     res.json({ ok: true, link: publicLink(store.getById(link.id)) });
   });
@@ -711,6 +720,15 @@ function attachFederationRoutes(
       return res.status(409).json({ error: "not_pending" });
     }
     store.setStatus(link.id, wasIncoming ? protocol.STATUS.REFUSED : protocol.STATUS.CANCELLED);
+    // Same as accept above -- only an incoming request ever has a
+    // "pairing request" notification to clear.
+    if (wasIncoming) {
+      try {
+        broadcastToAdmins?.({ type: "federation_invitation_resolved", linkId: link.id });
+      } catch {
+        /* SSE best-effort */
+      }
+    }
     // Tell the other side, so its pending request resolves instead of the
     // initiator retrying the invite forever (and never learning the
     // outcome). Unsigned — a pending link has no shared secret yet; the
