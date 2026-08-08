@@ -3606,12 +3606,19 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
 
     if (!newOwner) {
       // Only federated shadow collaborators remain — there is no real local
-      // user to hand the note to. Drop the remote share and keep the note in
-      // the owner's own trash (still restorable). Removing the shadow
-      // collaborator row makes the next federation reconcile treat the share
-      // as revoked and tear the mirror down cleanly, instead of orphaning the
-      // live note under a non-loginable shadow owner.
+      // user to hand the note to (ownership can't cross a server boundary
+      // the way it can to a same-server collaborator, above). Give each
+      // remote recipient their own independent copy on their own server
+      // instead -- the federated equivalent of "hand it to a collaborator" --
+      // before marking the note trashed here: once trashed, the next
+      // federation reconcile tick sees the share as revoked and tears the
+      // (by-then-copied, collaborator-less) mirror down on its own.
       for (const c of collaborators) {
+        if (c.federated_origin && federation?.noteFederation?.unshareFromRemote) {
+          Promise.resolve()
+            .then(() => federation.noteFederation.unshareFromRemote({ shadow: c, noteId: id, withCopy: true }))
+            .catch((e) => console.warn("[federation/notes] unshareFromRemote (remove_self) failed:", e?.message));
+        }
         db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, c.id);
       }
       db.prepare("UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ?").run(tsResult.iso, id);
