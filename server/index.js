@@ -2856,7 +2856,7 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
   const shouldGrantCopy = isOwner && !isRemovingSelf && mode === "keep_copy";
   // Needed up front: a federated removal skips the LOCAL copy below
   // entirely (see that call's own comment for why) and instead asks the
-  // recipient's own server to make the copy, over unshareFromRemote.
+  // recipient's own server to make the copy.
   const removedUser = getUserById.get(userIdToRemove);
   const isFederatedRemoval = !!removedUser?.federated_origin;
   let copyNoteId = null;
@@ -2920,10 +2920,15 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
   // own already-synced mirror content and owned by the recipient's real
   // local account — a copy made HERE would only ever be reachable by the
   // powerless shadow user that stands in for them on this server.
-  if (isFederatedRemoval && federation?.noteFederation?.unshareFromRemote) {
-    Promise.resolve()
-      .then(() => federation.noteFederation.unshareFromRemote({ shadow: removedUser, noteId, withCopy: shouldGrantCopy }))
-      .catch((e) => console.warn("[federation/notes] unshareFromRemote failed:", e?.message));
+  // Called BEFORE the broadcast below: when this was the peer's last
+  // recipient the whole mirror comes down, and this is what tells that
+  // teardown to preserve the copy rather than destroy it.
+  if (isFederatedRemoval) {
+    federation?.noteFederation?.onRemoteRecipientRemoved?.({
+      shadow: removedUser,
+      noteId,
+      withCopy: shouldGrantCopy,
+    });
   }
 
   // Notify the removed user FIRST — they are no longer in the collaborator list
@@ -3561,6 +3566,11 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
       // Revoke access for every collaborator, but keep the note in the
       // owner's trash so they can still restore it if it was a mistake.
       const collabIds = collaborators.map((c) => c.id);
+      // Say so explicitly rather than leaving the federation layer to infer
+      // it from the note being trashed: "trashed" alone cannot tell this
+      // apart from the owner merely leaving the note (below), where the
+      // remote copies must survive.
+      federation?.noteFederation?.markShareEnding?.(id, "destroy");
       for (const cid of collabIds) {
         db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, cid);
         db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, cid);
@@ -3607,18 +3617,13 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     if (!newOwner) {
       // Only federated shadow collaborators remain — there is no real local
       // user to hand the note to (ownership can't cross a server boundary
-      // the way it can to a same-server collaborator, above). Give each
-      // remote recipient their own independent copy on their own server
-      // instead -- the federated equivalent of "hand it to a collaborator" --
-      // before marking the note trashed here: once trashed, the next
-      // federation reconcile tick sees the share as revoked and tears the
-      // (by-then-copied, collaborator-less) mirror down on its own.
+      // the way it can to a same-server collaborator, above). The remote
+      // recipients must still KEEP the content: this is "delete for me",
+      // not "delete for everyone". Record that intent on the share before
+      // trashing, so the teardown push carries it — trashing alone is
+      // indistinguishable from delete_for_all and would wipe their copies.
+      federation?.noteFederation?.markShareEnding?.(id, "keep_copies");
       for (const c of collaborators) {
-        if (c.federated_origin && federation?.noteFederation?.unshareFromRemote) {
-          Promise.resolve()
-            .then(() => federation.noteFederation.unshareFromRemote({ shadow: c, noteId: id, withCopy: true }))
-            .catch((e) => console.warn("[federation/notes] unshareFromRemote (remove_self) failed:", e?.message));
-        }
         db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, c.id);
       }
       db.prepare("UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ?").run(tsResult.iso, id);

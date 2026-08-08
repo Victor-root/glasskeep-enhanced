@@ -486,6 +486,9 @@ function attachFederationRoutes(
     const result = noteFederation.handleIncomingRemove({
       linkId: link.id,
       noteId: (req.body || {}).noteId,
+      // The share ended without the content being deleted: each local
+      // recipient keeps a standalone copy rather than losing the note.
+      keepCopies: !!(req.body || {}).keepCopies,
     });
     res.status(result.ok ? 200 : 409).json(result);
   });
