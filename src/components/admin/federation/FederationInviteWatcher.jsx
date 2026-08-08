@@ -104,8 +104,15 @@ export default function FederationInviteWatcher({ token }) {
         // fired when coming back from "offline"), which is why an unlock
         // went unannounced while a lock did not.
         notify({ ...base, variant: "success", message: t("fedPeerUnlocked").replace("{peer}", who) });
-      } else if (msg.state === "online" && (msg.previousState === "offline" || msg.previousState === "incompatible" || msg.previousState === "unknown")) {
+      } else if (msg.state === "online" && (msg.previousState === "offline" || msg.previousState === "incompatible")) {
         notify({ ...base, variant: "success", message: t("fedPeerOnline").replace("{peer}", who) });
+      } else if (msg.state === "online" && msg.previousState === "unknown") {
+        // "unknown" only ever means "active but never health-checked yet"
+        // (see deriveLinkState) — i.e. this is a freshly accepted link's
+        // very first probe, not a peer coming back from a real outage.
+        // fedLinkedToast / fedAcceptedToast already announced the pairing
+        // itself, so silently absorb this one instead of also saying
+        // "back online" for a link that was never online before.
       } else if (msg.state === "locked") {
         notify({ ...base, variant: "warning", message: t("fedPeerLocked").replace("{peer}", who) });
       } else if (msg.state === "incompatible") {
