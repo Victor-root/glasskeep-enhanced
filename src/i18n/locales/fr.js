@@ -35,6 +35,8 @@ export const fr = {
   sessionExpired: "Session expirée. Veuillez vous reconnecter.",
   requestTimeout: "Délai dépassé. Vérifiez votre connexion.",
   networkError: "Erreur réseau.",
+  serverUnreachable:
+    "Serveur injoignable. Il est peut-être hors ligne ou en cours de redémarrage, votre modification n'a pas été enregistrée. Réessayez à son retour.",
   search: "Rechercher...",
   searchOrAskAi: "Rechercher ou demander à l'IA...",
 password: "Mot de passe",
