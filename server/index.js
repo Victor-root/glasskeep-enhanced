@@ -1688,6 +1688,55 @@ function createSharedNoteDeletedNotification({
   }
 }
 
+// Persist + push the "your access to this note was removed" notification
+// for a removed collaborator. Shared by the local remove-collaborator
+// route below and the federation unshare-recipient handler -- a
+// federated mirror recipient is a REAL local user on their own server,
+// reached the same way as a same-server removal once the caller resolves
+// who removed them (locally: the acting admin; over federation: the
+// mirror's shadow owner, which already satisfies notifications.
+// sender_user_id's real-row requirement) and their display name.
+function createAccessRevokedNotification({
+  recipientId,
+  senderId,
+  senderName,
+  noteId,
+  noteTitle,
+  withCopy = false,
+}) {
+  try {
+    const createdAt = nowISO();
+    const notificationType = withCopy ? "note_access_revoked_with_copy" : "note_access_revoked";
+    const row = insertNotification.run(
+      recipientId,
+      senderId,
+      notificationType,
+      noteId,
+      noteTitle || "",
+      senderName || "",
+      null,
+      null,
+      0,
+      null,
+      createdAt,
+    );
+    sendEventToUser(recipientId, {
+      type: "note_access_revoked_notification",
+      notificationType,
+      notificationId: row.lastInsertRowid,
+      senderName: senderName || "",
+      noteId,
+      noteTitle: noteTitle || "",
+      withCopy,
+      createdAt,
+    });
+    return createdAt;
+  } catch (e) {
+    console.warn("[notifications] createAccessRevokedNotification failed:", e?.message);
+    return null;
+  }
+}
+
 // ---------- At-rest encryption: unlock routes + lock gate ----------
 // These have to be registered BEFORE the bulk of the API so the lock
 // middleware can short-circuit everything else with HTTP 423 while
@@ -1758,6 +1807,7 @@ const federation = attachFederationRoutes(app, {
     updateNoteWithEditor,
     createShareNotification,
     createSharedNoteDeletedNotification,
+    createAccessRevokedNotification,
     broadcastNoteUpdated,
     isNewerOrEqual,
     parseIsoTimestamp,
@@ -2880,46 +2930,27 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
   // already know, and notifying the owner about their own action
   // would be circular.
   if (!isRemovingSelf) {
-    try {
-      const revokeCreatedAt = nowISO();
-      // -- Ex-collaborator notification --
-      // When a copy was granted, persist the COPY's id in note_id so
-      // the recipient's "Ouvrir" action targets the note they actually
-      // still have access to. Plain revoke (no copy) keeps the
-      // original id for historical context — the action falls back to
-      // null on the client side.
-      const recipientType = shouldGrantCopy
-        ? "note_access_revoked_with_copy"
-        : "note_access_revoked";
-      const recipientNoteId = shouldGrantCopy ? copyNoteId : noteId;
-      const revokeRow = insertNotification.run(
-        userIdToRemove,
-        req.user.id,
-        recipientType,
-        recipientNoteId,
-        note.title || "",
-        req.user.name || req.user.email || "",
-        null,
-        null,
-        0,
-        null,
-        revokeCreatedAt,
-      );
-      sendEventToUser(userIdToRemove, {
-        type: "note_access_revoked_notification",
-        notificationType: recipientType,
-        notificationId: revokeRow.lastInsertRowid,
-        senderName: req.user.name || req.user.email || "",
-        noteId: recipientNoteId,
-        noteTitle: note.title || "",
-        withCopy: shouldGrantCopy,
-        createdAt: revokeCreatedAt,
-      });
+    // -- Ex-collaborator notification --
+    // When a copy was granted, persist the COPY's id in note_id so the
+    // recipient's "Ouvrir" action targets the note they actually still
+    // have access to. Plain revoke (no copy) keeps the original id for
+    // historical context — the action falls back to null on the client
+    // side. Best-effort: a failure here shouldn't block the owner's own
+    // confirmation below.
+    const revokeCreatedAt = createAccessRevokedNotification({
+      recipientId: userIdToRemove,
+      senderId: req.user.id,
+      senderName: req.user.name || req.user.email || "",
+      noteId: shouldGrantCopy ? copyNoteId : noteId,
+      noteTitle: note.title || "",
+      withCopy: shouldGrantCopy,
+    }) || nowISO();
 
-      // -- Owner confirmation notification --
-      // The owner is the one driving the removal, so the sender of
-      // the row is the removed user (for the i18n {sender} slot to
-      // resolve to their name).
+    // -- Owner confirmation notification --
+    // The owner is the one driving the removal, so the sender of the row
+    // is the removed user (for the i18n {sender} slot to resolve to
+    // their name).
+    try {
       const removedUser = getUserById.get(userIdToRemove);
       const removedName =
         (removedUser && (removedUser.name || removedUser.email)) || "";
@@ -2950,7 +2981,7 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
         createdAt: revokeCreatedAt,
       });
     } catch (e) {
-      console.warn("[notifications] revoke notification failed:", e?.message);
+      console.warn("[notifications] owner confirmation notification failed:", e?.message);
     }
   } else if (!isOwner) {
     // Collaborator left the note voluntarily — notify the owner so

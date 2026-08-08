@@ -957,6 +957,23 @@ function createNoteFederation(ctx) {
     try {
       deps.removeCollaborator?.run(noteId, target.id);
       deps.sendEventToUser?.(target.id, { type: "note_deleted", noteId });
+      // note_deleted above only makes the note vanish live; without a real
+      // notification too, the removed user gets no explanation of what
+      // just happened, unlike a same-server removal. The remote owner is
+      // represented locally by the mirror's shadow user (its user_id --
+      // see ensureShadowUser in handleIncomingShare), so no extra data
+      // needs to travel over the wire to name them.
+      const note = deps.getNoteById?.get(noteId);
+      if (note) {
+        const owner = deps.getUserById?.get(note.user_id);
+        deps.createAccessRevokedNotification?.({
+          recipientId: target.id,
+          senderId: note.user_id,
+          senderName: owner?.name || owner?.email || "",
+          noteId,
+          noteTitle: note.title || "",
+        });
+      }
     } catch (e) {
       log.warn?.("[federation/notes] unshare recipient:", e?.message);
       return { ok: false, error: "apply_failed" };
