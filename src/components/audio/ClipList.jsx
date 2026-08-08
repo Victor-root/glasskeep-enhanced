@@ -22,6 +22,7 @@ export default function ClipList({
   onPlayClip,
   onRenameClip,
   onDeleteClip,
+  readOnly = false,
 }) {
   if (!Array.isArray(clips) || clips.length === 0) {
     return (
@@ -39,6 +40,7 @@ export default function ClipList({
           index={i}
           isCurrent={i === currentIndex}
           isPlaying={isPlaying && i === currentIndex}
+          readOnly={readOnly}
           onPlay={() => onPlayClip(i)}
           onRename={(name) => onRenameClip(i, name)}
           onDelete={() => onDeleteClip(i)}
@@ -48,7 +50,7 @@ export default function ClipList({
   );
 }
 
-function ClipRow({ clip, index, isCurrent, isPlaying, onPlay, onRename, onDelete }) {
+function ClipRow({ clip, index, isCurrent, isPlaying, readOnly, onPlay, onRename, onDelete }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(clip.name || "");
   // Mirror the section-header confirm-on-second-click delete: the trash
@@ -167,35 +169,39 @@ function ClipRow({ clip, index, isCurrent, isPlaying, onPlay, onRename, onDelete
         {formatDuration(Number.isFinite(clip.duration) ? clip.duration : 0)}
       </span>
 
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); editing ? commit() : startEdit(e); }}
-        aria-label={t("audioRowRename")}
-        data-tooltip={t("audioRowRename")}
-        className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full text-gray-700 dark:text-gray-200 opacity-60 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/15 active:scale-95 transition focus:outline-none focus:ring-2 focus:opacity-100"
-      >
-        <PencilIcon />
-      </button>
+      {!readOnly && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); editing ? commit() : startEdit(e); }}
+            aria-label={t("audioRowRename")}
+            data-tooltip={t("audioRowRename")}
+            className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full text-gray-700 dark:text-gray-200 opacity-60 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/15 active:scale-95 transition focus:outline-none focus:ring-2 focus:opacity-100"
+          >
+            <PencilIcon />
+          </button>
 
-      <button
-        type="button"
-        onClick={handleDeleteClick}
-        aria-label={confirmingDelete ? t("audioRowDeleteConfirm") : t("audioRowDelete")}
-        data-tooltip={confirmingDelete ? t("audioRowDeleteConfirm") : t("audioRowDelete")}
-        className={`shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full transition active:scale-95 focus:outline-none focus:ring-2 focus:opacity-100 ${
-          confirmingDelete
-            ? "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-200 opacity-100 ring-1 ring-red-400/60 focus:ring-red-400/50"
-            : "text-red-600 dark:text-red-300 opacity-60 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 focus:ring-red-400/50"
-        }`}
-      >
-        {confirmingDelete ? (
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        ) : (
-          <Trash />
-        )}
-      </button>
+          <button
+            type="button"
+            onClick={handleDeleteClick}
+            aria-label={confirmingDelete ? t("audioRowDeleteConfirm") : t("audioRowDelete")}
+            data-tooltip={confirmingDelete ? t("audioRowDeleteConfirm") : t("audioRowDelete")}
+            className={`shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full transition active:scale-95 focus:outline-none focus:ring-2 focus:opacity-100 ${
+              confirmingDelete
+                ? "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-200 opacity-100 ring-1 ring-red-400/60 focus:ring-red-400/50"
+                : "text-red-600 dark:text-red-300 opacity-60 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 focus:ring-red-400/50"
+            }`}
+          >
+            {confirmingDelete ? (
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <Trash />
+            )}
+          </button>
+        </>
+      )}
     </li>
   );
 }

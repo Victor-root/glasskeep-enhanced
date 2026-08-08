@@ -50,6 +50,7 @@ export default function ChecklistEditor({
   insertPosition = "bottom",
   removeSectionBehavior = "cascade",
   noteId,
+  readOnly = false,
 }) {
   const items = React.useMemo(() => normalizeItems(entries), [entries]);
   const sections = React.useMemo(() => getSections(items), [items]);
@@ -73,6 +74,7 @@ export default function ChecklistEditor({
   // (`collapsed: true`) so it syncs across devices via the note's items
   // array — toggling it saves the note like any other checklist edit.
   const toggleSectionCollapse = (id) => {
+    if (readOnly) return;
     const current = items.find((e) => e.id === id);
     commit(updateEntry(items, id, { collapsed: !current?.collapsed }));
   };
@@ -95,6 +97,7 @@ export default function ChecklistEditor({
 
   // ---------- Item-level edits ----------
   const toggleItem = (id, checked) => {
+    if (readOnly) return;
     // Preserve order. Checked items stay in place in the array; render
     // code groups them visually at the bottom.
     //
@@ -113,10 +116,12 @@ export default function ChecklistEditor({
   };
 
   const changeText = (id, text) => {
+    if (readOnly) return;
     commit(updateEntry(items, id, { text }));
   };
 
   const removeItem = (id) => {
+    if (readOnly) return;
     commit(removeEntry(items, id));
   };
 
@@ -127,11 +132,12 @@ export default function ChecklistEditor({
   // Outdenting has no precondition beyond "is currently indented" — no-op
   // otherwise, so this never fires a needless save.
   const indentItem = (id) => {
-    if (!canIndentItem(items, id)) return;
+    if (readOnly || !canIndentItem(items, id)) return;
     commit(updateEntry(items, id, { indent: 1 }));
   };
 
   const outdentItem = (id) => {
+    if (readOnly) return;
     const item = items.find((e) => e.id === id);
     if (!item || !item.indent) return;
     commit(updateEntry(items, id, { indent: 0 }));
@@ -144,6 +150,7 @@ export default function ChecklistEditor({
   // Enter was pressed, always insert ABOVE the current item — that
   // matches the natural editor reflex of "push this line down".
   const addItemAdjacent = (anchorId, opts = {}) => {
+    if (readOnly) return;
     const newItem = makeItem("", false);
     const insertAbove = opts.atStart || insertPosition === "top";
     const next = insertAbove
@@ -155,6 +162,7 @@ export default function ChecklistEditor({
   };
 
   const addItemToSection = (sectionId) => {
+    if (readOnly) return;
     const newItem = makeItem("", false);
     const next =
       insertPosition === "top"
@@ -166,6 +174,7 @@ export default function ChecklistEditor({
   };
 
   const addItemTopOrBottom = () => {
+    if (readOnly) return;
     const newItem = makeItem("", false);
     const next =
       insertPosition === "top"
@@ -177,6 +186,7 @@ export default function ChecklistEditor({
   };
 
   const removeAndFocusPrev = (id) => {
+    if (readOnly) return;
     const prevId = findPrevItemId(items, id);
     const next = removeEntry(items, id);
     setEntries(next);
@@ -186,6 +196,7 @@ export default function ChecklistEditor({
 
   // ---------- Section-level edits ----------
   const addSection = () => {
+    if (readOnly) return;
     const newSection = makeSection("");
     // Append a new section at the very end and seed one empty item
     // inside. Focus will land on the title input automatically because
@@ -197,14 +208,17 @@ export default function ChecklistEditor({
   };
 
   const renameSection = (id, title) => {
+    if (readOnly) return;
     commit(updateEntry(items, id, { title }));
   };
 
   const changeColor = (id, colorKey) => {
+    if (readOnly) return;
     commit(updateEntry(items, id, { color: colorKey }));
   };
 
   const removeSection = (id) => {
+    if (readOnly) return;
     // Two behaviours, controlled by the user setting:
     //   "cascade" → drop the section marker AND every item it owns.
     //   "keep"    → drop the marker but relocate its items back to the
@@ -240,30 +254,32 @@ export default function ChecklistEditor({
       className="group flex items-center gap-2"
       style={it.indent ? { marginLeft: INDENT_STEP_PX } : undefined}
     >
-      <div
-        onPointerDown={(e) => handlePointerDown(it.id, e)}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
-        className="flex items-center justify-center px-1 checklist-grab-handle opacity-40 group-hover:opacity-70 transition-opacity"
-        style={{ touchAction: "none" }}
-      >
-        <div className="grid grid-cols-2 gap-0.5">
-          <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-          <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-          <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-          <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-          <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
-          <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+      {!readOnly && (
+        <div
+          onPointerDown={(e) => handlePointerDown(it.id, e)}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          className="flex items-center justify-center px-1 checklist-grab-handle opacity-40 group-hover:opacity-70 transition-opacity"
+          style={{ touchAction: "none" }}
+        >
+          <div className="grid grid-cols-2 gap-0.5">
+            <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+            <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+            <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+            <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+            <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+            <div className="w-1 h-1 bg-gray-400 dark:bg-gray-300 rounded-full"></div>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex-1">
         <ChecklistRow
           item={it}
-          readOnly={false}
-          disableToggle={false}
-          showRemove={true}
+          readOnly={readOnly}
+          disableToggle={readOnly}
+          showRemove={!readOnly}
           size="lg"
           indentGutter={false}
           focusItemId={focusItemId}
@@ -285,7 +301,7 @@ export default function ChecklistEditor({
   );
 
   // ---------- Layout ----------
-  const topAddRow = (
+  const topAddRow = readOnly ? null : (
     <div
       data-checklist-row
       className="flex items-center gap-2 cursor-pointer p-2 border-b border-[var(--border-light)] text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-100 transition-colors"
@@ -341,9 +357,10 @@ export default function ChecklistEditor({
                   <div data-checklist-row data-section-header={section.id}>
                     <SectionHeader
                       section={section}
+                      readOnly={readOnly}
                       onRename={(title) => renameSection(section.id, title)}
                       onRemove={() => removeSection(section.id)}
-                      onEnter={(pendingTitle) => {
+                      onEnter={readOnly ? undefined : (pendingTitle) => {
                         // Atomically apply a pending title rename (from Enter key) + add item
                         // so both changes share one setEntries call and neither overwrites the other.
                         const base = pendingTitle !== undefined
@@ -357,13 +374,13 @@ export default function ChecklistEditor({
                         syncEntries(next);
                         requestFocus(newItem.id, "end");
                       }}
-                      onColorChange={(colorKey) => changeColor(section.id, colorKey)}
-                      onHandlePointerDown={handleSectionPointerDown}
+                      onColorChange={readOnly ? undefined : (colorKey) => changeColor(section.id, colorKey)}
+                      onHandlePointerDown={readOnly ? undefined : handleSectionPointerDown}
                       onHandlePointerMove={handleSectionPointerMove}
                       onHandlePointerUp={handleSectionPointerUp}
                       onHandlePointerCancel={handleSectionPointerCancel}
                       collapsed={isCollapsed}
-                      onToggleCollapse={() => toggleSectionCollapse(section.id)}
+                      onToggleCollapse={readOnly ? undefined : () => toggleSectionCollapse(section.id)}
                       count={uncheckedInSection.length}
                     />
                   </div>
@@ -374,15 +391,17 @@ export default function ChecklistEditor({
                           {uncheckedInSection.map(renderItemRow)}
                         </div>
                       )}
-                      <button
-                        type="button"
-                        data-checklist-row
-                        className="flex items-center gap-2 pl-4 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                        onClick={() => addItemToSection(section.id)}
-                      >
-                        <span className="leading-none">+</span>
-                        <span>{t("addToSectionEllipsis")}</span>
-                      </button>
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          data-checklist-row
+                          className="flex items-center gap-2 pl-4 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                          onClick={() => addItemToSection(section.id)}
+                        >
+                          <span className="leading-none">+</span>
+                          <span>{t("addToSectionEllipsis")}</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -390,15 +409,17 @@ export default function ChecklistEditor({
             );
           })}
 
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={addSection}
-              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border border-dashed border-[var(--border-light)] rounded px-2 py-1"
-            >
-              + {t("addSection")}
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={addSection}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border border-dashed border-[var(--border-light)] rounded px-2 py-1"
+              >
+                + {t("addSection")}
+              </button>
+            </div>
+          )}
 
           {checkedItems.length > 0 && (
             <div className="border-t border-[var(--border-light)] pt-4 mt-4">
@@ -439,9 +460,9 @@ export default function ChecklistEditor({
                           <ChecklistRow
                             key={it.id}
                             item={it}
-                            readOnly={false}
-                            disableToggle={false}
-                            showRemove={true}
+                            readOnly={readOnly}
+                            disableToggle={readOnly}
+                            showRemove={!readOnly}
                             size="lg"
                             onToggle={(checked, e) => {
                               e?.stopPropagation();
@@ -459,9 +480,9 @@ export default function ChecklistEditor({
                     <ChecklistRow
                       key={it.id}
                       item={it}
-                      readOnly={false}
-                      disableToggle={false}
-                      showRemove={true}
+                      readOnly={readOnly}
+                      disableToggle={readOnly}
+                      showRemove={!readOnly}
                       size="lg"
                       onToggle={(checked, e) => {
                         e?.stopPropagation();
@@ -481,6 +502,7 @@ export default function ChecklistEditor({
           {insertPosition === "top" && topAddRow}
           <p className="text-sm text-gray-500">{t("noItemsYet")}</p>
           {insertPosition === "bottom" && topAddRow}
+          {!readOnly && (
           <div className="pt-2">
             <button
               type="button"
@@ -490,6 +512,7 @@ export default function ChecklistEditor({
               + {t("addSection")}
             </button>
           </div>
+          )}
         </>
       )}
     </div>

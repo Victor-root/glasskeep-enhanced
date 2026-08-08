@@ -119,8 +119,9 @@ export default function SectionHeader({
   collapsed = false,
   onToggleCollapse,
   count,
+  readOnly = false,
 }) {
-  const [editing, setEditing] = React.useState(!section.title);
+  const [editing, setEditing] = React.useState(!readOnly && !section.title);
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const inputRef = React.useRef(null);
@@ -301,8 +302,8 @@ export default function SectionHeader({
         />
       ) : (
         <h4
-          className="flex-1 text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-text py-0"
-          onClick={() => setEditing(true)}
+          className={`flex-1 text-sm font-semibold text-gray-700 dark:text-gray-200 py-0${readOnly ? "" : " cursor-text"}`}
+          onClick={readOnly ? undefined : () => setEditing(true)}
         >
           {section.title || t("sectionTitlePlaceholder")}
         </h4>
@@ -319,23 +320,25 @@ export default function SectionHeader({
       )}
 
       {/* Delete button */}
-      <button
-        type="button"
-        onClick={handleDeleteClick}
-        data-tooltip={confirmingDelete ? t("confirmRemoveSection") : t("removeSection")}
-        aria-label={confirmingDelete ? t("confirmRemoveSection") : t("removeSection")}
-        className="flex items-center justify-center w-6 h-6 rounded text-red-500 hover:text-red-600 hover:bg-red-500/10 dark:hover:bg-red-500/20 transition-colors cursor-pointer flex-shrink-0"
-      >
-        {confirmingDelete ? (
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
-          </svg>
-        )}
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={handleDeleteClick}
+          data-tooltip={confirmingDelete ? t("confirmRemoveSection") : t("removeSection")}
+          aria-label={confirmingDelete ? t("confirmRemoveSection") : t("removeSection")}
+          className="flex items-center justify-center w-6 h-6 rounded text-red-500 hover:text-red-600 hover:bg-red-500/10 dark:hover:bg-red-500/20 transition-colors cursor-pointer flex-shrink-0"
+        >
+          {confirmingDelete ? (
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          )}
+        </button>
+      )}
     </div>
   );
 }
