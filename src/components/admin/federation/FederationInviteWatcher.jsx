@@ -136,8 +136,14 @@ export default function FederationInviteWatcher({ token }) {
         // The peer accepted a request WE sent → we're now paired.
         notify({ type: "federation", variant: "success", title: t("fedConnTitle"), message: t("fedLinkedToast").replace("{peer}", who) });
       } else if (msg.type === "federation_refused") {
-        // The peer declined (or cancelled) the pending pairing.
-        notify({ type: "federation", variant: "warning", title: t("fedConnTitle"), message: t("fedDeclinedToast").replace("{peer}", who) });
+        // One event covers two different things, disambiguated by
+        // msg.cancelled: the peer either declined the request WE sent
+        // them (fedDeclinedToast is accurate), or is withdrawing the
+        // request THEY sent US, one we never got to accept or decline
+        // (fedDeclinedToast would then wrongly imply WE were the one
+        // who declined something).
+        const key = msg.cancelled ? "fedCancelledToast" : "fedDeclinedToast";
+        notify({ type: "federation", variant: "warning", title: t("fedConnTitle"), message: t(key).replace("{peer}", who) });
       } else if (msg.type === "federation_dissociated") {
         // The peer unpaired from us; the link is gone on our side too.
         notify({ type: "federation", variant: "warning", title: t("fedConnTitle"), message: t("fedDissociatedToast").replace("{peer}", who) });

@@ -356,6 +356,12 @@ function attachFederationRoutes(
     if (!timingSafeEqualStr(nonce, link.nonce)) {
       return res.status(403).json({ error: "nonce mismatch" });
     }
+    // Our link's status right before this notice tells us which side of
+    // the pairing we were on: if WE had sent the invite (outgoing), the
+    // peer just declined OUR request. If WE were the recipient
+    // (incoming), the peer is withdrawing the invite THEY sent us --
+    // "declined your request" would be backwards in that case.
+    const weWereInviter = link.status === protocol.STATUS.OUTGOING_PENDING;
     store.setStatus(link.id, protocol.STATUS.REFUSED);
     try {
       broadcastToAdmins?.({
@@ -363,6 +369,7 @@ function attachFederationRoutes(
         linkId: link.id,
         peerBaseUrl: link.peer_base_url,
         peerLabel: refusedByLabel || link.peer_label || hostOf(link.peer_base_url),
+        cancelled: !weWereInviter,
       });
     } catch {
       /* SSE best-effort */
