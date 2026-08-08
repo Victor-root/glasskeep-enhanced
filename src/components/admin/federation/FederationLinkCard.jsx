@@ -144,6 +144,7 @@ export default function FederationLinkCard({
   busy,
   actions,
   showGenericConfirm,
+  hasSelfName = true,
 }) {
   const [edit, setEdit] = useState(null); // null | 'address' | 'rename'
   const meta = getFederationStateMeta(link.state);
@@ -195,14 +196,16 @@ export default function FederationLinkCard({
           className={`mt-3 text-xs leading-relaxed ${
             blocked && link.state === "offline"
               ? "text-rose-600 dark:text-rose-300"
-              : blocked
+              : blocked || (isIncoming && !hasSelfName)
                 ? "text-amber-700 dark:text-amber-300"
                 : "text-gray-600 dark:text-gray-300"
           }`}
         >
           {link.state === "incompatible"
             ? incompatibleDesc(link)
-            : t(meta.descKey)}
+            : isIncoming && !hasSelfName
+              ? t("fedIncomingNeedsSelfName")
+              : t(meta.descKey)}
         </p>
       )}
 
@@ -276,7 +279,7 @@ export default function FederationLinkCard({
                 icon={TI.Check}
                 label={t("fedAccept")}
                 variant="primary"
-                disabled={busy}
+                disabled={busy || !hasSelfName}
                 onClick={() => actions.accept(link.id)}
               />
               <ActionButton

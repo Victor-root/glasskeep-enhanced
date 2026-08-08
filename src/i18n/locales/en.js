@@ -1416,7 +1416,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedSelfNamePlaceholder: "e.g. Home server",
   fedSelfNameSaved: "Server name saved",
   fedSelfNameRequired:
-    "Set this server's name first (above), it's shown to the other server's users.",
+    "Set this server's name first (Cross-server collaboration settings), it's shown to the other server's users.",
   fedThisServer: "This server's address",
   fedThisServerHint:
     "This is the address the other server will use to reach you. Make sure it is correct and publicly reachable over HTTPS.",
@@ -1473,6 +1473,8 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedStateIncoming: "Pairing request",
   fedStateIncomingDesc:
     "This server is asking to pair with you. Accept to let your users collaborate across both servers.",
+  fedIncomingNeedsSelfName:
+    "Set this server's name (Cross-server collaboration settings) before you can accept.",
   fedStateAccepting: "Finalising…",
   fedStateAcceptingDesc: "Finishing the pairing with the other server…",
   fedStateRefused: "Declined",

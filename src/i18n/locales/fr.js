@@ -1419,7 +1419,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedSelfNamePlaceholder: "ex. Serveur maison",
   fedSelfNameSaved: "Nom du serveur enregistré",
   fedSelfNameRequired:
-    "Définissez d'abord le nom de ce serveur (ci-dessus), il est montré aux utilisateurs de l'autre serveur.",
+    "Définissez d'abord le nom de ce serveur (paramètres Collaboration entre serveurs), il est montré aux utilisateurs de l'autre serveur.",
   fedThisServer: "Adresse de ce serveur",
   fedThisServerHint:
     "C'est l'adresse que l'autre serveur utilisera pour vous joindre. Vérifiez qu'elle est correcte et joignable publiquement en HTTPS.",
@@ -1476,6 +1476,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedStateIncoming: "Demande d'appairage",
   fedStateIncomingDesc:
     "Ce serveur demande à s'associer avec vous. Acceptez pour permettre à vos utilisateurs de collaborer entre les deux serveurs.",
+  fedIncomingNeedsSelfName:
+    "Définissez le nom de ce serveur (paramètres Collaboration entre serveurs) avant de pouvoir accepter.",
   fedStateAccepting: "Finalisation…",
   fedStateAcceptingDesc: "Finalisation de l'appairage avec l'autre serveur…",
   fedStateRefused: "Refusée",

@@ -259,6 +259,7 @@ export default function FederationSection({
               busy={fed.busyId === link.id || fed.busyId === "__global__"}
               actions={actions}
               showGenericConfirm={showGenericConfirm}
+              hasSelfName={hasSelfName}
             />
           ))}
         </div>
