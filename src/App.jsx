@@ -3651,6 +3651,17 @@ export default function App() {
               window.dispatchEvent(new CustomEvent("instance-unlocked"));
             } else if (msg && msg.type === "note_updated" && msg.noteId) {
               debouncedPatch(msg.noteId);
+              // The participant list is announced by this same event (the
+              // server broadcasts it whenever a collaborator is added,
+              // removed or has their access changed, locally or via a
+              // federated peer's roster). Forward it on its own bus rather
+              // than letting the collaborator list ride the note patch
+              // above: that patch is deliberately skipped while the note
+              // holds unsaved local edits, and who the note is shared with
+              // has no reason to be held hostage to content protection.
+              try {
+                window.dispatchEvent(new CustomEvent("note-updated", { detail: { noteId: msg.noteId } }));
+              } catch (_) { /* bus is best-effort */ }
             } else if (msg && msg.type === "note_access_changed" && msg.noteId) {
               // The owner changed THIS user's read/write permission on a
               // shared note. Apply it immediately — even when the note is open
