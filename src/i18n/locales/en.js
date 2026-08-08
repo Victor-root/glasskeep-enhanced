@@ -1511,6 +1511,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedUnpairTitle: "Unpair this server?",
   fedUnpairConfirm:
     "Unpair from {peer}? Shared notes will stop syncing between the two servers.",
+  fedResendInvite: "Resend invitation",
   fedRemove: "Remove",
 
   // federation invite errors

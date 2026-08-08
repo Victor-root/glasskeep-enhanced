@@ -1514,6 +1514,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedUnpairTitle: "Dissocier ce serveur ?",
   fedUnpairConfirm:
     "Dissocier de {peer} ? Les notes partagées cesseront de se synchroniser entre les deux serveurs.",
+  fedResendInvite: "Renvoyer l'invitation",
   fedRemove: "Supprimer",
 
   // erreurs d'invitation de fédération

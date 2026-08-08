@@ -360,13 +360,21 @@ export default function FederationLinkCard({
           )}
 
           {isTerminal && (
-            <ActionButton
-              icon={TI.Trash}
-              label={t("fedRemove")}
-              variant="danger"
-              disabled={busy}
-              onClick={() => actions.unpair(link.id)}
-            />
+            <>
+              <ActionButton
+                icon={TI.Link}
+                label={t("fedResendInvite")}
+                disabled={busy}
+                onClick={() => actions.resend(link.id)}
+              />
+              <ActionButton
+                icon={TI.Trash}
+                label={t("fedRemove")}
+                variant="danger"
+                disabled={busy}
+                onClick={() => actions.unpair(link.id)}
+              />
+            </>
           )}
         </div>
       )}

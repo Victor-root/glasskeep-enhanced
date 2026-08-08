@@ -129,6 +129,7 @@ export default function FederationSection({
     updateAddress: fed.updateAddress,
     rename: fed.rename,
     unpair: fed.unpair,
+    resend: fed.resend,
     recheck: fed.recheck,
   };
 
