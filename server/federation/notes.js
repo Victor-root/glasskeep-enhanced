@@ -922,7 +922,7 @@ function createNoteFederation(ctx) {
   // any other recipients on the same peer (and the mirror itself) intact.
   // `shadow` is our local stand-in for the removed recipient
   // (federated_origin = `${linkId}|${remoteRef}`).
-  async function unshareFromRemote({ shadow, noteId }) {
+  async function unshareFromRemote({ shadow, noteId, withCopy = false }) {
     const origin = shadow?.federated_origin || "";
     const sep = origin.indexOf("|");
     if (sep < 0) return { ok: false, error: "not_federated" };
@@ -937,7 +937,7 @@ function createNoteFederation(ctx) {
         secret: link.shared_secret,
         linkId: link.id,
         path,
-        body: { linkId: link.id, noteId, targetRef },
+        body: { linkId: link.id, noteId, targetRef, withCopy },
       });
       return { ok: !!(resp.ok && resp.json && resp.json.ok === true) };
     } catch (e) {
@@ -948,30 +948,70 @@ function createNoteFederation(ctx) {
   // ── Inbound: the authority removed one of our local users from a note ─
   // Drop just that recipient's collaborator row (not the whole mirror) and
   // tell their open session so the note disappears without a manual refresh.
-  function handleIncomingUnshareRecipient({ linkId, noteId, targetRef }) {
+  // withCopy: the owner chose "keep a copy" -- built HERE, from the
+  // mirror's own already-synced content, and owned by the recipient's
+  // REAL local account. A copy built on the owner's server instead would
+  // only ever be reachable by the powerless shadow user standing in for
+  // this person there.
+  function handleIncomingUnshareRecipient({ linkId, noteId, targetRef, withCopy = false }) {
     const m = q.getMappingForLink.get(noteId, linkId);
     if (!m || m.role !== "mirror") return { ok: false, error: "unknown_note" };
     const target =
       deps.getRealUserByEmail?.get(targetRef) || deps.getRealUserByName?.get(targetRef);
     if (!target) return { ok: true }; // already gone — nothing to do
     try {
-      deps.removeCollaborator?.run(noteId, target.id);
-      deps.sendEventToUser?.(target.id, { type: "note_deleted", noteId });
-      // note_deleted above only makes the note vanish live; without a real
-      // notification too, the removed user gets no explanation of what
-      // just happened, unlike a same-server removal. The remote owner is
-      // represented locally by the mirror's shadow user (its user_id --
-      // see ensureShadowUser in handleIncomingShare), so no extra data
-      // needs to travel over the wire to name them.
       const note = deps.getNoteById?.get(noteId);
+      let copyNoteId = null;
+      if (withCopy && note) {
+        // Mirrors the local remove-collaborator "keep a copy" flow
+        // (server/index.js) field-for-field, just sourced from this
+        // mirror's own row instead of the request body.
+        copyNoteId = deps.uid?.();
+        const userTagsJson = deps.getUserTags?.(noteId, target.id) || "[]";
+        deps.runInsertNote?.({
+          id: copyNoteId,
+          user_id: target.id,
+          type: note.type,
+          title: note.title,
+          content: note.content,
+          items_json: note.items_json,
+          tags_json: userTagsJson,
+          images_json: note.images_json,
+          color: note.color,
+          pinned: 0,
+          position: note.position,
+          timestamp: note.timestamp,
+          client_updated_at: deps.nowISO?.(),
+        });
+        const maxPosRow = deps.getMaxUserEffectivePosition?.get(target.id, target.id, target.id, target.id);
+        deps.upsertUserPosition?.run({
+          note_id: copyNoteId,
+          user_id: target.id,
+          position: (typeof maxPosRow?.max_pos === "number" ? maxPosRow.max_pos : 0) + 1,
+          pinned: 0,
+        });
+      }
+      deps.removeCollaborator?.run(noteId, target.id);
+      // Same event the local flow sends: with no copyNoteId it behaves
+      // exactly like a plain note_deleted; with one, the client swaps the
+      // fetched copy in for the removed note in one atomic update.
+      deps.sendEventToUser?.(target.id, { type: "note_access_revoked", noteId, copyNoteId });
+      // A real notification too -- the live event above only makes the
+      // note vanish (or swaps in the copy); without this the removed user
+      // gets no explanation of what happened, unlike a same-server
+      // removal. The remote owner is represented locally by the mirror's
+      // shadow user (its user_id -- see ensureShadowUser in
+      // handleIncomingShare), so no extra data needs to travel over the
+      // wire to name them.
       if (note) {
         const owner = deps.getUserById?.get(note.user_id);
         deps.createAccessRevokedNotification?.({
           recipientId: target.id,
           senderId: note.user_id,
           senderName: owner?.name || owner?.email || "",
-          noteId,
+          noteId: copyNoteId || noteId,
           noteTitle: note.title || "",
+          withCopy: !!copyNoteId,
         });
       }
     } catch (e) {
