@@ -26,6 +26,7 @@ export const FED_STATE = Object.freeze({
   INCOMING_PENDING: "incoming_pending",
   ACCEPTING: "accepting",
   REFUSED: "refused",
+  CANCELLED: "cancelled",
   REVOKED: "revoked",
 });
 
@@ -39,6 +40,7 @@ const META = {
   [FED_STATE.INCOMING_PENDING]: { tone: "pending", icon: TI.UserPlus, labelKey: "fedStateIncoming", descKey: "fedStateIncomingDesc" },
   [FED_STATE.ACCEPTING]: { tone: "pending", icon: TI.Clock, labelKey: "fedStateAccepting", descKey: "fedStateAcceptingDesc" },
   [FED_STATE.REFUSED]: { tone: "neutral", icon: TI.X, labelKey: "fedStateRefused", descKey: "fedStateRefusedDesc" },
+  [FED_STATE.CANCELLED]: { tone: "neutral", icon: TI.X, labelKey: "fedStateCancelled", descKey: "fedStateCancelledDesc" },
   [FED_STATE.REVOKED]: { tone: "neutral", icon: TI.X, labelKey: "fedStateRevoked", descKey: "fedStateRevokedDesc" },
 };
 

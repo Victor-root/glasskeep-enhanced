@@ -1419,7 +1419,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedSelfNamePlaceholder: "ex. Serveur maison",
   fedSelfNameSaved: "Nom du serveur enregistré",
   fedSelfNameRequired:
-    "Définissez d'abord le nom de ce serveur (ci-dessus), il est montré aux utilisateurs de l'autre serveur.",
+    "Définissez d'abord le nom de ce serveur (paramètres Collaboration entre serveurs), il est montré aux utilisateurs de l'autre serveur.",
   fedThisServer: "Adresse de ce serveur",
   fedThisServerHint:
     "C'est l'adresse que l'autre serveur utilisera pour vous joindre. Vérifiez qu'elle est correcte et joignable publiquement en HTTPS.",
@@ -1443,6 +1443,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedPeerIncompatible: "{peer} n'est pas à jour",
   fedLinkedToast: "{peer} a accepté votre demande d'appairage",
   fedDeclinedToast: "{peer} a refusé votre demande d'appairage",
+  fedCancelledToast: "{peer} a annulé son invitation d'appairage",
   fedDissociatedToast: "{peer} s'est dissocié de votre serveur",
   fedInvitesPending: "{count} serveurs attendent de s'associer à vous",
   fedIncomingHeading: "Demandes d'appairage",
@@ -1475,10 +1476,14 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedStateIncoming: "Demande d'appairage",
   fedStateIncomingDesc:
     "Ce serveur demande à s'associer avec vous. Acceptez pour permettre à vos utilisateurs de collaborer entre les deux serveurs.",
+  fedIncomingNeedsSelfName:
+    "Définissez le nom de ce serveur (paramètres Collaboration entre serveurs) avant de pouvoir accepter.",
   fedStateAccepting: "Finalisation…",
   fedStateAcceptingDesc: "Finalisation de l'appairage avec l'autre serveur…",
   fedStateRefused: "Refusée",
   fedStateRefusedDesc: "Cette invitation a été refusée.",
+  fedStateCancelled: "Annulée",
+  fedStateCancelledDesc: "Cette invitation a été annulée.",
   fedStateRevoked: "Dissocié",
   fedStateRevokedDesc: "Cette liaison a été supprimée.",
 
@@ -1503,6 +1508,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedCancelInvite: "Annuler",
   fedCancelInviteTitle: "Annuler l'invitation ?",
   fedCancelInviteConfirm: "Annuler l'invitation d'appairage envoyée à {peer} ?",
+  fedCancelInviteAction: "Annuler l'invitation",
   fedRecheck: "Revérifier",
   fedChangeAddress: "Changer l'adresse",
   fedRename: "Renommer",
@@ -1510,15 +1516,18 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedUnpairTitle: "Dissocier ce serveur ?",
   fedUnpairConfirm:
     "Dissocier de {peer} ? Les notes partagées cesseront de se synchroniser entre les deux serveurs.",
+  fedResendInvite: "Renvoyer l'invitation",
   fedRemove: "Supprimer",
 
-  // erreurs d'invitation de fédération
+  // erreurs d'action de fédération
   fedErrInvalidPeerUrl:
     "Cette adresse de serveur n'est pas valide. Utilisez un domaine comme notes.exemple.com (HTTPS).",
   fedErrInvalidLocalUrl:
     "Impossible de déterminer l'adresse de ce serveur. Assurez-vous d'utiliser GlassKeep en HTTPS.",
   fedErrSelf: "Vous ne pouvez pas associer un serveur avec lui-même.",
   fedErrAlready: "Il existe déjà une liaison (ou une liaison en attente) avec ce serveur.",
+  fedErrLinkGone: "Cette invitation n'existe plus.",
+  fedErrNotPending: "Cette invitation a déjà été traitée.",
   fedErrGeneric:
     "Impossible d'envoyer l'invitation. Vérifiez l'adresse et réessayez.",
 };

@@ -1416,7 +1416,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedSelfNamePlaceholder: "e.g. Home server",
   fedSelfNameSaved: "Server name saved",
   fedSelfNameRequired:
-    "Set this server's name first (above), it's shown to the other server's users.",
+    "Set this server's name first (Cross-server collaboration settings), it's shown to the other server's users.",
   fedThisServer: "This server's address",
   fedThisServerHint:
     "This is the address the other server will use to reach you. Make sure it is correct and publicly reachable over HTTPS.",
@@ -1440,6 +1440,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedPeerIncompatible: "{peer} is out of date",
   fedLinkedToast: "{peer} accepted your pairing request",
   fedDeclinedToast: "{peer} declined your pairing request",
+  fedCancelledToast: "{peer} cancelled their pairing invitation",
   fedDissociatedToast: "{peer} unpaired from your server",
   fedInvitesPending: "{count} servers are waiting to pair with you",
   fedIncomingHeading: "Pairing requests",
@@ -1472,10 +1473,14 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedStateIncoming: "Pairing request",
   fedStateIncomingDesc:
     "This server is asking to pair with you. Accept to let your users collaborate across both servers.",
+  fedIncomingNeedsSelfName:
+    "Set this server's name (Cross-server collaboration settings) before you can accept.",
   fedStateAccepting: "Finalising…",
   fedStateAcceptingDesc: "Finishing the pairing with the other server…",
   fedStateRefused: "Declined",
   fedStateRefusedDesc: "This invitation was declined.",
+  fedStateCancelled: "Cancelled",
+  fedStateCancelledDesc: "This invitation was cancelled.",
   fedStateRevoked: "Unpaired",
   fedStateRevokedDesc: "This link was removed.",
 
@@ -1500,6 +1505,7 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedCancelInvite: "Cancel",
   fedCancelInviteTitle: "Cancel invitation?",
   fedCancelInviteConfirm: "Cancel the pairing invitation to {peer}?",
+  fedCancelInviteAction: "Cancel invitation",
   fedRecheck: "Re-check",
   fedChangeAddress: "Change address",
   fedRename: "Rename",
@@ -1507,15 +1513,18 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedUnpairTitle: "Unpair this server?",
   fedUnpairConfirm:
     "Unpair from {peer}? Shared notes will stop syncing between the two servers.",
+  fedResendInvite: "Resend invitation",
   fedRemove: "Remove",
 
-  // federation invite errors
+  // federation action errors
   fedErrInvalidPeerUrl:
     "That server address is not valid. Use a domain like notes.example.com (HTTPS).",
   fedErrInvalidLocalUrl:
     "This server's own address could not be determined. Make sure you are using GlassKeep over HTTPS.",
   fedErrSelf: "You can't pair a server with itself.",
   fedErrAlready: "There is already a link (or a pending one) with that server.",
+  fedErrLinkGone: "This invitation no longer exists.",
+  fedErrNotPending: "This invitation was already handled.",
   fedErrGeneric:
     "Could not send the invitation. Check the address and try again.",
 };

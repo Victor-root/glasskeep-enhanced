@@ -57,7 +57,7 @@ import TagSidebar from "./components/panels/TagSidebar.jsx";
 import SettingsPanel from "./components/panels/SettingsPanel.jsx";
 import AdminPanel from "./components/panels/AdminPanel.jsx";
 import FederationInviteWatcher from "./components/admin/federation/FederationInviteWatcher.jsx";
-import { acceptFederationLink, refuseFederationLink } from "./components/admin/federation/federationActions.js";
+import { acceptFederationLink, refuseFederationLink, federationErrorMessage } from "./components/admin/federation/federationActions.js";
 import { useUpdateCheck } from "./hooks/useUpdateCheck.js";
 import { useSelfUpdate } from "./hooks/useSelfUpdate.js";
 import SelfUpdateProgress from "./components/admin/SelfUpdateProgress.jsx";
@@ -5190,7 +5190,7 @@ export default function App() {
           showToast(t("fedAcceptedToast"), "success", undefined, "user-check");
           removeNotification(notif.id);
         })
-        .catch(() => showToast(t("fedActionFailed"), "error"));
+        .catch((e) => showToast(federationErrorMessage(e), "error"));
       return;
     }
     if (a.kind === "federation_refuse" && a.linkId) {
@@ -5199,7 +5199,7 @@ export default function App() {
           showToast(t("fedRefusedToast"), "info", undefined, "user-x");
           removeNotification(notif.id);
         })
-        .catch(() => showToast(t("fedActionFailed"), "error"));
+        .catch((e) => showToast(federationErrorMessage(e), "error"));
       return;
     }
     if (a.kind === "start_self_update" && a.latestVersion) {

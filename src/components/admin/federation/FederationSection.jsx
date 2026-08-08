@@ -16,19 +16,7 @@ import { SettingsSubHeading } from "../../common/SettingsAccordion.jsx";
 import { useFederation } from "../../../hooks/useFederation.js";
 import FederationLinkCard from "./FederationLinkCard.jsx";
 import { ServerPlusIcon, ServerUserIcon, WorldWwwIcon } from "./FederationIcons.jsx";
-
-// Map a server error code to a friendly, translated sentence.
-function inviteErrorMessage(err) {
-  const code = err?.message || "";
-  const map = {
-    invalid_peer_url: "fedErrInvalidPeerUrl",
-    invalid_local_url: "fedErrInvalidLocalUrl",
-    cannot_pair_with_self: "fedErrSelf",
-    already_linked_or_pending: "fedErrAlready",
-    self_name_required: "fedSelfNameRequired",
-  };
-  return t(map[code] || "fedErrGeneric");
-}
+import { federationErrorMessage } from "./federationActions.js";
 
 // The app's primary themed button — the exact gradient / theme / hover
 // treatment of the admin panel's "Create user" button. `.btn-gradient`
@@ -117,7 +105,7 @@ export default function FederationSection({
       setPeerInput("");
       showToast?.(t("fedInviteSent"), "success");
     } catch (e) {
-      showToast?.(inviteErrorMessage(e), "error");
+      showToast?.(federationErrorMessage(e, "fedErrGeneric"), "error");
     } finally {
       setSubmitting(false);
     }
@@ -129,6 +117,7 @@ export default function FederationSection({
     updateAddress: fed.updateAddress,
     rename: fed.rename,
     unpair: fed.unpair,
+    resend: fed.resend,
     recheck: fed.recheck,
   };
 
@@ -270,6 +259,7 @@ export default function FederationSection({
               busy={fed.busyId === link.id || fed.busyId === "__global__"}
               actions={actions}
               showGenericConfirm={showGenericConfirm}
+              hasSelfName={hasSelfName}
             />
           ))}
         </div>
@@ -291,7 +281,16 @@ export default function FederationSection({
         {/* Empty / loading states */}
         {fed.loaded && fed.links.length === 0 && (
           <div className="text-center text-sm text-gray-500 dark:text-gray-400 py-6">
-            <TI.World className="tabler-icon w-8 h-8 mx-auto mb-2 opacity-40" />
+            {/* .tabler-icon is display:inline-flex (needed for its many
+                icon+label button usages elsewhere), so mx-auto has no
+                effect on it directly and it was sharing a text line with
+                the message below, baseline-aligned against ~14px text —
+                pushing most of this 32px icon above the line instead of
+                centered over it. Wrapping it in its own block gives
+                text-center something block-level to centre AND puts it on
+                its own row, matching the stacked icon-then-text look the
+                original mx-auto/mb-2 pairing was going for. */}
+            <div className="mb-2"><TI.World className="tabler-icon w-8 h-8 opacity-40" /></div>
             {t("fedNoLinks")}
           </div>
         )}

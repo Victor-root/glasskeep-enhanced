@@ -153,6 +153,18 @@ export function useFederation({ token, enabled = false } = {}) {
     [run, token],
   );
 
+  const resend = useCallback(
+    (id) =>
+      run(id, () =>
+        api(`/admin/federation/links/${id}/resend`, {
+          method: "POST",
+          token,
+          body: { localBaseUrl },
+        }),
+      ),
+    [run, token, localBaseUrl],
+  );
+
   const recheck = useCallback(
     (id) =>
       run(id, async () => {
@@ -219,6 +231,7 @@ export function useFederation({ token, enabled = false } = {}) {
     updateAddress,
     rename,
     unpair,
+    resend,
     recheck,
     saveSelfName,
   };

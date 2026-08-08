@@ -144,6 +144,7 @@ export default function FederationLinkCard({
   busy,
   actions,
   showGenericConfirm,
+  hasSelfName = true,
 }) {
   const [edit, setEdit] = useState(null); // null | 'address' | 'rename'
   const meta = getFederationStateMeta(link.state);
@@ -151,7 +152,7 @@ export default function FederationLinkCard({
   const isActive = link.status === "active";
   const isIncoming = link.status === "incoming_pending";
   const isOutgoing = link.status === "outgoing_pending" || link.status === "accepting";
-  const isTerminal = link.status === "refused" || link.status === "revoked";
+  const isTerminal = link.status === "refused" || link.status === "cancelled" || link.status === "revoked";
   const blocked = isActive && !link.writable; // offline / locked / incompatible
 
   const title = link.peerLabel || hostOf(link.peerBaseUrl);
@@ -195,14 +196,16 @@ export default function FederationLinkCard({
           className={`mt-3 text-xs leading-relaxed ${
             blocked && link.state === "offline"
               ? "text-rose-600 dark:text-rose-300"
-              : blocked
+              : blocked || (isIncoming && !hasSelfName)
                 ? "text-amber-700 dark:text-amber-300"
                 : "text-gray-600 dark:text-gray-300"
           }`}
         >
           {link.state === "incompatible"
             ? incompatibleDesc(link)
-            : t(meta.descKey)}
+            : isIncoming && !hasSelfName
+              ? t("fedIncomingNeedsSelfName")
+              : t(meta.descKey)}
         </p>
       )}
 
@@ -276,7 +279,7 @@ export default function FederationLinkCard({
                 icon={TI.Check}
                 label={t("fedAccept")}
                 variant="primary"
-                disabled={busy}
+                disabled={busy || !hasSelfName}
                 onClick={() => actions.accept(link.id)}
               />
               <ActionButton
@@ -310,7 +313,7 @@ export default function FederationLinkCard({
                   {
                     title: t("fedCancelInviteTitle"),
                     message: t("fedCancelInviteConfirm").replace("{peer}", title),
-                    confirmText: t("fedCancelInvite"),
+                    confirmText: t("fedCancelInviteAction"),
                     cancelText: t("cancel"),
                   },
                   () => actions.refuse(link.id),
@@ -360,13 +363,28 @@ export default function FederationLinkCard({
           )}
 
           {isTerminal && (
-            <ActionButton
-              icon={TI.Trash}
-              label={t("fedRemove")}
-              variant="danger"
-              disabled={busy}
-              onClick={() => actions.unpair(link.id)}
-            />
+            <>
+              {/* Resending only makes sense for whoever actually sent the
+                  original invitation. A link where we were the acceptor
+                  (we received it, then declined it or watched the sender
+                  cancel it) has nothing of ours to resend -- offering the
+                  button there wrongly implies this side did the inviting. */}
+              {link.role === "initiator" && (
+                <ActionButton
+                  icon={TI.Link}
+                  label={t("fedResendInvite")}
+                  disabled={busy}
+                  onClick={() => actions.resend(link.id)}
+                />
+              )}
+              <ActionButton
+                icon={TI.Trash}
+                label={t("fedRemove")}
+                variant="danger"
+                disabled={busy}
+                onClick={() => actions.unpair(link.id)}
+              />
+            </>
           )}
         </div>
       )}

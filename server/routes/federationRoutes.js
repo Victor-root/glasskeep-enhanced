@@ -356,13 +356,22 @@ function attachFederationRoutes(
     if (!timingSafeEqualStr(nonce, link.nonce)) {
       return res.status(403).json({ error: "nonce mismatch" });
     }
-    store.setStatus(link.id, protocol.STATUS.REFUSED);
+    // Our link's status right before this notice tells us which side of
+    // the pairing we were on: if WE had sent the invite (outgoing), the
+    // peer just declined OUR request -- a real refusal. If WE were the
+    // recipient (incoming), the peer is withdrawing the invite THEY sent
+    // us, before we ever accepted or declined it -- that's a
+    // cancellation, not a refusal, and "declined your request" would be
+    // backwards for it.
+    const weWereInviter = link.status === protocol.STATUS.OUTGOING_PENDING;
+    store.setStatus(link.id, weWereInviter ? protocol.STATUS.REFUSED : protocol.STATUS.CANCELLED);
     try {
       broadcastToAdmins?.({
         type: "federation_refused",
         linkId: link.id,
         peerBaseUrl: link.peer_base_url,
         peerLabel: refusedByLabel || link.peer_label || hostOf(link.peer_base_url),
+        cancelled: !weWereInviter,
       });
     } catch {
       /* SSE best-effort */
@@ -687,22 +696,43 @@ function attachFederationRoutes(
       local_base_url: localUrl,
       peer_label: label || link.peer_label,
     });
+    // The "pairing request" notification (FederationInviteWatcher) is a
+    // separate UI surface from this panel and has no other way to learn
+    // the invite was just handled here -- without this it lingers,
+    // offering Accept/Decline on a link that's already moving on.
+    try {
+      broadcastToAdmins?.({ type: "federation_invitation_resolved", linkId: link.id });
+    } catch {
+      /* SSE best-effort */
+    }
     kickTick();
     res.json({ ok: true, link: publicLink(store.getById(link.id)) });
   });
 
-  // Decline an incoming invitation (or cancel one we sent).
+  // Decline an incoming invitation, or cancel one we sent -- distinct
+  // outcomes (see protocol.STATUS) even though a single endpoint and a
+  // single confirm-dialog flow (FederationLinkCard) covers both.
   app.post("/api/admin/federation/links/:id/refuse", auth, adminOnly, (req, res) => {
     const link = store.getById(req.params.id);
     if (!link) return res.status(404).json({ error: "not_found" });
-    if (link.status !== protocol.STATUS.INCOMING_PENDING && link.status !== protocol.STATUS.OUTGOING_PENDING) {
+    const wasIncoming = link.status === protocol.STATUS.INCOMING_PENDING;
+    if (!wasIncoming && link.status !== protocol.STATUS.OUTGOING_PENDING) {
       return res.status(409).json({ error: "not_pending" });
     }
-    store.setStatus(link.id, protocol.STATUS.REFUSED);
-    // Tell the other side, so its pending request resolves to "refused"
-    // instead of the initiator retrying the invite forever (and never
-    // learning the outcome). Unsigned — a pending link has no shared
-    // secret yet; the peer validates by linkId + nonce. Best-effort.
+    store.setStatus(link.id, wasIncoming ? protocol.STATUS.REFUSED : protocol.STATUS.CANCELLED);
+    // Same as accept above -- only an incoming request ever has a
+    // "pairing request" notification to clear.
+    if (wasIncoming) {
+      try {
+        broadcastToAdmins?.({ type: "federation_invitation_resolved", linkId: link.id });
+      } catch {
+        /* SSE best-effort */
+      }
+    }
+    // Tell the other side, so its pending request resolves instead of the
+    // initiator retrying the invite forever (and never learning the
+    // outcome). Unsigned — a pending link has no shared secret yet; the
+    // peer validates by linkId + nonce. Best-effort.
     if (link.peer_base_url && link.nonce) {
       const path = "/api/federation/pair/refused";
       Promise.resolve()
@@ -713,6 +743,42 @@ function attachFederationRoutes(
         .catch(() => { /* best-effort */ });
     }
     res.json({ ok: true, link: publicLink(store.getById(link.id)) });
+  });
+
+  // Resend an invitation after it ended in a terminal state (refused,
+  // cancelled, or unpaired). A fresh row -- new id, new nonce, a clean
+  // OUTGOING_PENDING status -- replaces the old one so the terminal row
+  // doesn't linger as a dead duplicate for the same address (/invite's
+  // NON_TERMINAL guard only ever protects non-terminal rows, not these).
+  // role is always "initiator": /pair/accept only matches a row back to
+  // the peer's acceptance when it is, regardless of which side the old
+  // (possibly acceptor) row belonged to.
+  app.post("/api/admin/federation/links/:id/resend", auth, adminOnly, (req, res) => {
+    if (!localLabel()) return res.status(400).json({ error: "self_name_required" });
+    const link = store.getById(req.params.id);
+    if (!link) return res.status(404).json({ error: "not_found" });
+    const isTerminal =
+      link.status === protocol.STATUS.REFUSED ||
+      link.status === protocol.STATUS.CANCELLED ||
+      link.status === protocol.STATUS.REVOKED;
+    if (!isTerminal) return res.status(409).json({ error: "not_terminal" });
+    const localUrl = peer.normalizeBaseUrl(req.body?.localBaseUrl);
+    if (!localUrl) return res.status(400).json({ error: "invalid_local_url" });
+    store.remove(link.id);
+    const id = store.newId();
+    store.insert({
+      id,
+      role: "initiator",
+      status: protocol.STATUS.OUTGOING_PENDING,
+      peer_base_url: link.peer_base_url,
+      peer_label: link.peer_label,
+      local_base_url: localUrl,
+      nonce: store.newNonce(),
+      created_by: req.user.id,
+      created_at: store.nowIso(),
+    });
+    kickTick();
+    res.json({ ok: true, link: publicLink(store.getById(id)) });
   });
 
   // Repair a peer's address after it moved (new domain / port). The link
