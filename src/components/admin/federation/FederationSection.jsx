@@ -291,7 +291,16 @@ export default function FederationSection({
         {/* Empty / loading states */}
         {fed.loaded && fed.links.length === 0 && (
           <div className="text-center text-sm text-gray-500 dark:text-gray-400 py-6">
-            <TI.World className="tabler-icon w-8 h-8 mx-auto mb-2 opacity-40" />
+            {/* .tabler-icon is display:inline-flex (needed for its many
+                icon+label button usages elsewhere), so mx-auto has no
+                effect on it directly and it was sharing a text line with
+                the message below, baseline-aligned against ~14px text —
+                pushing most of this 32px icon above the line instead of
+                centered over it. Wrapping it in its own block gives
+                text-center something block-level to centre AND puts it on
+                its own row, matching the stacked icon-then-text look the
+                original mx-auto/mb-2 pairing was going for. */}
+            <div className="mb-2"><TI.World className="tabler-icon w-8 h-8 opacity-40" /></div>
             {t("fedNoLinks")}
           </div>
         )}
