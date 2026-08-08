@@ -364,12 +364,19 @@ export default function FederationLinkCard({
 
           {isTerminal && (
             <>
-              <ActionButton
-                icon={TI.Link}
-                label={t("fedResendInvite")}
-                disabled={busy}
-                onClick={() => actions.resend(link.id)}
-              />
+              {/* Resending only makes sense for whoever actually sent the
+                  original invitation. A link where we were the acceptor
+                  (we received it, then declined it or watched the sender
+                  cancel it) has nothing of ours to resend -- offering the
+                  button there wrongly implies this side did the inviting. */}
+              {link.role === "initiator" && (
+                <ActionButton
+                  icon={TI.Link}
+                  label={t("fedResendInvite")}
+                  disabled={busy}
+                  onClick={() => actions.resend(link.id)}
+                />
+              )}
               <ActionButton
                 icon={TI.Trash}
                 label={t("fedRemove")}
