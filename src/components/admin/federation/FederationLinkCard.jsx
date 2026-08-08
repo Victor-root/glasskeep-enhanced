@@ -151,7 +151,7 @@ export default function FederationLinkCard({
   const isActive = link.status === "active";
   const isIncoming = link.status === "incoming_pending";
   const isOutgoing = link.status === "outgoing_pending" || link.status === "accepting";
-  const isTerminal = link.status === "refused" || link.status === "revoked";
+  const isTerminal = link.status === "refused" || link.status === "cancelled" || link.status === "revoked";
   const blocked = isActive && !link.writable; // offline / locked / incompatible
 
   const title = link.peerLabel || hostOf(link.peerBaseUrl);

@@ -1477,6 +1477,8 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedStateAcceptingDesc: "Finishing the pairing with the other server…",
   fedStateRefused: "Declined",
   fedStateRefusedDesc: "This invitation was declined.",
+  fedStateCancelled: "Cancelled",
+  fedStateCancelledDesc: "This invitation was cancelled.",
   fedStateRevoked: "Unpaired",
   fedStateRevokedDesc: "This link was removed.",
 

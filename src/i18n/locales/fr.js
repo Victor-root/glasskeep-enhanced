@@ -1480,6 +1480,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedStateAcceptingDesc: "Finalisation de l'appairage avec l'autre serveur…",
   fedStateRefused: "Refusée",
   fedStateRefusedDesc: "Cette invitation a été refusée.",
+  fedStateCancelled: "Annulée",
+  fedStateCancelledDesc: "Cette invitation a été annulée.",
   fedStateRevoked: "Dissocié",
   fedStateRevokedDesc: "Cette liaison a été supprimée.",
 

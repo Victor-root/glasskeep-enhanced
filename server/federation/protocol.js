@@ -59,7 +59,8 @@ const STATUS = Object.freeze({
   INCOMING_PENDING: "incoming_pending", // peer invited us, waiting for OUR admin to accept
   ACCEPTING: "accepting",               // our admin accepted, delivering the acceptance to the peer
   ACTIVE: "active",                     // paired and operational
-  REFUSED: "refused",                   // an admin declined the invitation
+  REFUSED: "refused",                   // an admin declined an invitation they received
+  CANCELLED: "cancelled",               // an admin withdrew an invitation they sent
   REVOKED: "revoked",                   // an admin unpaired the link
 });
 
@@ -80,6 +81,7 @@ const LINK_STATE = Object.freeze({
   INCOMING_PENDING: "incoming_pending",
   ACCEPTING: "accepting",
   REFUSED: "refused",
+  CANCELLED: "cancelled",
   REVOKED: "revoked",
   // active-link health
   ONLINE: "online",

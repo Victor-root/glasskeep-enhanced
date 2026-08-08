@@ -358,11 +358,13 @@ function attachFederationRoutes(
     }
     // Our link's status right before this notice tells us which side of
     // the pairing we were on: if WE had sent the invite (outgoing), the
-    // peer just declined OUR request. If WE were the recipient
-    // (incoming), the peer is withdrawing the invite THEY sent us --
-    // "declined your request" would be backwards in that case.
+    // peer just declined OUR request -- a real refusal. If WE were the
+    // recipient (incoming), the peer is withdrawing the invite THEY sent
+    // us, before we ever accepted or declined it -- that's a
+    // cancellation, not a refusal, and "declined your request" would be
+    // backwards for it.
     const weWereInviter = link.status === protocol.STATUS.OUTGOING_PENDING;
-    store.setStatus(link.id, protocol.STATUS.REFUSED);
+    store.setStatus(link.id, weWereInviter ? protocol.STATUS.REFUSED : protocol.STATUS.CANCELLED);
     try {
       broadcastToAdmins?.({
         type: "federation_refused",
@@ -698,18 +700,21 @@ function attachFederationRoutes(
     res.json({ ok: true, link: publicLink(store.getById(link.id)) });
   });
 
-  // Decline an incoming invitation (or cancel one we sent).
+  // Decline an incoming invitation, or cancel one we sent -- distinct
+  // outcomes (see protocol.STATUS) even though a single endpoint and a
+  // single confirm-dialog flow (FederationLinkCard) covers both.
   app.post("/api/admin/federation/links/:id/refuse", auth, adminOnly, (req, res) => {
     const link = store.getById(req.params.id);
     if (!link) return res.status(404).json({ error: "not_found" });
-    if (link.status !== protocol.STATUS.INCOMING_PENDING && link.status !== protocol.STATUS.OUTGOING_PENDING) {
+    const wasIncoming = link.status === protocol.STATUS.INCOMING_PENDING;
+    if (!wasIncoming && link.status !== protocol.STATUS.OUTGOING_PENDING) {
       return res.status(409).json({ error: "not_pending" });
     }
-    store.setStatus(link.id, protocol.STATUS.REFUSED);
-    // Tell the other side, so its pending request resolves to "refused"
-    // instead of the initiator retrying the invite forever (and never
-    // learning the outcome). Unsigned — a pending link has no shared
-    // secret yet; the peer validates by linkId + nonce. Best-effort.
+    store.setStatus(link.id, wasIncoming ? protocol.STATUS.REFUSED : protocol.STATUS.CANCELLED);
+    // Tell the other side, so its pending request resolves instead of the
+    // initiator retrying the invite forever (and never learning the
+    // outcome). Unsigned — a pending link has no shared secret yet; the
+    // peer validates by linkId + nonce. Best-effort.
     if (link.peer_base_url && link.nonce) {
       const path = "/api/federation/pair/refused";
       Promise.resolve()
