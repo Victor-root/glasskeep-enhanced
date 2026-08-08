@@ -1442,7 +1442,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedPeerUnlocked: "{peer} a été déverrouillé",
   fedPeerIncompatible: "{peer} n'est pas à jour",
   fedLinkedToast: "{peer} a accepté votre demande d'appairage",
-  fedRefusedToast: "{peer} a refusé votre demande d'appairage",
+  fedDeclinedToast: "{peer} a refusé votre demande d'appairage",
   fedDissociatedToast: "{peer} s'est dissocié de votre serveur",
   fedInvitesPending: "{count} serveurs attendent de s'associer à vous",
   fedIncomingHeading: "Demandes d'appairage",

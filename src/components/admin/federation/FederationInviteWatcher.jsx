@@ -137,7 +137,7 @@ export default function FederationInviteWatcher({ token }) {
         notify({ type: "federation", variant: "success", title: t("fedConnTitle"), message: t("fedLinkedToast").replace("{peer}", who) });
       } else if (msg.type === "federation_refused") {
         // The peer declined (or cancelled) the pending pairing.
-        notify({ type: "federation", variant: "warning", title: t("fedConnTitle"), message: t("fedRefusedToast").replace("{peer}", who) });
+        notify({ type: "federation", variant: "warning", title: t("fedConnTitle"), message: t("fedDeclinedToast").replace("{peer}", who) });
       } else if (msg.type === "federation_dissociated") {
         // The peer unpaired from us; the link is gone on our side too.
         notify({ type: "federation", variant: "warning", title: t("fedConnTitle"), message: t("fedDissociatedToast").replace("{peer}", who) });
