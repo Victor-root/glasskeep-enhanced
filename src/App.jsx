@@ -3889,21 +3889,39 @@ export default function App() {
                 // update so the user doesn't see a flash of empty slot.
                 (async () => {
                   let copy = null;
-                  try {
-                    copy = await api(`/notes/${msg.copyNoteId}`, { token });
-                  } catch (_) {}
+                  // A transient blip on this ONE fetch used to silently drop
+                  // the note from view with nothing to replace it — the copy
+                  // genuinely exists server-side, only this request failed —
+                  // until the next full reload quietly fixed it. Retry a
+                  // couple of times before falling back to a full resync.
+                  for (let attempt = 0; attempt < 3 && !copy; attempt++) {
+                    try {
+                      copy = await api(`/notes/${msg.copyNoteId}`, { token });
+                    } catch (e) {
+                      if (attempt < 2) {
+                        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+                      } else {
+                        console.warn("[note_access_revoked] could not fetch the kept copy after retries:", e?.message);
+                      }
+                    }
+                  }
+                  if (!copy) {
+                    // Still nothing — don't silently lose the note from view.
+                    // Re-sync from the authoritative server list instead,
+                    // exactly what a manual refresh already does today.
+                    reloadCurrentViewRef.current?.();
+                    return;
+                  }
                   const currentFilter = tagFilterRef.current;
                   const belongsInView =
-                    copy && copy.id
+                    copy.id
                     && !copy.archived && !copy.trashed
                     && (!currentFilter || (currentFilter !== "ARCHIVED" && currentFilter !== "TRASHED"));
                   setNotes((prev) => {
                     const filtered = prev.filter((n) => String(n.id) !== nid);
                     return belongsInView ? sortNotesByRecency([...filtered, copy]) : filtered;
                   });
-                  if (copy && copy.id) {
-                    try { await idbPutNote(copy, currentUser?.id, sessionId); } catch (_) {}
-                  }
+                  try { await idbPutNote(copy, currentUser?.id, sessionId); } catch (_) {}
                   idbDeleteNote(nid, currentUser?.id, sessionId).catch(() => {});
                   idbPurgeQueueForNote(nid, currentUser?.id).catch(() => {});
                   if (String(activeIdRef.current) === nid) {

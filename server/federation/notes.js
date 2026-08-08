@@ -165,6 +165,11 @@ function createNoteFederation(ctx) {
     // All real (non-shadow) local users — used to re-push profiles on reconnect.
     allRealUsers: db.prepare(`SELECT id, name, email, avatar_url FROM users WHERE federated_origin IS NULL`),
     deleteNoteRow: db.prepare(`DELETE FROM notes WHERE id = ?`),
+    // Per-user leftovers on a note a removed recipient no longer collaborates
+    // on — mirrors the local remove-collaborator route's own cleanup so a
+    // federated removal doesn't leave orphaned rows behind.
+    deleteUserTags: db.prepare(`DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?`),
+    deleteUserPosition: db.prepare(`DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?`),
   };
 
   // ── Helpers ─────────────────────────────────────────────────────────
@@ -992,6 +997,8 @@ function createNoteFederation(ctx) {
         });
       }
       deps.removeCollaborator?.run(noteId, target.id);
+      q.deleteUserTags.run(noteId, target.id);
+      q.deleteUserPosition.run(noteId, target.id);
       // Same event the local flow sends: with no copyNoteId it behaves
       // exactly like a plain note_deleted; with one, the client swaps the
       // fetched copy in for the removed note in one atomic update.
