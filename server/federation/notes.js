@@ -91,6 +91,29 @@ function createNoteFederation(ctx) {
   } catch (e) {
     log.warn?.("[federation/notes] schema migration:", e?.message);
   }
+  // How this share must END on the peer, recorded at the instant the local
+  // admin decides it:
+  //   NULL          — no teardown pending
+  //   'destroy'     — the mirror must go, content and all
+  //   'keep_copies' — the share is over, but every remote recipient keeps
+  //                   their own standalone copy of the content
+  //
+  // WHY PERSIST the intent instead of inferring it when we push: only the
+  // action itself knows whether this is "delete for everyone" or "delete
+  // just for me", yet the push may not happen until minutes later (the
+  // tick retries once an offline peer returns). reconcileMapping used to
+  // infer "destroy" from the note merely being trashed, which cannot tell
+  // those two apart — so a retry destroyed content the owner meant to
+  // leave behind. Runs AFTER the rebuild above, whose fixed column list
+  // would otherwise drop this column again on a legacy database.
+  try {
+    const cols = db.prepare(`PRAGMA table_info(federated_notes)`).all();
+    if (!cols.some((c) => c.name === "teardown")) {
+      db.exec(`ALTER TABLE federated_notes ADD COLUMN teardown TEXT`);
+    }
+  } catch (e) {
+    log.warn?.("[federation/notes] teardown migration:", e?.message);
+  }
 
   const q = {
     // All mappings for a note — a home note can ride several peer links.
@@ -111,6 +134,9 @@ function createNoteFederation(ctx) {
     `),
     // last_pushed_cua is per-peer, so the echo-guard is scoped to the link.
     setPushed: db.prepare(`UPDATE federated_notes SET last_pushed_cua = ? WHERE note_id = ? AND link_id = ?`),
+    // Record how this note's share must end, on every peer carrying it.
+    setTeardownForNote: db.prepare(`UPDATE federated_notes SET teardown = ? WHERE note_id = ?`),
+    setTeardownForLink: db.prepare(`UPDATE federated_notes SET teardown = ? WHERE note_id = ? AND link_id = ?`),
     deleteMappingForLink: db.prepare(`DELETE FROM federated_notes WHERE note_id = ? AND link_id = ?`),
     deleteAllForNote: db.prepare(`DELETE FROM federated_notes WHERE note_id = ?`),
     getShadowByOrigin: db.prepare(`SELECT * FROM users WHERE federated_origin = ?`),
@@ -603,25 +629,38 @@ function createNoteFederation(ctx) {
   }
 
   // Tell the peer to tear down its mirror of a note we no longer share.
-  async function pushRemoval(link, noteId) {
+  // keepCopies carries the "…but leave each recipient their content"
+  // intent recorded on the mapping (see the teardown column).
+  async function pushRemoval(link, noteId, keepCopies = false) {
     const path = "/api/federation/notes/remove";
     const resp = await peer.httpJson(link.peer_base_url + path, {
       method: "POST",
       secret: link.shared_secret,
       linkId: link.id,
       path,
-      body: { linkId: link.id, noteId },
+      body: { linkId: link.id, noteId, keepCopies },
     });
     return !!(resp.ok && resp.json && resp.json.ok === true);
   }
 
   // Has a HOME note's share been revoked locally? (the note was deleted,
   // trashed, or the remote participant removed) → the mirror must go.
+  // An explicitly recorded teardown always wins: it knows WHICH kind of
+  // ending this is, where the checks below can only guess "destroy".
   function homeShareRevoked(m, note) {
+    if (m.teardown) return true;
     if (!note) return true;
     if (note.trashed) return true;
     return !q.hasShadowCollab.get(m.note_id, `${m.link_id}|%`);
   }
+
+  // Teardown pushes in flight, keyed by note|link. A single delete can
+  // legitimately reach reconcile twice (the intent is recorded, then the
+  // route broadcasts), and the tick can overlap either; without this the
+  // same mirror gets torn down twice over the wire. Only the teardown
+  // branch is guarded — a duplicate content push is already a no-op via
+  // last_pushed_cua.
+  const teardownsInFlight = new Set();
 
   async function reconcileMapping(m) {
     const link = store.getById(m.link_id);
@@ -630,8 +669,19 @@ function createNoteFederation(ctx) {
 
     // Revoked home share → remove this peer's mirror, then forget only
     // THIS link's mapping (other peers sharing the same note are untouched).
+    // Until that push succeeds the mapping (and its teardown intent) stays
+    // put, so an offline peer simply gets it on a later tick.
     if (m.role === "home" && homeShareRevoked(m, note)) {
-      if (await pushRemoval(link, m.note_id)) q.deleteMappingForLink.run(m.note_id, m.link_id);
+      const key = `${m.note_id}|${m.link_id}`;
+      if (teardownsInFlight.has(key)) return;
+      teardownsInFlight.add(key);
+      try {
+        if (await pushRemoval(link, m.note_id, m.teardown === "keep_copies")) {
+          q.deleteMappingForLink.run(m.note_id, m.link_id);
+        }
+      } finally {
+        teardownsInFlight.delete(key);
+      }
       return;
     }
     if (!note) return;
@@ -816,7 +866,16 @@ function createNoteFederation(ctx) {
   }
 
   // ── Inbound: the peer removed/unshared a note we mirror ─────────────
-  function handleIncomingRemove({ linkId, noteId }) {
+  // keepCopies: the share ended WITHOUT the content being deleted (the
+  // owner left the note, or removed its last recipient while granting a
+  // copy). Every real local participant keeps a standalone copy instead of
+  // losing the note.
+  //
+  // Doing this here — rather than only in the separate unshare-recipient
+  // call — is what makes the two race-free: whichever of the two arrives
+  // first finds the recipient still present and makes the copy, and the
+  // other then finds nothing left to do. Exactly one copy either way.
+  function handleIncomingRemove({ linkId, noteId, keepCopies = false }) {
     const m = q.getMappingForLink.get(noteId, linkId);
     if (!m || m.role !== "mirror") {
       q.deleteMappingForLink.run(noteId, linkId); // tidy any stray mapping for this link
@@ -832,10 +891,20 @@ function createNoteFederation(ctx) {
       recipients = q.realParticipants.all(noteId).map((r) => r.user_id);
     } catch { /* ignore */ }
     const shadow = q.getShadowByOrigin.get(`${linkId}|${m.remote_owner_ref}`);
-    let title = "";
+    let note = null;
     try {
-      title = deps.getNoteById.get(noteId)?.title || "";
-    } catch { /* locked: no title, still remove */ }
+      note = deps.getNoteById.get(noteId) || null;
+    } catch { /* locked: no content, still remove */ }
+    const title = note?.title || "";
+
+    // Copies FIRST, while the mirror row is still readable.
+    const copyByUser = new Map();
+    if (keepCopies && note) {
+      for (const uid of recipients) {
+        const copyId = makeStandaloneCopy(note, uid);
+        if (copyId) copyByUser.set(uid, copyId);
+      }
+    }
 
     try {
       // A mirror note has exactly one mapping (this link); drop it and the
@@ -846,9 +915,17 @@ function createNoteFederation(ctx) {
       log.warn?.("[federation/notes] remove mirror:", e?.message);
     }
     for (const uid of recipients) {
-      // Drop it from the open view immediately…
+      const copyNoteId = copyByUser.get(uid) || null;
+      // Drop it from the open view immediately… or, when a copy was kept,
+      // swap the copy in for it in one atomic client-side update (the same
+      // event the local remove-collaborator flow sends).
       try {
-        deps.sendEventToUser?.(uid, { type: "note_deleted", noteId });
+        deps.sendEventToUser?.(
+          uid,
+          copyNoteId
+            ? { type: "note_access_revoked", noteId, copyNoteId }
+            : { type: "note_deleted", noteId },
+        );
       } catch { /* SSE best-effort */ }
       // …and leave a persisted notice so it reads like a local deletion
       // (and an offline participant still learns about it on reconnect).
@@ -859,6 +936,10 @@ function createNoteFederation(ctx) {
             senderId: shadow.id,
             senderName: shadow.name || m.remote_owner_ref || "",
             noteTitle: title,
+            // Point "Open" at the copy they actually still have, and pick
+            // the wording that says the content was kept.
+            noteId: copyNoteId,
+            notificationType: copyNoteId ? "shared_note_deleted_with_copy" : "shared_note_deleted",
           });
         }
       } catch { /* notification best-effort */ }
@@ -950,14 +1031,52 @@ function createNoteFederation(ctx) {
     }
   }
 
+  // Give a local user their own standalone (non-federated) note carrying
+  // this mirror's current content — what "keep a copy" means on THIS side
+  // of the link. Built here, from the already-synced mirror row, and owned
+  // by the recipient's REAL account: a copy made on the owner's server
+  // could only ever belong to the powerless shadow user standing in for
+  // them there. Field-for-field the same shape as the local
+  // remove-collaborator "keep a copy" flow in server/index.js.
+  // Returns the new note id, or null if it could not be created.
+  function makeStandaloneCopy(note, userId) {
+    try {
+      const copyNoteId = deps.uid?.();
+      if (!copyNoteId) return null;
+      deps.runInsertNote?.({
+        id: copyNoteId,
+        user_id: userId,
+        type: note.type,
+        title: note.title,
+        content: note.content,
+        items_json: note.items_json,
+        // Their own personal tags on the mirror, not the shared default.
+        tags_json: deps.getUserTags?.(note.id, userId) || "[]",
+        images_json: note.images_json,
+        color: note.color,
+        pinned: 0,
+        position: note.position,
+        timestamp: note.timestamp,
+        client_updated_at: deps.nowISO?.(),
+      });
+      const maxPosRow = deps.getMaxUserEffectivePosition?.get(userId, userId, userId, userId);
+      deps.upsertUserPosition?.run({
+        note_id: copyNoteId,
+        user_id: userId,
+        position: (typeof maxPosRow?.max_pos === "number" ? maxPosRow.max_pos : 0) + 1,
+        pinned: 0,
+      });
+      return copyNoteId;
+    } catch (e) {
+      log.warn?.("[federation/notes] standalone copy:", e?.message);
+      return null;
+    }
+  }
+
   // ── Inbound: the authority removed one of our local users from a note ─
   // Drop just that recipient's collaborator row (not the whole mirror) and
   // tell their open session so the note disappears without a manual refresh.
-  // withCopy: the owner chose "keep a copy" -- built HERE, from the
-  // mirror's own already-synced content, and owned by the recipient's
-  // REAL local account. A copy built on the owner's server instead would
-  // only ever be reachable by the powerless shadow user standing in for
-  // this person there.
+  // withCopy: the owner chose "keep a copy".
   function handleIncomingUnshareRecipient({ linkId, noteId, targetRef, withCopy = false }) {
     const m = q.getMappingForLink.get(noteId, linkId);
     if (!m || m.role !== "mirror") return { ok: false, error: "unknown_note" };
@@ -966,36 +1085,7 @@ function createNoteFederation(ctx) {
     if (!target) return { ok: true }; // already gone — nothing to do
     try {
       const note = deps.getNoteById?.get(noteId);
-      let copyNoteId = null;
-      if (withCopy && note) {
-        // Mirrors the local remove-collaborator "keep a copy" flow
-        // (server/index.js) field-for-field, just sourced from this
-        // mirror's own row instead of the request body.
-        copyNoteId = deps.uid?.();
-        const userTagsJson = deps.getUserTags?.(noteId, target.id) || "[]";
-        deps.runInsertNote?.({
-          id: copyNoteId,
-          user_id: target.id,
-          type: note.type,
-          title: note.title,
-          content: note.content,
-          items_json: note.items_json,
-          tags_json: userTagsJson,
-          images_json: note.images_json,
-          color: note.color,
-          pinned: 0,
-          position: note.position,
-          timestamp: note.timestamp,
-          client_updated_at: deps.nowISO?.(),
-        });
-        const maxPosRow = deps.getMaxUserEffectivePosition?.get(target.id, target.id, target.id, target.id);
-        deps.upsertUserPosition?.run({
-          note_id: copyNoteId,
-          user_id: target.id,
-          position: (typeof maxPosRow?.max_pos === "number" ? maxPosRow.max_pos : 0) + 1,
-          pinned: 0,
-        });
-      }
+      const copyNoteId = withCopy && note ? makeStandaloneCopy(note, target.id) : null;
       deps.removeCollaborator?.run(noteId, target.id);
       q.deleteUserTags.run(noteId, target.id);
       q.deleteUserPosition.run(noteId, target.id);
@@ -1039,18 +1129,69 @@ function createNoteFederation(ctx) {
     return !link || !require("./protocol").isLinkWritable(link);
   }
 
+  // Record how this note's share must end on every peer carrying it, and
+  // kick the push now (the tick retries it until it lands). Called by the
+  // delete routes at the moment the owner's intent is known — see the
+  // teardown column for why it has to be persisted rather than inferred.
+  // Applies to every peer the note rides, since the whole note is ending.
+  //   mode: 'destroy' | 'keep_copies'
+  //
+  // The DB write is synchronous on purpose: callers broadcast immediately
+  // afterwards, and that broadcast triggers the reconcile which reads it.
+  function markShareEnding(noteId, mode) {
+    if (mode !== "destroy" && mode !== "keep_copies") return;
+    try {
+      q.setTeardownForNote.run(mode, noteId);
+    } catch (e) {
+      log.warn?.("[federation/notes] mark share ending:", e?.message);
+      return;
+    }
+    onNoteChangedLocally(noteId);
+  }
+
+  // A federated recipient was just removed from a HOME note locally (the
+  // owner removed them, with or without leaving them a copy). Pushes the
+  // per-recipient unshare and — when that was the LAST recipient on this
+  // link, so the whole mirror is about to come down — records how that
+  // teardown must behave, instead of letting it default to "destroy" and
+  // wipe out the copy the owner meant to leave.
+  //
+  // Call this BEFORE broadcasting: the teardown write has to land before
+  // the reconcile that reads it.
+  function onRemoteRecipientRemoved({ shadow, noteId, withCopy = false }) {
+    const origin = shadow?.federated_origin || "";
+    const sep = origin.indexOf("|");
+    if (sep < 0) return;
+    const linkId = origin.slice(0, sep);
+    let stillShared = true;
+    try {
+      stillShared = !!q.hasShadowCollab.get(noteId, `${linkId}|%`);
+    } catch { /* on a read error assume it is: never tear down on a guess */ }
+    if (!stillShared) {
+      try {
+        q.setTeardownForLink.run(withCopy ? "keep_copies" : "destroy", noteId, linkId);
+      } catch (e) {
+        log.warn?.("[federation/notes] mark recipient teardown:", e?.message);
+      }
+    }
+    Promise.resolve()
+      .then(() => unshareFromRemote({ shadow, noteId, withCopy }))
+      .catch((e) => log.warn?.("[federation/notes] unshareFromRemote failed:", e?.message));
+  }
+
   return {
     handleIncomingShare,
     handleIncomingApply,
     handleIncomingRemove,
     handleIncomingPermission,
     handleIncomingUnshareRecipient,
+    markShareEnding,
+    onRemoteRecipientRemoved,
     applyRemoteProfile,
     broadcastProfileToPeers,
     pushProfilesToLink,
     shareWithRemote,
     setRemotePermission,
-    unshareFromRemote,
     syncTick,
     onNoteChangedLocally,
     onParticipantsChangedLocally,
