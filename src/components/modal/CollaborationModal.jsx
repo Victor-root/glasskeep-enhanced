@@ -3,6 +3,7 @@ import UserAvatar from "../common/UserAvatar.jsx";
 import ConfirmRemoveCollaboratorDialog from "./ConfirmRemoveCollaboratorDialog.jsx";
 import TI from "../../icons/editor/index.jsx";
 import { t } from "../../i18n";
+import { setThemeColor, currentThemeColor } from "../../utils/helpers.js";
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 // Only surface the A–Z index once the candidate list is long enough that
@@ -101,6 +102,30 @@ export default function CollaborationModal({
   const [selected, setSelected] = React.useState(() => new Map());
   const [newAccess, setNewAccess] = React.useState("write");
   const [adding, setAdding] = React.useState(false);
+
+  // Sync PWA / Android status bar + nav bar color with this modal's own
+  // surface — it renders full-bleed on mobile (below), on top of an
+  // already-colored NoteModal, so without this the bars keep showing the
+  // note's color instead. Branch inside one effect rather than a cleanup
+  // function — same reasoning as NoteModal's own status-bar effect: a
+  // cleanup→default→effect→color sequence flashes on Android WebView.
+  // Capture the note's color once per open (not on every `dark` toggle,
+  // which would overwrite the captured value with our own) and hand it
+  // back unchanged on close.
+  const priorThemeColorRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) {
+      if (priorThemeColorRef.current) {
+        setThemeColor(priorThemeColorRef.current);
+        priorThemeColorRef.current = null;
+      }
+      return;
+    }
+    if (priorThemeColorRef.current == null) {
+      priorThemeColorRef.current = currentThemeColor();
+    }
+    setThemeColor(dark ? "#282828" : "#ffffff");
+  }, [open, dark]);
 
   if (!open) return null;
 
@@ -214,8 +239,12 @@ export default function CollaborationModal({
         <div className="absolute inset-0 bg-black/40" onClick={handleClose} />
         <div
           // Full-screen on mobile (more width for the collaborator rows);
-          // a centred card from sm: up where there's already room.
-          className="glass-card relative flex flex-col overflow-hidden shadow-2xl w-full h-full max-h-full rounded-none p-4 sm:w-[90%] sm:max-w-md sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:p-6"
+          // a centred card from sm: up where there's already room. Full-
+          // screen means edge-to-edge under the status/nav bars, so the
+          // base padding adds the safe-area inset on top of the usual 1rem
+          // gutter (same idea as ChangelogModal's header); sm:p-6 resets
+          // all four sides once there's a real gutter around the card.
+          className="glass-card relative flex flex-col overflow-hidden shadow-2xl w-full h-full max-h-full rounded-none pt-[calc(var(--safe-top)+1rem)] pb-[calc(var(--safe-bottom)+1rem)] pl-[calc(var(--safe-left)+1rem)] pr-[calc(var(--safe-right)+1rem)] sm:w-[90%] sm:max-w-md sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:p-6"
           style={{ backgroundColor: dark ? "#282828" : "#ffffff" }}
           onClick={(e) => e.stopPropagation()}
         >
