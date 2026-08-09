@@ -456,8 +456,16 @@ export default function NoteModal({
   /* Sync PWA / Android status bar color with note color.
      No cleanup function — avoids the cleanup→default→effect→noteColor race
      that caused a flash on Android WebView. The default is set explicitly
-     when `open` becomes false. */
+     when `open` becomes false.
+
+     Skip entirely while CollaborationModal is open: it renders on top of
+     this modal and owns the bar itself meanwhile (own effect below it in
+     the tree, so it always applies first — this one would otherwise fire
+     right after on the same `dark` change and stomp its color). Listing
+     `collaborationModalOpen` as a dep is what makes this effect re-run
+     the moment that modal closes, putting the note's color back. */
   React.useEffect(() => {
+    if (collaborationModalOpen) return;
     const pageColor = currentStatusBarColor();
     if (!open) {
       window.__noteModalOpen = false;
@@ -466,7 +474,7 @@ export default function NoteModal({
     }
     window.__noteModalOpen = true;
     setThemeColor(toHex(modalBgFor(mColor, dark)));
-  }, [open, mColor, dark]);
+  }, [open, mColor, dark, collaborationModalOpen]);
 
   /* Intercept Ctrl+Z/Y at the modal level for title-only undo.
    *

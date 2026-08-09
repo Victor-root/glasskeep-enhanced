@@ -30,6 +30,15 @@ export function currentStatusBarColor() {
     : STATUS_BAR_LIGHT;
 }
 
+/** Whatever theme-color is live right now — a modal's own override or the
+ *  shell default, whichever last called setThemeColor — read straight from
+ *  the meta tag rather than recomputed, so a caller can restore exactly
+ *  what was there before it took over (e.g. a modal opened on top of an
+ *  already-colored NoteModal). Null if the tag isn't mounted yet. */
+export function currentThemeColor() {
+  return document.querySelector('meta[name="theme-color"]')?.getAttribute("content") || null;
+}
+
 /** Update PWA status bar color by removing and re-creating the meta tag */
 export function setThemeColor(color) {
   const old = document.querySelector('meta[name="theme-color"]');
