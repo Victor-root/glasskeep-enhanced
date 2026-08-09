@@ -80,14 +80,49 @@ export default function useCollaboration(token, {
     [loadNoteCollaborators],
   );
 
+  // Bumped when a local change to the participant list STARTS and again
+  // when it FINISHES. A reload compares this before applying its answer,
+  // and drops it if either bump happened while it was in flight — which
+  // covers both ways it can be out of date:
+  //   - it started before the change, so it describes the state the user
+  //     has just moved away from;
+  //   - it started after the click but while the change was still
+  //     travelling, so the server had not applied it yet and answered
+  //     with the old value anyway.
+  // Either one used to put the previous value straight back, so the click
+  // looked like it had not registered and only a second one seemed to
+  // work — most visible when several were changed in a row, which keeps
+  // requests in flight for longer.
+  //
+  // This cannot leave the list stale: every change makes the server
+  // broadcast, so a fresh reload always starts after the last one has
+  // landed, and that one is applied.
+  const participantsMutationRef = useRef(0);
+  // How many local changes are still travelling to the server. The count
+  // above only catches a reload that spans a change's start or end; a
+  // quick reload that fits entirely inside the window where a change is
+  // in flight sees no bump at all, yet the server has not applied it yet
+  // and answers with the old value. Changing several accesses in a row
+  // keeps that window wide open, which is when it was still showing.
+  const pendingMutationsRef = useRef(0);
+
+  // `force` is for the reloads a change fires for itself once the server
+  // has confirmed it: those are asking for the truth on purpose and must
+  // not be filtered by the guards below.
   const loadCollaboratorsForAddModal = useCallback(
-    async (noteId) => {
+    async (noteId, { force = false } = {}) => {
+      const seq = participantsMutationRef.current;
       try {
         const collaborators = await api(`/notes/${noteId}/collaborators`, {
           token,
         });
+        if (!force) {
+          if (participantsMutationRef.current !== seq) return; // superseded
+          if (pendingMutationsRef.current > 0) return; // change still travelling
+        }
         setAddModalCollaborators(collaborators || []);
       } catch (e) {
+        if (!force && participantsMutationRef.current !== seq) return;
         console.error("Failed to load collaborators:", e);
         setAddModalCollaborators([]);
       }
@@ -147,6 +182,8 @@ export default function useCollaboration(token, {
 
 
   const removeCollaborator = async (collaboratorId, noteId = null, mode = null) => {
+    participantsMutationRef.current++;
+    pendingMutationsRef.current++;
     try {
       const targetNoteId = noteId || collaborationDialogNoteId || activeId;
       if (!targetNoteId) return;
@@ -162,11 +199,14 @@ export default function useCollaboration(token, {
         loadNoteCollaborators(collaborationDialogNoteId);
       }
       if (activeId) {
-        await loadCollaboratorsForAddModal(activeId);
+        await loadCollaboratorsForAddModal(activeId, { force: true });
       }
       invalidateNotesCache();
     } catch (e) {
       showToast(localizeServerError(e.message, "failedRemoveCollaborator"), "error");
+    } finally {
+      pendingMutationsRef.current--;
+      participantsMutationRef.current++;
     }
   };
 
@@ -247,9 +287,14 @@ export default function useCollaboration(token, {
   };
 
   const addCollaborator = async (username, access = "write") => {
+    // Bail out BEFORE counting: the finally below always releases, so an
+    // early return from inside the try would release a change that was
+    // never counted and drift the tally negative, quietly disarming the
+    // guard for every later reload.
+    if (!activeId) return;
+    participantsMutationRef.current++;
+    pendingMutationsRef.current++;
     try {
-      if (!activeId) return;
-
       const res = await api(`/notes/${activeId}/collaborate`, {
         method: "POST",
         token,
@@ -294,12 +339,15 @@ export default function useCollaboration(token, {
       setCollaboratorUsername("");
       setShowUserDropdown(false);
       setFilteredUsers([]);
-      await loadCollaboratorsForAddModal(activeId);
+      await loadCollaboratorsForAddModal(activeId, { force: true });
       if (collaborationDialogNoteId === activeId) {
         loadNoteCollaborators(activeId);
       }
     } catch (e) {
       showToast(describeAddError(e, username), "error");
+    } finally {
+      pendingMutationsRef.current--;
+      participantsMutationRef.current++;
     }
   };
 
@@ -311,6 +359,8 @@ export default function useCollaboration(token, {
     const targetNoteId = activeId;
     if (!targetNoteId) return;
     const canWrite = access === "write" ? 1 : 0;
+    participantsMutationRef.current++;
+    pendingMutationsRef.current++;
     setAddModalCollaborators((prev) =>
       prev.map((c) => (c.id === collaboratorId ? { ...c, canWrite } : c)),
     );
@@ -323,7 +373,10 @@ export default function useCollaboration(token, {
       invalidateNotesCache();
     } catch (e) {
       showToast(localizeServerError(e.message, "genericError"), "error");
-      await loadCollaboratorsForAddModal(targetNoteId);
+      await loadCollaboratorsForAddModal(targetNoteId, { force: true });
+    } finally {
+      pendingMutationsRef.current--;
+      participantsMutationRef.current++;
     }
   };
 
@@ -332,33 +385,40 @@ export default function useCollaboration(token, {
   // is [{ username, access }].
   const addCollaboratorsBatch = async (items) => {
     if (!activeId || !Array.isArray(items) || items.length === 0) return;
+    participantsMutationRef.current++;
+    pendingMutationsRef.current++;
     let added = 0;
-    for (const it of items) {
-      try {
-        await api(`/notes/${activeId}/collaborate`, {
-          method: "POST",
-          token,
-          body: { username: it.username, access: it.access === "read" ? "read" : "write" },
-        });
-        added += 1;
-      } catch (e) {
-        // 409 = already a collaborator (raced) → skip quietly; surface others.
-        if (e.status !== 409) {
-          showToast(describeAddError(e, it), "error");
+    try {
+      for (const it of items) {
+        try {
+          await api(`/notes/${activeId}/collaborate`, {
+            method: "POST",
+            token,
+            body: { username: it.username, access: it.access === "read" ? "read" : "write" },
+          });
+          added += 1;
+        } catch (e) {
+          // 409 = already a collaborator (raced) → skip quietly; surface others.
+          if (e.status !== 409) {
+            showToast(describeAddError(e, it), "error");
+          }
         }
       }
-    }
-    if (added > 0) {
-      showToast(
-        added === 1
-          ? t("addedCollaboratorsOne")
-          : t("addedCollaboratorsMany").replace("{n}", String(added)),
-        "success",
-        undefined,
-        "share",
-      );
-      invalidateNotesCache();
-      await loadCollaboratorsForAddModal(activeId);
+      if (added > 0) {
+        showToast(
+          added === 1
+            ? t("addedCollaboratorsOne")
+            : t("addedCollaboratorsMany").replace("{n}", String(added)),
+          "success",
+          undefined,
+          "share",
+        );
+        invalidateNotesCache();
+        await loadCollaboratorsForAddModal(activeId, { force: true });
+      }
+    } finally {
+      pendingMutationsRef.current--;
+      participantsMutationRef.current++;
     }
   };
 

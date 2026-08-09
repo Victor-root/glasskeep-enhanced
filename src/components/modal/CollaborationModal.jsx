@@ -32,17 +32,23 @@ function ServerBadge({ label }) {
 // half is filled with the soft theme accent, matching the app's other
 // two-option pickers. Eye = read-only, Pencil = can edit; tooltips/aria
 // carry the labels so it stays small.
-function AccessToggle({ canWrite, busy, onChange }) {
+//
+// Deliberately never disabled while the change is in flight. Disabling it
+// bought nothing — the row already flips optimistically, and setting the
+// same access twice is a no-op server-side — but it meant a click landing
+// in that window did absolutely nothing, which is indistinguishable from
+// the app ignoring you. Clicking the half that is already active is
+// likewise a no-op, so there is nothing to guard against.
+function AccessToggle({ canWrite, onChange }) {
   const ro = canWrite === 0;
   const cell =
-    "inline-flex items-center justify-center px-2 py-1 transition-colors disabled:opacity-50";
+    "inline-flex items-center justify-center px-2 py-1 transition-colors";
   const active = "bg-[var(--gk-accent-soft-bg)] text-[var(--gk-chrome-accent)]";
   const idle = "text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/10";
   return (
     <div className="inline-flex rounded-lg border border-[var(--border-light)] overflow-hidden">
       <button
         type="button"
-        disabled={busy}
         aria-pressed={ro}
         aria-label={t("accessReadOnly")}
         data-tooltip={t("accessReadOnly")}
@@ -53,7 +59,6 @@ function AccessToggle({ canWrite, busy, onChange }) {
       </button>
       <button
         type="button"
-        disabled={busy}
         aria-pressed={!ro}
         aria-label={t("accessReadWrite")}
         data-tooltip={t("accessReadWrite")}
@@ -90,7 +95,6 @@ export default function CollaborationModal({
   onSetCollaboratorAccess,
 }) {
   const [confirmRemove, setConfirmRemove] = React.useState(null);
-  const [accessBusyId, setAccessBusyId] = React.useState(null);
   // Picker state
   const [search, setSearch] = React.useState("");
   const [letter, setLetter] = React.useState(null);
@@ -310,15 +314,7 @@ export default function CollaborationModal({
                           {showAccess && (
                             <AccessToggle
                               canWrite={collab.canWrite}
-                              busy={accessBusyId === collab.id}
-                              onChange={async (access) => {
-                                setAccessBusyId(collab.id);
-                                try {
-                                  await onSetCollaboratorAccess(collab.id, access);
-                                } finally {
-                                  setAccessBusyId(null);
-                                }
-                              }}
+                              onChange={(access) => onSetCollaboratorAccess(collab.id, access)}
                             />
                           )}
                           {canRemove && (

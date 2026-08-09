@@ -2805,12 +2805,17 @@ app.patch("/api/notes/:id/collaborate/:userId", auth, async (req, res) => {
   // recipient's mirror copy flips immediately.
   if (target.federated_origin && federation?.noteFederation?.setRemotePermission) {
     // Federated stand-in: the real user lives on the peer, which relays the
-    // change to them over its own SSE. Nothing to push on this side.
-    try {
-      await federation.noteFederation.setRemotePermission({ note, shadow: target, canWrite });
-    } catch (e) {
-      console.warn("[federation/notes] setRemotePermission failed:", e?.message);
-    }
+    // change to them over its own SSE. A courtesy push so their copy flips
+    // at once — deliberately NOT awaited. The decision is already recorded
+    // above, while holding the owner's request for a peer round trip (a
+    // second and a half for a sluggish peer, the full 8s timeout for one
+    // that has gone away) left BOTH halves of the access toggle disabled
+    // for that whole time, so clicks during it did nothing at all. The
+    // roster pushed just below carries the same access and is retried
+    // until it lands, so nothing is lost when this push fails.
+    Promise.resolve()
+      .then(() => federation.noteFederation.setRemotePermission({ note, shadow: target, canWrite }))
+      .catch((e) => console.warn("[federation/notes] setRemotePermission failed:", e?.message));
   } else {
     // Local collaborator: push a dedicated access-change event so their open
     // note flips read-only/read-write instantly — even mid-edit, where the
