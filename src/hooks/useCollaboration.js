@@ -80,14 +80,26 @@ export default function useCollaboration(token, {
     [loadNoteCollaborators],
   );
 
+  // Bumped by every local change to the participant list. A reload that
+  // started BEFORE the bump is describing a state the user has since
+  // changed, so its answer must be dropped rather than overwrite the row
+  // they just touched. Without this, a reload that happened to be in
+  // flight when the access toggle was clicked put the old value straight
+  // back — the click looked like it had not registered, and only a second
+  // one appeared to work.
+  const participantsMutationRef = useRef(0);
+
   const loadCollaboratorsForAddModal = useCallback(
     async (noteId) => {
+      const seq = participantsMutationRef.current;
       try {
         const collaborators = await api(`/notes/${noteId}/collaborators`, {
           token,
         });
+        if (participantsMutationRef.current !== seq) return; // superseded
         setAddModalCollaborators(collaborators || []);
       } catch (e) {
+        if (participantsMutationRef.current !== seq) return;
         console.error("Failed to load collaborators:", e);
         setAddModalCollaborators([]);
       }
@@ -147,6 +159,7 @@ export default function useCollaboration(token, {
 
 
   const removeCollaborator = async (collaboratorId, noteId = null, mode = null) => {
+    participantsMutationRef.current++;
     try {
       const targetNoteId = noteId || collaborationDialogNoteId || activeId;
       if (!targetNoteId) return;
@@ -249,6 +262,7 @@ export default function useCollaboration(token, {
   const addCollaborator = async (username, access = "write") => {
     try {
       if (!activeId) return;
+      participantsMutationRef.current++;
 
       const res = await api(`/notes/${activeId}/collaborate`, {
         method: "POST",
@@ -311,6 +325,7 @@ export default function useCollaboration(token, {
     const targetNoteId = activeId;
     if (!targetNoteId) return;
     const canWrite = access === "write" ? 1 : 0;
+    participantsMutationRef.current++;
     setAddModalCollaborators((prev) =>
       prev.map((c) => (c.id === collaboratorId ? { ...c, canWrite } : c)),
     );
@@ -332,6 +347,7 @@ export default function useCollaboration(token, {
   // is [{ username, access }].
   const addCollaboratorsBatch = async (items) => {
     if (!activeId || !Array.isArray(items) || items.length === 0) return;
+    participantsMutationRef.current++;
     let added = 0;
     for (const it of items) {
       try {
