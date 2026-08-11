@@ -184,6 +184,12 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
     const handle = e.currentTarget;
     const rowEl = handle.closest("[data-checklist-item]");
     if (!rowEl) return;
+    // The horizontal indent/outdent gesture only ever moves this inner
+    // wrapper (handle + checkbox + text), not the whole row -- so the
+    // delete button, which sits outside it, never chases the row
+    // sideways. Falls back to the row itself if a caller doesn't mark
+    // one (e.g. an older/simpler row layout).
+    const slideEl = rowEl.querySelector("[data-checklist-slide]") || rowEl;
 
     handle.setPointerCapture(e.pointerId);
 
@@ -196,6 +202,7 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
     dragState.current = {
       id: String(itemId),
       rowEl,
+      slideEl,
       handle,
       pointerId: e.pointerId,
       startX: e.clientX,
@@ -239,8 +246,8 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
         // no shadow. It stays exactly where it is in the list; only its
         // paint position shifts, which is what makes this read as "the
         // row slides in place" rather than "the row got picked up".
-        ds.rowEl.style.transition = "none";
-        ds.rowEl.style.willChange = "transform";
+        ds.slideEl.style.transition = "none";
+        ds.slideEl.style.willChange = "transform";
       }
     }
 
@@ -249,7 +256,7 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
       const allowed = (dir > 0 && ds.canIndent) || (dir < 0 && ds.canOutdent);
       const clamped = allowed ? Math.max(-INDENT_STEP_PX, Math.min(INDENT_STEP_PX, deltaX)) : 0;
       ds.lastDeltaX = deltaX;
-      ds.rowEl.style.transform = clamped ? `translateX(${clamped}px)` : "";
+      ds.slideEl.style.transform = clamped ? `translateX(${clamped}px)` : "";
       return;
     }
 
@@ -265,7 +272,7 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
     try { ds.handle.releasePointerCapture(ds.pointerId); } catch (_) {}
 
     if (ds.mode === "horizontal") {
-      const rowEl = ds.rowEl;
+      const slideEl = ds.slideEl;
       const draggedId = ds.id;
       const deltaX = ds.lastDeltaX || 0;
       const shouldIndent = ds.canIndent && deltaX >= INDENT_STEP_PX;
@@ -283,18 +290,18 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
         syncEntries(next);
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            rowEl.style.transition = "";
-            rowEl.style.transform = "";
-            rowEl.style.willChange = "";
+            slideEl.style.transition = "";
+            slideEl.style.transform = "";
+            slideEl.style.willChange = "";
           });
         });
       } else {
         // Didn't cross the commit threshold -- spring back to unindented.
-        rowEl.style.transition = "transform 0.15s cubic-bezier(.2,0,0,1)";
-        rowEl.style.transform = "";
+        slideEl.style.transition = "transform 0.15s cubic-bezier(.2,0,0,1)";
+        slideEl.style.transform = "";
         setTimeout(() => {
-          rowEl.style.transition = "";
-          rowEl.style.willChange = "";
+          slideEl.style.transition = "";
+          slideEl.style.willChange = "";
         }, 150);
       }
       dragState.current = null;
@@ -439,9 +446,9 @@ export default function useChecklistDrag(entries, setEntries, syncEntries) {
     if (ds.autoScrollRaf) cancelAnimationFrame(ds.autoScrollRaf);
 
     if (ds.mode === "horizontal") {
-      ds.rowEl.style.transition = "";
-      ds.rowEl.style.transform = "";
-      ds.rowEl.style.willChange = "";
+      ds.slideEl.style.transition = "";
+      ds.slideEl.style.transform = "";
+      ds.slideEl.style.willChange = "";
       dragState.current = null;
       return;
     }
