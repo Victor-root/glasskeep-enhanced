@@ -153,9 +153,16 @@ export default function NotesHeader({
     const el = headerRef.current;
     if (!el) return undefined;
     const apply = () => {
+      // Rounded to a whole CSS pixel: getBoundingClientRect() can return a
+      // fraction (e.g. 91.4), and the sidebar's mask-based divider (see
+      // .gk-sidebar::after in globalCSS) does border-vs-fractional-mask
+      // sub-pixel math against this value to land exactly on the header's
+      // real (integer-snapped) border row. A fractional input is one pixel
+      // grid the two can silently disagree on; landing here on a whole
+      // pixel removes that source of drift.
       document.documentElement.style.setProperty(
         "--gk-header-h",
-        `${el.getBoundingClientRect().height}px`,
+        `${Math.round(el.getBoundingClientRect().height)}px`,
       );
     };
     apply();
