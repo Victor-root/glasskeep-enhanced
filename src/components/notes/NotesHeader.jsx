@@ -143,9 +143,11 @@ export default function NotesHeader({
   const swallowNextClickRef = React.useRef(false);
   const swallowClearTimerRef = React.useRef(null);
 
-  // Publish the header's exact rendered height as --gk-header-h so the
-  // sidebar can mask its right-edge line precisely over the header strip
-  // (the top-left header/sidebar corner reads as one surface, to the pixel).
+  // Publish the header's exact rendered height as --gk-header-h. TagSidebar
+  // sizes its own header row to this same value, so its body nav's
+  // border-right (.gk-sidebar-body in globalCSS) starts exactly where the
+  // real header's own border-bottom sits -- ordinary layout lines both up,
+  // rather than the sidebar needing to know the header's height itself.
   // ResizeObserver keeps it correct across breakpoints, font/zoom changes,
   // and the offline-badge row that adds height on narrow widths.
   const headerRef = React.useRef(null);
@@ -154,12 +156,8 @@ export default function NotesHeader({
     if (!el) return undefined;
     const apply = () => {
       // Rounded to a whole CSS pixel: getBoundingClientRect() can return a
-      // fraction (e.g. 91.4), and the sidebar's mask-based divider (see
-      // .gk-sidebar::after in globalCSS) does border-vs-fractional-mask
-      // sub-pixel math against this value to land exactly on the header's
-      // real (integer-snapped) border row. A fractional input is one pixel
-      // grid the two can silently disagree on; landing here on a whole
-      // pixel removes that source of drift.
+      // fraction (e.g. 91.4), and every consumer of this variable expects
+      // a clean pixel value (the `84px`/`56px` fallbacks are whole too).
       document.documentElement.style.setProperty(
         "--gk-header-h",
         `${Math.round(el.getBoundingClientRect().height)}px`,
