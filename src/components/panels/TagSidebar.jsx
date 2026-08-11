@@ -88,7 +88,7 @@ export default function TagSidebar({
             <CloseIcon />
           </button>
         </div>
-        <nav className="p-2 overflow-y-auto h-[calc(100%-var(--gk-header-h,56px))]">
+        <nav className="gk-sidebar-body p-2 overflow-y-auto h-[calc(100%-var(--gk-header-h,56px))]">
           {/* Multi-tag filter indicator — at the top so it's impossible to miss */}
           {activeTagFilters.length > 1 && (
             <div

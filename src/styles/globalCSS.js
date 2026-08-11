@@ -641,46 +641,32 @@ header.glass-card {
     linear-gradient(180deg, var(--gk-statusbar) 0%, transparent 64px),
     linear-gradient(180deg, var(--gk-chrome-1) 0%, var(--gk-chrome-2) 55%, var(--gk-chrome-3) 100%),
     var(--gk-chrome-solid);
-  /* The lateral depth is painted by ::after below the header. Keeping it on
-     the sidebar itself projected a faint vertical shadow through the header
-     strip, even though the divider line was masked there. */
+  /* The lateral depth is painted on .gk-sidebar-body (the nav, below the
+     header row) instead of here: on the sidebar itself it projected a
+     faint vertical shadow through the header strip. */
   box-shadow: inset 0 1px 0 var(--gk-chrome-highlight);
 }
-/* Sidebar right edge drawn as a masked pseudo-element instead of a plain
-   border-right: the top ~header-height strip is masked out so the 1px line
-   doesn't cross the header. Its opacity ramps in just below the header rather
-   than starting with a hard "T" intersection. The sidebar is position:fixed,
-   so it's the containing block for this absolute child. */
-.gk-sidebar::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 1px;
-  background: var(--gk-chrome-border);
+/* Sidebar right edge: a real border-right + lateral shadow on the body
+   nav (below the header row), not a border-right on the whole sidebar --
+   that would cross the header strip, which reads as one seamless surface
+   with it (shared --gk-chrome-1 start, see the sidebar background above).
+   This used to be a masked pseudo-element instead: a gradient cutoff
+   computed from the header height, meant to meet the real header's own
+   border in a crisp right angle. That relied on a gradient's sub-pixel
+   colour-stop landing on the exact same device pixel as a border's
+   snapped position -- two different rasterisation paths that stayed in
+   sync at integer CSS pixel zoom but drifted apart under fractional
+   OS/browser scaling (125%/150% Windows scaling reproduced it every
+   time), leaving a stray pixel at the corner.
+   A real border doesn't have that problem: the header row above this
+   nav (see TagSidebar.jsx) is sized to var(--gk-header-h), the same
+   value the real header measures itself at, so this border's top edge
+   and the real header's bottom edge are positioned by ordinary layout --
+   the same snapping the browser already gives any two adjacent element
+   edges -- instead of needing a mask to fake the same result. */
+.gk-sidebar-body {
+  border-right: 1px solid var(--gk-chrome-border);
   box-shadow: 8px 0 24px -16px var(--gk-chrome-shadow);
-  pointer-events: none;
-   /* Transparent through the header's exact bottom edge (safe-top inset + the
-      measured header height published by NotesHeader), then start the divider
-      immediately so it meets the header edge in a crisp right angle. The
-      sidebar shadow is masked separately by this same pseudo-element. */
-   /* The header measurement includes its 1px bottom border. Start the vertical
-      edge one pixel inside that row so both borders share the corner pixel
-      instead of leaving a diagonal gap at their intersection. */
-   --gk-sidebar-edge-cut: calc(var(--safe-top, 0px) + var(--gk-header-h, 84px) - 1px);
-   -webkit-mask-image: linear-gradient(
-     to bottom,
-     transparent 0,
-     transparent var(--gk-sidebar-edge-cut),
-     #000 var(--gk-sidebar-edge-cut)
-   );
-   mask-image: linear-gradient(
-     to bottom,
-     transparent 0,
-     transparent var(--gk-sidebar-edge-cut),
-     #000 var(--gk-sidebar-edge-cut)
-   );
 }
 /* Installed DESKTOP PWA: drop the sidebar's bright inset top rim-highlight so
    its top edge (the title-bar colour) meets the OS title bar with no 1px line.
