@@ -11,6 +11,12 @@ export default function ChecklistRow({
   readOnly,
   disableToggle = false,
   showRemove = false,
+  // The full editor's unchecked-item wrapper renders its own delete
+  // button OUTSIDE the part that slides during the horizontal indent
+  // drag (see useChecklistDrag's slideEl), so the X stays put instead
+  // of chasing the row sideways. When true, this row renders none of
+  // its own — the caller owns it entirely.
+  externalRemove = false,
   size = "md", // "sm" | "md" | "lg"
   preview = false,
   initialEditing = false,
@@ -209,7 +215,7 @@ export default function ChecklistRow({
         />
       )}
 
-      {(showRemove || !readOnly) && (
+      {(showRemove || !readOnly) && !externalRemove && (
         <button
           className={`${removeVisibility} -translate-x-2 transition-opacity text-gray-500 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 rounded-full flex items-center justify-center cursor-pointer ${removeSize}`}
           data-tooltip={t("removeItem")}
