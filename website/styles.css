@@ -987,6 +987,17 @@ section { padding: 92px 0; position: relative; }
    whole page into horizontal scroll on narrow screens. */
 .install-card { padding: 32px; min-width: 0; }
 .install-card h3 { display: flex; align-items: center; gap: 10px; }
+.install-icon {
+  width: 30px; height: 30px;
+  flex: none;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(140deg, var(--primary), var(--secondary));
+  box-shadow: 0 6px 16px -6px var(--primary);
+  color: #fff;
+}
+.install-icon svg { width: 17px; height: 17px; }
 .install-badge {
   font-size: 0.68rem;
   font-weight: 800;
