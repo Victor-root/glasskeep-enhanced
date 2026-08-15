@@ -146,6 +146,12 @@ function createNoteFederation(ctx) {
     `),
     // Keep a shadow's display name + avatar fresh with the remote user.
     updateShadow: db.prepare(`UPDATE users SET name = ?, avatar_url = ? WHERE id = ?`),
+    // Re-point a stand-in at the remote user's new address (see the
+    // previousRef handling in applyRemoteProfile).
+    rekeyShadow: db.prepare(`UPDATE users SET federated_origin = ?, email = ? WHERE id = ?`),
+    renameOwnerRef: db.prepare(
+      `UPDATE federated_notes SET remote_owner_ref = ? WHERE link_id = ? AND remote_owner_ref = ?`,
+    ),
     // The authority server's friendly name for a stand-in's origin server,
     // so a third-server participant badges correctly on a mirror that has no
     // direct link to resolve it. NULL means "resolve via our own link".
@@ -358,19 +364,29 @@ function createNoteFederation(ctx) {
         // itself a name/address guess, and a wrong guess would change the
         // wrong person's access, while an older peer sending no access at
         // all must not silently demote everyone to read-only.
-        if (p.uid) {
-          const mine =
-            deps.getRealUserByEmail?.get(p.ref) || deps.getRealUserByName?.get(p.ref);
-          // The authority still counts this person as a participant. If they
-          // are no longer one here — they left, or their account is gone —
-          // our notice never reached it (it was down at the time, or the
-          // departure predates that message existing). Say it again: the
-          // roster is re-pushed until it lands, so this is what makes a
-          // departure survive the authority being unreachable.
+        // Only act on someone we can positively identify. An unresolvable
+        // ref is ambiguous — the account may be gone, but it may equally
+        // have just changed address, and cross-server identity IS the
+        // address. Reading that as a departure would quietly revoke a
+        // renamed user everywhere; deletions are reported explicitly by the
+        // route that performs them instead.
+        const mine = p.uid
+          ? deps.getRealUserByEmail?.get(p.ref) || deps.getRealUserByName?.get(p.ref)
+          : null;
+        if (mine) {
           const collaborators = deps.getNoteCollaborators?.all(noteId) || [];
-          if (!mine || !collaborators.some((c) => c.id === mine.id)) {
+          if (!collaborators.some((c) => c.id === mine.id)) {
+            // The authority still counts them in. Our notice never reached
+            // it (it was down at the time, or the departure predates that
+            // message existing) — say it again. The roster is re-pushed
+            // until it lands, so this is what makes a departure survive the
+            // authority being unreachable.
             pushLeave(linkId, noteId, p.ref);
           } else if (p.canWrite != null) {
+            // WHO our recipients are belongs to the share / unshare flow,
+            // but WHAT THEY MAY DO is the authority's call, and the direct
+            // permission push is fire-once: heal it from the roster, which
+            // is retried until delivered.
             try {
               deps.setCollaboratorCanWrite.run(p.canWrite ? 1 : 0, noteId, mine.id);
             } catch { /* best-effort */ }
@@ -825,9 +841,34 @@ function createNoteFederation(ctx) {
   // for a note edit. Scoped to the calling link (a shadow's federated_origin
   // is "<linkId>|<ref>"), so a peer can only ever touch the stand-ins it is
   // the origin of. Touches only the `users` row, so it works while locked.
-  function applyRemoteProfile({ linkId, ref, uid, name, avatarUrl }) {
+  function applyRemoteProfile({ linkId, ref, uid, name, avatarUrl, previousRef }) {
     const link = store.getById(linkId);
     if (!link) return { ok: false, error: "unknown_link" };
+    // The remote user changed their address. Cross-server identity IS the
+    // address (a stand-in is keyed "<linkId>|<their address>"), so leaving
+    // the old key in place strands them: every later message the authority
+    // sends about them — access changes, unshares, departures — carries the
+    // new address and matches nothing. Re-point the row instead, which
+    // keeps their notes, their access and their history intact.
+    if (previousRef && ref && previousRef !== ref) {
+      const stale = q.getShadowByOrigin.get(`${linkId}|${previousRef}`);
+      if (stale && !q.getShadowByOrigin.get(`${linkId}|${ref}`)) {
+        const origin = `${linkId}|${ref}`;
+        try {
+          try {
+            q.rekeyShadow.run(origin, `${ref}@${hostOf(link.peer_base_url)}`, stale.id);
+          } catch {
+            // Same collision fallback ensureShadowUser uses: an address
+            // that cannot clash with a real account.
+            q.rekeyShadow.run(origin, `${origin}@federated.invalid`, stale.id);
+          }
+          // Mirrors we hold of that user's notes point at them by address too.
+          q.renameOwnerRef.run(ref, linkId, previousRef);
+        } catch (e) {
+          log.warn?.("[federation/notes] rekey stand-in:", e?.message);
+        }
+      }
+    }
     // A stand-in may be keyed by the participant's clean ref (an owner or a
     // direct recipient) or by the home server's uid for them (a third-server
     // roster stand-in); try both so the refresh lands either way.
@@ -866,9 +907,11 @@ function createNoteFederation(ctx) {
   // ── Outbound: tell every paired peer OUR user changed their profile ──
   // Fire-and-forget; a peer that's momentarily down just misses this live
   // refresh and re-learns the avatar on the next share. `ref` is our user's
-  // stable identity on us (email||name) and `uid` our local key for them, so
-  // the peer can match a stand-in keyed either way.
-  function broadcastProfileToPeers({ ref, uid, name, avatarUrl }) {
+  // identity as the peers know them (email||name) and `uid` our local key
+  // for them, so the peer can match a stand-in keyed either way.
+  // `previousRef` is set only when the address itself changed, and is what
+  // lets the peer find the stand-in it still has under the old one.
+  function broadcastProfileToPeers({ ref, uid, name, avatarUrl, previousRef }) {
     if (!ref && !uid) return;
     const path = "/api/federation/profile";
     let links;
@@ -887,6 +930,7 @@ function createNoteFederation(ctx) {
               uid: uid || null,
               name: name || null,
               avatar_url: avatarUrl ?? null,
+              previousRef: previousRef || null,
             },
           }),
         )

@@ -579,6 +579,9 @@ function attachFederationRoutes(
       name: typeof b.name === "string" ? b.name : null,
       // null clears the avatar; a string sets it; anything else = "unknown".
       avatarUrl: b.avatar_url === null ? null : (typeof b.avatar_url === "string" ? b.avatar_url : undefined),
+      // Set only when the peer's user changed address, so we can re-key the
+      // stand-in we still hold under the old one.
+      previousRef: typeof b.previousRef === "string" ? b.previousRef : null,
     });
     res.status(result.ok ? 200 : 409).json(result);
   });

@@ -2077,7 +2077,7 @@ app.delete("/api/user/avatar", auth, (req, res) => {
 // showing it) refresh at once instead of staying frozen at the value
 // snapshotted when the note was shared. Fire-and-forget and fully optional
 // — federation may be off.
-function pushProfileToPeers(userId, avatarUrl) {
+function pushProfileToPeers(userId, avatarUrl, previousRef) {
   try {
     const u = getUserById.get(userId);
     if (!u) return;
@@ -2086,6 +2086,7 @@ function pushProfileToPeers(userId, avatarUrl) {
       uid: `local:${userId}`,
       name: u.name || null,
       avatarUrl: avatarUrl ?? null,
+      previousRef: previousRef || null,
     });
   } catch { /* federation optional */ }
 }
@@ -4794,11 +4795,19 @@ app.patch("/api/admin/users/:id", auth, adminOnly, (req, res) => {
   // Return updated user data
   const updatedUser = getUserById.get(id);
   // A rename has to reach the paired servers too, or their stand-in for this
-  // user keeps the old name on every note already shared with them. Only on
-  // an actual change: the other edits here (password, role) mean nothing to
-  // a peer and would just be needless traffic.
-  if (updatedUser.name !== existing.name) {
-    pushProfileToPeers(id, updatedUser.avatar_url ?? null);
+  // user keeps the old name on every note already shared with them. An
+  // ADDRESS change matters far more: peers key their stand-in by it, so
+  // without the old value they cannot tell "same person, new address" from
+  // "a stranger" and everything they later send about that user misses.
+  // Only on an actual change: the other edits here (password, role) mean
+  // nothing to a peer and would just be needless traffic.
+  const refChanged = (updatedUser.email || updatedUser.name) !== (existing.email || existing.name);
+  if (refChanged || updatedUser.name !== existing.name) {
+    pushProfileToPeers(
+      id,
+      updatedUser.avatar_url ?? null,
+      refChanged ? existing.email || existing.name : null,
+    );
   }
   // Live-sync to every other admin so name / email / role / temp-
   // password-flag changes show up without a manual reload.
