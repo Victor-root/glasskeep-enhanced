@@ -482,6 +482,19 @@ function createNoteFederation(ctx) {
     if (!link || link.status !== "active") return { ok: false, error: "unknown_link" };
     const peerHost = hostOf(link.peer_base_url);
 
+    // A share may only ever CREATE a mirror, or refresh the one this same
+    // link already owns. The peer picks the id, so without this check it
+    // could name any note that already lives here — one never shared with
+    // it, or one whose share was revoked (it still remembers the id) — and
+    // have it adopted as its mirror. From then on every local edit would be
+    // pushed to that peer, and the note would go read-only for its real
+    // owner whenever that peer went down. Checked before anything is
+    // written, so a refused share leaves no trace.
+    const existing = deps.getNoteById.get(note.id);
+    if (existing && q.getMappingForLink.get(note.id, linkId)?.role !== "mirror") {
+      return { ok: false, error: "note_id_conflict" };
+    }
+
     // Resolve the local recipient. Real accounts only — never a shadow row,
     // even one that happens to share a name with the target.
     const target =
@@ -517,7 +530,6 @@ function createNoteFederation(ctx) {
       client_updated_at: cua,
     };
 
-    const existing = deps.getNoteById.get(note.id);
     if (!existing) {
       deps.runInsertNote(row);
     } else {
