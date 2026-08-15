@@ -746,6 +746,7 @@ function createNoteFederation(ctx) {
   // automatically once unlocked.
   async function syncTick() {
     if (deps.isLocked?.()) return;
+    sweepOrphanedMappings();
     let rows;
     try {
       rows = q.listAll.all();
@@ -999,6 +1000,62 @@ function createNoteFederation(ctx) {
     return { ok: true };
   }
 
+  // ── A link is gone for good ─────────────────────────────────────────
+  // Unpaired here, unpaired by the peer, or a dissociation the health probe
+  // detected. Whatever hung off the link has to be resolved now: a mirror
+  // whose authority no longer exists can never be edited again (isReadOnly
+  // has no writable link to consult), and a home note keeps listing
+  // stand-ins for people it can no longer reach. Mirrors end exactly like a
+  // share that ends without a deletion — every local participant keeps a
+  // standalone copy of the content rather than a note frozen forever.
+  function onLinkRemoved(linkId) {
+    // Copies need the content, which we can't read while locked. The sweep
+    // below re-runs this once the instance is unlocked, so nothing is lost
+    // by waiting — where destroying the mirror now would lose it for good.
+    if (deps.isLocked?.()) return;
+    let mappings;
+    try {
+      mappings = q.listByLink.all(linkId);
+    } catch (e) {
+      log.warn?.("[federation/notes] link cleanup:", e?.message);
+      return;
+    }
+    for (const m of mappings) {
+      try {
+        if (m.role === "mirror") {
+          handleIncomingRemove({ linkId, noteId: m.note_id, keepCopies: true });
+          continue;
+        }
+        // Home side: the note stays ours; only the peer's stand-ins go.
+        for (const row of q.listShadowCollabsForNote.all(m.note_id, `${linkId}|%`)) {
+          deps.removeCollaborator?.run(m.note_id, row.id);
+        }
+        q.deleteMappingForLink.run(m.note_id, linkId);
+        deps.broadcastNoteUpdated?.(m.note_id);
+      } catch (e) {
+        log.warn?.(`[federation/notes] link cleanup ${m.note_id}:`, e?.message);
+      }
+    }
+  }
+
+  // Mappings whose link no longer exists. Normally onLinkRemoved handles
+  // them the instant the link goes, so this only catches what it could not:
+  // a teardown that landed while the instance was locked, and databases
+  // unpaired by a build that predates this cleanup.
+  function sweepOrphanedMappings() {
+    let rows;
+    try {
+      rows = q.listAll.all();
+    } catch {
+      return;
+    }
+    const dead = new Set();
+    for (const m of rows) {
+      if (!store.getById(m.link_id)) dead.add(m.link_id);
+    }
+    for (const linkId of dead) onLinkRemoved(linkId);
+  }
+
   // ── Outbound: tell the peer a remote collaborator's access changed ───
   // The owner toggled a federated recipient between read-only / read-write;
   // push it so their mirror copy flips immediately. `shadow` is our local
@@ -1237,6 +1294,7 @@ function createNoteFederation(ctx) {
     handleIncomingRemove,
     handleIncomingPermission,
     handleIncomingUnshareRecipient,
+    onLinkRemoved,
     markShareEnding,
     onRemoteRecipientRemoved,
     applyRemoteProfile,

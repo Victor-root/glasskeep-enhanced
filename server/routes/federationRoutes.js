@@ -137,8 +137,14 @@ function attachFederationRoutes(
 
   // The peer removed this link (detected via a 404 "unknown link" health
   // probe, i.e. we were offline when they unpaired). The store row is
-  // already gone; just tell our admins so the panel drops it and they learn.
+  // already gone; resolve what rode the link, then tell our admins so the
+  // panel drops it and they learn.
   function onLinkDissociated(link) {
+    try {
+      noteFederation?.onLinkRemoved(link.id);
+    } catch {
+      /* the sync tick sweeps whatever is left */
+    }
     try {
       broadcastToAdmins?.({
         type: "federation_dissociated",
@@ -417,6 +423,7 @@ function attachFederationRoutes(
     if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
     const peerLabel = link.peer_label || hostOf(link.peer_base_url);
     try { store.remove(link.id); } catch { /* best-effort */ }
+    try { noteFederation?.onLinkRemoved(link.id); } catch { /* swept by the tick */ }
     try {
       broadcastToAdmins?.({
         type: "federation_dissociated",
@@ -833,6 +840,10 @@ function attachFederationRoutes(
         .catch(() => { /* best-effort; durable 404 detection is the fallback */ });
     }
     store.remove(link.id);
+    // Resolve what rode the link before answering: our own notes drop the
+    // peer's stand-ins, and any mirror we held becomes a standalone copy for
+    // each local participant instead of a note nobody can ever edit again.
+    try { noteFederation?.onLinkRemoved(link.id); } catch { /* swept by the tick */ }
     res.json({ ok: true });
   });
 
