@@ -2061,22 +2061,23 @@ app.put("/api/user/avatar", auth, (req, res) => {
     return res.status(400).json({ error: "Avatar image too large (max ~1.5MB)." });
   }
   db.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").run(avatar_url, req.user.id);
-  broadcastAvatarToPeers(req.user.id, avatar_url);
+  pushProfileToPeers(req.user.id, avatar_url);
   res.json({ ok: true, avatar_url });
 });
 
 // Delete avatar (authenticated)
 app.delete("/api/user/avatar", auth, (req, res) => {
   db.prepare("UPDATE users SET avatar_url = NULL WHERE id = ?").run(req.user.id);
-  broadcastAvatarToPeers(req.user.id, null);
+  pushProfileToPeers(req.user.id, null);
   res.json({ ok: true });
 });
 
-// Push a just-changed avatar to every paired server so a cross-server
-// collaborator's stand-in (and the note footers showing it) refresh at
-// once instead of staying frozen at the value snapshotted when the note
-// was shared. Fire-and-forget and fully optional — federation may be off.
-function broadcastAvatarToPeers(userId, avatarUrl) {
+// Push a just-changed profile (display name and/or avatar) to every paired
+// server so a cross-server collaborator's stand-in (and the note footers
+// showing it) refresh at once instead of staying frozen at the value
+// snapshotted when the note was shared. Fire-and-forget and fully optional
+// — federation may be off.
+function pushProfileToPeers(userId, avatarUrl) {
   try {
     const u = getUserById.get(userId);
     if (!u) return;
@@ -4792,6 +4793,13 @@ app.patch("/api/admin/users/:id", auth, adminOnly, (req, res) => {
 
   // Return updated user data
   const updatedUser = getUserById.get(id);
+  // A rename has to reach the paired servers too, or their stand-in for this
+  // user keeps the old name on every note already shared with them. Only on
+  // an actual change: the other edits here (password, role) mean nothing to
+  // a peer and would just be needless traffic.
+  if (updatedUser.name !== existing.name) {
+    pushProfileToPeers(id, updatedUser.avatar_url ?? null);
+  }
   // Live-sync to every other admin so name / email / role / temp-
   // password-flag changes show up without a manual reload.
   broadcastToAdmins({

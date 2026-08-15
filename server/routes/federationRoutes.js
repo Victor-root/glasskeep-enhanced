@@ -261,6 +261,21 @@ function attachFederationRoutes(
     if (existing) {
       return res.json(selfReport({ status: existing.status }));
     }
+    // Both admins invited each other before either invitation landed, so
+    // each side is sitting on its own outgoing invite to the other. Nothing
+    // downstream merges them and both would go active — two links between
+    // the same pair, each with its own health probe and its own stand-ins.
+    // Simply refusing would deadlock: both sides would refuse the other's
+    // invite and neither pairing would ever complete. Both ends can see the
+    // same two ids though, so both can pick the same survivor without
+    // agreeing on anything — the smaller id wins, and the loser stands down.
+    const ours = store.getByPeerUrl(peerUrl);
+    if (ours && ours.status === protocol.STATUS.OUTGOING_PENDING) {
+      if (ours.id < linkId) {
+        return res.status(409).json({ error: "pairing already in progress" });
+      }
+      store.setStatus(ours.id, protocol.STATUS.CANCELLED);
+    }
     // Flood guard: never let an unauthenticated caller grow the table
     // without bound.
     // Anti-spam only — caps UNACCEPTED incoming invitations, never the
