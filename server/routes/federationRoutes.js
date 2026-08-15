@@ -516,6 +516,23 @@ function attachFederationRoutes(
     res.status(result.ok ? 200 : 409).json(result);
   });
 
+  // A peer tells us one of ITS users left a note we own → drop just that
+  // stand-in. The mirror side of "remove a recipient": only the authority
+  // holds the participant list, so this is the only way a departure made
+  // over there reaches it.
+  app.post("/api/federation/notes/leave", (req, res) => {
+    const link = verifyS2S(req);
+    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
+    const b = req.body || {};
+    const result = noteFederation.handleIncomingLeave({
+      linkId: link.id,
+      noteId: b.noteId,
+      ref: typeof b.ref === "string" ? b.ref : null,
+    });
+    res.status(result.ok ? 200 : 409).json(result);
+  });
+
   // A peer changed a remote collaborator's access on a note WE mirror →
   // flip the local recipient's read-only / read-write state instantly.
   app.post("/api/federation/notes/permission", (req, res) => {

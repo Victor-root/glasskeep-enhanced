@@ -358,10 +358,19 @@ function createNoteFederation(ctx) {
         // itself a name/address guess, and a wrong guess would change the
         // wrong person's access, while an older peer sending no access at
         // all must not silently demote everyone to read-only.
-        if (p.uid && p.canWrite != null) {
+        if (p.uid) {
           const mine =
             deps.getRealUserByEmail?.get(p.ref) || deps.getRealUserByName?.get(p.ref);
-          if (mine) {
+          // The authority still counts this person as a participant. If they
+          // are no longer one here — they left, or their account is gone —
+          // our notice never reached it (it was down at the time, or the
+          // departure predates that message existing). Say it again: the
+          // roster is re-pushed until it lands, so this is what makes a
+          // departure survive the authority being unreachable.
+          const collaborators = deps.getNoteCollaborators?.all(noteId) || [];
+          if (!mine || !collaborators.some((c) => c.id === mine.id)) {
+            pushLeave(linkId, noteId, p.ref);
+          } else if (p.canWrite != null) {
             try {
               deps.setCollaboratorCanWrite.run(p.canWrite ? 1 : 0, noteId, mine.id);
             } catch { /* best-effort */ }
@@ -1000,6 +1009,61 @@ function createNoteFederation(ctx) {
     return { ok: true };
   }
 
+  // ── Outbound: one of OUR users left a note we mirror ────────────────
+  // The authority owns the participant list, so it is the only side that
+  // can drop the stand-in representing this person. Nothing else tells it:
+  // the home→mirror direction has its own message (unshareFromRemote), but
+  // a recipient leaving on their own — or having their account deleted —
+  // is invisible from over there, leaving a collaborator the owner cannot
+  // get rid of and a mirror nobody can see still receiving pushes.
+  function onLocalParticipantLeft(noteId, ref) {
+    if (!ref) return;
+    const m = q.getMirrorMapping.get(noteId);
+    if (!m) return; // a note of ours, not a mirror: nobody to tell
+    pushLeave(m.link_id, noteId, ref);
+  }
+
+  function pushLeave(linkId, noteId, ref) {
+    const link = store.getById(linkId);
+    if (!link || link.status !== "active") return;
+    const path = "/api/federation/notes/leave";
+    Promise.resolve()
+      .then(() =>
+        peer.httpJson(link.peer_base_url + path, {
+          method: "POST",
+          secret: link.shared_secret,
+          linkId: link.id,
+          path,
+          body: { linkId: link.id, noteId, ref },
+        }),
+      )
+      .catch((e) => log.warn?.("[federation/notes] leave push:", e?.message));
+  }
+
+  // ── Inbound: a peer tells us one of ITS users left our note ─────────
+  // Scoped twice over: only a note that rides THIS link, and only a
+  // stand-in that belongs to it — so a peer can drop its own participants
+  // and nothing else. Dropping the last one leaves no shadow collaborator
+  // on the link, which is exactly what homeShareRevoked already reads as
+  // "this share is over", so the mirror teardown follows on its own.
+  function handleIncomingLeave({ linkId, noteId, ref }) {
+    const m = q.getMappingForLink.get(noteId, linkId);
+    if (!m || m.role !== "home") return { ok: false, error: "unknown_note" };
+    const shadow = ref ? q.getShadowByOrigin.get(`${linkId}|${ref}`) : null;
+    if (!shadow) return { ok: true }; // never here, or already gone
+    try {
+      deps.removeCollaborator?.run(noteId, shadow.id);
+      q.deleteUserTags.run(noteId, shadow.id);
+      q.deleteUserPosition.run(noteId, shadow.id);
+      deps.broadcastNoteUpdated?.(noteId);
+    } catch (e) {
+      log.warn?.("[federation/notes] apply leave:", e?.message);
+      return { ok: false, error: "apply_failed" };
+    }
+    onNoteChangedLocally(noteId);
+    return { ok: true };
+  }
+
   // ── A link is gone for good ─────────────────────────────────────────
   // Unpaired here, unpaired by the peer, or a dissociation the health probe
   // detected. Whatever hung off the link has to be resolved now: a mirror
@@ -1294,6 +1358,8 @@ function createNoteFederation(ctx) {
     handleIncomingRemove,
     handleIncomingPermission,
     handleIncomingUnshareRecipient,
+    handleIncomingLeave,
+    onLocalParticipantLeft,
     onLinkRemoved,
     markShareEnding,
     onRemoteRecipientRemoved,

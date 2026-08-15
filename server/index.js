@@ -2934,6 +2934,14 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
       noteId,
       withCopy: shouldGrantCopy,
     });
+  } else {
+    // The mirror side of the same event: a real local user stopped
+    // collaborating on a note whose authority is a peer. Only that peer can
+    // drop the stand-in representing them, and nothing else tells it.
+    federation?.noteFederation?.onLocalParticipantLeft?.(
+      noteId,
+      removedUser?.email || removedUser?.name,
+    );
   }
 
   // Notify the removed user FIRST — they are no longer in the collaborator list
@@ -3522,6 +3530,12 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     broadcastNoteUpdated(id);
+    // On a mirrored note the owner lives on a peer, so the notice below
+    // cannot reach them: tell their server instead, which drops the
+    // stand-in standing for this user (see onLocalParticipantLeft).
+    try {
+      noteFederationRef?.onLocalParticipantLeft?.(id, req.user.email || req.user.name);
+    } catch { /* best-effort */ }
     // Notify the note owner that this collaborator walked away on
     // their own. Symmetric with the owner-removes-collaborator path
     // in DELETE /:id/collaborate/:userId — there the owner gets a
@@ -4575,16 +4589,17 @@ app.get("/api/users/search", auth, (req, res) => {
 });
 
 const deleteUserStmt = db.prepare("DELETE FROM users WHERE id = ?");
-// Federated HOME notes a user collaborates on — queried BEFORE the DELETE
-// so we still see the rows that CASCADE will wipe, letting us re-push the
-// updated roster (without the deleted user) to peer mirrors after.
-const fedHomeCollabsForUser = (() => {
+// Federated notes a user collaborates on — queried BEFORE the DELETE so we
+// still see the rows that CASCADE will wipe. Both roles matter: on a HOME
+// note we re-push the roster without them, and on a MIRROR we must tell the
+// owning peer they are gone (nothing else would ever say so).
+const fedCollabsForUser = (() => {
   try {
     return db.prepare(`
-      SELECT DISTINCT fn.note_id
+      SELECT DISTINCT fn.note_id, fn.role
       FROM note_collaborators nc
       JOIN federated_notes fn ON nc.note_id = fn.note_id
-      WHERE nc.user_id = ? AND fn.role = 'home'
+      WHERE nc.user_id = ?
     `);
   } catch { return null; }
 })();
@@ -4603,19 +4618,26 @@ app.delete("/api/admin/users/:id", auth, adminOnly, (req, res) => {
   }
 
   // Capture BEFORE the DELETE cascades away the collaborator rows.
-  let federatedNoteIds = [];
+  let federatedNotes = [];
   try {
-    if (fedHomeCollabsForUser) {
-      federatedNoteIds = fedHomeCollabsForUser.all(id).map((r) => r.note_id);
-    }
+    if (fedCollabsForUser) federatedNotes = fedCollabsForUser.all(id);
   } catch { /* best-effort */ }
+  const deletedRef = target.email || target.name;
 
   deleteUserStmt.run(id);
 
-  // Push updated rosters (without the deleted user) to peer mirrors so
-  // Victor's view of the note stops showing the now-gone collaborator.
-  for (const noteId of federatedNoteIds) {
-    try { noteFederationRef?.onParticipantsChangedLocally?.(noteId); } catch { /* best-effort */ }
+  for (const { note_id: noteId, role } of federatedNotes) {
+    try {
+      if (role === "home") {
+        // Push updated rosters (without the deleted user) to peer mirrors so
+        // their view of the note stops showing the now-gone collaborator.
+        noteFederationRef?.onParticipantsChangedLocally?.(noteId);
+      } else {
+        // A mirror: the owner is on a peer and only they can drop the
+        // stand-in that represented this account.
+        noteFederationRef?.onLocalParticipantLeft?.(noteId, deletedRef);
+      }
+    } catch { /* best-effort */ }
   }
 
   // Notify every OTHER admin. The acting admin already sees the
