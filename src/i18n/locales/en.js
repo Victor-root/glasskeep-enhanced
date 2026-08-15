@@ -1076,6 +1076,12 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   errCollaboratorNotFound: "Collaborator not found.",
   errOnlyOwnerCanRemove: "Only the note owner can remove other collaborators.",
   errOnlyOwnerCanDeleteAll: "Only the owner can delete the note for everyone.",
+  errPeerNotPaired: "That server is no longer linked to yours. An admin needs to restore the link before you can share.",
+  errPeerNoteIdConflict: "The destination server refused the share: another note there already uses this identifier.",
+  errFederationFailed: "The cross-server share did not go through. Try again in a moment.",
+  errPeerTlsInvalid: "The remote server's certificate could not be verified. Sharing is refused until the connection is trustworthy.",
+  errPeerDnsNotFound: "The remote server's address cannot be found. An admin needs to correct it.",
+  errPeerUnreachable: "The remote server is unreachable. Try again once it is back online.",
 
   // Avatar / profile
   errAvatarRequired: "An avatar image is required.",
