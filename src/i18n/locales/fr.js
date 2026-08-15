@@ -1076,6 +1076,12 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   errCollaboratorNotFound: "Collaborateur introuvable.",
   errOnlyOwnerCanRemove: "Seul le propriétaire de la note peut retirer d'autres collaborateurs.",
   errOnlyOwnerCanDeleteAll: "Seul le propriétaire peut supprimer la note pour tout le monde.",
+  errPeerNotPaired: "Ce serveur n’est plus lié au vôtre. Un administrateur doit rétablir la liaison avant de partager.",
+  errPeerNoteIdConflict: "Le serveur de destination a refusé le partage : une autre note y porte déjà cet identifiant.",
+  errFederationFailed: "Le partage entre serveurs n’a pas abouti. Réessayez dans un instant.",
+  errPeerTlsInvalid: "Le certificat du serveur distant n’a pas pu être vérifié. Le partage est refusé tant que la connexion n’est pas sûre.",
+  errPeerDnsNotFound: "L’adresse du serveur distant est introuvable. Un administrateur doit la corriger.",
+  errPeerUnreachable: "Le serveur distant est injoignable. Réessayez quand il sera de retour en ligne.",
 
   // Avatar / profil
   errAvatarRequired: "Une image d'avatar est requise.",

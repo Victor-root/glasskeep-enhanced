@@ -81,6 +81,20 @@ const PATTERNS = [
   ["Only note owner can remove other collaborators", "errOnlyOwnerCanRemove"],
   ["Only owner can delete for all collaborators", "errOnlyOwnerCanDeleteAll"],
 
+  // ── Cross-server sharing ─────────────────────────────────────────
+  // Raised while sharing with someone on a paired server. These are
+  // machine tokens on the wire, so without a mapping they surfaced to the
+  // user as-is ("dns-not-found"). A locked peer has its own richer message
+  // (collabPeerLocked names the server and the person) and is handled
+  // before this map is consulted.
+  ["peer_not_paired",                            "errPeerNotPaired"],
+  ["note_id_conflict",                           "errPeerNoteIdConflict"],
+  ["federation_failed",                          "errFederationFailed"],
+  ["tls-certificate-invalid",                    "errPeerTlsInvalid"],
+  ["dns-not-found",                              "errPeerDnsNotFound"],
+  ["connection-refused",                         "errPeerUnreachable"],
+  ["unreachable",                                "errPeerUnreachable"],
+
   // ── Avatar / profile ─────────────────────────────────────────────
   ["avatar_url is required",                     "errAvatarRequired"],
   ["avatar_url must be a valid image data URL",  "errAvatarInvalidFormat"],
