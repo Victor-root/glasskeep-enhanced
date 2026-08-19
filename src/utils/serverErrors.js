@@ -90,6 +90,7 @@ const PATTERNS = [
   ["peer_not_paired",                            "errPeerNotPaired"],
   ["clock-skew",                                 "errPeerClockSkew"],
   ["note_id_conflict",                           "errPeerNoteIdConflict"],
+  ["payload_too_large",                          "errPeerPayloadTooLarge"],
   ["federation_failed",                          "errFederationFailed"],
   ["tls-certificate-invalid",                    "errPeerTlsInvalid"],
   ["dns-not-found",                              "errPeerDnsNotFound"],
