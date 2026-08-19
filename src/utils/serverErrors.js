@@ -88,6 +88,7 @@ const PATTERNS = [
   // (collabPeerLocked names the server and the person) and is handled
   // before this map is consulted.
   ["peer_not_paired",                            "errPeerNotPaired"],
+  ["clock-skew",                                 "errPeerClockSkew"],
   ["note_id_conflict",                           "errPeerNoteIdConflict"],
   ["federation_failed",                          "errFederationFailed"],
   ["tls-certificate-invalid",                    "errPeerTlsInvalid"],
