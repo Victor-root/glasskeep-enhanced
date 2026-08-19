@@ -457,6 +457,10 @@ function createNoteFederation(ctx) {
       return { ok: false, error: peer.tlsAwareMessage ? peer.tlsAwareMessage(e) : "unreachable" };
     }
     if (!resp.ok || !resp.json || resp.json.ok !== true) {
+      // A body the peer's reverse proxy refuses (see pushNoteContent): worth
+      // naming, because "http 413" sends the owner looking at GlassKeep when
+      // the limit is one hop in front of it.
+      if (resp.status === 413) return { ok: false, error: "payload_too_large" };
       return { ok: false, error: resp.json?.error || `http ${resp.status}` };
     }
 
@@ -686,21 +690,39 @@ function createNoteFederation(ctx) {
   // Push one note's current content to its peer (LWW on the other side).
   async function pushNoteContent(link, note) {
     const path = "/api/federation/notes/apply";
+    const body = {
+      linkId: link.id,
+      note: contentFromNote(note),
+      // Keep the peer's participant list in sync with ours (the authority).
+      roster: deps.getNoteRoster?.(note.id, note.user_id) || null,
+    };
     const resp = await peer.httpJson(link.peer_base_url + path, {
       method: "POST",
       secret: link.shared_secret,
       linkId: link.id,
       path,
-      body: {
-        linkId: link.id,
-        note: contentFromNote(note),
-        // Keep the peer's participant list in sync with ours (the authority).
-        roster: deps.getNoteRoster?.(note.id, note.user_id) || null,
-      },
+      body,
     });
     if (resp.ok && resp.json && resp.json.ok === true) {
       q.setPushed.run(note.client_updated_at, note.id, link.id);
       return true;
+    }
+    // 413 is the one failure here that will NEVER come good on its own: the
+    // same bytes get refused every time, so the tick would re-send this note
+    // on every pass, forever, in complete silence — the note simply never
+    // arrives and the link stays green, because the health probe that keeps
+    // it green is a few bytes. It is a reverse proxy in front of the peer
+    // refusing the body, not GlassKeep (which accepts up to 160 MB): images
+    // travel inline as base64, so one photo already dwarfs nginx's 1 MB
+    // default. Say it once per attempt, naming the fix — this is what an
+    // operator greps for when a note "just doesn't sync".
+    if (resp.status === 413) {
+      const kb = Math.round(JSON.stringify(body).length / 1024);
+      log.warn?.(
+        `[federation/notes] ${hostOf(link.peer_base_url)} refused note ${note.id} ` +
+        `as too large (HTTP 413, ~${kb} KB). This is its reverse proxy, not GlassKeep: ` +
+        `raise client_max_body_size (nginx) or the equivalent, then it syncs on the next tick.`,
+      );
     }
     return false;
   }

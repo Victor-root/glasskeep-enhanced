@@ -1079,6 +1079,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   errPeerNotPaired: "Ce serveur n’est plus lié au vôtre. Un administrateur doit rétablir la liaison avant de partager.",
   errPeerClockSkew: "Les horloges des deux serveurs ne concordent pas, le partage est refusé. Un administrateur doit synchroniser l’heure (NTP).",
   errPeerNoteIdConflict: "Le serveur de destination a refusé le partage : une autre note y porte déjà cet identifiant.",
+  errPeerPayloadTooLarge: "La note est trop volumineuse pour le serveur de destination (images comprises). Un administrateur doit relever la taille de requête autorisée sur son reverse proxy.",
   errFederationFailed: "Le partage entre serveurs n’a pas abouti. Réessayez dans un instant.",
   errPeerTlsInvalid: "Le certificat du serveur distant n’a pas pu être vérifié. Le partage est refusé tant que la connexion n’est pas sûre.",
   errPeerDnsNotFound: "L’adresse du serveur distant est introuvable. Un administrateur doit la corriger.",

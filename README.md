@@ -169,6 +169,20 @@ The script is designed to make installation as simple as possible:
 
 > This is the main installation method recommended for this project.
 
+> ⚠️ **Behind a reverse proxy: raise the request size limit.** Notes carry
+> their images inline, so a note with a couple of photos is several MB.
+> GlassKeep itself accepts up to 160 MB, but nginx refuses anything over
+> **1 MB** by default and answers `413` before the request ever reaches it.
+> That breaks image uploads, imports, and cross-server sharing of notes with
+> pictures. In your `server { … }` block:
+>
+> ```nginx
+> client_max_body_size 160m;
+> ```
+>
+> Caddy has no such limit by default; Apache uses `LimitRequestBody 0`; on
+> Traefik it is unlimited unless you set `buffering.maxRequestBodyBytes`.
+
 ---
 
 ### 🐳 Docker installation
