@@ -72,17 +72,30 @@ function computeSignature(secret, method, path, ts, bodyString) {
 
 // Verify an inbound signed request. `link` is the row matched from the
 // x-gk-fed-link header; headers carry the timestamp + signature.
+// Returns { ok: true } or { ok: false, reason }.
+//
+// WHY the reason matters: a timestamp outside the replay window and a
+// wrong secret both mean "this request is not acceptable", but they call
+// for opposite reactions. A wrong secret is a broken pairing; a stale
+// timestamp is, in practice, always a clock nobody synchronised. Reported
+// as one undifferentiated "bad signature", the second one sent admins
+// re-pairing a link that was never broken — the handshake is unsigned, so
+// re-pairing SUCCEEDS and the link then falls over again seconds later.
 function verifySignedRequest(link, { method, path, headers, rawBody }) {
-  if (!link || !link.shared_secret) return false;
+  if (!link || !link.shared_secret) return { ok: false, reason: "bad-signature" };
   const ts = Number(headers["x-gk-fed-ts"]);
   const sig = headers["x-gk-fed-sig"];
-  if (!Number.isFinite(ts) || !sig) return false;
-  if (Math.abs(Date.now() - ts) > SIGNATURE_WINDOW_MS) return false;
+  if (!Number.isFinite(ts) || !sig) return { ok: false, reason: "bad-signature" };
+  if (Math.abs(Date.now() - ts) > SIGNATURE_WINDOW_MS) {
+    return { ok: false, reason: "clock-skew" };
+  }
   const expected = computeSignature(link.shared_secret, method, path, ts, rawBody);
   const a = Buffer.from(String(sig));
   const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
+  if (a.length !== b.length) return { ok: false, reason: "bad-signature" };
+  return crypto.timingSafeEqual(a, b)
+    ? { ok: true }
+    : { ok: false, reason: "bad-signature" };
 }
 
 // ── Outbound calls ───────────────────────────────────────────────────
@@ -232,7 +245,15 @@ async function healthCheckOne(link, store, log = console, onStateChange, onDisso
     // healthily answering, so we must treat it as unreachable. (This is
     // the fix for "proxy up + LXC down still showed Online".)
     if (!r.ok || !r.json || r.json.ok !== true) {
-      const err = r.json?.error || `http ${r.status || "no-response"}`;
+      let err = r.json?.error || `http ${r.status || "no-response"}`;
+      // The peer refused our signature because our two clocks disagree.
+      // It sends its own time along, so record BY HOW MUCH: "the clocks
+      // differ by 3 h" is a fixable statement, where "bad signature" sends
+      // the admin after a pairing problem that does not exist.
+      if (err === "clock-skew" && Number.isFinite(Number(r.json?.serverTime))) {
+        const offsetSec = Math.round((Number(r.json.serverTime) - Date.now()) / 1000);
+        err = `clock-skew:${offsetSec >= 0 ? "+" : ""}${offsetSec}`;
+      }
       const fails = (_failCounts.get(link.id) || 0) + 1;
       _failCounts.set(link.id, fails);
       log.log?.(

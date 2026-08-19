@@ -415,7 +415,7 @@ function attachFederationRoutes(
       headers: req.headers,
       rawBody: req.rawBody ?? "",
     });
-    if (!valid) return res.status(403).json({ ok: false, error: "bad signature" });
+    if (!valid.ok) return res.status(403).json(signatureRefusal(valid.reason));
     res.json(selfReport({ locked: isLocked() }));
   });
 
@@ -424,8 +424,8 @@ function attachFederationRoutes(
   // kick the tick; the resulting health handshake refreshes the link and,
   // if its derived state flipped, onLinkStateFlip notifies our admins.
   app.post("/api/federation/peer-changed", (req, res) => {
-    const link = verifyS2S(req);
-    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    const link = verifyS2S(req, res);
+    if (!link) return;
     kickTick();
     res.json({ ok: true });
   });
@@ -434,8 +434,8 @@ function attachFederationRoutes(
   // the link doesn't linger forever showing "offline". Signed with the
   // (still valid) shared secret — only the real peer can trigger this.
   app.post("/api/federation/pair/unpair", (req, res) => {
-    const link = verifyS2S(req);
-    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    const link = verifyS2S(req, res);
+    if (!link) return;
     const peerLabel = link.peer_label || hostOf(link.peer_base_url);
     try { store.remove(link.id); } catch { /* best-effort */ }
     try { noteFederation?.onLinkRemoved(link.id); } catch { /* swept by the tick */ }
@@ -451,27 +451,45 @@ function attachFederationRoutes(
     res.json({ ok: true });
   });
 
-  // Verify a signed server-to-server request; returns the active link or
-  // null. Shared by the note endpoints below.
-  function verifyS2S(req) {
+  // The body sent when a signed request is refused. A clock disagreement
+  // is named as such rather than lumped in with a wrong secret, and only
+  // that case carries our own time — so the caller can report by how much
+  // the two servers differ. It reveals nothing: every HTTP response
+  // already carries this server's clock in its Date header.
+  function signatureRefusal(reason) {
+    const body = { ok: false, error: reason === "clock-skew" ? "clock-skew" : "bad signature" };
+    if (reason === "clock-skew") body.serverTime = Date.now();
+    return body;
+  }
+
+  // Verify a signed server-to-server request. Returns the active link, or
+  // ANSWERS the refusal itself and returns null — so every note endpoint
+  // below reads the same two lines, and the refusal (including telling a
+  // clock disagreement apart from a wrong secret, see verifySignedRequest)
+  // is worded in exactly one place instead of ten.
+  function verifyS2S(req, res) {
+    const deny = (reason) => {
+      res.status(403).json(signatureRefusal(reason));
+      return null;
+    };
     const linkId = req.headers["x-gk-fed-link"];
-    if (!linkId) return null;
+    if (!linkId) return deny();
     const link = store.getById(String(linkId));
-    if (!link || link.status !== protocol.STATUS.ACTIVE) return null;
-    const ok = peer.verifySignedRequest(link, {
+    if (!link || link.status !== protocol.STATUS.ACTIVE) return deny();
+    const v = peer.verifySignedRequest(link, {
       method: "POST",
       path: req.path,
       headers: req.headers,
       rawBody: req.rawBody ?? "",
     });
-    return ok ? link : null;
+    return v.ok ? link : deny(v.reason);
   }
 
   // A peer shares one of its notes with one of OUR users → create the
   // local mirror.
   app.post("/api/federation/notes/share", (req, res) => {
-    const link = verifyS2S(req);
-    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    const link = verifyS2S(req, res);
+    if (!link) return;
     if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
     const b = req.body || {};
     const result = noteFederation.handleIncomingShare({
@@ -489,8 +507,8 @@ function attachFederationRoutes(
 
   // A peer pushes an updated copy of a note we both share → LWW-apply.
   app.post("/api/federation/notes/apply", (req, res) => {
-    const link = verifyS2S(req);
-    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    const link = verifyS2S(req, res);
+    if (!link) return;
     if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
     const result = noteFederation.handleIncomingApply({
       linkId: link.id,
@@ -502,8 +520,8 @@ function attachFederationRoutes(
 
   // A peer unshared/deleted a note we mirror → tear down the mirror.
   app.post("/api/federation/notes/remove", (req, res) => {
-    const link = verifyS2S(req);
-    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    const link = verifyS2S(req, res);
+    if (!link) return;
     if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
     const result = noteFederation.handleIncomingRemove({
       linkId: link.id,
@@ -518,8 +536,8 @@ function attachFederationRoutes(
   // A peer removed ONE of our local users from a note we mirror → drop just
   // that recipient's access (leaving the rest of the mirror intact).
   app.post("/api/federation/notes/unshare-recipient", (req, res) => {
-    const link = verifyS2S(req);
-    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    const link = verifyS2S(req, res);
+    if (!link) return;
     if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
     const b = req.body || {};
     const result = noteFederation.handleIncomingUnshareRecipient({
@@ -536,8 +554,8 @@ function attachFederationRoutes(
   // holds the participant list, so this is the only way a departure made
   // over there reaches it.
   app.post("/api/federation/notes/leave", (req, res) => {
-    const link = verifyS2S(req);
-    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    const link = verifyS2S(req, res);
+    if (!link) return;
     if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
     const b = req.body || {};
     const result = noteFederation.handleIncomingLeave({
@@ -551,8 +569,8 @@ function attachFederationRoutes(
   // A peer changed a remote collaborator's access on a note WE mirror →
   // flip the local recipient's read-only / read-write state instantly.
   app.post("/api/federation/notes/permission", (req, res) => {
-    const link = verifyS2S(req);
-    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    const link = verifyS2S(req, res);
+    if (!link) return;
     if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
     const b = req.body || {};
     const result = noteFederation.handleIncomingPermission({
@@ -568,8 +586,8 @@ function attachFederationRoutes(
   // avatar). Refresh our shadow stand-ins for that user so their new avatar
   // shows on already-shared notes immediately, without waiting for an edit.
   app.post("/api/federation/profile", (req, res) => {
-    const link = verifyS2S(req);
-    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    const link = verifyS2S(req, res);
+    if (!link) return;
     if (!noteFederation) return res.status(501).json({ ok: false, error: "notes disabled" });
     const b = req.body || {};
     const result = noteFederation.applyRemoteProfile({
@@ -605,8 +623,8 @@ function attachFederationRoutes(
   // A peer searches OUR users for its share UI (real users, never shadow
   // rows). `ref` is the identity it passes back to actually share.
   app.post("/api/federation/users/search", (req, res) => {
-    const link = verifyS2S(req);
-    if (!link) return res.status(403).json({ ok: false, error: "bad signature" });
+    const link = verifyS2S(req, res);
+    if (!link) return;
     const query = String((req.body || {}).query || "").trim().slice(0, 100);
     const term = `%${query}%`;
     let users = [];

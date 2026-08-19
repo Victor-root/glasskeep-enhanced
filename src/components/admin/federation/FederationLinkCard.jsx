@@ -29,6 +29,17 @@ function formatWhen(iso) {
   }
 }
 
+// A clock difference, as a duration a human reads at a glance. The sign is
+// dropped: it tells you which server is ahead, but not which one is RIGHT,
+// and the fix (synchronise both) is the same either way.
+function formatSkew(seconds) {
+  const s = Math.abs(seconds);
+  if (s < 90) return `${s} s`;
+  const m = Math.round(s / 60);
+  if (m < 90) return `${m} min`;
+  return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}`;
+}
+
 // Turn the raw last_error (an English slug or a bare OpenSSL code recorded
 // by the server) into a localized, human-readable reason for the panel.
 // Unknown technical strings are surfaced as-is so nothing is hidden.
@@ -43,6 +54,12 @@ function federationErrorLabel(raw) {
     unreachable: "fedErrUnreachable",
   };
   if (slugs[s]) return t(slugs[s]);
+  // "clock-skew:<signed seconds>" — the peer refused our signature because
+  // the two clocks disagree. Say by how much, and name the actual fix; the
+  // raw signed value stays in the tooltip for a technical eye.
+  const skew = s.match(/^clock-skew:([+-]?\d+)$/);
+  if (skew) return t("fedErrClockSkew").replace("{offset}", formatSkew(Number(skew[1])));
+  if (s === "clock-skew") return t("fedErrClockSkewUnknown");
   // OpenSSL certificate-verification failures can surface as a bare
   // numeric code (e.g. "20") — treat any pure number as a TLS cert issue.
   if (/^\d+$/.test(s)) return t("fedErrTls");
