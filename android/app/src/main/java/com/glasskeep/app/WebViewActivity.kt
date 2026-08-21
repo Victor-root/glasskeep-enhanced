@@ -368,8 +368,7 @@ class WebViewActivity : AppCompatActivity() {
     // Soft-keyboard height, same idea. The window draws edge-to-edge, so the IME
     // never resizes the WebView and the page's own visualViewport stays at full
     // height: without this hand-off the app has no way to know a keyboard is
-    // covering its lower half. Only API 30+ reports Type.ime(); below that the
-    // value stays 0 and the layout is left alone.
+    // covering its lower half. Reported on API 30+ only (see the listener).
     private var keyboardInsetDp = 0.0
 
     private fun injectSafeAreaInsets() {
@@ -490,7 +489,13 @@ class WebViewActivity : AppCompatActivity() {
             // for the same reason — we just want to match it pixel-for-
             // pixel when we override the value.
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            val ime = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime()).bottom
+            // API 30+ only: there the window keeps its full height and the page
+            // has to pull its own bottom edge up. Older releases resize the
+            // window for real under adjustResize, so 100dvh already shrinks and
+            // forwarding the inset would subtract the keyboard twice.
+            val ime = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
+                insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime()).bottom
+            else 0
             val density = resources.displayMetrics.density
             safeAreaTopDp    = bars.top    / density.toDouble()
             safeAreaBottomDp = bars.bottom / density.toDouble()

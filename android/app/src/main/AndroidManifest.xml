@@ -74,10 +74,18 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <!-- adjustResize is what makes the framework report the keyboard as a
+             WindowInsets.Type.ime() inset. Without it the mode resolves to
+             adjustPan, which pans a window that has nothing to pan (the WebView
+             already fills it) and reports no inset at all, so the page never
+             learns the keyboard is there. The window itself is not resized:
+             setDecorFitsSystemWindows(false) keeps the edge-to-edge layout and
+             WebViewActivity forwards the inset to the page. -->
         <activity
             android:name=".WebViewActivity"
             android:exported="false"
             android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
 
         <!-- Self-update FileProvider: lets us hand the downloaded APK to
