@@ -365,6 +365,13 @@ class WebViewActivity : AppCompatActivity() {
     private var safeAreaLeftDp = 0.0
     private var safeAreaRightDp = 0.0
 
+    // Soft-keyboard height, same idea. The window draws edge-to-edge, so the IME
+    // never resizes the WebView and the page's own visualViewport stays at full
+    // height: without this hand-off the app has no way to know a keyboard is
+    // covering its lower half. Only API 30+ reports Type.ime(); below that the
+    // value stays 0 and the layout is left alone.
+    private var keyboardInsetDp = 0.0
+
     private fun injectSafeAreaInsets() {
         // Skip injection if the WebView hasn't loaded any page yet — evaluating JS
         // before there's a document just queues a useless call.
@@ -377,6 +384,8 @@ class WebViewActivity : AppCompatActivity() {
               s.setProperty('--android-inset-bottom', '${safeAreaBottomDp}px');
               s.setProperty('--android-inset-left',   '${safeAreaLeftDp}px');
               s.setProperty('--android-inset-right',  '${safeAreaRightDp}px');
+              s.setProperty('--android-keyboard-inset', '${keyboardInsetDp}px');
+              window.dispatchEvent(new Event('gk-android-insets'));
             })();
         """.trimIndent()
         webView.evaluateJavascript(js, null)
@@ -481,11 +490,13 @@ class WebViewActivity : AppCompatActivity() {
             // for the same reason — we just want to match it pixel-for-
             // pixel when we override the value.
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            val ime = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime()).bottom
             val density = resources.displayMetrics.density
             safeAreaTopDp    = bars.top    / density.toDouble()
             safeAreaBottomDp = bars.bottom / density.toDouble()
             safeAreaLeftDp   = bars.left   / density.toDouble()
             safeAreaRightDp  = bars.right  / density.toDouble()
+            keyboardInsetDp  = ime / density.toDouble()
             injectSafeAreaInsets()
             insets
         }

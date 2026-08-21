@@ -10,7 +10,12 @@ import { useEffect } from "react";
  *  Overlays subtract this value to stop at the top edge of the keyboard.
  *
  *  Below the threshold the shrink comes from the URL bar or an accessory
- *  bar, not from a keyboard, and must not move the layout. */
+ *  bar, not from a keyboard, and must not move the layout.
+ *
+ *  Inside the Android WebView the visual viewport says nothing at all: the
+ *  window draws edge-to-edge, so the keyboard never resizes it. WebViewActivity
+ *  forwards the real IME inset as `--android-keyboard-inset`, which takes over
+ *  when it is present. */
 
 const MIN_KEYBOARD = 150;
 const REVEAL_MARGIN = 8;
@@ -58,14 +63,20 @@ function revealCaret() {
 export default function useKeyboardInset() {
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!vv) return;
     const root = document.documentElement;
     let current = 0;
     let raf = 0;
 
-    const apply = () => {
+    const measure = () => {
+      const android = root.style.getPropertyValue("--android-keyboard-inset");
+      if (android) return Math.max(0, Math.round(parseFloat(android)) || 0);
+      if (!vv) return 0;
       const hidden = window.innerHeight - vv.height - vv.offsetTop;
-      const next = vv.scale > 1 || hidden < MIN_KEYBOARD ? 0 : Math.round(hidden);
+      return vv.scale > 1 || hidden < MIN_KEYBOARD ? 0 : Math.round(hidden);
+    };
+
+    const apply = () => {
+      const next = measure();
       if (next === current) return;
       const opening = next > current;
       current = next;
@@ -76,12 +87,14 @@ export default function useKeyboardInset() {
     };
 
     apply();
-    vv.addEventListener("resize", apply);
-    vv.addEventListener("scroll", apply);
+    window.addEventListener("gk-android-insets", apply);
+    vv?.addEventListener("resize", apply);
+    vv?.addEventListener("scroll", apply);
     return () => {
       cancelAnimationFrame(raf);
-      vv.removeEventListener("resize", apply);
-      vv.removeEventListener("scroll", apply);
+      window.removeEventListener("gk-android-insets", apply);
+      vv?.removeEventListener("resize", apply);
+      vv?.removeEventListener("scroll", apply);
       root.style.removeProperty("--keyboard-inset");
     };
   }, []);
