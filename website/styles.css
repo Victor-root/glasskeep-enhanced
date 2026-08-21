@@ -787,17 +787,22 @@ section { padding: 92px 0; position: relative; }
   position: relative;
 }
 
-/* Windows-style title bar: caption on the left, window controls on the right. */
+/* Breeze-style title bar: caption on the left, window buttons on the right.
+   Same frame as Proxmox-Tools, but every colour comes from a theme token
+   instead of the fixed dark values that site can afford — here the frame
+   has to read on both a light and a dark page. */
 .shot-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 0 0 14px;
+  gap: 10px;
+  padding: 0 6px 0 14px;
   height: 36px;
   border-bottom: 1px solid var(--glass-border);
   background: var(--glass);
 }
 .shot-title {
+  flex: 1;
+  min-width: 0;
   font-size: 0.74rem;
   font-weight: 600;
   color: var(--text-soft);
@@ -805,24 +810,32 @@ section { padding: 92px 0; position: relative; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.win-btns {
-  margin-left: auto;
-  display: flex;
-  align-self: stretch;
+.shot-btns { display: flex; align-items: center; gap: 2px; }
+.shot-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
   color: var(--text-soft);
+  transition: background 0.13s, color 0.13s;
 }
-.win-btns svg {
-  width: 46px;
-  height: 100%;
-  padding: 0 17px;
+.shot-btn svg {
+  width: 13px;
+  height: 13px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1;
-  opacity: 0.75;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-/* Only the close control gets the red hover, exactly like the real thing. */
-.win-btns svg:hover { background: color-mix(in srgb, var(--text) 10%, transparent); }
-.win-btns .win-close:hover { background: #e81123; stroke: #fff; opacity: 1; }
+/* The buttons wake up when the pointer is anywhere on the frame, then the
+   one under it lifts further — the Breeze behaviour. */
+.shot:hover .shot-btn { color: var(--text); }
+.shot-btn:hover { background: color-mix(in srgb, var(--text) 12%, transparent); }
+/* Only the close control turns red, exactly like the real thing. Kept as a
+   literal on both themes: it is a warning colour, not a surface colour. */
+.shot-btn.close:hover { background: #c9342c; color: #fff; }
 
 /* The TV capture already includes its own bezel, so it carries no card frame,
    no border and no window bar: the artwork sits directly on the page. */
