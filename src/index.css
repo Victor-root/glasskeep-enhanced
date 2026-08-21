@@ -19,10 +19,11 @@
   --safe-left:   var(--android-inset-left,   env(safe-area-inset-left));
   --safe-right:  var(--android-inset-right,  env(safe-area-inset-right));
 
-  /* Soft-keyboard height, kept up to date by useKeyboardInset. Full-screen
-     overlays subtract it so they stop at the top edge of the keyboard
-     instead of continuing behind it. */
+  /* Soft-keyboard geometry, kept up to date by useKeyboardInset: its height,
+     and how far a full-screen overlay slides up so what is being typed clears
+     it instead of staying behind it. */
   --keyboard-inset: 0px;
+  --keyboard-pan: 0px;
 }
 
 /* On mouse click: remove focus outline AND Tailwind ring (box-shadow).
