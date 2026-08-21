@@ -603,6 +603,7 @@ export default function NoteModal({
         data-split-closing={splitClosing ? "true" : undefined}
         data-ai-panel-side={splitMode ? aiPanelSide : undefined}
         data-sbs-opposite-hidden={sbsOppositeHidden ? "true" : undefined}
+        style={mobileLayout ? { bottom: 'var(--keyboard-inset)' } : undefined}
         onMouseDown={(e) => {
           // In SBS mode the right-scrim is pointer-events:none, so this
           // handler only fires on the left (backdrop) scrim. Track the
@@ -631,9 +632,11 @@ export default function NoteModal({
           }${drawTransition === 'entering' ? ' draw-expand' : drawTransition === 'leaving' ? ' draw-collapse' : ''} flex flex-col relative overflow-hidden`}
           style={{
             backgroundColor: modalBgFor(mColor, dark),
-            height: mobileLayout ? '100dvh' : undefined,
+            height: mobileLayout ? 'calc(100dvh - var(--keyboard-inset))' : undefined,
             paddingTop: mobileLayout ? 'var(--safe-top)' : undefined,
-            paddingBottom: mobileLayout ? 'var(--safe-bottom)' : undefined,
+            // The gesture bar sits on top of the keyboard, so its inset is
+            // already covered once the keyboard is up.
+            paddingBottom: mobileLayout ? 'max(0px, var(--safe-bottom) - var(--keyboard-inset))' : undefined,
             paddingLeft: mobileLayout && !edgeToEdgeLandscape ? 'var(--safe-left)' : undefined,
             paddingRight: mobileLayout ? 'var(--safe-right)' : undefined,
           }}
@@ -1128,9 +1131,9 @@ export default function NoteModal({
           className={`note-ai-panel-mobile fixed inset-0 z-50${isAiClosing ? " closing" : ""}`}
           style={{
             backgroundColor: modalBgFor(mColor, dark),
-            height: '100dvh',
+            height: 'calc(100dvh - var(--keyboard-inset))',
             paddingTop: 'var(--safe-top)',
-            paddingBottom: 'var(--safe-bottom)',
+            paddingBottom: 'max(0px, var(--safe-bottom) - var(--keyboard-inset))',
             paddingLeft: 'var(--safe-left)',
             paddingRight: 'var(--safe-right)',
           }}

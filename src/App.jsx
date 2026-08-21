@@ -86,6 +86,7 @@ import useImportExport from "./hooks/useImportExport.js";
 import useCollaboration from "./hooks/useCollaboration.js";
 import useFormatting from "./hooks/useFormatting.js";
 import useInstanceLockStatus from "./hooks/useInstanceLockStatus.js";
+import useKeyboardInset from "./hooks/useKeyboardInset.js";
 import { useStableCallback } from "./hooks/useStableCallback.js";
 import InstanceUnlockScreen from "./components/lock/InstanceUnlockScreen.jsx";
 import LockedBanner from "./components/lock/LockedBanner.jsx";
@@ -115,6 +116,8 @@ export default function App() {
 
   // Detect Android WebView (APK) — force mobile layout on tablets
   const isWebView = !!window.AndroidTheme;
+
+  useKeyboardInset();
 
   // Notes & search
   const [notes, setNotes] = useState([]);

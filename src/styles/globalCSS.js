@@ -2319,6 +2319,13 @@ html.dark .modal-scroll-themed::-webkit-scrollbar-thumb { background: var(--sb-t
     --sbs-single-w: min(91.6667vw, 896px, calc(100vw - var(--sbs-edge) * 2));
   }
 }
+/* Side-by-side panes take their height and anchor offsets from dvh-based
+   !important rules, so a scrim shortened by the soft keyboard would leave
+   them hanging past its bottom edge. Neutralise the inset for the whole
+   subtree; single-pane mode keeps it. */
+.modal-scrim[data-split-mode="true"] {
+  --keyboard-inset: 0px;
+}
 /* The right-pane scrim is invisible — only the left scrim provides
    the shared backdrop. Setting pointer-events:none lets clicks pass
    through the transparent scrim overlay to the left pane below. */
