@@ -54,3 +54,6 @@ data/notes.db-wal
 *.jks
 *.keystore
 keystore.properties
+
+# Bac à sable des tests de fédération (certificats, bases, journaux)
+test/federation/.lab/

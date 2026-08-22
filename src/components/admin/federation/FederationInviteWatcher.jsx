@@ -51,7 +51,17 @@ export default function FederationInviteWatcher({ token }) {
     const raiseRequest = (linkId, peerBaseUrl, peerLabel) => {
       if (linkId && seen.current.has(linkId)) return;
       if (linkId) seen.current.add(linkId);
-      const who = peerLabel || hostOf(peerBaseUrl);
+      // The name comes from whoever sent the invitation and is not verified
+      // by anything, so it can read exactly like the server you were
+      // expecting. The address is the part that decides where the shared
+      // secret would actually be sent, so it is always shown alongside, and
+      // the admin is told to check it. Only when the two would read the same
+      // is the address left out, to avoid saying it twice.
+      const host = hostOf(peerBaseUrl);
+      const who = peerLabel || host;
+      const message = who === host
+        ? t("fedInviteReceived").replace("{peer}", who)
+        : t("fedInviteReceivedFrom").replace("{peer}", who).replace("{host}", host);
       console.info("[federation] pairing request received:", {
         linkId,
         peer: peerBaseUrl,
@@ -60,7 +70,7 @@ export default function FederationInviteWatcher({ token }) {
         type: "federation",
         variant: "info",
         title: t("fedInviteReceivedTitle"),
-        message: t("fedInviteReceived").replace("{peer}", who),
+        message: `${message} ${t("fedInviteVerifyAddress")}`,
         // Stay until the admin decides (or dismisses) — a pairing
         // request shouldn't auto-vanish like a transient toast.
         persistent: true,
