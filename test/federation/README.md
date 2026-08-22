@@ -39,6 +39,8 @@ utiles si vous exposez les instances autrement).
 | `t3-uuid-tiebreak.mjs` | La variante dure de F-02 (un identifiant bien formé mais forgé), le bornage du libellé, le plafond par origine, et les invitations réellement croisées. |
 | `t4-double-accept.mjs` | Le cas limite du correctif: deux administrateurs qui acceptent en même temps ne doivent produire ni deux liens actifs, ni deux liens bloqués. |
 | `t5-notes.mjs` | Non-régression de la fonctionnalité: partage d'une note entre serveurs, édition dans les deux sens, passage en lecture seule, dépairage. |
+| `t6-trust-proxy.mjs` | F-03. Active le chiffrement au repos, verrouille, puis martèle le déverrouillage en changeant `X-Forwarded-For` à chaque essai. Laisse l'instance verrouillée: relancez `setup.sh` ensuite. |
+| `t7-trust-policy.mjs` | F-03, la politique elle-même: quelles adresses ont le droit de réécrire l'adresse retenue. Ne demande aucun serveur. |
 
 ## Tester avant / après un correctif
 
@@ -54,9 +56,31 @@ Sur le code antérieur au correctif de F-02, la première commande passe 8/8: le
 harnais reproduit bien l'attaque. Sur le code corrigé, c'est la seconde qui
 passe.
 
+`t6` se pilote de la même façon, en changeant qui le serveur considère comme un
+intermédiaire de confiance:
+
+```sh
+# L'appelant n'est pas un intermédiaire de confiance: l'en-tête est ignoré,
+# le limiteur mord au bout de 20 essais.
+FEDLAB_TRUST_PROXY=10.9.9.9 test/federation/setup.sh
+EXPECT=fixed node test/federation/t6-trust-proxy.mjs
+
+# L'appelant EST dans l'ensemble de confiance: son en-tête est honoré et le
+# limiteur ne mord jamais. C'est ce que faisait l'ancien réglage pour TOUT
+# LE MONDE, y compris un appelant venu d'Internet.
+FEDLAB_TRUST_PROXY=loopback test/federation/setup.sh
+node test/federation/t6-trust-proxy.mjs
+```
+
 ## Limites
 
-Ces scénarios couvrent la poignée de main d'appairage et le partage de notes.
-Ils ne couvrent pas le chiffrement au repos, les passkeys, ni la partie
+Le bac à sable tourne entièrement sur la boucle locale, qui fait partie des
+intermédiaires de confiance par défaut. On ne peut donc pas y fabriquer un
+appelant venant d'Internet: `t6` contourne la difficulté en désignant un
+intermédiaire qui n'est pas nous, et `t7` vérifie la politique adresse par
+adresse, sans réseau.
+
+Ces scénarios couvrent la poignée de main d'appairage, le partage de notes et
+le limiteur de déverrouillage. Ils ne couvrent pas les passkeys ni la partie
 Android. Un scénario qui passe dit que le chemin testé fonctionne, pas que la
 fédération est sans défaut.
