@@ -92,6 +92,23 @@ if (TRUST_PROXY) {
   );
 }
 
+// ---------- Framing protection ----------
+// Nothing in GlassKeep is ever meant to be embedded in another page, so
+// refuse framing outright. Without this a third-party site can load the
+// interface in an invisible frame and steer a signed-in admin into
+// clicking a one-shot action (accepting a federation pairing, say)
+// without them seeing what they clicked.
+//
+// Both headers, deliberately: frame-ancestors is the current directive,
+// X-Frame-Options is what older browsers still read. This is the ONLY
+// CSP directive set here: it governs framing and nothing else, so it
+// cannot affect how the app's own styles or scripts load.
+app.use((_req, res, next) => {
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+  next();
+});
+
 // ---------- CORS (dev only) ----------
 if (NODE_ENV !== "production") {
   app.use(
@@ -2677,8 +2694,12 @@ app.post("/api/notes/:id/collaborate", auth, async (req, res) => {
     }
   }
 
-  // Find user to collaborate with (by email or name)
-  const collaborator = getUserByEmail.get(username) || getUserByName.get(username);
+  // Find user to collaborate with (by email or name). Real accounts only:
+  // the federation stand-ins are matched by the cross-server branch above,
+  // and picking one up here would attach a collaborator who can never
+  // receive the note (and would confirm, to whoever guessed the name, that
+  // that person exists on the paired server).
+  const collaborator = getRealUserByEmail.get(username) || getRealUserByName.get(username);
   if (!collaborator) {
     return res.status(404).json({ error: "User not found" });
   }
@@ -4035,8 +4056,11 @@ app.post("/api/notes/import", auth, (req, res) => {
     tx(src);
     res.json({ ok: true, imported, skipped });
   } catch (err) {
+    // The raw message can name tables and columns, so it stays in the
+    // server log and never rides the response. The client maps the bare
+    // string to its localized errImportFailed either way.
     console.error("[Import] Failed:", err.message);
-    res.status(500).json({ error: `Import failed: ${err.message}` });
+    res.status(500).json({ error: "Import failed" });
   }
 });
 
