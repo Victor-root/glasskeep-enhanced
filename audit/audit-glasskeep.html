@@ -1,0 +1,837 @@
+<title>Audit Fédération GlassKeep</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --bg: #f7f8fa; --surface: #ffffff; --surface-2: #eef0f4;
+  --ink: #171a21; --ink-2: #39404e; --muted: #5c6472;
+  --line: #dfe3e9; --line-strong: #c3cad4;
+  --accent: #3d5a80; --accent-soft: #e8edf4;
+  --sev-critical: #a1252b; --sev-high: #c2521a; --sev-medium: #91690f;
+  --sev-low: #3f6b52; --sev-info: #5c6472;
+  --sev-critical-bg: #fbecec; --sev-high-bg: #fdf0e7; --sev-medium-bg: #fbf3e0;
+  --sev-low-bg: #eaf3ee; --sev-info-bg: #eef0f4;
+  --ok: #3f6b52; --no: #a1252b;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101319; --surface: #171b23; --surface-2: #1e232d;
+    --ink: #e6e9ef; --ink-2: #c2c9d6; --muted: #98a2b3;
+    --line: #262c37; --line-strong: #39414f;
+    --accent: #8fb0d6; --accent-soft: #1c2735;
+    --sev-critical: #f08a8f; --sev-high: #f0a271; --sev-medium: #ddb85a;
+    --sev-low: #7cc0a0; --sev-info: #98a2b3;
+    --sev-critical-bg: #2c1618; --sev-high-bg: #2c1e14; --sev-medium-bg: #292214;
+    --sev-low-bg: #16261f; --sev-info-bg: #1e232d;
+    --ok: #7cc0a0; --no: #f08a8f;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101319; --surface: #171b23; --surface-2: #1e232d;
+  --ink: #e6e9ef; --ink-2: #c2c9d6; --muted: #98a2b3;
+  --line: #262c37; --line-strong: #39414f;
+  --accent: #8fb0d6; --accent-soft: #1c2735;
+  --sev-critical: #f08a8f; --sev-high: #f0a271; --sev-medium: #ddb85a;
+  --sev-low: #7cc0a0; --sev-info: #98a2b3;
+  --sev-critical-bg: #2c1618; --sev-high-bg: #2c1e14; --sev-medium-bg: #292214;
+  --sev-low-bg: #16261f; --sev-info-bg: #1e232d;
+  --ok: #7cc0a0; --no: #f08a8f;
+}
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--body);
+  font-size:17px; line-height:1.65; -webkit-font-smoothing:antialiased; }
+.wrap { max-width:62rem; margin:0 auto; padding:0 1.5rem 6rem; }
+.prose { max-width:41rem; }
+h1,h2,h3,h4 { font-family:var(--display); font-weight:700; letter-spacing:-0.015em;
+  text-wrap:balance; color:var(--ink); margin:0; }
+.eyebrow { font-family:var(--mono); font-size:0.7rem; font-weight:500;
+  letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
+.masthead { border-bottom:2px solid var(--ink); padding:3.5rem 0 1.25rem;
+  margin-bottom:2rem; display:flex; flex-direction:column; gap:1.1rem; }
+.masthead h1 { font-size:clamp(2.1rem,5.5vw,3.1rem); line-height:1.05; }
+.masthead .sub { font-size:1.05rem; color:var(--ink-2); max-width:43rem; margin:0; }
+.meta-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));
+  gap:0.9rem 1.5rem; padding-top:0.9rem; border-top:1px solid var(--line); }
+.meta-grid div { display:flex; flex-direction:column; gap:0.15rem; }
+.meta-grid .val { font-family:var(--mono); font-size:0.8rem; color:var(--ink); word-break:break-word; }
+.scoreboard { display:grid; grid-template-columns:repeat(auto-fit,minmax(7rem,1fr));
+  gap:1px; background:var(--line); border:1px solid var(--line); margin:2.5rem 0; }
+.score { background:var(--surface); padding:1rem 1.1rem 1.1rem; display:flex;
+  flex-direction:column; gap:0.2rem; }
+.score .n { font-family:var(--display); font-size:2.1rem; font-weight:700; line-height:1;
+  font-variant-numeric:tabular-nums; }
+.score .l { font-family:var(--mono); font-size:0.64rem; letter-spacing:0.12em;
+  text-transform:uppercase; color:var(--muted); }
+.score.c-critical .n { color:var(--sev-critical); }
+.score.c-high .n { color:var(--sev-high); }
+.score.c-medium .n { color:var(--sev-medium); }
+.score.c-low .n { color:var(--sev-low); }
+.score.c-info .n { color:var(--sev-info); }
+.score.c-refuted .n { color:var(--ok); }
+.score.c-fixed .n { color:var(--ok); }
+section { margin-top:4rem; }
+.section-head { display:flex; align-items:baseline; gap:0.9rem;
+  border-bottom:1px solid var(--line-strong); padding-bottom:0.5rem;
+  margin-bottom:1.6rem; flex-wrap:wrap; }
+.section-head h2 { font-size:1.5rem; }
+.section-head .count { font-family:var(--mono); font-size:0.74rem; color:var(--muted);
+  font-variant-numeric:tabular-nums; }
+p { margin:0 0 1rem; } p:last-child { margin-bottom:0; }
+a { color:var(--accent); text-underline-offset:2px; }
+a:focus-visible, summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+code { font-family:var(--mono); font-size:0.84em; background:var(--surface-2);
+  padding:0.08em 0.32em; border-radius:2px; word-break:break-word; }
+.table-scroll { overflow-x:auto; border:1px solid var(--line); background:var(--surface); }
+table { border-collapse:collapse; width:100%; min-width:42rem; }
+thead th { font-family:var(--mono); font-size:0.64rem; letter-spacing:0.1em;
+  text-transform:uppercase; color:var(--muted); text-align:left; font-weight:500;
+  padding:0.7rem 0.9rem; border-bottom:1px solid var(--line-strong); white-space:nowrap; }
+tbody td { padding:0.7rem 0.9rem; border-bottom:1px solid var(--line);
+  font-size:0.9rem; vertical-align:top; }
+tbody tr:last-child td { border-bottom:0; }
+td.id { font-family:var(--mono); font-size:0.78rem; color:var(--muted); white-space:nowrap; }
+td.where { font-family:var(--mono); font-size:0.74rem; color:var(--ink-2); }
+.chip { display:inline-block; font-family:var(--mono); font-size:0.62rem; font-weight:600;
+  letter-spacing:0.1em; text-transform:uppercase; padding:0.2rem 0.45rem;
+  border-radius:2px; white-space:nowrap; }
+.chip.critical { color:var(--sev-critical); background:var(--sev-critical-bg); }
+.chip.high { color:var(--sev-high); background:var(--sev-high-bg); }
+.chip.medium { color:var(--sev-medium); background:var(--sev-medium-bg); }
+.chip.low { color:var(--sev-low); background:var(--sev-low-bg); }
+.chip.info { color:var(--sev-info); background:var(--sev-info-bg); }
+.chip.tp { color:var(--no); background:var(--sev-critical-bg); }
+.chip.fp { color:var(--ok); background:var(--sev-low-bg); }
+.chip.plain { color:var(--muted); background:var(--surface-2); }
+.chip.fixed { color:var(--ok); background:var(--sev-low-bg); box-shadow:inset 0 0 0 1px var(--ok); }
+.chip.open { color:var(--muted); background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--line-strong); }
+tr.done td { opacity:0.62; }
+.finding.done { border-top-color:var(--ok); }
+.fixnote { margin-top:0.9rem; padding:0.7rem 0.9rem; border-left:3px solid var(--ok);
+  background:var(--sev-low-bg); font-size:0.93rem; color:var(--ink-2); }
+.fixnote strong { color:var(--ok); }
+.finding { background:var(--surface); border:1px solid var(--line);
+  border-top:3px solid var(--line-strong); margin-bottom:1.4rem; }
+.finding.critical { border-top-color:var(--sev-critical); }
+.finding.high { border-top-color:var(--sev-high); }
+.finding.medium { border-top-color:var(--sev-medium); }
+.finding.low { border-top-color:var(--sev-low); }
+.finding.info { border-top-color:var(--sev-info); }
+.f-head { padding:1.1rem 1.4rem 1rem; display:flex; flex-direction:column; gap:0.5rem;
+  border-bottom:1px solid var(--line); }
+.f-tags { display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center; }
+.f-id { font-family:var(--mono); font-size:0.72rem; color:var(--muted); letter-spacing:0.06em; }
+.f-head h3 { font-size:1.16rem; line-height:1.25; }
+.f-body { padding:0.3rem 1.4rem 1.4rem; }
+.block { padding-top:1.05rem; }
+.block > .eyebrow { display:block; margin-bottom:0.3rem; }
+.block p, .block ul, .block ol { font-size:0.94rem; }
+.block ul, .block ol { margin:0.2rem 0 0; padding-left:1.15rem; }
+.block li { margin-bottom:0.3rem; }
+.loc { font-family:var(--mono); font-size:0.76rem; line-height:1.75; color:var(--ink-2);
+  background:var(--surface-2); padding:0.6rem 0.8rem; overflow-x:auto;
+  white-space:pre; border-left:2px solid var(--line-strong); }
+.verdict-line { margin-top:1.15rem; padding-top:0.8rem; border-top:1px dashed var(--line-strong);
+  font-size:0.87rem; color:var(--ink-2); }
+.verdict-line strong { font-family:var(--display); font-weight:600; color:var(--ink); }
+.refuted { border:1px solid var(--line); background:var(--surface); }
+.refuted-item { padding:0.95rem 1.3rem; border-bottom:1px solid var(--line);
+  display:flex; flex-direction:column; gap:0.3rem; }
+.refuted-item:last-child { border-bottom:0; }
+.refuted-item h4 { font-size:0.99rem; }
+.refuted-item p { font-size:0.9rem; color:var(--ink-2); margin:0; }
+.callout { border:1px solid var(--line-strong); background:var(--accent-soft);
+  padding:1.05rem 1.3rem; margin:1.7rem 0; }
+.callout .eyebrow { display:block; margin-bottom:0.35rem; }
+.callout p { font-size:0.94rem; }
+footer { margin-top:5rem; padding-top:1.5rem; border-top:1px solid var(--line);
+  font-size:0.84rem; color:var(--muted); }
+@media (max-width:640px) {
+  body { font-size:16px; }
+  .wrap { padding:0 1.1rem 4rem; }
+  .f-head, .f-body { padding-left:1rem; padding-right:1rem; }
+}
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <div class="eyebrow">Audit de sécurité</div>
+  <h1>Fédération inter-serveurs GlassKeep</h1>
+  <p class="sub">Revue de la branche <code>feature/cross-server-collaboration</code>, centrée sur le partage de notes entre deux instances auto-hébergées, avec couverture de l'authentification, du chiffrement au repos, de l'application Android, du déploiement et de la chaîne de dépendances.</p>
+  <div class="meta-grid">
+    <div><span class="eyebrow">Révision</span><span class="val">531e500</span></div>
+    <div><span class="eyebrow">Périmètre</span><span class="val">547 fichiers, 16 500 lignes serveur</span></div>
+    <div><span class="eyebrow">Outils</span><span class="val">audit-context, semgrep, insecure-defaults, supply-chain, fp-check, variant-analysis</span></div>
+    <div><span class="eyebrow">Modifications</span><span class="val">aucune, audit en lecture seule</span></div>
+  </div>
+</header>
+
+<div class="scoreboard">
+  <div class="score c-high"><span class="n">3</span><span class="l">Élevé</span></div>
+  <div class="score c-medium"><span class="n">7</span><span class="l">Moyen</span></div>
+  <div class="score c-low"><span class="n">7</span><span class="l">Faible</span></div>
+  <div class="score c-info"><span class="n">4</span><span class="l">Info</span></div>
+  <div class="score c-refuted"><span class="n">12</span><span class="l">Réfutés</span></div>
+  <div class="score c-fixed"><span class="n">3</span><span class="l">Corrigés</span></div>
+</div>
+
+<section>
+  <div class="section-head"><h2>État des correctifs</h2><span class="count">3 corrigés, 2 clos, 16 ouverts</span></div>
+  <div class="prose">
+    <p>Suivi tenu à jour au fil des corrections. Chaque entrée du rapport porte son statut, et les entrées corrigées ou closes portent en fin de bloc la raison et la référence du commit.</p>
+  </div>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Statut</th><th>Entrées</th><th>Détail</th></tr></thead>
+    <tbody>
+      <tr class="done"><td><span class="chip fixed">Corrigé</span></td><td class="id">F-12, F-16, F-17</td><td>Commit <code>6c00501</code> sur <code>feature/cross-server-collaboration</code>. Encadrement refusé par en-tête, détail d'erreur d'import retiré de la réponse, recherche de collaborateur filtrée sur les comptes réels. Relu et contrôlé syntaxiquement, non exécuté : la compilation se fait hors de l'environnement d'audit.</td></tr>
+      <tr><td><span class="chip plain">Accepté</span></td><td class="id">F-01</td><td>Risque accepté par le mainteneur. Le README documente la saisie du mot de passe à quatre reprises.</td></tr>
+      <tr><td><span class="chip plain">Reporté</span></td><td class="id">F-20</td><td>La mise à jour d'<code>esbuild</code> sort de la plage que <code>vite</code> 7 autorise. Résolu par le futur passage à <code>vite</code> 8.</td></tr>
+      <tr><td><span class="chip open">À traiter</span></td><td class="id">F-02 à F-11, F-13 à F-15, F-18, F-19, F-21</td><td>Aucune de ces entrées n'est un correctif d'une ligne : chacune demande soit un arbitrage de configuration, soit une modification que rien ne permet de vérifier ici (deuxième instance, appareil Android, harnais de test).</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <div class="section-head"><h2>En deux minutes</h2></div>
+  <div class="prose">
+    <p>La fédération est du code soigné. Le modèle est explicite, les commentaires raisonnent sur un pair hostile, et les défenses en profondeur que j'ai cherchées sont pour la plupart déjà là : le contenu des notes est bien assaini avant affichage, un pair ne peut pas s'approprier une note qui ne lui appartient pas, et le contrôle d'accès aux notes locales est solide. La majorité des pistes que j'ai ouvertes se sont refermées.</p>
+    <p>Le point le plus sérieux est dans la fédération : n'importe qui sur Internet peut envoyer une fausse invitation d'appairage à votre serveur, annuler l'appairage légitime en cours, et faire apparaître dans votre panneau une demande qui porte le nom qu'il a choisi. Aucun compte, aucun secret, une seule requête. Trois autres points concernent le déverrouillage du chiffrement au repos, dont la protection contre les essais répétés peut être neutralisée par un simple en-tête.</p>
+    <p>Une correction par rapport à une première version de ce rapport, signalée par le mainteneur et vérifiée : le <code>docker-compose.yml</code> du dépôt contient bien <code>admin</code>/<code>admin</code>, mais ce n'est pas le fichier que le README fait utiliser. Tous les chemins d'installation documentés font coller un bloc portant <code>your-admin-username</code> et <code>choose-a-strong-password</code>, avec la consigne explicite de les remplacer. Le résiduel est réel mais étroit, il est reclassé en F-01 faible.</p>
+  </div>
+</section>
+
+<section>
+  <div class="section-head"><h2>Synthèse</h2><span class="count">21 findings retenus</span></div>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>#</th><th>Criticité</th><th>Faille</th><th>Emplacement</th><th>Verdict</th><th>Statut</th></tr></thead>
+    <tbody>
+      <tr><td class="id">F-02</td><td><span class="chip high">Élevé</span></td><td>Appairage fédéré annulable et usurpable sans authentification</td><td class="where">server/routes/federationRoutes.js:250-318</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-03</td><td><span class="chip high">Élevé</span></td><td>Anti-brute-force du déverrouillage neutralisable par un en-tête</td><td class="where">server/index.js:84-92<br>server/routes/unlockRoutes.js:123-133,240</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-04</td><td><span class="chip high">Élevé</span></td><td>Refus du HTTP en clair inopérant pour la phrase de passe</td><td class="where">server/routes/unlockRoutes.js:166-179</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-05</td><td><span class="chip medium">Moyen</span></td><td>Requêtes sortantes arbitraires déclenchables par tout compte connecté</td><td class="where">server/ai/aiRoutes.js:142,239-257,267</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-06</td><td><span class="chip medium">Moyen</span></td><td>Aucune limitation d'essais sur la connexion, comptes énumérables</td><td class="where">server/index.js:1958-1986,2037-2046</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-07</td><td><span class="chip medium">Moyen</span></td><td>Application Android autorisant le HTTP en clair</td><td class="where">android/.../AndroidManifest.xml:58<br>.../SetupScreen.kt:245</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-08</td><td><span class="chip medium">Moyen</span></td><td>Jeton de session valable 30 jours, non révoqué au changement de mot de passe</td><td class="where">server/index.js:803-816,2190-2215</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-09</td><td><span class="chip medium">Moyen</span></td><td>Secret partagé de fédération accepté sans contrôle de forme ni d'entropie</td><td class="where">server/routes/federationRoutes.js:325-342</td><td><span class="chip tp">Variante</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-10</td><td><span class="chip medium">Moyen</span></td><td>Script de déverrouillage transmettant la phrase de passe sans vérifier le certificat</td><td class="where">scripts/unlock-instance.cjs:135</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-11</td><td><span class="chip medium">Moyen</span></td><td>Identité WebAuthn dérivée d'en-têtes fournis par le client</td><td class="where">server/routes/passkeyRoutes.js:51-88</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-01</td><td><span class="chip low">Faible</span></td><td>Le <code>docker-compose.yml</code> du dépôt porte <code>admin</code>/<code>admin</code>, à rebours des placeholders du README</td><td class="where">docker-compose.yml:35-36<br>README.md:203-204,230-231</td><td><span class="chip tp">Vrai positif étroit</span></td><td><span class="chip plain">Accepté</span></td></tr>
+      <tr class="done"><td class="id">F-12</td><td><span class="chip low">Faible</span></td><td>Aucune protection contre l'encadrement de la page par un site tiers</td><td class="where">server/index.js (aucun en-tête)</td><td><span class="chip tp">Vrai positif étroit</span></td><td><span class="chip fixed">Corrigé</span></td></tr>
+      <tr><td class="id">F-13</td><td><span class="chip low">Faible</span></td><td>Fuite d'adresse IP du lecteur via une note fédérée piégée</td><td class="where">src/utils/richText.js:103<br>absence de CSP</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-14</td><td><span class="chip low">Faible</span></td><td>WebView Android permissive autour d'un pont JavaScript</td><td class="where">android/.../WebViewActivity.kt:511-524</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-15</td><td><span class="chip low">Faible</span></td><td>APK de debug signé avec la clé de production</td><td class="where">android/app/build.gradle.kts:59-62</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr class="done"><td class="id">F-16</td><td><span class="chip low">Faible</span></td><td>Message d'erreur interne renvoyé au client à l'import</td><td class="where">server/index.js:4039</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip fixed">Corrigé</span></td></tr>
+      <tr class="done"><td class="id">F-17</td><td><span class="chip low">Faible</span></td><td>Un utilisateur peut ajouter un pseudo-compte fédéré comme collaborateur local</td><td class="where">server/index.js:2681</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip fixed">Corrigé</span></td></tr>
+      <tr><td class="id">F-18</td><td><span class="chip info">Info</span></td><td>Longueur du sceau d'authenticité non fixée sur les 9 appels de chiffrement</td><td class="where">server/encryption/*.js</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-19</td><td><span class="chip info">Info</span></td><td>Clé de signature F-Droid pré-autorisée pour les passkeys</td><td class="where">server/routes/assetLinksRoutes.js:44-52</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr><td class="id">F-20</td><td><span class="chip info">Info</span></td><td>Dépendance <code>esbuild</code> 0.27.7 vulnérable, hors production</td><td class="where">package-lock.json</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip plain">Reporté</span></td></tr>
+      <tr><td class="id">F-21</td><td><span class="chip info">Info</span></td><td>Aucune infrastructure de test, donc aucune défense verrouillée contre régression</td><td class="where">package.json</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip open">À traiter</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <div class="section-head"><h2>Élevé</h2><span class="count">3</span></div>
+
+  <article class="finding high">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-02</span><span class="chip high">Élevé</span><span class="chip tp">Vrai positif</span></div>
+      <h3>N'importe qui peut annuler votre appairage en cours et injecter une fausse invitation</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">server/routes/federationRoutes.js:250-318   POST /api/federation/pair/invite
+server/routes/federationRoutes.js:272-278   comparaison ours.id &lt; linkId
+server/routes/federationRoutes.js:284       plafond de 500 invitations en attente
+server/index.js:1780 puis :1839             le garde de verrouillage est monté après la route
+src/components/admin/federation/FederationInviteWatcher.jsx:54  le bandeau affiche le nom choisi par l'appelant</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Pour que deux serveurs s'appairent, l'un envoie une invitation à l'autre. Cette invitation arrive sur une porte volontairement ouverte : elle n'est ni authentifiée ni signée, puisque les deux serveurs ne partagent encore aucun secret. La protection prévue est que votre administrateur reconnaisse l'adresse affichée avant d'accepter.</p>
+        <p>Trois choses ne tiennent pas. D'abord, l'appelant choisit lui-même l'identifiant de l'invitation, et le code s'en sert pour départager deux invitations croisées en comparant les identifiants comme deux mots dans un dictionnaire. En choisissant un identifiant qui se classe avant, un inconnu fait annuler l'invitation légitime que vous étiez en train d'envoyer. C'est certain, pas probabiliste, et une seule requête suffit. Aucune notification n'est envoyée à l'administrateur, contrairement à une annulation faite depuis le panneau.</p>
+        <p>Ensuite, l'appelant choisit aussi le nom affiché. Le bandeau de notification montre ce nom sans montrer l'adresse réelle : une invitation frauduleuse peut donc se présenter sous le nom du serveur que vous attendiez. Si votre administrateur accepte depuis ce bandeau, le secret partagé fraîchement créé part vers l'adresse indiquée par l'attaquant.</p>
+        <p>Enfin, le plafond de 500 invitations en attente ne compte que celles qui n'ont pas encore été traitées. En le saturant, on bloque toute invitation légitime. Et comme l'identifiant peut contenir une barre oblique, les lignes ainsi créées deviennent impossibles à supprimer depuis l'interface.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Ce qu'il faut pour l'exploiter</span>
+        <ul>
+          <li>Joindre votre serveur en HTTPS. Aucun compte, aucun secret.</li>
+          <li>Pour l'annulation ciblée : connaître l'adresse du serveur avec lequel vous vous appairez, qui est publique par nature.</li>
+          <li>Pour le vol du secret : un clic de votre administrateur sur le bandeau, sans vérification de l'adresse.</li>
+        </ul>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <ul>
+          <li>Générer l'identifiant du lien localement plutôt que de l'accepter de l'appelant, ou au minimum le contraindre au format UUID.</li>
+          <li>Prévenir les administrateurs quand une invitation sortante est annulée par un tiers.</li>
+          <li>Afficher l'adresse réelle, et non le nom fourni, dans le bandeau d'invitation.</li>
+          <li>Compter les invitations par adresse d'origine plutôt que globalement, et limiter le débit sur cette route.</li>
+        </ul>
+      </div>
+      <div class="verdict-line"><strong>fp-check</strong> : vrai positif. L'énoncé initial était inversé sur un point, la revue adverse l'a corrigé : l'identifiant doit se classer <em>avant</em> l'UUID local, pas après. <strong>variant-analysis</strong> : voir F-09, la route jumelle <code>/pair/accept</code> présente le même défaut de validation.</div>
+    </div>
+  </article>
+
+  <article class="finding high">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-03</span><span class="chip high">Élevé</span><span class="chip tp">Vrai positif</span></div>
+      <h3>La protection contre les essais répétés du déverrouillage se contourne avec un en-tête</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">server/index.js:84-92        app.set("trust proxy", true)
+Dockerfile:64-68             HTTPS_ENABLED=false, donc actif par défaut
+server/routes/unlockRoutes.js:123-133  getClientIp / isLocalhost
+server/routes/unlockRoutes.js:240,297  clé du compteur d'essais
+server/encryption/runtimeUnlockState.js:83-110  le limiteur lui-même</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Quand le chiffrement au repos est activé, il faut saisir une phrase de passe pour déverrouiller l'instance. Pour empêcher qu'on la devine par essais successifs, le serveur compte les tentatives par adresse IP.</p>
+        <p>Or le serveur est configuré pour faire confiance à l'intégralité de la chaîne de proxys, sans limiter cette confiance à l'adresse du proxy réel. L'adresse qu'il retient est donc celle qu'un en-tête de la requête annonce, et cet en-tête est écrit par celui qui envoie la requête. Il suffit de changer cette valeur à chaque essai pour repartir à zéro à chaque fois. Cette configuration est active par défaut dans l'image Docker.</p>
+        <p>Ce qui limite réellement les essais n'est plus le compteur mais le coût du calcul cryptographique, mesuré à une dizaine d'essais par seconde. C'est environ 560 fois plus rapide que le rythme voulu. Une phrase de passe faible tombe ; la clé de récupération, elle, reste hors de portée grâce à ses 118 bits d'aléa.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Ce qu'il faut pour l'exploiter</span>
+        <ul>
+          <li>Joindre l'instance verrouillée, ce qui est possible sans compte puisque la page de déverrouillage doit rester accessible.</li>
+          <li>Le déploiement Docker par défaut, ou tout déploiement où <code>TRUST_PROXY</code> est activé.</li>
+          <li>Une phrase de passe devinables pour que le déchiffrement aboutisse ; sinon, l'effet se limite à une saturation du serveur.</li>
+        </ul>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Remplacer <code>app.set("trust proxy", true)</code> par le nombre de sauts réels ou l'adresse du proxy, afin que l'adresse retenue ne puisse plus être choisie par le client. Recouper aussi la valeur avec l'adresse de la connexion elle-même avant de l'utiliser comme clé de comptage.</p>
+      </div>
+      <div class="verdict-line"><strong>fp-check</strong> : vrai positif. Une sous-revendication a été réfutée : annoncer l'adresse <code>127.0.0.1</code> ne permet pas de contourner le refus du HTTP en clair. <strong>variant-analysis</strong> : la même valeur sert de clé au limiteur des passkeys en <code>passkeyRoutes.js:665,710</code>.</div>
+    </div>
+  </article>
+
+  <article class="finding high">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-04</span><span class="chip high">Élevé</span><span class="chip tp">Vrai positif</span></div>
+      <h3>Le refus d'accepter la phrase de passe en clair ne s'applique jamais dans la configuration Docker</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">server/routes/unlockRoutes.js:166-179  operatorDeclaredProxy / isSecureRequest
+server/routes/unlockRoutes.js:218      point d'application du contrôle
+Dockerfile:64-68                       HTTPS_ENABLED=false dans l'image</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Le serveur refuse, à raison, de recevoir la phrase de passe de déchiffrement sur une connexion non chiffrée. Mais ce refus se désactive entièrement dès que l'opérateur déclare qu'un proxy assure le chiffrement en amont, sans qu'aucune vérification ne soit faite. Or l'image Docker pose cette déclaration d'office. Un opérateur qui publie simplement le port 8080 sans proxy croit donc bénéficier d'un garde-fou qui, en réalité, ne s'applique pas.</p>
+        <p>Le code documente ce compromis et l'assume. Le signaler ici tient au fait que le défaut de l'image transforme un choix éclairé en comportement silencieux.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Ce qu'il faut pour l'exploiter</span>
+        <ul>
+          <li>Un déploiement Docker exposé sans proxy chiffrant, ce que rien n'empêche ni ne signale.</li>
+          <li>Une position d'écoute sur le réseau entre l'utilisateur et le serveur.</li>
+        </ul>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Ne plus déduire la présence d'un proxy de <code>HTTPS_ENABLED=false</code>. Exiger une déclaration explicite et distincte, et signaler au démarrage que le contrôle de transport est désactivé.</p>
+      </div>
+      <div class="verdict-line"><strong>insecure-defaults</strong> : classé élevé, catégorie « sécurité qui échoue en s'ouvrant », après vérification réfutante.</div>
+    </div>
+  </article>
+</section>
+
+<section>
+  <div class="section-head"><h2>Moyen</h2><span class="count">7</span></div>
+
+  <article class="finding medium">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-05</span><span class="chip medium">Moyen</span><span class="chip tp">Vrai positif</span></div>
+      <h3>Tout compte connecté peut faire émettre au serveur des requêtes vers l'adresse de son choix</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">server/ai/aiRoutes.js:239-257   PUT /api/user/ai/settings, sans contrôle admin
+server/ai/aiRoutes.js:142       buildOverride, URL prise dans le corps
+server/ai/aiRoutes.js:267       POST /api/user/ai/test
+server/ai/aiSettings.js:279-282 un simple trim, aucune liste blanche
+server/ai/openaiCompatibleProvider.js:81,94,155,169  l'appel sortant</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>La fonctionnalité d'assistance par IA laisse chaque utilisateur indiquer l'adresse de son propre fournisseur. Cette adresse n'est vérifiée d'aucune manière : ni le protocole, ni le domaine, ni le fait qu'elle désigne une machine interne. Le serveur va ensuite s'y connecter, et renvoie à l'utilisateur le code de réponse et une partie du message d'erreur.</p>
+        <p>Un utilisateur ordinaire peut donc se servir du serveur comme d'une sonde vers le réseau où il se trouve : découvrir quelles machines et quels ports répondent chez vous, atteindre l'interface de votre routeur ou d'autres conteneurs. Le chemin le plus direct passe par le test de configuration, qui court-circuite en outre la validation faite par l'administrateur : même si vous avez désactivé l'IA, il fonctionne.</p>
+        <p>La lecture complète des réponses, l'accès au socket Docker et aux services de métadonnées d'hébergeur ont été examinés et se sont révélés hors d'atteinte ou fortement dégradés. L'effet reste une sonde, pas une exfiltration.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Ce qu'il faut pour l'exploiter</span>
+        <ul>
+          <li>Un compte quelconque sur l'instance, sans privilège particulier.</li>
+        </ul>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Valider l'adresse à l'enregistrement comme à l'usage : n'accepter que <code>https</code>, refuser les adresses privées, de bouclage et de lien local, refuser de suivre les redirections, et poser un délai d'expiration. Faire passer le test de configuration par la même validation que le reste plutôt que de forcer l'activation.</p>
+      </div>
+      <div class="verdict-line"><strong>fp-check</strong> : vrai positif, sonde semi-aveugle. <strong>variant-analysis</strong> : le jumeau côté administrateur en <code>aiSettings.js:175</code> souffre du même manque de validation.</div>
+    </div>
+  </article>
+
+  <article class="finding medium">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-06</span><span class="chip medium">Moyen</span><span class="chip tp">Vrai positif</span></div>
+      <h3>Rien ne limite les tentatives de connexion, et les comptes se laissent énumérer</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">server/index.js:1958-1986  POST /api/login, aucun limiteur
+server/index.js:1967       « No account found. »
+server/index.js:1974       « Incorrect password. »
+server/index.js:2037-2046  GET /api/login/profiles, public
+server/index.js:1900       inscription, aucune longueur minimale de mot de passe</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>La page de connexion n'a ni compteur d'essais, ni verrouillage temporaire, ni délai croissant. Le seul frein est le coût du hachage du mot de passe, ce qui laisse environ dix essais par seconde : un dictionnaire de dix mille mots de passe courants s'épuise en un quart d'heure.</p>
+        <p>Par ailleurs, le message d'erreur diffère selon que le compte existe ou non, ce qui permet de dresser la liste des adresses valides, y compris celles des comptes que vous avez choisi de ne pas afficher sur l'écran d'accueil.</p>
+        <p>Point annexe relevé au passage : l'inscription n'impose aucune longueur minimale de mot de passe, alors que le changement de mot de passe en exige six.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Ce qu'il faut pour l'exploiter</span>
+        <ul>
+          <li>Joindre la page de connexion. Rien d'autre.</li>
+        </ul>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Ajouter un limiteur par compte et par adresse, avec un délai croissant après quelques échecs. Uniformiser le message d'erreur. Aligner la règle de longueur entre l'inscription et le changement de mot de passe.</p>
+      </div>
+      <div class="verdict-line"><strong>fp-check</strong> : vrai positif, bornes calculées. Le fait que la liste des profils affichés soit publique reste un choix assumé, atténué par la valeur par défaut qui masque les comptes.</div>
+    </div>
+  </article>
+
+  <article class="finding medium">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-07</span><span class="chip medium">Moyen</span><span class="chip tp">Vrai positif conditionnel</span></div>
+      <h3>L'application Android accepte de dialoguer en clair avec le serveur</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">android/app/src/main/AndroidManifest.xml:58     usesCleartextTraffic="true"
+android/.../ui/SetupScreen.kt:245               accepte une adresse en http://
+android/.../reminders/ReminderSyncWorker.kt:53,86-95  jeton envoyé sur cette adresse
+aucun fichier res/xml/network_security_config.xml</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Android bloque par défaut les connexions non chiffrées. L'application lève ce blocage pour tout le monde, sans le restreindre au réseau local, et l'écran de configuration accepte sans le moindre avertissement une adresse commençant par <code>http://</code>. Tout ce qui suit circule alors en clair : le mot de passe à la connexion, le jeton de session, et le contenu des notes.</p>
+        <p>Deux limites au périmètre, vérifiées : la validation des certificats reste correcte par ailleurs, et la mise à jour de l'application passe par HTTPS, donc il n'y a pas d'escalade vers l'installation d'une version piégée.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Ce qu'il faut pour l'exploiter</span>
+        <ul>
+          <li>Que l'utilisateur ait saisi une adresse en <code>http://</code>, ce que rien ne décourage.</li>
+          <li>Une position d'écoute sur le réseau emprunté, par exemple un Wi-Fi partagé.</li>
+        </ul>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Remplacer l'autorisation globale par un fichier de configuration réseau qui ne tolère le clair que vers les plages d'adresses locales, et afficher un avertissement explicite lorsque l'adresse saisie n'est pas chiffrée.</p>
+      </div>
+      <div class="verdict-line"><strong>fp-check</strong> : vrai positif conditionné au choix de l'utilisateur. <strong>insecure-defaults</strong> : classé moyen, deux catégories.</div>
+    </div>
+  </article>
+
+  <article class="finding medium">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-08</span><span class="chip medium">Moyen</span><span class="chip tp">Vrai positif partiel</span></div>
+      <h3>Changer son mot de passe n'invalide pas les sessions déjà ouvertes</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">server/index.js:803-816    jeton signé pour 30 jours, sans identifiant unique
+server/index.js:2190-2215  changement de mot de passe, aucun jeton invalidé
+aucune liste de révocation dans le projet</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Le jeton de session vaut trente jours et le serveur ne tient aucune liste des jetons révoqués. Si vous changez votre mot de passe parce que vous le croyez compromis, le jeton déjà entre les mains d'un tiers continue de fonctionner jusqu'à son expiration naturelle. Le geste qui devrait couper l'accès ne le coupe pas.</p>
+        <p>Deux sous-revendications ont été écartées : le retrait des droits d'administrateur est bien pris en compte immédiatement, et la suppression d'un compte coupe l'accès dans presque tous les cas.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Ce qu'il faut pour l'exploiter</span>
+        <ul>
+          <li>Disposer déjà d'un jeton volé, par exemple capturé via F-07.</li>
+        </ul>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Ajouter un numéro de version de session dans le compte, l'inclure dans le jeton, l'incrémenter à chaque changement de mot de passe et le vérifier à chaque requête.</p>
+      </div>
+      <div class="verdict-line"><strong>fp-check</strong> : vrai positif partiel. La revendication voisine sur l'absence de liste d'algorithmes dans la vérification du jeton a été réfutée par un test autonome : la bibliothèque contraint déjà les algorithmes et rejette <code>alg:none</code>.</div>
+    </div>
+  </article>
+
+  <article class="finding medium">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-09</span><span class="chip medium">Moyen</span><span class="chip plain">Variante de F-02</span></div>
+      <h3>Le secret partagé entre serveurs est accepté sans aucun contrôle de forme</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">server/routes/federationRoutes.js:325-342  POST /api/federation/pair/accept
+server/routes/federationRoutes.js:326      seul test : la valeur est-elle non vide
+server/routes/federationRoutes.js:342      shared_secret = String(sharedSecret)</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Quand le serveur d'en face accepte l'appairage, il envoie le secret qui servira ensuite à signer tous les échanges. Ce secret est enregistré tel quel. Aucune longueur minimale, aucun contrôle de contenu. Un pair mal implémenté ou malveillant peut donc imposer une clé d'un seul caractère, et toute la protection des échanges ultérieurs devient devinable. Un objet envoyé à la place d'un texte devient la chaîne <code>[object Object]</code>, tout aussi prévisible.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Ce qu'il faut pour l'exploiter</span>
+        <ul>
+          <li>Être le pair qui accepte l'appairage, ou avoir intercepté l'invitation pour connaître son identifiant et son jeton d'unicité.</li>
+        </ul>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Exiger une chaîne d'au moins 32 octets d'aléa encodés, refuser tout autre type, et rejeter l'acceptation sinon.</p>
+      </div>
+      <div class="verdict-line"><strong>variant-analysis</strong> : variante directe de F-02, même cause racine, découverte par le balayage des routes jumelles non signées.</div>
+    </div>
+  </article>
+
+  <article class="finding medium">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-10</span><span class="chip medium">Moyen</span><span class="chip tp">Vrai positif</span></div>
+      <h3>Le script de déverrouillage envoie la phrase de passe sans vérifier le certificat</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">scripts/unlock-instance.cjs:135  rejectUnauthorized: false</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>L'outil en ligne de commande qui déverrouille l'instance désactive la vérification du certificat. Le commentaire justifie ce choix par le fait que l'outil tourne sur la même machine que le service. Mais l'hôte et le port sont des paramètres : rien n'empêche de le pointer vers une machine distante, et la phrase de passe voyage alors sur une liaison chiffrée dont l'identité de l'interlocuteur n'est pas vérifiée, donc interceptable.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Ce qu'il faut pour l'exploiter</span>
+        <ul>
+          <li>Que l'administrateur utilise le script contre une instance distante.</li>
+          <li>Une position d'interception sur le trajet.</li>
+        </ul>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Ne désactiver la vérification que lorsque l'hôte visé est effectivement l'interface de bouclage, et refuser sinon.</p>
+      </div>
+      <div class="verdict-line"><strong>insecure-defaults</strong> : classé moyen. Également relevé par l'analyse statique.</div>
+    </div>
+  </article>
+
+  <article class="finding medium">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-11</span><span class="chip medium">Moyen</span><span class="chip tp">Vrai positif</span></div>
+      <h3>L'identité utilisée pour les passkeys est déduite d'en-têtes que le client fournit</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">server/routes/passkeyRoutes.js:51-61  resolveHost lit X-Forwarded-Host
+server/routes/passkeyRoutes.js:63-74  resolveProto renvoie https par principe
+server/routes/passkeyRoutes.js:76-88  rpId et expectedOrigin en découlent
+server/routes/passkeyRoutes.js:653    point d'application</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Faute de variables d'environnement explicites, le serveur déduit le domaine associé aux passkeys de l'en-tête d'hôte transmis dans la requête. Comme la confiance au proxy est totale par défaut dans l'image Docker, cet en-tête est écrit par l'appelant. Le serveur perd donc sa vérification indépendante du domaine.</p>
+        <p>L'exploitation reste indirecte : l'appareil de l'utilisateur lie chaque passkey à un domaine et refuse de la présenter ailleurs, ce qui absorbe l'essentiel du risque. Le point signalé est la disparition d'un contrôle censé être indépendant, pas une prise de compte directe.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Ce qu'il faut pour l'exploiter</span>
+        <ul>
+          <li>Un déploiement où <code>WEBAUTHN_RP_ID</code> et <code>WEBAUTHN_ORIGIN</code> ne sont pas définis.</li>
+          <li>Un proxy qui laisse passer l'en-tête d'hôte fourni par le client.</li>
+        </ul>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Exiger la définition explicite du domaine en configuration lorsque les passkeys sont actives, et refuser de démarrer cette fonctionnalité sinon.</p>
+      </div>
+      <div class="verdict-line"><strong>insecure-defaults</strong> : classé moyen, même cause racine que F-03 et F-04.</div>
+    </div>
+  </article>
+</section>
+
+<section>
+  <div class="section-head"><h2>Faible</h2><span class="count">7</span></div>
+
+  <article class="finding low">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-01</span><span class="chip plain">Accepté</span><span class="chip low">Faible</span><span class="chip tp">Vrai positif étroit</span></div>
+      <h3>Le fichier compose du dépôt porte « admin »/« admin », à rebours de ce que dit le README</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">docker-compose.yml:35-36        ADMIN_EMAIL / ADMIN_PASSWORD = "admin"
+docker-compose.yml:115          montage de /var/run/docker.sock
+README.md:203-204, 230-231      your-admin-username / choose-a-strong-password
+README.md:218                   « Edit the ADMIN_EMAIL and ADMIN_PASSWORD values below »
+docker/bootstrap-admin.js:41-47 crée le compte, is_admin = 1
+server/index.js:327             must_change_password vaut 0 par défaut</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Le <code>docker-compose.yml</code> présent dans le dépôt contient, en clair et sans être commenté, <code>admin</code> comme identifiant et comme mot de passe. Quelqu'un qui clone le dépôt et lance <code>docker compose up</code> dedans obtient un compte administrateur fonctionnel avec ces identifiants, sur un conteneur qui a accès au moteur Docker de la machine.</p>
+        <p>Ce n'est pas le chemin d'installation documenté. Le README ne renvoie jamais vers ce fichier : chacune de ses quatre procédures fait coller un bloc compose qui porte <code>your-admin-username</code> et <code>choose-a-strong-password</code>, et la consigne juste au-dessus dit de remplacer ces valeurs avant de lancer. Un opérateur qui suit la documentation ne rencontre donc jamais <code>admin</code>/<code>admin</code>.</p>
+        <p>Ce qui reste est une incohérence de paquetage : le dépôt et sa documentation ne disent pas la même chose, et la version du dépôt est la moins sûre des deux. S'y ajoute un point mineur mais indépendant du mot de passe : le drapeau <code>must_change_password</code> existe dans la base et le script d'amorçage ne le pose jamais, donc aucun déploiement Docker n'impose de rotation au premier accès.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Ce qu'il faut pour l'exploiter</span>
+        <ul>
+          <li>Que l'instance ait été déployée en clonant le dépôt et en lançant son <code>docker-compose.yml</code> tel quel, au lieu de suivre le README.</li>
+          <li>Pouvoir joindre le port publié.</li>
+          <li>Rien d'autre. Une seule requête de connexion suffit.</li>
+        </ul>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Aligner le <code>docker-compose.yml</code> du dépôt sur le bloc du README, c'est-à-dire y mettre les mêmes placeholders. Deux lignes. Accessoirement, faire poser <code>must_change_password = 1</code> par le script d'amorçage, ce qui couvre aussi l'opérateur qui laisserait <code>choose-a-strong-password</code> en place.</p>
+      </div>
+      <div class="verdict-line"><strong>Correction</strong> : cette entrée était classée critique dans la première version du rapport. Le mainteneur a contesté la sévérité, et il avait raison. La vérification initiale avait examiné le fichier compose isolément sans croiser avec la documentation d'installation, ce que la phase de cartographie des protections d'environnement aurait dû attraper. L'audit des défauts non sûrs, qui le classait également en critique, avait la même limite : il ne lit que les fichiers de configuration. Reclassé en faible, la population touchée se limitant à qui déploie depuis un clone du dépôt en ignorant le README.</div>
+      <div class="fixnote" style="border-left-color:var(--muted);background:var(--surface-2)"><strong>Risque accepté</strong> par le mainteneur, décision du 22 août 2026. Le README indique la marche à suivre à quatre reprises et la valeur du dépôt reste inchangée. Ce qui suit vaut donc comme trace de la décision, pas comme tâche ouverte.</div>
+    </div>
+  </article>
+
+
+  <article class="finding low done">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-12</span><span class="chip fixed">Corrigé</span><span class="chip low">Faible</span><span class="chip tp">Vrai positif étroit</span></div>
+      <h3>Aucune protection contre l'encadrement de l'interface par un site tiers</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">server/index.js  aucun X-Frame-Options, aucune directive frame-ancestors</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Un site malveillant peut afficher votre interface dans un cadre invisible et amener un administrateur connecté à cliquer sans le savoir sur une action sensible, par exemple accepter un appairage. La probabilité reste faible en pratique, mais la parade coûte une ligne.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Ajouter <code>X-Frame-Options: DENY</code> ou la directive <code>frame-ancestors 'none'</code>.</p>
+      </div>
+      <div class="verdict-line"><strong>fp-check</strong> : la revendication large sur l'absence d'en-têtes a été réfutée, seul ce volet subsiste. Le volet CSP contre l'injection de script est annulé par l'assainissement systématique, et le volet <code>nosniff</code> par des types de contenu corrects.</div>
+      <div class="fixnote"><strong>Corrigé</strong> le 22 août 2026, commit <code>6c00501</code> sur <code>feature/cross-server-collaboration</code>. Le serveur envoie désormais <code>X-Frame-Options: DENY</code> et la directive <code>frame-ancestors 'none'</code> sur toutes ses réponses. C'est la seule directive CSP posée, elle ne gouverne que l'encadrement.</div>
+    </div>
+  </article>
+
+  <article class="finding low">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-13</span><span class="chip low">Faible</span><span class="chip tp">Vrai positif</span></div>
+      <h3>Une note fédérée piégée peut révéler l'adresse IP de qui la lit</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">src/utils/richText.js:103  l'attribut style est autorisé à la sortie de l'assainissement
+absence de Content-Security-Policy côté serveur comme dans index.html</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Le contenu des notes est bien nettoyé de tout script, mais l'attribut de style est conservé pour préserver les couleurs et l'alignement. Combiné à l'absence de politique de sécurité du contenu, cela laisse un pair malveillant glisser dans une note partagée une règle de style qui déclenche une requête vers son serveur à l'ouverture, lui révélant l'adresse IP du lecteur et le moment de la lecture. Le contenu des notes n'est pas exposé.</p>
+        <p>À noter que l'assainissement du Markdown exclut délibérément les images pour éviter exactement ce type de fuite ; l'autorisation du style dans l'éditeur riche va à l'encontre de cette intention.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Poser une politique de sécurité du contenu restreignant les sources externes, et filtrer les propriétés de style autorisées plutôt que d'accepter l'attribut entier.</p>
+      </div>
+      <div class="verdict-line"><strong>fp-check</strong> : résiduel identifié en réfutant la revendication d'injection de script, elle-même écartée.</div>
+    </div>
+  </article>
+
+  <article class="finding low">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-14</span><span class="chip low">Faible</span><span class="chip tp">Vrai positif</span></div>
+      <h3>La WebView Android est très permissive autour d'un pont JavaScript</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">android/.../WebViewActivity.kt:511  addJavascriptInterface(RemindersBridge(), "AndroidReminders")
+android/.../WebViewActivity.kt:518  allowFileAccess = true
+android/.../WebViewActivity.kt:519  allowContentAccess = true
+android/.../WebViewActivity.kt:521  mixedContentMode = COMPATIBILITY_MODE</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>La vue web expose un pont vers le code natif tout en autorisant l'accès aux fichiers locaux, aux fournisseurs de contenu et au chargement de ressources non chiffrées depuis une page chiffrée. Aucun chemin d'exploitation n'a été trouvé, l'assainissement du contenu tenant par ailleurs. C'est une réduction de la marge de sécurité, pas une faille active.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Désactiver l'accès aux fichiers et aux fournisseurs de contenu, et passer le mode contenu mixte en refus strict.</p>
+      </div>
+      <div class="verdict-line"><strong>insecure-defaults</strong> et analyse statique : signalé par les deux, classé faible après vérification.</div>
+    </div>
+  </article>
+
+  <article class="finding low">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-15</span><span class="chip low">Faible</span><span class="chip tp">Vrai positif</span></div>
+      <h3>L'APK de debug est signé avec la clé de production</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">android/app/build.gradle.kts:59-62  le type debug reçoit la config de signature release</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Pour que les passkeys fonctionnent depuis Android Studio, les compilations de debug sont signées avec la clé de production. Un APK debug, donc inspectable et modifiable à l'exécution, porte alors l'identité de signature officielle et est reconnu comme légitime par le système. Tant que ces fichiers ne quittent pas la machine du mainteneur, il n'y a pas d'exposition.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Utiliser une clé de développement distincte, déclarée en plus dans les liens d'actifs numériques, plutôt que la clé de publication.</p>
+      </div>
+      <div class="verdict-line">La revendication voisine, un repli silencieux vers la clé de debug pour les compilations de publication, a été <strong>réfutée</strong> : sans fichier de clés, le type release ne reçoit aucune configuration de signature et produit un APK non signé.</div>
+    </div>
+  </article>
+
+  <article class="finding low done">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-16</span><span class="chip fixed">Corrigé</span><span class="chip low">Faible</span><span class="chip tp">Vrai positif</span></div>
+      <h3>Un message d'erreur interne est renvoyé au client lors d'un import</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">server/index.js:4039  res.status(500).json({ error: `Import failed: ${err.message}` })</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Le message d'erreur brut, potentiellement porteur de détails sur la structure de la base, est renvoyé tel quel à l'utilisateur. Le gain pour un attaquant est modeste mais réel lors d'une phase de reconnaissance.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Journaliser le détail côté serveur et renvoyer un message générique.</p>
+      </div>
+      <div class="verdict-line"><strong>insecure-defaults</strong> : classé faible, catégorie « fonctions de mise au point ».</div>
+      <div class="fixnote"><strong>Corrigé</strong> le 22 août 2026, commit <code>6c00501</code> sur <code>feature/cross-server-collaboration</code>. Le détail de l'exception reste dans le journal du serveur et ne part plus dans la réponse. Le texte affiché à l'utilisateur ne change pas : le client faisait déjà correspondre la chaîne à sa traduction par sous-chaîne.</div>
+    </div>
+  </article>
+
+  <article class="finding low done">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-17</span><span class="chip fixed">Corrigé</span><span class="chip low">Faible</span><span class="chip tp">Vrai positif</span></div>
+      <h3>Un utilisateur peut ajouter comme collaborateur un pseudo-compte représentant une personne distante</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">server/index.js:2681  getUserByEmail / getUserByName, sans filtre sur les comptes fédérés
+à comparer avec server/index.js:1114-1117  getRealUserByEmail / getRealUserByName</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Les comptes fictifs qui représentent localement les utilisateurs d'un autre serveur ne peuvent pas se connecter, cela a été vérifié. Mais le partage local d'une note les cherche sans les exclure, alors que les chemins de fédération utilisent partout les variantes filtrées. Un utilisateur peut donc partager une note avec une figure qui ne la recevra jamais, et confirmer au passage l'existence d'une personne sur le serveur distant.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Utiliser les variantes filtrées sur ce chemin, comme partout ailleurs.</p>
+      </div>
+      <div class="verdict-line">Relevé lors de la revue manuelle du contrôle d'accès aux notes, qui s'est par ailleurs révélé solide.</div>
+      <div class="fixnote"><strong>Corrigé</strong> le 22 août 2026, commit <code>6c00501</code> sur <code>feature/cross-server-collaboration</code>. Le partage local utilise maintenant les variantes filtrées <code>getRealUserByEmail</code> et <code>getRealUserByName</code>, comme tous les chemins de fédération.</div>
+    </div>
+  </article>
+</section>
+
+<section>
+  <div class="section-head"><h2>Informationnel</h2><span class="count">4</span></div>
+
+  <article class="finding info">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-18</span><span class="chip info">Info</span><span class="chip plain">Durcissement</span></div>
+      <h3>La longueur du sceau d'authenticité n'est fixée sur aucun des appels de chiffrement</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">server/encryption/noteCipher.js:109, :211
+server/encryption/instanceVault.js:121
+server/encryption/passkeyVault.js:132
+server/routes/passkeyRoutes.js:802
+aucune occurrence de authTagLength dans le dépôt</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Le chiffrement des notes accompagne chaque donnée d'un sceau qui permet de détecter toute altération. La longueur attendue de ce sceau n'étant jamais précisée, la bibliothèque accepte des sceaux tronqués, jusqu'à quatre octets, ce qui affaiblit considérablement la détection.</p>
+        <p>Ce n'est pas exploitable : le sceau ne provient jamais du réseau, il est lu dans la base locale. Il faudrait déjà pouvoir écrire dans le fichier de base de données, ce qui suppose un accès bien plus large. Deux protections limitent en outre l'intérêt de la manœuvre : le chiffré est lié à sa ligne, et le clair porte un contrôle de version.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Passer <code>{ authTagLength: 16 }</code> aux neuf appels, et vérifier la longueur du vecteur d'initialisation à la lecture.</p>
+      </div>
+      <div class="verdict-line"><strong>fp-check</strong> : confirmé comme défaut de durcissement, non exploitable. La porte d'atteignabilité échoue.</div>
+    </div>
+  </article>
+
+  <article class="finding info">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-19</span><span class="chip info">Info</span><span class="chip plain">Durcissement</span></div>
+      <h3>La clé de signature F-Droid est pré-autorisée pour les passkeys</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">server/routes/assetLinksRoutes.js:44-52  empreinte F-Droid embarquée par défaut
+server/routes/passkeyRoutes.js:112-135   convertie en origine acceptée</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Chaque installation accepte d'office, comme origine valide pour les passkeys, la clé du dépôt F-Droid, alors que l'application n'y est pas encore publiée. Cette clé signe par ailleurs de nombreuses autres applications. La liste d'origines du serveur est donc plus large que nécessaire.</p>
+        <p>Sans conséquence pratique : Android lie chaque passkey au couple nom de paquet et certificat, si bien qu'une autre application signée avec cette clé ne se verrait jamais remettre l'identifiant.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>N'ajouter cette empreinte que le jour où l'application est réellement distribuée sur F-Droid.</p>
+      </div>
+    </div>
+  </article>
+
+  <article class="finding info">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-20</span><span class="chip plain">Reporté</span><span class="chip info">Info</span><span class="chip plain">Chaîne de dépendances</span></div>
+      <h3>Une dépendance de compilation porte une vulnérabilité connue</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">package-lock.json  esbuild 0.27.7, avis GHSA-g7r4-m6w7-qqqr
+plage affectée : 0.27.3 à 0.28.0, corrigé en 0.28.1</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Le serveur de développement d'<code>esbuild</code> permet de lire des fichiers hors du dossier servi, uniquement sous Windows. Cet outil ne tourne pas en production, seulement pendant la compilation, et le projet se développe sous Linux. Aucune des 88 dépendances directes ne porte d'avis connu.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Monter <code>esbuild</code> en 0.28.1 ou plus lors de la prochaine mise à jour des dépendances.</p>
+      </div>
+      <div class="verdict-line">Audit de chaîne d'approvisionnement : 88 dépendances directes, 798 paquets transitifs vérifiés contre les avis publiés. 14 dépendances reposent sur un unique publieur humain, dont <code>dompurify</code>, <code>jsonwebtoken</code> et <code>bcryptjs</code>, ce qui est courant mais mérite d'être connu. Aucun script exécuté à l'installation.</div>
+      <div class="fixnote" style="border-left-color:var(--muted);background:var(--surface-2)"><strong>Reporté</strong>, décision du 22 août 2026. <code>vite</code> 7.3.5 déclare <code>esbuild ^0.27.0</code> : la version corrigée sort de la plage autorisée, et <code>vite</code> 8 a abandonné <code>esbuild</code> au profit de <code>rolldown</code>, donc aucune version de <code>vite</code> 7 ne va avec <code>esbuild</code> 0.28. Forcer la mise à jour ferait tourner <code>vite</code> 7 contre un <code>esbuild</code> pour lequel il n'a pas été testé, sans moyen de vérifier la compilation ici. Le passage à <code>vite</code> 8 réglera le point de lui-même.</div>
+    </div>
+  </article>
+
+  <article class="finding info">
+    <div class="f-head">
+      <div class="f-tags"><span class="f-id">F-21</span><span class="chip info">Info</span><span class="chip plain">Durcissement</span></div>
+      <h3>Aucune infrastructure de test ne verrouille les défenses existantes</h3>
+    </div>
+    <div class="f-body">
+      <div class="block"><span class="eyebrow">Où</span>
+        <div class="loc">package.json  aucun script de test, aucun lanceur en dépendances
+un seul fichier de test dans le dépôt, sans rapport avec la sécurité
+aucun répertoire de test côté Android</div>
+      </div>
+      <div class="block"><span class="eyebrow">Le problème, simplement</span>
+        <p>Plusieurs des défenses qui font que cet audit conclut « pas de faille » ne sont vérifiées par aucun test. C'est notamment le cas de la règle qui veut que l'assainissement du contenu soit toujours la dernière étape avant affichage : elle tient aujourd'hui sur les sept points d'affichage, mais rien n'empêcherait une modification future de la casser sans que personne ne s'en aperçoive.</p>
+      </div>
+      <div class="block"><span class="eyebrow">Correctif</span>
+        <p>Ajouter quelques tests ciblés sur les invariants de sécurité : assainissement du contenu, rejet d'un sceau tronqué, refus d'une signature invalide entre serveurs.</p>
+      </div>
+    </div>
+  </article>
+</section>
+
+<section>
+  <div class="section-head"><h2>Pistes examinées et écartées</h2><span class="count">12</span></div>
+  <p class="prose">Chacune de ces pistes a été ouverte puis refermée après vérification. Elles figurent ici parce qu'une piste écartée avec sa raison vaut mieux qu'une piste passée sous silence.</p>
+  <div class="refuted" style="margin-top:1.5rem">
+    <div class="refuted-item"><h4>Injection de code dans une note reçue d'un autre serveur</h4><p>Les sept points d'affichage en HTML brut passent tous par un assainissement à liste blanche, en dernière position. Ni script, ni image, ni SVG, ni gestionnaire d'événement ne survivent. Le titre, les cases à cocher, les images et le profil du pair n'atteignent aucun point d'affichage non assaini.</p></div>
+    <div class="refuted-item"><h4>Un serveur pair peut lister tous vos utilisateurs</h4><p>Le fait est exact : une recherche vide renvoie les cent premiers comptes réels avec nom et adresse. Mais l'endpoint local équivalent se comporte de la même manière, le client officiel appelle lui-même avec une recherche vide, et le journal des modifications annonce explicitement que le sélecteur de partage montre les vraies personnes de l'autre serveur. C'est un choix de conception documenté sur des serveurs déclarés de confiance, pas un contrôle contourné.</p></div>
+    <div class="refuted-item"><h4>Divulgation de la version du serveur sans authentification</h4><p>La même information est déjà accessible publiquement par les fichiers statiques et la route de personnalisation. Le canal fédération n'ajoute rien.</p></div>
+    <div class="refuted-item"><h4>Vérification du jeton sans liste d'algorithmes</h4><p>Réfuté par un test autonome de trois assertions : avec un secret symétrique, la bibliothèque restreint déjà la vérification aux algorithmes HMAC et rejette <code>alg:none</code> comme la confusion de type de clé.</p></div>
+    <div class="refuted-item"><h4>Permission par destinataire non vérifiée côté serveur autorité</h4><p>Le serveur qui détient la note accepte une modification poussée par un pair dès qu'au moins un de ses utilisateurs a le droit d'écrire, sans identifier lequel. Le gain pour un attaquant est nul : un pair malveillant se contenterait de déclarer l'utilisateur autorisé. Quatre démonstrations négatives le confirment, dont le cas où tous les destinataires sont en lecture seule, où le garde fonctionne bien.</p></div>
+    <div class="refuted-item"><h4>Le conteneur tourne en tant que root</h4><p>Signalé par l'analyse statique sur l'absence de directive d'utilisateur dans le fichier Docker. Le point d'entrée abaisse en réalité les privilèges vers un compte non privilégié avant de lancer le serveur.</p></div>
+    <div class="refuted-item"><h4>Contournement de la signature entre serveurs par un corps non capturé</h4><p>Le corps brut est bien capturé, et uniquement pour les routes de fédération, ce qui évite de conserver une copie des envois volumineux.</p></div>
+    <div class="refuted-item"><h4>Accès à une note d'autrui par manipulation d'identifiant</h4><p>La lecture comme l'écriture passent par une requête qui contrôle la propriété ou la collaboration, et la requête de mise à jour revérifie cette condition. Le propriétaire n'est jamais réécrit lorsqu'un collaborateur modifie la note.</p></div>
+    <div class="refuted-item"><h4>Repli silencieux vers la clé de debug pour les compilations de publication</h4><p>Sans fichier de clés, le type de compilation release ne reçoit aucune configuration de signature : le résultat est un APK non signé, pas un APK signé avec une clé connue.</p></div>
+    <div class="refuted-item"><h4>Contournement du refus du HTTP en clair en annonçant l'adresse de bouclage</h4><p>Quand la confiance au proxy est active, le contrôle est déjà satisfait par un autre chemin ; quand elle ne l'est pas, l'en-tête est ignoré. Le contournement décrit n'existe pas.</p></div>
+    <div class="refuted-item"><h4>Renvoi de l'origine dans les en-têtes du flux d'événements</h4><p>L'authentification se fait par jeton porteur et non par cookie, et aucun en-tête d'autorisation des identifiants n'est posé : un site tiers ne peut rien lire sans détenir déjà le jeton.</p></div>
+    <div class="refuted-item"><h4>Identifiants de session générés par un générateur non cryptographique</h4><p>Le repli sur un tirage pseudo-aléatoire ne concerne que des clés de cache locales au navigateur, qui ne portent aucune décision de sécurité.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="section-head"><h2>Méthode et couverture</h2></div>
+  <div class="prose">
+    <p>L'audit a porté sur la branche <code>feature/cross-server-collaboration</code> à la révision <code>531e500</code>, examinée dans une copie de travail séparée. Aucun fichier du dépôt n'a été modifié.</p>
+    <p>La construction du contexte a cartographié les modules, les acteurs et l'état persistant avant toute recherche de faille, en concentrant la profondeur sur la fédération, le coffre de chiffrement, l'authentification par passkey et l'orchestrateur de mise à jour.</p>
+    <p>L'analyse statique a fait tourner douze jeux de règles sur l'ensemble du dépôt, pour 94 remontées après fusion. Quatre jeux ont échoué, dont celui de Trail of Bits et le jeu Express, ce dernier ayant été retiré du registre public : la couverture n'est donc pas complète de ce côté, ce qui a été compensé par la revue manuelle et par les autres outils.</p>
+    <p>L'audit des défauts non sûrs a balayé 547 fichiers sur six catégories et 66 motifs, produisant 31 candidats dont 12 ont survécu à une vérification qui cherche à les réfuter.</p>
+    <p>L'audit de chaîne d'approvisionnement a mesuré 88 dépendances directes et vérifié 798 paquets transitifs contre les avis publiés. Les critères portant sur les dépôts amont n'ont pas pu être établis faute d'authentification auprès de l'API GitHub, ce qui borne les conclusions de cette partie.</p>
+    <p>Chaque faille candidate est passée par une vérification en sept phases : cartographie du flux de données et des frontières de confiance, preuve du contrôle attaquant avec bornes chiffrées, distinction entre impact réel et robustesse opérationnelle, démonstration positive et négative, revue adverse, puis une grille de six portes. Les démonstrations exécutables ont été écartées faute d'une seconde instance et de tout harnais de test dans le dépôt ; deux tests autonomes ont malgré tout pu être écrits, l'un sur la vérification des jetons, l'autre sur l'assainissement du contenu, et tous deux ont servi à réfuter une revendication.</p>
+    <p>La revue adverse a produit quatre corrections matérielles : le sens de la comparaison dans F-02 était inversé dans l'énoncé initial, <code>install.sh</code> n'est pas concerné par F-01, l'adresse de bouclage annoncée ne contourne pas le contrôle de transport, et le volet relatif aux droits d'administrateur de F-08 est annulé.</p>
+    <p>Une cinquième correction est venue après coup, du mainteneur et non de l'audit, et mérite d'être notée telle quelle : F-01 était classé critique sur la foi du seul <code>docker-compose.yml</code>. Le README, qui n'y renvoie jamais et fait coller un bloc à placeholders, annulait l'essentiel de la revendication. Deux outils indépendants avaient convergé sur « critique » en partageant le même angle mort, la lecture du fichier de configuration sans son mode d'emploi. La convergence d'outils n'est pas une vérification.</p>
+    <p>Enfin, la recherche de variantes a généralisé les deux causes racines principales, l'entrée distante non validée sur les routes de fédération et la valeur fournie par le demandeur servant de décision de sécurité, puis balayé le dépôt à leur recherche. Elle a produit F-09 ainsi que la confirmation que la faiblesse du chemin de test de configuration IA dépasse celle du chemin d'origine.</p>
+  </div>
+  <div class="callout">
+    <span class="eyebrow">Ce qui n'a pas été couvert</span>
+    <p>Le fonctionnement réel entre deux instances n'a pas été observé : tout repose sur la lecture du code, sans exécution. Les règles statiques de Trail of Bits et Express n'ont pas tourné. Les critères de qualité des dépôts amont des dépendances n'ont pas pu être mesurés. Enfin, la partie Android a été revue par lecture et analyse statique, sans instrumentation sur appareil.</p>
+  </div>
+</section>
+
+<footer>
+  <p>Audit en lecture seule de la branche <code>feature/cross-server-collaboration</code>, révision <code>531e500</code>. Aucun fichier du dépôt n'a été modifié, aucune correction n'a été appliquée.</p>
+</footer>
+
+</div>
