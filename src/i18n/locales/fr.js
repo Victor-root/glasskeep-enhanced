@@ -1441,6 +1441,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   fedInviteSending: "Envoi…",
   fedInviteSent: "Invitation envoyée. En attente de l'acceptation de l'autre administrateur.",
   fedInviteReceived: "{peer} souhaite s'associer à votre serveur",
+  fedInviteReceivedFrom: "{peer} souhaite s'associer à votre serveur, à l'adresse {host}",
+  fedInviteVerifyAddress: "N'acceptez que si vous reconnaissez cette adresse.",
   fedInviteReceivedTitle: "Demande d'appairage",
   fedAcceptedToast: "Serveur associé",
   fedRefusedToast: "Demande d'appairage refusée",

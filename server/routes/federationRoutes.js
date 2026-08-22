@@ -232,6 +232,37 @@ function attachFederationRoutes(
     };
   }
 
+  // A link id is minted by store.newId(), i.e. crypto.randomUUID(). Peers
+  // only ever echo one back, so requiring that exact shape costs nothing on
+  // the wire and keeps the value safe everywhere it travels: as a PRIMARY
+  // KEY, inside a URL path segment, and inside a SQL LIKE pattern.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  function isValidLinkId(v) {
+    return typeof v === "string" && UUID_RE.test(v);
+  }
+  // store.newNonce() is 16 random bytes in base64url, so 22 characters. Accept
+  // a little either way for peers that pick a different length, but keep it a
+  // bounded string from a fixed alphabet.
+  function isValidNonce(v) {
+    return typeof v === "string" && v.length >= 16 && v.length <= 128 && /^[A-Za-z0-9_-]+$/.test(v);
+  }
+  // Peer-supplied display names are shown next to a decision an admin is
+  // about to take, so bound them like the health handshake already does.
+  function cleanLabel(v) {
+    return typeof v === "string" ? v.trim().slice(0, MAX_LABEL_LEN) || null : null;
+  }
+
+  // Our own still-unanswered invitation to a given peer origin, if there is
+  // one. Deliberately not store.getByPeerUrl, which returns the most recent
+  // row for the address whatever its status: once the peer's own invitation
+  // has landed, that is the row it hands back, and our outgoing one would be
+  // missed.
+  function ourOutgoingTo(peerUrl, exceptId) {
+    return store
+      .listByStatus(protocol.STATUS.OUTGOING_PENDING)
+      .filter((l) => l.peer_base_url === peerUrl && l.id !== exceptId);
+  }
+
   function timingSafeEqualStr(a, b) {
     const ba = Buffer.from(String(a || ""));
     const bb = Buffer.from(String(b || ""));
@@ -253,6 +284,23 @@ function attachFederationRoutes(
     if (!linkId || !nonce || !initiatorBaseUrl) {
       return res.status(400).json({ error: "missing invite fields" });
     }
+    // Shape checks BEFORE anything is read from or written to the store.
+    // This body is anonymous: the caller has proved nothing about who it is,
+    // so every field it supplies has to look like what a GlassKeep peer
+    // actually sends before it is allowed anywhere near the database.
+    //
+    // The id in particular becomes a PRIMARY KEY and lands in URL paths
+    // (/api/admin/federation/links/:id) and in SQL LIKE patterns
+    // ("<linkId>|%"). Left unchecked it accepted a slash, which Express
+    // cannot match in a path segment, so the row could never be removed
+    // from the panel again; and it accepted non-strings, which the SQLite
+    // binding rejects with an uncaught throw and a 500.
+    if (!isValidLinkId(linkId)) {
+      return res.status(400).json({ error: "invalid link id" });
+    }
+    if (!isValidNonce(nonce)) {
+      return res.status(400).json({ error: "invalid nonce" });
+    }
     const peerUrl = peer.normalizeBaseUrl(initiatorBaseUrl);
     if (!peerUrl) {
       return res.status(400).json({ error: "initiator url must be https" });
@@ -269,20 +317,36 @@ function attachFederationRoutes(
     // invite and neither pairing would ever complete. Both ends can see the
     // same two ids though, so both can pick the same survivor without
     // agreeing on anything — the smaller id wins, and the loser stands down.
-    const ours = store.getByPeerUrl(peerUrl);
-    if (ours && ours.status === protocol.STATUS.OUTGOING_PENDING) {
-      if (ours.id < linkId) {
-        return res.status(409).json({ error: "pairing already in progress" });
-      }
-      store.setStatus(ours.id, protocol.STATUS.CANCELLED);
+    //
+    // WHY THE LOSER NO LONGER STANDS DOWN HERE. Nothing authenticates this
+    // request, so "the peer also invited us" is a claim, not a fact: anyone
+    // who knows the address our admin is pairing with could send an id that
+    // sorts first and have our real invitation cancelled, in one anonymous
+    // request, with no notification. The tie-break is kept, because the
+    // deadlock it avoids is real, but standing down is deferred to the
+    // moment OUR admin accepts the incoming card (see the accept route).
+    // Until then both rows simply coexist, and an anonymous caller can add
+    // a card an admin has to look at, never remove one they were relying on.
+    const ours = ourOutgoingTo(peerUrl, linkId);
+    if (ours.some((l) => l.id < linkId)) {
+      return res.status(409).json({ error: "pairing already in progress" });
     }
     // Flood guard: never let an unauthenticated caller grow the table
     // without bound.
     // Anti-spam only — caps UNACCEPTED incoming invitations, never the
     // number of servers you can actually pair with (active links are
     // unlimited). Set high so it's effectively invisible in normal use.
-    if (store.listByStatus(protocol.STATUS.INCOMING_PENDING).length > 500) {
+    //
+    // Counted per claimed origin as well as globally: with a single global
+    // ceiling, one caller filling it locked every OTHER server out of
+    // inviting us, turning an anti-spam measure into the outage it was
+    // meant to prevent.
+    const pending = store.listByStatus(protocol.STATUS.INCOMING_PENDING);
+    if (pending.length > 500) {
       return res.status(429).json({ error: "too many pending invitations" });
+    }
+    if (pending.filter((l) => l.peer_base_url === peerUrl).length >= 5) {
+      return res.status(429).json({ error: "too many pending invitations from this server" });
     }
     const now = store.nowIso();
     store.insert({
@@ -290,7 +354,7 @@ function attachFederationRoutes(
       role: "acceptor",
       status: protocol.STATUS.INCOMING_PENDING,
       peer_base_url: peerUrl,
-      peer_label: initiatorLabel || null,
+      peer_label: cleanLabel(initiatorLabel),
       nonce,
       created_at: now,
     });
@@ -309,7 +373,7 @@ function attachFederationRoutes(
         type: "federation_invitation",
         linkId,
         peerBaseUrl: peerUrl,
-        peerLabel: initiatorLabel || null,
+        peerLabel: cleanLabel(initiatorLabel),
       });
     } catch {
       /* SSE best-effort */
@@ -325,6 +389,17 @@ function attachFederationRoutes(
     const { linkId, acceptorBaseUrl, acceptorLabel, sharedSecret, nonce } = req.body || {};
     if (!linkId || !sharedSecret || !nonce || !acceptorBaseUrl) {
       return res.status(400).json({ error: "missing accept fields" });
+    }
+    // Same shape checks as /pair/invite: this body is anonymous too, and
+    // linkId reaches the SQLite binding directly.
+    if (!isValidLinkId(linkId) || !isValidNonce(nonce)) {
+      return res.status(400).json({ error: "invalid link id or nonce" });
+    }
+    // F-09: the secret becomes the only thing standing between this link and
+    // a forged signed request, so refuse one that cannot carry real entropy.
+    // store.newSecret() is 32 random bytes in base64, i.e. 44 characters.
+    if (typeof sharedSecret !== "string" || sharedSecret.length < 32 || sharedSecret.length > 512) {
+      return res.status(400).json({ error: "invalid shared secret" });
     }
     const link = store.getById(linkId);
     if (!link || link.status !== protocol.STATUS.OUTGOING_PENDING || link.role !== "initiator") {
@@ -365,6 +440,9 @@ function attachFederationRoutes(
     const { linkId, nonce, refusedByLabel } = req.body || {};
     if (!linkId || !nonce) {
       return res.status(400).json({ error: "missing fields" });
+    }
+    if (!isValidLinkId(linkId) || !isValidNonce(nonce)) {
+      return res.status(400).json({ error: "invalid link id or nonce" });
     }
     const link = store.getById(linkId);
     if (
@@ -754,6 +832,19 @@ function attachFederationRoutes(
     const localUrl = peer.normalizeBaseUrl(req.body?.localBaseUrl);
     if (!localUrl) return res.status(400).json({ error: "invalid_local_url" });
     const label = typeof req.body?.label === "string" ? req.body.label.trim() || null : null;
+    // Crossed invitations: we had our own invite out to this same address
+    // when theirs arrived, and an admin has just picked theirs. Stand our
+    // own one down now, so the pair ends up with exactly one link. This is
+    // the half of the tie-break that /pair/invite deliberately no longer
+    // performs: doing it here means it takes an authenticated admin choice
+    // to retire an invitation, never an anonymous claim over the network.
+    for (const ours of ourOutgoingTo(link.peer_base_url, link.id)) {
+      store.setStatus(ours.id, protocol.STATUS.CANCELLED);
+      log.log?.(
+        `[federation] crossed invitations with ${hostOf(link.peer_base_url)}; ` +
+        `standing down our outgoing link ${ours.id} in favour of ${link.id}`,
+      );
+    }
     store.setAccepting({
       id: link.id,
       shared_secret: store.newSecret(),

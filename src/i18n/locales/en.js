@@ -1438,6 +1438,10 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   fedInviteSending: "Sending…",
   fedInviteSent: "Invitation sent. Waiting for the other admin to accept.",
   fedInviteReceived: "{peer} wants to pair with your server",
+  // The name is chosen by whoever sent the invitation, so the address
+  // is shown next to it: the address is the part an admin can verify.
+  fedInviteReceivedFrom: "{peer} wants to pair with your server, at the address {host}",
+  fedInviteVerifyAddress: "Only accept if you recognise this address.",
   fedInviteReceivedTitle: "Pairing request",
   fedAcceptedToast: "Server paired",
   fedRefusedToast: "Pairing request declined",
