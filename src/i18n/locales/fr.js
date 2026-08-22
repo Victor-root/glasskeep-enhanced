@@ -1094,6 +1094,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   // IA
   errAiDisabled: "L'assistant IA est désactivé.",
   errAiNotConfigured: "L'assistant IA n'est pas configuré. Contactez un administrateur.",
+  aiAllowPrivateAiForUsersLabel: "Autoriser les adresses locales pour les utilisateurs",
+  aiAllowPrivateAiForUsersDesc: "Permet à chaque utilisateur de pointer son propre fournisseur vers une adresse de réseau privé, par exemple un modèle tournant sur sa machine. Désactivé par défaut : sans cela, n'importe quel compte pourrait faire connecter le serveur à une machine de votre réseau et lire ce qui a répondu. Pointer vers le fournisseur configuré ci-dessus ne le nécessite jamais.",
   errAiUrlPrivateForbidden: "Cette adresse est sur un réseau privé. Seul le fournisseur configuré par votre administrateur y est joignable ; utilisez une adresse publique, ou demandez à votre administrateur de le configurer côté serveur.",
   errAiUrlUnresolvable: "Cette adresse n'a pas pu être résolue.",
   errAiUrlCredentials: "Retirez l'identifiant et le mot de passe de l'adresse ; mettez la clé dans le champ prévu.",

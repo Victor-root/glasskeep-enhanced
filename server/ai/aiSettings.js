@@ -29,6 +29,13 @@ const ADMIN_DEFAULTS = Object.freeze({
   temperature: 0.3,
   maxTokens: 800,
   allowServerAiForUsers: false,
+  // Whether a user's OWN provider may sit on a private network. Off by
+  // default: without it, any account can make the server connect to a
+  // machine on the operator's LAN and read back what answered. Turning it
+  // on is a deliberate choice for a household where each person runs their
+  // own local model. Pointing at the provider the admin already configured
+  // never needs this, it is allowed either way.
+  allowPrivateAiForUsers: false,
 });
 
 const USER_DEFAULTS = Object.freeze({
@@ -75,6 +82,11 @@ function ensureSchema(db) {
   try {
     const cols = db.prepare(`PRAGMA table_info(ai_settings)`).all();
     const names = new Set(cols.map((c) => c.name));
+    if (!names.has("allow_private_ai_for_users")) {
+      db.exec(
+        `ALTER TABLE ai_settings ADD COLUMN allow_private_ai_for_users INTEGER NOT NULL DEFAULT 0`,
+      );
+    }
     if (!names.has("allow_server_ai_for_users")) {
       db.exec(
         `ALTER TABLE ai_settings ADD COLUMN allow_server_ai_for_users INTEGER NOT NULL DEFAULT 0`,
@@ -114,6 +126,7 @@ function adminRowToInternal(row) {
         ? row.max_tokens
         : ADMIN_DEFAULTS.maxTokens,
     allowServerAiForUsers: !!row.allow_server_ai_for_users,
+    allowPrivateAiForUsers: !!row.allow_private_ai_for_users,
   };
 }
 
@@ -160,6 +173,7 @@ function getAdminPublicConfig(db) {
     maxTokens: cfg.maxTokens,
     hasApiKey: cfg.apiKey.length > 0,
     allowServerAiForUsers: cfg.allowServerAiForUsers,
+    allowPrivateAiForUsers: cfg.allowPrivateAiForUsers,
   };
 }
 
@@ -193,6 +207,10 @@ function updateAdminConfig(db, patch = {}) {
       typeof patch.allowServerAiForUsers === "boolean"
         ? patch.allowServerAiForUsers
         : current.allowServerAiForUsers,
+    allowPrivateAiForUsers:
+      typeof patch.allowPrivateAiForUsers === "boolean"
+        ? patch.allowPrivateAiForUsers
+        : current.allowPrivateAiForUsers,
   };
 
   db.prepare(`
@@ -205,6 +223,7 @@ function updateAdminConfig(db, patch = {}) {
            temperature = ?,
            max_tokens = ?,
            allow_server_ai_for_users = ?,
+           allow_private_ai_for_users = ?,
            updated_at = datetime('now')
      WHERE id = 1
   `).run(
@@ -216,6 +235,7 @@ function updateAdminConfig(db, patch = {}) {
     next.temperature,
     next.maxTokens,
     next.allowServerAiForUsers ? 1 : 0,
+    next.allowPrivateAiForUsers ? 1 : 0,
   );
 
   return getAdminPublicConfig(db);
@@ -406,7 +426,8 @@ function resolveEffectiveConfig(db, userId) {
     // the provider the ADMIN already configured. A household running one
     // Ollama on the LAN can still point at it with their own key and model;
     // an arbitrary internal host is not reachable.
-    allowPrivateEndpoint: sameOrigin(userCfg.baseUrl, adminCfg.baseUrl),
+    allowPrivateEndpoint:
+      adminCfg.allowPrivateAiForUsers || sameOrigin(userCfg.baseUrl, adminCfg.baseUrl),
   };
 }
 

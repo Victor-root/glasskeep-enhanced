@@ -152,6 +152,49 @@ try {
   t.check("pointer vers le fournisseur local de l'administrateur reste possible",
           victimHits > 0, `${victimHits} requête(s), http ${same.status}`);
 
+  // ── E bis) L'interrupteur du panneau admin ─────────────────────────────
+  // GlassKeep assume deux montages: l'IA du serveur partagée, ou chacun la
+  // sienne. Le second mode a besoin des adresses locales quand chaque
+  // personne fait tourner son propre modèle. L'administrateur décide, et par
+  // défaut c'est non.
+  await put("/api/admin/ai/settings",
+            { enabled: true, baseUrl: "https://api.invalid.example/v1", model: "m" }, adminTok);
+  victimHits = 0;
+  const offToggle = await post("/api/user/ai/test", {
+    mode: "custom", baseUrl: `http://127.0.0.1:${VICTIM_PORT}/v1`, model: "m", apiKey: "x",
+  }, userTok);
+  t.check("interrupteur éteint: l'adresse locale d'un utilisateur est refusée",
+          FIXED ? victimHits === 0 : true,
+          `${victimHits} requête(s), http ${offToggle.status}`);
+
+  const flip = await put("/api/admin/ai/settings", { allowPrivateAiForUsers: true }, adminTok);
+  t.check("l'administrateur peut activer le réglage", flip.status === 200,
+          `http ${flip.status} ${JSON.stringify(flip.json).slice(0, 80)}`);
+  t.check("le réglage est bien renvoyé une fois enregistré",
+          flip.json?.allowPrivateAiForUsers === true,
+          JSON.stringify(flip.json?.allowPrivateAiForUsers));
+
+  victimHits = 0;
+  const onToggle = await post("/api/user/ai/test", {
+    mode: "custom", baseUrl: `http://127.0.0.1:${VICTIM_PORT}/v1`, model: "m", apiKey: "x",
+  }, userTok);
+  await sleep(300);
+  t.check("interrupteur allumé: chacun peut viser son propre modèle local",
+          victimHits > 0, `${victimHits} requête(s), http ${onToggle.status}`);
+
+  // Couper l'IA doit tout arrêter, y compris cette route de test qui
+  // court-circuitait l'interrupteur maître.
+  await put("/api/admin/ai/settings", { enabled: false }, adminTok);
+  victimHits = 0;
+  const whenOff = await post("/api/user/ai/test", {
+    mode: "custom", baseUrl: `http://127.0.0.1:${VICTIM_PORT}/v1`, model: "m", apiKey: "x",
+  }, userTok);
+  t.check(FIXED ? "IA coupée: plus aucune requête sortante depuis la route de test" : "IA coupée: la route de test sort quand même",
+          FIXED ? (victimHits === 0 && whenOff.status === 503) : true,
+          `${victimHits} requête(s), http ${whenOff.status}`);
+  await put("/api/admin/ai/settings",
+            { enabled: true, baseUrl: `http://127.0.0.1:${VICTIM_PORT}/v1`, model: "m" }, adminTok);
+
   // ── E) Et l'administrateur, lui, va où il veut ─────────────────────────
   victimHits = 0;
   const adminProbe = await post("/api/admin/ai/test", {

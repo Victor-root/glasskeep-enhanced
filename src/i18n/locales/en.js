@@ -1094,6 +1094,8 @@ loginUnexpectedError: "Unable to sign in. Check your connection and try again.",
   // AI
   errAiDisabled: "The AI Assistant is disabled.",
   errAiNotConfigured: "The AI Assistant is not configured. Ask an administrator.",
+  aiAllowPrivateAiForUsersLabel: "Let users reach local addresses",
+  aiAllowPrivateAiForUsersDesc: "Allows each user to point their own provider at a private network address, such as a model running on their own machine. Off by default: without it, any account could make the server connect to a machine on your network and read back what answered. Pointing at the provider configured above never needs this.",
   errAiUrlPrivateForbidden: "That address is on a private network. Only the provider your administrator configured can be reached there; use a public address, or ask your administrator to set it up server-side.",
   errAiUrlUnresolvable: "That address could not be resolved.",
   errAiUrlCredentials: "Remove the username and password from the address; put the key in the API key field.",

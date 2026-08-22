@@ -31,6 +31,7 @@ export default function AiAdminSection({ token, showToast }) {
 
   const [enabled, setEnabled] = useState(false);
   const [allowServerAiForUsers, setAllowServerAiForUsers] = useState(false);
+  const [allowPrivateAiForUsers, setAllowPrivateAiForUsers] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
   const [model, setModel] = useState("");
   const [apiKeyDraft, setApiKeyDraft] = useState("");
@@ -53,6 +54,7 @@ export default function AiAdminSection({ token, showToast }) {
         if (cancelled) return;
         setEnabled(!!data.enabled);
         setAllowServerAiForUsers(!!data.allowServerAiForUsers);
+        setAllowPrivateAiForUsers(!!data.allowPrivateAiForUsers);
         setBaseUrl(data.baseUrl || "");
         setModel(data.model || "");
         setHasApiKey(!!data.hasApiKey);
@@ -83,6 +85,7 @@ export default function AiAdminSection({ token, showToast }) {
     const patch = {
       enabled,
       allowServerAiForUsers,
+      allowPrivateAiForUsers,
       baseUrl: baseUrl.trim(),
       model: model.trim(),
       temperature: Number(temperature),
@@ -159,7 +162,21 @@ export default function AiAdminSection({ token, showToast }) {
       patch.allowServerAiForUsers = false;
       setAllowServerAiForUsers(false);
     }
+    if (!next && allowPrivateAiForUsers) {
+      patch.allowPrivateAiForUsers = false;
+      setAllowPrivateAiForUsers(false);
+    }
     persistOne(patch);
+  };
+
+  // Users reaching private addresses only makes sense while the feature is
+  // on at all, and follows it down when it is switched off, exactly like the
+  // sharing toggle above.
+  const onTogglePrivate = () => {
+    if (!enabled) return;
+    const next = !allowPrivateAiForUsers;
+    setAllowPrivateAiForUsers(next);
+    persistOne({ allowPrivateAiForUsers: next });
   };
 
   const onToggleShare = () => {
@@ -279,6 +296,33 @@ export default function AiAdminSection({ token, showToast }) {
           <span
             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
               allowServerAiForUsers && enabled
+                ? "translate-x-6"
+                : "translate-x-1"
+            }`}
+          />
+        </button>
+      </div>
+
+      {/* Let users reach private addresses — auto-saves */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-medium">{t("aiAllowPrivateAiForUsersLabel")}</div>
+          <div className="text-sm text-gray-500">{t("aiAllowPrivateAiForUsersDesc")}</div>
+        </div>
+        <button
+          type="button"
+          disabled={loading || saving || !enabled}
+          onClick={onTogglePrivate}
+          className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+            allowPrivateAiForUsers && enabled
+              ? "bg-[var(--gk-switch-on)]"
+              : "bg-gray-300 dark:bg-gray-600"
+          } disabled:opacity-50`}
+          aria-pressed={allowPrivateAiForUsers}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              allowPrivateAiForUsers && enabled
                 ? "translate-x-6"
                 : "translate-x-1"
             }`}
