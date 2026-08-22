@@ -177,24 +177,25 @@ footer { margin-top:5rem; padding-top:1.5rem; border-top:1px solid var(--line);
   <div class="score c-low"><span class="n">7</span><span class="l">Faible</span></div>
   <div class="score c-info"><span class="n">4</span><span class="l">Info</span></div>
   <div class="score c-refuted"><span class="n">12</span><span class="l">Réfutés</span></div>
-  <div class="score c-fixed"><span class="n">5</span><span class="l">Corrigés</span></div>
+  <div class="score c-fixed"><span class="n">6</span><span class="l">Corrigés</span></div>
 </div>
 
 <section>
-  <div class="section-head"><h2>État des correctifs</h2><span class="count">5 corrigés, 2 clos, 14 ouverts</span></div>
+  <div class="section-head"><h2>État des correctifs</h2><span class="count">6 corrigés, 2 clos, 13 ouverts</span></div>
   <div class="prose">
     <p>Suivi tenu à jour au fil des corrections. Chaque entrée du rapport porte son statut, et les entrées corrigées ou closes portent en fin de bloc la raison et la référence du commit.</p>
-    <p>Le correctif de F-02 s'est accompagné d'un banc d'essai à deux instances, versé au dépôt sous <code>test/federation</code>. Il monte une autorité de certification locale et deux serveurs qui s'appairent réellement en TLS vérifié, puis joue cinq scénarios pour 53 vérifications : la poignée de main nominale, l'attaque et sa variante à identifiant bien formé, les invitations croisées, la double acceptation simultanée, et le partage d'une note entre serveurs jusqu'au dépairage. Les scénarios d'attaque acceptent une attente « vulnérable » ou « bloqué », ce qui permet de vérifier qu'ils détectent réellement la faille au lieu de simplement passer : sur le code antérieur au correctif, l'attaque réussit 8/8. Cela ne referme pas F-21, qui vise l'absence de tests sur l'ensemble du projet, mais la fédération n'est plus la partie non couverte.</p>
+    <p>Le correctif de F-02 s'est accompagné d'un banc d'essai à deux instances, versé au dépôt sous <code>test/federation</code>. Il monte une autorité de certification locale et deux serveurs qui s'appairent réellement en TLS vérifié, puis joue sept scénarios pour 70 vérifications : la poignée de main nominale, l'attaque et sa variante à identifiant bien formé, les invitations croisées, la double acceptation simultanée, le partage d'une note entre serveurs jusqu'au dépairage, et le limiteur d'essais du déverrouillage au repos. Les scénarios d'attaque acceptent une attente « vulnérable » ou « bloqué », ce qui permet de vérifier qu'ils détectent réellement la faille au lieu de simplement passer : sur le code antérieur au correctif, l'attaque réussit 8/8. Cela ne referme pas F-21, qui vise l'absence de tests sur l'ensemble du projet, mais la fédération n'est plus la partie non couverte.</p>
   </div>
   <div class="table-scroll">
   <table>
     <thead><tr><th>Statut</th><th>Entrées</th><th>Détail</th></tr></thead>
     <tbody>
+      <tr class="done"><td><span class="chip fixed">Corrigé</span></td><td class="id">F-03</td><td>Commit <code>d538a53</code>. <code>TRUST_PROXY=true</code> ne signifie plus « tout accepter » mais les plages où se trouve réellement un proxy auto-hébergé. Une adresse publique ne peut plus réécrire l'adresse que le limiteur compte. <strong>Vérifié en bout en bout et sur la fonction de confiance elle-même.</strong></td></tr>
       <tr class="done"><td><span class="chip fixed">Corrigé</span></td><td class="id">F-02, F-09</td><td>Commit <code>3fbdfe1</code>. Identifiant et jeton contrôlés, départage rendu non destructeur, libellé borné, adresse réelle affichée dans le bandeau, plafond par origine, secret partagé refusé s'il est trop court. <strong>Vérifié sur deux instances réelles</strong> dialoguant en TLS vérifié.</td></tr>
       <tr class="done"><td><span class="chip fixed">Corrigé</span></td><td class="id">F-12, F-16, F-17</td><td>Commit <code>6c00501</code>. Encadrement refusé par en-tête, détail d'erreur d'import retiré de la réponse, recherche de collaborateur filtrée sur les comptes réels. Relu et contrôlé syntaxiquement, non exécuté au moment du commit.</td></tr>
       <tr><td><span class="chip plain">Accepté</span></td><td class="id">F-01</td><td>Risque accepté par le mainteneur. Le README documente la saisie du mot de passe à quatre reprises.</td></tr>
       <tr><td><span class="chip plain">Reporté</span></td><td class="id">F-20</td><td>La mise à jour d'<code>esbuild</code> sort de la plage que <code>vite</code> 7 autorise. Résolu par le futur passage à <code>vite</code> 8.</td></tr>
-      <tr><td><span class="chip open">À traiter</span></td><td class="id">F-03 à F-08, F-10, F-11, F-13 à F-15, F-18, F-19, F-21</td><td>Aucune de ces entrées n'est un correctif d'une ligne : chacune demande soit un arbitrage de configuration, soit une modification que rien ne permet de vérifier ici (deuxième instance, appareil Android, harnais de test).</td></tr>
+      <tr><td><span class="chip open">À traiter</span></td><td class="id">F-04 à F-08, F-10, F-11, F-13 à F-15, F-18, F-19, F-21</td><td>Aucune de ces entrées n'est un correctif d'une ligne : chacune demande soit un arbitrage de configuration, soit une modification que rien ne permet de vérifier ici (deuxième instance, appareil Android, harnais de test).</td></tr>
     </tbody>
   </table>
   </div>
@@ -216,7 +217,7 @@ footer { margin-top:5rem; padding-top:1.5rem; border-top:1px solid var(--line);
     <thead><tr><th>#</th><th>Criticité</th><th>Faille</th><th>Emplacement</th><th>Verdict</th><th>Statut</th></tr></thead>
     <tbody>
       <tr class="done"><td class="id">F-02</td><td><span class="chip high">Élevé</span></td><td>Appairage fédéré annulable et usurpable sans authentification</td><td class="where">server/routes/federationRoutes.js:250-318</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip fixed">Corrigé</span></td></tr>
-      <tr><td class="id">F-03</td><td><span class="chip high">Élevé</span></td><td>Anti-brute-force du déverrouillage neutralisable par un en-tête</td><td class="where">server/index.js:84-92<br>server/routes/unlockRoutes.js:123-133,240</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr class="done"><td class="id">F-03</td><td><span class="chip high">Élevé</span></td><td>Anti-brute-force du déverrouillage neutralisable par un en-tête</td><td class="where">server/index.js:84-92<br>server/routes/unlockRoutes.js:123-133,240</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip fixed">Corrigé</span></td></tr>
       <tr><td class="id">F-04</td><td><span class="chip high">Élevé</span></td><td>Refus du HTTP en clair inopérant pour la phrase de passe</td><td class="where">server/routes/unlockRoutes.js:166-179</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
       <tr><td class="id">F-05</td><td><span class="chip medium">Moyen</span></td><td>Requêtes sortantes arbitraires déclenchables par tout compte connecté</td><td class="where">server/ai/aiRoutes.js:142,239-257,267</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
       <tr><td class="id">F-06</td><td><span class="chip medium">Moyen</span></td><td>Aucune limitation d'essais sur la connexion, comptes énumérables</td><td class="where">server/index.js:1958-1986,2037-2046</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip open">À traiter</span></td></tr>
@@ -283,9 +284,9 @@ src/components/admin/federation/FederationInviteWatcher.jsx:54  le bandeau affic
     </div>
   </article>
 
-  <article class="finding high">
+  <article class="finding high done">
     <div class="f-head">
-      <div class="f-tags"><span class="f-id">F-03</span><span class="chip high">Élevé</span><span class="chip tp">Vrai positif</span></div>
+      <div class="f-tags"><span class="f-id">F-03</span><span class="chip fixed">Corrigé</span><span class="chip high">Élevé</span><span class="chip tp">Vrai positif</span></div>
       <h3>La protection contre les essais répétés du déverrouillage se contourne avec un en-tête</h3>
     </div>
     <div class="f-body">
@@ -312,6 +313,7 @@ server/encryption/runtimeUnlockState.js:83-110  le limiteur lui-même</div>
         <p>Remplacer <code>app.set("trust proxy", true)</code> par le nombre de sauts réels ou l'adresse du proxy, afin que l'adresse retenue ne puisse plus être choisie par le client. Recouper aussi la valeur avec l'adresse de la connexion elle-même avant de l'utiliser comme clé de comptage.</p>
       </div>
       <div class="verdict-line"><strong>fp-check</strong> : vrai positif. Une sous-revendication a été réfutée : annoncer l'adresse <code>127.0.0.1</code> ne permet pas de contourner le refus du HTTP en clair. <strong>variant-analysis</strong> : la même valeur sert de clé au limiteur des passkeys en <code>passkeyRoutes.js:665,710</code>.</div>
+      <div class="fixnote"><strong>Corrigé</strong> le 22 août 2026, commit <code>d538a53</code> sur <code>feature/cross-server-collaboration</code>. <code>TRUST_PROXY=true</code> ne veut plus dire « faire confiance à tout le monde » mais « faire confiance aux adresses où se trouve réellement un reverse proxy auto-hébergé » : boucle locale, lien-local et plages privées. Une requête arrivant directement d'une adresse publique n'est plus un intermédiaire de confiance, donc son <code>X-Forwarded-For</code> est ignoré et l'adresse retenue est celle d'où elle vient vraiment. La variable accepte aussi un nombre de sauts ou une liste explicite d'adresses, pour les installations que ce défaut ne couvre pas. Un proxy sur adresse publique doit désormais être nommé, ce qui échoue en se fermant plutôt qu'en s'ouvrant. Vérifié de deux façons, parce que le bac à sable tourne sur la boucle locale et ne peut pas fabriquer un appelant venu d'Internet. En bout en bout : avec l'appelant hors de l'ensemble de confiance, le limiteur mord après 20 essais (25 refus sur 45) alors que l'en-tête change à chaque coup ; avec l'appelant dedans, 45 sur 45 passent, ce que recevait tout le monde auparavant. Et directement sur la fonction de confiance compilée par Express : une adresse publique n'est pas de confiance, une adresse privée l'est, l'ancien réglage acceptait les deux.</div>
     </div>
   </article>
 

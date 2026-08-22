@@ -40,6 +40,7 @@ start_one() {
   SSL_KEY="$LAB/tls/node.key" \
   NODE_EXTRA_CA_CERTS="$LAB/tls/ca.pem" \
   FEDERATION_TICK_MS=5000 \
+  TRUST_PROXY="${FEDLAB_TRUST_PROXY:-}" \
   nohup node "$ROOT/server/index.js" > "$LAB/$name/server.log" 2>&1 &
   echo $! > "$LAB/$name/pid"
 }

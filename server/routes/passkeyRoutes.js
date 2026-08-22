@@ -49,7 +49,11 @@ const runtime = require("../encryption/runtimeUnlockState");
 // the browser sees, which is why we pull it from the request rather
 // than hard-coding.
 function operatorTrustsProxy() {
-  return process.env.TRUST_PROXY === "true"
+  // Any non-empty TRUST_PROXY other than "false" counts as the operator
+  // declaring a proxy: the variable also accepts a hop count or a list of
+  // trusted addresses (see server/index.js), not just "true".
+  const raw = (process.env.TRUST_PROXY || "").trim();
+  return (raw !== "" && raw !== "false")
     || process.env.HTTPS_ENABLED === "false";
 }
 
