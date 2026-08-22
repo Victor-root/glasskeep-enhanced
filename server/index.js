@@ -125,6 +125,21 @@ if (TRUST_PROXY) {
     + "; TLS termination is the operator's responsibility upstream of Node.",
   );
 }
+// The Docker image ships HTTPS_ENABLED=false, which switches proxy-header
+// handling on but says nothing about whether a proxy is actually there. The
+// at-rest unlock endpoints no longer read it as "the operator promised TLS
+// upstream" (they used to, silently), so say out loud what will happen: with
+// a proxy that forwards X-Forwarded-Proto nothing changes, without one the
+// passphrase will be refused rather than accepted over plaintext.
+if (process.env.HTTPS_ENABLED === "false" && TRUST_PROXY_RAW === "") {
+  console.warn(
+    "[boot] HTTPS is off at the Node level and TRUST_PROXY is unset. Unlocking "
+    + "the at-rest vault needs either a reverse proxy that forwards "
+    + "X-Forwarded-Proto: https, or TRUST_PROXY=true to assert that TLS is "
+    + "terminated upstream. Without one of the two the unlock endpoints will "
+    + "refuse the passphrase rather than accept it over plaintext HTTP.",
+  );
+}
 
 // ---------- Framing protection ----------
 // Nothing in GlassKeep is ever meant to be embedded in another page, so
