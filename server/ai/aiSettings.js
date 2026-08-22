@@ -15,6 +15,8 @@
 //                        mode = "custom". The user's API key is also
 //                        stored server-side and never returned in full.
 
+const guard = require("./endpointGuard");
+
 const PROVIDER_OPENAI_COMPATIBLE = "openai-compatible";
 const MODES = Object.freeze(["server", "custom"]);
 
@@ -27,6 +29,13 @@ const ADMIN_DEFAULTS = Object.freeze({
   temperature: 0.3,
   maxTokens: 800,
   allowServerAiForUsers: false,
+  // Whether a user's OWN provider may sit on a private network. Off by
+  // default: without it, any account can make the server connect to a
+  // machine on the operator's LAN and read back what answered. Turning it
+  // on is a deliberate choice for a household where each person runs their
+  // own local model. Pointing at the provider the admin already configured
+  // never needs this, it is allowed either way.
+  allowPrivateAiForUsers: false,
 });
 
 const USER_DEFAULTS = Object.freeze({
@@ -73,6 +82,11 @@ function ensureSchema(db) {
   try {
     const cols = db.prepare(`PRAGMA table_info(ai_settings)`).all();
     const names = new Set(cols.map((c) => c.name));
+    if (!names.has("allow_private_ai_for_users")) {
+      db.exec(
+        `ALTER TABLE ai_settings ADD COLUMN allow_private_ai_for_users INTEGER NOT NULL DEFAULT 0`,
+      );
+    }
     if (!names.has("allow_server_ai_for_users")) {
       db.exec(
         `ALTER TABLE ai_settings ADD COLUMN allow_server_ai_for_users INTEGER NOT NULL DEFAULT 0`,
@@ -112,6 +126,7 @@ function adminRowToInternal(row) {
         ? row.max_tokens
         : ADMIN_DEFAULTS.maxTokens,
     allowServerAiForUsers: !!row.allow_server_ai_for_users,
+    allowPrivateAiForUsers: !!row.allow_private_ai_for_users,
   };
 }
 
@@ -158,6 +173,7 @@ function getAdminPublicConfig(db) {
     maxTokens: cfg.maxTokens,
     hasApiKey: cfg.apiKey.length > 0,
     allowServerAiForUsers: cfg.allowServerAiForUsers,
+    allowPrivateAiForUsers: cfg.allowPrivateAiForUsers,
   };
 }
 
@@ -191,6 +207,10 @@ function updateAdminConfig(db, patch = {}) {
       typeof patch.allowServerAiForUsers === "boolean"
         ? patch.allowServerAiForUsers
         : current.allowServerAiForUsers,
+    allowPrivateAiForUsers:
+      typeof patch.allowPrivateAiForUsers === "boolean"
+        ? patch.allowPrivateAiForUsers
+        : current.allowPrivateAiForUsers,
   };
 
   db.prepare(`
@@ -203,6 +223,7 @@ function updateAdminConfig(db, patch = {}) {
            temperature = ?,
            max_tokens = ?,
            allow_server_ai_for_users = ?,
+           allow_private_ai_for_users = ?,
            updated_at = datetime('now')
      WHERE id = 1
   `).run(
@@ -214,6 +235,7 @@ function updateAdminConfig(db, patch = {}) {
     next.temperature,
     next.maxTokens,
     next.allowServerAiForUsers ? 1 : 0,
+    next.allowPrivateAiForUsers ? 1 : 0,
   );
 
   return getAdminPublicConfig(db);
@@ -324,6 +346,14 @@ function updateUserConfig(db, userId, patch = {}) {
 // Error tagged with `.status` so the route layer can surface a clean
 // HTTP response. Never returns the admin config when the admin hasn't
 // authorised it — even if a user previously set `mode = 'server'`.
+// Same scheme, host and port. Compared on the parsed origin so that a
+// trailing slash or a differing path does not decide a security question.
+function sameOrigin(a, b) {
+  const pa = guard.normalizeProviderUrl(a);
+  const pb = guard.normalizeProviderUrl(b);
+  return pa.ok && pb.ok && pa.url.origin === pb.url.origin;
+}
+
 function resolveEffectiveConfig(db, userId) {
   const userCfg = getUserConfig(db, userId);
   if (!userCfg.enabled) {
@@ -367,6 +397,9 @@ function resolveEffectiveConfig(db, userId) {
       temperature: adminCfg.temperature,
       maxTokens: adminCfg.maxTokens,
       origin: "server",
+      // The admin chose this address. Reaching a model on the LAN is the
+      // setup the README recommends, so nothing is restricted here.
+      allowPrivateEndpoint: true,
     };
   }
 
@@ -386,10 +419,20 @@ function resolveEffectiveConfig(db, userId) {
     temperature: userCfg.temperature,
     maxTokens: userCfg.maxTokens,
     origin: "custom",
+    // A regular user picked this address. Left unrestricted, any account on
+    // the instance could make the server connect anywhere on the operator's
+    // network and report what answered. Private destinations are therefore
+    // refused, with one exception that keeps the documented setup working:
+    // the provider the ADMIN already configured. A household running one
+    // Ollama on the LAN can still point at it with their own key and model;
+    // an arbitrary internal host is not reachable.
+    allowPrivateEndpoint:
+      adminCfg.allowPrivateAiForUsers || sameOrigin(userCfg.baseUrl, adminCfg.baseUrl),
   };
 }
 
 module.exports = {
+  sameProviderOrigin: sameOrigin,
   PROVIDER_OPENAI_COMPATIBLE,
   MODES,
   ADMIN_DEFAULTS,

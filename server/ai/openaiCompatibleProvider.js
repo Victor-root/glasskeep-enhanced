@@ -6,6 +6,8 @@
 // (/v1), Open WebUI, LiteLLM, LM Studio, OpenRouter, OpenAI itself,
 // etc. No vendor-specific quirks live here.
 
+const guard = require("./endpointGuard");
+
 function joinUrl(baseUrl, suffix) {
   if (!baseUrl) return suffix;
   const trimmed = baseUrl.replace(/\/+$/, "");
@@ -57,6 +59,46 @@ function validateConfig(cfg) {
   if (!cfg.enabled) throw new AIProviderError("AI is disabled.", { status: 503 });
   if (!cfg.baseUrl) throw new AIProviderError("AI base URL is not set.", { status: 400 });
   if (!cfg.model) throw new AIProviderError("AI model is not set.", { status: 400 });
+  // Scheme and shape, before anything is dialled. http/https only: the rest
+  // of the URL space has no business behind a chat endpoint.
+  const parsed = guard.normalizeProviderUrl(cfg.baseUrl);
+  if (!parsed.ok) throw new AIProviderError(parsed.reason, { status: 400 });
+}
+
+// Everything the two request paths need to share: the destination check, the
+// dispatcher that enforces it at connect time, a deadline, and a refusal to
+// follow redirects (a public host answering with a 302 to 127.0.0.1 would
+// otherwise walk straight past the destination check).
+const REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS) > 0
+  ? Number(process.env.AI_REQUEST_TIMEOUT_MS)
+  : 120000;
+
+// deadlineMs = 0 means "no total deadline": the streaming path stays open as
+// long as the model keeps producing, and is bounded by the connect timeout
+// the dispatcher applies plus whatever signal the caller passes.
+async function requestInit(cfg, { body, signal, headers, deadlineMs = REQUEST_TIMEOUT_MS }) {
+  if (!cfg.allowPrivateEndpoint) {
+    const verdict = await guard.checkDestination(cfg.baseUrl, { allowPrivate: false });
+    if (!verdict.ok) throw new AIProviderError(verdict.reason, { status: 400 });
+  }
+  const timer = new AbortController();
+  const deadline = deadlineMs > 0 ? setTimeout(() => timer.abort(), deadlineMs) : null;
+  // Honour the caller's own signal too, without losing the deadline.
+  if (signal) {
+    if (signal.aborted) timer.abort();
+    else signal.addEventListener("abort", () => timer.abort(), { once: true });
+  }
+  return {
+    init: {
+      method: "POST",
+      headers: { ...buildHeaders(cfg), ...(headers || {}) },
+      body: JSON.stringify(body),
+      signal: timer.signal,
+      redirect: "error",
+      ...(cfg.allowPrivateEndpoint ? {} : { dispatcher: guard.publicOnlyDispatcher() }),
+    },
+    done: () => { if (deadline) clearTimeout(deadline); },
+  };
 }
 
 function buildHeaders(cfg) {
@@ -90,27 +132,32 @@ async function chatCompletion(cfg, { messages, temperature, maxTokens, signal } 
   };
 
   let res;
-  try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: buildHeaders(cfg),
-      body: JSON.stringify(body),
-      signal,
-    });
-  } catch (err) {
-    // Network-level failure (DNS, connection refused, TLS, abort, …).
-    // Keep the error message generic — never leak the API key.
-    const reason = err?.name === "AbortError" ? "request aborted" : "network error";
-    throw new AIProviderError(`Failed to reach AI provider (${reason}).`, {
-      status: 502,
-    });
-  }
-
+  // The deadline covers the body as well as the connection, so it is only
+  // cleared once the payload has been read.
+  const { init, done } = await requestInit(cfg, { body, signal });
   let payload = null;
   try {
-    payload = await res.json();
-  } catch {
-    payload = null;
+    try {
+      res = await fetch(url, init);
+    } catch (err) {
+      // Network-level failure (DNS, connection refused, TLS, abort, a
+      // destination the guard refused, …). Keep the message generic, never
+      // leak the API key, but name a refused destination so the user can act.
+      if (err?.cause?.code === "GK_PRIVATE_ADDRESS" || err?.code === "GK_PRIVATE_ADDRESS") {
+        throw new AIProviderError(guard.REASON.PRIVATE, { status: 400 });
+      }
+      const reason = err?.name === "AbortError" ? "request aborted" : "network error";
+      throw new AIProviderError(`Failed to reach AI provider (${reason}).`, {
+        status: 502,
+      });
+    }
+    try {
+      payload = await res.json();
+    } catch {
+      payload = null;
+    }
+  } finally {
+    done();
   }
 
   if (!res.ok) {
@@ -165,14 +212,16 @@ async function* chatCompletionStream(
 
   dbg(`fetch start url=${url} model=${cfg.model}`);
   let res;
+  const { init } = await requestInit(cfg, {
+    body, signal, headers: { Accept: "text/event-stream" }, deadlineMs: 0,
+  });
   try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: { ...buildHeaders(cfg), Accept: "text/event-stream" },
-      body: JSON.stringify(body),
-      signal,
-    });
+    res = await fetch(url, init);
   } catch (err) {
+    if (err?.cause?.code === "GK_PRIVATE_ADDRESS" || err?.code === "GK_PRIVATE_ADDRESS") {
+      dbg("fetch refused: private destination");
+      throw new AIProviderError(guard.REASON.PRIVATE, { status: 400 });
+    }
     const reason = err?.name === "AbortError" ? "request aborted" : "network error";
     dbg(`fetch failed: ${err?.message || reason}`);
     throw new AIProviderError(`Failed to reach AI provider (${reason}).`, {

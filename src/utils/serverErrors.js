@@ -107,6 +107,12 @@ const PATTERNS = [
   ["AI is disabled",                             "errAiDisabled"],
   ["AI is not configured",                       "errAiNotConfigured"],
   ["AI base URL is not set",                     "errAiBaseUrlMissing"],
+  // Adresse de fournisseur refusée: jetons machine émis par endpointGuard.
+  ["ai_url_private_forbidden",                   "errAiUrlPrivateForbidden"],
+  ["ai_url_unresolvable",                        "errAiUrlUnresolvable"],
+  ["ai_url_credentials",                         "errAiUrlCredentials"],
+  ["ai_url_malformed",                           "errAiUrlMalformed"],
+  ["ai_url_scheme",                              "errAiUrlScheme"],
   ["AI model is not set",                        "errAiModelMissing"],
   ["Failed to reach AI provider",                "errAiUnreachable"],
   ["AI provider error",                          "errAiProvider"],
