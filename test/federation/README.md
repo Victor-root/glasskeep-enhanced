@@ -41,6 +41,7 @@ utiles si vous exposez les instances autrement).
 | `t5-notes.mjs` | Non-régression de la fonctionnalité: partage d'une note entre serveurs, édition dans les deux sens, passage en lecture seule, dépairage. |
 | `t6-trust-proxy.mjs` | F-03. Active le chiffrement au repos, verrouille, puis martèle le déverrouillage en changeant `X-Forwarded-For` à chaque essai. Laisse l'instance verrouillée: relancez `setup.sh` ensuite. |
 | `t7-trust-policy.mjs` | F-03, la politique elle-même: quelles adresses ont le droit de réécrire l'adresse retenue. Ne demande aucun serveur. |
+| `t9-ai-ssrf.mjs` | F-05. Un compte ordinaire ne doit pas pouvoir faire sonder le réseau par le serveur via l'adresse du fournisseur IA, sans casser le montage recommandé (modèle local configuré par l'administrateur). Démarre son instance et un faux service interne. |
 | `t8-plaintext-guard.mjs` | F-04. Le refus d'envoyer la phrase de passe en clair doit s'appliquer au défaut Docker, sans casser les installations qui déclarent un proxy. Démarre ses propres instances en HTTP, n'utilise pas le bac à sable. |
 
 ## Tester avant / après un correctif
@@ -82,6 +83,7 @@ intermédiaire qui n'est pas nous, et `t7` vérifie la politique adresse par
 adresse, sans réseau.
 
 Ces scénarios couvrent la poignée de main d'appairage, le partage de notes, le
-limiteur de déverrouillage et le refus du transport en clair. Ils ne couvrent pas les passkeys ni la partie
+limiteur de déverrouillage, le refus du transport en clair et les adresses
+sortantes de la configuration IA. Ils ne couvrent pas les passkeys ni la partie
 Android. Un scénario qui passe dit que le chemin testé fonctionne, pas que la
 fédération est sans défaut.

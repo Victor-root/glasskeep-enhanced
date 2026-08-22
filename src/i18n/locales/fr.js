@@ -1094,6 +1094,11 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   // IA
   errAiDisabled: "L'assistant IA est désactivé.",
   errAiNotConfigured: "L'assistant IA n'est pas configuré. Contactez un administrateur.",
+  errAiUrlPrivateForbidden: "Cette adresse est sur un réseau privé. Seul le fournisseur configuré par votre administrateur y est joignable ; utilisez une adresse publique, ou demandez à votre administrateur de le configurer côté serveur.",
+  errAiUrlUnresolvable: "Cette adresse n'a pas pu être résolue.",
+  errAiUrlCredentials: "Retirez l'identifiant et le mot de passe de l'adresse ; mettez la clé dans le champ prévu.",
+  errAiUrlMalformed: "Cette adresse ne semble pas valide.",
+  errAiUrlScheme: "L'adresse doit commencer par http:// ou https://.",
   errAiBaseUrlMissing: "L'URL de base de l'IA n'est pas définie.",
   errAiModelMissing: "Le modèle IA n'est pas défini.",
   errAiUnreachable: "Impossible de joindre le fournisseur IA.",
