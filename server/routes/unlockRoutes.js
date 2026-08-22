@@ -147,34 +147,50 @@ function isLocalhost(req) {
 //      the cleanest signal — when nginx is configured to send XFP, we
 //      can verify the upstream scheme without taking the operator's
 //      word for it.
-//   3. Operator-declared proxy mode: TRUST_PROXY=true (or HTTPS_ENABLED
-//      =false, which install.sh writes when the operator picks
-//      "reverse proxy" SSL mode). This is an explicit assertion from
-//      the operator that TLS is terminated upstream of Node. We trust
-//      it even if the proxy is misconfigured to omit X-Forwarded-Proto
-//      (a very common nginx oversight). The security boundary that
-//      matters is browser ↔ proxy, which the operator owns and has
-//      asserted to be HTTPS — the proxy ↔ Node hop is loopback or a
-//      private LAN where the unencrypted body is no worse than what
-//      already crosses it for every other API call.
+//   3. An EXPLICIT TRUST_PROXY set by the operator. That is an assertion
+//      from a person that TLS is terminated upstream, and it is honoured
+//      even when the proxy forgets to forward X-Forwarded-Proto, which is
+//      a common enough oversight that refusing outright would strand
+//      people whose browser-to-proxy hop really is encrypted. The
+//      boundary that matters is browser to proxy, which the operator owns
+//      and has asserted; proxy to Node is loopback or a private network
+//      where the body is no worse off than every other API call already
+//      crossing it.
+//
+//      HTTPS_ENABLED=false used to reach the same conclusion, and no
+//      longer does. install.sh always writes TRUST_PROXY explicitly, so
+//      that inference only ever fired for the Docker image, which ships
+//      HTTPS_ENABLED=false on its own: an operator who simply published
+//      the port with nothing in front had this check switched off without
+//      ever asking for it. Behind a correctly configured proxy nothing
+//      changes, because path 2 already covers it.
 //
 // What we deliberately do NOT do: inspect raw X-Forwarded-Proto /
 // X-Forwarded-Ssl / Front-End-Https headers without `trust proxy`
 // being configured. Without trust proxy, any client can send those
 // headers and bypass the check. Express's req.secure is the only
 // trustworthy view of "did this come over HTTPS upstream".
-function operatorDeclaredProxy() {
-  // Any non-empty TRUST_PROXY other than "false" counts as the operator
-  // declaring a proxy: the variable also accepts a hop count or a list of
-  // trusted addresses (see server/index.js), not just "true".
-  const raw = (process.env.TRUST_PROXY || "").trim();
-  return (raw !== "" && raw !== "false")
-    || process.env.HTTPS_ENABLED === "false";
-}
-
 function isSecureRequest(req) {
+  // req.secure is true when Node terminated TLS itself, and also when a
+  // TRUSTED hop forwarded X-Forwarded-Proto: https. Since trust is now
+  // scoped to the addresses a proxy actually sits on (see server/index.js),
+  // that second case is a statement from the proxy, not from the client.
   if (req.secure === true) return true;
-  if (operatorDeclaredProxy()) return true;
+
+  // What used to be here: "the operator declared a proxy, so assume https".
+  // That assumption was made for the operator rather than by them. The
+  // Docker image ships HTTPS_ENABLED=false, which the code read as the
+  // declaration, so an operator who simply published the port with nothing
+  // in front had the check silently switched off while believing it was on.
+  //
+  // An explicit TRUST_PROXY is different: the operator typed it. Honour it,
+  // because a reverse proxy that forgets X-Forwarded-Proto is a common
+  // enough misconfiguration that refusing outright would strand people whose
+  // browser-to-proxy hop really is encrypted. What is no longer accepted is
+  // the same conclusion drawn from a value the image set on its own.
+  const declared = (process.env.TRUST_PROXY || "").trim();
+  if (declared !== "" && declared !== "false") return true;
+
   return false;
 }
 

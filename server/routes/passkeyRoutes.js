@@ -168,8 +168,26 @@ function isLocalhost(req) {
   return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
 }
 function isSecureRequest(req) {
+  // req.secure is true when Node terminated TLS itself, and also when a
+  // TRUSTED hop forwarded X-Forwarded-Proto: https. Since trust is now
+  // scoped to the addresses a proxy actually sits on (see server/index.js),
+  // that second case is a statement from the proxy, not from the client.
   if (req.secure === true) return true;
-  if (operatorTrustsProxy()) return true;
+
+  // What used to be here: "the operator declared a proxy, so assume https".
+  // That assumption was made for the operator rather than by them. The
+  // Docker image ships HTTPS_ENABLED=false, which the code read as the
+  // declaration, so an operator who simply published the port with nothing
+  // in front had the check silently switched off while believing it was on.
+  //
+  // An explicit TRUST_PROXY is different: the operator typed it. Honour it,
+  // because a reverse proxy that forgets X-Forwarded-Proto is a common
+  // enough misconfiguration that refusing outright would strand people whose
+  // browser-to-proxy hop really is encrypted. What is no longer accepted is
+  // the same conclusion drawn from a value the image set on its own.
+  const declared = (process.env.TRUST_PROXY || "").trim();
+  if (declared !== "" && declared !== "false") return true;
+
   return false;
 }
 function transportOk(req) {
