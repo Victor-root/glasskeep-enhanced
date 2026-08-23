@@ -53,10 +53,15 @@ services:
       # Passkeys and encryption are supported on Docker. Requirements:
       #   1. Set up a reverse proxy with HTTPS (Nginx, Caddy, Traefik, etc.)
       #   2. The reverse proxy MUST pass X-Forwarded-Host and X-Forwarded-Proto
-      #      headers so the server can auto-detect your domain.
+      #      headers.
       #   3. Users access via HTTPS only (WebAuthn does not work over HTTP).
-      #
-      # If auto-detection fails (wrong RP_ID), set these explicitly:
+      #   4. On a public domain, SET THE TWO VARIABLES BELOW. They are not a
+      #      fallback any more: the server no longer takes the passkey domain
+      #      from the request headers, because whoever sends the request
+      #      writes them, and a domain the caller chose is not a domain the
+      #      server can check anything against. Without them, passkeys keep
+      #      working on a local address and are refused on a public one.
+      #      The startup log says which case applies to you.
       # WEBAUTHN_RP_ID: "example.com"
       # WEBAUTHN_ORIGIN: "https://example.com"
       #
