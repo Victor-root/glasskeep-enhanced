@@ -91,6 +91,7 @@ place. This guide walks through every case we've seen.
 | **The server must answer on the standard port `443`** for the `/.well-known/assetlinks.json` URL — see [the non-standard-port section](#-special-case-glasskeep-on-a-non-standard-port-eg-8090) below if you can't dedicate port 443 to GlassKeep. | When Android validates the app↔domain link, it ignores any custom port you might use elsewhere and goes straight to `https://your-domain.tld/.well-known/assetlinks.json` on port 443. If nothing serves that URL, association fails. |
 | **Android 9+** (Android 14+ recommended) | Below Android 9, no `Credential Manager` API exists in any form. Below 14 you also need Google Play Services to be installed — most phones have it, /e/OS / GrapheneOS / Lineage-without-MicroG users will need a third-party credential provider (Bitwarden Android) installed instead. |
 | **The official APK** from the [GlassKeep Releases page](https://github.com/Victor-root/glasskeep-enhanced/releases) — *or* the F-Droid build once it ships there. | Each APK is signed with one key. The server is pre-configured to trust the official key + the F-Droid key out of the box; custom rebuilds need extra setup ([Part 2](#part-2--for-developers-rebuilding-the-apk)). |
+| **`WEBAUTHN_RP_ID` set to your domain**, plus `WEBAUTHN_ORIGIN` when something else terminates TLS (Docker behind a reverse proxy, for instance). | A passkey belongs to one domain, and the server checks that independently of the browser. It will not take the domain from the request's own headers: whoever sends a request writes those, so a value read from them is not something the server can check anything against. The server can work it out on its own in exactly two cases, and says which at startup: when it holds the TLS certificate itself (the name comes from the certificate), and when the address is local (`localhost`, a private address, a `.local` name), which keeps development and LAN installs configuration-free. On a public domain, set the variables. |
 
 ## Step-by-step setup
 
@@ -414,6 +415,27 @@ https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=http
 
 It returns the **same** statements Android sees. If `statements: []`
 or an error, that's exactly what your phone sees too.
+
+### "Failed to start passkey registration / login", nothing else in the browser
+
+Look at the server log. A line reading *"Passkeys are not configured
+for this domain"* means the server could not establish, on its own,
+which domain your passkeys belong to, and refused rather than take the
+domain from a request header the caller writes.
+
+Set `WEBAUTHN_RP_ID` to your domain, and `WEBAUTHN_ORIGIN` to the full
+`https://…` address when something in front terminates TLS. Restart.
+The startup log then names the source it is using:
+
+```
+[passkeys] relying party from configuration (notes.example.com)
+[passkeys] relying party from the TLS certificate (notes.example.com)
+[passkeys] no relying party configured: …
+```
+
+The third line is fine on a local or LAN address, where passkeys keep
+working with no configuration at all. It is the one to act on as soon
+as the instance is reachable on a public domain.
 
 ### "Échec de la vérification" / "Verification failed"
 

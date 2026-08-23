@@ -32,69 +32,46 @@ const runtime = require("../encryption/runtimeUnlockState");
 
 // ── RP config resolution ──────────────────────────────────────────────
 //
-// WebAuthn ties every credential to a "Relying Party ID" — typically
-// the bare hostname, e.g. "glasskeep.example.com". We resolve it in
-// this order:
+// WebAuthn ties every credential to a "Relying Party ID", typically the
+// bare hostname, e.g. "glasskeep.example.com". Deciding which one applies
+// to a request is the whole of server/services/webauthnRp.js: read the
+// reasoning there, it is the answer to F-11. In short, the domain never
+// comes from a header the caller wrote.
 //
-//   1. WEBAUTHN_RP_ID env var (operator override; required when the
-//      app sits behind a domain that differs from the Node Host header
-//      e.g. mixed Tailscale + public DNS setups).
-//   2. The request's Host header (or X-Forwarded-Host when trust proxy
-//      is enabled), with port stripped.
-//   3. "localhost" as a last resort so dev still works.
-//
-// Origin follows the same logic but keeps the protocol + port. Modern
-// browsers reject any registration whose origin doesn't match what
-// the credential was created on — we MUST send the exact same string
-// the browser sees, which is why we pull it from the request rather
-// than hard-coding.
-function operatorTrustsProxy() {
-  // Any non-empty TRUST_PROXY other than "false" counts as the operator
-  // declaring a proxy: the variable also accepts a hop count or a list of
-  // trusted addresses (see server/index.js), not just "true".
-  const raw = (process.env.TRUST_PROXY || "").trim();
-  return (raw !== "" && raw !== "false")
-    || process.env.HTTPS_ENABLED === "false";
+// Origin follows the same source and keeps the protocol and port. A
+// browser rejects any ceremony whose origin does not match the one the
+// credential was created on, so the list has to contain the exact string
+// the browser saw.
+const webauthnRp = require("../services/webauthnRp");
+
+// Thrown when no trustworthy domain can be established. Every route
+// turns it into a 500 naming the variable the operator has to set.
+class RpUnresolved extends Error {
+  constructor(reason) {
+    super("Passkeys are not configured for this domain. Set WEBAUTHN_RP_ID "
+      + "(and WEBAUTHN_ORIGIN when a proxy terminates TLS).");
+    this.name = "RpUnresolved";
+    this.reason = reason;
+  }
 }
 
-function resolveHost(req) {
-  if (operatorTrustsProxy()) {
-    const xfh = req.headers["x-forwarded-host"];
-    if (xfh) return String(xfh).split(",")[0].trim();
-  }
-  return req.headers.host || "localhost";
-}
-
-function resolveProto(req) {
-  if (req.secure) return "https";
-  if (operatorTrustsProxy()) {
-    const xfp = req.headers["x-forwarded-proto"];
-    if (xfp) return String(xfp).split(",")[0].trim();
-    // When the operator declared a proxy, default to https for origin
-    // construction — public passkey deployments are virtually always
-    // behind TLS.
-    return "https";
-  }
-  return req.protocol || "http";
+function resolveRpOrThrow(req) {
+  const verdict = webauthnRp.resolveRp(req);
+  if (!verdict.ok) throw new RpUnresolved(verdict.reason);
+  return verdict;
 }
 
 function rpId(req) {
-  if (process.env.WEBAUTHN_RP_ID) return process.env.WEBAUTHN_RP_ID;
-  const host = resolveHost(req);
-  // Strip port from "host:8080" → "host"; an IPv6 literal "[::1]:80" →
-  // "[::1]" is left as-is (valid RP ID for IP-only setups).
-  return host.replace(/:\d+$/, "");
+  return resolveRpOrThrow(req).rpId;
 }
 
 function expectedOrigin(req) {
-  const webOrigin = process.env.WEBAUTHN_ORIGIN
-    || `${resolveProto(req)}://${resolveHost(req)}`;
   // Passkeys created via the Android Credential Manager (i.e. from
   // inside the native app) carry an origin of the form
   // `android:apk-key-hash:<URL-safe-base64(SHA-256(signing cert))>`
   // rather than the web URL — even when the WebView itself was loaded
   // from https://<domain>. @simplewebauthn/server accepts an array of
-  // acceptable origins, so we hand it both the regular web origin AND
+  // acceptable origins, so we hand it both the regular web origins AND
   // every Android origin derived from the same fingerprint list the
   // /.well-known/assetlinks.json route already publishes (official
   // APK + F-Droid + ANDROID_EXTRA_FINGERPRINTS).
@@ -103,7 +80,7 @@ function expectedOrigin(req) {
   // than at module load: env vars can be changed (and the process
   // reloaded by systemd) between cold-starts, and we want the next
   // request to pick the new value up without an extra restart.
-  return [webOrigin, ...androidApkOrigins()];
+  return [...resolveRpOrThrow(req).origins, ...androidApkOrigins()];
 }
 
 const assetLinks = require("./assetLinksRoutes")._internals;
@@ -212,6 +189,11 @@ async function paceFailure(ms) {
 // ── Route attachment ──────────────────────────────────────────────────
 function attachPasskeyRoutes(app, deps) {
   const { db, auth, adminOnly, signToken, getUserById, log = console } = deps;
+
+  // Said once at boot rather than discovered when a passkey fails: the
+  // operator learns here which of the four sources their domain comes
+  // from, and what to set if the answer is "none".
+  log.log?.(webauthnRp.describeConfig());
 
   // ====================================================================
   //   USER PASSKEY MANAGEMENT
