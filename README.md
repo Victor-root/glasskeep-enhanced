@@ -183,6 +183,26 @@ The script is designed to make installation as simple as possible:
 > Caddy has no such limit by default; Apache uses `LimitRequestBody 0`; on
 > Traefik it is unlimited unless you set `buffering.maxRequestBodyBytes`.
 
+> ⚠️ **Custom error pages: keep them away from `/api/`.** If your proxy
+> replaces upstream error responses with its own pages, GlassKeep's answers
+> stop reaching the browser. The app says *why* a request failed in the
+> response body, so a wrong passphrase, a rejected recovery key or a taken
+> email all arrive as an HTML page the app cannot read, and the screen can
+> only fall back to a vague message. In nginx this is `proxy_intercept_errors
+> on;` combined with `error_page`; turn it off where the API lives:
+>
+> ```nginx
+> location /api/ {
+>     proxy_intercept_errors off;
+>     proxy_pass http://127.0.0.1:8080;
+>     # … your existing proxy_set_header lines
+> }
+> ```
+>
+> Your pretty pages keep working everywhere else. On Traefik the equivalent
+> is scoping the `errors` middleware so it does not cover `/api/`; Caddy's
+> `handle_errors` should likewise skip it.
+
 ---
 
 ### 🐳 Docker installation

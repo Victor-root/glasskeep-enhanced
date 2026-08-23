@@ -121,13 +121,48 @@ for (const [nom, chemin, message] of [
 }
 
 // ── Un 401 sans corps, sans jeton: surtout pas « session expirée » ──
+//
+// Trouvé après coup, sur une instance réelle: la raison du serveur
+// n'arrivait pas jusqu'au navigateur, et le client la remplaçait par
+// « une erreur est survenue ». Une phrase générique n'est jamais la
+// vérité sur un 401, et elle masquait le repli de l'écran appelant, qui
+// sait, lui, ce qu'il vient d'envoyer. On n'invente donc plus rien.
 {
   freshSession();
   respondWith(401, null);
   const err = await expectThrow(() => api("/instance/unlock", { method: "POST", body: {} }));
   t.check("sans corps et sans jeton, on ne parle pas de session expirée",
           !/expir/i.test(err?.message || ""), err?.message);
+  t.check("et on n'invente aucune phrase générique", err?.message === "", err?.message);
+  t.check("le code reste lisible par l'appelant", err?.status === 401);
   t.check("et la session survit", sessionStillThere());
+}
+
+// ── L'écran appelant sait dire la vraie raison sans le corps ────────
+{
+  const { localizeSecretRejection } = await import(
+    path.join(ROOT, "src", "utils", "serverErrors.js"));
+  const { t: tr } = await import(path.join(ROOT, "src", "i18n", "index.js"));
+  const muet = { status: 401, message: "" };
+
+  t.check("un 401 muet sur le déverrouillage parle de la phrase de passe",
+          localizeSecretRejection(muet, "errInvalidPassphrase", "unlockFailed")
+            === tr("errInvalidPassphrase"));
+  t.check("le même 401 muet sur la clé de secours parle de la clé",
+          localizeSecretRejection(muet, "errInvalidRecoveryKey", "unlockFailed")
+            === tr("errInvalidRecoveryKey"));
+  t.check("le même 401 muet sur la connexion parle des identifiants",
+          localizeSecretRejection(muet, "errInvalidCredentials", "loginFailed")
+            === tr("errInvalidCredentials"));
+  t.check("quand le serveur dit sa raison, c'est elle qui l'emporte",
+          localizeSecretRejection({ status: 401, message: "Too many unlock attempts. Try again later." },
+                                  "errInvalidPassphrase", "unlockFailed")
+            === tr("errTooManyUnlock"));
+  t.check("une panne sans code 401 garde le repli de l'écran",
+          localizeSecretRejection({ status: 0, message: "" }, "errInvalidPassphrase", "unlockFailed")
+            === tr("unlockFailed"));
+  t.check("et aucune de ces phrases n'est le message générique",
+          tr("errInvalidPassphrase") !== tr("genericError"));
 }
 
 process.exit(t.summary() ? 0 : 1);
