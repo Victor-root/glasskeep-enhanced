@@ -14,13 +14,12 @@
 
 const crypto = require("crypto");
 const recoveryKey = require("./recoveryKey");
+const aead = require("./aeadGcm");
 
 const SCHEMA_VERSION = 1;
 const KDF_ALGO = "scrypt";
 const KDF_PARAMS = { N: 1 << 15, r: 8, p: 1, len: 32 };
-const WRAP_ALGO = "aes-256-gcm";
 const SALT_LEN = 16;
-const IV_LEN = 12;
 
 // Sentinel encrypted with the DEK so we can verify after unwrap that we
 // got the right key (rather than waiting for the first note decrypt to
@@ -109,19 +108,10 @@ function deriveKek(secret, salt) {
   );
 }
 
-function aesGcmEncrypt(key, plaintext) {
-  const iv = crypto.randomBytes(IV_LEN);
-  const cipher = crypto.createCipheriv(WRAP_ALGO, key, iv);
-  const ct = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return { iv, ct, tag };
-}
-
-function aesGcmDecrypt(key, iv, ct, tag) {
-  const decipher = crypto.createDecipheriv(WRAP_ALGO, key, iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(ct), decipher.final()]);
-}
+// Shared with the note cipher and the passkey wraps: the tag length and
+// the IV length are pinned in one place (see aeadGcm.js).
+const aesGcmEncrypt = (key, plaintext) => aead.encrypt(key, plaintext);
+const aesGcmDecrypt = (key, iv, ct, tag) => aead.decrypt(key, iv, ct, tag);
 
 function wrapDek(secret, salt, dek) {
   const kek = deriveKek(secret, salt);
@@ -359,5 +349,6 @@ module.exports = {
   markMigrated,
   markUnlockedNow,
   disable,
+  verifyDek,
   SCHEMA_VERSION,
 };

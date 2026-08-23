@@ -17,7 +17,6 @@
 // authenticator advertised PRF support during its registration
 // ceremony.
 
-const crypto = require("crypto");
 const {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -801,15 +800,9 @@ function attachPasskeyRoutes(app, deps) {
     // can't unlock with a stale credential.
     try {
       const row = vault.getStatusRow(db);
-      if (row) {
-        // verifyDek throws on mismatch; reuse instanceVault's logic.
-        const decipher = crypto.createDecipheriv("aes-256-gcm", dek, row.dek_check_iv);
-        decipher.setAuthTag(row.dek_check_tag);
-        const plain = Buffer.concat([decipher.update(row.dek_check), decipher.final()]).toString("utf8");
-        if (plain !== "GKVAULT-OK-v1") {
-          throw new Error("DEK self-check failed");
-        }
-      }
+      // Actually reuse instanceVault's check rather than copy it: the
+      // sentinel value and the AES-GCM parameters then have one owner.
+      if (row) vault.verifyDek(row, dek);
     } catch (e) {
       runtime.recordAttempt(id, false);
       try { dek.fill(0); } catch {}

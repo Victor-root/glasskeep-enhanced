@@ -32,6 +32,7 @@
 // staying stable across restarts.
 
 const crypto = require("crypto");
+const aead = require("./aeadGcm");
 
 // ── Schema ────────────────────────────────────────────────────────────
 function ensureSchema(db) {
@@ -120,19 +121,10 @@ function deriveKekFromPrf(prfOutput, credentialId, instanceSalt) {
   return Buffer.isBuffer(kek) ? kek : Buffer.from(kek);
 }
 
-function aesGcmEncrypt(key, plaintext) {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-  const ct = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return { iv, ct, tag };
-}
-
-function aesGcmDecrypt(key, iv, ct, tag) {
-  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(ct), decipher.final()]);
-}
+// Same construction as the vault and the note cipher, set up once in
+// aeadGcm.js so the tag length cannot drift between them.
+const aesGcmEncrypt = (key, plaintext) => aead.encrypt(key, plaintext);
+const aesGcmDecrypt = (key, iv, ct, tag) => aead.decrypt(key, iv, ct, tag);
 
 // ── Wrap / unwrap DEK with a passkey's PRF output ─────────────────────
 function wrapDekWithPrf(db, credentialId, prfOutput, dek) {

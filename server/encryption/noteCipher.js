@@ -28,11 +28,9 @@
 // (the column was added in this hardening pass), so reads always
 // expect v1 = AAD-bound.
 
-const crypto = require("crypto");
 const runtime = require("./runtimeUnlockState");
+const aead = require("./aeadGcm");
 
-const ALG = "aes-256-gcm";
-const IV_LEN = 12;
 const NOTE_VERSION_LATEST = 2;
 const NOTE_AAD_PREFIX = "glasskeep|note|v1";
 const TAG_VERSION_LATEST = 1;
@@ -83,11 +81,7 @@ function encryptFields(fields, ctx) {
     images_json: fields.images_json ?? "[]",
     color: fields.color ?? "default",
   });
-  const iv = crypto.randomBytes(IV_LEN);
-  const cipher = crypto.createCipheriv(ALG, dek, iv);
-  cipher.setAAD(noteAad(ctx));
-  const ct = Buffer.concat([cipher.update(payload, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
+  const { iv, ct, tag } = aead.encrypt(dek, payload, noteAad(ctx));
   return JSON.stringify({
     v: NOTE_VERSION_LATEST,
     iv: iv.toString("base64"),
@@ -106,17 +100,14 @@ function decryptPayload(encPayload, ctx) {
   const iv = Buffer.from(obj.iv, "base64");
   const ct = Buffer.from(obj.c, "base64");
   const tag = Buffer.from(obj.t, "base64");
-  const decipher = crypto.createDecipheriv(ALG, dek, iv);
   // v1 was the original format with no AAD. v2 binds the ciphertext to
   // (ownerUserId, noteId) so a thief cannot move a payload from one
   // row to another without breaking the auth tag. Reader supports
   // both; writer always emits v2 (the upgrade is performed in-place
   // by /api/instance/unlock when v1 rows are detected).
-  if (obj.v === 2) {
-    decipher.setAAD(noteAad(ctx));
-  }
-  decipher.setAuthTag(tag);
-  const plain = Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
+  const plain = aead
+    .decrypt(dek, iv, ct, tag, obj.v === 2 ? noteAad(ctx) : undefined)
+    .toString("utf8");
   const fields = JSON.parse(plain);
   if (!fields || fields.v !== 1) {
     throw new Error("Unsupported note payload version");
@@ -185,11 +176,7 @@ function prepareRowForWrite(row, ctx) {
 function encryptTagsJson(tagsJson, ctx) {
   const dek = runtime.getDek();
   if (!dek) throw new Error("Instance is locked");
-  const iv = crypto.randomBytes(IV_LEN);
-  const cipher = crypto.createCipheriv(ALG, dek, iv);
-  cipher.setAAD(tagAad(ctx));
-  const ct = Buffer.concat([cipher.update(tagsJson || "[]", "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
+  const { iv, ct, tag } = aead.encrypt(dek, tagsJson || "[]", tagAad(ctx));
   return JSON.stringify({
     v: TAG_VERSION_LATEST,
     iv: iv.toString("base64"),
@@ -208,10 +195,7 @@ function decryptTagsPayload(encPayload, ctx) {
   const iv = Buffer.from(obj.iv, "base64");
   const ct = Buffer.from(obj.c, "base64");
   const tag = Buffer.from(obj.t, "base64");
-  const decipher = crypto.createDecipheriv(ALG, dek, iv);
-  decipher.setAAD(tagAad(ctx));
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
+  return aead.decrypt(dek, iv, ct, tag, tagAad(ctx)).toString("utf8");
 }
 
 module.exports = {
