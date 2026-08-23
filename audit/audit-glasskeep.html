@@ -207,10 +207,58 @@ footer { margin-top:5rem; padding-top:1.5rem; border-top:1px solid var(--line);
       <tr><td><span class="chip plain">Accepté</span></td><td class="id">F-15</td><td>Risque accepté par le mainteneur, et son objection est juste : le build renomme la sortie en <code>GlassKeep-v&lt;version&gt;-debug.apk</code>, et la publication passe par l'assistant de build signé où la variante est choisie explicitement. Le scénario du mauvais fichier attrapé par erreur est écarté par l'outillage.</td></tr>
       <tr><td><span class="chip plain">Accepté</span></td><td class="id">F-01</td><td>Risque accepté par le mainteneur. Le README documente la saisie du mot de passe à quatre reprises.</td></tr>
       <tr><td><span class="chip plain">Reporté</span></td><td class="id">F-20</td><td>La mise à jour d'<code>esbuild</code> sort de la plage que <code>vite</code> 7 autorise. Résolu par le futur passage à <code>vite</code> 8.</td></tr>
-      <tr class="done"><td><span class="chip fixed">Corrigé</span></td><td class="id">Hors audit</td><td>Commit <code>c337b86</code>. Trouvé par le mainteneur en recette, pas par l'audit : une mauvaise phrase de passe sur l'écran de déverrouillage affichait « Session expirée, veuillez vous reconnecter », et le message disait vrai sur autre chose puisque le client venait bel et bien de détruire la session. Le client prenait tout refus 401 pour un jeton périmé, alors que le déverrouillage, la clé de secours et la connexion sont des routes sans jeton où 401 répond au secret saisi. Le démontage de session est maintenant conditionné au fait d'avoir présenté un jeton. Défaut antérieur à ce lot de correctifs.</td></tr>
+      <tr class="done"><td><span class="chip fixed">Corrigé</span></td><td class="id">Hors audit</td><td>Commit <code>c337b86</code>. Trouvé par le mainteneur en recette, pas par l'audit : une mauvaise phrase de passe sur l'écran de déverrouillage affichait « Session expirée, veuillez vous reconnecter », et le message disait vrai sur autre chose puisque le client venait bel et bien de détruire la session. Le client prenait tout refus 401 pour un jeton périmé, alors que le déverrouillage, la clé de secours et la connexion sont des routes sans jeton où 401 répond au secret saisi. Le démontage de session est maintenant conditionné au fait d'avoir présenté un jeton. <strong>Défaut introduit le 7 janvier 2026</strong> par <code>b3e3d18</code>, présent dès la version <code>1.0</code> ; il ne touchait alors que la connexion, et devient visible sur le déverrouillage le 26 avril 2026 avec le chiffrement au repos.</td></tr>
       <tr class="done"><td><span class="chip fixed">Corrigé</span></td><td class="id">F-21</td><td>Commit <code>f426636</code>. Deux commandes : <code>npm test</code> en une demi-seconde sans rien démarrer, et <code>npm run test:integration</code> pour la suite complète, montage et démontage compris. Surtout, les deux règles dont l'audit dépendait sans que rien ne les vérifie sont désormais verrouillées : l'assainissement avant chaque affichage, et le refus d'une signature falsifiée entre serveurs. <strong>Pas de GitHub Actions</strong>, décision du mainteneur qui lance ses tests lui-même.</td></tr>
     </tbody>
   </table>
+  </div>
+</section>
+
+<section>
+  <div class="section-head"><h2>Recette manuelle</h2><span class="count">ce que les tests ne peuvent pas dire</span></div>
+  <div class="prose">
+    <p>Les deux commandes de test couvrent les règles, pas l'usage. Elles disent qu'un chemin refuse ce qu'il doit refuser ; elles ne disent pas que l'application reste agréable à utiliser, ni qu'une installation déjà en service survit à la mise à jour. Voici donc ce qui reste à faire à la main, classé par ordre de risque et non par numéro de faille.</p>
+  </div>
+
+  <div class="callout" style="margin-top:1.5rem">
+    <span class="eyebrow">D'abord ceci</span>
+    <p>Cinq correctifs changent délibérément un comportement. Si quelque chose doit casser chez un utilisateur après la mise à jour, c'est là. Le reste de la liste est de la vérification de non-régression, moins urgente.</p>
+  </div>
+
+  <div class="table-scroll" style="margin-top:1.5rem">
+  <table>
+    <thead><tr><th>Origine</th><th>Ce que tu fais</th><th>Ce que tu dois voir</th></tr></thead>
+    <tbody>
+      <tr><td class="id">F-04</td><td>Lancer l'image Docker telle qu'un utilisateur la lance, derrière un proxy, et tenter le déverrouillage.</td><td>Le déverrouillage passe. S'il est refusé, le message nomme la variable à poser : c'est le cas prévu, mais il faut savoir combien d'installations le rencontreront.</td></tr>
+      <tr><td class="id">F-07</td><td>Sur Android, partir d'une installation déjà configurée en <code>http://</code> vers un nom de domaine, puis mettre à jour l'application.</td><td>Un passage unique par l'écran de configuration, champ prérempli. Ensuite, saisir <code>http://192.168.x.x</code> doit être accepté, et <code>http://mondomaine.fr</code> refusé avec une phrase qui dit pourquoi.</td></tr>
+      <tr><td class="id">F-11</td><td>Sur l'instance publique, créer une passkey puis s'en servir pour se connecter, et pour déverrouiller l'instance en tant qu'administrateur.</td><td>Les deux fonctionnent. Au démarrage du serveur, une ligne de journal annonce d'où vient le domaine retenu : si elle dit qu'il vient de la requête ou qu'il est indécidable, pose <code>WEBAUTHN_RP_ID</code>.</td></tr>
+      <tr><td class="id">F-13</td><td>Ouvrir l'application dans un navigateur, console ouverte, après un rechargement forcé qui vide le cache du service worker.</td><td>Aucune violation de politique de sécurité du contenu. Les images des notes, les avatars, les aperçus de liens et la visionneuse s'affichent tous.</td></tr>
+      <tr><td class="id">F-10</td><td>Lancer <code>scripts/unlock-instance.cjs</code> comme tu le fais d'habitude, puis <code>test-notification.cjs</code> et <code>test-reminder.cjs</code>.</td><td>Vers la boucle locale, rien ne change. Vers une adresse distante, le certificat est vérifié : si tu utilises un certificat auto-signé, il faut désormais <code>--ca=&lt;fichier&gt;</code>.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="section-head" style="margin-top:3rem"><h2 style="font-size:1.15rem">Non-régression, par zone</h2></div>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Zone</th><th>Ce que tu fais</th><th>Ce que tu dois voir</th></tr></thead>
+    <tbody>
+      <tr><td class="id">Connexion<br><span class="chip plain">F-06</span></td><td>Se connecter normalement. Puis se tromper de mot de passe une dizaine de fois d'affilée sur ton propre compte, et se reconnecter correctement.</td><td>Aucune gêne sur les dix premiers échecs. Ensuite un délai qui s'allonge, jusqu'à huit secondes. Le bon mot de passe passe toujours : tu ne dois jamais réussir à te verrouiller toi-même par maladresse.</td></tr>
+      <tr><td class="id">Mot de passe<br><span class="chip plain">F-08</span></td><td>Se connecter sur deux appareils, changer le mot de passe depuis l'un des deux.</td><td>L'appareil qui a fait le changement reste connecté. L'autre est déconnecté à sa prochaine action. Et surtout : la mise à jour du serveur, à elle seule, ne déconnecte personne.</td></tr>
+      <tr><td class="id">Chiffrement<br><span class="chip plain">F-04 F-18</span></td><td>Déverrouiller par phrase de passe, puis redémarrer et déverrouiller par clé de secours. Créer, modifier, étiqueter et supprimer des notes entre les deux.</td><td>Tout le contenu antérieur reste lisible, étiquettes comprises. <strong>Déjà validé sur ton instance de test</strong> : à refaire seulement si le coffre change encore.</td></tr>
+      <tr><td class="id">Interface<br><span class="chip plain">Hors audit</span></td><td>Taper une mauvaise phrase de passe sur l'écran de déverrouillage, puis la bonne. Idem avec une mauvaise clé de secours, et avec un mauvais mot de passe à la connexion.</td><td>Le message rouge dit la vraie raison, jamais « session expirée », et la session ouverte survit. À l'inverse, une session réellement périmée doit toujours ramener proprement à l'écran de connexion.</td></tr>
+      <tr><td class="id">IA<br><span class="chip plain">F-05</span></td><td>Configurer le fournisseur en tant qu'administrateur, y compris vers une adresse de ton réseau local. Puis, avec un compte ordinaire, tenter la même chose.</td><td>L'administrateur garde l'accès au réseau local. Le compte ordinaire ne peut viser une adresse privée que si l'interrupteur admin l'autorise. Le chat lui-même répond normalement, sans expirer trop tôt.</td></tr>
+      <tr><td class="id">Fédération<br><span class="chip plain">F-02 F-09 F-17</span></td><td>Appairer tes deux instances de bout en bout, partager une note, la modifier des deux côtés, puis dépairer. Essayer aussi un secret partagé trop court.</td><td>Le bandeau d'invitation affiche la vraie adresse du demandeur. Le secret trop court est refusé. Le sélecteur de collaborateurs ne propose que de vrais comptes.</td></tr>
+      <tr><td class="id">Notes<br><span class="chip plain">F-13 F-16</span></td><td>Coller du texte mis en forme depuis une autre application : couleurs, surlignage, gras, listes, cases à cocher. Importer ensuite un fichier volontairement invalide.</td><td>La mise en forme est conservée à l'identique. L'import échoue avec un message générique, sans détail technique interne.</td></tr>
+      <tr><td class="id">Proxy<br><span class="chip plain">F-03</span></td><td>Depuis l'extérieur de ton réseau, provoquer plusieurs échecs de déverrouillage.</td><td>Le limiteur compte bien ton adresse réelle et non celle du proxy. Si le serveur ne voit plus la bonne adresse, c'est <code>TRUST_PROXY</code> qui doit désigner la plage où se trouve réellement ton proxy.</td></tr>
+      <tr><td class="id">Android<br><span class="chip plain">F-14</span></td><td>Sur un vrai appareil : joindre une photo à une note, ouvrir un lien depuis une note, la visionneuse d'images, les rappels, la reprise depuis une notification, la synchronisation en arrière-plan.</td><td>Tout fonctionne. La pièce jointe photo est le seul chemin qui touche une adresse <code>content://</code>, donc le seul que le durcissement de la WebView pouvait casser : c'est le point à ne pas sauter.</td></tr>
+      <tr><td class="id">Android<br><span class="chip plain">R8</span></td><td>Compiler en <em>release</em> signée, pas seulement en debug, et refaire un tour rapide de l'application.</td><td>Aucun plantage au démarrage ni à l'ouverture d'un écran. Le durcissement touche des classes atteintes par nom, ce que seul le mode release révèle.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="prose" style="margin-top:1.5rem">
+    <p>Ce que tu n'as pas besoin de refaire : tout ce qui est déjà verrouillé par <code>npm test</code> et <code>npm run test:integration</code>, c'est à dire les refus eux mêmes. Une signature falsifiée entre serveurs, une invitation d'appairage forgée, un en-tête qui prétend venir d'ailleurs, une adresse IA interdite, un style de note capable d'appeler le réseau : ces cas là sont couverts, et le jour où quelqu'un les casse, la commande le dira avant toi.</p>
   </div>
 </section>
 
