@@ -24,7 +24,8 @@ const PATTERNS = [
   ["Current passphrase is incorrect",           "errCurrentPassphrase"],
   ["Current passphrase is required",            "errCurrentPassphraseRequired"],
   ["Current password is incorrect",             "errCurrentPassword"],
-  ["Incorrect password",                        "errIncorrectPassword"],
+  ["Invalid email or password",                 "errInvalidCredentials"],
+  ["Too many sign-in attempts",                 "errTooManySignIn"],
   ["Invalid token",                             "errInvalidToken"],
   ["Missing token",                             "errMissingToken"],
   ["Invalid key.",                              "errInvalidKey"],
@@ -33,6 +34,7 @@ const PATTERNS = [
   ["Email and password are required",           "errEmailPasswordRequired"],
   ["Name, email, and password are required",    "errNameEmailPasswordRequired"],
   ["New password must be at least",             "errNewPasswordTooShort"],
+  ["Password must be at least",                 "errPasswordTooShort"],
 
   // ── Vault state ──────────────────────────────────────────────────
   ["Encryption is not enabled",                 "errEncryptionNotEnabled"],

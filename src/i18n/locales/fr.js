@@ -1024,7 +1024,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   errCurrentPassphrase: "La passphrase actuelle est incorrecte.",
   errCurrentPassphraseRequired: "La passphrase actuelle est requise.",
   errCurrentPassword: "Le mot de passe actuel est incorrect.",
-  errIncorrectPassword: "Mot de passe incorrect.",
+  errInvalidCredentials: "E-mail ou mot de passe invalide.",
+  errTooManySignIn: "Trop de tentatives de connexion. Réessayez dans quelques minutes.",
   errInvalidToken: "Jeton invalide.",
   errMissingToken: "Jeton d'authentification manquant.",
   errInvalidKey: "Clé invalide.",
@@ -1033,6 +1034,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   errEmailPasswordRequired: "L'e-mail et le mot de passe sont requis.",
   errNameEmailPasswordRequired: "Le nom, l'e-mail et le mot de passe sont requis.",
   errNewPasswordTooShort: "Le nouveau mot de passe doit contenir au moins 6 caractères.",
+  errPasswordTooShort: "Le mot de passe doit contenir au moins 6 caractères.",
 
   // État du coffre
   errEncryptionNotEnabled: "Le chiffrement au repos n'est pas activé.",
