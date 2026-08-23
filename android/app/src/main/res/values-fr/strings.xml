@@ -5,7 +5,9 @@
     <string name="setup_placeholder">https://votre-serveur.com</string>
     <string name="setup_hint">Exemples :\nhttps://notes.example.com\nhttps://example.com:3000\nhttps://192.168.1.10:8080</string>
     <string name="setup_connect">Se connecter</string>
+    <string name="setup_cleartext_notice">Cette adresse n\'est pas chiffrée. Acceptable sur votre propre réseau, jamais par Internet.</string>
     <string name="error_empty_url">Veuillez entrer une URL</string>
+    <string name="error_cleartext_public">Cette adresse est hors de votre réseau et n\'est pas chiffrée : votre mot de passe et vos notes circuleraient en clair. Utilisez plutôt https://.</string>
     <string name="error_invalid_url">L\'URL doit commencer par http:// ou https://</string>
     <string name="error_not_glasskeep">Ce serveur n\'est pas une instance GlassKeep</string>
     <string name="error_unreachable">Serveur injoignable</string>

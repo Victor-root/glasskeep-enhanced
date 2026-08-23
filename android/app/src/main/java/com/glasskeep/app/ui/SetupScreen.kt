@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.content.res.Configuration
 import com.glasskeep.app.R
+import com.glasskeep.app.net.CleartextPolicy
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -87,6 +88,11 @@ internal val ButtonGradient = Brush.horizontalGradient(
     colors = listOf(Color(0xFF6366f1), Color(0xFF7c3aed))
 )
 internal val Indigo = Color(0xFF6366f1)
+
+// Amber, not red: an unencrypted address on your own network is allowed,
+// it is just worth knowing about. Legible on both the light card and the
+// dark TV backdrop.
+private val CleartextNoticeColor = Color(0xFFd97706)
 
 // Floating card accent colors
 private val FloatingCardColors = listOf(
@@ -226,10 +232,13 @@ private val TvBodyColor = Color(0xFFf9fafb)
 private val TvAccent = Color(0xFFa78bfa) // violet-400 — focus / accent
 
 @Composable
-fun SetupScreen(onConnect: (String) -> Unit) {
+fun SetupScreen(initialUrl: String = "", onConnect: (String) -> Unit) {
     val dark = isSystemInDarkTheme()
     val isTv = isTelevision()
-    var url by remember { mutableStateOf("") }
+    // Pre-filled when the app sent the user back here because the stored
+    // address needs a second look: pressing Connect is then enough, and
+    // an address that turns out to be refused shows exactly why.
+    var url by remember { mutableStateOf(initialUrl) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
     val handler = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
@@ -237,6 +246,12 @@ fun SetupScreen(onConnect: (String) -> Unit) {
     val errorInvalid = stringResource(R.string.error_invalid_url)
     val errorNotGlasskeep = stringResource(R.string.error_not_glasskeep)
     val errorUnreachable = stringResource(R.string.error_unreachable)
+    val errorCleartextPublic = stringResource(R.string.error_cleartext_public)
+
+    // An address that is not encrypted is worth saying out loud even when
+    // it is allowed: on your own network it is a deliberate choice, and
+    // the person making it should know they are making it.
+    val cleartextNotice = url.trim().startsWith("http://", ignoreCase = true)
 
     val doConnect: () -> Unit = {
         val trimmed = url.trim().trimEnd('/')
@@ -248,6 +263,24 @@ fun SetupScreen(onConnect: (String) -> Unit) {
                 loading = true
                 error = null
                 Thread {
+                    // Resolving the address needs the network, so it
+                    // happens here rather than on the main thread. An
+                    // unencrypted address aimed at the open internet
+                    // never reaches the connection attempt.
+                    val verdict = CleartextPolicy.resolve(trimmed)
+                    if (verdict == CleartextPolicy.Verdict.PUBLIC_CLEARTEXT ||
+                        verdict == CleartextPolicy.Verdict.UNUSABLE
+                    ) {
+                        handler.post {
+                            loading = false
+                            error = if (verdict == CleartextPolicy.Verdict.UNUSABLE) {
+                                errorInvalid
+                            } else {
+                                errorCleartextPublic
+                            }
+                        }
+                        return@Thread
+                    }
                     val result = checkGlassKeepServer(trimmed)
                     handler.post {
                         loading = false
@@ -270,6 +303,7 @@ fun SetupScreen(onConnect: (String) -> Unit) {
             url = url,
             onUrlChange = { url = it; error = null },
             error = error,
+            cleartextNotice = cleartextNotice,
             loading = loading,
             onConnect = doConnect
         )
@@ -345,6 +379,12 @@ fun SetupScreen(onConnect: (String) -> Unit) {
                     supportingText = {
                         if (error != null) {
                             Text(error!!, color = Color(0xFFdc2626))
+                        } else if (cleartextNotice) {
+                            Text(
+                                stringResource(R.string.setup_cleartext_notice),
+                                color = CleartextNoticeColor,
+                                fontSize = 12.sp
+                            )
                         } else {
                             Text(
                                 stringResource(R.string.setup_hint),
@@ -410,6 +450,7 @@ private fun TvSetupScreen(
     url: String,
     onUrlChange: (String) -> Unit,
     error: String?,
+    cleartextNotice: Boolean,
     loading: Boolean,
     onConnect: () -> Unit,
 ) {
@@ -481,6 +522,12 @@ private fun TvSetupScreen(
                     supportingText = {
                         if (error != null) {
                             Text(error, color = Color(0xFFfca5a5))
+                        } else if (cleartextNotice) {
+                            Text(
+                                stringResource(R.string.setup_cleartext_notice),
+                                color = CleartextNoticeColor,
+                                fontSize = 12.sp
+                            )
                         } else {
                             Text(
                                 stringResource(R.string.setup_hint),

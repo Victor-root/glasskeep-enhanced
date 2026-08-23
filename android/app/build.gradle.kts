@@ -141,4 +141,9 @@ dependencies {
     // forcing users back to a browser.
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+
+    // Plain JVM unit tests (./gradlew test). net/CleartextPolicy decides
+    // which server addresses may be reached without TLS and touches
+    // nothing Android-specific, so it is testable without a device.
+    testImplementation("junit:junit:4.13.2")
 }

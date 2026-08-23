@@ -9,6 +9,8 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.glasskeep.app.MainActivity
+import com.glasskeep.app.net.CleartextPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -46,6 +48,19 @@ class ReminderSyncWorker(
         )
         if (serverUrl.isNullOrBlank() || token.isNullOrBlank()) {
             android.util.Log.w("GKReminders", "sync: skipped — not signed in (no server_url/token yet)")
+            return@withContext Result.success()
+        }
+        // This request carries the session token. It runs on its own
+        // schedule, with nobody watching, so it does not inherit the
+        // check the app start performs: it makes it again. An address
+        // sending the token in the clear across the internet is dropped
+        // here rather than retried.
+        if (!CleartextPolicy.isUsableAtStartup(
+                serverUrl,
+                prefs.getBoolean(MainActivity.KEY_URL_VETTED, false),
+            )
+        ) {
+            android.util.Log.w("GKReminders", "sync: skipped, stored server address is not usable in cleartext")
             return@withContext Result.success()
         }
 

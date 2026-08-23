@@ -6,7 +6,9 @@
     <string name="setup_placeholder">https://your-server.com</string>
     <string name="setup_hint">Examples:\nhttps://notes.example.com\nhttps://example.com:3000\nhttps://192.168.1.10:8080</string>
     <string name="setup_connect">Connect</string>
+    <string name="setup_cleartext_notice">This address is not encrypted. Fine on your own network, never over the internet.</string>
     <string name="error_empty_url">Please enter a URL</string>
+    <string name="error_cleartext_public">This address is outside your network and is not encrypted: your password and your notes would travel in the clear. Use https:// instead.</string>
     <string name="error_invalid_url">URL must start with http:// or https://</string>
     <string name="error_not_glasskeep">This server is not a GlassKeep instance</string>
     <string name="error_unreachable">Server unreachable</string>

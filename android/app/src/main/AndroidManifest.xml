@@ -45,6 +45,21 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.faketouch" android:required="false" />
 
+    <!-- usesCleartextTraffic below: unencrypted traffic stays possible at
+         the platform level because reaching a server on your own network
+         by its address, with no certificate, is a first-class way to run
+         GlassKeep. It is no longer a blanket permission: which addresses
+         may be reached in the clear is decided by net/CleartextPolicy,
+         applied where the address is chosen (ui/SetupScreen), where a
+         stored one is reused (MainActivity, WebViewActivity) and where
+         the session token is sent in the background (ReminderSyncWorker).
+         An address pointing at the open internet is refused.
+
+         The rule cannot live in res/xml/network_security_config.xml,
+         where a reader would look for it: that file matches destinations
+         by name and matches IP literals literally, so "the private
+         ranges" is not something it can express, and the private ranges
+         are exactly the case that has to keep working. -->
     <application
         android:allowBackup="false"
         android:fullBackupContent="@xml/backup_rules"
