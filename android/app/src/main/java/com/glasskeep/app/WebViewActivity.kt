@@ -546,10 +546,37 @@ class WebViewActivity : AppCompatActivity() {
                 domStorageEnabled = true
                 databaseEnabled = true
                 cacheMode = WebSettings.LOAD_DEFAULT
-                allowFileAccess = true
-                allowContentAccess = true
                 mediaPlaybackRequiresUserGesture = false
-                mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+
+                // The three settings below were open with nothing asking
+                // for them, next to four bridges into native code. No way
+                // in was found, but a WebView that can read the phone's
+                // files and content providers is a wider target than this
+                // app needs, and none of it is used:
+                //
+                //   - the app only ever loads http(s) from its own server
+                //     (see shouldOverrideUrlLoading, which sends anything
+                //     off-host to a Custom Tab), so file:// and content://
+                //     have no legitimate reader here;
+                //   - note content cannot even carry an <img>, let alone
+                //     one pointing at content://, because neither
+                //     sanitizer allows the tag.
+                //
+                // The one thing to watch on a device: picking a photo for
+                // a note goes through the file chooser, which hands the
+                // WebView a content:// URI. That path reads the file
+                // through the app's own resolver with the permission the
+                // picker granted, not through content-URL loading, so it
+                // is unaffected. If an attachment ever fails to upload,
+                // this is the line to look at first.
+                allowFileAccess = false
+                allowContentAccess = false
+
+                // An https page has no business pulling http resources.
+                // The server's content-security-policy already refuses
+                // them; this says the same thing one layer lower, where
+                // no policy header can be missing.
+                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
 
                 javaScriptCanOpenWindowsAutomatically = true
                 setSupportMultipleWindows(false)

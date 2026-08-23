@@ -109,6 +109,28 @@ try {
     t.check(`conservé: ${name}`, expected.test(out), out.slice(0, 90));
   }
 
+  // ── B bis) Aucune balise ne peut pointer vers une ressource ────────
+  // Ce point sert aussi F-14: le pont natif de l'application Android
+  // vit dans une WebView, et l'argument « rien ne peut y arriver depuis
+  // une note » repose sur le fait qu'une note ne peut porter aucune
+  // balise qui charge quoi que ce soit. C'est vérifié ici plutôt
+  // qu'affirmé.
+  const loaders = [
+    ['image', `<p><img src="https://beacon.example/i.png"></p>`],
+    ['image content://', `<p><img src="content://media/external/images/1"></p>`],
+    ['cadre', `<iframe src="https://beacon.example/f"></iframe>`],
+    ['objet', `<object data="https://beacon.example/o"></object>`],
+    ['embarqué', `<embed src="https://beacon.example/e">`],
+    ['vidéo', `<video src="https://beacon.example/v"></video>`],
+    ['audio', `<audio src="https://beacon.example/a"></audio>`],
+    ['fichier local', `<p><img src="file:///data/data/com.glasskeep.app/databases/x"></p>`],
+  ];
+  for (const [name, html] of loaders) {
+    const out = clean(html);
+    t.check(`une note ne peut pas charger: ${name}`,
+            !/beacon\.example|content:\/\/|file:\/\//.test(out), out.slice(0, 80));
+  }
+
   // Le mélange: ce qui est légitime reste, la balise part.
   const mixed = clean(`<p style="color: red; background-image: url(https://beacon.example/x); text-align: right">x</p>`);
   t.check(FIXED ? "dans une déclaration mixte, seule la partie piégée saute"
