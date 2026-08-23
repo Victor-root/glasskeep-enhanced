@@ -17,3 +17,12 @@ trap cleanup EXIT
 
 "$HERE/federation/setup.sh" || exit 1
 "$HERE/federation/run.sh"
+fed=$?
+
+# Les scénarios fonctionnels montent leurs propres instances et n'ont
+# besoin de rien de tout cela, mais une commande qui dit « tout est vert »
+# doit vraiment avoir tout joué.
+"$HERE/run-functional.sh"
+fonc=$?
+
+[ $fed -eq 0 ] && [ $fonc -eq 0 ]
