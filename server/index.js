@@ -659,6 +659,7 @@ const { requireUnlocked } = require("./routes/lockMiddleware");
 const { t: serverT } = require("./i18n");
 const pushService = require("./services/pushNotifications");
 const { startReminderScheduler } = require("./services/reminderScheduler");
+const loginThrottle = require("./services/loginThrottle");
 
 instanceVault.ensureSchema(db);
 {
@@ -1952,6 +1953,37 @@ app.get("/api/events", authFromQueryOrHeader, (req, res) => {
 });
 
 // ---------- Auth ----------
+// Sign-in answers must not leak whether an email is registered, neither
+// through the wording nor through the time taken. A miss therefore
+// spends a bcrypt comparison against a throwaway hash, exactly like a
+// hit does, and every rejection carries the same sentence.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(24).toString("hex"), 10);
+const INVALID_CREDENTIALS = "Invalid email or password.";
+const MIN_PASSWORD_LENGTH = 6;
+
+function clientIp(req) {
+  return req.ip || req.socket?.remoteAddress || "0.0.0.0";
+}
+
+// Answers a failed sign-in: charges the throttle, waits out whatever
+// penalty has accumulated, then replies. accountId is optional: an
+// unknown email has no account to charge, only an address.
+async function denySignIn(req, res, { accountId = null, error = INVALID_CREDENTIALS } = {}) {
+  const ip = clientIp(req);
+  loginThrottle.recordFailure({ ip, accountId });
+  await loginThrottle.sleep(loginThrottle.penaltyMs({ ip, accountId }));
+  return res.status(401).json({ error });
+}
+
+// Returns true (after answering) when the caller is on hold.
+function signInOnHold(req, res, accountId = null) {
+  const held = loginThrottle.blockedForSeconds({ ip: clientIp(req), accountId });
+  if (held <= 0) return false;
+  res.setHeader("Retry-After", String(held));
+  res.status(429).json({ error: "Too many sign-in attempts. Please try again later." });
+  return true;
+}
+
 const getPendingByEmail = db.prepare("SELECT * FROM pending_users WHERE lower(email)=lower(?)");
 const insertPendingUser = db.prepare(
   "INSERT INTO pending_users (name,email,password_hash,created_at) VALUES (?,?,?,?)"
@@ -1966,6 +1998,8 @@ app.post("/api/register", (req, res) => {
   const { name, email, password } = req.body || {};
   if (!email || !password)
     return res.status(400).json({ error: "Email and password are required." });
+  if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH)
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
   if (getUserByEmail.get(email))
     return res.status(409).json({ error: "Email already registered." });
   if (getPendingByEmail.get(email))
@@ -2021,7 +2055,7 @@ app.post("/api/register", (req, res) => {
   res.status(202).json({ pending: true });
 });
 
-app.post("/api/login", (req, res) => {
+app.post("/api/login", async (req, res) => {
   const { email, password, user_id } = req.body || {};
   // Support login by user_id (profile selection) or by email (manual login)
   let user;
@@ -2030,23 +2064,25 @@ app.post("/api/login", (req, res) => {
   } else {
     user = email ? getUserByEmail.get(email) : null;
   }
-  if (!user) return res.status(401).json({ error: "No account found." });
   // Federation stand-in accounts (local mirrors of a remote server's
   // users) must never authenticate — they exist only to own/participate
-  // in mirrored notes. Same generic message so they're indistinguishable
-  // from a missing account.
-  if (user.federated_origin) return res.status(401).json({ error: "No account found." });
-  if (!bcrypt.compareSync(password || "", user.password_hash)) {
-    return res.status(401).json({ error: "Incorrect password." });
-  }
-  const token = signToken(user, "login-password");
+  // in mirrored notes, so as far as sign-in goes they are no account.
+  const candidate = user && !user.federated_origin ? user : null;
+
+  if (signInOnHold(req, res, candidate?.id)) return;
+
+  const ok = bcrypt.compareSync(password || "", candidate?.password_hash || DUMMY_PASSWORD_HASH);
+  if (!candidate || !ok) return denySignIn(req, res, { accountId: candidate?.id });
+
+  loginThrottle.recordSuccess({ ip: clientIp(req), accountId: candidate.id });
+  const token = signToken(candidate, "login-password");
   // Always include must_change_password as a boolean for parity with
   // the passkey + QR sign-in responses. Field-presence parity matters
   // because the client stores the response straight into auth state.
   const response = {
     token,
-    user: { id: user.id, name: user.name, email: user.email, is_admin: !!user.is_admin, avatar_url: user.avatar_url || null, language: user.language || null },
-    must_change_password: !!user.must_change_password,
+    user: { id: candidate.id, name: candidate.name, email: candidate.email, is_admin: !!candidate.is_admin, avatar_url: candidate.avatar_url || null, language: candidate.language || null },
+    must_change_password: !!candidate.must_change_password,
   };
   res.json(response);
 });
@@ -2077,7 +2113,11 @@ app.post("/api/secret-key", auth, (req, res) => {
 });
 
 // Login with secret key
-app.post("/api/login/secret", (req, res) => {
+// Same throttle as the password route: this one compares the submitted
+// key against every stored hash, so an unthrottled run is both a
+// guessing attempt and a way to keep the server busy.
+app.post("/api/login/secret", async (req, res) => {
+  if (signInOnHold(req, res)) return;
   const { key } = req.body || {};
   if (!key || typeof key !== "string" || key.length < 16) {
     return res.status(400).json({ error: "Invalid key." });
@@ -2086,6 +2126,7 @@ app.post("/api/login/secret", (req, res) => {
   for (const u of rows) {
     if (u.secret_key_hash && bcrypt.compareSync(key, u.secret_key_hash)) {
       const fullUser = getUserById.get(u.id);
+      loginThrottle.recordSuccess({ ip: clientIp(req), accountId: u.id });
       const token = signToken(u, "login-secret-key");
       const response = {
         token,
@@ -2095,7 +2136,7 @@ app.post("/api/login/secret", (req, res) => {
       return res.json(response);
     }
   }
-  return res.status(401).json({ error: "Secret key not recognized." });
+  return denySignIn(req, res, { error: "Secret key not recognized." });
 });
 
 // ---------- Login Profiles (public) ----------
@@ -4768,6 +4809,9 @@ app.post("/api/admin/users", auth, adminOnly, (req, res) => {
   if (!name || !email || !password) {
     return res.status(400).json({ error: "Name, email, and password are required." });
   }
+  if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
+  }
 
   if (getUserByEmail.get(email)) {
     return res.status(409).json({ error: "Email already registered." });
@@ -4840,6 +4884,9 @@ app.patch("/api/admin/users/:id", auth, adminOnly, (req, res) => {
   }
 
   if (password) {
+    if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
+    }
     updates.push("password_hash = ?");
     params.push(bcrypt.hashSync(password, 10));
     // When admin resets a password, force the user to change it on next login

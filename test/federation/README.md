@@ -43,6 +43,7 @@ utiles si vous exposez les instances autrement).
 | `t7-trust-policy.mjs` | F-03, la politique elle-même: quelles adresses ont le droit de réécrire l'adresse retenue. Ne demande aucun serveur. |
 | `t9-ai-ssrf.mjs` | F-05. Un compte ordinaire ne doit pas pouvoir faire sonder le réseau par le serveur via l'adresse du fournisseur IA, sans casser les deux montages que GlassKeep assume (IA du serveur partagée, ou chacun la sienne). Couvre l'interrupteur admin dans ses deux positions. Démarre son instance et un faux service interne. |
 | `t8-plaintext-guard.mjs` | F-04. Le refus d'envoyer la phrase de passe en clair doit s'appliquer au défaut Docker, sans casser les installations qui déclarent un proxy. Démarre ses propres instances en HTTP, n'utilise pas le bac à sable. |
+| `t10-login-throttle.mjs` | F-06. Le freinage de la connexion, dans les deux directions: dix mots de passe ratés d'affilée ne doivent rien coûter, un martèlement doit se faire couper. Vérifie aussi que le refus ne dit plus si le compte existe, ni par la phrase ni par le temps de réponse. Démarre sa propre instance. |
 
 ## Tester avant / après un correctif
 
@@ -83,7 +84,7 @@ intermédiaire qui n'est pas nous, et `t7` vérifie la politique adresse par
 adresse, sans réseau.
 
 Ces scénarios couvrent la poignée de main d'appairage, le partage de notes, le
-limiteur de déverrouillage, le refus du transport en clair et les adresses
-sortantes de la configuration IA. Ils ne couvrent pas les passkeys ni la partie
-Android. Un scénario qui passe dit que le chemin testé fonctionne, pas que la
+limiteur de déverrouillage, le freinage de la connexion, le refus du transport
+en clair et les adresses sortantes de la configuration IA. Ils ne couvrent pas
+les passkeys ni la partie Android. Un scénario qui passe dit que le chemin testé fonctionne, pas que la
 fédération est sans défaut.
