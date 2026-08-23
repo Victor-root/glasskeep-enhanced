@@ -177,26 +177,27 @@ try {
 
     // Le vrai navigateur, sur la vraie page: la politique ne doit rien
     // casser, et doit bloquer la balise.
+    // playwright-core est déjà une dépendance de développement du
+    // projet. Il ne télécharge aucun navigateur: on lui désigne celui
+    // qui est déjà installé sur la machine.
     let chromium = null;
-    try {
-      ({ chromium } = await import(path.join(ROOT, "node_modules", "playwright", "index.mjs")));
-    } catch { /* playwright absent */ }
+    try { ({ chromium } = require(path.join(ROOT, "node_modules", "playwright-core"))); }
+    catch { /* absent */ }
+    const browserPath = [
+      process.env.GK_CHROMIUM,
+      "/opt/pw-browsers/chromium",
+      "/usr/bin/chromium",
+      "/usr/bin/chromium-browser",
+      "/usr/bin/google-chrome",
+    ].find((p) => p && existsSync(p));
 
-    if (!chromium) {
-      // Playwright n'est pas une dépendance du projet: le faire installer
-      // à tout le monde pour un seul scénario coûterait plus qu'il ne
-      // rapporte. Quand il est là (npm install --no-save playwright), la
-      // politique est vérifiée dans un vrai navigateur; sinon on le dit
-      // et on s'arrête là plutôt que de faire semblant.
-      console.log("  (ignoré)  vérification navigateur: playwright absent, "
-        + "installez-le avec `npm install --no-save playwright` pour la jouer");
+    if (!chromium || !browserPath) {
+      // Pas de navigateur sur la machine: on le dit et on s'arrête là
+      // plutôt que de faire semblant d'avoir vérifié.
+      console.log("  (ignoré)  vérification navigateur: aucun Chromium trouvé. "
+        + "Installez-en un (apt install chromium) ou désignez-le avec GK_CHROMIUM=/chemin/vers/chrome");
     } else {
-      // GK_CHROMIUM permet de désigner un navigateur déjà présent quand
-      // la version de playwright installée n'est pas celle qui a
-      // téléchargé les binaires.
-      const browser = await chromium.launch(
-        process.env.GK_CHROMIUM ? { executablePath: process.env.GK_CHROMIUM } : {},
-      );
+      const browser = await chromium.launch({ executablePath: browserPath });
       const page = await browser.newPage();
       const violations = [];
       const externalHits = [];

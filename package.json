@@ -12,6 +12,8 @@
     "api": "cross-env NODE_ENV=development API_PORT=8080 nodemon server/index.js",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "bash test/run-fast.sh",
+    "test:integration": "bash test/run-integration.sh",
     "unlock-instance": "node scripts/unlock-instance.cjs",
     "unlock-instance-recovery": "node scripts/unlock-instance.cjs --recovery",
     "unlock-instance-status": "node scripts/unlock-instance.cjs --status",
