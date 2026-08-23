@@ -2,9 +2,9 @@
 // scripts/unlock-instance.cjs
 //
 // CLI fallback for at-rest encryption unlock. Talks to the running
-// glass-keep service over loopback so it never touches the database
-// directly — all state changes go through the same code paths as the
-// web unlock screen.
+// glass-keep service rather than touching the database directly, so
+// every state change goes through the same code paths as the web
+// unlock screen.
 //
 // Usage:
 //   sudo -u glass-keep node scripts/unlock-instance.js
@@ -12,15 +12,27 @@
 //
 // The script reads /opt/glass-keep/.env (or the file pointed at by
 // GLASSKEEP_ENV) to discover the listening port and HTTPS settings.
+//
+// The target defaults to loopback but --host can send it anywhere, so
+// the certificate is verified for every destination that is not the
+// machine itself. See scripts/lib/secureRequest.cjs for the rule and
+// for the --ca / --insecure escape hatches.
 
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
-const http = require("http");
-const https = require("https");
+const {
+  parseTlsArgs,
+  assertSafeForSecrets,
+  requestJson,
+  TLS_USAGE,
+} = require("./lib/secureRequest.cjs");
 
 function parseArgs(argv) {
-  const out = { recovery: false, lock: false, status: false, port: null, host: null };
+  const out = {
+    recovery: false, lock: false, status: false, port: null, host: null,
+    ...parseTlsArgs(argv.slice(2)),
+  };
   for (const a of argv.slice(2)) {
     if (a === "--recovery" || a === "-r") out.recovery = true;
     else if (a === "--lock") out.lock = true;
@@ -44,8 +56,15 @@ function printUsage() {
     "  unlock-instance.js --lock       Re-lock a running instance (admin token required)",
     "  unlock-instance.js --status     Print enabled/locked status and exit",
     "",
+    "Options:",
+    "  --host=<h>         target host (default 127.0.0.1)",
+    "  --port=<n>         override the discovered API port",
+    TLS_USAGE,
+    "",
     "Reads /opt/glass-keep/.env (or $GLASSKEEP_ENV) for the listening port",
-    "and HTTPS settings. The request is sent to 127.0.0.1 by default.",
+    "and HTTPS settings. The request is sent to 127.0.0.1 by default; the",
+    "certificate is only left unverified when the target is the loopback",
+    "interface, since the passphrase never leaves the machine there.",
     "",
   ].join("\n"));
 }
@@ -115,50 +134,18 @@ function ask(question, { hidden = false } = {}) {
   });
 }
 
-function postJson({ host, port, httpsEnabled, path, body, token }) {
-  return new Promise((resolve, reject) => {
-    const data = body ? Buffer.from(JSON.stringify(body), "utf8") : null;
-    const lib = httpsEnabled ? https : http;
-    const req = lib.request({
-      host,
-      port,
-      method: body ? "POST" : "GET",
-      path,
-      headers: {
-        "Content-Type": "application/json",
-        ...(data ? { "Content-Length": data.length } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      // Self-signed certificates are common on self-hosted boxes; the
-      // CLI runs on the same machine as the service so trusting any
-      // cert here is no worse than trusting the loopback interface.
-      rejectUnauthorized: false,
-    }, (res) => {
-      let buf = "";
-      res.setEncoding("utf8");
-      res.on("data", (c) => { buf += c; });
-      res.on("end", () => {
-        let json = null;
-        try { json = buf ? JSON.parse(buf) : null; } catch { /* not json */ }
-        resolve({ status: res.statusCode, body: json, raw: buf });
-      });
-    });
-    req.on("error", reject);
-    if (data) req.write(data);
-    req.end();
-  });
-}
-
 async function main() {
   const args = parseArgs(process.argv);
   const cfg = loadConfig(args);
+  const tls = { insecure: args.insecure, caFile: args.caFile };
+  const postJson = (opts) => requestJson({ ...cfg, tls, ...opts });
   const proto = cfg.httpsEnabled ? "https" : "http";
   const base = `${proto}://${cfg.host}:${cfg.port}`;
 
   // 1. Status check (always works, no secret needed).
   let status;
   try {
-    const res = await postJson({ ...cfg, path: "/api/instance/status" });
+    const res = await postJson({ path: "/api/instance/status" });
     if (res.status !== 200) throw new Error(`status returned ${res.status}: ${res.raw}`);
     status = res.body;
   } catch (e) {
@@ -187,16 +174,25 @@ async function main() {
     process.exit(0);
   }
 
-  // 2. Prompt and submit.
+  // 2. Prompt and submit. The transport is checked before the secret is
+  // typed rather than after: nothing to be gained from letting someone
+  // enter a passphrase that is about to travel in the open.
+  try {
+    assertSafeForSecrets(cfg);
+  } catch (e) {
+    console.error(`[error] ${e.message}`);
+    process.exit(1);
+  }
+
   let res;
   if (args.recovery) {
     const key = await ask("Recovery key (GKRV-...): ", { hidden: true });
     if (!key) { console.error("Empty input."); process.exit(1); }
-    res = await postJson({ ...cfg, path: "/api/instance/unlock-recovery", body: { recoveryKey: key } });
+    res = await postJson({ path: "/api/instance/unlock-recovery", body: { recoveryKey: key } });
   } else {
     const passphrase = await ask("Instance passphrase: ", { hidden: true });
     if (!passphrase) { console.error("Empty input."); process.exit(1); }
-    res = await postJson({ ...cfg, path: "/api/instance/unlock", body: { passphrase } });
+    res = await postJson({ path: "/api/instance/unlock", body: { passphrase } });
   }
 
   if (res.status === 200 && res.body && res.body.ok) {

@@ -44,9 +44,12 @@
 
 const fs = require("fs");
 const path = require("path");
-const http = require("http");
-const https = require("https");
 const readline = require("readline");
+const {
+  parseTlsArgs,
+  requestJson,
+  TLS_USAGE,
+} = require("./lib/secureRequest.cjs");
 
 function parseArgs(argv) {
   const out = {
@@ -64,6 +67,7 @@ function parseArgs(argv) {
     host: null,
     positional: [],
     help: false,
+    ...parseTlsArgs(argv.slice(2)),
   };
   const av = argv.slice(2);
   for (let i = 0; i < av.length; i++) {
@@ -108,6 +112,7 @@ function usage() {
       "",
       "Flags: --variant --title --message --persistent --icon --as --to",
       "       --all --gallery --port --host",
+      TLS_USAGE,
       "",
     ].join("\n"),
   );
@@ -165,40 +170,6 @@ function ask(question) {
   });
 }
 
-function requestJson({ host, port, httpsEnabled, method, path: p, body, token }) {
-  return new Promise((resolve, reject) => {
-    const data = body ? Buffer.from(JSON.stringify(body), "utf8") : null;
-    const lib = httpsEnabled ? https : http;
-    const req = lib.request(
-      {
-        host,
-        port,
-        method,
-        path: p,
-        headers: {
-          "Content-Type": "application/json",
-          ...(data ? { "Content-Length": data.length } : {}),
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        rejectUnauthorized: false,
-      },
-      (res) => {
-        let buf = "";
-        res.setEncoding("utf8");
-        res.on("data", (c) => { buf += c; });
-        res.on("end", () => {
-          let json = null;
-          try { json = buf ? JSON.parse(buf) : null; } catch { /* not json */ }
-          resolve({ status: res.statusCode, body: json, raw: buf });
-        });
-      },
-    );
-    req.on("error", reject);
-    if (data) req.write(data);
-    req.end();
-  });
-}
-
 function pickAuthUser(db, args) {
   if (args.as) {
     const row = db
@@ -242,6 +213,7 @@ async function sendOne(cfg, jwt, args, override) {
     path: "/api/notifications/test",
     body: payload,
     token: jwt,
+    tls: { insecure: args.insecure, caFile: args.caFile },
   });
   if (res.status !== 200) {
     console.error(
