@@ -18,6 +18,7 @@ réseau, pas de base de données, rien à nettoyer après. Assez rapide pour
 | L'assainissement est la dernière étape avant chaque affichage de HTML | `invariants/t16-sanitize-before-display.mjs` |
 | Quelles adresses ont le droit de réécrire l'adresse d'appel retenue | `federation/t7-trust-policy.mjs` |
 | Adresses IA autorisées, certificat exigé par les scripts, domaine des passkeys, filtre de style, sceau du chiffrement, freinage de la connexion | `unit/t18-pure-rules.mjs` |
+| Un refus 401 sur une route sans jeton ne détruit pas la session ouverte | `unit/t19-unauthenticated-401.mjs` |
 
 Le premier mérite un mot: ce n'est pas le test d'une fonction, c'est le
 test d'une règle. Il recense chaque endroit où l'interface affiche du

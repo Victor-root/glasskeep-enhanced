@@ -68,19 +68,33 @@ export async function api(path, { method = "GET", body, token, timeoutMs } = {})
     }
 
     // Handle token expiration (401 Unauthorized)
+    //
+    // A 401 only means "your session is over" when we actually presented
+    // a session. Several endpoints answer 401 to say something entirely
+    // different, and they are all called WITHOUT a token: the unlock
+    // screen (wrong passphrase), the recovery-key form, the login form
+    // (wrong password). Treating those as an expired session had two
+    // consequences, both wrong: the stored credentials were wiped, so
+    // mistyping the instance passphrase signed the user out of an
+    // otherwise valid session; and the real reason was replaced by
+    // "session expired, please log in again", which is not what
+    // happened.
+    //
+    // So the teardown is gated on having sent a token. Without one, a
+    // 401 is the endpoint's answer about the secret that was typed, and
+    // it is handed to the caller untouched.
     if (res.status === 401) {
-      // Clear auth from localStorage
-      try {
-        localStorage.removeItem(AUTH_KEY);
-      } catch (e) {
-        console.error("Error clearing auth:", e);
+      if (token) {
+        try {
+          localStorage.removeItem(AUTH_KEY);
+        } catch (e) {
+          console.error("Error clearing auth:", e);
+        }
+        window.dispatchEvent(new CustomEvent("auth-expired"));
       }
 
-      // Dispatch a custom event so the app can handle it
-      window.dispatchEvent(new CustomEvent("auth-expired"));
-
       const err = new Error(
-        data?.error || t("sessionExpired"),
+        data?.error || (token ? t("sessionExpired") : t("genericError")),
       );
       err.status = res.status;
       err.isAuthError = true;
