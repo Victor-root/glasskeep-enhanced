@@ -31,6 +31,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.glasskeep.app.net.CleartextPolicy
 
 class WebViewActivity : AppCompatActivity() {
 
@@ -412,9 +413,23 @@ class WebViewActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_webview)
 
+        // MainActivity has already vetted the address it passes here. The
+        // fallback (a reminder notification tap, say) reads the stored one
+        // straight from preferences, so it goes through the same gate.
         val url = intent.getStringExtra("url")
-            ?: getSharedPreferences("glasskeep", MODE_PRIVATE).getString("server_url", null)
-            ?: run { finish(); return }
+            ?: getSharedPreferences("glasskeep", MODE_PRIVATE).let { prefs ->
+                prefs.getString("server_url", null)?.takeIf {
+                    CleartextPolicy.isUsableAtStartup(
+                        it,
+                        prefs.getBoolean(MainActivity.KEY_URL_VETTED, false),
+                    )
+                }
+            }
+            ?: run {
+                startActivity(Intent(this, MainActivity::class.java))
+                finish()
+                return
+            }
 
         // Deep-link target if we were launched by a reminder notification tap.
         pendingOpenNoteId = intent.getStringExtra(EXTRA_OPEN_NOTE_ID)
@@ -1042,7 +1057,10 @@ class WebViewActivity : AppCompatActivity() {
             setOnClickListener {
                 dialog.dismiss()
                 getSharedPreferences("glasskeep", MODE_PRIVATE)
-                    .edit().remove("server_url").apply()
+                    .edit()
+                    .remove("server_url")
+                    .remove(MainActivity.KEY_URL_VETTED)
+                    .apply()
                 val intent = Intent(this@WebViewActivity, MainActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 startActivity(intent)

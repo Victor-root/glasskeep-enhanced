@@ -11,6 +11,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowInsetsControllerCompat
+import com.glasskeep.app.net.CleartextPolicy
 import com.glasskeep.app.ui.OnboardingPager
 import com.glasskeep.app.ui.theme.GlassKeepTheme
 
@@ -23,11 +24,20 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val savedUrl = prefs.getString("server_url", null)
+        val storedUrl = prefs.getString("server_url", null)
         // Treat already-configured installs as having completed the
         // permissions onboarding — existing users updating from 1.2.x
         // shouldn't suddenly see the welcome flow.
-        val welcomeDone = prefs.getBoolean(KEY_WELCOME_DONE, savedUrl != null)
+        val welcomeDone = prefs.getBoolean(KEY_WELCOME_DONE, storedUrl != null)
+
+        // A stored address that sends everything in the clear across the
+        // internet does not get used again, whatever it was allowed to do
+        // in an earlier version. Dropping the user back on the setup
+        // screen is the whole remedy: the address is re-examined there,
+        // properly, with a lookup this startup path cannot afford.
+        val savedUrl = storedUrl?.takeIf {
+            CleartextPolicy.isUsableAtStartup(it, prefs.getBoolean(KEY_URL_VETTED, false))
+        }
 
         // Fast path: onboarding done AND URL configured → straight to
         // the WebView, same as the previous behaviour.
@@ -77,11 +87,19 @@ class MainActivity : ComponentActivity() {
                 // (existing 1.2.x installs) land on page 2 directly.
                 OnboardingPager(
                     startAtSetup = welcomeDone,
+                    initialUrl = storedUrl.orEmpty(),
                     onWelcomeCompleted = {
                         prefs.edit().putBoolean(KEY_WELCOME_DONE, true).apply()
                     },
                     onConnect = { url ->
-                        prefs.edit().putString("server_url", url).apply()
+                        // The setup screen only hands back an address it
+                        // has examined, lookup included. Recording that
+                        // is what keeps the startup gate from sending a
+                        // legitimate local name back here every time.
+                        prefs.edit()
+                            .putString("server_url", url)
+                            .putBoolean(KEY_URL_VETTED, true)
+                            .apply()
                         launchWebView(url)
                     },
                 )
@@ -111,6 +129,11 @@ class MainActivity : ComponentActivity() {
         // SharedPreferences key marking the one-time permissions
         // onboarding as completed.
         private const val KEY_WELCOME_DONE = "welcome_done"
+
+        // Set when the setup screen accepted an address after examining
+        // where it actually points. WebViewActivity clears it along with
+        // the address itself when the user switches server.
+        const val KEY_URL_VETTED = "server_url_vetted"
 
         // Action strings must match res/xml/shortcuts.xml. Each maps
         // to the (queryParamKey, queryParamValue) pair MainActivity

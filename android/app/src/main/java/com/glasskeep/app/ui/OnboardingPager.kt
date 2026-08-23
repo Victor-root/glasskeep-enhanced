@@ -44,6 +44,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun OnboardingPager(
     startAtSetup: Boolean,
+    initialUrl: String = "",
     onWelcomeCompleted: () -> Unit,
     onConnect: (String) -> Unit,
 ) {
@@ -67,7 +68,7 @@ fun OnboardingPager(
                     onWelcomeCompleted()
                     scope.launch { pagerState.animateScrollToPage(1) }
                 })
-                1 -> SetupScreen(onConnect = onConnect)
+                1 -> SetupScreen(initialUrl = initialUrl, onConnect = onConnect)
             }
         }
 
