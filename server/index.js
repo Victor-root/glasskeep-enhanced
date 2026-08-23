@@ -392,6 +392,15 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
       if (!names.has("must_change_password")) {
         db.exec(`ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0`);
       }
+      if (!names.has("token_version")) {
+        // Bumped when the password changes, which is the moment every
+        // other session has to stop. Tokens carry the value they were
+        // minted with; a token holding an older one is refused. Starting
+        // at 0 means tokens issued before this column existed, which
+        // carry no version at all, keep working until the first password
+        // change. Nobody is signed out by the upgrade itself.
+        db.exec(`ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0`);
+      }
       if (!names.has("language")) {
         // NULL = automatic (detect from browser). Otherwise an explicit
         // tag like "fr" or "en". Stored as TEXT to remain forward-compatible.
@@ -867,6 +876,29 @@ function serializeNote(r, userId) {
   };
 }
 
+// ---------- Session revocation ----------
+// Changing a password has to cut the sessions opened with the old one,
+// otherwise the one gesture meant to lock an intruder out leaves their
+// token working for another month. There is no token blacklist: the
+// account carries a counter, every token carries the counter it was
+// minted with, and a token whose counter has fallen behind is refused.
+// One counter per account, so one bump revokes every device at once.
+const getTokenVersionStmt = db.prepare("SELECT token_version FROM users WHERE id = ?");
+
+function currentTokenVersion(userId) {
+  return getTokenVersionStmt.get(userId)?.token_version ?? 0;
+}
+
+// A token is still current when its version matches the account's, and
+// when the account still exists at all. Tokens minted before this
+// mechanism existed carry no version; they count as 0, which is the
+// default every account starts at.
+function tokenStillValid(payload) {
+  const row = getTokenVersionStmt.get(payload?.uid);
+  if (!row) return false;
+  return (payload.tv ?? 0) === row.token_version;
+}
+
 function signToken(user, reason = "issue") {
   const token = jwt.sign(
     {
@@ -874,6 +906,13 @@ function signToken(user, reason = "issue") {
       email: user.email,
       name: user.name,
       is_admin: !!user.is_admin,
+      // Read from the database rather than from the row handed in: this
+      // function is called from six places (password, recovery key, QR
+      // pairing, passkeys, renewal, password change) and some of them
+      // pass a partial row. Stamping a stale or missing version would
+      // mint a token that dies at the next request, or one that outlives
+      // the revocation it was supposed to respect.
+      tv: currentTokenVersion(user.id),
     },
     JWT_SECRET,
     // 30-day ceiling: an actively-used session is renewed well before this
@@ -922,18 +961,29 @@ function logAuthFailure(req, token, err) {
   } catch { /* never let diagnostics break auth */ }
 }
 
+// Verify a token and fill req.user, or throw. Two things are checked:
+// the signature, and whether the session behind it is still current.
+// The caller answers the same way for both, so a revoked session is
+// indistinguishable from a forged one from the outside.
+function acceptToken(req, token) {
+  const payload = jwt.verify(token, JWT_SECRET);
+  if (!tokenStillValid(payload)) {
+    throw Object.assign(new Error("Session revoked"), { name: "SessionRevokedError" });
+  }
+  req.user = {
+    id: payload.uid,
+    email: payload.email,
+    name: payload.name,
+    is_admin: !!payload.is_admin,
+  };
+}
+
 function auth(req, res, next) {
   const h = req.headers.authorization || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : null;
   if (!token) return res.status(401).json({ error: "Missing token" });
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.user = {
-      id: payload.uid,
-      email: payload.email,
-      name: payload.name,
-      is_admin: !!payload.is_admin,
-    };
+    acceptToken(req, token);
     next();
   } catch (e) {
     logAuthFailure(req, token, e);
@@ -949,13 +999,7 @@ function authFromQueryOrHeader(req, res, next) {
   const token = headerToken || queryToken;
   if (!token) return res.status(401).json({ error: "Missing token" });
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.user = {
-      id: payload.uid,
-      email: payload.email,
-      name: payload.name,
-      is_admin: !!payload.is_admin,
-    };
+    acceptToken(req, token);
     next();
   } catch (e) {
     logAuthFailure(req, token, e);
@@ -1597,6 +1641,27 @@ function removeSseClient(userId, res) {
   if (!set) return;
   set.delete(res);
   if (set.size === 0) sseClients.delete(key);
+}
+
+// Drop every open event stream belonging to an account. Called when the
+// password changes: the streams were accepted with tokens that are no
+// longer valid, and a stream stays open for as long as the client keeps
+// it, so revoking the token alone would leave note updates flowing to a
+// session that is supposed to be shut out.
+//
+// The device that just changed its password is disconnected too, and
+// that is fine: its client reopens a stream as soon as it takes the new
+// token, and the reconnection path runs an unauthenticated health check,
+// so nothing mistakes this for an expired session.
+function closeSseClientsFor(userId) {
+  const key = parseSseKey(userId);
+  if (key === null) return;
+  const set = sseClients.get(key);
+  if (!set) return;
+  for (const res of set) {
+    try { res.end(); } catch { /* already gone */ }
+  }
+  sseClients.delete(key);
 }
 
 function sendEventToUser(userId, event) {
@@ -2308,7 +2373,14 @@ app.post("/api/user/change-password", auth, (req, res) => {
   }
 
   const hash = bcrypt.hashSync(new_password, 10);
-  db.prepare("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?").run(hash, user.id);
+  // Bumping the version in the same statement is what cuts the sessions
+  // opened with the old password. The device asking for the change is
+  // handed a fresh token below, so it stays signed in; every other one
+  // stops at its next request.
+  db.prepare(
+    "UPDATE users SET password_hash = ?, must_change_password = 0, token_version = token_version + 1 WHERE id = ?",
+  ).run(hash, user.id);
+  closeSseClientsFor(user.id);
 
   // Return a fresh token + full user object. The client REPLACES its
   // entire user state with whatever this returns (not a merge), so
@@ -4892,6 +4964,12 @@ app.patch("/api/admin/users/:id", auth, adminOnly, (req, res) => {
     // When admin resets a password, force the user to change it on next login
     updates.push("must_change_password = ?");
     params.push(1);
+    // An administrator resetting a password is the same event as the user
+    // doing it: the old password no longer opens anything, so neither
+    // should the sessions opened with it. The account signs in again
+    // everywhere, which is the point when the reason for the reset is
+    // that someone else got in.
+    updates.push("token_version = token_version + 1");
   }
 
   if (is_admin !== undefined) {
@@ -4911,6 +4989,10 @@ app.patch("/api/admin/users/:id", auth, adminOnly, (req, res) => {
   if (result.changes === 0) {
     return res.status(404).json({ error: "User not found" });
   }
+
+  // The password reset above bumped the account's token version; the open
+  // event streams were accepted with the tokens it just revoked.
+  if (password) closeSseClientsFor(id);
 
   // Return updated user data
   const updatedUser = getUserById.get(id);
