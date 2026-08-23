@@ -181,7 +181,7 @@ footer { margin-top:5rem; padding-top:1.5rem; border-top:1px solid var(--line);
 </div>
 
 <section>
-  <div class="section-head"><h2>État des correctifs</h2><span class="count">16 corrigés, 3 clos, 2 ouverts</span></div>
+  <div class="section-head"><h2>État des correctifs</h2><span class="count">16 corrigés, 4 clos, 1 ouvert</span></div>
   <div class="prose">
     <p>Suivi tenu à jour au fil des corrections. Chaque entrée du rapport porte son statut, et les entrées corrigées ou closes portent en fin de bloc la raison et la référence du commit.</p>
     <p>Le correctif de F-02 s'est accompagné d'un banc d'essai à deux instances, versé au dépôt sous <code>test/federation</code>. Il monte une autorité de certification locale et deux serveurs qui s'appairent réellement en TLS vérifié, puis joue quinze scénarios pour 214 vérifications : la poignée de main nominale, l'attaque et sa variante à identifiant bien formé, les invitations croisées, la double acceptation simultanée, le partage d'une note entre serveurs jusqu'au dépairage, le limiteur d'essais du déverrouillage au repos, le refus du transport en clair, les adresses sortantes de la configuration IA, le freinage de la connexion, la révocation des sessions, la vérification du certificat par les scripts d'administration, le domaine des passkeys, le filtrage du style dans les notes et le cycle de vie complet du coffre au repos. Les scénarios d'attaque acceptent une attente « vulnérable » ou « bloqué », ce qui permet de vérifier qu'ils détectent réellement la faille au lieu de simplement passer : sur le code antérieur au correctif, l'attaque réussit 8/8. Cela ne referme pas F-21, qui vise l'absence de tests sur l'ensemble du projet, mais la fédération n'est plus la partie non couverte.</p>
@@ -203,10 +203,11 @@ footer { margin-top:5rem; padding-top:1.5rem; border-top:1px solid var(--line);
       <tr class="done"><td><span class="chip fixed">Corrigé</span></td><td class="id">F-03</td><td>Commit <code>d538a53</code>. <code>TRUST_PROXY=true</code> ne signifie plus « tout accepter » mais les plages où se trouve réellement un proxy auto-hébergé. Une adresse publique ne peut plus réécrire l'adresse que le limiteur compte. <strong>Vérifié en bout en bout et sur la fonction de confiance elle-même.</strong></td></tr>
       <tr class="done"><td><span class="chip fixed">Corrigé</span></td><td class="id">F-02, F-09</td><td>Commit <code>3fbdfe1</code>. Identifiant et jeton contrôlés, départage rendu non destructeur, libellé borné, adresse réelle affichée dans le bandeau, plafond par origine, secret partagé refusé s'il est trop court. <strong>Vérifié sur deux instances réelles</strong> dialoguant en TLS vérifié.</td></tr>
       <tr class="done"><td><span class="chip fixed">Corrigé</span></td><td class="id">F-12, F-16, F-17</td><td>Commit <code>6c00501</code>. Encadrement refusé par en-tête, détail d'erreur d'import retiré de la réponse, recherche de collaborateur filtrée sur les comptes réels. Relu et contrôlé syntaxiquement, non exécuté au moment du commit.</td></tr>
+      <tr><td><span class="chip plain">Accepté</span></td><td class="id">F-19</td><td>Risque accepté, et la réserve du mainteneur est fondée. Le fichier d'autorisation épingle le nom du paquet <em>et</em> l'empreinte, donc Android ne remettra jamais une passkey GlassKeep à une autre application signée par F-Droid. Retirer l'empreinte échangerait un durcissement théorique contre un vrai piège le jour de la publication sur F-Droid, où les passkeys cesseraient de fonctionner tant que chaque serveur n'aurait pas été mis à jour.</td></tr>
       <tr><td><span class="chip plain">Accepté</span></td><td class="id">F-15</td><td>Risque accepté par le mainteneur, et son objection est juste : le build renomme la sortie en <code>GlassKeep-v&lt;version&gt;-debug.apk</code>, et la publication passe par l'assistant de build signé où la variante est choisie explicitement. Le scénario du mauvais fichier attrapé par erreur est écarté par l'outillage.</td></tr>
       <tr><td><span class="chip plain">Accepté</span></td><td class="id">F-01</td><td>Risque accepté par le mainteneur. Le README documente la saisie du mot de passe à quatre reprises.</td></tr>
       <tr><td><span class="chip plain">Reporté</span></td><td class="id">F-20</td><td>La mise à jour d'<code>esbuild</code> sort de la plage que <code>vite</code> 7 autorise. Résolu par le futur passage à <code>vite</code> 8.</td></tr>
-      <tr><td><span class="chip open">À traiter</span></td><td class="id">F-19, F-21</td><td>Aucune de ces entrées n'est un correctif d'une ligne : chacune demande soit un arbitrage de configuration, soit une modification que rien ne permet de vérifier ici (deuxième instance, appareil Android, harnais de test).</td></tr>
+      <tr><td><span class="chip open">À traiter</span></td><td class="id">F-21</td><td>Aucune de ces entrées n'est un correctif d'une ligne : chacune demande soit un arbitrage de configuration, soit une modification que rien ne permet de vérifier ici (deuxième instance, appareil Android, harnais de test).</td></tr>
     </tbody>
   </table>
   </div>
@@ -245,7 +246,7 @@ footer { margin-top:5rem; padding-top:1.5rem; border-top:1px solid var(--line);
       <tr class="done"><td class="id">F-16</td><td><span class="chip low">Faible</span></td><td>Message d'erreur interne renvoyé au client à l'import</td><td class="where">server/index.js:4039</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip fixed">Corrigé</span></td></tr>
       <tr class="done"><td class="id">F-17</td><td><span class="chip low">Faible</span></td><td>Un utilisateur peut ajouter un pseudo-compte fédéré comme collaborateur local</td><td class="where">server/index.js:2681</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip fixed">Corrigé</span></td></tr>
       <tr class="done"><td class="id">F-18</td><td><span class="chip info">Info</span></td><td>Longueur du sceau d'authenticité non fixée sur les 9 appels de chiffrement</td><td class="where">server/encryption/*.js</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip open">À traiter</span></td></tr>
-      <tr><td class="id">F-19</td><td><span class="chip info">Info</span></td><td>Clé de signature F-Droid pré-autorisée pour les passkeys</td><td class="where">server/routes/assetLinksRoutes.js:44-52</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr class="done"><td class="id">F-19</td><td><span class="chip info">Info</span></td><td>Clé de signature F-Droid pré-autorisée pour les passkeys</td><td class="where">server/routes/assetLinksRoutes.js:44-52</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip open">À traiter</span></td></tr>
       <tr><td class="id">F-20</td><td><span class="chip info">Info</span></td><td>Dépendance <code>esbuild</code> 0.27.7 vulnérable, hors production</td><td class="where">package-lock.json</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip plain">Reporté</span></td></tr>
       <tr><td class="id">F-21</td><td><span class="chip info">Info</span></td><td>Aucune infrastructure de test, donc aucune défense verrouillée contre régression</td><td class="where">package.json</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip open">À traiter</span></td></tr>
     </tbody>
@@ -812,9 +813,9 @@ aucune occurrence de authTagLength dans le dépôt</div>
     </div>
   </article>
 
-  <article class="finding info">
+  <article class="finding info done">
     <div class="f-head">
-      <div class="f-tags"><span class="f-id">F-19</span><span class="chip info">Info</span><span class="chip plain">Durcissement</span></div>
+      <div class="f-tags"><span class="f-id">F-19</span><span class="chip plain">Accepté</span><span class="chip info">Info</span><span class="chip plain">Durcissement</span></div>
       <h3>La clé de signature F-Droid est pré-autorisée pour les passkeys</h3>
     </div>
     <div class="f-body">
@@ -828,6 +829,11 @@ server/routes/passkeyRoutes.js:112-135   convertie en origine acceptée</div>
       </div>
       <div class="block"><span class="eyebrow">Correctif</span>
         <p>N'ajouter cette empreinte que le jour où l'application est réellement distribuée sur F-Droid.</p>
+      </div>
+      <div class="fixnote" style="border-left-color:var(--muted);background:var(--surface-2)"><strong>Accepté</strong>, décision du mainteneur le 23 août 2026, et sa réserve est fondée.
+        <p>Vérification faite : le fichier publié épingle <code>package_name: "com.glasskeep.app"</code> <em>et</em> les empreintes. Android ne remettra donc jamais une passkey GlassKeep à une autre application signée par F-Droid, le nom du paquet ne correspondant pas. C'est la serrure qui compte, et elle tient.</p>
+        <p>Ce qui reste effectivement plus large que nécessaire est la vérification côté serveur, qui compare une origine <code>android:apk-key-hash:&lt;empreinte&gt;</code> ne portant pas le nom du paquet. Mais pour y arriver il faut déjà détenir la passkey, que la première serrure n'a pas remise. Deux verrous, un lâche, le serré tient.</p>
+        <p>Le retrait échangerait un durcissement théorique contre un piège réel : le jour de la publication sur F-Droid, les passkeys cesseraient de fonctionner pour ces utilisateurs tant que chaque serveur n'aurait pas été mis à jour. C'est précisément pourquoi l'empreinte est pré-embarquée, et le commentaire du code le disait déjà. Résidu assumé : l'infrastructure de F-Droid est un second acteur capable de produire un APK que tous les serveurs GlassKeep acceptent, ce qui est exactement la confiance recherchée le jour venu.</p>
       </div>
     </div>
   </article>
