@@ -177,14 +177,14 @@ footer { margin-top:5rem; padding-top:1.5rem; border-top:1px solid var(--line);
   <div class="score c-low"><span class="n">7</span><span class="l">Faible</span></div>
   <div class="score c-info"><span class="n">4</span><span class="l">Info</span></div>
   <div class="score c-refuted"><span class="n">12</span><span class="l">Réfutés</span></div>
-  <div class="score c-fixed"><span class="n">16</span><span class="l">Corrigés</span></div>
+  <div class="score c-fixed"><span class="n">17</span><span class="l">Corrigés</span></div>
 </div>
 
 <section>
-  <div class="section-head"><h2>État des correctifs</h2><span class="count">16 corrigés, 4 clos, 1 ouvert</span></div>
+  <div class="section-head"><h2>État des correctifs</h2><span class="count">17 corrigés, 4 clos, 0 ouvert</span></div>
   <div class="prose">
     <p>Suivi tenu à jour au fil des corrections. Chaque entrée du rapport porte son statut, et les entrées corrigées ou closes portent en fin de bloc la raison et la référence du commit.</p>
-    <p>Le correctif de F-02 s'est accompagné d'un banc d'essai à deux instances, versé au dépôt sous <code>test/federation</code>. Il monte une autorité de certification locale et deux serveurs qui s'appairent réellement en TLS vérifié, puis joue quinze scénarios pour 214 vérifications : la poignée de main nominale, l'attaque et sa variante à identifiant bien formé, les invitations croisées, la double acceptation simultanée, le partage d'une note entre serveurs jusqu'au dépairage, le limiteur d'essais du déverrouillage au repos, le refus du transport en clair, les adresses sortantes de la configuration IA, le freinage de la connexion, la révocation des sessions, la vérification du certificat par les scripts d'administration, le domaine des passkeys, le filtrage du style dans les notes et le cycle de vie complet du coffre au repos. Les scénarios d'attaque acceptent une attente « vulnérable » ou « bloqué », ce qui permet de vérifier qu'ils détectent réellement la faille au lieu de simplement passer : sur le code antérieur au correctif, l'attaque réussit 8/8. Cela ne referme pas F-21, qui vise l'absence de tests sur l'ensemble du projet, mais la fédération n'est plus la partie non couverte.</p>
+    <p>Le correctif de F-02 s'est accompagné d'un banc d'essai à deux instances, versé au dépôt sous <code>test/federation</code>. Il monte une autorité de certification locale et deux serveurs qui s'appairent réellement en TLS vérifié, puis joue seize scénarios pour 226 vérifications : la poignée de main nominale, l'attaque et sa variante à identifiant bien formé, les invitations croisées, la double acceptation simultanée, le partage d'une note entre serveurs jusqu'au dépairage, le limiteur d'essais du déverrouillage au repos, le refus du transport en clair, les adresses sortantes de la configuration IA, le freinage de la connexion, la révocation des sessions, la vérification du certificat par les scripts d'administration, le domaine des passkeys, le filtrage du style dans les notes et le cycle de vie complet du coffre au repos. Les scénarios d'attaque acceptent une attente « vulnérable » ou « bloqué », ce qui permet de vérifier qu'ils détectent réellement la faille au lieu de simplement passer : sur le code antérieur au correctif, l'attaque réussit 8/8. Cela ne referme pas F-21, qui vise l'absence de tests sur l'ensemble du projet, mais la fédération n'est plus la partie non couverte.</p>
   </div>
   <div class="table-scroll">
   <table>
@@ -207,7 +207,7 @@ footer { margin-top:5rem; padding-top:1.5rem; border-top:1px solid var(--line);
       <tr><td><span class="chip plain">Accepté</span></td><td class="id">F-15</td><td>Risque accepté par le mainteneur, et son objection est juste : le build renomme la sortie en <code>GlassKeep-v&lt;version&gt;-debug.apk</code>, et la publication passe par l'assistant de build signé où la variante est choisie explicitement. Le scénario du mauvais fichier attrapé par erreur est écarté par l'outillage.</td></tr>
       <tr><td><span class="chip plain">Accepté</span></td><td class="id">F-01</td><td>Risque accepté par le mainteneur. Le README documente la saisie du mot de passe à quatre reprises.</td></tr>
       <tr><td><span class="chip plain">Reporté</span></td><td class="id">F-20</td><td>La mise à jour d'<code>esbuild</code> sort de la plage que <code>vite</code> 7 autorise. Résolu par le futur passage à <code>vite</code> 8.</td></tr>
-      <tr><td><span class="chip open">À traiter</span></td><td class="id">F-21</td><td>Aucune de ces entrées n'est un correctif d'une ligne : chacune demande soit un arbitrage de configuration, soit une modification que rien ne permet de vérifier ici (deuxième instance, appareil Android, harnais de test).</td></tr>
+      <tr class="done"><td><span class="chip fixed">Corrigé</span></td><td class="id">F-21</td><td>Commit <code>f426636</code>. Deux commandes : <code>npm test</code> en une demi-seconde sans rien démarrer, et <code>npm run test:integration</code> pour la suite complète, montage et démontage compris. Surtout, les deux règles dont l'audit dépendait sans que rien ne les vérifie sont désormais verrouillées : l'assainissement avant chaque affichage, et le refus d'une signature falsifiée entre serveurs. <strong>Pas de GitHub Actions</strong>, décision du mainteneur qui lance ses tests lui-même.</td></tr>
     </tbody>
   </table>
   </div>
@@ -245,10 +245,10 @@ footer { margin-top:5rem; padding-top:1.5rem; border-top:1px solid var(--line);
       <tr class="done"><td class="id">F-15</td><td><span class="chip low">Faible</span></td><td>APK de debug signé avec la clé de production</td><td class="where">android/app/build.gradle.kts:59-62</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip plain">Accepté</span></td></tr>
       <tr class="done"><td class="id">F-16</td><td><span class="chip low">Faible</span></td><td>Message d'erreur interne renvoyé au client à l'import</td><td class="where">server/index.js:4039</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip fixed">Corrigé</span></td></tr>
       <tr class="done"><td class="id">F-17</td><td><span class="chip low">Faible</span></td><td>Un utilisateur peut ajouter un pseudo-compte fédéré comme collaborateur local</td><td class="where">server/index.js:2681</td><td><span class="chip tp">Vrai positif</span></td><td><span class="chip fixed">Corrigé</span></td></tr>
-      <tr class="done"><td class="id">F-18</td><td><span class="chip info">Info</span></td><td>Longueur du sceau d'authenticité non fixée sur les 9 appels de chiffrement</td><td class="where">server/encryption/*.js</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip open">À traiter</span></td></tr>
-      <tr class="done"><td class="id">F-19</td><td><span class="chip info">Info</span></td><td>Clé de signature F-Droid pré-autorisée pour les passkeys</td><td class="where">server/routes/assetLinksRoutes.js:44-52</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr class="done"><td class="id">F-18</td><td><span class="chip info">Info</span></td><td>Longueur du sceau d'authenticité non fixée sur les 9 appels de chiffrement</td><td class="where">server/encryption/*.js</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip fixed">Corrigé</span></td></tr>
+      <tr class="done"><td class="id">F-19</td><td><span class="chip info">Info</span></td><td>Clé de signature F-Droid pré-autorisée pour les passkeys</td><td class="where">server/routes/assetLinksRoutes.js:44-52</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip plain">Accepté</span></td></tr>
       <tr><td class="id">F-20</td><td><span class="chip info">Info</span></td><td>Dépendance <code>esbuild</code> 0.27.7 vulnérable, hors production</td><td class="where">package-lock.json</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip plain">Reporté</span></td></tr>
-      <tr><td class="id">F-21</td><td><span class="chip info">Info</span></td><td>Aucune infrastructure de test, donc aucune défense verrouillée contre régression</td><td class="where">package.json</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip open">À traiter</span></td></tr>
+      <tr class="done"><td class="id">F-21</td><td><span class="chip info">Info</span></td><td>Aucune infrastructure de test, donc aucune défense verrouillée contre régression</td><td class="where">package.json</td><td><span class="chip plain">Durcissement</span></td><td><span class="chip fixed">Corrigé</span></td></tr>
     </tbody>
   </table>
   </div>
@@ -859,9 +859,9 @@ plage affectée : 0.27.3 à 0.28.0, corrigé en 0.28.1</div>
     </div>
   </article>
 
-  <article class="finding info">
+  <article class="finding info done">
     <div class="f-head">
-      <div class="f-tags"><span class="f-id">F-21</span><span class="chip info">Info</span><span class="chip plain">Durcissement</span></div>
+      <div class="f-tags"><span class="f-id">F-21</span><span class="chip fixed">Corrigé</span><span class="chip info">Info</span><span class="chip plain">Durcissement</span></div>
       <h3>Aucune infrastructure de test ne verrouille les défenses existantes</h3>
     </div>
     <div class="f-body">
@@ -875,6 +875,14 @@ aucun répertoire de test côté Android</div>
       </div>
       <div class="block"><span class="eyebrow">Correctif</span>
         <p>Ajouter quelques tests ciblés sur les invariants de sécurité : assainissement du contenu, rejet d'un sceau tronqué, refus d'une signature invalide entre serveurs.</p>
+      </div>
+      <div class="fixnote"><strong>Corrigé</strong> le 23 août 2026, commit <code>f426636</code> sur <code>feature/cross-server-collaboration</code>.
+        <p>Les correctifs précédents avaient déjà laissé derrière eux quinze scénarios et plus de deux cents vérifications. Ce qui manquait tenait en trois points : une commande simple, et les deux règles que ce constat nomme et que rien ne tenait.</p>
+        <p><strong>Deux commandes.</strong> <code>npm test</code> tourne en une demi-seconde, sans démarrer le moindre serveur ni ouvrir le moindre port : 51 vérifications, assez rapides pour être lancées avant chaque commit. <code>npm run test:integration</code> joue la suite complète, 226 vérifications sur seize scénarios, en montant et démontant le bac à sable tout seul, y compris quand un scénario échoue.</p>
+        <p><strong>La règle de l'assainissement avant affichage</strong> est celle qui portait le plus de poids : plusieurs conclusions « pas de faille » reposent dessus. Le test recense les neuf endroits où l'interface affiche du HTML brut et remonte chaque valeur jusqu'à un nettoyeur, en suivant les variables, les fonctions locales et une propriété passée à un sous-composant. Il a été éprouvé en ajoutant volontairement un affichage fautif : il l'attrape, et repasse une fois l'affichage retiré. Un test qui ne peut pas échouer ne vaut rien, celui-ci a été mis à l'épreuve.</p>
+        <p><strong>La signature entre serveurs</strong> n'était éprouvée nulle part alors que toute la fédération repose dessus une fois l'appairage fait. Mauvaise clé, signature absente, longueur absurde, corps modifié après signature, horodatage hors fenêtre : tout est refusé, et le motif distingue bien l'horloge de la clé, ce qui évite qu'un administrateur ré-appaire un lien qui n'était pas cassé.</p>
+        <p><strong>Pas d'intégration continue</strong>, et c'est un choix assumé du mainteneur : il lance ses tests lui-même et réserve GitHub Actions à la construction de l'image Docker destinée aux utilisateurs. Les deux commandes tournent partout, y compris sur son serveur, sans rien installer de plus.</p>
+        <p>Cela ne fait pas du projet un projet testé de bout en bout : il n'y a toujours ni test d'interface, ni cérémonie passkey, ni couverture de l'application Android au-delà de sa logique d'adresses. Mais les défenses sur lesquelles cet audit s'appuie ne peuvent plus disparaître en silence.</p>
       </div>
     </div>
   </article>
