@@ -11,7 +11,7 @@ import React, { useState } from "react";
 import AuthShell from "../auth/AuthShell.jsx";
 import { api } from "../../utils/api.js";
 import { t } from "../../i18n";
-import { localizeServerError } from "../../utils/serverErrors.js";
+import { localizeSecretRejection } from "../../utils/serverErrors.js";
 import PasskeyUnlockPanel from "./PasskeyUnlockPanel.jsx";
 
 // onBackToOffline (optional): when set, render a "back to my offline
@@ -40,7 +40,11 @@ export default function InstanceUnlockScreen({ dark, onToggleDark, onUnlocked, o
       setRecoveryKey("");
       onUnlocked && onUnlocked();
     } catch (e) {
-      setErr(localizeServerError(e?.message, "unlockFailed"));
+      setErr(localizeSecretRejection(
+        e,
+        mode === "recovery" ? "errInvalidRecoveryKey" : "errInvalidPassphrase",
+        "unlockFailed",
+      ));
     } finally {
       setLoading(false);
     }

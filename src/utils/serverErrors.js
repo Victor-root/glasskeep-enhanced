@@ -156,3 +156,17 @@ export function localizeServerError(message, fallbackKey = "genericError") {
   }
   return m;
 }
+
+// Les écrans qui envoient un secret (phrase de passe, clé de secours,
+// mot de passe) appellent des routes qui ne répondent 401 que pour une
+// seule raison: ce qui a été saisi ne correspond pas. Le reste passe par
+// d'autres codes. L'écran sait donc dire la vraie raison même quand la
+// réponse arrive sans son message, ce qui vaut mieux qu'une phrase
+// générique qui n'apprend rien.
+//
+// rejectedKey: ce qu'on dit sur un 401 muet. fallbackKey: ce qu'on dit
+// quand il n'y a ni message ni 401, c'est à dire une panne quelconque.
+export function localizeSecretRejection(error, rejectedKey, fallbackKey) {
+  if (!error?.message && error?.status === 401) return t(rejectedKey);
+  return localizeServerError(error?.message, fallbackKey);
+}

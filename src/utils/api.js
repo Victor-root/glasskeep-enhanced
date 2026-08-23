@@ -83,6 +83,12 @@ export async function api(path, { method = "GET", body, token, timeoutMs } = {})
     // So the teardown is gated on having sent a token. Without one, a
     // 401 is the endpoint's answer about the secret that was typed, and
     // it is handed to the caller untouched.
+    //
+    // And when the server's reason does not reach us at all — an empty
+    // body, or one a proxy replaced on the way — we invent nothing. A
+    // generic "an error occurred" is never the truth here, and worse, it
+    // masks the calling screen's own fallback, which knows what it just
+    // submitted. An empty message lets that fallback speak instead.
     if (res.status === 401) {
       if (token) {
         try {
@@ -93,9 +99,7 @@ export async function api(path, { method = "GET", body, token, timeoutMs } = {})
         window.dispatchEvent(new CustomEvent("auth-expired"));
       }
 
-      const err = new Error(
-        data?.error || (token ? t("sessionExpired") : t("genericError")),
-      );
+      const err = new Error(data?.error || (token ? t("sessionExpired") : ""));
       err.status = res.status;
       err.isAuthError = true;
       throw err;

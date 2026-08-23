@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { t } from "../../i18n";
 import AuthShell from "./AuthShell.jsx";
 import UserAvatar from "../common/UserAvatar.jsx";
-import { localizeServerError } from "../../utils/serverErrors.js";
+import { localizeServerError, localizeSecretRejection } from "../../utils/serverErrors.js";
 import PasskeyLoginButton from "./PasskeyLoginButton.jsx";
 import QrLoginButton from "./QrLoginButton.jsx";
 import QrLoginPanel from "./QrLoginPanel.jsx";
@@ -47,6 +47,7 @@ export default function LoginView({
   const hasProfiles = loginProfiles && loginProfiles.length > 0;
 
   const loginErrorMessage = (er) => {
+    if (er?.status === 401) return localizeSecretRejection(er, "errInvalidCredentials", "loginFailed");
     if (er && (er.status || er.isNetworkError) && er.message) {
       return localizeServerError(er.message, "loginUnexpectedError");
     }
