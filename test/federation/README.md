@@ -15,6 +15,15 @@ cela suffit à en faire deux serveurs distincts. Aucun `/etc/hosts` à modifier.
 
 ## Lancer
 
+Le plus simple, depuis la racine du dépôt, qui monte et démonte tout seul:
+
+```sh
+npm run test:integration
+```
+
+Pour piloter les étapes à la main, par exemple pour rejouer un scénario
+sans tout remonter:
+
 ```sh
 npm ci                      # une fois, pour better-sqlite3 et express
 test/federation/setup.sh    # CA, certificats, deux instances, comptes
@@ -45,6 +54,7 @@ utiles si vous exposez les instances autrement).
 | `t8-plaintext-guard.mjs` | F-04. Le refus d'envoyer la phrase de passe en clair doit s'appliquer au défaut Docker, sans casser les installations qui déclarent un proxy. Démarre ses propres instances en HTTP, n'utilise pas le bac à sable. |
 | `t15-vault-roundtrip.mjs` | F-18. Le cycle de vie complet du coffre au repos, de l'activation à la relecture après changement de phrase de passe, puis le refus d'un sceau d'authenticité tronqué. La première moitié compte autant que la seconde: toucher aux paramètres de chiffrement d'un coffre existant, c'est risquer de rendre les notes illisibles. Démarre sa propre instance. |
 | `t14-note-beacon.mjs` | F-13 et F-14. Une note piégée ne doit pas pouvoir faire appeler le serveur de son auteur par le navigateur de son lecteur. Vérifie les deux serrures: l'assainissement du style, et la politique de sécurité du contenu, celle-ci dans un vrai navigateur sur la vraie page construite. Vérifie aussi qu'une note ne peut porter aucune balise qui charge une ressource, ce qui est l'argument d'inaccessibilité des ponts natifs Android. Demande `npm run build`; la partie navigateur demande `npm install --no-save playwright` et se signale ignorée sinon. |
+| `t17-forged-signature.mjs` | F-21. Une requête entre serveurs signée avec la mauvaise clé, sans signature, avec un corps modifié après coup, ou horodatée hors fenêtre, doit être refusée, et le motif doit distinguer l'horloge de la clé. Utilise le bac à sable. |
 | `t13-passkey-rp.mjs` | F-11. Le domaine auquel une passkey est attachée ne doit venir d'aucun en-tête écrit par l'appelant. Joue les quatre sources, dont deux avec de vrais serveurs: une instance qui porte son propre certificat, et une instance en clair jointe sous un nom forgé. Démarre ses propres instances, demande `openssl`. |
 | `t12-cli-tls.mjs` | F-10. Les scripts d'administration ne doivent envoyer une phrase de passe ou un jeton que vers un interlocuteur identifié. Monte une instance en TLS auto-signé et lance le vrai script d'abord par la boucle locale, puis par une adresse d'interface qui n'en est pas une. Démarre sa propre instance, demande `openssl`. |
 | `t11-session-revocation.mjs` | F-08. Changer son mot de passe doit couper les sessions ouvertes avec l'ancien, y compris les flux d'événements déjà établis, sans toucher aux autres comptes, à l'appareil qui fait le changement, ni aux jetons émis avant le mécanisme. Démarre sa propre instance. |
