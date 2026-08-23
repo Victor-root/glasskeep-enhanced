@@ -16,11 +16,18 @@
 
 import { generateHTML, generateJSON } from "@tiptap/html";
 import DOMPurify from "dompurify";
+import { installStyleGuard } from "./safeStyle.js";
 import { marked as markedParser } from "marked";
 import { RENDER_EXTENSIONS } from "../components/richtext/richTextSchema.js";
 
 const marked =
   typeof markedParser === "function" ? { parse: markedParser } : markedParser;
+
+// The `style` attribute is allowed through below so the editor's colours
+// and alignment survive. Without this filter it would also carry
+// `url(...)`, which turns a shared note into a beacon for its author.
+// See src/utils/safeStyle.js.
+installStyleGuard(DOMPurify);
 
 export const RICH_FORMAT_VERSION = 1;
 export const RICH_FORMAT_NAME = "tiptap";

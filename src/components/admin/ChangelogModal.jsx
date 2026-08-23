@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import { installStyleGuard } from "../../utils/safeStyle.js";
 import changelogRaw from "../../../CHANGELOG.md?raw";
 import { t, locale } from "../../i18n";
 import TI from "../../icons/editor/index.jsx";
@@ -96,6 +97,9 @@ export function onOpenChangelogRequest(cb) {
     window.addEventListener(OPEN_EVENT, handler);
     return () => window.removeEventListener(OPEN_EVENT, handler);
 }
+
+// One filter for every sanitizing path in the app. See safeStyle.js.
+installStyleGuard(DOMPurify);
 
 function compileMarkdown(md) {
     try {
