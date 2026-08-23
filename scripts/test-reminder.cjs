@@ -42,11 +42,17 @@
 
 const fs = require("fs");
 const path = require("path");
-const http = require("http");
-const https = require("https");
+const {
+  parseTlsArgs,
+  requestJson,
+  TLS_USAGE,
+} = require("./lib/secureRequest.cjs");
 
 function parseArgs(argv) {
-  const out = { note: null, in: 0, as: null, port: null, host: null, help: false, positional: [] };
+  const out = {
+    note: null, in: 0, as: null, port: null, host: null, help: false, positional: [],
+    ...parseTlsArgs(argv.slice(2)),
+  };
   const av = argv.slice(2);
   for (let i = 0; i < av.length; i++) {
     const a = av[i];
@@ -74,6 +80,7 @@ function usage() {
       "  GLASSKEEP_TEST_NOTE_ID=<id> test-reminder.cjs",
       "",
       "Flags: --in <seconds> --note --as --port --host",
+      TLS_USAGE,
       "",
     ].join("\n"),
   );
@@ -114,40 +121,6 @@ function loadConfig(args) {
   const dbFile =
     merged.DB_FILE || merged.SQLITE_FILE || path.join(serverDir, "data.sqlite");
   return { host, port, httpsEnabled, jwtSecret, dbFile, envFile };
-}
-
-function requestJson({ host, port, httpsEnabled, method, path: p, body, token }) {
-  return new Promise((resolve, reject) => {
-    const data = body ? Buffer.from(JSON.stringify(body), "utf8") : null;
-    const lib = httpsEnabled ? https : http;
-    const req = lib.request(
-      {
-        host,
-        port,
-        method,
-        path: p,
-        headers: {
-          "Content-Type": "application/json",
-          ...(data ? { "Content-Length": data.length } : {}),
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        rejectUnauthorized: false,
-      },
-      (res) => {
-        let buf = "";
-        res.setEncoding("utf8");
-        res.on("data", (c) => { buf += c; });
-        res.on("end", () => {
-          let json = null;
-          try { json = buf ? JSON.parse(buf) : null; } catch { /* not json */ }
-          resolve({ status: res.statusCode, body: json, raw: buf });
-        });
-      },
-    );
-    req.on("error", reject);
-    if (data) req.write(data);
-    req.end();
-  });
 }
 
 function pickAdmin(db, args) {
@@ -232,6 +205,7 @@ async function main() {
     path: `/api/notes/${encodeURIComponent(String(args.note))}/test-reminder`,
     body: { inSeconds: args.in },
     token,
+    tls: { insecure: args.insecure, caFile: args.caFile },
   });
 
   if (res.status !== 200) {
