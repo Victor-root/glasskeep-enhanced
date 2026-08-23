@@ -43,6 +43,7 @@ utiles si vous exposez les instances autrement).
 | `t7-trust-policy.mjs` | F-03, la politique elle-même: quelles adresses ont le droit de réécrire l'adresse retenue. Ne demande aucun serveur. |
 | `t9-ai-ssrf.mjs` | F-05. Un compte ordinaire ne doit pas pouvoir faire sonder le réseau par le serveur via l'adresse du fournisseur IA, sans casser les deux montages que GlassKeep assume (IA du serveur partagée, ou chacun la sienne). Couvre l'interrupteur admin dans ses deux positions. Démarre son instance et un faux service interne. |
 | `t8-plaintext-guard.mjs` | F-04. Le refus d'envoyer la phrase de passe en clair doit s'appliquer au défaut Docker, sans casser les installations qui déclarent un proxy. Démarre ses propres instances en HTTP, n'utilise pas le bac à sable. |
+| `t14-note-beacon.mjs` | F-13. Une note piégée ne doit pas pouvoir faire appeler le serveur de son auteur par le navigateur de son lecteur. Vérifie les deux serrures: l'assainissement du style, et la politique de sécurité du contenu, celle-ci dans un vrai navigateur sur la vraie page construite. Demande `npm run build`; la partie navigateur demande `npm install --no-save playwright` et se signale ignorée sinon. |
 | `t13-passkey-rp.mjs` | F-11. Le domaine auquel une passkey est attachée ne doit venir d'aucun en-tête écrit par l'appelant. Joue les quatre sources, dont deux avec de vrais serveurs: une instance qui porte son propre certificat, et une instance en clair jointe sous un nom forgé. Démarre ses propres instances, demande `openssl`. |
 | `t12-cli-tls.mjs` | F-10. Les scripts d'administration ne doivent envoyer une phrase de passe ou un jeton que vers un interlocuteur identifié. Monte une instance en TLS auto-signé et lance le vrai script d'abord par la boucle locale, puis par une adresse d'interface qui n'en est pas une. Démarre sa propre instance, demande `openssl`. |
 | `t11-session-revocation.mjs` | F-08. Changer son mot de passe doit couper les sessions ouvertes avec l'ancien, y compris les flux d'événements déjà établis, sans toucher aux autres comptes, à l'appareil qui fait le changement, ni aux jetons émis avant le mécanisme. Démarre sa propre instance. |
@@ -89,8 +90,9 @@ adresse, sans réseau.
 Ces scénarios couvrent la poignée de main d'appairage, le partage de notes, le
 limiteur de déverrouillage, le freinage de la connexion, la révocation des
 sessions, le refus du transport en clair, la vérification du certificat par les
-scripts d'administration, le domaine auquel les passkeys sont attachées et les
-adresses sortantes de la configuration IA. Ils ne couvrent pas les cérémonies
+scripts d'administration, le domaine auquel les passkeys sont attachées, le
+filtrage du style dans les notes et les adresses sortantes de la
+configuration IA. Ils ne couvrent pas les cérémonies
 passkey elles-mêmes, qui demanderaient un authentificateur. La partie Android a
 ses propres tests, côté JVM: `android/app/src/test`, lancés par
 `./gradlew test`.

@@ -1,6 +1,7 @@
 import React from "react";
 import { marked as markedParser } from "marked";
 import DOMPurify from "dompurify";
+import { installStyleGuard } from "./safeStyle.js";
 import { isRichContent, contentToPlain } from "./richText.js";
 
 // Ensure we can call marked.parse(...)
@@ -10,6 +11,9 @@ export const marked =
 /** ---------- Secure Markdown Renderer ---------- */
 // Allowlist of tags produced by marked for standard markdown.
 // SVG, style, script and all event-handler attributes are intentionally excluded.
+// One filter for every sanitizing path in the app. See safeStyle.js.
+installStyleGuard(DOMPurify);
+
 const _PURIFY_CONFIG = {
   ALLOWED_TAGS: [
     "a", "b", "strong", "i", "em", "del", "s", "u",
