@@ -51,6 +51,30 @@ MUTATIONS = [
     ("f5", "le cloisonnement de la bibliothèque de logos",
      "`SELECT id, name, src, created_at FROM logos WHERE user_id = ? ORDER BY created_at ASC`",
      "`SELECT id, name, src, created_at FROM logos WHERE ? IS NOT NULL ORDER BY created_at ASC`"),
+
+    # Les correctifs de la sauvegarde: chacun doit rester tenu.
+    ("f2", "l'épingle personnelle dans l'export",
+     "        pinned: perso ? !!perso.pinned : !!r.pinned,", "        pinned: !!r.pinned,"),
+    ("f2", "la relecture de l'icône à l'import",
+     "        if (n.icon && typeof n.icon.src === \"string\") {\n          runSetUserIcon(id, req.user.id, n.icon);\n        }",
+     "        if (false) {\n          runSetUserIcon(id, req.user.id, n.icon);\n        }"),
+    ("f2", "la restauration d'une note déjà présente",
+     "  const restaurerAttributs = (row, n) => {\n    let touche = false;",
+     "  const restaurerAttributs = (row, n) => {\n    let touche = false;\n    return false;"),
+    ("f3", "les étiquettes du retiré sur sa copie",
+     "    if (userTagsJson && userTagsJson !== \"[]\") {\n      runUpsertUserTags(copyNoteId, userIdToRemove, userTagsJson);\n    }",
+     "    if (false) {\n      runUpsertUserTags(copyNoteId, userIdToRemove, userTagsJson);\n    }"),
+
+    # Les correctifs des droits.
+    ("f3", "le refus d'un droit de partage inconnu",
+     "  if (req.body?.access !== undefined\n      && req.body.access !== \"read\" && req.body.access !== \"write\") {",
+     "  if (false) {"),
+    ("f3", "le départage entre appareils sur la corbeille partagée",
+     "  if (!isNewerOrEqual(tsResult.ms, cible.client_updated_at)) {\n    return res.json({ ok: true, stale: true, note: serializeNote(cible, req.user.id) });\n  }",
+     "  if (false) {\n    return res.json({ ok: true, stale: true, note: serializeNote(cible, req.user.id) });\n  }"),
+    ("f5", "le garde-fou du dernier administrateur face à un « non » écrit autrement",
+     "  if (id === req.user.id && is_admin !== undefined && !is_admin) {",
+     "  if (id === req.user.id && is_admin === false) {"),
 ]
 
 SCENARIOS = {
