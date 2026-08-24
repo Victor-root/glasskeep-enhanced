@@ -49,10 +49,40 @@ donc l'ordre d'exécution n'a aucune importance et un scénario qui
 | Profil, avatar, réglages et leur synchronisation entre onglets, rappels, notifications, changement de mot de passe | `functional/f4-compte-reglages-rappels.mjs` | 9514 |
 | Panneau d'administration: inscriptions en attente, comptes, garde-fous, réglages d'instance, logos | `functional/f5-administration.mjs` | 9515 |
 
-Ces scénarios ont été éprouvés par mutation: casser la fusion des
-réglages, le garde-fou du dernier administrateur ou la lecture des
-étiquettes personnelles fait bien tomber les vérifications concernées,
-et seulement elles. Un test qui passe quoi qu'on fasse ne sert à rien.
+### Éprouvés par mutation
+
+Un test qui passe ne prouve rien tant qu'on n'a pas vérifié qu'il sait
+échouer. Douze régressions ont donc été introduites une par une dans le
+serveur, réparties sur les cinq scénarios, et chacune a bien fait tomber
+les vérifications concernées:
+
+| Ce qu'on a cassé | Détecté par |
+|---|---|
+| La couleur d'une note | f1, 2 vérifications |
+| La restauration depuis la corbeille | f1, 6 |
+| Le sens de la demande d'archivage | f1, 2 |
+| L'épinglage personnel | f1, 2 |
+| Les étiquettes dans l'export | f2, 6 |
+| Le dédoublonnage à l'import | f2, 6 |
+| Le partage en lecture seule | f3, 7 |
+| Le cloisonnement entre comptes | f3, 6 |
+| La liste des rappels à venir | f4, 1 |
+| La révocation des sessions au changement de mot de passe | f4, 1 |
+| La porte du panneau d'administration | f5, 3 |
+| Le cloisonnement de la bibliothèque de logos | f5, 1 |
+
+Douze sur douze. La campagne est rejouable, et mieux vaut la relancer
+après avoir touché à ces scénarios que de leur faire confiance sur
+parole:
+
+```sh
+python3 test/functional/mutations.py
+```
+
+Elle restaure `server/index.js` dans tous les cas, et refuse de démarrer
+si ce fichier porte des modifications non validées. Une ligne
+« NON DÉTECTÉ » désigne un trou dans la couverture; « motif introuvable »
+veut dire que le code a bougé et que la mutation est à réécrire.
 
 ## `npm run test:integration`
 
