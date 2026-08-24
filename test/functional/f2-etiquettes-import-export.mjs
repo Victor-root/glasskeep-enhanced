@@ -254,12 +254,12 @@ try {
   });
   t.check(
     "importer l'export d'un autre compte crée les trois notes et n'en saute aucune",
-    imp.status === 200 && same(imp.json, { ok: true, imported: 3, skipped: 0 }),
+    imp.status === 200 && same(imp.json, { ok: true, imported: 3, updated: 0, skipped: 0 }),
     `http ${imp.status}, corps=${cut(imp.text)}`,
   );
   t.check(
     "la réponse d'import ne dit que combien de notes sont passées, jamais leur contenu ni leurs identifiants",
-    same(Object.keys(imp.json || {}).sort(), ["imported", "ok", "skipped"]),
+    same(Object.keys(imp.json || {}).sort(), ["imported", "ok", "skipped", "updated"]),
     `champs=${show(Object.keys(imp.json || {}))}`,
   );
 
@@ -323,7 +323,7 @@ try {
   const apres = await inst.call("GET", "/api/notes", { token: rei.token });
   t.check(
     "réimporter son propre export ne crée aucune note et signale les deux notes sautées",
-    same(impRei.json, { ok: true, imported: 0, skipped: 2 }),
+    same(impRei.json, { ok: true, imported: 0, updated: 0, skipped: 2 }),
     `corps=${cut(impRei.text)}`,
   );
   t.check(
@@ -353,7 +353,7 @@ try {
   const apresMix = await inst.call("GET", "/api/notes", { token: mix.token });
   t.check(
     "dans un lot, un doublon d'une note existante et un doublon interne au lot sont tous deux sautés",
-    same(impMix.json, { ok: true, imported: 1, skipped: 2 }),
+    same(impMix.json, { ok: true, imported: 1, updated: 0, skipped: 2 }),
     `corps=${cut(impMix.text)}`,
   );
   t.check(
@@ -384,15 +384,28 @@ try {
   });
   const apresDou = await inst.call("GET", "/api/notes", { token: dou.token });
   t.check(
-    "une note importée de même titre et même contenu est sautée même si ses étiquettes et sa couleur diffèrent",
-    same(impDou.json, { ok: true, imported: 0, skipped: 1 }),
+    "une note déjà là dont la sauvegarde porte d'autres étiquettes est restaurée, pas dupliquée ni sautée",
+    same(impDou.json, { ok: true, imported: 0, updated: 1, skipped: 0 }),
     `corps=${cut(impDou.text)}`,
   );
   t.check(
-    "cette note sautée ne modifie pas non plus la note déjà en place",
-    apresDou.json?.length === 1 && same(apresDou.json?.[0]?.tags, ["vieux"])
-      && apresDou.json?.[0]?.color === "default" && apresDou.json?.[0]?.id === "dou-1",
+    "la note en place récupère les étiquettes et la couleur du fichier, sans devenir une seconde note",
+    apresDou.json?.length === 1 && same(apresDou.json?.[0]?.tags, ["neuf"])
+      && apresDou.json?.[0]?.color === "blue" && apresDou.json?.[0]?.id === "dou-1",
     `nb=${apresDou.json?.length}, note=${show(apresDou.json?.[0] && { id: apresDou.json[0].id, tags: apresDou.json[0].tags, color: apresDou.json[0].color })}`,
+  );
+
+  // Rejouer exactement le même fichier ne doit plus rien changer: c'est
+  // la contrepartie de la restauration, sans quoi chaque import
+  // compterait des mises à jour fantômes.
+  const impDouBis = await inst.call("POST", "/api/notes/import", {
+    token: dou.token,
+    body: { notes: [{ id: "dou-neuf", title: "Idées", content: "a", tags: ["neuf"], color: "blue" }] },
+  });
+  t.check(
+    "réimporter le même fichier une seconde fois ne restaure plus rien",
+    same(impDouBis.json, { ok: true, imported: 0, updated: 0, skipped: 1 }),
+    `corps=${cut(impDouBis.text)}`,
   );
 
   // ─────────────────────────────────────────────────────────────────
@@ -413,7 +426,7 @@ try {
   const version2 = (apresEdi.json || []).find((nt) => nt.title === "Rapport v2");
   t.check(
     "importer une version retouchée crée bien une note supplémentaire",
-    same(impEdi.json, { ok: true, imported: 1, skipped: 0 }) && apresEdi.json?.length === 2,
+    same(impEdi.json, { ok: true, imported: 1, updated: 0, skipped: 0 }) && apresEdi.json?.length === 2,
     `corps=${cut(impEdi.text)}, nb notes=${apresEdi.json?.length}`,
   );
   t.check(
@@ -439,7 +452,7 @@ try {
   const apresNu = await inst.call("GET", "/api/notes", { token: nue.token });
   t.check(
     "un import envoyé comme un simple tableau de notes est accepté",
-    impNu.status === 200 && same(impNu.json, { ok: true, imported: 1, skipped: 0 }),
+    impNu.status === 200 && same(impNu.json, { ok: true, imported: 1, updated: 0, skipped: 0 }),
     `http ${impNu.status}, corps=${cut(impNu.text)}`,
   );
   t.check(
@@ -572,8 +585,10 @@ try {
   );
 
   // ─────────────────────────────────────────────────────────────────
-  // 11. Épinglage: ce que l'export montre n'est pas ce que l'écran
-  //     montre. Comportement actuel du code, vérifié tel quel.
+  // 11. Épinglage: l'export doit montrer ce que l'écran montre.
+  //     L'épingle est personnelle, elle vit dans note_user_positions;
+  //     l'export lisait la colonne partagée et rendait donc épinglée
+  //     une note que l'utilisateur avait dépinglée.
   // ─────────────────────────────────────────────────────────────────
   const epi = await compte("epinglage");
   const tsEpi = nextIso();
@@ -597,9 +612,25 @@ try {
     `pinned dans la liste=${show(vueEcran.json?.[0]?.pinned)}`,
   );
   t.check(
-    "l'export, lui, rend encore la note épinglée: le dépinglage personnel n'y figure pas",
-    vueExport.json?.notes?.[0]?.pinned === true,
+    "l'export dit la même chose que l'écran: la note y est dépinglée",
+    vueExport.json?.notes?.[0]?.pinned === false,
     `pinned dans l'export=${show(vueExport.json?.notes?.[0]?.pinned)}`,
+  );
+  t.check(
+    "et il emporte le rangement personnel, pas la position de départ",
+    vueExport.json?.notes?.[0]?.position === vueEcran.json?.[0]?.position,
+    `export=${show(vueExport.json?.notes?.[0]?.position)}, écran=${show(vueEcran.json?.[0]?.position)}`,
+  );
+
+  // C'est le trajet qui compte vraiment: restaurer la sauvegarde ne doit
+  // pas réépingler ce que l'utilisateur avait dépinglé.
+  const epiBis = await compte("epinglagebis");
+  await inst.call("POST", "/api/notes/import", { token: epiBis.token, body: vueExport.json });
+  const listeEpiBis = await inst.call("GET", "/api/notes", { token: epiBis.token });
+  t.check(
+    "après restauration de la sauvegarde, la note est toujours dépinglée",
+    listeEpiBis.json?.length === 1 && listeEpiBis.json?.[0]?.pinned === false,
+    `note=${show(listeEpiBis.json?.[0] && { title: listeEpiBis.json[0].title, pinned: listeEpiBis.json[0].pinned })}`,
   );
 
   // ─────────────────────────────────────────────────────────────────
@@ -677,9 +708,9 @@ try {
   await inst.call("POST", "/api/notes/import", { token: icoBis.token, body: expIco.json });
   const listeIcoBis = await inst.call("GET", "/api/notes", { token: icoBis.token });
   t.check(
-    "après import, la note existe avec ses étiquettes mais son icône est perdue",
+    "après import, la note retrouve ses étiquettes et son icône",
     listeIcoBis.json?.length === 1 && same(listeIcoBis.json?.[0]?.tags, ["deco"])
-      && listeIcoBis.json?.[0]?.icon === null,
+      && same(listeIcoBis.json?.[0]?.icon, ICONE),
     `note=${show(listeIcoBis.json?.[0] && { tags: listeIcoBis.json[0].tags, icon: listeIcoBis.json[0].icon })}`,
   );
 

@@ -3088,7 +3088,12 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
   if (shouldGrantCopy && !isFederatedRemoval) {
     copyNoteId = uid();
     // Preserve the removed user's own per-user tags on the copy instead of
-    // inheriting the shared default — those tags are personal to them.
+    // inheriting the shared default: those tags are personal to them.
+    //
+    // Elles doivent aller dans note_user_tags, pas dans la colonne
+    // partagée: toute lecture passe par getUserTags, qui ne consulte que
+    // cette table. Recopiées dans la colonne, elles étaient bien écrites
+    // mais plus jamais lues, et le retiré récupérait une note nue.
     const userTagsJson = getUserTags(noteId, userIdToRemove);
     runInsertNote({
       id: copyNoteId,
@@ -3097,7 +3102,7 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
       title: note.title,
       content: note.content,
       items_json: note.items_json,
-      tags_json: userTagsJson,
+      tags_json: "[]",
       images_json: note.images_json,
       color: note.color,
       pinned: 0,
@@ -3105,6 +3110,9 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
       timestamp: note.timestamp,
       client_updated_at: nowISO(),
     });
+    if (userTagsJson && userTagsJson !== "[]") {
+      runUpsertUserTags(copyNoteId, userIdToRemove, userTagsJson);
+    }
     // Seed the removed user's per-user position for the copy so it appears
     // at the top of their list, matching the share-to-collaborator UX.
     const { max_pos } = getMaxUserEffectivePosition.get(
@@ -4066,20 +4074,29 @@ app.get("/api/notes/export", auth, (req, res) => {
     version: 1,
     user: req.user.email,
     exportedAt: nowISO(),
-    notes: rows.map((r) => ({
-      id: r.id,
-      type: r.type,
-      title: r.title,
-      content: r.content,
-      items: JSON.parse(r.items_json || "[]"),
-      tags: JSON.parse(getUserTags(r.id, req.user.id)),
-      images: (JSON.parse(r.images_json || "[]") || []).filter((im) => !(im && im.role === "icon")),
-      icon: getUserIcon(r.id, req.user.id),
-      color: r.color,
-      pinned: !!r.pinned,
-      position: r.position,
-      timestamp: r.timestamp,
-    })),
+    notes: rows.map((r) => {
+      // L'épingle et le rangement sont personnels: ils vivent dans
+      // note_user_positions, la colonne de la note ne portant que la
+      // valeur de départ. Lire la colonne partagée ici exportait donc
+      // l'état de départ et non celui de l'utilisateur, et une note
+      // dépinglée ressortait épinglée. On lit la même source que
+      // l'affichage.
+      const perso = getUserPosition(r.id, req.user.id);
+      return {
+        id: r.id,
+        type: r.type,
+        title: r.title,
+        content: r.content,
+        items: JSON.parse(r.items_json || "[]"),
+        tags: JSON.parse(getUserTags(r.id, req.user.id)),
+        images: (JSON.parse(r.images_json || "[]") || []).filter((im) => !(im && im.role === "icon")),
+        icon: getUserIcon(r.id, req.user.id),
+        color: r.color,
+        pinned: perso ? !!perso.pinned : !!r.pinned,
+        position: perso ? perso.position : r.position,
+        timestamp: r.timestamp,
+      };
+    }),
   });
 });
 
@@ -4205,16 +4222,89 @@ app.post("/api/notes/import", auth, (req, res) => {
     if (type === "checklist") return `cl|${title}|${normItems(n.items)}|${imgs}`;
     return `${type}|${title}|${String(n.content || "")}|${imgs}`;
   };
-  const seenFingerprints = new Set(userRows.map(fingerprintFromRow));
+  // On retient la note existante derrière chaque empreinte, et pas
+  // seulement l'empreinte: une sauvegarde restaurée doit pouvoir rendre à
+  // une note ce qu'elle avait perdu, ce qu'un simple « déjà vue » ne
+  // permet pas.
+  const noteParEmpreinte = new Map();
+  for (const r of userRows) {
+    const fp = fingerprintFromRow(r);
+    if (!noteParEmpreinte.has(fp)) noteParEmpreinte.set(fp, r);
+  }
+  const seenFingerprints = new Set(noteParEmpreinte.keys());
+
+  const aLeChamp = (n, cle) => Object.prototype.hasOwnProperty.call(n, cle);
+
+  // Ce qu'une note déjà présente peut récupérer d'une sauvegarde: tout ce
+  // qui ne fait pas partie de son texte, donc précisément ce que
+  // l'empreinte ignore et qu'un simple saut perdait pour de bon.
+  //
+  // Rien n'est écrit si rien ne diffère: réimporter deux fois le même
+  // fichier reste sans effet, ce qui est la raison d'être du
+  // dédoublonnage. Un champ absent du fichier n'efface rien, pour qu'une
+  // sauvegarde ancienne ou venue d'ailleurs ne vide pas ce qu'elle ne
+  // connaît pas.
+  const restaurerAttributs = (row, n) => {
+    let touche = false;
+
+    if (Array.isArray(n.tags)) {
+      const voulues = JSON.stringify(n.tags);
+      if (voulues !== "[]" && voulues !== getUserTags(row.id, req.user.id)) {
+        runUpsertUserTags(row.id, req.user.id, voulues);
+        touche = true;
+      }
+    }
+
+    if (typeof n.color === "string" && n.color !== row.color) {
+      // Passe par le chemin d'écriture normal: la couleur fait partie de
+      // ce qui est chiffré au repos, l'écrire en colonne la perdrait.
+      runPatchNoteSensitiveCollab(row.id, req.user.id, { color: n.color });
+      touche = true;
+    }
+
+    if (aLeChamp(n, "pinned") || typeof n.position === "number") {
+      const perso = getUserPosition(row.id, req.user.id);
+      const epingleActuelle = perso ? !!perso.pinned : !!row.pinned;
+      const rangActuel = perso ? perso.position : row.position;
+      const epingleVoulue = aLeChamp(n, "pinned") ? !!n.pinned : epingleActuelle;
+      const rangVoulu = typeof n.position === "number" ? n.position : rangActuel;
+      if (epingleVoulue !== epingleActuelle || rangVoulu !== rangActuel) {
+        upsertUserPosition.run({
+          note_id: row.id, user_id: req.user.id,
+          position: rangVoulu, pinned: epingleVoulue ? 1 : 0,
+        });
+        touche = true;
+      }
+    }
+
+    if (n.icon && typeof n.icon.src === "string") {
+      const actuelle = getUserIcon(row.id, req.user.id);
+      if (JSON.stringify(actuelle) !== JSON.stringify(n.icon)) {
+        runSetUserIcon(row.id, req.user.id, n.icon);
+        touche = true;
+      }
+    }
+
+    return touche;
+  };
 
   let imported = 0;
+  let updated = 0;
   let skipped = 0;
   try {
     const tx = db.transaction((arr) => {
       for (const n of arr) {
         const fp = fingerprintFromIncoming(n);
         if (seenFingerprints.has(fp)) {
-          skipped++;
+          // Une note archivée ou à la corbeille n'est pas touchée: on ne
+          // ressuscite pas discrètement ce que l'utilisateur a rangé ou
+          // jeté, on se contente de ne pas le dupliquer.
+          const dejaLa = noteParEmpreinte.get(fp);
+          if (dejaLa && !dejaLa.archived && !dejaLa.trashed && restaurerAttributs(dejaLa, n)) {
+            updated++;
+          } else {
+            skipped++;
+          }
           continue;
         }
         seenFingerprints.add(fp);
@@ -4246,11 +4336,17 @@ app.post("/api/notes/import", auth, (req, res) => {
           client_updated_at: (parseIsoTimestamp(n.client_updated_at || n.timestamp) || {}).iso || nowISO(),
         });
         if (importedTags !== "[]") runUpsertUserTags(id, req.user.id, importedTags);
+        // L'icône est personnelle comme les étiquettes: l'export l'écrit
+        // déjà, l'import ne la relisait pas et elle se perdait à chaque
+        // aller-retour de sauvegarde.
+        if (n.icon && typeof n.icon.src === "string") {
+          runSetUserIcon(id, req.user.id, n.icon);
+        }
         imported++;
       }
     });
     tx(src);
-    res.json({ ok: true, imported, skipped });
+    res.json({ ok: true, imported, updated, skipped });
   } catch (err) {
     // The raw message can name tables and columns, so it stays in the
     // server log and never rides the response. The client maps the bare

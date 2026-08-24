@@ -638,13 +638,11 @@ try {
       && copie.title === "Recette" && copie.content === "farine, œufs",
     `copie=${j(copie && { id: copie.id, user_id: copie.user_id, access: copie.access, title: copie.title })}`,
   );
-  // Défaut connu, figé ici plutôt que passé sous silence. Le serveur dit
-  // explicitement vouloir garder les étiquettes personnelles du retiré
-  // sur sa copie, et il les recopie bel et bien, mais dans la colonne
-  // partagée que la lecture ne consulte jamais: elle passe par
-  // note_user_tags, où rien n'a été écrit pour la copie. Bob récupère
-  // donc sa note nue. Le jour où c'est corrigé, ces deux vérifications
-  // tombent et diront quoi changer, ce qui vaut mieux qu'un silence.
+  // Les étiquettes personnelles du retiré partent avec sa copie: c'est
+  // ce que le serveur annonce, et il faut qu'elles soient rangées là où
+  // la lecture va les chercher, dans note_user_tags. Écrites dans la
+  // colonne partagée, elles étaient bien recopiées mais plus jamais
+  // lues, et Bob récupérait une note nue.
   {
     const lignesPerso = enBase((b) => b
       .prepare("SELECT COUNT(*) c FROM note_user_tags WHERE note_id = ? AND user_id = ?")
@@ -652,13 +650,13 @@ try {
     const colonnePartagee = enBase((b) => b
       .prepare("SELECT tags_json FROM notes WHERE id = ?").get(copieId)?.tags_json);
     t.check(
-      "défaut connu: la copie arrive sans les étiquettes personnelles du retiré",
-      same(copie?.tags, []) && lignesPerso === 0,
+      "le retiré retrouve ses étiquettes personnelles sur sa copie",
+      same(copie?.tags, ["perso-bob"]) && lignesPerso === 1,
       `étiquettes lues=${j(copie?.tags)}, lignes personnelles=${lignesPerso}`,
     );
     t.check(
-      "elles ont pourtant bien été recopiées, mais là où plus personne ne les lit",
-      String(colonnePartagee || "").includes("perso-bob"),
+      "et elles sont rangées là où la lecture les cherche, pas dans la colonne partagée",
+      colonnePartagee === "[]",
       `colonne partagée=${j(colonnePartagee)}`,
     );
   }
