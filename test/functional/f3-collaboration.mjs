@@ -906,6 +906,33 @@ try {
     `http ${droitAbsurde.status}, corps=${cut(droitAbsurde.text)}`,
   );
 
+  // Le partage doit refuser un droit inconnu comme le fait le changement
+  // de droit ci-dessus. Retomber sur l'écriture était un échec en mode
+  // ouvert: qui écrivait « READ » croyait restreindre et donnait tout.
+  await creerNote(alice, { id: "n-casse", title: "Casse", content: "c", position: 200 });
+  const casses = [];
+  for (const valeur of ["READ", "readonly", "read-only", "lecture", true, 0]) {
+    const r = await partager(alice, "n-casse", carl.email, valeur);
+    const lignes = enBase((b) => b
+      .prepare("SELECT COUNT(*) c FROM note_collaborators WHERE note_id = ?").get("n-casse").c);
+    casses.push({ valeur, status: r.status, lignes });
+  }
+  t.check(
+    "un droit de partage écrit autrement que « read » ou « write » est refusé, pas deviné",
+    casses.every((c) => c.status === 400 && c.lignes === 0),
+    `essais=${j(casses)}`,
+  );
+
+  const lectureExacte = await partager(alice, "n-casse", carl.email, "read");
+  const droitCarl = enBase((b) => b
+    .prepare("SELECT can_write FROM note_collaborators WHERE note_id = ? AND user_id = ?")
+    .get("n-casse", carl.id)?.can_write);
+  t.check(
+    "écrit exactement « read », le partage donne bien la lecture seule",
+    lectureExacte.status === 200 && droitCarl === 0,
+    `http ${lectureExacte.status}, can_write=${j(droitCarl)}`,
+  );
+
   const droitNonCollab = await inst.call("PATCH", `/api/notes/n-refus/collaborate/${carl.id}`, {
     token: alice.token, body: { access: "write" },
   });
@@ -1019,7 +1046,56 @@ try {
   );
 
   // ─────────────────────────────────────────────────────────────────
-  // 13. Les notes archivées restent visibles dans les notes
+  // 13. Une commande de corbeille arrivée en retard ne s'applique pas,
+  //     y compris sur une note partagée. C'est là que ça compte le plus:
+  //     quitter une note et la retirer à tout le monde sont les deux
+  //     gestes qu'un appareil resté hors ligne ne doit pas pouvoir
+  //     rejouer une heure plus tard.
+  // ─────────────────────────────────────────────────────────────────
+  {
+    const enRetard = new Date(Date.parse(nextIso()) - 3600 * 1000).toISOString();
+
+    await creerNote(alice, { id: "n-retard-a", title: "Départ tardif", content: "c", position: 210 });
+    await partager(alice, "n-retard-a", bob.email, "write");
+    const bobPart = await inst.call("POST", "/api/notes/n-retard-a/trash", {
+      token: bob.token, body: { client_updated_at: enRetard },
+    });
+    const bobVoitEncore = await inst.call("GET", "/api/notes/n-retard-a", { token: bob.token });
+    const collabRestants = enBase((b) => b
+      .prepare("SELECT COUNT(*) c FROM note_collaborators WHERE note_id = ?").get("n-retard-a").c);
+    t.check(
+      "un collaborateur ne peut pas quitter une note avec une commande périmée",
+      bobPart.status === 200 && bobPart.json?.stale === true && !bobPart.json?.left
+        && bobVoitEncore.status === 200 && collabRestants === 1,
+      `http ${bobPart.status}, corps=${cut(bobPart.text, 90)}, lignes=${collabRestants}`,
+    );
+
+    await creerNote(alice, { id: "n-retard-b", title: "Retrait tardif", content: "c", position: 220 });
+    await partager(alice, "n-retard-b", bob.email, "write");
+    const pourTous = await inst.call("POST", "/api/notes/n-retard-b/trash", {
+      token: alice.token, body: { mode: "delete_for_all", client_updated_at: enRetard },
+    });
+    const bobGarde = await inst.call("GET", "/api/notes/n-retard-b", { token: bob.token });
+    t.check(
+      "et le propriétaire ne peut pas retirer la note à tout le monde avec une commande périmée",
+      pourTous.status === 200 && pourTous.json?.stale === true && !pourTous.json?.deletedForAll
+        && bobGarde.status === 200,
+      `http ${pourTous.status}, corps=${cut(pourTous.text, 90)}, Bob=${bobGarde.status}`,
+    );
+
+    const pourTousAJour = await inst.call("POST", "/api/notes/n-retard-b/trash", {
+      token: alice.token, body: { mode: "delete_for_all", client_updated_at: nextIso() },
+    });
+    const bobPerd = await inst.call("GET", "/api/notes/n-retard-b", { token: bob.token });
+    t.check(
+      "la même commande, à l'heure, s'applique bel et bien",
+      pourTousAJour.json?.deletedForAll === true && bobPerd.status === 404,
+      `http ${pourTousAJour.status}, corps=${cut(pourTousAJour.text, 90)}, Bob=${bobPerd.status}`,
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // 14. Les notes archivées restent visibles dans les notes
   //     collaborées, contrairement à la liste principale.
   // ─────────────────────────────────────────────────────────────────
   const archive = await inst.call("POST", "/api/notes/n-partage/archive", {

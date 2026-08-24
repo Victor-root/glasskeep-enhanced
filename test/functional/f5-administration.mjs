@@ -80,6 +80,24 @@ try {
     `http ${seRetrograder.status}, ${j(seRetrograder.json?.error)}`,
   );
 
+  // Le garde-fou doit tenir quelle que soit la façon d'écrire « non ».
+  // Comparé strictement à false, il laissait passer un 0, et l'instance
+  // se retrouvait sans le moindre administrateur, sans moyen d'en refaire
+  // un depuis l'interface.
+  const contournements = [];
+  for (const valeur of [0, "", null]) {
+    const r = await inst.call("PATCH", `/api/admin/users/${chef.id}`, {
+      token: chef.token, body: { is_admin: valeur },
+    });
+    const encoreAdmin = (await inst.call("GET", "/api/user/me", { token: chef.token })).json?.is_admin;
+    contournements.push({ valeur, status: r.status, encoreAdmin });
+  }
+  t.check(
+    "le garde-fou ne se contourne pas en écrivant « non » autrement",
+    contournements.every((c) => c.status === 400 && c.encoreAdmin === true),
+    `essais=${j(contournements)}`,
+  );
+
   const seSupprimer = await inst.call("DELETE", `/api/admin/users/${chef.id}`, {
     token: chef.token,
   });

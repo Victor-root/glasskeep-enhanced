@@ -2835,8 +2835,18 @@ app.post("/api/notes/reorder", auth, (req, res) => {
 app.post("/api/notes/:id/collaborate", auth, async (req, res) => {
   const noteId = req.params.id;
   const { username } = req.body || {};
-  // Access level chosen at add time. Defaults to "write" (read-write) to
-  // preserve prior behaviour; "read" shares the note read-only.
+  // Access level chosen at add time. Absent means "write" (read-write),
+  // pour ne pas changer le comportement d'un client qui ne le précise pas.
+  //
+  // Toute autre valeur est refusée au lieu d'être devinée. Comparer à
+  // "read" et retomber sur "write" échouait dans le mauvais sens: un
+  // « READ » ou un « readonly » donnait silencieusement tous les droits
+  // d'écriture à quelqu'un qu'on croyait limiter à la lecture. La route
+  // jumelle qui change le droit d'un collaborateur validait déjà ainsi.
+  if (req.body?.access !== undefined
+      && req.body.access !== "read" && req.body.access !== "write") {
+    return res.status(400).json({ error: "access must be 'read' or 'write'" });
+  }
   const access = req.body?.access === "read" ? "read" : "write";
 
   if (!username || typeof username !== "string") {
@@ -3720,14 +3730,26 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
   const mode = typeof req.body?.mode === "string" ? req.body.mode : null;
 
   const existing = getNote.get(id, req.user.id);
+  // Not the owner: check if user is a collaborator
+  const collabNote = existing ? null : getNoteWithCollaboration.get(req.user.id, id, req.user.id);
+  const cible = existing || collabNote;
+  if (!cible) return res.status(404).json({ error: "Note not found" });
+  // Only owners may request delete_for_all
+  if (!existing && mode === "delete_for_all") {
+    return res.status(403).json({ error: "Only owner can delete for all collaborators" });
+  }
+
+  // Le départage entre appareils vaut pour toutes les branches, pas
+  // seulement pour la note sans collaborateur. Il n'était appliqué qu'à
+  // celle-là, tout en bas de la route, donc les deux gestes les plus
+  // destructifs, quitter une note partagée et la retirer à tout le monde,
+  // n'étaient protégés par rien: un appareil resté hors ligne pouvait
+  // rejouer la commande une heure plus tard et elle s'appliquait.
+  if (!isNewerOrEqual(tsResult.ms, cible.client_updated_at)) {
+    return res.json({ ok: true, stale: true, note: serializeNote(cible, req.user.id) });
+  }
+
   if (!existing) {
-    // Not the owner — check if user is a collaborator
-    const collabNote = getNoteWithCollaboration.get(req.user.id, id, req.user.id);
-    if (!collabNote) return res.status(404).json({ error: "Note not found" });
-    // Only owners may request delete_for_all
-    if (mode === "delete_for_all") {
-      return res.status(403).json({ error: "Only owner can delete for all collaborators" });
-    }
     // Collaborator "delete" — mirror the owner branch below: the user
     // gets a personal, trashed copy of the note in their own corbeille,
     // and the collaboration row is dropped so the live shared note is
@@ -3919,12 +3941,8 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     return res.json({ ok: true, left: true, trashedCopy: trashedCopy ? serializeNote(trashedCopy, req.user.id) : null });
   }
 
-  // Non-collaborative note: normal trash
-  // LWW: reject stale writes (compare milliseconds)
-  if (!isNewerOrEqual(tsResult.ms, existing.client_updated_at)) {
-    return res.json({ ok: true, stale: true, note: serializeNote(existing, req.user.id) });
-  }
-
+  // Non-collaborative note: normal trash. Le départage a déjà été fait
+  // plus haut, pour toutes les branches.
   const updateTrashed = db.prepare(`
     UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
@@ -5049,8 +5067,14 @@ app.patch("/api/admin/users/:id", auth, adminOnly, (req, res) => {
   const id = Number(req.params.id);
   const { name, email, password, is_admin } = req.body || {};
 
-  // Cannot update yourself to non-admin if you're the only admin
-  if (id === req.user.id && is_admin === false) {
+  // Cannot update yourself to non-admin if you're the only admin.
+  //
+  // Le test doit porter sur la même règle que l'écriture plus bas, qui
+  // fait `is_admin ? 1 : 0`. Comparé strictement à false, le garde-fou
+  // laissait passer un 0 ou une chaîne vide: le dernier administrateur
+  // se retrogradait pour de bon et l'instance se retrouvait sans personne
+  // pour en refaire un.
+  if (id === req.user.id && is_admin !== undefined && !is_admin) {
     const adminCount = db.prepare("SELECT COUNT(*) AS c FROM users WHERE is_admin=1").get().c;
     if (adminCount <= 1) {
       return res.status(400).json({ error: "Cannot remove admin status from the last admin." });
