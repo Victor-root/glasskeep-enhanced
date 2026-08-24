@@ -21,30 +21,40 @@ function ensureRichContent(raw) {
 
 /**
  * Build the post-import success message based on the server's
- * imported/skipped breakdown. The server now dedupes by
+ * imported/updated/skipped breakdown. The server dedupes by
  * (type|title|body) so a re-import of the same file won't multiply
- * notes; surface that to the user via the message variant matching
- * the situation.
+ * notes; when a note is already there but the file carries tags, a
+ * colour or a pin it has since lost, the server restores those and
+ * counts it as updated. All three outcomes are worth saying out loud:
+ * a restore that only updates would otherwise report zero.
  *
- * @param {object} result      server response { imported, skipped }
+ * @param {object} result      server response { imported, updated, skipped }
  * @param {number} attempted   how many notes the client sent
- * @param {string} successKey  i18n key used when nothing was skipped
+ * @param {string} successKey  i18n key used when nothing else happened
  *                             ("importedNotesSuccessfully", etc.)
  */
 function buildImportMessage(result, attempted, successKey) {
   const imported = Number(result?.imported);
+  const updated = Number(result?.updated);
   const skipped = Number(result?.skipped);
   const importedSafe = Number.isFinite(imported) ? imported : attempted;
+  const updatedSafe = Number.isFinite(updated) ? updated : 0;
   const skippedSafe = Number.isFinite(skipped) ? skipped : 0;
-  if (skippedSafe > 0 && importedSafe === 0) {
-    return t("importAllSkipped").replace("{skipped}", String(skippedSafe));
+
+  const base =
+    skippedSafe > 0 && importedSafe === 0
+      ? t("importAllSkipped").replace("{skipped}", String(skippedSafe))
+      : skippedSafe > 0
+        ? t("importedWithSkipped")
+          .replace("{count}", String(importedSafe))
+          .replace("{skipped}", String(skippedSafe))
+        : t(successKey).replace("{count}", String(importedSafe));
+
+  if (updatedSafe === 0) return base;
+  if (importedSafe === 0 && skippedSafe === 0) {
+    return t("importAllUpdated").replace("{updated}", String(updatedSafe));
   }
-  if (skippedSafe > 0) {
-    return t("importedWithSkipped")
-      .replace("{count}", String(importedSafe))
-      .replace("{skipped}", String(skippedSafe));
-  }
-  return t(successKey).replace("{count}", String(importedSafe));
+  return `${base} ${t("importAlsoUpdated").replace("{updated}", String(updatedSafe))}`;
 }
 
 // Google Keep persists colours as a fixed enum; GlassKeep uses its own
