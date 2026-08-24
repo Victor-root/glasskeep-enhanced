@@ -13,6 +13,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "bash test/run-fast.sh",
+    "test:functional": "bash test/run-functional.sh",
     "test:integration": "bash test/run-integration.sh",
     "unlock-instance": "node scripts/unlock-instance.cjs",
     "unlock-instance-recovery": "node scripts/unlock-instance.cjs --recovery",
