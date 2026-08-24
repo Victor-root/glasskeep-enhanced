@@ -3757,6 +3757,11 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     // note would just vanish without any restore path — which is what
     // the user reported as "supprimée définitivement" instead of
     // "envoyée à la corbeille".
+    // Les étiquettes du partant sont personnelles: elles doivent aller
+    // dans note_user_tags sur la copie, la seule table que la lecture
+    // consulte. Recopiées dans la colonne partagée, elles étaient bien
+    // écrites mais plus jamais lues, et la copie de corbeille arrivait
+    // nue. Même erreur que le retrait avec copie, deux routes plus loin.
     const userTagsJson = getUserTags(id, req.user.id);
     const trashedCopyId = uid();
     runInsertNote({
@@ -3766,7 +3771,7 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
       title: collabNote.title,
       content: collabNote.content,
       items_json: collabNote.items_json,
-      tags_json: userTagsJson,
+      tags_json: "[]",
       images_json: collabNote.images_json,
       color: collabNote.color,
       pinned: 0,
@@ -3775,6 +3780,9 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
       client_updated_at: tsResult.iso,
     });
     db.prepare("UPDATE notes SET trashed = 1 WHERE id = ?").run(trashedCopyId);
+    if (userTagsJson && userTagsJson !== "[]") {
+      runUpsertUserTags(trashedCopyId, req.user.id, userTagsJson);
+    }
     db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
@@ -3896,13 +3904,21 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
       }
       db.prepare("UPDATE notes SET trashed = 1, client_updated_at = ? WHERE id = ?").run(tsResult.iso, id);
       updateNoteWithEditor.run(nowISO(), req.user.name || req.user.email, nowISO(), id);
-      db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
+      // Ici la note n'est transmise à personne: elle reste au propriétaire,
+      // simplement à la corbeille. Effacer ses étiquettes lui ferait perdre
+      // son classement sur une note qu'il peut encore restaurer. Seul son
+      // rangement est remis à zéro, la note quittant la liste active.
       db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
       broadcastNoteUpdated(id);
       const trashedSelf = getNoteById.get(id);
       return res.json({ ok: true, left: true, trashedCopy: trashedSelf ? serializeNote(trashedSelf, req.user.id) : null });
     }
 
+    // Idem pour le propriétaire qui s'en va: ses étiquettes vivent dans
+    // note_user_tags, pas dans la colonne partagée de la note. Recopier
+    // cette colonne ne recopiait donc rien du tout, et il repartait avec
+    // une copie de corbeille sans aucune de ses étiquettes.
+    const tagsProprietaire = getUserTags(id, req.user.id);
     const trashedCopyId = uid();
     runInsertNote({
       id: trashedCopyId,
@@ -3911,7 +3927,7 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
       title: existing.title,
       content: existing.content,
       items_json: existing.items_json,
-      tags_json: existing.tags_json,
+      tags_json: "[]",
       images_json: existing.images_json,
       color: existing.color,
       pinned: 0,
@@ -3920,6 +3936,9 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
       client_updated_at: tsResult.iso,
     });
     db.prepare("UPDATE notes SET trashed = 1 WHERE id = ?").run(trashedCopyId);
+    if (tagsProprietaire && tagsProprietaire !== "[]") {
+      runUpsertUserTags(trashedCopyId, req.user.id, tagsProprietaire);
+    }
     db.prepare("UPDATE notes SET user_id = ? WHERE id = ?").run(newOwner.id, id);
     db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, newOwner.id);
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);

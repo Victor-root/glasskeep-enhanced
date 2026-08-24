@@ -75,6 +75,17 @@ MUTATIONS = [
     ("f5", "le garde-fou du dernier administrateur face à un « non » écrit autrement",
      "  if (id === req.user.id && is_admin !== undefined && !is_admin) {",
      "  if (id === req.user.id && is_admin === false) {"),
+
+    # Les trois chemins de départ d'une note partagée, même défaut que D4.
+    ("f3", "les étiquettes du collaborateur qui jette une note partagée",
+     "    if (userTagsJson && userTagsJson !== \"[]\") {\n      runUpsertUserTags(trashedCopyId, req.user.id, userTagsJson);\n    }",
+     "    if (false) {\n      runUpsertUserTags(trashedCopyId, req.user.id, userTagsJson);\n    }"),
+    ("f3", "les étiquettes du propriétaire qui passe la main",
+     "    if (tagsProprietaire && tagsProprietaire !== \"[]\") {\n      runUpsertUserTags(trashedCopyId, req.user.id, tagsProprietaire);\n    }",
+     "    if (false) {\n      runUpsertUserTags(trashedCopyId, req.user.id, tagsProprietaire);\n    }"),
+    ("f3", "les étiquettes conservées quand personne ne reprend la note",
+     "      db.prepare(\"DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?\").run(id, req.user.id);\n      broadcastNoteUpdated(id);\n      const trashedSelf = getNoteById.get(id);",
+     "      db.prepare(\"DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?\").run(id, req.user.id);\n      db.prepare(\"DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?\").run(id, req.user.id);\n      broadcastNoteUpdated(id);\n      const trashedSelf = getNoteById.get(id);"),
 ]
 
 SCENARIOS = {

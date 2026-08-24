@@ -816,6 +816,97 @@ try {
   );
 
   // ─────────────────────────────────────────────────────────────────
+  // 10 bis. Partir d'une note partagée ne doit pas coûter ses étiquettes.
+  //   Trois chemins mènent à une copie de corbeille, et tous les trois
+  //   rangeaient les étiquettes personnelles dans la colonne partagée
+  //   que la lecture ne consulte jamais. Le partant repartait donc avec
+  //   une note nue.
+  // ─────────────────────────────────────────────────────────────────
+  {
+    // Le collaborateur jette la note partagée: il en garde une copie.
+    await creerNote(alice, { id: "n-adieu-a", title: "Adieu collaborateur", content: "c", position: 130 });
+    await partager(alice, "n-adieu-a", bob.email, "write");
+    await inst.call("PATCH", "/api/notes/n-adieu-a", {
+      token: bob.token, body: { tags: ["à-moi-bob"], client_updated_at: nextIso() },
+    });
+    const jetParBob = await inst.call("POST", "/api/notes/n-adieu-a/trash", {
+      token: bob.token, body: { client_updated_at: nextIso() },
+    });
+    const copieBob = jetParBob.json?.trashedCopy;
+    t.check(
+      "le collaborateur qui jette une note partagée garde ses étiquettes sur sa copie",
+      jetParBob.json?.left === true && same(copieBob?.tags, ["à-moi-bob"]),
+      `copie=${j(copieBob && { id: copieBob.id, tags: copieBob.tags })}`,
+    );
+
+    // Le propriétaire s'en va et passe la main au collaborateur.
+    await creerNote(alice, { id: "n-adieu-b", title: "Adieu propriétaire", content: "c", position: 140 });
+    await inst.call("PATCH", "/api/notes/n-adieu-b", {
+      token: alice.token, body: { tags: ["à-moi-alice"], client_updated_at: nextIso() },
+    });
+    await partager(alice, "n-adieu-b", bob.email, "write");
+    const departAlice = await inst.call("POST", "/api/notes/n-adieu-b/trash", {
+      token: alice.token, body: { client_updated_at: nextIso() },
+    });
+    const copieAlice = departAlice.json?.trashedCopy;
+    const nouveauProprio = await inst.call("GET", "/api/notes/n-adieu-b", { token: bob.token });
+    t.check(
+      "le propriétaire qui s'en va garde les siennes, et la note vit sa vie chez le collaborateur",
+      departAlice.json?.left === true && same(copieAlice?.tags, ["à-moi-alice"])
+        && nouveauProprio.json?.access === "owner",
+      `copie=${j(copieAlice && { id: copieAlice.id, tags: copieAlice.tags })}, repreneur=${j(nouveauProprio.json?.access)}`,
+    );
+
+    // Et dans les deux cas, les étiquettes sont là où la lecture va les
+    // chercher, pas dans la colonne partagée.
+    const rangement = enBase((b) => [copieBob?.id, copieAlice?.id].map((cid) => ({
+      perso: b.prepare("SELECT COUNT(*) c FROM note_user_tags WHERE note_id = ?").get(cid).c,
+      partage: b.prepare("SELECT tags_json FROM notes WHERE id = ?").get(cid)?.tags_json,
+    })));
+    t.check(
+      "dans les deux cas elles sont rangées par personne, jamais dans la colonne partagée",
+      rangement.every((r) => r.perso === 1 && r.partage === "[]"),
+      `rangement=${j(rangement)}`,
+    );
+
+    // Troisième chemin: le propriétaire s'en va alors qu'il ne reste que
+    // des participants d'un autre serveur. Personne ne peut reprendre la
+    // note, elle lui reste donc, simplement à la corbeille. Ses
+    // étiquettes ne doivent pas partir avec, il peut encore la restaurer.
+    //
+    // Ce cas n'est pas atteignable par l'API sur une instance seule: on
+    // pose donc en base le participant distant que la fédération aurait
+    // créé, ce qui est le seul moyen honnête d'exercer cette branche.
+    await creerNote(alice, { id: "n-adieu-c", title: "Adieu sans repreneur", content: "c", position: 150 });
+    await inst.call("PATCH", "/api/notes/n-adieu-c", {
+      token: alice.token, body: { tags: ["à-garder"], client_updated_at: nextIso() },
+    });
+    {
+      const base = inst.db();
+      try {
+        const distant = base.prepare(
+          "INSERT INTO users (name,email,password_hash,created_at,federated_origin) VALUES (?,?,?,?,?)",
+        ).run("Dana", "dana@pair.test", "x", new Date().toISOString(), "https://pair.test");
+        base.prepare(
+          "INSERT INTO note_collaborators (note_id,user_id,added_by,added_at,can_write) VALUES (?,?,?,?,1)",
+        ).run("n-adieu-c", Number(distant.lastInsertRowid), alice.id, new Date().toISOString());
+      } finally {
+        base.close();
+      }
+    }
+    const sansRepreneur = await inst.call("POST", "/api/notes/n-adieu-c/trash", {
+      token: alice.token, body: { client_updated_at: nextIso() },
+    });
+    const dansSaCorbeille = (await inst.call("GET", "/api/notes/trashed", { token: alice.token })).json || [];
+    const gardee = dansSaCorbeille.find((n) => n.id === "n-adieu-c");
+    t.check(
+      "sans repreneur, la note reste au propriétaire, dans sa corbeille, avec ses étiquettes",
+      sansRepreneur.json?.left === true && !!gardee && same(gardee.tags, ["à-garder"]),
+      `réponse=${cut(sansRepreneur.text, 90)}, corbeille=${j(gardee && { id: gardee.id, tags: gardee.tags })}`,
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────
   // 11. Les refus attendus autour du partage.
   // ─────────────────────────────────────────────────────────────────
   await creerNote(alice, { id: "n-refus", title: "Refus", content: "contenu", position: 110 });
