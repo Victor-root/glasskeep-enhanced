@@ -338,20 +338,37 @@ try {
     token: typ.token, body: { type: "checklist", items: [{ id: "a", text: "un", done: false }], client_updated_at: iso() },
   });
   t.check(
-    "une modification partielle ne peut pas transformer une note texte en liste",
-    typeParPatch.status === 200 && typeParPatch.json?.note?.type === "text"
+    "une modification partielle transforme bien une note texte en liste à cocher",
+    typeParPatch.status === 200 && typeParPatch.json?.note?.type === "checklist"
       && memeJson(typeParPatch.json?.note?.items, [{ id: "a", text: "un", done: false }]),
     `type=${vue(typeParPatch.json?.note?.type)}, items=${bout(vue(typeParPatch.json?.note?.items))}`,
   );
 
+  t.check(
+    "devenue liste, la note ne garde pas son ancien paragraphe de texte",
+    typeParPatch.json?.note?.content === "",
+    `contenu=${vue(typeParPatch.json?.note?.content)}`,
+  );
+
+  const typeInvente = await inst.call("PATCH", "/api/notes/typ-x", {
+    token: typ.token, body: { type: "recette", client_updated_at: iso() },
+  });
+  const typeApresInvente = await inst.call("GET", "/api/notes/typ-x", { token: typ.token });
+  t.check(
+    "un type qui n'existe pas est refusé au lieu de ramener la note au texte",
+    typeInvente.status === 400 && typeApresInvente.json?.type === "checklist",
+    `http ${typeInvente.status}, ${vue(typeInvente.json?.error)}, type=${vue(typeApresInvente.json?.type)}`,
+  );
+
   const typeParPut = await inst.call("PUT", "/api/notes/typ-x", {
     token: typ.token,
-    body: { type: "checklist", title: "type inventé", items: [{ id: "a", text: "un", done: false }], client_updated_at: iso() },
+    body: { type: "text", title: "revenue au texte", content: "du texte", client_updated_at: iso() },
   });
   t.check(
-    "la conversion d'une note en liste passe par le remplacement complet",
-    typeParPut.status === 200 && typeParPut.json?.note?.type === "checklist",
-    `type=${vue(typeParPut.json?.note?.type)}`,
+    "le remplacement complet convertit lui aussi, dans l'autre sens",
+    typeParPut.status === 200 && typeParPut.json?.note?.type === "text"
+      && typeParPut.json?.note?.content === "du texte",
+    `type=${vue(typeParPut.json?.note?.type)}, contenu=${vue(typeParPut.json?.note?.content)}`,
   );
 
   // ─────────────────────────────────────────────────────────────────
@@ -597,10 +614,11 @@ try {
   const sansChamp = await inst.call("POST", "/api/notes/arc-B/archive", {
     token: arc.token, body: { client_updated_at: iso() },
   });
+  const arcBApres = await inst.call("GET", "/api/notes/arc-B", { token: arc.token });
   t.check(
-    "une demande d'archivage sans dire si l'on archive ou non désarchive la note",
-    sansChamp.status === 200 && sansChamp.json?.note?.archived === false,
-    `archived=${vue(sansChamp.json?.note?.archived)} (aucun champ archived envoyé)`,
+    "une demande d'archivage tronquée est refusée au lieu de faire l'inverse",
+    sansChamp.status === 400 && arcBApres.json?.archived === true,
+    `http ${sansChamp.status}, ${vue(sansChamp.json?.error)}, archived=${vue(arcBApres.json?.archived)}`,
   );
 
   // ─────────────────────────────────────────────────────────────────
@@ -633,13 +651,38 @@ try {
   const arch2 = await inst.call("GET", "/api/notes/archived", { token: drp.token });
   const corb2 = await inst.call("GET", "/api/notes/trashed", { token: drp.token });
   t.check(
-    "restaurer une note qui était archivée la renvoie dans les archives, pas dans la liste active",
-    restaureArchivee.json?.note?.trashed === false && restaureArchivee.json?.note?.archived === true
-      && memeJson(titres(actives2.json), [])
-      && memeJson(titres(arch2.json), ["Rangée puis jetée"])
+    "restaurer une note archivée puis jetée la ramène là où l'utilisateur la cherche: la liste active",
+    restaureArchivee.json?.note?.trashed === false && restaureArchivee.json?.note?.archived === false
+      && memeJson(titres(actives2.json), ["Rangée puis jetée"])
+      && memeJson(titres(arch2.json), [])
       && memeJson(titres(corb2.json), []),
     `actives=${vue(titres(actives2.json))}, archives=${vue(titres(arch2.json))}, corbeille=${vue(titres(corb2.json))}`,
   );
+
+  // Rejouer une restauration déjà appliquée ne doit rien faire du tout.
+  // Le recalcul de position s'exécutait sans vérifier que la note était
+  // bien à la corbeille: un simple rattrapage de la file de
+  // synchronisation faisait alors remonter la note en tête de liste.
+  {
+    const rej = await compte("rejeu");
+    await inst.call("POST", "/api/notes", {
+      token: rej.token, body: { id: "rej-vieille", title: "vieille", position: 5000, client_updated_at: iso() },
+    });
+    await inst.call("POST", "/api/notes", {
+      token: rej.token, body: { id: "rej-recente", title: "récente", position: 9000, client_updated_at: iso() },
+    });
+    const avant = await inst.call("GET", "/api/notes", { token: rej.token });
+    const rejeu = await inst.call("POST", "/api/notes/rej-vieille/restore", {
+      token: rej.token, body: { client_updated_at: iso() },
+    });
+    const apres = await inst.call("GET", "/api/notes", { token: rej.token });
+    t.check(
+      "restaurer une note qui n'est pas à la corbeille ne la fait pas remonter en tête de liste",
+      rejeu.status === 200 && memeJson(titres(apres.json), titres(avant.json))
+        && apres.json?.find((n) => n.id === "rej-vieille")?.position === 5000,
+      `avant=${vue(titres(avant.json))}, après=${vue(titres(apres.json))}, position=${vue(apres.json?.find((n) => n.id === "rej-vieille")?.position)}`,
+    );
+  }
 
   // ─────────────────────────────────────────────────────────────────
   // 8. L'ordre d'affichage et le réordonnancement, qui est personnel.

@@ -1125,6 +1125,7 @@ const patchNoteSensitiveCollabStmt = db.prepare(`
   UPDATE notes SET
     title=@title, content=@content, items_json=@items_json, tags_json=@tags_json,
     images_json=@images_json, color=@color,
+    type=COALESCE(@type,type),
     pinned=COALESCE(@pinned,pinned),
     timestamp=COALESCE(@timestamp,timestamp),
     client_updated_at=COALESCE(@client_updated_at,client_updated_at),
@@ -1233,6 +1234,9 @@ function runPatchNoteSensitiveCollab(id, userId, partial) {
     tags_json: w.tags_json,
     images_json: w.images_json,
     color: w.color,
+    // Le type n'est pas chiffré, il ne passe donc pas par buildWriteRow.
+    // Absent, il ne change pas: la colonne est laissée telle quelle.
+    type: partial.type ?? null,
     pinned: partial.pinned ?? null,
     timestamp: partial.timestamp ?? null,
     client_updated_at: partial.client_updated_at ?? null,
@@ -2644,6 +2648,7 @@ app.patch("/api/notes/:id", auth, (req, res) => {
   const hasSharedChange = (
     typeof req.body.title === "string" ||
     typeof req.body.content === "string" ||
+    typeof req.body.type === "string" ||
     Array.isArray(req.body.items) ||
     Array.isArray(req.body.images) ||
     Array.isArray(req.body.tags) ||
@@ -2664,6 +2669,7 @@ app.patch("/api/notes/:id", auth, (req, res) => {
   const hasContentChange = (
     typeof req.body.title === "string" ||
     typeof req.body.content === "string" ||
+    typeof req.body.type === "string" ||
     Array.isArray(req.body.items) ||
     Array.isArray(req.body.images) ||
     typeof req.body.color === "string" ||
@@ -2686,6 +2692,25 @@ app.patch("/api/notes/:id", auth, (req, res) => {
     return res.json({ ok: true, stale: true, note: serializeNote(existing, req.user.id) });
   }
 
+  // Convertir une note d'un type à l'autre passait à la trappe: la colonne
+  // était absente de l'instruction de mise à jour partielle, alors que le
+  // client envoie bien `type` quand il transforme une note en liste à
+  // cocher ou en dessin. La note gardait donc ses éléments tout en
+  // s'affichant comme du texte, et seule une réécriture complète la
+  // convertissait vraiment.
+  //
+  // Un type inconnu est refusé au lieu d'être ramené à "text" comme le
+  // font la création et la réécriture complète: là c'est un défaut de
+  // départ, ici cela détruirait le type d'une note existante.
+  let typeVoulu = null;
+  if (req.body.type !== undefined) {
+    if (!["text", "checklist", "draw", "audio"].includes(req.body.type)) {
+      return res.status(400).json({ error: "Invalid note type" });
+    }
+    typeVoulu = req.body.type;
+  }
+  const typeApres = typeVoulu || existing.type;
+
   // Save tags to per-user table (not on the note itself)
   if (Array.isArray(req.body.tags)) {
     runUpsertUserTags(id, req.user.id, JSON.stringify(req.body.tags));
@@ -2693,18 +2718,29 @@ app.patch("/api/notes/:id", auth, (req, res) => {
   // Audio content patches must still pass the same shape/size guards as
   // creates and full updates — otherwise a malicious client could rewrite
   // the audio_data of an existing audio note with anything.
-  if (
-    typeof req.body.content === "string" &&
-    existing.type === "audio"
-  ) {
-    const err = validateAudioContent(String(req.body.content));
-    if (err) return res.status(400).json({ error: err });
+  if (typeApres === "audio") {
+    const contenuAudio = typeof req.body.content === "string"
+      ? req.body.content : (existing.content || "");
+    if (typeof req.body.content === "string" || typeVoulu === "audio") {
+      const err = validateAudioContent(String(contenuAudio));
+      if (err) return res.status(400).json({ error: err });
+    }
   }
   const p = {
     id,
     user_id: req.user.id,
+    type: typeVoulu,
     title: typeof req.body.title === "string" ? String(req.body.title) : null,
-    content: typeof req.body.content === "string" ? String(req.body.content) : null,
+    // Une liste à cocher ne porte pas de texte libre: son contenu vit dans
+    // ses éléments. La création et la réécriture complète le vident déjà,
+    // la conversion doit faire pareil sous peine de laisser un ancien
+    // paragraphe accroché à une note devenue liste.
+    //
+    // Uniquement au moment de la conversion: vider à chaque modification
+    // d'une liste existante effacerait le contenu d'une vieille note qui
+    // en porterait encore un, ce que personne n'a demandé.
+    content: typeVoulu === "checklist" ? ""
+      : (typeof req.body.content === "string" ? String(req.body.content) : null),
     items_json: Array.isArray(req.body.items) ? JSON.stringify(req.body.items) : null,
     tags_json: null,
     images_json: Array.isArray(req.body.images) ? JSON.stringify(req.body.images) : null,
@@ -3496,6 +3532,13 @@ app.post("/api/notes/:id/archive", auth, (req, res) => {
   if (!req.body?.client_updated_at) {
     return res.status(400).json({ error: "client_updated_at is required" });
   }
+  // Sans ce champ, `archived ? 1 : 0` lisait undefined et DÉSARCHIVAIT la
+  // note en répondant que tout allait bien: une requête tronquée faisait
+  // exactement l'inverse de son intention. Le sens de la demande doit
+  // être dit, il ne se devine pas.
+  if (typeof archived !== "boolean") {
+    return res.status(400).json({ error: "archived must be a boolean" });
+  }
   const tsResult = validateLwwTimestamp(req.body.client_updated_at);
   if (tsResult.error) {
     return res.status(400).json({ error: tsResult.error });
@@ -3998,6 +4041,16 @@ app.post("/api/notes/:id/restore", auth, (req, res) => {
     return res.json({ ok: true, stale: true, note: serializeNote(existing, req.user.id) });
   }
 
+  // Restaurer une note qui n'est pas à la corbeille n'a rien à faire, et
+  // surtout pas à lui recalculer sa position: un simple rejeu de la file
+  // de synchronisation faisait alors remonter la note en tête de liste
+  // sans que personne ne l'ait demandé. On répond sans rien toucher,
+  // plutôt que par une erreur: rejouer une restauration déjà appliquée
+  // est normal pour un appareil qui rattrape son retard.
+  if (!existing.trashed) {
+    return res.json({ ok: true, note: serializeNote(existing, req.user.id) });
+  }
+
   // Calculate a position that places the restored note among active notes
   // at the chronologically correct spot (by creation timestamp).
   // Without this, notes restored after a reorder end up at the bottom because
@@ -4031,8 +4084,14 @@ app.post("/api/notes/:id/restore", auth, (req, res) => {
     }
   }
 
+  // Restaurer remet la note dans la liste active, y compris si elle avait
+  // été archivée avant d'être jetée. Laisser le drapeau d'archivage en
+  // place la renvoyait dans les archives: vu de l'utilisateur, il cliquait
+  // sur « Restaurer » depuis la corbeille et la note disparaissait sans
+  // explication. L'écran ne propose qu'une action, elle doit rendre la
+  // note visible là où on la cherche.
   const updateTrashed = db.prepare(`
-    UPDATE notes SET trashed = 0, position = ?, client_updated_at = ? WHERE id = ? AND user_id = ?
+    UPDATE notes SET trashed = 0, archived = 0, position = ?, client_updated_at = ? WHERE id = ? AND user_id = ?
   `);
 
   const result = updateTrashed.run(restoredPosition, tsResult.iso, id, req.user.id);
