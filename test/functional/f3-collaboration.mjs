@@ -638,6 +638,31 @@ try {
       && copie.title === "Recette" && copie.content === "farine, œufs",
     `copie=${j(copie && { id: copie.id, user_id: copie.user_id, access: copie.access, title: copie.title })}`,
   );
+  // Défaut connu, figé ici plutôt que passé sous silence. Le serveur dit
+  // explicitement vouloir garder les étiquettes personnelles du retiré
+  // sur sa copie, et il les recopie bel et bien, mais dans la colonne
+  // partagée que la lecture ne consulte jamais: elle passe par
+  // note_user_tags, où rien n'a été écrit pour la copie. Bob récupère
+  // donc sa note nue. Le jour où c'est corrigé, ces deux vérifications
+  // tombent et diront quoi changer, ce qui vaut mieux qu'un silence.
+  {
+    const lignesPerso = enBase((b) => b
+      .prepare("SELECT COUNT(*) c FROM note_user_tags WHERE note_id = ? AND user_id = ?")
+      .get(copieId, bob.id).c);
+    const colonnePartagee = enBase((b) => b
+      .prepare("SELECT tags_json FROM notes WHERE id = ?").get(copieId)?.tags_json);
+    t.check(
+      "défaut connu: la copie arrive sans les étiquettes personnelles du retiré",
+      same(copie?.tags, []) && lignesPerso === 0,
+      `étiquettes lues=${j(copie?.tags)}, lignes personnelles=${lignesPerso}`,
+    );
+    t.check(
+      "elles ont pourtant bien été recopiées, mais là où plus personne ne les lit",
+      String(colonnePartagee || "").includes("perso-bob"),
+      `colonne partagée=${j(colonnePartagee)}`,
+    );
+  }
+
   const originalPerdu = await inst.call("GET", "/api/notes/n-copie", { token: bob.token });
   t.check(
     "la note d'origine reste inaccessible au retiré, malgré la copie",
