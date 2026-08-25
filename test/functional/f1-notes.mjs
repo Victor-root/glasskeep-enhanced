@@ -240,6 +240,57 @@ try {
     );
   }
 
+  // Une note a une seule forme, quelle que soit la route qui la rend.
+  // La liste la construisait à la main et en sortait une variante à qui
+  // il manquait le drapeau de corbeille: le client ne pouvait pas traiter
+  // une note de la même façon selon d'où elle venait.
+  {
+    const frm = await compte("forme");
+    const cree = await inst.call("POST", "/api/notes", {
+      token: frm.token, body: { id: "frm-1", title: "Forme", content: "c", client_updated_at: iso() },
+    });
+    const liste = await inst.call("GET", "/api/notes", { token: frm.token });
+    const seule = await inst.call("GET", "/api/notes/frm-1", { token: frm.token });
+    const patchee = await inst.call("PATCH", "/api/notes/frm-1", {
+      token: frm.token, body: { title: "Forme bis", client_updated_at: iso() },
+    });
+
+    const clesListe = Object.keys(liste.json?.[0] || {}).sort();
+    const clesSeule = Object.keys(seule.json || {}).sort();
+    const clesEcriture = Object.keys(patchee.json?.note || {}).sort();
+    t.check(
+      "la liste et la lecture d'une note seule rendent exactement les mêmes champs",
+      memeJson(clesListe, clesSeule) && clesListe.length > 0,
+      `liste=${vue(clesListe)}, seule=${vue(clesSeule)}`,
+    );
+    t.check(
+      "toutes deux disent si la note est à la corbeille, ce qui manquait à la liste",
+      liste.json?.[0]?.trashed === false && seule.json?.trashed === false,
+      `liste=${vue(liste.json?.[0]?.trashed)}, seule=${vue(seule.json?.trashed)}`,
+    );
+    t.check(
+      "une écriture rend la même note, au trombinoscope près qui n'appartient qu'à la lecture",
+      memeJson(clesEcriture, clesListe.filter((k) => k !== "collaborators")),
+      `écriture=${vue(clesEcriture)}`,
+    );
+    t.check("la note support de ce bloc a bien été créée", cree.status === 201, `http ${cree.status}`);
+
+    // Un identifiant déjà pris par quelqu'un d'AUTRE faisait tomber le
+    // serveur en page d'erreur HTML, illisible pour la file de
+    // synchronisation. La note visée n'est ni écrasée ni divulguée.
+    const frmBis = await compte("formebis");
+    const conflit = await inst.call("POST", "/api/notes", {
+      token: frmBis.token, body: { id: "frm-1", title: "Vol d'identifiant", client_updated_at: iso() },
+    });
+    const chezLautre = await inst.call("GET", "/api/notes/frm-1", { token: frm.token });
+    t.check(
+      "créer une note avec l'identifiant de quelqu'un d'autre est refusé en JSON, pas en page d'erreur",
+      conflit.status === 409 && typeof conflit.json?.error === "string"
+        && chezLautre.json?.title === "Forme bis",
+      `http ${conflit.status}, corps=${bout(conflit.text, 90)}`,
+    );
+  }
+
   // ─────────────────────────────────────────────────────────────────
   // 2. Les types de note réellement gérés par le serveur.
   // ─────────────────────────────────────────────────────────────────

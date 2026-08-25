@@ -50,11 +50,20 @@ function buildImportMessage(result, attempted, successKey) {
           .replace("{skipped}", String(skippedSafe))
         : t(successKey).replace("{count}", String(importedSafe));
 
-  if (updatedSafe === 0) return base;
-  if (importedSafe === 0 && skippedSafe === 0) {
-    return t("importAllUpdated").replace("{updated}", String(updatedSafe));
-  }
-  return `${base} ${t("importAlsoUpdated").replace("{updated}", String(updatedSafe))}`;
+  const withUpdated =
+    updatedSafe === 0
+      ? base
+      : importedSafe === 0 && skippedSafe === 0
+        ? t("importAllUpdated").replace("{updated}", String(updatedSafe))
+        : `${base} ${t("importAlsoUpdated").replace("{updated}", String(updatedSafe))}`;
+
+  // A rejected note is lost data, not a duplicate quietly stepped over.
+  // The server counts them apart now, so say so instead of letting them
+  // hide among the skipped ones.
+  const rejected = Number(result?.rejected);
+  const rejectedSafe = Number.isFinite(rejected) ? rejected : 0;
+  if (rejectedSafe === 0) return withUpdated;
+  return `${withUpdated} ${t("importRejected").replace("{rejected}", String(rejectedSafe))}`;
 }
 
 // Google Keep persists colours as a fixed enum; GlassKeep uses its own

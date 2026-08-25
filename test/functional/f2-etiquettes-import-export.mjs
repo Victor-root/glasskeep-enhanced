@@ -254,12 +254,12 @@ try {
   });
   t.check(
     "importer l'export d'un autre compte crée les trois notes et n'en saute aucune",
-    imp.status === 200 && same(imp.json, { ok: true, imported: 3, updated: 0, skipped: 0 }),
+    imp.status === 200 && same(imp.json, { ok: true, imported: 3, updated: 0, skipped: 0, rejected: 0 }),
     `http ${imp.status}, corps=${cut(imp.text)}`,
   );
   t.check(
     "la réponse d'import ne dit que combien de notes sont passées, jamais leur contenu ni leurs identifiants",
-    same(Object.keys(imp.json || {}).sort(), ["imported", "ok", "skipped", "updated"]),
+    same(Object.keys(imp.json || {}).sort(), ["imported", "ok", "rejected", "skipped", "updated"]),
     `champs=${show(Object.keys(imp.json || {}))}`,
   );
 
@@ -323,7 +323,7 @@ try {
   const apres = await inst.call("GET", "/api/notes", { token: rei.token });
   t.check(
     "réimporter son propre export ne crée aucune note et signale les deux notes sautées",
-    same(impRei.json, { ok: true, imported: 0, updated: 0, skipped: 2 }),
+    same(impRei.json, { ok: true, imported: 0, updated: 0, skipped: 2, rejected: 0 }),
     `corps=${cut(impRei.text)}`,
   );
   t.check(
@@ -353,7 +353,7 @@ try {
   const apresMix = await inst.call("GET", "/api/notes", { token: mix.token });
   t.check(
     "dans un lot, un doublon d'une note existante et un doublon interne au lot sont tous deux sautés",
-    same(impMix.json, { ok: true, imported: 1, updated: 0, skipped: 2 }),
+    same(impMix.json, { ok: true, imported: 1, updated: 0, skipped: 2, rejected: 0 }),
     `corps=${cut(impMix.text)}`,
   );
   t.check(
@@ -385,7 +385,7 @@ try {
   const apresDou = await inst.call("GET", "/api/notes", { token: dou.token });
   t.check(
     "une note déjà là dont la sauvegarde porte d'autres étiquettes est restaurée, pas dupliquée ni sautée",
-    same(impDou.json, { ok: true, imported: 0, updated: 1, skipped: 0 }),
+    same(impDou.json, { ok: true, imported: 0, updated: 1, skipped: 0, rejected: 0 }),
     `corps=${cut(impDou.text)}`,
   );
   t.check(
@@ -404,7 +404,7 @@ try {
   });
   t.check(
     "réimporter le même fichier une seconde fois ne restaure plus rien",
-    same(impDouBis.json, { ok: true, imported: 0, updated: 0, skipped: 1 }),
+    same(impDouBis.json, { ok: true, imported: 0, updated: 0, skipped: 1, rejected: 0 }),
     `corps=${cut(impDouBis.text)}`,
   );
 
@@ -426,7 +426,7 @@ try {
   const version2 = (apresEdi.json || []).find((nt) => nt.title === "Rapport v2");
   t.check(
     "importer une version retouchée crée bien une note supplémentaire",
-    same(impEdi.json, { ok: true, imported: 1, updated: 0, skipped: 0 }) && apresEdi.json?.length === 2,
+    same(impEdi.json, { ok: true, imported: 1, updated: 0, skipped: 0, rejected: 0 }) && apresEdi.json?.length === 2,
     `corps=${cut(impEdi.text)}, nb notes=${apresEdi.json?.length}`,
   );
   t.check(
@@ -452,7 +452,7 @@ try {
   const apresNu = await inst.call("GET", "/api/notes", { token: nue.token });
   t.check(
     "un import envoyé comme un simple tableau de notes est accepté",
-    impNu.status === 200 && same(impNu.json, { ok: true, imported: 1, updated: 0, skipped: 0 }),
+    impNu.status === 200 && same(impNu.json, { ok: true, imported: 1, updated: 0, skipped: 0, rejected: 0 }),
     `http ${impNu.status}, corps=${cut(impNu.text)}`,
   );
   t.check(
@@ -461,6 +461,80 @@ try {
       && same(apresNu.json?.[0]?.tags, ["direct"]),
     `note=${show(apresNu.json?.[0] && { id: apresNu.json[0].id, content: apresNu.json[0].content, tags: apresNu.json[0].tags })}`,
   );
+
+  // ─────────────────────────────────────────────────────────────────
+  // 8 bis. Ce qu'un fichier venu d'ailleurs a le droit d'être: sans
+  //   identifiants, avec des notes illisibles, et sans que l'utilisateur
+  //   reste dans le noir.
+  // ─────────────────────────────────────────────────────────────────
+  {
+    const etr = await compte("etranger");
+    const sansId = await inst.call("POST", "/api/notes/import", {
+      token: etr.token,
+      body: { notes: [
+        { title: "Sans identifiant", content: "un" },
+        { title: "Sans identifiant non plus", content: "deux" },
+      ] },
+    });
+    const listeSansId = await inst.call("GET", "/api/notes", { token: etr.token });
+    const ids = (listeSansId.json || []).map((n) => n.id);
+    t.check(
+      "des notes sans identifiant reçoivent chacune un vrai identifiant unique",
+      sansId.json?.imported === 2 && ids.length === 2
+        && !ids.includes("undefined") && ids[0] !== ids[1],
+      `import=${show(sansId.json)}, ids=${show(ids)}`,
+    );
+
+    // Sans quoi le premier import prenait l'identifiant « undefined » et
+    // bloquait tous les suivants du même genre.
+    const encore = await inst.call("POST", "/api/notes/import", {
+      token: etr.token, body: { notes: [{ title: "Encore une", content: "trois" }] },
+    });
+    t.check(
+      "et un second fichier du même genre s'importe encore",
+      encore.json?.imported === 1,
+      `import=${show(encore.json)}`,
+    );
+
+    const illisible = await inst.call("POST", "/api/notes/import", {
+      token: etr.token,
+      body: { notes: [{ id: "aud-ko", type: "audio", title: "Vocale abîmée", content: "pas du son" }] },
+    });
+    t.check(
+      "une note illisible est comptée comme refusée, pas confondue avec un doublon ignoré",
+      illisible.json?.rejected === 1 && illisible.json?.skipped === 0
+        && illisible.json?.imported === 0,
+      `import=${show(illisible.json)}`,
+    );
+
+    const dateBidon = await inst.call("POST", "/api/notes", {
+      token: etr.token,
+      body: { id: "date-ko", title: "Date inventée", timestamp: "pas une date", client_updated_at: nextIso() },
+    });
+    t.check(
+      "une date d'affichage qui n'en est pas une est refusée au lieu de fausser le tri",
+      dateBidon.status === 400 && /timestamp/i.test(dateBidon.json?.error || ""),
+      `http ${dateBidon.status}, ${show(dateBidon.json?.error)}`,
+    );
+
+    // Le signal qui manquait: sans lui, restaurer une sauvegarde depuis
+    // l'ordinateur ne faisait rien apparaître sur le téléphone.
+    const flux = await listenEvents(inst, etr.token);
+    try {
+      await flux.waitFor((e) => e.type === "hello");
+      await inst.call("POST", "/api/notes/import", {
+        token: etr.token, body: { notes: [{ id: "signal-1", title: "Prévient", content: "les autres" }] },
+      });
+      const signal = await flux.waitFor((e) => e.data?.type === "notes_imported");
+      t.check(
+        "un import prévient les autres appareils, une fois pour tout le lot",
+        signal?.data?.imported === 1,
+        `signal=${show(signal?.data)}`,
+      );
+    } finally {
+      flux.close();
+    }
+  }
 
   // ─────────────────────────────────────────────────────────────────
   // 9. Refus d'import: chaque corps inexploitable doit être écarté avec
@@ -485,8 +559,8 @@ try {
     token: ref.token, raw: "{ceci n'est pas du json",
   });
   t.check(
-    "un corps qui n'est même pas du JSON est refusé, mais sans message exploitable par le client",
-    casse.status === 400 && casse.json === null,
+    "un fichier de sauvegarde illisible est refusé avec un message que le client sait lire",
+    casse.status === 400 && casse.json?.error === "Request body is not valid JSON.",
     `http ${casse.status}, corps=${cut(casse.text, 80)}`,
   );
   const sansJeton = await inst.call("POST", "/api/notes/import", {

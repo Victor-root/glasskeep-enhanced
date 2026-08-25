@@ -489,14 +489,19 @@ try {
   await inst.call("PATCH", "/api/notes/n-retrait", {
     token: bob.token, body: { tags: ["bob"], client_updated_at: nextIso() },
   });
+  await inst.call("PUT", "/api/notes/n-retrait/icon", {
+    token: bob.token,
+    body: { icon: { id: "ic-bob", src: "data:image/png;base64,iVBORw0KGgo=", name: "b.png" } },
+  });
   {
     const traces = enBase((b) => ({
       tags: b.prepare("SELECT COUNT(*) AS c FROM note_user_tags WHERE note_id = ? AND user_id = ?").get("n-retrait", bob.id).c,
       pos: b.prepare("SELECT COUNT(*) AS c FROM note_user_positions WHERE note_id = ? AND user_id = ?").get("n-retrait", bob.id).c,
+      icone: b.prepare("SELECT COUNT(*) AS c FROM note_user_icons WHERE note_id = ? AND user_id = ?").get("n-retrait", bob.id).c,
     }));
     t.check(
       "avant le retrait, le collaborateur a bien des traces personnelles sur la note",
-      traces.tags === 1 && traces.pos === 1,
+      traces.tags === 1 && traces.pos === 1 && traces.icone === 1,
       `traces=${j(traces)}`,
     );
   }
@@ -576,11 +581,33 @@ try {
     const traces = enBase((b) => ({
       tags: b.prepare("SELECT COUNT(*) AS c FROM note_user_tags WHERE note_id = ? AND user_id = ?").get("n-retrait", bob.id).c,
       pos: b.prepare("SELECT COUNT(*) AS c FROM note_user_positions WHERE note_id = ? AND user_id = ?").get("n-retrait", bob.id).c,
+      icone: b.prepare("SELECT COUNT(*) AS c FROM note_user_icons WHERE note_id = ? AND user_id = ?").get("n-retrait", bob.id).c,
     }));
     t.check(
-      "le retrait efface les étiquettes et le rangement personnels du retiré",
-      traces.tags === 0 && traces.pos === 0,
+      "le retrait efface tout l'état personnel du retiré, icône comprise",
+      traces.tags === 0 && traces.pos === 0 && traces.icone === 0,
       `traces restantes=${j(traces)}`,
+    );
+  }
+
+  // L'icône survivait au retrait et ressuscitait au repartage: elle était
+  // le seul des trois états personnels que le nettoyage oubliait. Sur sa
+  // propre note, pour ne pas ajouter d'avertissements aux comptages que
+  // les blocs suivants font sur « n-retrait ».
+  {
+    await creerNote(alice, { id: "n-icone", title: "Icône fantôme", content: "c", position: 65 });
+    await partager(alice, "n-icone", bob.email, "write");
+    await inst.call("PUT", "/api/notes/n-icone/icon", {
+      token: bob.token,
+      body: { icon: { id: "ic-f", src: "data:image/png;base64,iVBORw0KGgo=", name: "f.png" } },
+    });
+    await inst.call("DELETE", `/api/notes/n-icone/collaborate/${bob.id}`, { token: alice.token });
+    await partager(alice, "n-icone", bob.email, "write");
+    const repartagee = await inst.call("GET", "/api/notes/n-icone", { token: bob.token });
+    t.check(
+      "repartager une note ne fait pas ressusciter l'icône que le retiré y avait posée",
+      repartagee.status === 200 && repartagee.json?.icon === null,
+      `icône=${j(repartagee.json?.icon)}`,
     );
   }
 
@@ -983,8 +1010,9 @@ try {
     token: bob.token, body: { access: "write" },
   });
   t.check(
-    "un collaborateur ne peut pas s'attribuer lui-même un droit d'écriture",
-    droitParCollab.status === 404 && droitParCollab.json?.error === "Note not found",
+    "un collaborateur ne peut pas s'attribuer lui-même un droit d'écriture, et on le lui dit franchement",
+    droitParCollab.status === 403
+      && droitParCollab.json?.error === "Only note owner can change collaborator access",
     `http ${droitParCollab.status}, corps=${cut(droitParCollab.text)}`,
   );
 
