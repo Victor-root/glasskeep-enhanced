@@ -3690,6 +3690,11 @@ export default function App() {
               // Another session reordered notes — reload the full list once
               // instead of fetching each note individually (avoids rate limits).
               reloadCurrentViewRef.current?.();
+            } else if (msg && msg.type === "notes_imported") {
+              // Another session restored a backup. Same treatment as a
+              // reorder: one reload of the whole view rather than one fetch
+              // per imported note, which would be hundreds of requests.
+              reloadCurrentViewRef.current?.();
             } else if (msg && msg.type === "note_deleted" && msg.noteId) {
               // Another session permanently deleted this note — remove locally
               const nid = String(msg.noteId);

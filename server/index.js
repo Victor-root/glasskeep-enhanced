@@ -74,6 +74,22 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true, limit: "160mb" }));
 
+// Un corps illisible doit répondre comme le reste de l'API, en JSON.
+// Sans ce garde-fou, Express renvoie sa propre page HTML: un fichier de
+// sauvegarde tronqué donnait à l'utilisateur un message inexploitable,
+// et le client, qui ne sait lire que du JSON, n'avait plus rien à
+// afficher que « une erreur est survenue ».
+app.use((err, req, res, next) => {
+  if (!err) return next();
+  if (err.type === "entity.too.large") {
+    return res.status(413).json({ error: "Request body is too large." });
+  }
+  if (err.type === "entity.parse.failed" || err instanceof SyntaxError) {
+    return res.status(400).json({ error: "Request body is not valid JSON." });
+  }
+  return next(err);
+});
+
 // Trust proxy headers (X-Forwarded-Proto / X-Forwarded-For) when:
 //   - the operator explicitly set TRUST_PROXY=true, OR
 //   - HTTPS is disabled at the Node level (HTTPS_ENABLED=false), which
@@ -783,6 +799,22 @@ function validateLwwTimestamp(ts) {
     return { error: `Timestamp too far in the future: ${ts}` };
   }
   return parsed;
+}
+
+// La date d'affichage d'une note, à ne pas confondre avec l'horodatage de
+// départage entre appareils juste au-dessus. Elle peut légitimement être
+// ancienne (une note importée d'ailleurs), donc rien ne borne le passé,
+// mais elle doit être une vraie date.
+//
+// Elle n'était vérifiée nulle part. Les archives et la corbeille étant
+// triées dessus par comparaison de chaînes, une valeur fantaisiste se
+// plaçait devant les notes réellement récentes. On la normalise au format
+// ISO pour que toutes les dates stockées se comparent entre elles.
+function normalizeDisplayTimestamp(value) {
+  if (value === undefined || value === null || value === "") return { iso: null };
+  const ms = new Date(value).getTime();
+  if (!Number.isFinite(ms)) return { error: `Invalid timestamp: ${value}` };
+  return { iso: new Date(ms).toISOString() };
 }
 
 /**
@@ -2476,33 +2508,15 @@ app.get("/api/notes", auth, (req, res) => {
     ? allNotesWithPagingQuery.all(req.user.id, req.user.id, req.user.id, lim, off)
     : allNotesQuery.all(req.user.id, req.user.id, req.user.id));
 
+  // Une note a une seule forme, celle que serializeNote produit: cette
+  // liste la reconstruisait à la main et en sortait une variante à qui il
+  // manquait `trashed`. Deux formes pour le même objet obligeaient le
+  // client à savoir d'où il venait. Seul le trombinoscope s'ajoute, parce
+  // qu'il n'appartient pas à la note mais à sa lecture.
   res.json(
     rows.map((r) => ({
-      id: r.id,
-      user_id: r.user_id,
-      type: r.type,
-      title: r.title,
-      content: r.content,
-      items: JSON.parse(r.items_json || "[]"),
-      tags: JSON.parse(getUserTags(r.id, req.user.id)),
-      // Per-user icon (logo), and strip any legacy role:"icon" from the
-      // shared images so it's never inherited across collaborators.
-      images: (JSON.parse(r.images_json || "[]") || []).filter((im) => !(im && im.role === "icon")),
-      icon: getUserIcon(r.id, req.user.id),
-      color: r.color,
-      pinned: !!r.eff_pinned,
-      position: r.eff_position,
-      timestamp: r.timestamp,
-      updated_at: r.updated_at,
-      client_updated_at: r.client_updated_at,
-      lastEditedBy: r.last_edited_by,
-      lastEditedAt: r.last_edited_at,
-      archived: !!r.archived,
-      reminderAt: r.reminder_at || null,
-      reminderFiredAt: r.reminder_fired_at || null,
+      ...serializeNote(r, req.user.id),
       collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
-      access: noteAccessFor(r.id, r.user_id, req.user.id),
-      federation: noteFederationRef?.noteFederationInfo(r.id) || null,
     }))
   );
 });
@@ -2523,6 +2537,9 @@ app.post("/api/notes", auth, (req, res) => {
     const err = validateAudioContent(String(body.content || ""));
     if (err) return res.status(400).json({ error: err });
   }
+  const tsAffichage = normalizeDisplayTimestamp(body.timestamp);
+  if (tsAffichage.error) return res.status(400).json({ error: tsAffichage.error });
+
   const n = {
     id: noteId,
     user_id: req.user.id,
@@ -2535,7 +2552,7 @@ app.post("/api/notes", auth, (req, res) => {
     color: body.color && typeof body.color === "string" ? body.color : "default",
     pinned: body.pinned ? 1 : 0,
     position: typeof body.position === "number" ? body.position : Date.now(),
-    timestamp: body.timestamp || nowISO(),
+    timestamp: tsAffichage.iso || nowISO(),
     client_updated_at: clientTs,
   };
 
@@ -2545,6 +2562,16 @@ app.post("/api/notes", auth, (req, res) => {
     const existing = getNoteById.get(body.id);
     if (existing && existing.user_id === req.user.id) {
       return res.status(200).json(serializeNote(existing, req.user.id));
+    }
+    // L'identifiant est la clé primaire de toutes les notes, pas seulement
+    // des vôtres: s'il appartient à quelqu'un d'autre, l'insertion violait
+    // la contrainte d'unicité et Express répondait une page HTML d'erreur.
+    // La note visée n'était ni écrasée ni divulguée, ce qui est le bon
+    // résultat, mais la file de synchronisation ne pouvait rien faire
+    // d'une réponse qu'elle ne sait pas lire. Un conflit se dit en JSON,
+    // et le client sait déjà le traiter comme définitif sur une création.
+    if (existing) {
+      return res.status(409).json({ error: "Note id already in use" });
     }
   }
 
@@ -2599,6 +2626,9 @@ app.put("/api/notes/:id", auth, (req, res) => {
     const err = validateAudioContent(String(b.content || ""));
     if (err) return res.status(400).json({ error: err });
   }
+  const tsAffichageMaj = normalizeDisplayTimestamp(b.timestamp);
+  if (tsAffichageMaj.error) return res.status(400).json({ error: tsAffichageMaj.error });
+
   const updated = {
     id,
     user_id: req.user.id,
@@ -2613,7 +2643,7 @@ app.put("/api/notes/:id", auth, (req, res) => {
     // write the requester's state to note_user_positions below.
     pinned: existing.pinned,
     position: existing.position,
-    timestamp: b.timestamp || existing.timestamp,
+    timestamp: tsAffichageMaj.iso || existing.timestamp,
     client_updated_at: tsResult.iso,
   };
   // existing.user_id is the note's owner — it doesn't change on edit,
@@ -2711,6 +2741,9 @@ app.patch("/api/notes/:id", auth, (req, res) => {
   }
   const typeApres = typeVoulu || existing.type;
 
+  const tsAffichagePatch = normalizeDisplayTimestamp(req.body.timestamp);
+  if (tsAffichagePatch.error) return res.status(400).json({ error: tsAffichagePatch.error });
+
   // Save tags to per-user table (not on the note itself)
   if (Array.isArray(req.body.tags)) {
     runUpsertUserTags(id, req.user.id, JSON.stringify(req.body.tags));
@@ -2748,7 +2781,7 @@ app.patch("/api/notes/:id", auth, (req, res) => {
     // Pinned state is per-user; route it to note_user_positions below instead
     // of mutating the shared notes.pinned column.
     pinned: null,
-    timestamp: req.body.timestamp || null,
+    timestamp: tsAffichagePatch.iso,
     client_updated_at: tsResult.iso,
   };
   const result = runPatchNoteSensitiveCollab(id, req.user.id, p);
@@ -3050,10 +3083,18 @@ app.patch("/api/notes/:id/collaborate/:userId", auth, async (req, res) => {
     return res.status(400).json({ error: "access must be 'read' or 'write'" });
   }
 
-  // Owner-only: getNote scopes to notes the requester owns.
-  const note = getNote.get(noteId, req.user.id);
+  // Owner-only, mais dit de la même façon que la route jumelle qui retire
+  // un collaborateur: on résout d'abord la note comme la voit le
+  // demandeur, puis on refuse le geste. Chercher la note en propriétaire
+  // seul répondait « note introuvable » à un collaborateur qui la voit
+  // pourtant très bien, ce qui est faux et oblige un client à traiter deux
+  // codes pour une seule situation.
+  const note = getNoteWithCollaboration.get(req.user.id, noteId, req.user.id);
   if (!note) {
     return res.status(404).json({ error: "Note not found" });
+  }
+  if (note.user_id !== req.user.id) {
+    return res.status(403).json({ error: "Only note owner can change collaborator access" });
   }
 
   // Must already be a collaborator on this note.
@@ -3187,9 +3228,14 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
     return res.status(404).json({ error: "Collaborator not found" });
   }
 
-  // Clean up per-user tags and positions for the removed collaborator
+  // Clean up per-user tags, positions and icon for the removed collaborator.
+  //
+  // L'icône était oubliée: sa ligne survivait au retrait, sur une note à
+  // laquelle la personne n'a plus accès, et ressuscitait telle quelle au
+  // repartage. Les trois états personnels doivent partir ensemble.
   db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(noteId, userIdToRemove);
   db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(noteId, userIdToRemove);
+  deleteUserIconStmt.run(noteId, userIdToRemove);
 
   // If the removed collaborator was a FEDERATED stand-in, tell their peer to
   // drop that specific recipient from the mirror — an explicit, deterministic
@@ -4201,32 +4247,11 @@ app.get("/api/notes/export", auth, (req, res) => {
 app.get("/api/notes/:id", auth, (req, res) => {
   const r = getNoteWithCollaboration.get(req.user.id, req.params.id, req.user.id);
   if (!r) return res.status(404).json({ error: "Note not found" });
-  const ov = getUserPosition(r.id, req.user.id);
+  // Même forme que la liste, au trombinoscope près: une seule définition
+  // de ce qu'est une note, pas trois recopies qui divergent.
   res.json({
-    id: r.id,
-    user_id: r.user_id,
-    type: r.type,
-    title: r.title,
-    content: r.content,
-    items: JSON.parse(r.items_json || "[]"),
-    tags: JSON.parse(getUserTags(r.id, req.user.id)),
-    images: (JSON.parse(r.images_json || "[]") || []).filter((im) => !(im && im.role === "icon")),
-    icon: getUserIcon(r.id, req.user.id),
-    color: r.color,
-    pinned: ov ? !!ov.pinned : !!r.pinned,
-    position: ov ? ov.position : r.position,
-    timestamp: r.timestamp,
-    updated_at: r.updated_at,
-    client_updated_at: r.client_updated_at,
-    lastEditedBy: r.last_edited_by,
-    lastEditedAt: r.last_edited_at,
-    archived: !!r.archived,
-    trashed: !!r.trashed,
-    reminderAt: r.reminder_at || null,
-    reminderFiredAt: r.reminder_fired_at || null,
+    ...serializeNote(r, req.user.id),
     collaborators: getNoteParticipants(r.id, r.user_id, req.user.id),
-    access: noteAccessFor(r.id, r.user_id, req.user.id),
-    federation: noteFederationRef?.noteFederationInfo(r.id) || null,
   });
 });
 
@@ -4387,6 +4412,8 @@ app.post("/api/notes/import", auth, (req, res) => {
   let imported = 0;
   let updated = 0;
   let skipped = 0;
+  let rejected = 0;
+  const idsImportes = [];
   try {
     const tx = db.transaction((arr) => {
       for (const n of arr) {
@@ -4404,7 +4431,14 @@ app.post("/api/notes/import", auth, (req, res) => {
           continue;
         }
         seenFingerprints.add(fp);
-        const id = existing.has(String(n.id)) ? uid() : String(n.id);
+        // Une note sans identifiant recevait l'identifiant littéral
+        // "undefined", faute de vérifier sa présence avant de la convertir
+        // en chaîne. Un fichier venu d'un autre outil créait donc une note
+        // fantôme portant ce nom, et cet identifiant, désormais pris,
+        // bloquait tous les imports suivants du même genre.
+        const idPropose = n.id === undefined || n.id === null || n.id === ""
+          ? uid() : String(n.id);
+        const id = existing.has(idPropose) ? uid() : idPropose;
         existing.add(id);
         const importedTags = JSON.stringify(Array.isArray(n.tags) ? n.tags : []);
         const importedType =
@@ -4413,8 +4447,11 @@ app.post("/api/notes/import", auth, (req, res) => {
               : n.type === "audio" ? "audio"
                 : "text";
         if (importedType === "audio") {
+          // Une note refusée n'est pas un doublon: la compter avec eux
+          // présentait une perte de données comme un saut volontaire, et
+          // le client n'avait aucun moyen de prévenir.
           const audioErr = validateAudioContent(String(n.content || ""));
-          if (audioErr) { skipped++; continue; }
+          if (audioErr) { rejected++; continue; }
         }
         runInsertNote({
           id,
@@ -4428,7 +4465,7 @@ app.post("/api/notes/import", auth, (req, res) => {
           color: typeof n.color === "string" ? n.color : "default",
           pinned: n.pinned ? 1 : 0,
           position: typeof n.position === "number" ? n.position : Date.now(),
-          timestamp: n.timestamp || nowISO(),
+          timestamp: normalizeDisplayTimestamp(n.timestamp).iso || nowISO(),
           client_updated_at: (parseIsoTimestamp(n.client_updated_at || n.timestamp) || {}).iso || nowISO(),
         });
         if (importedTags !== "[]") runUpsertUserTags(id, req.user.id, importedTags);
@@ -4438,11 +4475,24 @@ app.post("/api/notes/import", auth, (req, res) => {
         if (n.icon && typeof n.icon.src === "string") {
           runSetUserIcon(id, req.user.id, n.icon);
         }
+        idsImportes.push(id);
         imported++;
       }
     });
     tx(src);
-    res.json({ ok: true, imported, updated, skipped });
+    // Prévenir les autres appareils. Une création ordinaire les prévient,
+    // un import ne disait rien: restaurer une sauvegarde depuis
+    // l'ordinateur ne faisait rien apparaître sur le téléphone avant un
+    // rechargement à la main. Un seul signal pour tout le lot, les autres
+    // sessions rechargeant leur vue d'un coup plutôt que note par note.
+    if (idsImportes.length > 0 || updated > 0) {
+      sendEventToUser(req.user.id, {
+        type: "notes_imported",
+        imported: idsImportes.length,
+        updated,
+      });
+    }
+    res.json({ ok: true, imported, updated, skipped, rejected });
   } catch (err) {
     // The raw message can name tables and columns, so it stays in the
     // server log and never rides the response. The client maps the bare

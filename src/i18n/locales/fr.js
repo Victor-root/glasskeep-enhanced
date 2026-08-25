@@ -554,6 +554,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   importAllSkipped: "Aucune note importée, {skipped} doublon(s) déjà présent(s).",
   importAllUpdated: "{updated} note(s) existante(s) restaurée(s), rien de nouveau à importer.",
   importAlsoUpdated: "{updated} note(s) existante(s) restaurée(s).",
+  importRejected: "{rejected} note(s) illisible(s), non importée(s).",
   duplicateNote: "Dupliquer la note",
   duplicateSuffix: "(copie)",
   noteDuplicated: "Note dupliquée",
