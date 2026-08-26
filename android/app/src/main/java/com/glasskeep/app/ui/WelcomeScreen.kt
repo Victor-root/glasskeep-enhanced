@@ -146,7 +146,6 @@ fun WelcomeScreen(onContinue: () -> Unit) {
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val cardBg = if (dark) DarkCardBg else LightCardBg
-    val borderColor = if (dark) DarkBorderColor else LightBorderColor
 
     Box(modifier = Modifier.fillMaxSize().then(bgModifier)) {
         // Same animated background as SetupScreen — soft pastel cards
@@ -194,7 +193,6 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 granted = micGranted,
                 tried = micTried,
                 cardBg = cardBg,
-                borderColor = borderColor,
                 titleColor = titleColor,
                 subtextColor = subtextColor,
                 onGrant = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) },
@@ -208,7 +206,6 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 granted = cameraGranted,
                 tried = cameraTried,
                 cardBg = cardBg,
-                borderColor = borderColor,
                 titleColor = titleColor,
                 subtextColor = subtextColor,
                 onGrant = { cameraLauncher.launch(Manifest.permission.CAMERA) },
@@ -223,7 +220,6 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                     granted = notifGranted,
                     tried = notifTried,
                     cardBg = cardBg,
-                    borderColor = borderColor,
                     titleColor = titleColor,
                     subtextColor = subtextColor,
                     onGrant = {
@@ -251,7 +247,6 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 granted = batteryIgnored,
                 tried = batteryTried,
                 cardBg = cardBg,
-                borderColor = borderColor,
                 titleColor = titleColor,
                 subtextColor = subtextColor,
                 onGrant = {
@@ -275,7 +270,6 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                     granted = installGranted,
                     tried = installTried,
                     cardBg = cardBg,
-                    borderColor = borderColor,
                     titleColor = titleColor,
                     subtextColor = subtextColor,
                     // "Install unknown apps" is a special-access setting,
@@ -314,7 +308,6 @@ private fun PermissionCard(
     granted: Boolean,
     tried: Boolean,
     cardBg: Color,
-    borderColor: Color,
     titleColor: Color,
     subtextColor: Color,
     onGrant: () -> Unit,
