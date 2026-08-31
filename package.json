@@ -88,6 +88,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-masonry-css": "^1.0.16",
+    "undici": "^7.29.0",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
