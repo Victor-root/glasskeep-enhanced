@@ -44,11 +44,11 @@ const runtime = require("../encryption/runtimeUnlockState");
 const webauthnRp = require("../services/webauthnRp");
 
 // Thrown when no trustworthy domain can be established. Every route
-// turns it into a 500 naming the variable the operator has to set.
+// turns it into a 500 pointing at where an admin fixes it.
 class RpUnresolved extends Error {
   constructor(reason) {
-    super("Passkeys are not configured for this domain. Set WEBAUTHN_RP_ID "
-      + "(and WEBAUTHN_ORIGIN when a proxy terminates TLS).");
+    super("Passkeys are not configured for this domain. An administrator can "
+      + "set the passkey domain in the admin panel.");
     this.name = "RpUnresolved";
     this.reason = reason;
   }
@@ -188,11 +188,6 @@ async function paceFailure(ms) {
 // ── Route attachment ──────────────────────────────────────────────────
 function attachPasskeyRoutes(app, deps) {
   const { db, auth, adminOnly, signToken, getUserById, log = console } = deps;
-
-  // Said once at boot rather than discovered when a passkey fails: the
-  // operator learns here which of the four sources their domain comes
-  // from, and what to set if the answer is "none".
-  log.log?.(webauthnRp.describeConfig());
 
   // ====================================================================
   //   USER PASSKEY MANAGEMENT

@@ -675,6 +675,13 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
       if (!names.has("federation_self_name")) {
         db.exec(`ALTER TABLE app_settings ADD COLUMN federation_self_name TEXT NOT NULL DEFAULT ''`);
       }
+      // The domain passkeys belong to, declared by an admin from the
+      // panel so a reverse-proxied install does not need an env var.
+      // Empty means "not declared"; see server/services/webauthnRp.js
+      // for the order the server resolves it in.
+      if (!names.has("webauthn_rp_id")) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN webauthn_rp_id TEXT NOT NULL DEFAULT ''`);
+      }
     });
     tx();
   } catch {
@@ -709,6 +716,7 @@ const noteCipher = require("./encryption/noteCipher");
 const runtimeUnlock = require("./encryption/runtimeUnlockState");
 const { attachUnlockRoutes } = require("./routes/unlockRoutes");
 const { attachPasskeyRoutes } = require("./routes/passkeyRoutes");
+const webauthnRp = require("./services/webauthnRp");
 const { attachUpdateRoutes } = require("./routes/updateRoutes");
 const { attachSelfUpdateRoutes } = require("./routes/selfUpdateRoutes");
 const { attachAssetLinksRoutes } = require("./routes/assetLinksRoutes");
@@ -4607,10 +4615,10 @@ app.delete("/api/logos/:id", auth, (req, res) => {
 // on every login page hit, allowNewAccounts on every signup attempt)
 // don't hit SQLite repeatedly. The mirror is updated on every PATCH so
 // it stays in sync.
-const getAppSettingsRow = db.prepare(`SELECT allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme FROM app_settings WHERE id = 1`);
+const getAppSettingsRow = db.prepare(`SELECT allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme, webauthn_rp_id FROM app_settings WHERE id = 1`);
 const upsertAppSettings = db.prepare(
-  `INSERT INTO app_settings (id, allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme) VALUES (1, ?, ?, ?, ?, ?)
-   ON CONFLICT(id) DO UPDATE SET allow_new_accounts=excluded.allow_new_accounts, login_slogan=excluded.login_slogan, custom_app_name=excluded.custom_app_name, login_bg_blur=excluded.login_bg_blur, login_theme=excluded.login_theme`,
+  `INSERT INTO app_settings (id, allow_new_accounts, login_slogan, custom_app_name, login_bg_blur, login_theme, webauthn_rp_id) VALUES (1, ?, ?, ?, ?, ?, ?)
+   ON CONFLICT(id) DO UPDATE SET allow_new_accounts=excluded.allow_new_accounts, login_slogan=excluded.login_slogan, custom_app_name=excluded.custom_app_name, login_bg_blur=excluded.login_bg_blur, login_theme=excluded.login_theme, webauthn_rp_id=excluded.webauthn_rp_id`,
 );
 // Branding images live in their own read/write statements so the
 // (potentially multi-MB) data URLs never get held in the in-memory
@@ -4654,6 +4662,7 @@ let adminSettings = (function loadAdminSettings() {
       appName: row.custom_app_name || "",
       loginBackgroundBlur: row.login_bg_blur || 0,
       loginTheme: VALID_LOGIN_THEMES.has(row.login_theme) ? row.login_theme : "glasskeep",
+      passkeyDomain: row.webauthn_rp_id || "",
     };
   }
   // Fresh install — seed the row from the env var default so subsequent
@@ -4664,10 +4673,18 @@ let adminSettings = (function loadAdminSettings() {
     appName: "",
     loginBackgroundBlur: 0,
     loginTheme: "glasskeep",
+    passkeyDomain: "",
   };
-  upsertAppSettings.run(seed.allowNewAccounts ? 1 : 0, seed.loginSlogan, seed.appName, seed.loginBackgroundBlur, seed.loginTheme);
+  upsertAppSettings.run(seed.allowNewAccounts ? 1 : 0, seed.loginSlogan, seed.appName, seed.loginBackgroundBlur, seed.loginTheme, seed.passkeyDomain);
   return seed;
 })();
+
+// Hand the stored domain to the resolver, which holds it for every
+// passkey ceremony. Re-pushed on every settings change below. Said once
+// here rather than discovered when a passkey fails: the operator learns
+// which source their domain comes from, and what to do if none applies.
+webauthnRp.setDeclaredRpId(adminSettings.passkeyDomain);
+console.log(webauthnRp.describeConfig());
 
 // Merge the scalar mirror with the on-disk image columns into the full
 // settings shape returned to admins / the public branding endpoint.
@@ -4682,6 +4699,28 @@ function brandingSettingsPayload() {
   };
 }
 
+// Where the passkey domain actually comes from for THIS request, so the
+// panel can say "nothing to do" instead of showing an empty field an
+// admin would fill in for no reason. `source` mirrors resolveRp: an env
+// var and a certificate are decided outside the panel, so the field is
+// read-only then; "local" means the address is on the local network and
+// needs no domain; "none" is the case that has to be fixed.
+function passkeyDomainState(req) {
+  const verdict = webauthnRp.resolveRp(req);
+  const lockedByEnv = !!(process.env.WEBAUTHN_RP_ID || process.env.WEBAUTHN_ORIGIN);
+  return {
+    declared: adminSettings.passkeyDomain,
+    effective: verdict.ok ? verdict.rpId : "",
+    source: verdict.ok ? verdict.source : "none",
+    lockedByEnv,
+    // What the admin's own browser reached us on. Offered as the value
+    // to fill the field with: the admin is looking at the real domain in
+    // their address bar, and confirming it is a decision only an admin
+    // can make. It is a suggestion, never a source.
+    suggested: webauthnRp.isValidRpId(req.hostname) ? String(req.hostname).toLowerCase() : "",
+  };
+}
+
 // Public, cacheable URL for the login background, or null when none is set.
 // Versioned (?v=) so changing the background busts the browser HTTP cache
 // even though the path is constant. `row` is a getBrandingImagesRow result.
@@ -4692,13 +4731,13 @@ function loginBgUrl(row) {
 }
 
 // Get admin settings
-app.get("/api/admin/settings", auth, adminOnly, (_req, res) => {
-  res.json(brandingSettingsPayload());
+app.get("/api/admin/settings", auth, adminOnly, (req, res) => {
+  res.json({ ...brandingSettingsPayload(), passkeyDomainState: passkeyDomainState(req) });
 });
 
 // Update admin settings
 app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
-  const { allowNewAccounts, loginSlogan, appName, loginBackgroundBlur, loginTheme, logo, logoPwa, loginBackground, loginBackgroundColor, loginBackgroundHash } = req.body || {};
+  const { allowNewAccounts, loginSlogan, appName, loginBackgroundBlur, loginTheme, passkeyDomain, logo, logoPwa, loginBackground, loginBackgroundColor, loginBackgroundHash } = req.body || {};
 
   if (typeof allowNewAccounts === 'boolean') {
     adminSettings.allowNewAccounts = allowNewAccounts;
@@ -4714,6 +4753,25 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
   }
   if (typeof loginTheme === 'string' && VALID_LOGIN_THEMES.has(loginTheme)) {
     adminSettings.loginTheme = loginTheme;
+  }
+
+  // The passkey domain. An empty string clears it and falls back to the
+  // rest of the resolution order; anything else has to be a bare host
+  // name, refused rather than trimmed into shape so the admin sees what
+  // they actually stored. An env var wins over this value, so setting it
+  // from the panel while one is present would be a silent no-op: say so
+  // instead.
+  if (typeof passkeyDomain === 'string') {
+    const wanted = passkeyDomain.trim().toLowerCase();
+    if (wanted && !webauthnRp.isValidRpId(wanted)) {
+      return res.status(400).json({ error: "Passkey domain must be a bare host name, like notes.example.com: no https://, no port, no path." });
+    }
+    if (wanted !== adminSettings.passkeyDomain
+        && (process.env.WEBAUTHN_RP_ID || process.env.WEBAUTHN_ORIGIN)) {
+      return res.status(409).json({ error: "The passkey domain is pinned by WEBAUTHN_RP_ID on this server and cannot be changed here." });
+    }
+    adminSettings.passkeyDomain = wanted;
+    webauthnRp.setDeclaredRpId(wanted);
   }
 
   // Image fields use a tri-state contract: an explicit `null` clears the
@@ -4771,6 +4829,7 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
     adminSettings.appName,
     adminSettings.loginBackgroundBlur,
     adminSettings.loginTheme,
+    adminSettings.passkeyDomain,
   );
   // Live-sync the scalar settings to every other admin so their
   // AdminPanel toggles / slogan / app name / blur reflect the change
@@ -4781,7 +4840,7 @@ app.patch("/api/admin/settings", auth, adminOnly, (req, res) => {
     type: "admin_settings_updated",
     settings: { ...adminSettings },
   });
-  res.json(brandingSettingsPayload());
+  res.json({ ...brandingSettingsPayload(), passkeyDomainState: passkeyDomainState(req) });
 });
 
 // Public branding for the login page + app shell. Unauthenticated on

@@ -85,6 +85,114 @@ function LoginSloganRow({ value, onSave, showToast }) {
   );
 }
 
+// The domain passkeys belong to. Behind a reverse proxy the server has
+// no honest way to learn it: the only place it appears is a header the
+// caller wrote, so an admin states it once here. Every other case
+// (local network, a certificate, an env var) resolves on its own and
+// this row just says so instead of asking for anything.
+function PasskeyDomainRow({ state, onSave, showToast }) {
+  const declared = state?.declared || "";
+  const suggested = state?.suggested || "";
+  const source = state?.source || "none";
+  const undecided = source === "none";
+  const readOnly = state?.lockedByEnv || source === "certificate";
+
+  const [draft, setDraft] = useState(declared || (undecided ? suggested : ""));
+  const [busy, setBusy] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  React.useEffect(() => {
+    const wanted = declared || (undecided ? suggested : "");
+    setDraft((prev) => (prev === wanted ? prev : wanted));
+  }, [declared, suggested, undecided]);
+
+  const dirty = draft.trim().toLowerCase() !== declared;
+
+  const save = async () => {
+    if (!dirty) return;
+    setBusy(true);
+    try {
+      // updateAdminSettings reports its own failures and resolves with
+      // nothing, so a refused domain must not flash "saved".
+      const stored = await onSave(draft.trim().toLowerCase());
+      if (!stored) return;
+      setSavedFlash(true);
+      showToast?.(t("saved"), "success");
+      setTimeout(() => setSavedFlash(false), 1500);
+    } catch (e) {
+      showToast?.(localizeServerError(e?.message, "saveFailed"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const etat = {
+    configured: t("passkeyDomainFromEnv"),
+    admin: t("passkeyDomainFromPanel"),
+    certificate: t("passkeyDomainFromCertificate"),
+    "local-request": t("passkeyDomainFromLocal"),
+    none: t("passkeyDomainMissing"),
+  }[source];
+
+  return (
+    <div className="flex flex-col gap-2 px-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <RowIcon icon={TI.Key} />
+        <div className="min-w-0">
+          <div className="font-medium">{t("passkeyDomainLabel")}</div>
+          <div className="text-sm text-gray-500">{t("passkeyDomainDesc")}</div>
+        </div>
+      </div>
+
+      <div
+        className={`text-sm rounded-lg px-3 py-2 ${
+          undecided
+            ? "bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300"
+            : "text-gray-500"
+        }`}
+      >
+        {etat}
+        {state?.effective ? <> <code className="font-mono">{state.effective}</code></> : null}
+      </div>
+
+      {!readOnly && (
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            inputMode="url"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={253}
+            className="flex-1 px-3 py-2 border border-[var(--border-light)] rounded-lg bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--gk-chrome-accent)] placeholder-gray-500 dark:placeholder-gray-400 text-sm font-mono"
+            placeholder={suggested || t("passkeyDomainPlaceholder")}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                save();
+              }
+            }}
+            disabled={busy}
+          />
+          <button
+            type="button"
+            onClick={save}
+            disabled={!dirty || busy}
+            className="shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 text-white hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-300/40 dark:shadow-none hover:shadow-lg hover:shadow-indigo-300/50 dark:hover:shadow-none hover:scale-[1.03] active:scale-[0.98] btn-gradient disabled:opacity-50 disabled:pointer-events-none disabled:hover:scale-100"
+          >
+            {busy ? t("saving") : savedFlash ? t("saved") : t("save")}
+          </button>
+        </div>
+      )}
+
+      {!readOnly && declared && (
+        <div className="text-xs text-gray-500">{t("passkeyDomainChangeWarning")}</div>
+      )}
+    </div>
+  );
+}
+
 function formatBytes(bytes) {
   if (!bytes) return "0 B";
   const k = 1024;
@@ -527,6 +635,12 @@ export default function AdminPanel({
               <LoginSloganRow
                 value={adminSettings.loginSlogan}
                 onSave={(slogan) => updateAdminSettings({ loginSlogan: slogan })}
+                showToast={showToast}
+              />
+
+              <PasskeyDomainRow
+                state={adminSettings.passkeyDomainState}
+                onSave={(domain) => updateAdminSettings({ passkeyDomain: domain })}
                 showToast={showToast}
               />
 

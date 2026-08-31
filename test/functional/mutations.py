@@ -19,9 +19,11 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SRC = os.path.join(ROOT, "server", "index.js")
+DEFAUT = "server/index.js"
 
 # (scénario, promesse cassée, texte cherché, texte de remplacement)
+# Un cinquième élément nomme le fichier quand la promesse ne vit pas
+# dans server/index.js.
 MUTATIONS = [
     ("f1", "la couleur d'une note",
      "    color: r.color,", '    color: "default",'),
@@ -127,6 +129,25 @@ MUTATIONS = [
     ("f3", "les étiquettes conservées quand personne ne reprend la note",
      "      db.prepare(\"DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?\").run(id, req.user.id);\n      broadcastNoteUpdated(id);\n      const trashedSelf = getNoteById.get(id);",
      "      db.prepare(\"DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?\").run(id, req.user.id);\n      db.prepare(\"DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?\").run(id, req.user.id);\n      broadcastNoteUpdated(id);\n      const trashedSelf = getNoteById.get(id);"),
+
+    # Le domaine des passkeys: déclaré une fois depuis le panneau, jamais
+    # pris dans la requête, et il doit tenir d'un démarrage à l'autre.
+    ("f5", "le refus de prendre le domaine dans une requête publique",
+     "  if (isLocalHostname(hostname)) {", "  if (true) {",
+     "server/services/webauthnRp.js"),
+    ("f5", "la forme exigée du domaine déclaré",
+     "  if (!v || net.isIP(v)) return false;\n  return RP_ID_RE.test(v);",
+     "  return !!v;",
+     "server/services/webauthnRp.js"),
+    ("f5", "la prise en compte du domaine déclaré depuis le panneau",
+     '  if (declaredRpId) {\n    return fromDeclaredId(declaredRpId, req, listenPort, "admin");\n  }',
+     '  if (false) {\n    return fromDeclaredId(declaredRpId, req, listenPort, "admin");\n  }',
+     "server/services/webauthnRp.js"),
+    ("f5", "l'enregistrement du domaine des passkeys en base",
+     "    adminSettings.passkeyDomain,\n  );", '    "",\n  );'),
+    ("f5", "le domaine fixé par la variable du serveur, non modifiable depuis le panneau",
+     "    if (wanted !== adminSettings.passkeyDomain\n        && (process.env.WEBAUTHN_RP_ID || process.env.WEBAUTHN_ORIGIN)) {",
+     "    if (false) {"),
 ]
 
 SCENARIOS = {
@@ -138,25 +159,45 @@ SCENARIOS = {
 }
 
 
-def refuser_si_travail_en_cours():
-    sortie = subprocess.run(["git", "status", "--porcelain", "--", SRC],
+def normaliser(mutation):
+    """(scénario, promesse, avant, après[, fichier]) -> les cinq, fichier rempli."""
+    scenario, promesse, avant, apres = mutation[:4]
+    fichier = mutation[4] if len(mutation) > 4 else DEFAUT
+    return scenario, promesse, avant, apres, fichier
+
+
+def refuser_si_travail_en_cours(fichiers):
+    sortie = subprocess.run(["git", "status", "--porcelain", "--", *fichiers],
                             cwd=ROOT, capture_output=True, text=True)
     if sortie.stdout.strip():
-        print("server/index.js porte des modifications non validées.")
+        print("Les fichiers mutés portent des modifications non validées:")
+        print(sortie.stdout.rstrip())
         print("Validez-les ou mettez-les de côté avant de lancer la campagne.")
         sys.exit(2)
 
 
 def main():
-    refuser_si_travail_en_cours()
-    original = open(SRC, encoding="utf-8").read()
-    sauvegarde = tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
-    sauvegarde.write(original)
-    sauvegarde.close()
+    mutations = [normaliser(m) for m in MUTATIONS]
+    fichiers = sorted({m[4] for m in mutations})
+    refuser_si_travail_en_cours(fichiers)
+
+    # Une copie de chaque fichier muté, restaurée quoi qu'il arrive.
+    originaux = {f: open(os.path.join(ROOT, f), encoding="utf-8").read() for f in fichiers}
+    sauvegardes = {}
+    for f, contenu in originaux.items():
+        tmp = tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+        tmp.write(contenu)
+        tmp.close()
+        sauvegardes[f] = tmp.name
+
+    def restaurer():
+        for f, copie in sauvegardes.items():
+            shutil.copy(copie, os.path.join(ROOT, f))
 
     resultats = []
     try:
-        for scenario, promesse, avant, apres in MUTATIONS:
+        for scenario, promesse, avant, apres, fichier in mutations:
+            original = originaux[fichier]
             if original.count(avant) == 0:
                 # Le code a bougé: la mutation ne veut plus rien dire, il
                 # faut la réécrire plutôt que la croire réussie.
@@ -164,19 +205,21 @@ def main():
                 print(f"[{scenario}] {promesse}: MOTIF INTROUVABLE", flush=True)
                 continue
 
-            open(SRC, "w", encoding="utf-8").write(original.replace(avant, apres, 1))
+            cible = os.path.join(ROOT, fichier)
+            open(cible, "w", encoding="utf-8").write(original.replace(avant, apres, 1))
             joue = subprocess.run(
                 ["node", os.path.join(ROOT, "test", "functional", SCENARIOS[scenario])],
                 capture_output=True, text=True, timeout=900)
-            shutil.copy(sauvegarde.name, SRC)
+            restaurer()
 
             echecs = [l for l in joue.stdout.splitlines() if l.startswith(" ÉCHEC")]
             premier = echecs[0].replace(" ÉCHEC  ", "").split("  ·")[0].strip() if echecs else ""
             resultats.append((scenario, promesse, len(echecs), premier))
             print(f"[{scenario}] {promesse}: {len(echecs)} vérification(s) tombée(s)", flush=True)
     finally:
-        shutil.copy(sauvegarde.name, SRC)
-        os.unlink(sauvegarde.name)
+        restaurer()
+        for copie in sauvegardes.values():
+            os.unlink(copie)
 
     print("\n──────── récapitulatif ────────")
     manques = 0

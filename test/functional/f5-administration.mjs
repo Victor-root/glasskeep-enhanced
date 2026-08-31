@@ -10,9 +10,17 @@
 // L'inscription est fermée par défaut sur une instance neuve: le
 // scénario le vérifie d'abord, puis l'ouvre par le panneau, ce qui est
 // exactement le chemin d'un opérateur.
+import path from "node:path";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { startInstance, createAndLogin, listenEvents, runner } from "./lab.mjs";
 
 const PORT = 9515;
+// Le domaine des passkeys se joue derrière un proxy, sur une instance
+// qui a sa propre base parce qu'elle doit survivre à un redémarrage.
+const PORT_PROXY = 9516;
+const PORT_PROXY_BIS = 9517;
+const PORT_ENV = 9518;
 const t = runner("Panneau d'administration");
 
 const j = (v) => JSON.stringify(v);
@@ -433,6 +441,157 @@ try {
     "une adresse externe n'est pas acceptée comme logo: la bibliothèque ne va rien chercher au dehors",
     pasUneImage.status === 400, `http ${pasUneImage.status}, ${j(pasUneImage.json?.error)}`,
   );
+
+  // ───────────────────────────────────────────────────────────────────
+  // 6. Le domaine des passkeys.
+  //
+  // Derrière un proxy, le seul endroit où le domaine apparaît est un
+  // en-tête écrit par l'appelant: le serveur refuse de s'en servir. Un
+  // administrateur le déclare donc une fois depuis le panneau, et cette
+  // déclaration doit tenir, survivre au redémarrage, et ne jamais être
+  // déplacée par une requête qui annonce autre chose.
+  // ───────────────────────────────────────────────────────────────────
+  const dossierPasskeys = mkdtempSync(path.join(tmpdir(), "gk-rp-"));
+  const basePasskeys = path.join(dossierPasskeys, "data.sqlite");
+  const proxy = { "x-forwarded-host": "notes.exemple.fr", "x-forwarded-proto": "https" };
+  const autreProxy = { "x-forwarded-host": "mechant.exemple.fr", "x-forwarded-proto": "https" };
+
+  const derriereProxy = await startInstance({
+    port: PORT_PROXY, dbFile: basePasskeys, env: { TRUST_PROXY: "true" },
+  });
+  try {
+    const patron = await createAndLogin(derriereProxy, {
+      name: "Patron", email: "patron@glasskeep.test", password: "Passw0rd-patron", isAdmin: true,
+    });
+    const employe = await createAndLogin(derriereProxy, {
+      name: "Employé", email: "employe@glasskeep.test", password: "Passw0rd-employe",
+    });
+    const etat = async (headers = proxy, token = patron.token) =>
+      (await derriereProxy.call("GET", "/api/admin/settings", { token, headers })).json?.passkeyDomainState;
+
+    const avant = await etat();
+    t.check(
+      "sur un domaine public, tant que rien n'est déclaré le panneau le dit et propose le domaine vu",
+      avant?.source === "none" && avant?.effective === "" && avant?.suggested === "notes.exemple.fr",
+      j(avant),
+    );
+
+    const refuses = [];
+    for (const mauvais of ["https://notes.exemple.fr", "notes.exemple.fr:8080", "192.168.1.10", "notes.exemple.fr/app"]) {
+      const r = await derriereProxy.call("PATCH", "/api/admin/settings", {
+        token: patron.token, headers: proxy, body: { passkeyDomain: mauvais },
+      });
+      refuses.push(`${mauvais}=${r.status}`);
+    }
+    const toujoursVide = await etat();
+    t.check(
+      "une adresse collée depuis la barre du navigateur est refusée, pas rabotée en silence",
+      refuses.every((r) => r.endsWith("=400")) && toujoursVide?.declared === "",
+      `${refuses.join(" ")}, declared=${j(toujoursVide?.declared)}`,
+    );
+
+    const pose = await derriereProxy.call("PATCH", "/api/admin/settings", {
+      token: patron.token, headers: proxy, body: { passkeyDomain: "Notes.Exemple.FR " },
+    });
+    t.check(
+      "le domaine déclaré par l'administrateur devient celui des passkeys, en minuscules",
+      pose.status === 200
+        && pose.json?.passkeyDomainState?.source === "admin"
+        && pose.json?.passkeyDomainState?.effective === "notes.exemple.fr",
+      `http ${pose.status}, ${j(pose.json?.passkeyDomainState)}`,
+    );
+
+    const enBase = (() => {
+      const db = derriereProxy.db(true);
+      try { return db.prepare("SELECT webauthn_rp_id FROM app_settings WHERE id = 1").get(); }
+      finally { db.close(); }
+    })();
+    t.check(
+      "il est écrit en base et pas seulement gardé en mémoire",
+      enBase?.webauthn_rp_id === "notes.exemple.fr", j(enBase),
+    );
+
+    const detourne = await etat(autreProxy);
+    t.check(
+      "une requête qui annonce un autre domaine ne déplace pas celui des passkeys",
+      detourne?.effective === "notes.exemple.fr" && detourne?.source === "admin", j(detourne),
+    );
+
+    const parUnSimple = await derriereProxy.call("PATCH", "/api/admin/settings", {
+      token: employe.token, headers: proxy, body: { passkeyDomain: "mechant.exemple.fr" },
+    });
+    const inchange = await etat();
+    t.check(
+      "un compte ordinaire ne peut pas le changer",
+      parUnSimple.status === 403 && inchange?.effective === "notes.exemple.fr",
+      `http ${parUnSimple.status}, ${j(inchange?.effective)}`,
+    );
+    derriereProxy.stop();
+
+    // Le point de tout l'exercice: une variable d'environnement tenait
+    // déjà après un redémarrage, un réglage gardé en mémoire non.
+    const apresRedemarrage = await startInstance({
+      port: PORT_PROXY_BIS, dbFile: basePasskeys, env: { TRUST_PROXY: "true" },
+    });
+    try {
+      const revenu = await apresRedemarrage.call("POST", "/api/login", {
+        body: { email: patron.email, password: patron.password },
+      });
+      const etatApres = (await apresRedemarrage.call("GET", "/api/admin/settings", {
+        token: revenu.json?.token, headers: proxy,
+      })).json?.passkeyDomainState;
+      t.check(
+        "il survit au redémarrage du serveur, et le journal de démarrage le nomme",
+        etatApres?.effective === "notes.exemple.fr" && etatApres?.source === "admin"
+          && apresRedemarrage.logs().includes("[passkeys] relying party from the admin panel (notes.exemple.fr)"),
+        `${j(etatApres)}, journal=${bout(apresRedemarrage.logs().split("\n").find((l) => l.includes("[passkeys]")), 120)}`,
+      );
+
+      const vide = await apresRedemarrage.call("PATCH", "/api/admin/settings", {
+        token: revenu.json?.token, headers: proxy, body: { passkeyDomain: "" },
+      });
+      t.check(
+        "le vider rend la main à la résolution automatique",
+        vide.status === 200 && vide.json?.passkeyDomainState?.source === "none",
+        `http ${vide.status}, ${j(vide.json?.passkeyDomainState)}`,
+      );
+    } finally {
+      apresRedemarrage.stop();
+    }
+  } finally {
+    // stop() est idempotent: l'appel plus haut coupe l'instance avant le
+    // redémarrage, celui-ci rattrape le cas où le scénario a échoué avant
+    // d'y arriver. Sans lui, un échec laisse le port occupé et fait
+    // échouer toutes les exécutions suivantes pour une autre raison.
+    derriereProxy.stop();
+    rmSync(dossierPasskeys, { recursive: true, force: true });
+  }
+
+  // Une instance dont l'opérateur a posé la variable: le panneau la
+  // montre et refuse de la contredire, plutôt que d'accepter un
+  // changement qui ne servirait à rien.
+  const avecVariable = await startInstance({
+    port: PORT_ENV, env: { TRUST_PROXY: "true", WEBAUTHN_RP_ID: "fixe.exemple.fr" },
+  });
+  try {
+    const operateur = await createAndLogin(avecVariable, {
+      name: "Opérateur", email: "op@glasskeep.test", password: "Passw0rd-op", isAdmin: true,
+    });
+    const vu = (await avecVariable.call("GET", "/api/admin/settings", {
+      token: operateur.token, headers: proxy,
+    })).json?.passkeyDomainState;
+    const tentative = await avecVariable.call("PATCH", "/api/admin/settings", {
+      token: operateur.token, headers: proxy, body: { passkeyDomain: "autre.exemple.fr" },
+    });
+    t.check(
+      "quand la variable du serveur fixe le domaine, le panneau le montre et refuse de le changer",
+      vu?.source === "configured" && vu?.effective === "fixe.exemple.fr" && vu?.lockedByEnv === true
+        && tentative.status === 409,
+      `${j(vu)}, tentative=${tentative.status}`,
+    );
+  } finally {
+    avecVariable.stop();
+  }
 } finally {
   for (const f of flux) f.close();
   inst.stop();

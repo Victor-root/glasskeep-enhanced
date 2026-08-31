@@ -18,18 +18,23 @@
 // The order below only ever uses sources the caller cannot write:
 //
 //   1. WEBAUTHN_RP_ID / WEBAUTHN_ORIGIN. The operator said it. Done.
-//   2. The names in the server's own TLS certificate, when it
+//   2. The domain an admin declared from the admin panel, stored in
+//      app_settings and pushed here by setDeclaredRpId(). An admin
+//      typing their own domain is the same act as the operator setting
+//      the variable: a deliberate statement by someone who already runs
+//      the instance, not a header a stranger wrote.
+//   3. The names in the server's own TLS certificate, when it
 //      terminates TLS itself. The browser reached us through one of
 //      them or the connection would not exist.
-//   3. The request host, and only when it names something local: a
+//   4. The request host, and only when it names something local: a
 //      loopback or private address, or a name that has no meaning
 //      outside the local network. Forging it buys an attacker a domain
 //      they already had to be inside the network to use, and it keeps
 //      development and LAN installs working with no configuration.
-//   4. Otherwise the ceremony is refused, naming the variable to set.
+//   5. Otherwise the ceremony is refused, pointing at the panel.
 //      A public deployment has to say its own domain once.
 //
-// Note that step 4 is not the drama it looks like. A forged domain has
+// Note that step 5 is not the drama it looks like. A forged domain has
 // never been enough to steal an account: the authenticator signs over
 // the domain the browser gave it, so a mismatched expectation makes
 // verification fail rather than succeed. What was lost is the second
@@ -46,6 +51,33 @@ const REASON = Object.freeze({
 
 // Names that cannot mean anything outside the local network.
 const LOCAL_SUFFIXES = [".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain"];
+
+// What the admin panel accepts as a domain: a dotted host name, nothing
+// else. No scheme, no port, no path: those are the shapes people paste
+// out of a browser bar, and silently trimming them would store a domain
+// the admin never checked. WebAuthn forbids an IP address as a relying
+// party id, so one is refused here rather than at ceremony time.
+const RP_ID_RE = /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/;
+
+function isValidRpId(value) {
+  const v = String(value || "").trim().toLowerCase();
+  if (!v || net.isIP(v)) return false;
+  return RP_ID_RE.test(v);
+}
+
+// The domain an admin declared in the panel. index.js seeds this at boot
+// from app_settings and rewrites it on every change, the same way it
+// mirrors the other admin settings in memory.
+let declaredRpId = "";
+
+function setDeclaredRpId(value) {
+  declaredRpId = isValidRpId(value) ? String(value).trim().toLowerCase() : "";
+  return declaredRpId;
+}
+
+function getDeclaredRpId() {
+  return declaredRpId;
+}
 
 function isLocalHostname(hostname) {
   const h = String(hostname || "").trim().replace(/^\[|\]$/g, "").toLowerCase();
@@ -138,6 +170,23 @@ function requestOrigins(req, listenPort) {
   return originsFor(hostname, proto, port);
 }
 
+// An id declared with no origin beside it: WEBAUTHN_RP_ID on its own, or
+// the domain an admin typed in the panel. WebAuthn lets a credential
+// registered for "example.com" be used on "notes.example.com", and that
+// split is a normal way to configure this, so the request's own host is
+// accepted as an origin when the spec itself would allow it for the
+// declared id. A forged host fails that test, which is the point.
+function fromDeclaredId(rpId, req, listenPort, source) {
+  const origins = originsFor(rpId, "https", listenPort);
+  for (const candidate of requestOrigins(req, listenPort)) {
+    const host = new URL(candidate).hostname.toLowerCase();
+    if ((host === rpId || host.endsWith(`.${rpId}`)) && !origins.includes(candidate)) {
+      origins.push(candidate);
+    }
+  }
+  return { ok: true, rpId, origins, source };
+}
+
 /**
  * Resolve the relying party for this request.
  * Returns { ok: true, rpId, origins, source } or { ok: false, reason }.
@@ -157,23 +206,15 @@ function resolveRp(req, env = process.env) {
         source: "configured",
       };
     }
-    // Only the id was given. WebAuthn lets a credential registered for
-    // "example.com" be used on "notes.example.com", and that split is a
-    // normal way to configure this, so the request's own host is
-    // accepted as an origin when the spec itself would allow it for the
-    // declared id. A forged host fails that test, which is the point.
-    const origins = originsFor(rpId, "https", listenPort);
-    const requested = requestOrigins(req, listenPort);
-    for (const candidate of requested) {
-      const host = new URL(candidate).hostname.toLowerCase();
-      if ((host === rpId || host.endsWith(`.${rpId}`)) && !origins.includes(candidate)) {
-        origins.push(candidate);
-      }
-    }
-    return { ok: true, rpId, origins, source: "configured" };
+    return fromDeclaredId(rpId, req, listenPort, "configured");
   }
 
-  // 2. What our own certificate says. Preferred over anything in the
+  // 2. What an admin declared in the panel.
+  if (declaredRpId) {
+    return fromDeclaredId(declaredRpId, req, listenPort, "admin");
+  }
+
+  // 3. What our own certificate says. Preferred over anything in the
   //    request: the browser reached one of these names or there would
   //    be no connection to answer.
   const hostname = String(req?.hostname || "").toLowerCase()
@@ -190,7 +231,7 @@ function resolveRp(req, env = process.env) {
     return { ok: true, rpId, origins, source: "certificate" };
   }
 
-  // 3. The request host, only when it names something local. Express
+  // 4. The request host, only when it names something local. Express
   //    has already applied the operator's proxy policy to it, so
   //    X-Forwarded-Host only counts when it came from a hop the
   //    operator trusts.
@@ -203,23 +244,35 @@ function resolveRp(req, env = process.env) {
     };
   }
 
-  // 4. Nothing trustworthy to go on.
+  // 5. Nothing trustworthy to go on.
   return { ok: false, reason: REASON.UNDECIDABLE };
 }
 
-// One line at boot so the operator knows which of the four applies to
-// them, before a passkey fails rather than after.
+// One line at boot so the operator knows which case applies to them,
+// before a passkey fails rather than after.
 function describeConfig(env = process.env) {
   if (env.WEBAUTHN_RP_ID || env.WEBAUTHN_ORIGIN) {
     return `[passkeys] relying party from configuration (${env.WEBAUTHN_RP_ID || env.WEBAUTHN_ORIGIN})`;
+  }
+  if (declaredRpId) {
+    return `[passkeys] relying party from the admin panel (${declaredRpId})`;
   }
   const certNames = certificateNames(env);
   if (certNames.length) {
     return `[passkeys] relying party from the TLS certificate (${certNames.join(", ")})`;
   }
   return "[passkeys] no relying party configured: passkeys will work on a local address, "
-    + "and are refused on a public domain until WEBAUTHN_RP_ID (and WEBAUTHN_ORIGIN behind a "
-    + "proxy) are set. The request's Host header is not trusted for this, it is written by the caller.";
+    + "and are refused on a public domain until an admin sets the passkey domain in the "
+    + "admin panel (or WEBAUTHN_RP_ID is set). The request's Host header is not trusted "
+    + "for this, it is written by the caller.";
 }
 
-module.exports = { REASON, resolveRp, describeConfig, isLocalHostname };
+module.exports = {
+  REASON,
+  resolveRp,
+  describeConfig,
+  isLocalHostname,
+  isValidRpId,
+  setDeclaredRpId,
+  getDeclaredRpId,
+};
