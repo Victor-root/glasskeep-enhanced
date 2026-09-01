@@ -222,10 +222,7 @@ services:
     environment:
       ADMIN_EMAIL: "votre-nom-admin"
       ADMIN_PASSWORD: "choisissez-un-mot-de-passe-fort"
-      # Facultatif. Sur un domaine public, les passkeys ont besoin de
-      # savoir à quel domaine elles appartiennent. Indiquez-le ici, ou
-      # validez-le depuis le panneau d'administration après votre
-      # première connexion. Les deux marchent, au choix.
+      # Facultatif, pour les passkeys sur un domaine public (voir la note dédiée).
       # WEBAUTHN_RP_ID: "notes.exemple.fr"
     volumes:
       - ./data:/data
@@ -235,7 +232,12 @@ services:
 
 Une fois le conteneur démarré, ouvrez `http://<votre-hôte>:8080` et connectez-vous avec le nom d'utilisateur et le mot de passe administrateur que vous avez choisis.
 
-> 🔑 **Passkeys derrière un reverse proxy.** Une passkey est liée à un nom de domaine, et le serveur refuse de lire ce nom dans les requêtes qu'il reçoit, puisque c'est celui qui les envoie qui l'écrit. Validez votre domaine une fois depuis le panneau d'administration, section **Paramètres de la page de connexion**, ou décommentez `WEBAUTHN_RP_ID` ci-dessus pour le poser ici. Les deux marchent ; sur une adresse locale il n'y a rien à faire.
+<details>
+<summary>🔑 <b>Passkeys derrière un reverse proxy</b></summary>
+
+Une passkey est liée à un nom de domaine, et le serveur refuse de lire ce nom dans les requêtes qu'il reçoit, puisque c'est celui qui les envoie qui l'écrit. Validez votre domaine une fois depuis le panneau d'administration, section **Paramètres de la page de connexion**, ou décommentez `WEBAUTHN_RP_ID` dans le fichier compose pour le poser là. Les deux marchent ; sur une adresse locale il n'y a rien à faire.
+
+</details>
 
 #### 🚀 Déploiement
 
@@ -256,10 +258,7 @@ services:
     environment:
       ADMIN_EMAIL: "votre-nom-admin"
       ADMIN_PASSWORD: "choisissez-un-mot-de-passe-fort"
-      # Facultatif. Sur un domaine public, les passkeys ont besoin de
-      # savoir à quel domaine elles appartiennent. Indiquez-le ici, ou
-      # validez-le depuis le panneau d'administration après votre
-      # première connexion. Les deux marchent, au choix.
+      # Facultatif, pour les passkeys sur un domaine public (voir la note dédiée).
       # WEBAUTHN_RP_ID: "notes.exemple.fr"
     volumes:
       - ./data:/data
