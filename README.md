@@ -222,6 +222,10 @@ services:
     environment:
       ADMIN_EMAIL: "your-admin-username"
       ADMIN_PASSWORD: "choose-a-strong-password"
+      # Optional. On a public domain, passkeys need to know which domain
+      # they belong to. Set it here, or confirm it from the admin panel
+      # after your first sign-in. Either works, pick one.
+      # WEBAUTHN_RP_ID: "notes.example.com"
     volumes:
       - ./data:/data
       # Lets the admin panel update the container in one click.
@@ -229,6 +233,8 @@ services:
 ```
 
 Once the container is up, open `http://<your-host>:8080` and sign in with the admin username and password you chose.
+
+> 🔑 **Passkeys behind a reverse proxy.** A passkey is tied to a domain name, and the server will not read that name off the requests it receives, since whoever sends a request writes it. Confirm your domain once from the admin panel, under **Login page settings**, or uncomment `WEBAUTHN_RP_ID` above to pin it here instead. Both work; on a local address there is nothing to do at all.
 
 #### 🚀 Deploy
 
@@ -249,6 +255,10 @@ services:
     environment:
       ADMIN_EMAIL: "your-admin-username"
       ADMIN_PASSWORD: "choose-a-strong-password"
+      # Optional. On a public domain, passkeys need to know which domain
+      # they belong to. Set it here, or confirm it from the admin panel
+      # after your first sign-in. Either works, pick one.
+      # WEBAUTHN_RP_ID: "notes.example.com"
     volumes:
       - ./data:/data
       # Lets the admin panel update the container in one click.
