@@ -92,3 +92,34 @@ body {
 .btn-gradient:hover::after {
   animation: btn-shimmer 0.7s ease-in-out;
 }
+
+/* Attention pulse for a setting reached through a shortcut from
+   somewhere else in the app: the panel it lives in can be long, so the
+   row breathes a few times instead of leaving the reader to hunt for it.
+   The tint and the ring are the same translucent indigo, which reads on
+   both the light and the dark surface, and the glow is a box-shadow so
+   nothing around it moves. */
+@keyframes gk-attention-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    background-color: rgba(99, 102, 241, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.22);
+    background-color: rgba(99, 102, 241, 0.12);
+  }
+}
+
+.gk-attention {
+  border-radius: 0.75rem;
+  animation: gk-attention-pulse 1.15s ease-in-out 3;
+}
+
+/* Held still rather than pulsing, so the row is still pointed out. */
+@media (prefers-reduced-motion: reduce) {
+  .gk-attention {
+    animation: none;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.22);
+    background-color: rgba(99, 102, 241, 0.12);
+  }
+}

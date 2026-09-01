@@ -254,6 +254,9 @@ export default function App() {
   const [settingsOpenSections, setSettingsOpenSections] = useState({});
   // Same for the Admin panel.
   const [adminOpenSections, setAdminOpenSections] = useState({});
+  // Set when the admin panel is opened from the passkey notice, so the
+  // domain row can point itself out on arrival. Cleared once it has.
+  const [highlightPasskeyDomain, setHighlightPasskeyDomain] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     try {
       return parseInt(localStorage.getItem("sidebarWidth")) || 288;
@@ -7402,6 +7405,7 @@ export default function App() {
         onOpenPasskeyDomainSetting={() => {
           setSettingsPanelOpen(false);
           setAdminOpenSections({ site: true });
+          setHighlightPasskeyDomain(true);
           openAdminPanel();
         }}
         aiAssistantEnabled={aiAssistantEnabled}
@@ -7455,6 +7459,8 @@ export default function App() {
         open={adminPanelOpen}
         onClose={() => setAdminPanelOpen(false)}
         dark={dark}
+        highlightPasskeyDomain={highlightPasskeyDomain}
+        onPasskeyDomainHighlighted={() => setHighlightPasskeyDomain(false)}
         openSections={adminOpenSections}
         setOpenSections={setAdminOpenSections}
         adminSettings={adminSettings}

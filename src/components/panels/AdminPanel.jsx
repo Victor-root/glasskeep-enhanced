@@ -90,7 +90,7 @@ function LoginSloganRow({ value, onSave, showToast }) {
 // caller wrote, so an admin states it once here. Every other case
 // (local network, a certificate, an env var) resolves on its own and
 // this row just says so instead of asking for anything.
-function PasskeyDomainRow({ state, onSave, showToast }) {
+function PasskeyDomainRow({ state, onSave, showToast, highlight, onHighlightDone }) {
   const declared = state?.declared || "";
   const suggested = state?.suggested || "";
   const source = state?.source || "none";
@@ -105,6 +105,23 @@ function PasskeyDomainRow({ state, onSave, showToast }) {
     const wanted = declared || (undecided ? suggested : "");
     setDraft((prev) => (prev === wanted ? prev : wanted));
   }, [declared, suggested, undecided]);
+
+  // Arriving here from the passkey notice in the user settings: the
+  // section it lives in is long, so bring the row into view and let it
+  // pulse. The flag is cleared once, so re-opening the panel by hand
+  // afterwards does not replay it.
+  const ligne = React.useRef(null);
+  // The parent passes a fresh arrow on every render, so it is held in a
+  // ref rather than depended on: as a dependency it would restart the
+  // timer on each render and the flag would never clear.
+  const finRef = React.useRef(onHighlightDone);
+  React.useEffect(() => { finRef.current = onHighlightDone; }, [onHighlightDone]);
+  React.useEffect(() => {
+    if (!highlight) return;
+    ligne.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const fin = setTimeout(() => finRef.current?.(), 3600);
+    return () => clearTimeout(fin);
+  }, [highlight]);
 
   const dirty = draft.trim().toLowerCase() !== declared;
 
@@ -137,7 +154,10 @@ function PasskeyDomainRow({ state, onSave, showToast }) {
   }[source];
 
   return (
-    <div className="flex flex-col gap-2 px-3">
+    <div
+      ref={ligne}
+      className={`flex flex-col gap-2 px-3 py-2 ${highlight ? "gk-attention" : ""}`}
+    >
       <div className="flex items-center gap-3 min-w-0">
         <RowIcon icon={TI.Key} />
         <div className="min-w-0">
@@ -227,6 +247,8 @@ export default function AdminPanel({
   updateInfo,
   selfUpdate,
   syncStatus,
+  highlightPasskeyDomain,
+  onPasskeyDomainHighlighted,
   openSections = {},
   setOpenSections,
 }) {
@@ -642,6 +664,8 @@ export default function AdminPanel({
                 state={adminSettings.passkeyDomainState}
                 onSave={(domain) => updateAdminSettings({ passkeyDomain: domain })}
                 showToast={showToast}
+                highlight={highlightPasskeyDomain}
+                onHighlightDone={onPasskeyDomainHighlighted}
               />
 
               {/* Branding (custom app name, logo, login background +
