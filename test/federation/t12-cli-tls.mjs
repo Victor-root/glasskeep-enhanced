@@ -130,7 +130,7 @@ try {
           FIXED ? !!rule : !rule);
 
   if (rule) {
-  const { isLoopbackHost, tlsOptionsFor, assertSafeForSecrets } = rule;
+  const { isLoopbackHost, tlsOptionsFor, usesHttps } = rule;
 
   const loopback = ["127.0.0.1", "127.0.0.53", "localhost", "LOCALHOST", "::1", "[::1]"];
   const elsewhere = ["192.168.1.10", "10.0.0.1", "example.com", "0.0.0.0", "128.0.0.1", "", "1.2.3.4"];
@@ -154,14 +154,16 @@ try {
     } catch { return true; }
   })());
 
-  t.check("un secret en clair vers la boucle locale reste permis", (() => {
-    try { assertSafeForSecrets({ host: "127.0.0.1", httpsEnabled: false }); return true; }
-    catch { return false; }
-  })());
-  t.check("un secret en clair vers ailleurs est refusé", (() => {
-    try { assertSafeForSecrets({ host: "notes.example.com", httpsEnabled: false }); return false; }
-    catch { return true; }
-  })());
+  // Le protocole se choisit d'après le destinataire, pas d'après la
+  // machine qui écrit: c'est ce que disait le premier correctif et ce
+  // que les scripts ne faisaient pas, d'où un jeton d'administrateur
+  // parti en clair vers un domaine public.
+  t.check("vers la boucle locale, le réglage local décide encore",
+          usesHttps({ host: "127.0.0.1", localHttpsEnabled: false }) === false
+          && usesHttps({ host: "127.0.0.1", localHttpsEnabled: true }) === true);
+  t.check("vers ailleurs, c'est TLS même quand la machine locale n'en a pas",
+          ["notes.example.com", "192.168.1.10"]
+            .every((h) => usesHttps({ host: h, localHttpsEnabled: false }) === true));
   }
 
   // ── B) Le script, en vrai, contre une instance en TLS auto-signé ───

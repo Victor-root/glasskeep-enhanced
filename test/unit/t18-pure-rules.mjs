@@ -8,6 +8,7 @@
 // ports libres. Une régression sur une de ces règles est attrapée tout
 // de suite plutôt qu'au moment où on pense à jouer la suite lourde.
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { runner } from "../federation/lib.mjs";
@@ -45,10 +46,27 @@ const t = runner("Règles pures");
           req.tlsOptionsFor({ host: "127.0.0.1", httpsEnabled: true }).rejectUnauthorized === false);
   t.check("vers ailleurs, elle l'est",
           req.tlsOptionsFor({ host: "notes.example.com", httpsEnabled: true }).rejectUnauthorized === true);
-  t.check("un secret en clair vers une machine distante est refusé", (() => {
-    try { req.assertSafeForSecrets({ host: "notes.example.com", httpsEnabled: false }); return false; }
-    catch { return true; }
-  })());
+
+  // Les trois vérifications ci-dessus éprouvent la bibliothèque, et
+  // elles passaient toutes pendant que les scripts choisissaient leur
+  // protocole d'après la machine locale plutôt que d'après le
+  // destinataire: un jeton d'administrateur partait en clair vers un
+  // domaine public. La serrure était bonne, elle n'était montée sur
+  // aucune porte. Ce qui suit vérifie la règle, puis le montage.
+  t.check("vers la boucle locale, c'est le réglage local qui décide",
+          req.usesHttps({ host: "127.0.0.1", localHttpsEnabled: false }) === false
+          && req.usesHttps({ host: "localhost", localHttpsEnabled: true }) === true);
+  t.check("vers ailleurs, c'est HTTPS quoi que dise la machine locale",
+          ["notes.example.com", "192.168.1.10"]
+            .every((h) => req.usesHttps({ host: h, localHttpsEnabled: false }) === true));
+
+  for (const nom of ["unlock-instance.cjs", "test-notification.cjs", "test-reminder.cjs"]) {
+    const source = readFileSync(path.join(ROOT, "scripts", nom), "utf8");
+    t.check(`${nom} choisit son protocole d'après la destination`,
+            source.includes("usesHttps({ host, localHttpsEnabled })"));
+    t.check(`${nom} ne rebranche pas sa propre règle à côté`,
+            !/const httpsEnabled =\s*\n?\s*(env|merged)\./.test(source));
+  }
 }
 
 // ── F-11: d'où vient le domaine des passkeys ────────────────────────

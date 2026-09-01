@@ -23,7 +23,7 @@ const path = require("path");
 const readline = require("readline");
 const {
   parseTlsArgs,
-  assertSafeForSecrets,
+  usesHttps,
   requestJson,
   TLS_USAGE,
 } = require("./lib/secureRequest.cjs");
@@ -92,13 +92,15 @@ function loadConfig(args) {
     || Number(env.API_PORT || env.PORT)
     || 8080;
   const host = args.host || "127.0.0.1";
-  // Mirror the server's HTTPS check from server/index.js so the CLI
-  // talks to the same protocol the service is listening on.
-  const httpsEnabled =
+  // Mirrors the server's own HTTPS check, and describes THIS machine
+  // only: usesHttps decides what that is worth for the target actually
+  // being addressed.
+  const localHttpsEnabled = Boolean(
     env.HTTPS_ENABLED !== "false"
     && env.SSL_CERT && env.SSL_KEY
-    && fs.existsSync(env.SSL_CERT) && fs.existsSync(env.SSL_KEY);
-  return { host, port, httpsEnabled, envFile };
+    && fs.existsSync(env.SSL_CERT) && fs.existsSync(env.SSL_KEY),
+  );
+  return { host, port, httpsEnabled: usesHttps({ host, localHttpsEnabled }), envFile };
 }
 
 function ask(question, { hidden = false } = {}) {
@@ -174,15 +176,10 @@ async function main() {
     process.exit(0);
   }
 
-  // 2. Prompt and submit. The transport is checked before the secret is
-  // typed rather than after: nothing to be gained from letting someone
-  // enter a passphrase that is about to travel in the open.
-  try {
-    assertSafeForSecrets(cfg);
-  } catch (e) {
-    console.error(`[error] ${e.message}`);
-    process.exit(1);
-  }
+  // 2. Prompt and submit. Nothing to check first any more: usesHttps
+  // has already settled the transport, and a passphrase cannot leave
+  // this machine unencrypted whatever the local service is configured
+  // with.
 
   let res;
   if (args.recovery) {
