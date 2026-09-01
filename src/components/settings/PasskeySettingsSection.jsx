@@ -40,6 +40,11 @@ export default function PasskeySettingsSection({
   showToast,
   isWebView,
   onOpenPasskeyDomainSetting,
+  // Whether the settings panel is on screen. It is never unmounted, only
+  // slid out of view, so without this the section would keep whatever it
+  // read the first time: an admin who steps out to confirm the domain
+  // and comes straight back would still be told to go and confirm it.
+  visible = true,
 }) {
   const [supported, setSupported] = useState(false);
   // Whether this instance can create a passkey at all: false while the
@@ -104,8 +109,12 @@ export default function PasskeySettingsSection({
 
   useEffect(() => {
     setSupported(isWebAuthnSupported());
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
     refresh();
-  }, [refresh]);
+  }, [refresh, visible]);
 
   const handleAdd = () => {
     setTextPrompt({

@@ -479,6 +479,7 @@ export default function SettingsPanel({
                 showToast={showToast}
                 isWebView={!!isWebView}
                 onOpenPasskeyDomainSetting={onOpenPasskeyDomainSetting}
+                visible={open}
               />
             </div>
             </div>
