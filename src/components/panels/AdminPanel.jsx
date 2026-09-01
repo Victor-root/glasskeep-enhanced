@@ -126,12 +126,14 @@ function PasskeyDomainRow({ state, onSave, showToast }) {
     }
   };
 
+  // Where the domain in force comes from. Nothing to say while none is
+  // settled: the description already asks for the confirmation, and a
+  // second block saying the same thing was just noise.
   const etat = {
     configured: t("passkeyDomainFromEnv"),
     admin: t("passkeyDomainFromPanel"),
     certificate: t("passkeyDomainFromCertificate"),
     "local-request": t("passkeyDomainFromLocal"),
-    none: t("passkeyDomainMissing"),
   }[source];
 
   return (
@@ -144,13 +146,7 @@ function PasskeyDomainRow({ state, onSave, showToast }) {
         </div>
       </div>
 
-      <div
-        className={`text-sm rounded-lg px-3 py-2 ${
-          undecided
-            ? "bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300"
-            : "text-gray-500"
-        }`}
-      >
+      <div className="text-sm rounded-lg px-3 py-2 text-gray-500" hidden={!etat}>
         {etat}
         {state?.effective ? <> <code className="font-mono">{state.effective}</code></> : null}
       </div>
