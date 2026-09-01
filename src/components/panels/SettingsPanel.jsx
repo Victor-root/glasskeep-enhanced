@@ -41,6 +41,7 @@ export default function SettingsPanel({
   setReadModeEnabled,
   openSections = {},
   setOpenSections,
+  onOpenPasskeyDomainSetting,
   aiAssistantEnabled,
   setAiAssistantEnabled,
   floatingCardsEnabled,
@@ -477,6 +478,7 @@ export default function SettingsPanel({
                 instanceUnlocked={!!instanceUnlocked}
                 showToast={showToast}
                 isWebView={!!isWebView}
+                onOpenPasskeyDomainSetting={onOpenPasskeyDomainSetting}
               />
             </div>
             </div>

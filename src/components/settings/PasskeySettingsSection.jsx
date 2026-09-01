@@ -39,6 +39,7 @@ export default function PasskeySettingsSection({
   instanceUnlocked,    // boolean — same
   showToast,
   isWebView,
+  onOpenPasskeyDomainSetting,
 }) {
   const [supported, setSupported] = useState(false);
   // Whether this instance can create a passkey at all: false while the
@@ -302,9 +303,20 @@ export default function PasskeySettingsSection({
             can act on. Admins get the same notice pointing at the field
             they own. */}
         {!domainReady && (
-          <p className="text-sm rounded-lg px-3 py-2 mb-3 bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300">
-            {isAdmin ? t("passkeyDomainNotSetAdmin") : t("passkeyDomainNotSetUser")}
-          </p>
+          <div className="text-sm rounded-lg px-3 py-2 mb-3 bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300">
+            <p>{isAdmin ? t("passkeyDomainNotSetAdmin") : t("passkeyDomainNotSetUser")}</p>
+            {/* Only an admin has somewhere to be sent, and only when the
+                parent wired the shortcut. */}
+            {isAdmin && onOpenPasskeyDomainSetting && (
+              <button
+                type="button"
+                onClick={onOpenPasskeyDomainSetting}
+                className="mt-1 font-semibold underline underline-offset-2 hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-current rounded"
+              >
+                {t("passkeyDomainGoToSetting")}
+              </button>
+            )}
+          </div>
         )}
         {/* Split-button: one visual surface, two independent click zones.
             The wide left zone runs the WebAuthn registration flow; the

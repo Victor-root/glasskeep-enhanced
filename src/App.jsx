@@ -7395,6 +7395,15 @@ export default function App() {
         setReadModeEnabled={setReadModeEnabled}
         openSections={settingsOpenSections}
         setOpenSections={setSettingsOpenSections}
+        // Shortcut out of the passkey section for an admin who is told the
+        // instance has no confirmed domain: closes these settings and opens
+        // the admin panel with the section holding that field already
+        // unfolded, rather than making them go hunting for it.
+        onOpenPasskeyDomainSetting={() => {
+          setSettingsPanelOpen(false);
+          setAdminOpenSections({ site: true });
+          openAdminPanel();
+        }}
         aiAssistantEnabled={aiAssistantEnabled}
         setAiAssistantEnabled={setAiAssistantEnabled}
         floatingCardsEnabled={floatingCardsEnabled}

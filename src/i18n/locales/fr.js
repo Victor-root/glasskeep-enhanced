@@ -602,8 +602,9 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   passkeyDomainFromLocal: "Adresse locale, aucun domaine nécessaire :",
   passkeyDomainConfirmCta: "Valider",
   passkeyDomainChangeWarning: "Changer ce domaine rend inutilisables les passkeys existantes : elles ont été créées pour le précédent.",
-  passkeyDomainNotSetUser: "Les passkeys ne sont pas disponibles sur cette instance tant qu'un administrateur n'a pas renseigné son domaine. Rien à faire de votre côté : demandez-lui de le faire, puis revenez.",
-  passkeyDomainNotSetAdmin: "Les passkeys ne sont pas disponibles tant que vous n'avez pas renseigné le domaine de cette instance, dans le panneau d'administration, section Réglages du site.",
+  passkeyDomainNotSetUser: "Les passkeys ne sont pas disponibles sur cette instance tant qu'un administrateur n'a pas validé son domaine. Rien à faire de votre côté : demandez-lui de le faire, puis revenez.",
+  passkeyDomainNotSetAdmin: "Les passkeys ne sont pas disponibles tant que vous n'avez pas validé le domaine de cette instance, dans le panneau d'administration, section Réglages du site.",
+  passkeyDomainGoToSetting: "M'y emmener",
   // Personnalisation de la page de connexion (admin)
   customAppName: "Nom personnalisé de l'application",
   customAppNameDesc: "Remplace le nom affiché sur l'écran de connexion et dans l'en-tête.",
