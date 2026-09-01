@@ -476,6 +476,32 @@ try {
       j(avant),
     );
 
+    // Ce que voit un utilisateur ordinaire tant que personne n'a rien
+    // déclaré: il ne peut pas ajouter de passkey, et ce n'est pas à lui
+    // de le régler. Il doit donc l'apprendre avant d'essayer, et le
+    // refus doit nommer la raison au lieu d'un échec générique.
+    const listeAvant = await derriereProxy.call("GET", "/api/passkeys", {
+      token: employe.token, headers: proxy,
+    });
+    t.check(
+      "un utilisateur voit d'avance que les passkeys sont indisponibles ici",
+      listeAvant.status === 200 && listeAvant.json?.available === false,
+      `http ${listeAvant.status}, ${j(listeAvant.json)}`,
+    );
+
+    const ajoutAvant = await derriereProxy.call("POST", "/api/passkeys/register/options", {
+      token: employe.token, headers: proxy,
+    });
+    const connexionAvant = await derriereProxy.call("POST", "/api/passkeys/login/options", {
+      headers: proxy,
+    });
+    const nommeLaRaison = (r) => /not configured for this domain/i.test(r.json?.error || "");
+    t.check(
+      "et s'il essaie quand même, le refus nomme la raison au lieu d'un échec générique",
+      nommeLaRaison(ajoutAvant) && nommeLaRaison(connexionAvant),
+      `ajout=${j(ajoutAvant.json?.error)}, connexion=${j(connexionAvant.json?.error)}`,
+    );
+
     const refuses = [];
     for (const mauvais of ["https://notes.exemple.fr", "notes.exemple.fr:8080", "192.168.1.10", "notes.exemple.fr/app"]) {
       const r = await derriereProxy.call("PATCH", "/api/admin/settings", {
@@ -499,6 +525,19 @@ try {
         && pose.json?.passkeyDomainState?.source === "admin"
         && pose.json?.passkeyDomainState?.effective === "notes.exemple.fr",
       `http ${pose.status}, ${j(pose.json?.passkeyDomainState)}`,
+    );
+
+    const listeApresPose = await derriereProxy.call("GET", "/api/passkeys", {
+      token: employe.token, headers: proxy,
+    });
+    const ajoutApresPose = await derriereProxy.call("POST", "/api/passkeys/register/options", {
+      token: employe.token, headers: proxy,
+    });
+    t.check(
+      "une fois le domaine déclaré, l'utilisateur peut enfin ajouter une passkey",
+      listeApresPose.json?.available === true && ajoutApresPose.status === 200
+        && ajoutApresPose.json?.options?.rp?.id === "notes.exemple.fr",
+      `disponible=${j(listeApresPose.json?.available)}, options=${ajoutApresPose.status} rp=${j(ajoutApresPose.json?.options?.rp)}`,
     );
 
     const enBase = (() => {

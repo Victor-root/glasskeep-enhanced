@@ -54,6 +54,17 @@ class RpUnresolved extends Error {
   }
 }
 
+// The one ceremony failure a user can act on is "this instance has not
+// declared its domain": it is the administrator's to fix, and a generic
+// "could not start" sends the user looking in the wrong place. Every
+// entry point reports that reason verbatim and keeps its own message
+// for everything else.
+function startFailed(res, log, e, what, fallback) {
+  log.error?.(`[passkey] ${what} failed: ${e.message}`);
+  const message = e instanceof RpUnresolved ? e.message : fallback;
+  return res.status(500).json({ error: message });
+}
+
 function resolveRpOrThrow(req) {
   const verdict = webauthnRp.resolveRp(req);
   if (!verdict.ok) throw new RpUnresolved(verdict.reason);
@@ -193,10 +204,15 @@ function attachPasskeyRoutes(app, deps) {
   //   USER PASSKEY MANAGEMENT
   // ====================================================================
 
-  // List the caller's own passkeys.
+  // List the caller's own passkeys, and say whether a new one can be
+  // created at all. Without `available`, a user on an instance whose
+  // domain is still undeclared only finds out by pressing the button and
+  // reading a failure: the settings screen can now say up front that
+  // this is the administrator's to fix, not theirs.
   app.get("/api/passkeys", auth, (req, res) => {
     const list = passkeyVault.listPasskeysForUser(db, req.user.id);
     res.json({
+      available: webauthnRp.resolveRp(req).ok,
       passkeys: list.map((p) => ({
         credentialId: p.credential_id,
         name: p.name || null,
@@ -252,8 +268,7 @@ function attachPasskeyRoutes(app, deps) {
 
       res.json({ options, challengeId });
     } catch (e) {
-      log.error?.(`[passkey] register/options failed: ${e.message}`);
-      res.status(500).json({ error: "Failed to start passkey registration" });
+      startFailed(res, log, e, "register/options", "Failed to start passkey registration");
     }
   });
 
@@ -367,8 +382,7 @@ function attachPasskeyRoutes(app, deps) {
       });
       res.json({ options, challengeId });
     } catch (e) {
-      log.error?.(`[passkey] login/options failed: ${e.message}`);
-      res.status(500).json({ error: "Failed to start passkey login" });
+      startFailed(res, log, e, "login/options", "Failed to start passkey login");
     }
   });
 
@@ -478,8 +492,7 @@ function attachPasskeyRoutes(app, deps) {
       });
       res.json({ options, challengeId });
     } catch (e) {
-      log.error?.(`[passkey] promote/options failed: ${e.message}`);
-      res.status(500).json({ error: "Failed to start promotion ceremony" });
+      startFailed(res, log, e, "promote/options", "Failed to start promotion ceremony");
     }
   });
 
@@ -591,8 +604,7 @@ function attachPasskeyRoutes(app, deps) {
       });
       res.json({ options, challengeId });
     } catch (e) {
-      log.error?.(`[passkey] test/options failed: ${e.message}`);
-      res.status(500).json({ error: "Failed to start passkey test" });
+      startFailed(res, log, e, "test/options", "Failed to start passkey test");
     }
   });
 
@@ -686,8 +698,7 @@ function attachPasskeyRoutes(app, deps) {
       });
       res.json({ options, challengeId });
     } catch (e) {
-      log.error?.(`[passkey] unlock/options failed: ${e.message}`);
-      res.status(500).json({ error: "Failed to start unlock ceremony" });
+      startFailed(res, log, e, "unlock/options", "Failed to start unlock ceremony");
     }
   });
 

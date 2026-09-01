@@ -41,6 +41,11 @@ export default function PasskeySettingsSection({
   isWebView,
 }) {
   const [supported, setSupported] = useState(false);
+  // Whether this instance can create a passkey at all: false while the
+  // administrator has not declared the domain they belong to. Optimistic
+  // until the list answers, so the button is never blocked on a slow or
+  // failed fetch.
+  const [domainReady, setDomainReady] = useState(true);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState(null);    // credentialId currently mutating (rename/delete/toggle)
@@ -88,8 +93,9 @@ export default function PasskeySettingsSection({
   const refresh = useCallback(async () => {
     if (!token) return;
     try {
-      const items = await listPasskeys(token);
-      setList(items);
+      const { passkeys, available } = await listPasskeys(token);
+      setList(passkeys);
+      setDomainReady(available);
     } catch (e) {
       console.warn("[passkeys] list failed:", e?.message || e);
     }
@@ -290,17 +296,27 @@ export default function PasskeySettingsSection({
         <p className="text-sm text-gray-500 dark:text-gray-400 leading-snug mb-3">
           {t("passkeySectionExplain")}
         </p>
+        {/* Said before the button rather than after a failure: on this
+            instance nobody can create a passkey until an administrator
+            declares the domain, and that is not something a plain user
+            can act on. Admins get the same notice pointing at the field
+            they own. */}
+        {!domainReady && (
+          <p className="text-sm rounded-lg px-3 py-2 mb-3 bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300">
+            {isAdmin ? t("passkeyDomainNotSetAdmin") : t("passkeyDomainNotSetUser")}
+          </p>
+        )}
         {/* Split-button: one visual surface, two independent click zones.
             The wide left zone runs the WebAuthn registration flow; the
             chevron zone on the right toggles the saved-keys list. A thin
             translucent divider keeps the visual unity. */}
         <div
-          className={`inline-flex w-full sm:w-auto rounded-lg overflow-hidden text-white bg-gradient-to-r from-indigo-500 to-violet-600 shadow-md shadow-indigo-300/40 dark:shadow-none btn-gradient ${loading ? "opacity-50" : ""}`}
+          className={`inline-flex w-full sm:w-auto rounded-lg overflow-hidden text-white bg-gradient-to-r from-indigo-500 to-violet-600 shadow-md shadow-indigo-300/40 dark:shadow-none btn-gradient ${loading || !domainReady ? "opacity-50" : ""}`}
         >
           <button
             type="button"
             onClick={handleAdd}
-            disabled={loading}
+            disabled={loading || !domainReady}
             className="flex-1 sm:flex-none min-w-0 px-4 py-2 text-sm font-semibold text-center hover:bg-white/10 active:bg-white/20 focus:outline-none focus-visible:bg-white/15 disabled:cursor-not-allowed transition-colors"
           >
             <span className="truncate">

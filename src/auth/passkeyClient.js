@@ -201,9 +201,13 @@ export function hasAndroidPasskeyBridge() {
 }
 
 // ── User passkey list / management ────────────────────────────────────
+// `available` says whether a passkey can be created on this instance at
+// all: it is false while the administrator has not declared the domain
+// passkeys belong to. A server too old to send it is treated as
+// available, so nothing new gets blocked.
 export async function listPasskeys(token) {
   const r = await getJSON("/passkeys", token);
-  return r.passkeys || [];
+  return { passkeys: r.passkeys || [], available: r.available !== false };
 }
 
 export async function renamePasskey(token, credentialId, name) {

@@ -602,6 +602,8 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   passkeyDomainFromLocal: "Adresse locale, aucun domaine nécessaire :",
   passkeyDomainMissing: "Non défini. Les passkeys fonctionnent sur une adresse locale, mais elles seront refusées sur un domaine public tant que ce champ est vide.",
   passkeyDomainChangeWarning: "Changer ce domaine rend inutilisables les passkeys existantes : elles ont été créées pour le précédent.",
+  passkeyDomainNotSetUser: "Les passkeys ne sont pas disponibles sur cette instance tant qu'un administrateur n'a pas renseigné son domaine. Rien à faire de votre côté : demandez-lui de le faire, puis revenez.",
+  passkeyDomainNotSetAdmin: "Les passkeys ne sont pas disponibles tant que vous n'avez pas renseigné le domaine de cette instance, dans le panneau d'administration, section Réglages du site.",
   // Personnalisation de la page de connexion (admin)
   customAppName: "Nom personnalisé de l'application",
   customAppNameDesc: "Remplace le nom affiché sur l'écran de connexion et dans l'en-tête.",
@@ -1170,6 +1172,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   errPasskeyNotFound: "Clé d'accès introuvable.",
   errPasskeyNoPrf: "Cette clé d'accès ne prend pas en charge PRF (chiffrement).",
   errPasskeyUserGone: "Le compte utilisateur n'existe plus.",
+  errPasskeyDomainNotSet: "Les passkeys ne sont pas encore disponibles sur cette instance : un administrateur doit d'abord en renseigner le domaine.",
   errPasskeyNotAuthorisedUnlock: "Cette clé d'accès n'est pas autorisée à déverrouiller l'instance.",
   errPasskeyOnlyAdminUnlock: "Seules les clés d'accès administrateur peuvent déverrouiller l'instance.",
   errPasskeyUnlockWrapMissing: "Wrap de déverrouillage manquant pour cette clé d'accès.",
