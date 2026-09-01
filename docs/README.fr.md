@@ -167,41 +167,45 @@ Le script est conçu pour rendre l'installation aussi simple que possible :
 
 > Il s'agit de la méthode d'installation principale recommandée pour ce projet.
 
-> ⚠️ **Derrière un reverse proxy : relevez la taille de requête autorisée.**
-> Les notes embarquent leurs images, donc une note avec deux photos pèse
-> plusieurs Mo. GlassKeep accepte jusqu'à 160 Mo, mais nginx refuse tout ce
-> qui dépasse **1 Mo** par défaut et répond `413` avant même que la requête
-> ne l'atteigne. Cela casse l'envoi d'images, les imports, et le partage
-> inter-serveurs des notes illustrées. Dans votre bloc `server { … }` :
->
-> ```nginx
-> client_max_body_size 160m;
-> ```
->
-> Caddy n'impose aucune limite par défaut ; Apache utilise `LimitRequestBody 0` ;
-> sur Traefik c'est illimité sauf si vous définissez `buffering.maxRequestBodyBytes`.
+<details>
+<summary>⚠️ <b>Deux réglages à vérifier sur votre reverse proxy</b></summary>
 
-> ⚠️ **Pages d'erreur personnalisées : tenez-les à l'écart de `/api/`.** Si
-> votre proxy remplace les réponses d'erreur du serveur par ses propres pages,
-> les réponses de GlassKeep n'arrivent plus jusqu'au navigateur. L'application
-> dit *pourquoi* une requête échoue dans le corps de la réponse : une phrase de
-> passe erronée, une clé de secours refusée ou une adresse e-mail déjà prise
-> arrivent alors sous forme de page HTML illisible pour elle, et l'écran ne
-> peut plus afficher qu'un message vague. Sous nginx il s'agit de
-> `proxy_intercept_errors on;` combiné à `error_page` ; désactivez-le là où
-> vit l'API :
->
-> ```nginx
-> location /api/ {
->     proxy_intercept_errors off;
->     proxy_pass http://127.0.0.1:8080;
->     # … vos lignes proxy_set_header existantes
-> }
-> ```
->
-> Vos jolies pages continuent de s'afficher partout ailleurs. Sur Traefik,
-> l'équivalent est de restreindre le middleware `errors` pour qu'il ne couvre
-> pas `/api/` ; sous Caddy, `handle_errors` doit également l'ignorer.
+**Relevez la taille de requête autorisée.** Les notes embarquent leurs images,
+donc une note avec deux photos pèse plusieurs Mo. GlassKeep accepte jusqu'à
+160 Mo, mais nginx refuse tout ce qui dépasse **1 Mo** par défaut et répond
+`413` avant même que la requête ne l'atteigne. Cela casse l'envoi d'images, les
+imports, et le partage inter-serveurs des notes illustrées. Dans votre bloc
+`server { … }` :
+
+```nginx
+client_max_body_size 160m;
+```
+
+Caddy n'impose aucune limite par défaut ; Apache utilise `LimitRequestBody 0` ;
+sur Traefik c'est illimité sauf si vous définissez `buffering.maxRequestBodyBytes`.
+
+**Tenez les pages d'erreur personnalisées à l'écart de `/api/`.** Si votre proxy
+remplace les réponses d'erreur du serveur par ses propres pages, les réponses de
+GlassKeep n'arrivent plus jusqu'au navigateur. L'application dit *pourquoi* une
+requête échoue dans le corps de la réponse : une phrase de passe erronée, une
+clé de secours refusée ou une adresse e-mail déjà prise arrivent alors sous
+forme de page HTML illisible pour elle, et l'écran ne peut plus afficher qu'un
+message vague. Sous nginx il s'agit de `proxy_intercept_errors on;` combiné à
+`error_page` ; désactivez-le là où vit l'API :
+
+```nginx
+location /api/ {
+    proxy_intercept_errors off;
+    proxy_pass http://127.0.0.1:8080;
+    # … vos lignes proxy_set_header existantes
+}
+```
+
+Vos jolies pages continuent de s'afficher partout ailleurs. Sur Traefik,
+l'équivalent est de restreindre le middleware `errors` pour qu'il ne couvre pas
+`/api/` ; sous Caddy, `handle_errors` doit également l'ignorer.
+
+</details>
 
 ---
 

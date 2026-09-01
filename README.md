@@ -169,39 +169,43 @@ The script is designed to make installation as simple as possible:
 
 > This is the main installation method recommended for this project.
 
-> ⚠️ **Behind a reverse proxy: raise the request size limit.** Notes carry
-> their images inline, so a note with a couple of photos is several MB.
-> GlassKeep itself accepts up to 160 MB, but nginx refuses anything over
-> **1 MB** by default and answers `413` before the request ever reaches it.
-> That breaks image uploads, imports, and cross-server sharing of notes with
-> pictures. In your `server { … }` block:
->
-> ```nginx
-> client_max_body_size 160m;
-> ```
->
-> Caddy has no such limit by default; Apache uses `LimitRequestBody 0`; on
-> Traefik it is unlimited unless you set `buffering.maxRequestBodyBytes`.
+<details>
+<summary>⚠️ <b>Two settings to check on your reverse proxy</b></summary>
 
-> ⚠️ **Custom error pages: keep them away from `/api/`.** If your proxy
-> replaces upstream error responses with its own pages, GlassKeep's answers
-> stop reaching the browser. The app says *why* a request failed in the
-> response body, so a wrong passphrase, a rejected recovery key or a taken
-> email all arrive as an HTML page the app cannot read, and the screen can
-> only fall back to a vague message. In nginx this is `proxy_intercept_errors
-> on;` combined with `error_page`; turn it off where the API lives:
->
-> ```nginx
-> location /api/ {
->     proxy_intercept_errors off;
->     proxy_pass http://127.0.0.1:8080;
->     # … your existing proxy_set_header lines
-> }
-> ```
->
-> Your pretty pages keep working everywhere else. On Traefik the equivalent
-> is scoping the `errors` middleware so it does not cover `/api/`; Caddy's
-> `handle_errors` should likewise skip it.
+**Raise the request size limit.** Notes carry their images inline, so a note
+with a couple of photos is several MB. GlassKeep itself accepts up to 160 MB,
+but nginx refuses anything over **1 MB** by default and answers `413` before
+the request ever reaches it. That breaks image uploads, imports, and
+cross-server sharing of notes with pictures. In your `server { … }` block:
+
+```nginx
+client_max_body_size 160m;
+```
+
+Caddy has no such limit by default; Apache uses `LimitRequestBody 0`; on
+Traefik it is unlimited unless you set `buffering.maxRequestBodyBytes`.
+
+**Keep custom error pages away from `/api/`.** If your proxy replaces upstream
+error responses with its own pages, GlassKeep's answers stop reaching the
+browser. The app says *why* a request failed in the response body, so a wrong
+passphrase, a rejected recovery key or a taken email all arrive as an HTML page
+the app cannot read, and the screen can only fall back to a vague message. In
+nginx this is `proxy_intercept_errors on;` combined with `error_page`; turn it
+off where the API lives:
+
+```nginx
+location /api/ {
+    proxy_intercept_errors off;
+    proxy_pass http://127.0.0.1:8080;
+    # … your existing proxy_set_header lines
+}
+```
+
+Your pretty pages keep working everywhere else. On Traefik the equivalent is
+scoping the `errors` middleware so it does not cover `/api/`; Caddy's
+`handle_errors` should likewise skip it.
+
+</details>
 
 ---
 
