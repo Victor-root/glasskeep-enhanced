@@ -23,8 +23,13 @@
 //     still exists for the operator who knowingly wants the old
 //     behaviour, and says so on stderr every time.
 //
-// Plaintext HTTP gets the same treatment: fine to loopback, refused to
-// anywhere else when the request carries a secret.
+// Whether to encrypt at all follows the same line, and the destination
+// is what decides it. The first version of this file left that choice to
+// each script, which answered it by reading the LOCAL service's TLS
+// settings: run from a container with no certificate of its own, they
+// sent an admin token in the clear to a public domain. usesHttps below
+// is the fix, and it makes the unsafe case unrepresentable rather than
+// merely checked for.
 
 const fs = require("fs");
 const http = require("http");
@@ -44,6 +49,25 @@ function isLoopbackHost(host) {
   if (version === 4) return h.split(".")[0] === "127";
   if (version === 6) return h === "::1" || h === "::ffff:127.0.0.1";
   return false;
+}
+
+// Whether to speak HTTPS to this target.
+//
+// The three scripts used to answer this by looking at SSL_CERT and
+// HTTPS_ENABLED in the local .env, which describes the service on THIS
+// machine and says nothing whatsoever about a machine reached through
+// --host. Run from a container with no TLS of its own, that reasoning
+// sent an admin token in the clear to a public domain: the local
+// configuration was the wrong thing to read.
+//
+// The destination decides instead. Loopback keeps the local answer,
+// because there the local service IS the target. Anything else is
+// spoken to over HTTPS: a request that leaves the machine carries a
+// passphrase or a token, and there is no version of that worth sending
+// unprotected. --insecure and --ca stay available for a certificate
+// that will not verify; neither of them turns the encryption off.
+function usesHttps({ host, localHttpsEnabled }) {
+  return isLoopbackHost(host) ? !!localHttpsEnabled : true;
 }
 
 // Reads the two TLS flags out of argv. Left separate from each script's
@@ -86,19 +110,15 @@ function tlsOptionsFor({ host, httpsEnabled, insecure = false, caFile = null }) 
   return { rejectUnauthorized: true };
 }
 
-// Refuses to put a secret on a link that protects nothing. The server
-// refuses the plaintext unlock on its own side too; saying it here gives
-// the operator the reason before the secret is typed rather than after.
-function assertSafeForSecrets({ host, httpsEnabled }) {
-  if (httpsEnabled || isLoopbackHost(host)) return;
-  throw new Error(
-    `refusing to send a secret to ${host} over plain HTTP. ` +
-    "Enable HTTPS on the service, or run this from the machine itself against 127.0.0.1.",
-  );
-}
-
-// Turns a failed certificate check into an explanation, because the
-// stock message says nothing about what to do next.
+// Turns a failed connection into an explanation, because the stock
+// messages say nothing about what to do next.
+//
+// There used to be a guard here that refused to send a secret in the
+// clear. Once usesHttps started forcing TLS for every target off this
+// machine, that guard could no longer fire: the state it protected
+// against had become unreachable. What is left to explain is the shape
+// it now fails in, which is a service on the other end that speaks plain
+// HTTP and cannot answer a TLS handshake.
 function explainTlsError(err, host) {
   const code = err && err.code;
   const certCodes = new Set([
@@ -109,12 +129,27 @@ function explainTlsError(err, host) {
     "ERR_TLS_CERT_ALTNAME_INVALID",
     "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
   ]);
-  if (!certCodes.has(code)) return err;
-  return new Error(
-    `the certificate of ${host} could not be verified (${code}). ` +
-    "Pass --ca=<file> with the certificate of the authority that signed it, " +
-    "or --insecure to skip the check knowing what that costs.",
-  );
+  if (certCodes.has(code)) {
+    return new Error(
+      `the certificate of ${host} could not be verified (${code}). ` +
+      "Pass --ca=<file> with the certificate of the authority that signed it, " +
+      "or --insecure to skip the check knowing what that costs.",
+    );
+  }
+  const plainCodes = new Set([
+    "EPROTO",
+    "ERR_SSL_WRONG_VERSION_NUMBER",
+    "ERR_SSL_PACKET_LENGTH_TOO_LONG",
+    "ECONNRESET",
+  ]);
+  if (plainCodes.has(code)) {
+    return new Error(
+      `${host} answered as plain HTTP (${code}). This command carries an ` +
+      "admin token, which is not sent unencrypted to another machine: run it " +
+      "on that machine against 127.0.0.1, or put HTTPS in front of the service.",
+    );
+  }
+  return err;
 }
 
 function requestJson({ host, port, httpsEnabled, method, path, body, token, tls }) {
@@ -150,9 +185,9 @@ function requestJson({ host, port, httpsEnabled, method, path, body, token, tls 
 
 module.exports = {
   isLoopbackHost,
+  usesHttps,
   parseTlsArgs,
   tlsOptionsFor,
-  assertSafeForSecrets,
   requestJson,
   TLS_USAGE,
 };

@@ -44,6 +44,7 @@ const fs = require("fs");
 const path = require("path");
 const {
   parseTlsArgs,
+  usesHttps,
   requestJson,
   TLS_USAGE,
 } = require("./lib/secureRequest.cjs");
@@ -106,12 +107,16 @@ function loadConfig(args) {
   const merged = { ...env, ...process.env };
   const port = args.port || Number(merged.API_PORT || merged.PORT) || 8080;
   const host = args.host || "127.0.0.1";
-  const httpsEnabled =
+  // Describes THIS machine only; usesHttps turns it into the answer for
+  // the target actually being addressed.
+  const localHttpsEnabled = Boolean(
     merged.HTTPS_ENABLED !== "false" &&
     merged.SSL_CERT &&
     merged.SSL_KEY &&
     fs.existsSync(merged.SSL_CERT) &&
-    fs.existsSync(merged.SSL_KEY);
+    fs.existsSync(merged.SSL_KEY),
+  );
+  const httpsEnabled = usesHttps({ host, localHttpsEnabled });
   const jwtSecret = merged.JWT_SECRET;
   if (!jwtSecret) {
     console.error("[error] JWT_SECRET is not set (env or " + envFile + ").");
