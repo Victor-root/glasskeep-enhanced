@@ -123,6 +123,7 @@ const PATTERNS = [
   // ── Passkeys / unlock ────────────────────────────────────────────
   // Order matters: more specific needles first because PATTERNS uses
   // includes() and the first match wins.
+  ["Passkeys are not configured for this domain",           "errPasskeyDomainNotSet"],
   ["This passkey is not authorised to unlock the instance", "errPasskeyNotAuthorisedUnlock"],
   ["Only admin passkeys can unlock the instance",           "errPasskeyOnlyAdminUnlock"],
   ["Unlock wrap missing for this passkey",                  "errPasskeyUnlockWrapMissing"],

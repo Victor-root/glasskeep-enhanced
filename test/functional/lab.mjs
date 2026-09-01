@@ -29,10 +29,14 @@ const bcrypt = require(path.join(ROOT, "node_modules", "bcryptjs"));
 
 // Démarre une instance et rend de quoi lui parler. `stop()` est
 // idempotent et efface la base; appelez-le dans un `finally`.
-export async function startInstance({ port, env = {}, timeoutMs = 20000 } = {}) {
+//
+// `dbFile` sert aux scénarios qui vérifient qu'un réglage survit à un
+// redémarrage: deux instances successives sur le même fichier. Ce
+// fichier-là appartient à l'appelant, `stop()` n'y touche pas.
+export async function startInstance({ port, env = {}, dbFile: dbPartagee, timeoutMs = 20000 } = {}) {
   if (!port) throw new Error("startInstance: port requis");
   const dir = mkdtempSync(path.join(tmpdir(), "gk-fonc-"));
-  const dbFile = path.join(dir, "data.sqlite");
+  const dbFile = dbPartagee || path.join(dir, "data.sqlite");
   const base = `http://127.0.0.1:${port}`;
 
   const child = spawn(process.execPath, [path.join(ROOT, "server", "index.js")], {

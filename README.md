@@ -169,39 +169,43 @@ The script is designed to make installation as simple as possible:
 
 > This is the main installation method recommended for this project.
 
-> ⚠️ **Behind a reverse proxy: raise the request size limit.** Notes carry
-> their images inline, so a note with a couple of photos is several MB.
-> GlassKeep itself accepts up to 160 MB, but nginx refuses anything over
-> **1 MB** by default and answers `413` before the request ever reaches it.
-> That breaks image uploads, imports, and cross-server sharing of notes with
-> pictures. In your `server { … }` block:
->
-> ```nginx
-> client_max_body_size 160m;
-> ```
->
-> Caddy has no such limit by default; Apache uses `LimitRequestBody 0`; on
-> Traefik it is unlimited unless you set `buffering.maxRequestBodyBytes`.
+<details>
+<summary>⚠️ <b>Two settings to check on your reverse proxy</b></summary>
 
-> ⚠️ **Custom error pages: keep them away from `/api/`.** If your proxy
-> replaces upstream error responses with its own pages, GlassKeep's answers
-> stop reaching the browser. The app says *why* a request failed in the
-> response body, so a wrong passphrase, a rejected recovery key or a taken
-> email all arrive as an HTML page the app cannot read, and the screen can
-> only fall back to a vague message. In nginx this is `proxy_intercept_errors
-> on;` combined with `error_page`; turn it off where the API lives:
->
-> ```nginx
-> location /api/ {
->     proxy_intercept_errors off;
->     proxy_pass http://127.0.0.1:8080;
->     # … your existing proxy_set_header lines
-> }
-> ```
->
-> Your pretty pages keep working everywhere else. On Traefik the equivalent
-> is scoping the `errors` middleware so it does not cover `/api/`; Caddy's
-> `handle_errors` should likewise skip it.
+**Raise the request size limit.** Notes carry their images inline, so a note
+with a couple of photos is several MB. GlassKeep itself accepts up to 160 MB,
+but nginx refuses anything over **1 MB** by default and answers `413` before
+the request ever reaches it. That breaks image uploads, imports, and
+cross-server sharing of notes with pictures. In your `server { … }` block:
+
+```nginx
+client_max_body_size 160m;
+```
+
+Caddy has no such limit by default; Apache uses `LimitRequestBody 0`; on
+Traefik it is unlimited unless you set `buffering.maxRequestBodyBytes`.
+
+**Keep custom error pages away from `/api/`.** If your proxy replaces upstream
+error responses with its own pages, GlassKeep's answers stop reaching the
+browser. The app says *why* a request failed in the response body, so a wrong
+passphrase, a rejected recovery key or a taken email all arrive as an HTML page
+the app cannot read, and the screen can only fall back to a vague message. In
+nginx this is `proxy_intercept_errors on;` combined with `error_page`; turn it
+off where the API lives:
+
+```nginx
+location /api/ {
+    proxy_intercept_errors off;
+    proxy_pass http://127.0.0.1:8080;
+    # … your existing proxy_set_header lines
+}
+```
+
+Your pretty pages keep working everywhere else. On Traefik the equivalent is
+scoping the `errors` middleware so it does not cover `/api/`; Caddy's
+`handle_errors` should likewise skip it.
+
+</details>
 
 ---
 
@@ -222,6 +226,8 @@ services:
     environment:
       ADMIN_EMAIL: "your-admin-username"
       ADMIN_PASSWORD: "choose-a-strong-password"
+      # Optional, for passkeys on a public domain (see the passkey note).
+      # WEBAUTHN_RP_ID: "notes.example.com"
     volumes:
       - ./data:/data
       # Lets the admin panel update the container in one click.
@@ -229,6 +235,13 @@ services:
 ```
 
 Once the container is up, open `http://<your-host>:8080` and sign in with the admin username and password you chose.
+
+<details>
+<summary>🔑 <b>Passkeys behind a reverse proxy</b></summary>
+
+A passkey is tied to a domain name, and the server will not read that name off the requests it receives, since whoever sends a request writes it. Confirm your domain once from the admin panel, under **Login page settings**, or uncomment `WEBAUTHN_RP_ID` in the compose file to pin it there instead. Both work; on a local address there is nothing to do at all.
+
+</details>
 
 #### 🚀 Deploy
 
@@ -249,6 +262,8 @@ services:
     environment:
       ADMIN_EMAIL: "your-admin-username"
       ADMIN_PASSWORD: "choose-a-strong-password"
+      # Optional, for passkeys on a public domain (see the passkey note).
+      # WEBAUTHN_RP_ID: "notes.example.com"
     volumes:
       - ./data:/data
       # Lets the admin panel update the container in one click.

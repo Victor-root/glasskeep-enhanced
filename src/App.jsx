@@ -254,6 +254,9 @@ export default function App() {
   const [settingsOpenSections, setSettingsOpenSections] = useState({});
   // Same for the Admin panel.
   const [adminOpenSections, setAdminOpenSections] = useState({});
+  // Set when the admin panel is opened from the passkey notice, so the
+  // domain row can point itself out on arrival. Cleared once it has.
+  const [highlightPasskeyDomain, setHighlightPasskeyDomain] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     try {
       return parseInt(localStorage.getItem("sidebarWidth")) || 288;
@@ -7395,6 +7398,16 @@ export default function App() {
         setReadModeEnabled={setReadModeEnabled}
         openSections={settingsOpenSections}
         setOpenSections={setSettingsOpenSections}
+        // Shortcut out of the passkey section for an admin who is told the
+        // instance has no confirmed domain: closes these settings and opens
+        // the admin panel with the section holding that field already
+        // unfolded, rather than making them go hunting for it.
+        onOpenPasskeyDomainSetting={() => {
+          setSettingsPanelOpen(false);
+          setAdminOpenSections({ site: true });
+          setHighlightPasskeyDomain(true);
+          openAdminPanel();
+        }}
         aiAssistantEnabled={aiAssistantEnabled}
         setAiAssistantEnabled={setAiAssistantEnabled}
         floatingCardsEnabled={floatingCardsEnabled}
@@ -7446,6 +7459,8 @@ export default function App() {
         open={adminPanelOpen}
         onClose={() => setAdminPanelOpen(false)}
         dark={dark}
+        highlightPasskeyDomain={highlightPasskeyDomain}
+        onPasskeyDomainHighlighted={() => setHighlightPasskeyDomain(false)}
         openSections={adminOpenSections}
         setOpenSections={setAdminOpenSections}
         adminSettings={adminSettings}

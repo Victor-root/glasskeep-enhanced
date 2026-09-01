@@ -55,13 +55,29 @@ services:
       #   2. The reverse proxy MUST pass X-Forwarded-Host and X-Forwarded-Proto
       #      headers.
       #   3. Users access via HTTPS only (WebAuthn does not work over HTTP).
-      #   4. On a public domain, SET THE TWO VARIABLES BELOW. They are not a
-      #      fallback any more: the server no longer takes the passkey domain
-      #      from the request headers, because whoever sends the request
-      #      writes them, and a domain the caller chose is not a domain the
-      #      server can check anything against. Without them, passkeys keep
-      #      working on a local address and are refused on a public one.
-      #      The startup log says which case applies to you.
+      #   4. On a public domain, the server has to be told which domain the
+      #      passkeys belong to. It no longer takes it from the request
+      #      headers, because whoever sends the request writes them, and a
+      #      domain the caller chose is not a domain the server can check
+      #      anything against.
+      #
+      #      Two ways to tell it, pick either:
+      #
+      #      a) Leave the two lines below commented out and confirm the
+      #         domain from the admin panel, under "Login page settings".
+      #         The field is pre-filled with the domain your own browser
+      #         reached, so it is one click, and the value sticks across
+      #         restarts.
+      #
+      #      b) Set WEBAUTHN_RP_ID here. Passkeys then work from the first
+      #         boot with nothing to click, and the panel shows the value
+      #         as read-only. WEBAUTHN_ORIGIN is only needed to pin the
+      #         exact origin as well; the id alone is enough in the usual
+      #         reverse-proxy case.
+      #
+      #      Setting them wins over the panel, so a deployment that keeps
+      #      its configuration in this file stays in charge of it. Either
+      #      way the startup log says which source is in force.
       # WEBAUTHN_RP_ID: "example.com"
       # WEBAUTHN_ORIGIN: "https://example.com"
       #
