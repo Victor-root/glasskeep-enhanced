@@ -134,6 +134,19 @@ MUTATIONS = [
      '    (typeof req.body.type === "string" && req.body.type !== existing.type) ||\n    Array.isArray(req.body.items) ||\n    Array.isArray(req.body.images) ||\n    typeof req.body.color === "string" ||\n    typeof req.body.timestamp === "string"\n  );\n  if (hasContentChange && (noteFederationRef?.isReadOnly(id) || isCollabReadOnly(id, req.user.id))) {',
      '    typeof req.body.type === "string" ||\n    Array.isArray(req.body.items) ||\n    Array.isArray(req.body.images) ||\n    typeof req.body.color === "string" ||\n    typeof req.body.timestamp === "string"\n  );\n  if (hasContentChange && (noteFederationRef?.isReadOnly(id) || isCollabReadOnly(id, req.user.id))) {'),
 
+    ("f3", "l'icône du retiré suit sa copie quand on lui en laisse une",
+     '    if (userTagsJson && userTagsJson !== "[]") {\n      runUpsertUserTags(copyNoteId, userIdToRemove, userTagsJson);\n    }\n    if (userIcon) {\n      runSetUserIcon(copyNoteId, userIdToRemove, userIcon);\n    }',
+     '    if (userTagsJson && userTagsJson !== "[]") {\n      runUpsertUserTags(copyNoteId, userIdToRemove, userTagsJson);\n    }'),
+    ("f3", "l'icône du collaborateur qui jette une note partagée suit sa copie",
+     '    if (userTagsJson && userTagsJson !== "[]") {\n      runUpsertUserTags(trashedCopyId, req.user.id, userTagsJson);\n    }\n    if (userIcon) {\n      runSetUserIcon(trashedCopyId, req.user.id, userIcon);\n    }',
+     '    if (userTagsJson && userTagsJson !== "[]") {\n      runUpsertUserTags(trashedCopyId, req.user.id, userTagsJson);\n    }'),
+    ("f3", "l'icône du propriétaire qui part suit sa copie",
+     '    if (tagsProprietaire && tagsProprietaire !== "[]") {\n      runUpsertUserTags(trashedCopyId, req.user.id, tagsProprietaire);\n    }\n    if (iconProprietaire) {\n      runSetUserIcon(trashedCopyId, req.user.id, iconProprietaire);\n    }',
+     '    if (tagsProprietaire && tagsProprietaire !== "[]") {\n      runUpsertUserTags(trashedCopyId, req.user.id, tagsProprietaire);\n    }'),
+    ("f3", "l'icône du propriétaire qui part ne traîne pas sur la note léguée",
+     "    deleteUserIconStmt.run(id, req.user.id);",
+     "    void 0;"),
+
     # Le domaine des passkeys: déclaré une fois depuis le panneau, jamais
     # pris dans la requête, et il doit tenir d'un démarrage à l'autre.
     ("f5", "le refus de prendre le domaine dans une requête publique",

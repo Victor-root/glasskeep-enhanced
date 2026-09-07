@@ -3200,6 +3200,10 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
     // cette table. Recopiées dans la colonne, elles étaient bien écrites
     // mais plus jamais lues, et le retiré récupérait une note nue.
     const userTagsJson = getUserTags(noteId, userIdToRemove);
+    // Same reasoning for the icon, one line below: it is personal too, and
+    // was being wiped everywhere (including on this fresh copy) instead of
+    // following its owner onto it.
+    const userIcon = getUserIcon(noteId, userIdToRemove);
     runInsertNote({
       id: copyNoteId,
       user_id: userIdToRemove,
@@ -3217,6 +3221,9 @@ app.delete("/api/notes/:id/collaborate/:userId", auth, (req, res) => {
     });
     if (userTagsJson && userTagsJson !== "[]") {
       runUpsertUserTags(copyNoteId, userIdToRemove, userTagsJson);
+    }
+    if (userIcon) {
+      runSetUserIcon(copyNoteId, userIdToRemove, userIcon);
     }
     // Seed the removed user's per-user position for the copy so it appears
     // at the top of their list, matching the share-to-collaborator UX.
@@ -3870,6 +3877,8 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     // écrites mais plus jamais lues, et la copie de corbeille arrivait
     // nue. Même erreur que le retrait avec copie, deux routes plus loin.
     const userTagsJson = getUserTags(id, req.user.id);
+    // Icon is personal too, same as the tags above.
+    const userIcon = getUserIcon(id, req.user.id);
     const trashedCopyId = uid();
     runInsertNote({
       id: trashedCopyId,
@@ -3889,6 +3898,9 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     db.prepare("UPDATE notes SET trashed = 1 WHERE id = ?").run(trashedCopyId);
     if (userTagsJson && userTagsJson !== "[]") {
       runUpsertUserTags(trashedCopyId, req.user.id, userTagsJson);
+    }
+    if (userIcon) {
+      runSetUserIcon(trashedCopyId, req.user.id, userIcon);
     }
     db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
@@ -4026,6 +4038,8 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     // cette colonne ne recopiait donc rien du tout, et il repartait avec
     // une copie de corbeille sans aucune de ses étiquettes.
     const tagsProprietaire = getUserTags(id, req.user.id);
+    // Icon is personal too, same as the tags above.
+    const iconProprietaire = getUserIcon(id, req.user.id);
     const trashedCopyId = uid();
     runInsertNote({
       id: trashedCopyId,
@@ -4046,10 +4060,18 @@ app.post("/api/notes/:id/trash", auth, (req, res) => {
     if (tagsProprietaire && tagsProprietaire !== "[]") {
       runUpsertUserTags(trashedCopyId, req.user.id, tagsProprietaire);
     }
+    if (iconProprietaire) {
+      runSetUserIcon(trashedCopyId, req.user.id, iconProprietaire);
+    }
     db.prepare("UPDATE notes SET user_id = ? WHERE id = ?").run(newOwner.id, id);
     db.prepare("DELETE FROM note_collaborators WHERE note_id = ? AND user_id = ?").run(id, newOwner.id);
     db.prepare("DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
     db.prepare("DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?").run(id, req.user.id);
+    // Same leftover-icon risk as a plain collaborator removal: without
+    // this, the departing owner's icon row survives on a note they no
+    // longer have any access to, and would resurface unchanged if they
+    // were ever added back as a collaborator on it.
+    deleteUserIconStmt.run(id, req.user.id);
     broadcastNoteUpdated(id);
     // The note was handed over to this collaborator (they keep it / become its
     // owner). Persist a notice so they actually learn the owner deleted the

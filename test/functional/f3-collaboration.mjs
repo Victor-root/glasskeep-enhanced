@@ -666,6 +666,10 @@ try {
   await inst.call("PATCH", "/api/notes/n-copie", {
     token: bob.token, body: { tags: ["perso-bob"], client_updated_at: nextIso() },
   });
+  await inst.call("PUT", "/api/notes/n-copie/icon", {
+    token: bob.token,
+    body: { icon: { id: "ic-copie", src: "data:image/png;base64,iVBORw0KGgo=", name: "copie.png" } },
+  });
 
   const avecCopie = await inst.call("DELETE", `/api/notes/n-copie/collaborate/${bob.id}`, {
     token: alice.token, body: { mode: "keep_copy" },
@@ -708,6 +712,14 @@ try {
       `colonne partagée=${j(colonnePartagee)}`,
     );
   }
+  // Même exigence pour l'icône que pour les étiquettes juste au-dessus:
+  // personnelle au retiré, elle doit suivre sa copie plutôt que rester
+  // accrochée à une note qu'il ne peut plus voir.
+  t.check(
+    "le retiré retrouve aussi l'icône personnelle qu'il avait posée",
+    same(copie?.icon, { id: "ic-copie", src: "data:image/png;base64,iVBORw0KGgo=", name: "copie.png" }),
+    `icône lue=${j(copie?.icon)}`,
+  );
 
   const originalPerdu = await inst.call("GET", "/api/notes/n-copie", { token: bob.token });
   t.check(
@@ -877,6 +889,9 @@ try {
     await inst.call("PATCH", "/api/notes/n-adieu-a", {
       token: bob.token, body: { tags: ["à-moi-bob"], client_updated_at: nextIso() },
     });
+    await inst.call("PUT", "/api/notes/n-adieu-a/icon", {
+      token: bob.token, body: { icon: { id: "ic-adieu-bob", src: "data:image/png;base64,iVBORw0KGgo=", name: "b.png" } },
+    });
     const jetParBob = await inst.call("POST", "/api/notes/n-adieu-a/trash", {
       token: bob.token, body: { client_updated_at: nextIso() },
     });
@@ -886,11 +901,19 @@ try {
       jetParBob.json?.left === true && same(copieBob?.tags, ["à-moi-bob"]),
       `copie=${j(copieBob && { id: copieBob.id, tags: copieBob.tags })}`,
     );
+    t.check(
+      "et son icône personnelle avec, pas seulement ses étiquettes",
+      same(copieBob?.icon, { id: "ic-adieu-bob", src: "data:image/png;base64,iVBORw0KGgo=", name: "b.png" }),
+      `icône=${j(copieBob?.icon)}`,
+    );
 
     // Le propriétaire s'en va et passe la main au collaborateur.
     await creerNote(alice, { id: "n-adieu-b", title: "Adieu propriétaire", content: "c", position: 140 });
     await inst.call("PATCH", "/api/notes/n-adieu-b", {
       token: alice.token, body: { tags: ["à-moi-alice"], client_updated_at: nextIso() },
+    });
+    await inst.call("PUT", "/api/notes/n-adieu-b/icon", {
+      token: alice.token, body: { icon: { id: "ic-adieu-alice", src: "data:image/png;base64,iVBORw0KGgo=", name: "a.png" } },
     });
     await partager(alice, "n-adieu-b", bob.email, "write");
     const departAlice = await inst.call("POST", "/api/notes/n-adieu-b/trash", {
@@ -898,6 +921,15 @@ try {
     });
     const copieAlice = departAlice.json?.trashedCopy;
     const nouveauProprio = await inst.call("GET", "/api/notes/n-adieu-b", { token: bob.token });
+    const iconeAliceRestante = enBase((b) => b
+      .prepare("SELECT COUNT(*) c FROM note_user_icons WHERE note_id = ? AND user_id = ?")
+      .get("n-adieu-b", alice.id).c);
+    t.check(
+      "et l'icône de la propriétaire qui part ne traîne pas non plus sur la note léguée",
+      same(copieAlice?.icon, { id: "ic-adieu-alice", src: "data:image/png;base64,iVBORw0KGgo=", name: "a.png" })
+        && iconeAliceRestante === 0,
+      `copie=${j(copieAlice?.icon)}, ligne restante chez l'ex-propriétaire=${iconeAliceRestante}`,
+    );
     t.check(
       "le propriétaire qui s'en va garde les siennes, et la note vit sa vie chez le collaborateur",
       departAlice.json?.left === true && same(copieAlice?.tags, ["à-moi-alice"])
