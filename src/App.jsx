@@ -101,6 +101,14 @@ export default function App() {
   const currentUser = session?.user || null;
   const sessionId = session?.sessionId || null;
 
+  // Mirrors a profile field (avatar, name...) into the live session and
+  // the localStorage auth cache, from either this tab's own write or a
+  // user_profile_updated event relayed from another tab/device.
+  const applyProfileUpdate = useCallback((updates) => {
+    setSession((prev) => (prev ? { ...prev, user: { ...prev.user, ...updates } } : prev));
+    setAuth({ ...getAuth(), user: { ...getAuth()?.user, ...updates } });
+  }, []);
+
   // Password change state
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
@@ -1376,6 +1384,10 @@ export default function App() {
     } catch (e) {}
     // Only sync to server after initial load from server is done
     if (!sidebarSettingsLoadedRef.current) return;
+    if (remoteSyncedKeysRef.current.has("alwaysShowSidebarOnWide")) {
+      remoteSyncedKeysRef.current.delete("alwaysShowSidebarOnWide");
+      return;
+    }
     if (token) {
       api("/user/settings", {
         method: "PATCH",
@@ -1390,6 +1402,10 @@ export default function App() {
       localStorage.setItem("sidebarBreakpoint", String(sidebarBreakpoint));
     } catch (e) {}
     if (!sidebarSettingsLoadedRef.current) return;
+    if (remoteSyncedKeysRef.current.has("sidebarBreakpoint")) {
+      remoteSyncedKeysRef.current.delete("sidebarBreakpoint");
+      return;
+    }
     if (token) {
       api("/user/settings", {
         method: "PATCH",
@@ -1422,6 +1438,10 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem("floatingCardsEnabled", String(floatingCardsEnabled)); } catch (e) {}
     if (!sidebarSettingsLoadedRef.current) return;
+    if (remoteSyncedKeysRef.current.has("floatingCardsEnabled")) {
+      remoteSyncedKeysRef.current.delete("floatingCardsEnabled");
+      return;
+    }
     if (token) {
       api("/user/settings", {
         method: "PATCH",
@@ -1493,6 +1513,10 @@ export default function App() {
       localStorage.setItem("checklistInsertPosition", checklistInsertPosition);
     } catch (e) {}
     if (!sidebarSettingsLoadedRef.current) return;
+    if (remoteSyncedKeysRef.current.has("checklistInsertPosition")) {
+      remoteSyncedKeysRef.current.delete("checklistInsertPosition");
+      return;
+    }
     if (token) {
       api("/user/settings", {
         method: "PATCH",
@@ -1507,6 +1531,10 @@ export default function App() {
       localStorage.setItem("checklistRemoveSectionBehavior", checklistRemoveSectionBehavior);
     } catch (e) {}
     if (!sidebarSettingsLoadedRef.current) return;
+    if (remoteSyncedKeysRef.current.has("checklistRemoveSectionBehavior")) {
+      remoteSyncedKeysRef.current.delete("checklistRemoveSectionBehavior");
+      return;
+    }
     if (token) {
       api("/user/settings", {
         method: "PATCH",
@@ -1519,6 +1547,10 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem("editorToolbarMode", editorToolbarMode); } catch (e) {}
     if (!sidebarSettingsLoadedRef.current) return;
+    if (remoteSyncedKeysRef.current.has("editorToolbarMode")) {
+      remoteSyncedKeysRef.current.delete("editorToolbarMode");
+      return;
+    }
     if (token) {
       api("/user/settings", {
         method: "PATCH",
@@ -1670,6 +1702,10 @@ export default function App() {
     try { localStorage.setItem("edgeToEdgeLandscape", String(edgeToEdgeLandscape)); } catch (e) {}
     document.body.style.paddingLeft = edgeToEdgeLandscape ? "" : "var(--safe-left)";
     if (!sidebarSettingsLoadedRef.current) return;
+    if (remoteSyncedKeysRef.current.has("edgeToEdgeLandscape")) {
+      remoteSyncedKeysRef.current.delete("edgeToEdgeLandscape");
+      return;
+    }
     if (token) {
       api("/user/settings", {
         method: "PATCH",
@@ -1683,6 +1719,10 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(typographyPresets)); } catch (e) {}
     if (!sidebarSettingsLoadedRef.current) return;
+    if (remoteSyncedKeysRef.current.has("typographyPresets")) {
+      remoteSyncedKeysRef.current.delete("typographyPresets");
+      return;
+    }
     if (token) {
       api("/user/settings", {
         method: "PATCH",
@@ -3642,6 +3682,88 @@ export default function App() {
                   try { localStorage.setItem("gk:taskStrikeChecked", v ? "1" : "0"); } catch (_) {}
                 }
               }
+              if (keys.has("alwaysShowSidebarOnWide")) {
+                const v = settings.alwaysShowSidebarOnWide;
+                if (typeof v === "boolean") {
+                  mark("alwaysShowSidebarOnWide");
+                  setAlwaysShowSidebarOnWide(v);
+                  try { localStorage.setItem("sidebarAlwaysVisible", String(v)); } catch (_) {}
+                }
+              }
+              if (keys.has("sidebarBreakpoint")) {
+                const v = settings.sidebarBreakpoint;
+                if (Number.isFinite(Number(v))) {
+                  mark("sidebarBreakpoint");
+                  setSidebarBreakpoint(v);
+                  try { localStorage.setItem("sidebarBreakpoint", String(Number(v))); } catch (_) {}
+                }
+              }
+              if (keys.has("floatingCardsEnabled")) {
+                const v = settings.floatingCardsEnabled;
+                if (typeof v === "boolean") {
+                  mark("floatingCardsEnabled");
+                  setFloatingCardsEnabled(v);
+                  try { localStorage.setItem("floatingCardsEnabled", String(v)); } catch (_) {}
+                }
+              }
+              if (keys.has("checklistInsertPosition")) {
+                const v = settings.checklistInsertPosition;
+                if (v) {
+                  mark("checklistInsertPosition");
+                  setChecklistInsertPosition(v);
+                  try { localStorage.setItem("checklistInsertPosition", v); } catch (_) {}
+                }
+              }
+              if (keys.has("checklistRemoveSectionBehavior")) {
+                const v = settings.checklistRemoveSectionBehavior;
+                if (v === "keep" || v === "cascade") {
+                  mark("checklistRemoveSectionBehavior");
+                  setChecklistRemoveSectionBehavior(v);
+                  try { localStorage.setItem("checklistRemoveSectionBehavior", v); } catch (_) {}
+                }
+              }
+              if (keys.has("editorToolbarMode")) {
+                const v = settings.editorToolbarMode;
+                if (v === "simple" || v === "advanced") {
+                  mark("editorToolbarMode");
+                  setEditorToolbarMode(v);
+                  try { localStorage.setItem("editorToolbarMode", v); } catch (_) {}
+                }
+              }
+              if (keys.has("edgeToEdgeLandscape")) {
+                const v = settings.edgeToEdgeLandscape;
+                if (typeof v === "boolean") {
+                  mark("edgeToEdgeLandscape");
+                  setEdgeToEdgeLandscape(v);
+                  try { localStorage.setItem("edgeToEdgeLandscape", String(v)); } catch (_) {}
+                }
+              }
+              if (keys.has("typographyPresets")) {
+                const v = settings.typographyPresets;
+                if (v && typeof v === "object") {
+                  const normalized = normalizeTypographyPresets(v);
+                  mark("typographyPresets");
+                  setTypographyPresets(normalized);
+                  try { localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(normalized)); } catch (_) {}
+                }
+              }
+              // Quick-QR toggle and reminder-time chips are written from a
+              // callback that PATCHes the server directly (like shellTheme
+              // above), not from a useEffect watching the state — so
+              // applying them here has no outbound write to echo-suppress.
+              if (keys.has("qrQuickEnabled")) {
+                const v = settings.qrQuickEnabled;
+                if (typeof v === "boolean") {
+                  setQrQuickEnabledState(v);
+                  try { localStorage.setItem("glass-keep-qr-quick", v ? "1" : "0"); } catch (_) {}
+                }
+              }
+              if (keys.has("reminderTimeChips")) {
+                const v = settings.reminderTimeChips;
+                if (Array.isArray(v) && v.length > 0) {
+                  setReminderTimeChips(v);
+                }
+              }
             };
 
             if (msg && msg.type === "instance_locked") {
@@ -3887,6 +4009,53 @@ export default function App() {
                 // Our own write — server confirmed it, nothing else to do.
               } else {
                 applyRemoteUserSettings(msg.settings);
+              }
+            } else if (msg && msg.type === "user_profile_updated" && msg.profile) {
+              // Live sync for the profile fields that live outside the
+              // settings blob (/api/user/settings): whether the account
+              // shows up on the login screen, the interface language, and
+              // the avatar (/api/user/profile and /api/user/avatar). Same
+              // echo-skip as user_settings_updated above.
+              if (!(msg.originClientId && msg.originClientId === getClientId())) {
+                if (typeof msg.profile.language === "string") {
+                  if (syncLanguageFromServer(msg.profile.language)) window.location.reload();
+                }
+                if (typeof msg.profile.show_on_login === "boolean") {
+                  try {
+                    window.dispatchEvent(
+                      new CustomEvent("user-profile-updated", { detail: msg.profile }),
+                    );
+                  } catch (_) { /* bus is best-effort */ }
+                }
+                if (
+                  "avatar_url" in msg.profile &&
+                  (msg.profile.avatar_url === null || typeof msg.profile.avatar_url === "string")
+                ) {
+                  applyProfileUpdate({ avatar_url: msg.profile.avatar_url });
+                }
+              }
+            } else if (msg && msg.type === "user_ai_settings_updated" && msg.settings) {
+              // Live sync of the personal AI settings (/api/user/ai/settings)
+              // — enable/mode/provider — to every other session of this
+              // user. Setting state directly here never re-triggers a
+              // PATCH, so no echo-skip is needed beyond ignoring our own
+              // write (the sender already applied it locally on success).
+              if (!(msg.originClientId && msg.originClientId === getClientId())) {
+                try {
+                  window.dispatchEvent(
+                    new CustomEvent("user-ai-settings-updated", { detail: msg.settings }),
+                  );
+                } catch (_) { /* bus is best-effort */ }
+              }
+            } else if (msg && msg.type === "admin_ai_settings_updated" && msg.settings) {
+              // Live sync of the shared/server AI configuration to every
+              // other connected admin, mirroring admin_settings_updated.
+              if (currentUserRef.current?.is_admin) {
+                try {
+                  window.dispatchEvent(
+                    new CustomEvent("admin-ai-settings-updated", { detail: msg.settings }),
+                  );
+                } catch (_) { /* bus is best-effort */ }
               }
             } else if (msg && msg.type === "user_deleted_notification") {
               // Audit notification for OTHER admins: someone got
@@ -7444,10 +7613,7 @@ export default function App() {
         onResetNoteOrder={resetNoteOrder}
         currentUser={currentUser}
         token={token}
-        onProfileUpdated={(updates) => {
-          setSession((prev) => prev ? { ...prev, user: { ...prev.user, ...updates } } : prev);
-          setAuth({ ...getAuth(), user: { ...getAuth()?.user, ...updates } });
-        }}
+        onProfileUpdated={applyProfileUpdate}
         onChangePassword={() => setChangePasswordOpen(true)}
         openQrScanner={openQrScanner}
         qrQuickEnabled={qrQuickEnabled}

@@ -147,6 +147,25 @@ MUTATIONS = [
      "    deleteUserIconStmt.run(id, req.user.id);",
      "    void 0;"),
 
+    ("f4", "la diffusion en direct d'un changement de profil aux autres onglets",
+     '  sendEventToUser(req.user.id, {\n    type: "user_profile_updated",\n    profile,\n    originClientId,\n  });',
+     ""),
+    ("f4", "la diffusion en direct d'une nouvelle photo aux autres onglets",
+     '  sendEventToUser(req.user.id, {\n    type: "user_profile_updated",\n    profile: { avatar_url },\n    originClientId: req.headers["x-client-id"] || req.headers["X-Client-Id"] || null,\n  });',
+     ""),
+    ("f4", "la diffusion en direct du retrait de la photo aux autres onglets",
+     '  sendEventToUser(req.user.id, {\n    type: "user_profile_updated",\n    profile: { avatar_url: null },\n    originClientId: req.headers["x-client-id"] || req.headers["X-Client-Id"] || null,\n  });',
+     ""),
+
+    ("f4", "la diffusion en direct des réglages IA personnels aux autres onglets",
+     '      sendEventToUser(req.user.id, {\n        type: "user_ai_settings_updated",\n        settings: updated,\n        originClientId: req.headers["x-client-id"] || req.headers["X-Client-Id"] || null,\n      });',
+     "",
+     "server/ai/aiRoutes.js"),
+    ("f5", "la diffusion en direct des réglages IA de l'instance aux autres administrateurs",
+     '      broadcastToAdmins({ type: "admin_ai_settings_updated", settings: updated });',
+     "",
+     "server/ai/aiRoutes.js"),
+
     # Le domaine des passkeys: déclaré une fois depuis le panneau, jamais
     # pris dans la requête, et il doit tenir d'un démarrage à l'autre.
     ("f5", "le refus de prendre le domaine dans une requête publique",

@@ -443,6 +443,38 @@ try {
   );
 
   // ───────────────────────────────────────────────────────────────────
+  // 9. Les réglages IA de l'instance: eux aussi vivent sur leur propre
+  //    route, dans leur propre module (server/ai/aiRoutes.js). Un
+  //    administrateur qui les change doit prévenir tout de suite les
+  //    autres administrateurs connectés, pas seulement lui-même.
+  // ───────────────────────────────────────────────────────────────────
+  const collegue = await createAndLogin(inst, {
+    name: "Collègue", email: "collegue@glasskeep.test", password: "Passw0rd-collegue", isAdmin: true,
+  });
+  const ecouteCollegue = await listenEvents(inst, collegue.token);
+  flux.push(ecouteCollegue);
+  await ecouteCollegue.waitFor((e) => e.type === "hello");
+
+  await inst.call("PUT", "/api/admin/ai/settings", {
+    token: chef.token,
+    body: { enabled: true, baseUrl: "https://ia-partagee.exemple.fr", model: "grand-modele", apiKey: "secret-de-chef" },
+    headers: { "x-client-id": "onglet-chef" },
+  });
+  const iaAdminVue = await ecouteCollegue.waitFor((e) => e.data?.type === "admin_ai_settings_updated");
+  t.check(
+    "un autre administrateur connecté apprend tout de suite le changement de fournisseur IA",
+    iaAdminVue?.data?.settings?.enabled === true
+      && iaAdminVue?.data?.settings?.baseUrl === "https://ia-partagee.exemple.fr",
+    `reçu=${j(iaAdminVue?.data)}`,
+  );
+  t.check(
+    "et là non plus la clé ne voyage pas, seul le drapeau la signale",
+    iaAdminVue?.data?.settings?.hasApiKey === true
+      && !("apiKey" in (iaAdminVue?.data?.settings || {})),
+    `settings=${j(iaAdminVue?.data?.settings)}`,
+  );
+
+  // ───────────────────────────────────────────────────────────────────
   // 6. Le domaine des passkeys.
   //
   // Derrière un proxy, le seul endroit où le domaine apparaît est un

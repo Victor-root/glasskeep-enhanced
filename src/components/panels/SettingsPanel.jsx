@@ -201,6 +201,19 @@ export default function SettingsPanel({
     }
   }, [open, token]);
 
+  // Live cross-tab/cross-device sync: App.jsx forwards the
+  // user_profile_updated SSE event here (show_on_login has no useEffect
+  // of its own to re-trigger, so no echo-suppression is needed).
+  React.useEffect(() => {
+    const onProfileUpdated = (e) => {
+      if (typeof e.detail?.show_on_login === "boolean") {
+        setProfileShowOnLogin(e.detail.show_on_login);
+      }
+    };
+    window.addEventListener("user-profile-updated", onProfileUpdated);
+    return () => window.removeEventListener("user-profile-updated", onProfileUpdated);
+  }, []);
+
   const handleLanguageChange = async (next) => {
     const previous = languageChoice;
     if (next === previous) return;

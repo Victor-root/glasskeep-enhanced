@@ -237,6 +237,93 @@ try {
     `settings=${j(vuParB?.data?.settings)}`,
   );
 
+  // /api/user/profile (visibilité sur l'écran de connexion, langue) vit
+  // en dehors du sac de réglages ci-dessus, sur sa propre route: même
+  // exigence de diffusion en direct aux autres onglets.
+  await inst.call("PATCH", "/api/user/profile", {
+    token: moi.token, body: { show_on_login: false },
+    headers: { "x-client-id": "onglet-A" },
+  });
+  const profilVuParA = await ongletA.waitFor((e) => e.data?.type === "user_profile_updated");
+  const profilVuParB = await ongletB.waitFor((e) => e.data?.type === "user_profile_updated");
+  t.check(
+    "l'autre onglet apprend aussi qu'on s'est retiré de l'écran de connexion",
+    profilVuParB?.data?.profile?.show_on_login === false,
+    `reçu=${j(profilVuParB?.data)}`,
+  );
+  t.check(
+    "et l'onglet émetteur reconnaît son propre écho de la même façon que pour les réglages",
+    profilVuParA?.data?.originClientId === "onglet-A" && profilVuParB?.data?.originClientId === "onglet-A",
+    `A=${j(profilVuParA?.data?.originClientId)}, B=${j(profilVuParB?.data?.originClientId)}`,
+  );
+  t.check(
+    "le message ne transporte que le champ réellement changé, pas la langue avec",
+    profilVuParB?.data?.profile && Object.keys(profilVuParB.data.profile).join(",") === "show_on_login",
+    `profile=${j(profilVuParB?.data?.profile)}`,
+  );
+
+  // La photo (/api/user/avatar) est encore une route à part, qui ne
+  // prévenait avant que les serveurs fédérés, jamais les autres onglets
+  // du même compte.
+  await inst.call("PUT", "/api/user/avatar", {
+    token: moi.token, body: { avatar_url: AVATAR },
+    headers: { "x-client-id": "onglet-A" },
+  });
+  const avatarVuParB = await ongletB.waitFor((e) => e.data?.type === "user_profile_updated"
+    && "avatar_url" in (e.data?.profile || {}));
+  t.check(
+    "poser une nouvelle photo se voit tout de suite dans l'autre onglet",
+    avatarVuParB?.data?.profile?.avatar_url === AVATAR,
+    `reçu=${j(avatarVuParB?.data)}`,
+  );
+
+  await inst.call("DELETE", "/api/user/avatar", {
+    token: moi.token, headers: { "x-client-id": "onglet-A" },
+  });
+  const retraitVuParB = await ongletB.waitFor((e) => e.data?.type === "user_profile_updated"
+    && e.data?.profile?.avatar_url === null);
+  t.check(
+    "et la retirer se voit tout aussi vite",
+    retraitVuParB?.data?.profile?.avatar_url === null,
+    `reçu=${j(retraitVuParB?.data)}`,
+  );
+
+  // /api/user/ai/settings vit encore sur sa propre route, dans son propre
+  // module (server/ai/aiRoutes.js): même exigence de diffusion en direct,
+  // et surtout la clé ne doit jamais y voyager en clair.
+  const aiParDefaut = await inst.call("GET", "/api/user/ai/settings", { token: moi.token });
+  t.check(
+    "un compte neuf n'a pas activé l'IA personnelle",
+    aiParDefaut.status === 200 && aiParDefaut.json?.enabled === false
+      && aiParDefaut.json?.hasApiKey === false,
+    `http ${aiParDefaut.status}, corps=${bout(aiParDefaut.text)}`,
+  );
+
+  await inst.call("PUT", "/api/user/ai/settings", {
+    token: moi.token,
+    body: { enabled: true, mode: "custom", baseUrl: "https://ia.exemple.fr", model: "petit-modele", apiKey: "secret-de-camille" },
+    headers: { "x-client-id": "onglet-A" },
+  });
+  const iaVueParA = await ongletA.waitFor((e) => e.data?.type === "user_ai_settings_updated");
+  const iaVueParB = await ongletB.waitFor((e) => e.data?.type === "user_ai_settings_updated");
+  t.check(
+    "l'autre onglet apprend que l'IA personnalisée vient d'être activée",
+    iaVueParB?.data?.settings?.enabled === true && iaVueParB?.data?.settings?.mode === "custom"
+      && iaVueParB?.data?.settings?.baseUrl === "https://ia.exemple.fr",
+    `reçu=${j(iaVueParB?.data)}`,
+  );
+  t.check(
+    "la clé elle-même ne voyage jamais, seul un drapeau dit qu'elle existe",
+    iaVueParB?.data?.settings?.hasApiKey === true
+      && !("apiKey" in (iaVueParB?.data?.settings || {})),
+    `settings=${j(iaVueParB?.data?.settings)}`,
+  );
+  t.check(
+    "l'onglet émetteur reconnaît aussi son propre écho ici",
+    iaVueParA?.data?.originClientId === "onglet-A" && iaVueParB?.data?.originClientId === "onglet-A",
+    `A=${j(iaVueParA?.data?.originClientId)}, B=${j(iaVueParB?.data?.originClientId)}`,
+  );
+
   // ───────────────────────────────────────────────────────────────────
   // 4. Les rappels: posés, listés, effacés, et vraiment déclenchés.
   // ───────────────────────────────────────────────────────────────────

@@ -2312,6 +2312,11 @@ app.put("/api/user/avatar", auth, (req, res) => {
   }
   db.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").run(avatar_url, req.user.id);
   pushProfileToPeers(req.user.id, avatar_url);
+  sendEventToUser(req.user.id, {
+    type: "user_profile_updated",
+    profile: { avatar_url },
+    originClientId: req.headers["x-client-id"] || req.headers["X-Client-Id"] || null,
+  });
   res.json({ ok: true, avatar_url });
 });
 
@@ -2319,6 +2324,11 @@ app.put("/api/user/avatar", auth, (req, res) => {
 app.delete("/api/user/avatar", auth, (req, res) => {
   db.prepare("UPDATE users SET avatar_url = NULL WHERE id = ?").run(req.user.id);
   pushProfileToPeers(req.user.id, null);
+  sendEventToUser(req.user.id, {
+    type: "user_profile_updated",
+    profile: { avatar_url: null },
+    originClientId: req.headers["x-client-id"] || req.headers["X-Client-Id"] || null,
+  });
   res.json({ ok: true });
 });
 
@@ -2426,6 +2436,26 @@ app.patch("/api/user/profile", auth, (req, res) => {
   db.prepare(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`).run(...params);
 
   const user = getUserById.get(req.user.id);
+
+  // Live-sync to every connected session of this user, the same way
+  // /api/user/settings does: only the fields that were actually
+  // patched, tagged with the originating tab so it can ignore its own
+  // echo instead of re-applying (and re-broadcasting) its own write.
+  const originClientId =
+    req.headers["x-client-id"] || req.headers["X-Client-Id"] || null;
+  const profile = {};
+  if (Object.prototype.hasOwnProperty.call(body, "show_on_login")) {
+    profile.show_on_login = user.show_on_login !== 0;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "language")) {
+    profile.language = user.language || null;
+  }
+  sendEventToUser(req.user.id, {
+    type: "user_profile_updated",
+    profile,
+    originClientId,
+  });
+
   res.json({
     ok: true,
     show_on_login: user.show_on_login !== 0,
@@ -5427,7 +5457,7 @@ app.post("/api/admin/shutdown", auth, adminOnly, (_req, res) => {
 
 // ---------- AI Assistant (OpenAI-compatible provider) ----------
 // All AI endpoints (admin settings + user chat) live in server/ai/.
-attachAiRoutes(app, { db, auth, adminOnly });
+attachAiRoutes(app, { db, auth, adminOnly, sendEventToUser, broadcastToAdmins });
 
 // ---------- Health ----------
 app.get("/api/health", (_req, res) => res.json({

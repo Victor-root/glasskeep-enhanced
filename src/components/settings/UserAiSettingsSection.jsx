@@ -57,6 +57,39 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
     onEnabledChangeRef.current = onEnabledChange;
   }, [onEnabledChange]);
 
+  // Shared by the initial load, every local save, and a
+  // user_ai_settings_updated event relayed from another tab/device — one
+  // place applies the server's response to local state.
+  const applyConfig = (data) => {
+    setEnabled(!!data.enabled);
+    setMode(data.mode === "custom" ? "custom" : "server");
+    setServerAiAvailable(!!data.serverAiAvailable);
+    setAdminAiEnabled(data.adminAiEnabled !== false);
+    setBaseUrl(data.baseUrl || "");
+    setModel(data.model || "");
+    setHasApiKey(!!data.hasApiKey);
+    setApiKeyDraft("");
+    setTemperature(
+      typeof data.temperature === "number" ? data.temperature : 0.3,
+    );
+    setMaxTokens(
+      typeof data.maxTokens === "number" ? data.maxTokens : 800,
+    );
+    onEnabledChangeRef.current?.(
+      !!data.enabled && data.adminAiEnabled !== false,
+    );
+  };
+  const applyConfigRef = useRef(applyConfig);
+  applyConfigRef.current = applyConfig;
+
+  useEffect(() => {
+    const onRemote = (e) => {
+      if (e.detail) applyConfigRef.current(e.detail);
+    };
+    window.addEventListener("user-ai-settings-updated", onRemote);
+    return () => window.removeEventListener("user-ai-settings-updated", onRemote);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     if (!token) return undefined;
@@ -65,23 +98,7 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
       try {
         const data = await api("/user/ai/settings", { token });
         if (cancelled) return;
-        setEnabled(!!data.enabled);
-        setMode(data.mode === "custom" ? "custom" : "server");
-        setServerAiAvailable(!!data.serverAiAvailable);
-        setAdminAiEnabled(data.adminAiEnabled !== false);
-        setBaseUrl(data.baseUrl || "");
-        setModel(data.model || "");
-        setHasApiKey(!!data.hasApiKey);
-        setApiKeyDraft("");
-        setTemperature(
-          typeof data.temperature === "number" ? data.temperature : 0.3,
-        );
-        setMaxTokens(
-          typeof data.maxTokens === "number" ? data.maxTokens : 800,
-        );
-        onEnabledChangeRef.current?.(
-          !!data.enabled && data.adminAiEnabled !== false,
-        );
+        applyConfig(data);
       } catch (err) {
         // Background load: this panel mounts (and fetches) even while the
         // Settings panel is closed, so a failed initial fetch must stay
@@ -123,21 +140,7 @@ export default function UserAiSettingsSection({ token, showToast, onEnabledChang
         token,
         body: patch,
       });
-      setEnabled(!!data.enabled);
-      setMode(data.mode === "custom" ? "custom" : "server");
-      setServerAiAvailable(!!data.serverAiAvailable);
-      setAdminAiEnabled(data.adminAiEnabled !== false);
-      setBaseUrl(data.baseUrl || "");
-      setModel(data.model || "");
-      setHasApiKey(!!data.hasApiKey);
-      setApiKeyDraft("");
-      setTemperature(
-        typeof data.temperature === "number" ? data.temperature : 0.3,
-      );
-      setMaxTokens(typeof data.maxTokens === "number" ? data.maxTokens : 800);
-      onEnabledChangeRef.current?.(
-        !!data.enabled && data.adminAiEnabled !== false,
-      );
+      applyConfig(data);
       return data;
     } finally {
       setSaving(false);

@@ -45,6 +45,36 @@ export default function AiAdminSection({ token, showToast }) {
   // user about whether they're about to clear an existing key.
   const baselineRef = useRef(null);
 
+  // Shared by the initial load, every local save, and an
+  // admin_ai_settings_updated event relayed from another admin's tab —
+  // one place applies the server's response to local state.
+  const applyConfig = (data) => {
+    setEnabled(!!data.enabled);
+    setAllowServerAiForUsers(!!data.allowServerAiForUsers);
+    setAllowPrivateAiForUsers(!!data.allowPrivateAiForUsers);
+    setBaseUrl(data.baseUrl || "");
+    setModel(data.model || "");
+    setHasApiKey(!!data.hasApiKey);
+    setApiKeyDraft("");
+    setTemperature(
+      typeof data.temperature === "number" ? data.temperature : 0.3,
+    );
+    setMaxTokens(
+      typeof data.maxTokens === "number" ? data.maxTokens : 800,
+    );
+    baselineRef.current = data;
+  };
+  const applyConfigRef = useRef(applyConfig);
+  applyConfigRef.current = applyConfig;
+
+  useEffect(() => {
+    const onRemote = (e) => {
+      if (e.detail) applyConfigRef.current(e.detail);
+    };
+    window.addEventListener("admin-ai-settings-updated", onRemote);
+    return () => window.removeEventListener("admin-ai-settings-updated", onRemote);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -52,20 +82,7 @@ export default function AiAdminSection({ token, showToast }) {
       try {
         const data = await api("/admin/ai/settings", { token });
         if (cancelled) return;
-        setEnabled(!!data.enabled);
-        setAllowServerAiForUsers(!!data.allowServerAiForUsers);
-        setAllowPrivateAiForUsers(!!data.allowPrivateAiForUsers);
-        setBaseUrl(data.baseUrl || "");
-        setModel(data.model || "");
-        setHasApiKey(!!data.hasApiKey);
-        setApiKeyDraft("");
-        setTemperature(
-          typeof data.temperature === "number" ? data.temperature : 0.3,
-        );
-        setMaxTokens(
-          typeof data.maxTokens === "number" ? data.maxTokens : 800,
-        );
-        baselineRef.current = data;
+        applyConfig(data);
       } catch (err) {
         // Background load: mounts (and fetches) with the admin panel even
         // when closed, so a failed initial fetch stays silent instead of
@@ -110,17 +127,7 @@ export default function AiAdminSection({ token, showToast }) {
         token,
         body: buildPatch(),
       });
-      setEnabled(!!data.enabled);
-      setAllowServerAiForUsers(!!data.allowServerAiForUsers);
-      setBaseUrl(data.baseUrl || "");
-      setModel(data.model || "");
-      setHasApiKey(!!data.hasApiKey);
-      setApiKeyDraft("");
-      setTemperature(
-        typeof data.temperature === "number" ? data.temperature : 0.2,
-      );
-      setMaxTokens(typeof data.maxTokens === "number" ? data.maxTokens : 800);
-      baselineRef.current = data;
+      applyConfig(data);
       showToast?.(t("aiSettingsSaved"), "success");
     } catch (err) {
       showToast?.(localizeServerError(err?.message, "saveFailed"), "error");
@@ -140,10 +147,7 @@ export default function AiAdminSection({ token, showToast }) {
         token,
         body: patch,
       });
-      setEnabled(!!data.enabled);
-      setAllowServerAiForUsers(!!data.allowServerAiForUsers);
-      setHasApiKey(!!data.hasApiKey);
-      baselineRef.current = data;
+      applyConfig(data);
     } catch (err) {
       showToast?.(localizeServerError(err?.message, "saveFailed"), "error");
     } finally {
@@ -195,9 +199,7 @@ export default function AiAdminSection({ token, showToast }) {
         token,
         body: { apiKey: "" },
       });
-      setHasApiKey(!!data.hasApiKey);
-      setApiKeyDraft("");
-      baselineRef.current = data;
+      applyConfig(data);
       showToast?.(t("aiApiKeyCleared"), "success");
     } catch (err) {
       showToast?.(localizeServerError(err?.message, "saveFailed"), "error");
