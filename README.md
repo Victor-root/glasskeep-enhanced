@@ -1,7 +1,5 @@
 <div align="center">
 
-🌐 [Français](./docs/README.fr.md)
-
 [![Latest release](https://img.shields.io/github/v/release/Victor-root/glasskeep-enhanced?style=for-the-badge\&logo=github\&label=release)](https://github.com/Victor-root/glasskeep-enhanced/releases)
 [![Last update](https://img.shields.io/github/last-commit/Victor-root/glasskeep-enhanced/main?style=for-the-badge\&logo=git\&label=last%20update)](https://github.com/Victor-root/glasskeep-enhanced/commits/main)
 [![Active development](https://img.shields.io/badge/Active-development-2ea44f?style=for-the-badge\&logo=rocket\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/commits/main)
@@ -12,6 +10,11 @@
 [![Android TV](https://img.shields.io/badge/Android%20TV-supported-3DDC84?style=for-the-badge\&logo=androidtv\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.5.0/GlassKeep-v1.4.6.apk)
 [![PWA](https://img.shields.io/badge/PWA-ready-5A0FC8?style=for-the-badge\&logo=pwa\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced)
 
+<a href="https://victor-root.github.io/glasskeep-enhanced/"><picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/website-dark.webp"><img width="820" alt="The GlassKeep website: the feature list, real screenshots, the six workspace themes, and the install instructions" src=".github/assets/website-light.webp" /></picture></a>
+
+**[victor-root.github.io/glasskeep-enhanced](https://victor-root.github.io/glasskeep-enhanced/)** has the full
+feature list with real screenshots, the six workspace themes in light and dark, and the install instructions.
+
 </div>
 
 # ✨ GlassKeep
@@ -19,55 +22,6 @@
 > A self-hosted, local-first notes app focused on offline support, safer note management, mobile usability, straightforward self-hosting, and a native Android companion app.
 >
 > Originally based on [Glass Keep](https://github.com/nikunjsingh93/react-glass-keep).
-
----
-
-## 📸 Screenshots
-
-### 🖥️ Desktop
-
-<table width="100%">
-  <tr>
-    <td><img src="https://github.com/user-attachments/assets/e9fa11e1-a91a-4058-b588-673f71f8fcf0" width="100%" /></td>
-    <td><img src="https://github.com/user-attachments/assets/98919346-5fef-4768-9853-a1c1cbc9441c" width="100%" /></td>
-  </tr>
-  <tr>
-    <td><img src="https://github.com/user-attachments/assets/97e8935d-e9dd-4cfa-b501-101c3d36c67e" width="100%" /></td>
-    <td><img src="https://github.com/user-attachments/assets/9d10b4ad-f432-4d9d-a5ba-2fe86ea11c6d" width="100%" /></td>
-  </tr>
-  <tr>
-    <td><img src="https://github.com/user-attachments/assets/2f737586-31b8-48ae-8e2a-91b8fb2e069a" width="100%" /></td>
-    <td><img src="https://github.com/user-attachments/assets/9a3ca927-e3ce-4b58-bf85-eec243912de1" width="100%" /></td>
-  </tr>
-  <tr>
-    <td><img src="https://github.com/user-attachments/assets/9c2ebd1f-84db-4de2-9234-2189d80317d9" width="100%" /></td>
-    <td><img src="https://github.com/user-attachments/assets/35a09231-1098-442c-a0f6-ef111754220f" width="100%" /></td>
-  </tr>
-</table>
-
-<table align="center">
-  <tr>
-    <td><img src="https://github.com/user-attachments/assets/74e948dc-b020-40ce-b639-694555ea41c3" width="240" /></td>
-    <td><img src="https://github.com/user-attachments/assets/25100983-1a95-4300-85a2-47e60eee9d05" width="240" /></td>
-  </tr>
-</table>
-
-### 📱 Mobile
-
-<table width="100%">
-  <tr>
-    <td align="center"><img src="https://github.com/user-attachments/assets/18ccfbb3-3137-4656-a899-af3ed3543400" width="185" /></td>
-    <td align="center"><img src="https://github.com/user-attachments/assets/a500a8df-ceb8-4b0f-af3a-270abdce8d53" width="185" /></td>
-    <td align="center"><img src="https://github.com/user-attachments/assets/dd8df55b-e478-4575-8ab3-1ce1ce5ea4f7" width="185" /></td>
-    <td align="center"><img src="https://github.com/user-attachments/assets/678c8c44-da5e-46db-8370-b41a568654e0" width="185" /></td>
-    <td align="center"><img src="https://github.com/user-attachments/assets/49bf41e2-02f0-4636-aa35-232d0925858f" width="185" /></td>
-    <td align="center"><img src="https://github.com/user-attachments/assets/34d79018-dab3-4494-8e42-d36a1a5bb9d9" width="185" /></td>
-  </tr>
-</table>
-
-### 📺 TV
-
-<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/a27ccb79-3197-42e5-9b7f-bd3583443685" />
 
 ---
 
