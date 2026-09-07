@@ -1,24 +1,58 @@
 # 📋 Changelog
 
-## 🚀 v2.6.0 (2026-06-10)
+## 🚀 v2.6.0 (unreleased)
 
-Headline feature: **cross-server collaboration**. Pair two independent, self-hosted GlassKeep servers and let their users share notes across instances in real time, with per-collaborator read-only or read-write access and support for sharing to several paired servers at once. Each note's owning server stays the source of truth while the other keeps a synced mirror, with clear handling for when a peer is offline, locked or out of date. The release also fixes cross-device profile sync and removes a redundant lock notification.
+Headline feature: **cross-server collaboration**. Pair two self-hosted GlassKeep servers and share notes across them in real time. Also in this release: a full **security audit** with every finding fixed, and a batch of pre-existing bugs found during manual testing.
 
 ### ➕ Added
-- 🌐 **Cross-server collaboration (federation)**: from Admin → *Cross-server collaboration*, pair this server with another GlassKeep instance you trust (HTTPS with a valid certificate required). The other admin receives a **durable pairing request** (delivered even if their server was offline at the time) and accepts it once. After that, **any user can share a note with people on any paired peer**, and a single note can be shared across **several peers at once**: the share box lists the **real people on the other server** with a server badge (no URL to type), and edits sync **both ways, instantly**. Unsharing/deletes propagate across the link, and avatars carry over.
-- 🔐 **Per-collaborator access levels**: when sharing a note, whether with someone local or on a paired peer, choose **read-only or read-write** for each person individually, and change it later from the collaborator list. Read-only collaborators see a clear badge and can't edit; access changes apply live, even to a note that's currently open.
-- 🛡️ **Built to stay reliable**: the feature has its **own protocol version**, independent of the app version, so a normal GlassKeep update never breaks an existing link. Each link's state is always explicit (**online / offline / locked / out of date**), shown both on the note and in the admin panel, and a peer can change domain/port without losing the link (or its notes). When a peer can't be reached, its shared notes stay fully visible but go **read-only with a clear banner** until it's back, so the two copies never diverge.
-- ☑️ **Single-level checklist indent (Google Keep style)**: drag a checklist item's handle sideways, or press Ctrl+]/Ctrl+[, to indent it under the item above (one level only). Checking or unchecking an indented parent cascades to its children, and they stay grouped together in the Done section.
+- 🌐 **Cross-server collaboration (federation)**: pair with another trusted GlassKeep server (Admin → *Cross-server collaboration*) and share notes with its users, live, with per-collaborator read-only/read-write access and support for several peers at once.
+- 👥 **Redesigned collaborator picker**: a searchable list of real accounts instead of typing a name, with multi-select and an A-Z index.
+- 🖼️ **Note icon is now personal**, like tags: your own icon, follows you if you leave a shared note.
+- ☑️ **Single-level checklist indent** (Google Keep style): drag sideways or Ctrl+]/Ctrl+[.
+- 🔑 **Passkey domain, confirmed from the admin panel**: no more mandatory `WEBAUTHN_RP_ID` env var.
+- 🔒 **Quick instance lock + account menu** in the header.
+- 🔔 **Per-category notification display filter**.
+- 🌍 **Project website**, published via GitHub Pages.
+
+### 🔒 Security
+An independent audit covered the server, the Android app and the admin scripts. Every confirmed finding is fixed (details in `audit/audit-glasskeep.html`):
+- Instance-unlock brute-force protection and its plaintext-HTTP refusal could both be bypassed via a spoofable header/value.
+- The AI feature could be used to probe your private network.
+- No rate limiting on login.
+- Android accepted plaintext HTTP to any domain, not just local.
+- Changing your password didn't revoke other devices' sessions.
+- The admin CLI scripts sent secrets without verifying the server certificate.
+- The passkey domain trusted a header the caller controls.
+- No clickjacking protection.
+- A booby-trapped note's formatting could leak the reader's IP.
+- Import errors could leak internal server details.
+- The Android WebView was too permissive around native bridges.
+- At-rest encryption's tag-length check wasn't enforced everywhere.
 
 ### 🐛 Fixed
-- 🖼️ **Your profile (avatar / name) now syncs across your devices**: the user profile was cached at login and never re-read, so an avatar set on one device never appeared on another, not even after Ctrl+F5 (which doesn't clear `localStorage`); only a fresh/incognito session showed it. The app now refreshes your profile from the server on boot and on window focus.
-- 🔒 **No more redundant "instance locked" toast**: when an instance is at-rest-locked, the dedicated unlock banner already says so, so the extra error toast(s) that any in-flight request could raise are now suppressed.
-- ⌨️ **Mobile: the keyboard no longer hides what you're typing**: on a note whose text ended low on the screen but wasn't long enough to scroll, the soft keyboard covered the last lines and nothing could bring them back. Opening the keyboard now slides the whole note up as one block, header included, just far enough for the cursor to clear it and never higher than the keyboard itself, then puts everything back when the keyboard closes. Same for checklist rows and the mobile AI panel.
-- 🔑 **Passkey list display fixed**: in Settings → *Passkeys*, a key able to unlock the encrypted instance rendered with its badges and "last used" text overlapping the action buttons (an unreadable mess on desktop and mobile). Each passkey row now lays out cleanly: the action buttons are left-aligned and wrap to their own line when space is tight, with the long unlock button last.
+- Read-only collaborators couldn't tag a shared note.
+- Your own tags didn't always follow you when leaving a shared note.
+- Several settings didn't sync live across tabs/devices (avatar, language, login visibility, personal AI config, admin AI config, and ~10 interface preferences).
+- A wrong passphrase/recovery key/password logged you out instead of just refusing.
+- Backup export/import lost your pin, icon, or tags in a few cases; import messages were misleading; a corrupted file showed a raw browser error.
+- Three access checks granted more than intended (a malformed read-only value, the last-admin safeguard, leaving/removing a collaborator).
+- Four note actions did the opposite of what was asked (archive toggle, restore position, restore landing spot, partial type change).
+- Several server errors failed silently or leaked technical details instead of a clear message.
+- Session tokens expired on a hard 7-day clock regardless of activity; now renew on use, capped at 30 days.
+- One-click self-update (native) could target the tracked branch's tip instead of the exact announced release.
+- Mobile: the keyboard could hide what you were typing.
+- Passkey list rows overlapped visually.
+- Your profile (avatar/name) didn't sync across devices.
+- Redundant "instance locked" toast on top of the unlock banner.
 
 ### 🛠️ Upgrade
 
-Cross-server collaboration needs **both servers on HTTPS with a valid certificate and a stable domain**, plus an admin on each side to accept the one-time pairing. Set this server's display name in Admin → *Cross-server collaboration* before pairing. No new dependencies; the database migrates automatically on restart.
+Federation needs both servers on HTTPS with a valid certificate. Three behaviour changes to know about:
+- **Docker behind a proxy**: unlock now needs an explicit `TRUST_PROXY` or a proxy forwarding `X-Forwarded-Proto`.
+- **Passkeys on a public domain**: confirm the domain from Admin → *Login page settings*, or set `WEBAUTHN_RP_ID`.
+- **Android pointed at a domain over `http://`**: one pass through setup, prefilled.
+
+No new dependencies; the database migrates automatically on restart.
 
 ## v2.5.0 (2026-06-08)
 
