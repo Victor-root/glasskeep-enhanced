@@ -20,9 +20,18 @@ set -o pipefail
 INSTALL_DIR="${INSTALL_DIR:-/opt/glass-keep/app}"
 DATA_DIR="${DATA_DIR:-/opt/glass-keep/data}"
 SERVICE_NAME="${SERVICE_NAME:-glass-keep}"
-# Branch to pull from. Defaults to main; can be overridden via /opt/glass-keep/.env
-# (`UPDATE_BRANCH=...`) to track a custom fork or pre-release branch.
+# Branch to fall back to when no target release was recorded (manual
+# `systemctl start`, outside the admin panel). Can be overridden via
+# /opt/glass-keep/.env (`UPDATE_BRANCH=...`) to track a custom fork or
+# pre-release branch.
 TARGET_BRANCH="${UPDATE_BRANCH:-main}"
+# The release the admin panel actually offered, written by the
+# orchestrator right before it starts this unit (see
+# getTargetVersionFilePath in updateOrchestrator.js). Reading it here
+# means we check out THAT tag precisely, instead of whatever currently
+# sits on the tip of the tracked branch — which could be ahead of the
+# last tagged release.
+TARGET_VERSION_FILE="${UPDATE_TARGET_VERSION_FILE:-${DATA_DIR}/.update-target-version}"
 STATUS_FILE="${UPDATE_STATUS_FILE:-${DATA_DIR}/.update-status.json}"
 LOG_FILE="${UPDATE_LOG_FILE:-${DATA_DIR}/.update.log}"
 LOCK_FILE="${UPDATE_LOCK_FILE:-${DATA_DIR}/.update.lock}"
@@ -37,6 +46,7 @@ STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 PREV_COMMIT=""
 FROM_VERSION=""
 TO_VERSION=""
+TARGET_VERSION=""
 ROLLED_BACK=0
 
 mkdir -p "$DATA_DIR"
@@ -253,6 +263,15 @@ CURRENT_ACTION="initializing"
 
 # ── Preflight ────────────────────────────────────────────────────────────────
 FROM_VERSION="$(read_version_from_pkg "$INSTALL_DIR/package.json")"
+
+# Consumed once: a stale leftover from an aborted run must never be
+# picked up by a later, unrelated invocation (e.g. someone running
+# `systemctl start` by hand for support).
+if [[ -f "$TARGET_VERSION_FILE" ]]; then
+    TARGET_VERSION="$(tr -d '[:space:]' < "$TARGET_VERSION_FILE" 2>/dev/null || true)"
+    rm -f "$TARGET_VERSION_FILE"
+fi
+
 write_status "preparing" 0 "Preparing update..." ""
 
 if [[ ! -d "$INSTALL_DIR/.git" ]]; then
@@ -283,16 +302,32 @@ take_snapshot
 CURRENT_STEP=1
 CURRENT_ACTION="downloading the latest version"
 write_status "fetching" "$CURRENT_STEP" "Downloading the latest version..." ""
-echo "[self-update] target branch: $TARGET_BRANCH"
 (
     cd "$INSTALL_DIR"
     # Guard against local edits leaking into the rebuild.
-    git fetch --depth=1 origin "$TARGET_BRANCH"
-    git reset --hard "origin/$TARGET_BRANCH"
+    if [[ -n "$TARGET_VERSION" ]]; then
+        # The exact release the admin was offered: fetch and check out
+        # its tag, never the tracked branch's current tip, which may
+        # already be ahead of the last tagged release.
+        echo "[self-update] target release: v${TARGET_VERSION}"
+        git fetch --depth=1 origin "refs/tags/v${TARGET_VERSION}:refs/tags/v${TARGET_VERSION}"
+        git reset --hard "refs/tags/v${TARGET_VERSION}"
+    else
+        # No release recorded — a manual `systemctl start`, outside the
+        # admin panel. Fall back to the tracked branch, as before.
+        echo "[self-update] no target release recorded — falling back to branch: $TARGET_BRANCH"
+        git fetch --depth=1 origin "$TARGET_BRANCH"
+        git reset --hard "origin/$TARGET_BRANCH"
+    fi
 )
 
 TO_VERSION="$(read_version_from_pkg "$INSTALL_DIR/package.json")"
 echo "[self-update] new package.json version: ${TO_VERSION:-unknown}"
+
+if [[ -n "$TARGET_VERSION" && "$TO_VERSION" != "$TARGET_VERSION" ]]; then
+    CURRENT_ACTION="tag v${TARGET_VERSION} reports version ${TO_VERSION:-unknown}, not ${TARGET_VERSION}"
+    false
+fi
 
 # ── Step 2: install dependencies ─────────────────────────────────────────────
 CURRENT_STEP=2

@@ -80,6 +80,19 @@ function getLockFilePath() {
     );
 }
 
+// The exact release the admin was told about, handed off to
+// self-update.sh so it checks out that tag instead of whatever
+// currently sits on the tracked branch. A file rather than an
+// environment variable: `systemctl start` does not forward the
+// caller's environment to the unit it starts, only what the unit
+// file's own Environment=/EnvironmentFile= already provide.
+function getTargetVersionFilePath() {
+    return (
+        process.env.UPDATE_TARGET_VERSION_FILE ||
+        path.join(getDataDir(), ".update-target-version")
+    );
+}
+
 // ── Status I/O ───────────────────────────────────────────────────────────────
 function readStatus() {
     try {
@@ -237,8 +250,17 @@ async function getMode({ verifyDocker = true } = {}) {
 }
 
 // ── Native trigger (systemd) ─────────────────────────────────────────────────
-function startNativeUpdate() {
+function startNativeUpdate(toVersion) {
     const updaterUnit = process.env.UPDATER_UNIT || NATIVE_DEFAULTS.updaterService;
+    // Record which release this run is supposed to land on, for
+    // self-update.sh to pick up (see getTargetVersionFilePath above).
+    // Best-effort: if the write fails, the script falls back to
+    // whatever sits on the tracked branch, same as before this existed.
+    if (toVersion) {
+        try {
+            fs.writeFileSync(getTargetVersionFilePath(), String(toVersion).replace(/^v/i, ""));
+        } catch { /* self-update.sh falls back to the tracked branch */ }
+    }
     return new Promise((resolve, reject) => {
         const child = spawn(
             "systemctl",
@@ -250,11 +272,15 @@ function startNativeUpdate() {
             if (resolved) return;
             resolved = true;
             if (code === 0) resolve();
-            else reject(new Error(`systemctl start exited with code ${code}`));
+            else {
+                try { fs.unlinkSync(getTargetVersionFilePath()); } catch { /* noop */ }
+                reject(new Error(`systemctl start exited with code ${code}`));
+            }
         };
         child.on("error", (err) => {
             if (resolved) return;
             resolved = true;
+            try { fs.unlinkSync(getTargetVersionFilePath()); } catch { /* noop */ }
             reject(err);
         });
         child.on("exit", onExit);
@@ -430,7 +456,7 @@ async function startUpdate({ fromVersion, toVersion }) {
     writeInitialStatus({ fromVersion: fromVersion || pkg.version, toVersion });
 
     if (mode === "native") {
-        await startNativeUpdate();
+        await startNativeUpdate(toVersion);
         return { mode };
     }
     if (mode === "docker") {
