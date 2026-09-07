@@ -92,6 +92,7 @@
     if (label) label.textContent = lang.toUpperCase();
 
     refreshSwatchLabels();
+    refreshModeLabel();
   }
 
   function initLang() {
@@ -168,13 +169,50 @@
   }
 
   /* ── Dark mode ────────────────────────────────────────────────────── */
+  // Three states, cycled by one click: system (the default for everyone,
+  // no stored value at all) -> light -> dark -> back to system. "system"
+  // is not just the initial guess, it stays live: as long as nothing is
+  // stored, the page keeps following the OS preference even after it
+  // changes, with no reload needed.
   var SUN = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/>';
   var MOON = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
+  // Half-filled circle, the same glyph used for "system" on the Omnify site.
+  var SYSTEM = '<path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>';
 
-  function paintMode(mode) {
-    root.setAttribute("data-mode", mode);
+  // The chosen state: "light" / "dark" read straight from storage, or
+  // "system" when nothing is stored (never guessed from the OS here,
+  // that guess belongs to the paint step below).
+  function modeState() {
+    var saved = read(STORE_MODE);
+    return (saved === "dark" || saved === "light") ? saved : "system";
+  }
+
+  // Re-applies the current state's aria-label/title, in the current
+  // language: its own function so a language switch can refresh it
+  // without repainting the actual colours.
+  function refreshModeLabel() {
+    var toggle = document.getElementById("modeToggle");
+    if (!toggle) return;
+    var state = modeState();
+    var key = state === "system" ? "nav.modeLabelSystem"
+      : state === "dark" ? "nav.modeLabelDark" : "nav.modeLabelLight";
+    var label = t(key);
+    if (label) {
+      toggle.setAttribute("aria-label", label);
+      toggle.setAttribute("title", label);
+    }
+  }
+
+  function paintMode(state, query) {
+    var effective = state === "system"
+      ? ((query && query.matches) ? "dark" : "light")
+      : state;
+    root.setAttribute("data-mode", effective);
+
     var icon = document.getElementById("modeIcon");
-    if (icon) icon.innerHTML = mode === "dark" ? MOON : SUN;
+    if (icon) icon.innerHTML = state === "system" ? SYSTEM : (effective === "dark" ? MOON : SUN);
+
+    refreshModeLabel();
     syncMetaThemeColor();
     // refreshLightboxMode is declared further down but hoisted (function
     // declaration), and is a no-op when the lightbox isn't open.
@@ -185,17 +223,14 @@
     var query = window.matchMedia
       ? window.matchMedia("(prefers-color-scheme: dark)")
       : null;
-    var saved = read(STORE_MODE);
-    var explicit = (saved === "dark" || saved === "light");
 
-    paintMode(explicit ? saved : (query && query.matches ? "dark" : "light"));
+    paintMode(modeState(), query);
 
-    // With no explicit choice, keep following the OS live: flipping the system
-    // theme repaints the page immediately, no reload needed.
+    // With no explicit choice, keep following the OS live: flipping the
+    // system theme repaints the page immediately, no reload needed.
     if (query) {
-      var onSystemChange = function (event) {
-        if (read(STORE_MODE)) return; // user took control
-        paintMode(event.matches ? "dark" : "light");
+      var onSystemChange = function () {
+        if (modeState() === "system") paintMode("system", query);
       };
       if (query.addEventListener) query.addEventListener("change", onSystemChange);
       else if (query.addListener) query.addListener(onSystemChange);
@@ -204,9 +239,14 @@
     var toggle = document.getElementById("modeToggle");
     if (toggle) {
       toggle.addEventListener("click", function () {
-        var next = root.getAttribute("data-mode") === "dark" ? "light" : "dark";
-        paintMode(next);
-        store(STORE_MODE, next);
+        var state = modeState();
+        var next = state === "system" ? "light" : state === "light" ? "dark" : "system";
+        if (next === "system") {
+          try { localStorage.removeItem(STORE_MODE); } catch (e) { /* storage blocked */ }
+        } else {
+          store(STORE_MODE, next);
+        }
+        paintMode(next, query);
       });
     }
   }

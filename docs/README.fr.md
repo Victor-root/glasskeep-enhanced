@@ -127,6 +127,8 @@ L'icône du launcher, la bannière Android TV, l'icône d'installation PWA et le
 
 [Télécharger le dernier APK Android](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.5.0/GlassKeep-v1.4.6.apk)
 
+[![Get it on Omnify](https://victor-root.github.io/Omnify/assets/get-it-on-omnify.svg)](https://victor-root.github.io/Omnify/add?url=https%3A%2F%2Fgithub.com%2FVictor-root%2Fglasskeep-enhanced) <a href="https://github.com/Victor-root/glasskeep-enhanced/releases"><img src="badges/get-it-on-github.svg" alt="Get it on GitHub"/></a>
+
 Version APK actuelle : `1.4.6`
 
 > Le code source Android est disponible dans le répertoire `android/`.

@@ -15,6 +15,9 @@ window.GK_I18N = {
     "nav.migrate": "Import",
     "nav.langLabel": "Switch to French",
     "nav.modeLabel": "Toggle dark mode",
+    "nav.modeLabelSystem": "Following system theme (click for light mode)",
+    "nav.modeLabelLight": "Light mode (click for dark mode)",
+    "nav.modeLabelDark": "Dark mode (click to follow system theme)",
 
     "hero.eyebrow": "Self-hosted · Local-first · Open source",
     "hero.title": "Your notes.<br />Your server.<br /><span class=\"grad-text\">Your rules.</span>",
@@ -158,6 +161,9 @@ window.GK_I18N = {
     "nav.migrate": "Import",
     "nav.langLabel": "Passer en anglais",
     "nav.modeLabel": "Basculer le mode sombre",
+    "nav.modeLabelSystem": "Suit le thème du système (cliquer pour le mode clair)",
+    "nav.modeLabelLight": "Mode clair (cliquer pour le mode sombre)",
+    "nav.modeLabelDark": "Mode sombre (cliquer pour suivre le système)",
 
     "hero.eyebrow": "Auto-hébergé · Local-first · Open source",
     "hero.title": "Vos notes.<br />Votre serveur.<br /><span class=\"grad-text\">Vos règles.</span>",
