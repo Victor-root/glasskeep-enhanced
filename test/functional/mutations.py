@@ -130,6 +130,10 @@ MUTATIONS = [
      "      db.prepare(\"DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?\").run(id, req.user.id);\n      broadcastNoteUpdated(id);\n      const trashedSelf = getNoteById.get(id);",
      "      db.prepare(\"DELETE FROM note_user_tags WHERE note_id = ? AND user_id = ?\").run(id, req.user.id);\n      db.prepare(\"DELETE FROM note_user_positions WHERE note_id = ? AND user_id = ?\").run(id, req.user.id);\n      broadcastNoteUpdated(id);\n      const trashedSelf = getNoteById.get(id);"),
 
+    ("f3", "poser son tag reste permis à un lecteur seul malgré le type toujours renvoyé",
+     '    (typeof req.body.type === "string" && req.body.type !== existing.type) ||\n    Array.isArray(req.body.items) ||\n    Array.isArray(req.body.images) ||\n    typeof req.body.color === "string" ||\n    typeof req.body.timestamp === "string"\n  );\n  if (hasContentChange && (noteFederationRef?.isReadOnly(id) || isCollabReadOnly(id, req.user.id))) {',
+     '    typeof req.body.type === "string" ||\n    Array.isArray(req.body.items) ||\n    Array.isArray(req.body.images) ||\n    typeof req.body.color === "string" ||\n    typeof req.body.timestamp === "string"\n  );\n  if (hasContentChange && (noteFederationRef?.isReadOnly(id) || isCollabReadOnly(id, req.user.id))) {'),
+
     # Le domaine des passkeys: déclaré une fois depuis le panneau, jamais
     # pris dans la requête, et il doit tenir d'un démarrage à l'autre.
     ("f5", "le refus de prendre le domaine dans une requête publique",

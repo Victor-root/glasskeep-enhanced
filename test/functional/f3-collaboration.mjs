@@ -305,6 +305,27 @@ try {
     `titre=${j(relueAlice.json?.title)}, contenu=${j(relueAlice.json?.content)}, dernier éditeur=${j(relueAlice.json?.lastEditedBy)}`,
   );
 
+  // Le client renvoie systématiquement le type de la note à chaque
+  // sauvegarde, y compris quand seul le tag change: ce type recopié à
+  // l'identique ne doit pas se faire passer pour une vraie modification
+  // de contenu et bloquer un geste qui reste personnel.
+  const tagLecteur = await inst.call("PATCH", "/api/notes/n-lecture", {
+    token: bob.token, body: { tags: ["bob-seul"], type: "text", client_updated_at: nextIso() },
+  });
+  t.check(
+    "poser son propre tag reste permis à un lecteur seul, même avec le type renvoyé en même temps",
+    tagLecteur.status === 200 && tagLecteur.json?.ok === true
+      && !tagLecteur.json?.readOnly && tagLecteur.json?.note?.tags?.includes("bob-seul"),
+    `http ${tagLecteur.status}, corps=${cut(tagLecteur.text)}`,
+  );
+
+  const tagsAlice = await inst.call("GET", "/api/notes/n-lecture", { token: alice.token });
+  t.check(
+    "ce tag reste privé au lecteur, la propriétaire ne le voit pas",
+    !(tagsAlice.json?.tags || []).includes("bob-seul"),
+    `tags chez Alice=${j(tagsAlice.json?.tags)}`,
+  );
+
   // ─────────────────────────────────────────────────────────────────
   // 4. Le propriétaire n'est jamais remplacé quand un collaborateur
   //    modifie la note.

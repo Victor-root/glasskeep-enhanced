@@ -2683,10 +2683,16 @@ app.patch("/api/notes/:id", auth, (req, res) => {
   // Pin-only toggle: purely per-user state. Skip LWW/timestamp bumps,
   // shared-column writes, and cross-user broadcasts so other participants
   // see nothing move when someone else pins/unpins their shared copy.
+  //
+  // `type` only counts when it actually differs from the stored type: the
+  // client's metadata autosave always resends the note's current type
+  // alongside tags/color/images, even when nothing about the type changed,
+  // so treating its mere presence as a change made every one of those
+  // patches look like a shared edit.
   const hasSharedChange = (
     typeof req.body.title === "string" ||
     typeof req.body.content === "string" ||
-    typeof req.body.type === "string" ||
+    (typeof req.body.type === "string" && req.body.type !== existing.type) ||
     Array.isArray(req.body.items) ||
     Array.isArray(req.body.images) ||
     Array.isArray(req.body.tags) ||
@@ -2704,10 +2710,14 @@ app.patch("/api/notes/:id", auth, (req, res) => {
   // peer is unreachable OR when the owner limited this collaborator to
   // read-only (per-user tags / pin stay editable either way). The client
   // already shows the read-only banner.
+  //
+  // Same `type` refinement as hasSharedChange above: the autosave path
+  // always resends the current type on a tags-only or colour-only patch,
+  // and an unchanged type must not turn that into a blocked content edit.
   const hasContentChange = (
     typeof req.body.title === "string" ||
     typeof req.body.content === "string" ||
-    typeof req.body.type === "string" ||
+    (typeof req.body.type === "string" && req.body.type !== existing.type) ||
     Array.isArray(req.body.items) ||
     Array.isArray(req.body.images) ||
     typeof req.body.color === "string" ||
