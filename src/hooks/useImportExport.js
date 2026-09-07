@@ -170,7 +170,19 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
       if (!fileList || !fileList.length) return;
       const file = fileList[0];
       const text = await file.text();
-      const parsed = JSON.parse(text);
+      // A truncated file or one that was never a GlassKeep export throws
+      // here with a browser-native message ("Unexpected non-whitespace
+      // character..."), meant for a developer console, not the person who
+      // just picked a file. Caught on its own so it never reaches
+      // localizeServerError, which only knows how to translate messages
+      // the server itself sends.
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        alert(t("importInvalidJson"));
+        return;
+      }
       const notesArr = Array.isArray(parsed?.notes)
         ? parsed.notes
         : Array.isArray(parsed)

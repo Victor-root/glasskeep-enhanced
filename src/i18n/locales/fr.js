@@ -293,6 +293,7 @@ loginUnexpectedError: "Impossible de se connecter. Vérifiez votre réseau et r�
   glassKeepLogoAlt: "Logo Glass Keep",
   pin: "Épingler",
   noNotesFoundInFile: "Aucune note trouvée dans le fichier.",
+  importInvalidJson: "Ce fichier n'est pas une sauvegarde GlassKeep valide, ou il est endommagé.",
   noValidGoogleKeepNotesFound: "Aucune note Google Keep valide trouvée.",
   noValidMarkdownFilesFound: "Aucun fichier Markdown valide trouvé.",
   orderedListLabel: "1. liste",
