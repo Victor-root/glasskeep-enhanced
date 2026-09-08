@@ -83,6 +83,7 @@ data class CreateNoteRequest(
     val content: String? = null,
     val color: String? = null,
     val items: List<JsonElement>? = null,
+    val tags: List<String>? = null,
 )
 
 /** Body for a pin-only PATCH /api/notes/:id. Pin is per-user state, not
@@ -113,6 +114,17 @@ data class TrashNoteRequest(@SerialName("client_updated_at") val clientUpdatedAt
 @Serializable
 data class SetColorRequest(
     val color: String,
+    @SerialName("client_updated_at") val clientUpdatedAt: String,
+)
+
+/** Body for a tags-only PATCH /api/notes/:id. Tags are stored per-user on
+ *  the server (note_user_tags, not the shared notes row), but the PATCH
+ *  handler still treats a `tags` array as a shared-content change
+ *  (see hasSharedChange in server/index.js), so client_updated_at is
+ *  required here too, same as color. */
+@Serializable
+data class SetTagsRequest(
+    val tags: List<String>,
     @SerialName("client_updated_at") val clientUpdatedAt: String,
 )
 
@@ -155,4 +167,7 @@ interface GlassKeepApi {
 
     @PATCH("api/notes/{id}")
     suspend fun setColor(@Path("id") id: String, @Body body: SetColorRequest): Response<NoteMutationResponse>
+
+    @PATCH("api/notes/{id}")
+    suspend fun setTags(@Path("id") id: String, @Body body: SetTagsRequest): Response<NoteMutationResponse>
 }

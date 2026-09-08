@@ -166,6 +166,43 @@ fun CloseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Col
 }
 
 @Composable
+fun TagIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/components/modal/ModalFooter.jsx's own inline tag glyph (kept
+    // inline there too): a label outline plus a small hole dot, viewBox
+    // 24x24, stroke (not filled), strokeWidth 1.8, round caps/joins. The
+    // dot is a zero-length round-capped line in the source SVG, drawn here
+    // as an equivalent filled circle of the same radius.
+    val path = remember {
+        PathParser().parsePathString(
+            "M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawCircle(color = tint, radius = 1.25f, center = Offset(7f, 7f))
+        }
+    }
+}
+
+@Composable
+fun CheckmarkIcon(modifier: Modifier = Modifier, size: Dp = 16.dp, tint: Color = Color.White) {
+    // src/components/modal/ModalFooter.jsx's checked tag checkbox glyph:
+    // "M3.5 8.5l3 3 6-6", viewBox 16x16, stroke (not filled), strokeWidth
+    // 2.5, round caps/joins.
+    val path = remember {
+        PathParser().parsePathString("M3.5 8.5l3 3 6-6").toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 16f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 2.5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+@Composable
 fun PlusIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
     // src/components/notes/MobileCreateFab.jsx's own FAB glyph: a "+" made
     // of two strokes, x=12/y=5..19 and x=5..19/y=12, strokeWidth 2.5,

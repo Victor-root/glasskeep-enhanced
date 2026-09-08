@@ -9,6 +9,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,10 +22,13 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,6 +58,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -61,6 +69,7 @@ import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NoteExporter
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.SaveNoteResult
+import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.ui.ButtonGradient
 import com.glasskeep.app.ui.DarkBgColor
@@ -89,6 +98,10 @@ private data class Editability(
     val isLegacyPlain: Boolean,
     val bodyPlainText: String,
 )
+
+/** One entry in the tag suggestion list: a tag already used on at least one
+ *  of this user's notes, and how many. Mirrors App.jsx's tagsWithCounts. */
+private data class TagCount(val tag: String, val count: Int)
 
 /**
  * Milestone: opening and safely editing a single text note. Deliberately
@@ -123,6 +136,26 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     var showColorPicker by remember { mutableStateOf(false) }
     var changingColor by remember { mutableStateOf(false) }
     var duplicating by remember { mutableStateOf(false) }
+    var showTagsPicker by remember { mutableStateOf(false) }
+    var tagInput by remember { mutableStateOf("") }
+    var changingTags by remember { mutableStateOf(false) }
+
+    // Tag suggestions need every note's tags, not just the open one (same
+    // as App.jsx's allNotesForTags -> tagsWithCounts), so this reads the
+    // repository's whole local cache, same source NativeNotesListScreen
+    // observes for the grid.
+    val allNotes by repository.observeNotes().collectAsState(initial = emptyList())
+    val tagsWithCounts = remember(allNotes) {
+        val counts = LinkedHashMap<String, Int>()
+        for (n in allNotes) {
+            for (rawTag in TagsJson.parse(n.tagsJson)) {
+                val key = rawTag.trim()
+                if (key.isEmpty()) continue
+                counts[key] = (counts[key] ?: 0) + 1
+            }
+        }
+        counts.map { (tag, count) -> TagCount(tag, count) }.sortedBy { it.tag.lowercase() }
+    }
 
     val errorLoadTemplate = stringResource(R.string.native_note_detail_error)
     val errorSaveTemplate = stringResource(R.string.native_note_detail_save_error)
@@ -233,6 +266,59 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                 changingColor = false
             }
         }
+    }
+
+    fun isTagApplied(tag: String): Boolean = (note?.tags ?: emptyList()).any { it.equals(tag, ignoreCase = true) }
+
+    fun saveTags(newTags: List<String>) {
+        val current = note ?: return
+        if (changingTags) return
+        changingTags = true
+        scope.launch {
+            try {
+                when (val result = repository.setTags(current.id, newTags)) {
+                    is SaveNoteResult.Saved -> {
+                        NativeDebug.d("NoteDetailScreen saveTags OK id=${current.id}")
+                        note = result.note
+                    }
+                    SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
+                    SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("NoteDetailScreen saveTags failed", t)
+                Toast.makeText(
+                    context,
+                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } finally {
+                changingTags = false
+            }
+        }
+    }
+
+    /** Toggles one tag on/off, case-insensitively (same rule the web
+     *  applies via isTagApplied/toggleTag in ModalFooter.jsx). Used by both
+     *  the suggestion list's checkboxes and a chip's own remove button. */
+    fun toggleTag(tag: String) {
+        val current = note?.tags ?: return
+        val updated = if (isTagApplied(tag)) current.filterNot { it.equals(tag, ignoreCase = true) } else current + tag
+        saveTags(updated)
+    }
+
+    /** Commits typed/pasted text as one or more tags: splits on comma,
+     *  trims, drops blanks, and skips anything already applied
+     *  case-insensitively. Mirrors App.jsx's addTags(). */
+    fun addTagsFromInput(raw: String) {
+        val current = note?.tags ?: return
+        val parts = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (parts.isEmpty()) return
+        val seen = current.mapTo(mutableSetOf()) { it.lowercase() }
+        val merged = current.toMutableList()
+        for (p in parts) {
+            if (seen.add(p.lowercase())) merged.add(p)
+        }
+        if (merged != current) saveTags(merged)
     }
 
     fun duplicateNote() {
@@ -416,6 +502,28 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                     text = { Text(stringResource(R.string.native_note_detail_change_color)) },
                                     leadingIcon = { PaletteIcon(size = 18.dp) },
                                     onClick = { menuExpanded = false; showColorPicker = true },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.native_note_detail_tags)) },
+                                    leadingIcon = { TagIcon(size = 18.dp, tint = titleColor) },
+                                    trailingIcon = if (currentNote.tags.isNotEmpty()) {
+                                        {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(999.dp))
+                                                    .background(Indigo)
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                            ) {
+                                                Text(
+                                                    currentNote.tags.size.toString(),
+                                                    color = Color.White,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                )
+                                            }
+                                        }
+                                    } else null,
+                                    onClick = { menuExpanded = false; tagInput = ""; showTagsPicker = true },
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.native_note_detail_duplicate)) },
@@ -635,6 +743,166 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
             }
         }
 
+        if (showTagsPicker) {
+            val currentTags = note?.tags ?: emptyList()
+            val trimmedInput = tagInput.trim()
+            val filteredTags = remember(tagsWithCounts, tagInput) {
+                if (trimmedInput.isEmpty()) tagsWithCounts
+                else tagsWithCounts.filter { it.tag.contains(trimmedInput, ignoreCase = true) }
+            }
+            val isNewTag = trimmedInput.isNotEmpty() &&
+                tagsWithCounts.none { it.tag.equals(trimmedInput, ignoreCase = true) }
+
+            Dialog(onDismissRequest = { showTagsPicker = false; tagInput = "" }) {
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (dark) DarkBgColor else Color.White)
+                        // Unlike the fixed-size color grid above, this dialog's
+                        // content grows with however many tags exist, so it
+                        // gets its own outer scroll (the suggestion list below
+                        // is separately capped+scrollable at 200dp, this is
+                        // for the dialog as a whole on a short/landscape screen).
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.native_note_detail_tags_title),
+                        color = titleColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                    )
+                    Spacer(Modifier.height(14.dp))
+
+                    OutlinedTextField(
+                        value = tagInput,
+                        onValueChange = { value ->
+                            // A comma commits everything before it as a tag,
+                            // same trigger the web uses on keydown/paste
+                            // (ModalFooter.jsx's handleTagKeyDown /
+                            // handleTagPaste); Compose has no pre-insertion
+                            // key intercept for a soft keyboard, so this
+                            // reacts to the comma once it's in the text
+                            // instead, which lands on the same end state.
+                            if (value.contains(",")) {
+                                val segments = value.split(",")
+                                addTagsFromInput(segments.dropLast(1).joinToString(","))
+                                tagInput = segments.last()
+                            } else {
+                                tagInput = value
+                            }
+                        },
+                        placeholder = { Text(stringResource(R.string.native_note_detail_tags_search_placeholder)) },
+                        singleLine = true,
+                        colors = detailFieldColors(titleColor, subtextColor, borderColor),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            if (trimmedInput.isNotEmpty()) {
+                                addTagsFromInput(trimmedInput)
+                                tagInput = ""
+                            }
+                        }),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+
+                    if (filteredTags.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.native_note_detail_tags_existing),
+                            color = subtextColor,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Column(modifier = Modifier.heightIn(max = 200.dp).verticalScroll(rememberScrollState())) {
+                            for (entry in filteredTags) {
+                                val checked = isTagApplied(entry.tag)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                            enabled = !changingTags,
+                                            role = Role.Button,
+                                        ) { toggleTag(entry.tag) }
+                                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(18.dp)
+                                            .clip(RoundedCornerShape(5.dp))
+                                            .background(if (checked) Indigo else Color.Transparent)
+                                            .border(
+                                                width = if (checked) 0.dp else 1.5.dp,
+                                                color = if (checked) Color.Transparent else borderColor,
+                                                shape = RoundedCornerShape(5.dp),
+                                            ),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        if (checked) CheckmarkIcon(size = 12.dp, tint = Color.White)
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(
+                                        entry.tag,
+                                        color = titleColor,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Normal,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(entry.count.toString(), color = subtextColor, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    } else if (!isNewTag) {
+                        Text(
+                            stringResource(R.string.native_note_detail_tags_none_found),
+                            color = subtextColor,
+                            fontSize = 13.sp,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+
+                    if (isNewTag) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    enabled = !changingTags,
+                                    role = Role.Button,
+                                ) { addTagsFromInput(trimmedInput); tagInput = "" }
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                        ) {
+                            PlusIcon(size = 14.dp, tint = Indigo)
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                String.format(stringResource(R.string.native_note_detail_tags_create), trimmedInput),
+                                color = Indigo,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+
+                    if (currentTags.isNotEmpty()) {
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
+                        Spacer(Modifier.height(10.dp))
+                        TagChipsRow(tags = currentTags, enabled = !changingTags, onRemove = { toggleTag(it) })
+                    }
+                }
+            }
+        }
+
         if (showTrashConfirm) {
             AlertDialog(
                 onDismissRequest = { showTrashConfirm = false },
@@ -651,6 +919,49 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                     }
                 },
             )
+        }
+    }
+}
+
+/** Applied-tags chip row, wrapping onto as many lines as needed. FlowRow is
+ *  still gated behind ExperimentalLayoutApi upstream even though it's long
+ *  since been stable in practice, so the opt-in is scoped to just this one
+ *  small composable rather than the whole screen. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TagChipsRow(tags: List<String>, enabled: Boolean, onRemove: (String) -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        for (tag in tags) {
+            val removeLabel = String.format(stringResource(R.string.native_note_detail_tags_remove), tag)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Indigo.copy(alpha = 0.14f))
+                    .border(width = 1.dp, color = Indigo.copy(alpha = 0.3f), shape = RoundedCornerShape(999.dp))
+                    .padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            ) {
+                Text(tag, color = Indigo, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(4.dp))
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clip(CircleShape)
+                        .semantics { contentDescription = removeLabel }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            enabled = enabled,
+                            role = Role.Button,
+                        ) { onRemove(tag) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CloseIcon(size = 10.dp, tint = Indigo)
+                }
+            }
         }
     }
 }

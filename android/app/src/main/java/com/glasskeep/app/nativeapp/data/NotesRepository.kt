@@ -10,6 +10,7 @@ import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
+import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
 import com.glasskeep.app.nativeapp.data.network.TrashNoteRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonArray
@@ -76,13 +77,13 @@ class NotesRepository(
 
     /**
      * Duplicates a note: creates a new one with the same type, content,
-     * items and color (caller already worked out the new title, e.g. with
-     * a "(copy)" suffix). Safe for every note type, not just text: unlike
+     * items, tags and color (caller already worked out the new title, e.g.
+     * with a "(copy)" suffix), same fields duplicateActiveNote() in
+     * App.jsx copies. Safe for every note type, not just text: unlike
      * creating a blank note of an unsupported type, a duplicate is just
      * another fully-formed note of a type native can already view
-     * (read-only, same as the original), never a dead end. Tags and
-     * images aren't carried over yet, native has no data layer for
-     * either.
+     * (read-only, same as the original), never a dead end. Images aren't
+     * carried over yet, native has no data layer for them.
      */
     suspend fun duplicateNote(source: NoteDto, newTitle: String): NoteDto {
         NativeDebug.d("NotesRepository.duplicateNote id=${source.id}")
@@ -93,6 +94,7 @@ class NotesRepository(
                 content = source.content,
                 color = source.color,
                 items = source.items,
+                tags = source.tags,
             )
         )
         val note = response.body()
@@ -239,6 +241,30 @@ class NotesRepository(
         return SaveNoteResult.Saved(saved)
     }
 
+    /** Replaces a note's tag list. Shares the general PATCH endpoint with
+     *  patchNote()/setColor(), same narrow-body pattern: only `tags` and
+     *  client_updated_at are sent, so title/content/color stay untouched
+     *  server-side. Tags are per-user, but the server still treats this as
+     *  a shared-content change (see SetTagsRequest), so stale/readOnly are
+     *  real outcomes here too, same as setColor(). */
+    suspend fun setTags(id: String, tags: List<String>): SaveNoteResult {
+        NativeDebug.d("NotesRepository.setTags id=$id tags=$tags")
+        val response = api.setTags(id, SetTagsRequest(tags, nowIso()))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "PATCH /api/notes/$id (tags) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        if (body.stale) {
+            NativeDebug.d("NotesRepository.setTags id=$id: stale, not applied")
+            return SaveNoteResult.Stale
+        }
+        val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (tags): ok response with no note")
+        noteDao.upsertAll(listOf(saved.toEntity()))
+        return SaveNoteResult.Saved(saved)
+    }
+
     // Full content/items are cached now too (not just the summary fields),
     // so the list's cards can show a real preview, like the web app's own
     // NoteCard.jsx, instead of just a title.
@@ -251,5 +277,6 @@ class NotesRepository(
         updatedAt = updatedAt,
         content = content,
         itemsJson = JsonArray(items).toString(),
+        tagsJson = TagsJson.encode(tags),
     )
 }

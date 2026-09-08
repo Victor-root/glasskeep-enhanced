@@ -89,6 +89,13 @@
     <string name="native_note_detail_duplicate_suffix">(copy)</string>
     <string name="native_note_detail_download">Download as Markdown</string>
     <string name="native_note_detail_download_error">Couldn\'t start the download</string>
+    <string name="native_note_detail_tags">Tags</string>
+    <string name="native_note_detail_tags_title">Note tags</string>
+    <string name="native_note_detail_tags_search_placeholder">Search or create…</string>
+    <string name="native_note_detail_tags_existing">Existing tags</string>
+    <string name="native_note_detail_tags_none_found">No tags found</string>
+    <string name="native_note_detail_tags_create">Create \"%1$s\"</string>
+    <string name="native_note_detail_tags_remove">Remove tag %1$s</string>
 
     <!-- App shortcut: long-press the launcher icon to open the QR
          scanner straight away (sign in to a PC paired with this phone). -->
