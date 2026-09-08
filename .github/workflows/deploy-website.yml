@@ -1,10 +1,10 @@
 name: Deploy website
 
-# Publishes website/ to GitHub Pages. Runs on pushes to the `website` branch
+# Publishes website/ to GitHub Pages. Runs on pushes to `main`
 # and can be triggered by hand from the Actions tab.
 on:
   push:
-    branches: [website]
+    branches: [main]
     paths:
       - "website/**"
       - ".github/workflows/deploy-website.yml"
