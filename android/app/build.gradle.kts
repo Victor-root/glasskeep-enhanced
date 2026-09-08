@@ -8,6 +8,10 @@ plugins {
     // classes be marked @Serializable for the Retrofit/JSON layer below.
     id("com.google.devtools.ksp")
     id("org.jetbrains.kotlin.plugin.serialization")
+    // Kotlin 2.0+: the Compose compiler is a Kotlin compiler plugin now,
+    // not a composeOptions{} version string. See the composeOptions
+    // removal below.
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 // Pull release-keystore credentials from android/keystore.properties.
@@ -96,36 +100,37 @@ android {
         buildConfig = true
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
-    }
+}
 
-    // Rename the output APK so Android Studio's Build → Build Bundle(s) /
-    // APK(s) → Build APK(s) drops a "GlassKeep-v<versionName>.apk" file
-    // (debug builds get a "-debug" suffix) instead of the default
-    // "app-release.apk" / "app-debug.apk". Matches the asset naming
-    // convention the in-app self-updater scans for on GitHub Releases,
-    // so the APK uploaded to a release is already named correctly.
-    applicationVariants.all {
-        val variant = this
-        outputs.forEach { output ->
-            val suffix = if (variant.buildType.name == "debug") "-debug" else ""
-            (output as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
-                .outputFileName = "GlassKeep-v${variant.versionName}${suffix}.apk"
+// Rename the output APK so Android Studio's Build → Build Bundle(s) /
+// APK(s) → Build APK(s) drops a "GlassKeep-v<versionName>.apk" file
+// (debug builds get a "-debug" suffix) instead of the default
+// "app-release.apk" / "app-debug.apk". Matches the asset naming
+// convention the in-app self-updater scans for on GitHub Releases, so
+// the APK uploaded to a release is already named correctly.
+//
+// This used to be `android.applicationVariants.all { ... }` casting the
+// output to the internal BaseVariantOutputImpl class. AGP 9 disabled
+// that legacy variant API by default (gone for good in AGP 10), so this
+// is the modern androidComponents replacement: a top-level block, not
+// nested inside android {}, and versionName is read from defaultConfig
+// directly rather than from the (now lazy/Provider-based) variant itself.
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            val suffix = if (variant.buildType == "debug") "-debug" else ""
+            output.outputFileName.set("GlassKeep-v${android.defaultConfig.versionName}$suffix.apk")
         }
     }
 }
 
 dependencies {
-    // Bumped from 2024.01.00 (native rewrite, milestone: note detail):
-    // navigation-compose 2.7.7 below needs a slightly newer
-    // compose-animation than that BOM pins, so Gradle resolved animation
-    // to a version material3 wasn't built against, crashing at runtime
-    // (NoSuchMethodError on KeyframesSpecConfig.at, only reachable once
-    // CircularProgressIndicator or a NavHost transition actually ran).
-    // Still Compose UI 1.6.x, so kotlinCompilerExtensionVersion (1.5.8,
-    // below) does not need to move.
-    implementation(platform("androidx.compose:compose-bom:2024.04.01"))
+    // Current as of the Sept 2026 toolchain upgrade (was 2024.04.01).
+    // Tracks the Kotlin/AGP/Gradle bump above: the Compose compiler
+    // plugin, the BOM and Kotlin all move together, an old BOM paired
+    // with a new Kotlin/compiler is the same kind of mismatch that broke
+    // CircularProgressIndicator earlier in this project (see git log).
+    implementation(platform("androidx.compose:compose-bom:2026.08.00"))
     implementation("androidx.core:core-ktx:1.12.0")
     // WorkManager: periodic background reminder sync so reminders created on
     // another device still fire on a closed phone — without any push service.
