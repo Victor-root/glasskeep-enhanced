@@ -265,8 +265,10 @@ private fun ViewerIconButton(
     }
 }
 
+// internal, not private: SettingsScreen.kt (same package, different file)
+// reuses this to render the account's avatar, same data: URL shape.
 @Composable
-private fun rememberDecodedImage(dataUrl: String): ImageBitmap? = remember(dataUrl) {
+internal fun rememberDecodedImage(dataUrl: String): ImageBitmap? = remember(dataUrl) {
     try {
         val base64 = dataUrl.substringAfter("base64,", "")
         if (base64.isEmpty()) return@remember null

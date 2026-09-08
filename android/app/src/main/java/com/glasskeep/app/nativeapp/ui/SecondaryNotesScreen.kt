@@ -119,7 +119,7 @@ fun SecondaryNotesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(headerGradient(dark))
+                        .background(WorkspaceTheme.headerGradient(container.themeState.themeId, dark))
                         .windowInsetsPadding(WindowInsets.statusBars)
                         .padding(horizontal = 8.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -159,7 +159,7 @@ fun SecondaryNotesScreen(
                             .padding(8.dp),
                     )
                 }
-                Box(Modifier.fillMaxWidth().height(1.dp).background(headerBorderColor(dark)))
+                Box(Modifier.fillMaxWidth().height(1.dp).background(WorkspaceTheme.headerBorderColor(container.themeState.themeId, dark)))
             }
 
             errorMessage?.let {

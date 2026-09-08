@@ -66,6 +66,36 @@
     <string name="native_trash_empty">Trash is empty.</string>
     <string name="native_trash_error">Couldn\'t load trash: %1$s</string>
 
+    <string name="native_settings_title">Settings</string>
+    <string name="native_settings_loading">Loading…</string>
+    <string name="native_settings_error">Couldn\'t load settings: %1$s</string>
+    <string name="native_settings_action_error">Couldn\'t save: %1$s</string>
+    <string name="native_dialog_cancel">Cancel</string>
+    <string name="native_settings_profile_section">Profile</string>
+    <string name="native_settings_avatar_description">Profile photo</string>
+    <string name="native_settings_change_avatar">Change photo</string>
+    <string name="native_settings_remove_avatar">Remove photo</string>
+    <string name="native_settings_show_on_login">Show on the login screen</string>
+    <string name="native_settings_language">Language</string>
+    <string name="native_settings_language_system">System</string>
+    <string name="native_settings_language_english">English</string>
+    <string name="native_settings_language_french">French</string>
+    <string name="native_settings_security_section">Security</string>
+    <string name="native_settings_change_password">Change password</string>
+    <string name="native_settings_password_current">Current password</string>
+    <string name="native_settings_password_new">New password</string>
+    <string name="native_settings_password_confirm">Confirm new password</string>
+    <string name="native_settings_password_mismatch">The new passwords don\'t match.</string>
+    <string name="native_settings_password_too_short">The new password must be at least 6 characters.</string>
+    <string name="native_settings_password_error">Couldn\'t change password (code %1$d). Check your current password.</string>
+    <string name="native_settings_password_success">Password changed.</string>
+    <string name="native_settings_appearance_section">Appearance</string>
+    <string name="native_settings_theme_title">Workspace theme</string>
+    <string name="native_settings_notes_section">Notes</string>
+    <string name="native_settings_checklist_insert_position">New checklist item position</string>
+    <string name="native_settings_checklist_insert_top">Top</string>
+    <string name="native_settings_checklist_insert_bottom">Bottom</string>
+
     <string name="native_note_detail_back">Back</string>
     <string name="native_note_detail_loading">Loading note…</string>
     <string name="native_note_detail_error">Couldn\'t load this note: %1$s</string>

@@ -4,17 +4,25 @@ import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.local.NoteDao
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
+import com.glasskeep.app.nativeapp.data.network.ChangePasswordRequest
 import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
 import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
+import com.glasskeep.app.nativeapp.data.network.ProfileDto
+import com.glasskeep.app.nativeapp.data.network.SetAvatarRequest
+import com.glasskeep.app.nativeapp.data.network.SetChecklistInsertPositionRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
 import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
+import com.glasskeep.app.nativeapp.data.network.SetLanguageRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
+import com.glasskeep.app.nativeapp.data.network.SetShellThemeRequest
+import com.glasskeep.app.nativeapp.data.network.SetShowOnLoginRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
+import com.glasskeep.app.nativeapp.data.network.UserDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -33,6 +41,14 @@ sealed class SaveNoteResult {
 sealed class DeleteResult {
     data object Deleted : DeleteResult()
     data object Stale : DeleteResult()
+}
+
+/** Outcome of a password change. Rejected carries the HTTP code rather
+ *  than the server's own error text: same convention NativeLoginScreen
+ *  already uses for its own rejected-login message, not a new one. */
+sealed class ChangePasswordResult {
+    data class Saved(val token: String, val user: UserDto) : ChangePasswordResult()
+    data class Rejected(val httpCode: Int) : ChangePasswordResult()
 }
 
 class NotesRepository(
@@ -479,10 +495,12 @@ class NotesRepository(
      *  ("top"/"bottom", see App.jsx's checklistInsertPosition), read from
      *  the generic settings blob so the native editor's Enter-to-add-item
      *  behavior matches whatever the user already has configured on the
-     *  web app instead of guessing a hardcoded default. Best-effort: native
-     *  has no settings screen to surface a failure in, and a wrong-but
-     *  harmless default (the web's own fresh-install default) is a better
-     *  outcome here than blocking checklist editing on this one read. */
+     *  web app instead of guessing a hardcoded default. Best-effort: a
+     *  wrong-but-harmless default (the web's own fresh-install default) is
+     *  a better outcome for a background read like this one than blocking
+     *  checklist editing over it; SettingsScreen's own read (for the
+     *  picker itself) surfaces a real failure instead, see setReminder's
+     *  sibling actions below for that shape. */
     suspend fun fetchChecklistInsertPosition(): String {
         return try {
             val response = api.getUserSettings()
@@ -492,6 +510,131 @@ class NotesRepository(
             NativeDebug.e("NotesRepository.fetchChecklistInsertPosition failed, defaulting to top", t)
             "top"
         }
+    }
+
+    /** Sets the checklist insert-position preference ("top"/"bottom").
+     *  Same narrow-body PATCH /api/user/settings pattern as setShellTheme;
+     *  unlike fetchChecklistInsertPosition's own best-effort read, this is
+     *  a deliberate user action from SettingsScreen and surfaces a real
+     *  failure rather than silently keeping the old value. */
+    suspend fun setChecklistInsertPosition(position: String) {
+        NativeDebug.d("NotesRepository.setChecklistInsertPosition position=$position")
+        val response = api.setChecklistInsertPosition(SetChecklistInsertPositionRequest(position))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (checklistInsertPosition) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** Best-effort read of this user's saved workspace theme id (see
+     *  WorkspaceTheme.kt), same settings blob as fetchChecklistInsertPosition.
+     *  Null on any failure or if the user never picked one; the caller
+     *  (ThemeState) decides the default rather than this data-layer class
+     *  depending on the ui-layer WorkspaceTheme object for one constant. */
+    suspend fun fetchShellTheme(): String? {
+        return try {
+            val response = api.getUserSettings()
+            if (response.isSuccessful) response.body()?.shellTheme else null
+        } catch (t: Throwable) {
+            NativeDebug.e("NotesRepository.fetchShellTheme failed", t)
+            null
+        }
+    }
+
+    /** Sets the workspace theme preference. Deliberate user action from
+     *  SettingsScreen's theme picker, surfaces a real failure. */
+    suspend fun setShellTheme(themeId: String) {
+        NativeDebug.d("NotesRepository.setShellTheme id=$themeId")
+        val response = api.setShellTheme(SetShellThemeRequest(themeId))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (shellTheme) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** Full profile for the Settings screen (name/email are read-only,
+     *  see SetShowOnLoginRequest/SetLanguageRequest for what's actually
+     *  editable: no route accepts changing either on the web either). */
+    suspend fun fetchProfile(): ProfileDto {
+        NativeDebug.d("NotesRepository.fetchProfile")
+        val response = api.getProfile()
+        val profile = response.body()
+        if (!response.isSuccessful || profile == null) {
+            val error = "GET /api/user/profile failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return profile
+    }
+
+    /** Returns the server's own confirmed value, not just an echo of what
+     *  was requested: patchNote()'s "trust the response" convention. */
+    suspend fun setShowOnLogin(value: Boolean): Boolean {
+        NativeDebug.d("NotesRepository.setShowOnLogin value=$value")
+        val response = api.setShowOnLogin(SetShowOnLoginRequest(value))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "PATCH /api/user/profile (show_on_login) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body.showOnLogin
+    }
+
+    suspend fun setLanguage(value: String?): String? {
+        NativeDebug.d("NotesRepository.setLanguage value=$value")
+        val response = api.setLanguage(SetLanguageRequest(value))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "PATCH /api/user/profile (language) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body.language
+    }
+
+    /** [dataUrl] must already be a compressed image/jpeg or image/png data
+     *  URL (see ImageCompression.compressToDataUrl): the server rejects
+     *  anything else or over ~1.5MB decoded. Returns the confirmed URL. */
+    suspend fun setAvatar(dataUrl: String): String? {
+        NativeDebug.d("NotesRepository.setAvatar")
+        val response = api.setAvatar(SetAvatarRequest(dataUrl))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "PUT /api/user/avatar failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body.avatarUrl
+    }
+
+    suspend fun removeAvatar() {
+        NativeDebug.d("NotesRepository.removeAvatar")
+        val response = api.deleteAvatar()
+        if (!response.isSuccessful) {
+            val error = "DELETE /api/user/avatar failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** On success the server issues a fresh token and invalidates every
+     *  other session (see server/index.js's token_version bump): the
+     *  caller must store the returned token (mirrors NativeLoginScreen's
+     *  own container.tokenStore.token = ... at its call site) or every
+     *  request after this one fails as unauthorized. */
+    suspend fun changePassword(currentPassword: String?, newPassword: String): ChangePasswordResult {
+        NativeDebug.d("NotesRepository.changePassword")
+        val response = api.changePassword(ChangePasswordRequest(currentPassword, newPassword))
+        val token = response.body()?.token
+        val user = response.body()?.user
+        if (!response.isSuccessful || token == null || user == null) {
+            NativeDebug.e("NotesRepository.changePassword rejected: HTTP ${response.code()}")
+            return ChangePasswordResult.Rejected(response.code())
+        }
+        return ChangePasswordResult.Saved(token, user)
     }
 }
 

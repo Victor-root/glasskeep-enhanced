@@ -9,12 +9,12 @@ import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 
 /**
  * Hand-rolled dependency container, no DI framework: the native rewrite is
- * still small enough (two screens) that Hilt would be pure ceremony right
- * now. Revisit once there are enough repositories to make manual wiring
- * painful.
+ * still small enough that Hilt would be pure ceremony right now. Revisit
+ * once there are enough repositories to make manual wiring painful.
  */
 class NativeAppContainer(context: Context) {
     val tokenStore = TokenStore(context)
+    val themeState = ThemeState(tokenStore)
     private val db = AppDatabase.get(context)
 
     private var cachedApi: GlassKeepApi? = null

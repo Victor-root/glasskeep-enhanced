@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -14,6 +15,7 @@ import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.syncReminderAlarms
 import com.glasskeep.app.reminders.ReminderScheduler
 import com.glasskeep.app.reminders.ReminderSyncWorker
+import kotlinx.coroutines.launch
 
 /**
  * The native rewrite's navigation graph. One route per real screen; grows
@@ -62,6 +64,17 @@ fun NativeNavHost(
         }
     }
 
+    // Workspace theme: TokenStore's cache already made the right chrome
+    // live from the very first frame (see ThemeState); this reconciles it
+    // against the server's own copy, the source of truth, exactly once
+    // per session, same "fetch on load, apply if different" shape as the
+    // web's own applyStoredShellTheme()-then-server-sync design.
+    LaunchedEffect(startDestination) {
+        if (startDestination == "notes") {
+            repository.fetchShellTheme()?.let { container.themeState.apply(it) }
+        }
+    }
+
     // Deep-link from a reminder notification tap (NativeAppActivity's
     // EXTRA_OPEN_NOTE_ID / onNewIntent). Only handles the "already signed
     // in" case: startDestination is fixed for this composition's lifetime,
@@ -75,6 +88,8 @@ fun NativeNavHost(
         }
     }
 
+    val scope = rememberCoroutineScope()
+
     NavHost(navController = navController, startDestination = startDestination) {
         composable("login") {
             NativeLoginScreen(
@@ -83,6 +98,7 @@ fun NativeNavHost(
                 onLoggedIn = {
                     ReminderScheduler.schedulePeriodic(context)
                     ReminderSyncWorker.syncNow(context)
+                    scope.launch { repository.fetchShellTheme()?.let { container.themeState.apply(it) } }
                     navController.navigate("notes") {
                         popUpTo("login") { inclusive = true }
                     }
@@ -100,6 +116,14 @@ fun NativeNavHost(
                 onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
                 onOpenArchived = { navController.navigate("archived") },
                 onOpenTrash = { navController.navigate("trash") },
+                onOpenSettings = { navController.navigate("settings") },
+            )
+        }
+        composable("settings") {
+            SettingsScreen(
+                container = container,
+                serverUrl = serverUrl,
+                onBack = { navController.popBackStack() },
             )
         }
         composable("notes/{noteId}") { backStackEntry ->

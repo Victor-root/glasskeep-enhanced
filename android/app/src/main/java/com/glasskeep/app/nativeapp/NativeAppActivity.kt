@@ -9,8 +9,10 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import com.glasskeep.app.nativeapp.ui.NativeNavHost
+import com.glasskeep.app.nativeapp.ui.WorkspaceTheme
 import com.glasskeep.app.ui.applyThemedSystemBars
 import com.glasskeep.app.ui.theme.GlassKeepTheme
 
@@ -42,11 +44,19 @@ class NativeAppActivity : ComponentActivity() {
         setContent {
             val dark = isSystemInDarkTheme()
             val view = LocalView.current
-            // Same status/nav bar treatment as MainActivity's onboarding
-            // (same two colors as SetupScreen's own light/dark background),
-            // so the system bars never clash with the native screens below.
+            // Signed-in only: the login screen keeps the same fixed pair
+            // onboarding uses (the web's own theme system explicitly never
+            // recolors its login page either, see WorkspaceTheme.kt). Reads
+            // themeState.themeId (real Compose state) so picking a new
+            // theme in Settings retints the bar immediately; reads
+            // tokenStore.token directly (not state) so a first-ever login
+            // within this same Activity instance can lag one theme change
+            // behind before catching up, a narrow, cosmetic-only gap.
+            val themeId = container.themeState.themeId
+            val signedIn = container.tokenStore.token != null
             SideEffect {
-                (view.context as ComponentActivity).applyThemedSystemBars(dark)
+                val overrideColor = if (signedIn) WorkspaceTheme.statusBarColor(themeId, dark).toArgb() else null
+                (view.context as ComponentActivity).applyThemedSystemBars(dark, overrideColor)
             }
             GlassKeepTheme {
                 NativeNavHost(

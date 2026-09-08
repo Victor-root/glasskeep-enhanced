@@ -10,12 +10,13 @@ import java.io.ByteArrayOutputStream
 
 /**
  * Ports fileToCompressedDataURL() (src/utils/helpers.js) to Android: resize
- * so the longer side is at most 1600px, encode as JPEG at 85% quality
+ * so the longer side is at most maxDimension (1600px by default, matching
+ * the web's own default), encode as JPEG at jpegQuality (85% by default)
  * unless the source actually has real transparency (checked by sampling
  * pixels, not just "does this format support alpha"), in which case PNG.
  * Same reasoning as the web: a data: URL is what the server stores
- * (server/index.js, images_json), so this produces exactly that string,
- * not a file path.
+ * (server/index.js, images_json / avatar_url), so this produces exactly
+ * that string, not a file path.
  *
  * Decodes in two passes (bounds only, then a downsampled decode) rather
  * than loading the original at full resolution, standard Android practice
@@ -27,8 +28,19 @@ object ImageCompression {
 
     /** Returns null if the URI can't be decoded as an image at all (a
      *  malformed/inaccessible pick), never throws. Must be called off the
-     *  main thread, this does real disk and CPU work. */
-    fun compressToDataUrl(context: Context, uri: Uri): String? {
+     *  main thread, this does real disk and CPU work.
+     *
+     *  [maxDimension]/[jpegQuality] default to the note-image values
+     *  (fileToCompressedDataURL's own defaults on the web); a profile
+     *  avatar calls this with the web's own smaller avatar-specific pair
+     *  (fileToCompressedDataURL(file, 256, 0.85) in SettingsPanel.jsx)
+     *  instead, so an avatar never balloons to a full 1600px note image. */
+    fun compressToDataUrl(
+        context: Context,
+        uri: Uri,
+        maxDimension: Int = MAX_DIMENSION,
+        jpegQuality: Int = JPEG_QUALITY,
+    ): String? {
         return try {
             val resolver = context.contentResolver
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -36,12 +48,12 @@ object ImageCompression {
                 ?: return null
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-            val sampleSize = computeInSampleSize(bounds.outWidth, bounds.outHeight, MAX_DIMENSION)
+            val sampleSize = computeInSampleSize(bounds.outWidth, bounds.outHeight, maxDimension)
             val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
             val sampled = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, decodeOptions) }
                 ?: return null
 
-            val scale = minOf(1f, MAX_DIMENSION.toFloat() / maxOf(sampled.width, sampled.height))
+            val scale = minOf(1f, maxDimension.toFloat() / maxOf(sampled.width, sampled.height))
             val resized = if (scale < 1f) {
                 val scaledWidth = (sampled.width * scale).toInt().coerceAtLeast(1)
                 val scaledHeight = (sampled.height * scale).toInt().coerceAtLeast(1)
@@ -55,7 +67,7 @@ object ImageCompression {
             if (usePng) {
                 resized.compress(Bitmap.CompressFormat.PNG, 100, output)
             } else {
-                resized.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
+                resized.compress(Bitmap.CompressFormat.JPEG, jpegQuality, output)
             }
             if (resized !== sampled) resized.recycle()
             sampled.recycle()

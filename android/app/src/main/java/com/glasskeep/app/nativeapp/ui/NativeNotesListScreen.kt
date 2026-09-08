@@ -96,8 +96,10 @@ fun NativeNotesListScreen(
     onOpenNote: (String) -> Unit,
     onOpenArchived: () -> Unit,
     onOpenTrash: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val dark = isSystemInDarkTheme()
+    val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val notes by repository.observeNotes().collectAsState(initial = emptyList())
     var refreshing by remember { mutableStateOf(false) }
@@ -218,12 +220,14 @@ fun NativeNotesListScreen(
         Column(Modifier.fillMaxSize()) {
             NativeHeader(
                 dark = dark,
+                themeId = themeId,
                 titleColor = titleColor,
                 subtextColor = subtextColor,
                 refreshing = refreshing,
                 onRefresh = { refresh() },
                 onOpenArchived = onOpenArchived,
                 onOpenTrash = onOpenTrash,
+                onOpenSettings = onOpenSettings,
                 searchOpen = searchOpen,
                 onSearchOpenChange = { open ->
                     searchOpen = open
@@ -282,30 +286,33 @@ fun NativeNotesListScreen(
 @Composable
 private fun NativeHeader(
     dark: Boolean,
+    themeId: String,
     titleColor: Color,
     subtextColor: Color,
     refreshing: Boolean,
     onRefresh: () -> Unit,
     onOpenArchived: () -> Unit,
     onOpenTrash: () -> Unit,
+    onOpenSettings: () -> Unit,
     searchOpen: Boolean,
     onSearchOpenChange: (Boolean) -> Unit,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
 ) {
-    // Same indigo -> violet "glass chrome" gradient the web header uses
-    // (see headerGradient()), a bottom hairline in the matching border
-    // token, and the real Hamburger glyph. The web header also
-    // backdrop-blurs whatever scrolls behind it. There's no full sidebar
-    // yet, so the hamburger opens a plain dropdown (archived, trash)
-    // instead of a drawer for now; it can grow more entries the same way
-    // as more of the web sidebar gets native screens, without needing a
-    // drawer rebuild for each one.
+    // The web header's own "glass chrome" gradient, following whichever of
+    // the six workspace themes the account has picked (see WorkspaceTheme.kt
+    // and the Settings screen's own theme picker), a bottom hairline in the
+    // matching border token, and the real Hamburger glyph. The web header
+    // also backdrop-blurs whatever scrolls behind it. There's no full
+    // sidebar yet, so the hamburger opens a plain dropdown (archived,
+    // trash, settings) instead of a drawer for now; it can grow more
+    // entries the same way as more of the web sidebar gets native screens,
+    // without needing a drawer rebuild for each one.
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(headerGradient(dark))
+                .background(WorkspaceTheme.headerGradient(themeId, dark))
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -377,6 +384,11 @@ private fun NativeHeader(
                             leadingIcon = { TrashIcon(size = 18.dp, tint = titleColor) },
                             onClick = { mainMenuExpanded = false; onOpenTrash() },
                         )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.native_settings_title)) },
+                            leadingIcon = { SettingsIcon(size = 18.dp, tint = titleColor) },
+                            onClick = { mainMenuExpanded = false; onOpenSettings() },
+                        )
                     }
                 }
                 Spacer(Modifier.width(12.dp))
@@ -418,7 +430,7 @@ private fun NativeHeader(
                 )
             }
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(headerBorderColor(dark)))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(WorkspaceTheme.headerBorderColor(themeId, dark)))
     }
 }
 

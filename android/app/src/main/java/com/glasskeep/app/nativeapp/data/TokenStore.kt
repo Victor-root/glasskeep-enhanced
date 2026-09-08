@@ -39,6 +39,17 @@ class TokenStore(context: Context) {
             prefs.edit().putString(KEY_TOKEN, value).apply()
         }
 
+    /** Cached workspace theme id (see WorkspaceTheme.kt), this app's
+     *  equivalent of the web's own localStorage["gk:shellTheme"] cache
+     *  (src/theme/shellTheme.js): read once at startup so the right
+     *  chrome is live from the first frame, before the server's own
+     *  copy (the source of truth) lands and, if different, wins. */
+    var themeId: String?
+        get() = prefs.getString(KEY_THEME_ID, null)
+        set(value) {
+            prefs.edit().putString(KEY_THEME_ID, value).apply()
+        }
+
     fun clear() {
         NativeDebug.d("TokenStore.clear")
         prefs.edit().clear().apply()
@@ -47,5 +58,6 @@ class TokenStore(context: Context) {
     companion object {
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_TOKEN = "token"
+        private const val KEY_THEME_ID = "theme_id"
     }
 }

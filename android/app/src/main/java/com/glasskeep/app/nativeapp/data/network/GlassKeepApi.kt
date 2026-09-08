@@ -9,6 +9,7 @@ import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 
 @Serializable
@@ -184,10 +185,106 @@ data class SetReminderRequest(
 
 /** Body-less read of this user's saved settings blob (GET /api/user/settings
  *  returns whatever arbitrary keys are stored; only the ones native reads
- *  are declared here, `ignoreUnknownKeys` covers the rest). */
+ *  are declared here, `ignoreUnknownKeys` covers the rest). Also the
+ *  response shape of a PATCH to the same route (server/index.js: it
+ *  echoes back the full merged blob, not just the field that was sent). */
 @Serializable
 data class UserSettingsDto(
     val checklistInsertPosition: String? = null,
+    /** Chosen workspace theme id (see WorkspaceTheme.kt), or null for a
+     *  user who never picked one (defaults to "glasskeep"). */
+    val shellTheme: String? = null,
+)
+
+/** Body for a PATCH /api/user/settings that sets only the workspace theme.
+ *  The server merges partial bodies into the existing settings blob, so
+ *  this narrow request (like every Set*Request in this file) leaves
+ *  every other stored setting untouched. */
+@Serializable
+data class SetShellThemeRequest(val shellTheme: String)
+
+/** Body for a PATCH /api/user/settings that sets only the checklist
+ *  insert-position preference ("top" or "bottom"). Same narrow-body,
+ *  merge-only shape as SetShellThemeRequest. */
+@Serializable
+data class SetChecklistInsertPositionRequest(val checklistInsertPosition: String)
+
+/** GET /api/user/profile response. Mirrors serializeNote()-adjacent
+ *  server code (server/index.js) field for field; `name`/`email` are
+ *  read-only here, same as the web: no route accepts changing either. */
+@Serializable
+data class ProfileDto(
+    val id: Int,
+    val name: String,
+    val email: String,
+    @SerialName("is_admin") val isAdmin: Boolean = false,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    @SerialName("show_on_login") val showOnLogin: Boolean = true,
+    val language: String? = null,
+)
+
+/** Response shape shared by both PATCH /api/user/profile narrow bodies
+ *  below: the server always echoes both fields back regardless of which
+ *  one was actually patched. */
+@Serializable
+data class ProfileMutationResponse(
+    val ok: Boolean = false,
+    @SerialName("show_on_login") val showOnLogin: Boolean = true,
+    val language: String? = null,
+)
+
+/** Body for a profile PATCH that sets only show_on_login. Deliberately its
+ *  own type rather than one combined request with both fields optional:
+ *  kotlinx.serialization (see ApiClientFactory's Json config) serializes
+ *  every declared property including nulls, so a combined request would
+ *  send "language": null on every show_on_login-only change and silently
+ *  clear the user's language preference. */
+@Serializable
+data class SetShowOnLoginRequest(@SerialName("show_on_login") val showOnLogin: Boolean)
+
+/** Body for a profile PATCH that sets only language. `null` is a real,
+ *  meaningful value here (clears the preference back to none), unlike
+ *  SetShowOnLoginRequest's boolean, so this one field is genuinely
+ *  nullable rather than narrowed further. */
+@Serializable
+data class SetLanguageRequest(val language: String?)
+
+/** Body for PUT /api/user/avatar. The server only accepts a data: URL of
+ *  image/png, image/jpeg or image/webp, ≤ ~2MB as base64 text (see
+ *  server/index.js): ImageCompression.compressToDataUrl already only
+ *  ever produces image/jpeg or image/png, so every avatar this app
+ *  uploads is accepted by construction, not by hoping the limits line up. */
+@Serializable
+data class SetAvatarRequest(@SerialName("avatar_url") val avatarUrl: String)
+
+/** Response shared by PUT and DELETE /api/user/avatar (DELETE's own
+ *  avatarUrl is always absent/null, matching its `{ok: true}` body). */
+@Serializable
+data class AvatarMutationResponse(
+    val ok: Boolean = false,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+)
+
+/** Body for POST /api/user/change-password. `currentPassword` is required
+ *  unless the account is still under a first-login temp password
+ *  (server/index.js checks `must_change_password` itself; native has no
+ *  way to know that ahead of the call, so it always sends whatever the
+ *  user typed, including blank, and lets the server decide). */
+@Serializable
+data class ChangePasswordRequest(
+    @SerialName("current_password") val currentPassword: String?,
+    @SerialName("new_password") val newPassword: String,
+)
+
+/** The server replaces the whole session on a password change (fresh
+ *  token, bumped token_version invalidates every other device's session),
+ *  so this mirrors LoginResponse's shape rather than NoteMutationResponse. */
+@Serializable
+data class ChangePasswordResponse(
+    val ok: Boolean = false,
+    val token: String? = null,
+    val user: UserDto? = null,
+    @SerialName("must_change_password") val mustChangePassword: Boolean = false,
 )
 
 /** Shared response shape for PUT/PATCH on a note: `stale` means someone
@@ -256,4 +353,28 @@ interface GlassKeepApi {
 
     @GET("api/user/settings")
     suspend fun getUserSettings(): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setShellTheme(@Body body: SetShellThemeRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setChecklistInsertPosition(@Body body: SetChecklistInsertPositionRequest): Response<UserSettingsDto>
+
+    @GET("api/user/profile")
+    suspend fun getProfile(): Response<ProfileDto>
+
+    @PATCH("api/user/profile")
+    suspend fun setShowOnLogin(@Body body: SetShowOnLoginRequest): Response<ProfileMutationResponse>
+
+    @PATCH("api/user/profile")
+    suspend fun setLanguage(@Body body: SetLanguageRequest): Response<ProfileMutationResponse>
+
+    @PUT("api/user/avatar")
+    suspend fun setAvatar(@Body body: SetAvatarRequest): Response<AvatarMutationResponse>
+
+    @DELETE("api/user/avatar")
+    suspend fun deleteAvatar(): Response<AvatarMutationResponse>
+
+    @POST("api/user/change-password")
+    suspend fun changePassword(@Body body: ChangePasswordRequest): Response<ChangePasswordResponse>
 }
