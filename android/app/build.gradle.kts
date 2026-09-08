@@ -117,7 +117,15 @@ android {
 }
 
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2024.01.00"))
+    // Bumped from 2024.01.00 (native rewrite, milestone: note detail):
+    // navigation-compose 2.7.7 below needs a slightly newer
+    // compose-animation than that BOM pins, so Gradle resolved animation
+    // to a version material3 wasn't built against, crashing at runtime
+    // (NoSuchMethodError on KeyframesSpecConfig.at, only reachable once
+    // CircularProgressIndicator or a NavHost transition actually ran).
+    // Still Compose UI 1.6.x, so kotlinCompilerExtensionVersion (1.5.8,
+    // below) does not need to move.
+    implementation(platform("androidx.compose:compose-bom:2024.04.01"))
     implementation("androidx.core:core-ktx:1.12.0")
     // WorkManager: periodic background reminder sync so reminders created on
     // another device still fire on a closed phone — without any push service.
