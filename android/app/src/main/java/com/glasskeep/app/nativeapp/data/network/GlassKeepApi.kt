@@ -71,6 +71,12 @@ data class PatchNoteRequest(
     @SerialName("client_updated_at") val clientUpdatedAt: String,
 )
 
+/** Body for POST /api/notes. The server defaults every other field (title,
+ *  content, items...) to empty on its own, so creating a blank note only
+ *  needs the type. */
+@Serializable
+data class CreateNoteRequest(val type: String = "text")
+
 /** Shared response shape for PUT/PATCH on a note: `stale` means someone
  *  else changed it first (LWW lost, `note` is the server's current copy,
  *  nothing was written); `readOnly` means the caller isn't allowed to
@@ -89,6 +95,9 @@ interface GlassKeepApi {
 
     @GET("api/notes")
     suspend fun getNotes(): Response<List<NoteDto>>
+
+    @POST("api/notes")
+    suspend fun createNote(@Body body: CreateNoteRequest): Response<NoteDto>
 
     @GET("api/notes/{id}")
     suspend fun getNote(@Path("id") id: String): Response<NoteDto>

@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -76,13 +78,18 @@ private val ErrorColor = Color(0xFFdc2626)
 @Composable
 fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOpenNote: (String) -> Unit) {
     val dark = isSystemInDarkTheme()
+    val context = LocalContext.current
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val notes by repository.observeNotes().collectAsState(initial = emptyList())
     var refreshing by remember { mutableStateOf(false) }
+    var creatingNote by remember { mutableStateOf(false) }
+    var fabOpen by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     val errorSyncTemplate = stringResource(R.string.native_notes_error_sync)
+    val errorCreateTemplate = stringResource(R.string.native_notes_create_error)
+    val typeUnavailableMessage = stringResource(R.string.native_fab_type_unavailable)
 
     val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
@@ -99,6 +106,24 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOp
                 errorMessage = String.format(errorSyncTemplate, t.message ?: t.javaClass.simpleName)
             } finally {
                 refreshing = false
+            }
+        }
+    }
+
+    fun createTextNote() {
+        if (creatingNote) return
+        creatingNote = true
+        errorMessage = null
+        scope.launch {
+            try {
+                val note = repository.createTextNote()
+                NativeDebug.d("Created text note id=${note.id}")
+                onOpenNote(note.id)
+            } catch (t: Throwable) {
+                NativeDebug.e("Create text note failed", t)
+                errorMessage = String.format(errorCreateTemplate, t.message ?: t.javaClass.simpleName)
+            } finally {
+                creatingNote = false
             }
         }
     }
@@ -144,6 +169,14 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOp
                 }
             }
         }
+
+        CreateNoteFab(
+            dark = dark,
+            open = fabOpen,
+            onOpenChange = { fabOpen = it },
+            onCreateText = { createTextNote() },
+            onUnavailableType = { Toast.makeText(context, typeUnavailableMessage, Toast.LENGTH_SHORT).show() },
+        )
     }
 }
 

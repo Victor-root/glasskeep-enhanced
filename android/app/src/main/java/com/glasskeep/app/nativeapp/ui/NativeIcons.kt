@@ -3,6 +3,7 @@ package com.glasskeep.app.nativeapp.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -10,6 +11,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -110,5 +112,95 @@ fun PinIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color
         } else {
             drawPath(path = path, color = tint, style = Stroke(width = 1.5f * scale))
         }
+    }
+}
+
+@Composable
+fun PlusIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/components/notes/MobileCreateFab.jsx's own FAB glyph: a "+" made
+    // of two strokes, x=12/y=5..19 and x=5..19/y=12, strokeWidth 2.5,
+    // round caps. The caller rotates this 45 degrees to turn it into a
+    // close "x" when the dial is open, same as the web version.
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        val strokeWidth = 2.5f * scale
+        drawLine(
+            color = tint,
+            start = Offset(12f * scale, 5f * scale),
+            end = Offset(12f * scale, 19f * scale),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = tint,
+            start = Offset(5f * scale, 12f * scale),
+            end = Offset(19f * scale, 12f * scale),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+    }
+}
+
+// The four icons below are filled paths with real curves (arcs), unlike
+// the straight-line/circle icons above, hand-translating those precisely
+// would be error-prone. PathParser reads the exact same SVG path data
+// string src/icons/index.jsx uses, so the geometry matches byte for byte
+// instead of being eyeballed.
+
+@Composable
+fun TextNoteIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/icons/index.jsx TextNoteIcon, viewBox 24x24, fill="currentColor".
+    val path = remember {
+        PathParser().parsePathString(
+            "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 " +
+                "16H5V5h14v14zm-2-6H7v-2h10v2zm-4 4H7v-2h6v2zm4-8H7V7h10v2z"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) { drawPath(path, color = tint) }
+    }
+}
+
+@Composable
+fun ChecklistIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/icons/index.jsx ChecklistIcon, viewBox 24x24, fill="currentColor".
+    val path = remember {
+        PathParser().parsePathString(
+            "M11 7H3v2h8V7zm0 4H3v2h8v-2zm0 4H3v2h8v-2zm5.59.58L13 12l1.41-1.41L16.59 12l4.59-4.59L22.59 9 16.59 15z"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) { drawPath(path, color = tint) }
+    }
+}
+
+@Composable
+fun BrushIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/icons/index.jsx BrushIcon, viewBox 24x24, fill="currentColor".
+    val path = remember {
+        PathParser().parsePathString(
+            "M20.71 4.63 19.37 3.29c-.39-.39-1.04-.39-1.41 0L9 12.25 11.75 15l8.96-8.96c.39-.39.39-1.02 0-1.41z" +
+                "M7.5 13.5a4.2 4.2 0 0 0-4.2 4.2c0 1.83-1.62 2.8-2.8 2.8 1.29 1.71 3.49 2.8 5.6 2.8a5.6 5.6 0 0 0 5.6-5.6 4.2 4.2 0 0 0-4.2-4.2z"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) { drawPath(path, color = tint) }
+    }
+}
+
+@Composable
+fun MicIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/icons/index.jsx MicIcon, viewBox 24x24, fill="currentColor".
+    val path = remember {
+        PathParser().parsePathString(
+            "M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) { drawPath(path, color = tint) }
     }
 }

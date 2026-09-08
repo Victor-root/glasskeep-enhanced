@@ -33,6 +33,7 @@
     <string name="native_notes_refresh">Refresh</string>
     <string name="native_notes_empty">No notes yet.</string>
     <string name="native_notes_error_sync">Couldn\'t sync: %1$s</string>
+    <string name="native_notes_create_error">Couldn\'t create the note: %1$s</string>
     <string name="native_notes_untitled">Untitled</string>
     <string name="native_notes_more_items">+%1$d more…</string>
     <string name="native_notes_completed_fraction">%1$d/%2$d completed</string>
@@ -40,6 +41,21 @@
     <string name="native_note_type_checklist">Checklist</string>
     <string name="native_note_type_draw">Drawing</string>
     <string name="native_note_type_audio">Audio note</string>
+
+    <!-- "New note" FAB and its dial. Only the text option is wired up
+         (see NoteDetailScreen's own editing scope); the rest show
+         native_fab_type_unavailable instead of creating a note nobody
+         could then edit. -->
+    <string name="native_fab_add_note">Add Note</string>
+    <string name="native_fab_text_note">Text note</string>
+    <string name="native_fab_text_note_desc">Text and formatting</string>
+    <string name="native_fab_checklist">Checklist</string>
+    <string name="native_fab_checklist_desc">Tasks to check off</string>
+    <string name="native_fab_drawing">Drawing</string>
+    <string name="native_fab_drawing_desc">Freehand sketch</string>
+    <string name="native_fab_audio_note">Audio note</string>
+    <string name="native_fab_audio_note_desc">Voice memo from microphone</string>
+    <string name="native_fab_type_unavailable">Not available in the native app yet.</string>
 
     <string name="native_note_detail_back">Back</string>
     <string name="native_note_detail_loading">Loading note…</string>

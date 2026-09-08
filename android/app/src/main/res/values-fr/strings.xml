@@ -30,6 +30,7 @@
     <string name="native_notes_refresh">Actualiser</string>
     <string name="native_notes_empty">Aucune note pour le moment.</string>
     <string name="native_notes_error_sync">Synchronisation impossible : %1$s</string>
+    <string name="native_notes_create_error">Impossible de créer la note : %1$s</string>
     <string name="native_notes_untitled">Sans titre</string>
     <string name="native_notes_more_items">+%1$d de plus…</string>
     <string name="native_notes_completed_fraction">%1$d/%2$d terminés</string>
@@ -37,6 +38,17 @@
     <string name="native_note_type_checklist">Liste</string>
     <string name="native_note_type_draw">Dessin</string>
     <string name="native_note_type_audio">Note audio</string>
+
+    <string name="native_fab_add_note">Ajouter la note</string>
+    <string name="native_fab_text_note">Note texte</string>
+    <string name="native_fab_text_note_desc">Texte et mise en forme</string>
+    <string name="native_fab_checklist">Liste de tâches</string>
+    <string name="native_fab_checklist_desc">Tâches à cocher</string>
+    <string name="native_fab_drawing">Dessin</string>
+    <string name="native_fab_drawing_desc">Croquis libre</string>
+    <string name="native_fab_audio_note">Note audio</string>
+    <string name="native_fab_audio_note_desc">Mémo vocal au microphone</string>
+    <string name="native_fab_type_unavailable">Pas encore disponible dans l\'appli native.</string>
 
     <string name="native_note_detail_back">Retour</string>
     <string name="native_note_detail_loading">Chargement de la note…</string>

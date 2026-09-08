@@ -3,6 +3,7 @@ package com.glasskeep.app.nativeapp.data
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.local.NoteDao
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
+import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
@@ -46,6 +47,27 @@ class NotesRepository(
         val notes = response.body().orEmpty()
         NativeDebug.d("NotesRepository.refresh: got ${notes.size} note(s)")
         noteDao.replaceAll(notes.map { it.toEntity() })
+    }
+
+    /**
+     * Creates a new blank text note and mirrors it into the local list
+     * cache immediately, so it shows up without waiting for the next
+     * refresh(). Checklist/draw/audio creation isn't wired up yet: the
+     * native detail screen can't edit those types either (see
+     * NoteDetailScreen), so creating one would just strand the user on a
+     * note they can't do anything with.
+     */
+    suspend fun createTextNote(): NoteDto {
+        NativeDebug.d("NotesRepository.createTextNote")
+        val response = api.createNote(CreateNoteRequest(type = "text"))
+        val note = response.body()
+        if (!response.isSuccessful || note == null) {
+            val error = "POST /api/notes failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        noteDao.upsertAll(listOf(note.toEntity()))
+        return note
     }
 
     /** Full detail for one note (content/items included, unlike the
