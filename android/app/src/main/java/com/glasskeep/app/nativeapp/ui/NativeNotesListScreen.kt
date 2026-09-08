@@ -2,6 +2,7 @@ package com.glasskeep.app.nativeapp.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -33,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -48,12 +50,10 @@ import com.glasskeep.app.nativeapp.data.ChecklistPreview
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.ui.DarkBgColor
-import com.glasskeep.app.ui.DarkCardBg
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightBgGradient
-import com.glasskeep.app.ui.LightCardBg
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import kotlinx.coroutines.launch
@@ -82,7 +82,6 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOp
     val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
-    val headerBg = if (dark) DarkCardBg else LightCardBg
 
     fun refresh() {
         refreshing = true
@@ -104,9 +103,9 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOp
     Box(Modifier.fillMaxSize().then(bgModifier)) {
         Column(Modifier.fillMaxSize()) {
             NativeHeader(
+                dark = dark,
                 titleColor = titleColor,
                 subtextColor = subtextColor,
-                headerBg = headerBg,
                 refreshing = refreshing,
                 onRefresh = { refresh() },
             )
@@ -144,53 +143,73 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOp
 
 @Composable
 private fun NativeHeader(
+    dark: Boolean,
     titleColor: Color,
     subtextColor: Color,
-    headerBg: Color,
     refreshing: Boolean,
     onRefresh: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(headerBg)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Image(
-            painter = painterResource(id = R.drawable.glasskeep_logo),
-            contentDescription = "GlassKeep",
-            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)),
-        )
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text("Glass Keep", color = titleColor, fontWeight = FontWeight.Bold, fontSize = 19.sp)
-            Text(stringResource(R.string.native_header_notes_label), color = subtextColor, fontSize = 12.sp)
-        }
-        Text(
-            stringResource(R.string.native_notes_refresh),
-            color = if (refreshing) subtextColor else Indigo,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
+    // Same indigo -> violet "glass chrome" gradient the web header uses
+    // (see headerGradient()), a bottom hairline in the matching border
+    // token, and the real Hamburger glyph. The web header also
+    // backdrop-blurs whatever scrolls behind it; there's no sidebar to
+    // open yet so the icon is decorative for now, not a dead menu.
+    Column {
+        Row(
             modifier = Modifier
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    enabled = !refreshing,
-                    role = Role.Button,
-                ) { onRefresh() }
-                .padding(8.dp),
-        )
+                .fillMaxWidth()
+                .background(headerGradient(dark))
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            HamburgerIcon(size = 22.dp, tint = titleColor)
+            Spacer(Modifier.width(12.dp))
+            Image(
+                painter = painterResource(id = R.drawable.glasskeep_logo),
+                contentDescription = "GlassKeep",
+                modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Glass Keep", color = titleColor, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+                Text(stringResource(R.string.native_header_notes_label), color = subtextColor, fontSize = 12.sp)
+            }
+            Text(
+                stringResource(R.string.native_notes_refresh),
+                color = if (refreshing) subtextColor else Indigo,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        enabled = !refreshing,
+                        role = Role.Button,
+                    ) { onRefresh() }
+                    .padding(8.dp),
+            )
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(headerBorderColor(dark)))
     }
 }
 
+// Violet-tinted card shadow, standing in for the web card's own
+// `box-shadow: 0 2px 8px rgba(139, 92, 246, 0.06)`. Compose's shadow
+// API doesn't take a CSS-style low-alpha shadow color directly, so this
+// is the closest native equivalent, not a byte-for-byte port.
+private val CardShadowTint = Color(0xFF8B5CF6)
+
 @Composable
 private fun NoteCard(note: NoteEntity, dark: Boolean, titleColor: Color, subtextColor: Color, onClick: () -> Unit) {
+    val borderColor = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
+    val shape = RoundedCornerShape(12.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .shadow(elevation = 3.dp, shape = shape, ambientColor = CardShadowTint, spotColor = CardShadowTint)
+            .clip(shape)
             .background(noteColorFor(note.color, dark))
+            .border(width = 1.dp, color = borderColor, shape = shape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -199,12 +218,18 @@ private fun NoteCard(note: NoteEntity, dark: Boolean, titleColor: Color, subtext
             )
             .padding(14.dp),
     ) {
-        Text(
-            note.title.ifBlank { stringResource(R.string.native_notes_untitled) },
-            color = titleColor,
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
-        )
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                note.title.ifBlank { stringResource(R.string.native_notes_untitled) },
+                color = titleColor,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                modifier = Modifier.weight(1f),
+            )
+            if (note.pinned) {
+                PinIcon(size = 14.dp, tint = Indigo, filled = true)
+            }
+        }
         Spacer(Modifier.height(6.dp))
 
         if (note.type == "checklist") {
@@ -216,16 +241,6 @@ private fun NoteCard(note: NoteEntity, dark: Boolean, titleColor: Color, subtext
             } else if (note.type != "text") {
                 Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
             }
-        }
-
-        if (note.pinned) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "• " + stringResource(R.string.native_notes_pinned),
-                color = Indigo,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
         }
     }
 }

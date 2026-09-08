@@ -1,6 +1,7 @@
 package com.glasskeep.app.nativeapp.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -31,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -164,28 +166,38 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
 
     Box(Modifier.fillMaxSize().then(bgModifier)) {
         Column(Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "←",
-                    color = titleColor,
-                    fontSize = 22.sp,
+            Column {
+                Row(
                     modifier = Modifier
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onBack() }
-                        .padding(8.dp),
-                )
-                Text(
-                    stringResource(R.string.native_note_detail_back),
-                    color = subtextColor,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(start = 4.dp),
-                )
+                        .fillMaxWidth()
+                        .background(headerGradient(dark))
+                        .padding(horizontal = 8.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Button,
+                            ) { onBack() }
+                            .padding(6.dp)
+                            .weight(1f),
+                    ) {
+                        BackArrowIcon(size = 22.dp, tint = titleColor)
+                        Text(
+                            stringResource(R.string.native_note_detail_back),
+                            color = subtextColor,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(start = 6.dp),
+                        )
+                    }
+                    if (note?.pinned == true) {
+                        PinIcon(size = 20.dp, tint = Indigo, filled = true)
+                    }
+                }
+                Box(Modifier.fillMaxWidth().height(1.dp).background(headerBorderColor(dark)))
             }
 
             when {
@@ -202,17 +214,21 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                 else -> {
                     val currentNote = note!!
                     val edit = editability!!
+                    val cardBorder = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
+                    val cardShape = RoundedCornerShape(16.dp)
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 20.dp),
+                            .padding(20.dp),
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
+                                .shadow(elevation = 3.dp, shape = cardShape, ambientColor = Color(0xFF8B5CF6), spotColor = Color(0xFF8B5CF6))
+                                .clip(cardShape)
                                 .background(cardBg)
+                                .border(width = 1.dp, color = cardBorder, shape = cardShape)
                                 .padding(20.dp),
                         ) {
                             if (edit.isTextType) {

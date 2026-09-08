@@ -31,7 +31,6 @@
     <string name="native_notes_empty">Aucune note pour le moment.</string>
     <string name="native_notes_error_sync">Synchronisation impossible : %1$s</string>
     <string name="native_notes_untitled">Sans titre</string>
-    <string name="native_notes_pinned">Épinglée</string>
     <string name="native_notes_more_items">+%1$d de plus…</string>
     <string name="native_notes_completed_fraction">%1$d/%2$d terminés</string>
     <string name="native_note_type_text">Texte</string>

@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 /**
@@ -44,3 +45,32 @@ fun noteColorFor(colorKey: String?, dark: Boolean): Color {
     val swatch = table[colorKey?.trim()?.lowercase()] ?: table.getValue("default")
     return Color(swatch.r / 255f, swatch.g / 255f, swatch.b / 255f, swatch.a)
 }
+
+/**
+ * The header's "glass chrome" gradient, ported from globalCSS.js's
+ * default GlassKeep theme (--gk-chrome-1/2/3, both light and dark). The
+ * web header also backdrop-blurs whatever scrolls behind it; a solid
+ * gradient at the same ~90% opacity these tokens already carry is the
+ * honest native equivalent (no real per-user theme selection yet either,
+ * this is always the default theme's chrome, not whichever of the six
+ * workspace themes the account has picked on the web).
+ */
+fun headerGradient(dark: Boolean): Brush = Brush.linearGradient(
+    colors = if (dark) {
+        listOf(
+            Color(30 / 255f, 36 / 255f, 64 / 255f, 0.90f),
+            Color(36 / 255f, 33 / 255f, 66 / 255f, 0.90f),
+            Color(44 / 255f, 32 / 255f, 66 / 255f, 0.90f),
+        )
+    } else {
+        listOf(
+            Color(212 / 255f, 221 / 255f, 252 / 255f, 0.90f),
+            Color(221 / 255f, 217 / 255f, 252 / 255f, 0.90f),
+            Color(231 / 255f, 215 / 255f, 252 / 255f, 0.90f),
+        )
+    },
+)
+
+/** --gk-chrome-border, same source. */
+fun headerBorderColor(dark: Boolean): Color =
+    if (dark) Color(126 / 255f, 142 / 255f, 200 / 255f, 0.20f) else Color(120 / 255f, 134 / 255f, 196 / 255f, 0.28f)
