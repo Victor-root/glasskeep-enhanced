@@ -427,6 +427,16 @@ internal fun NoteCard(note: NoteEntity, dark: Boolean, titleColor: Color, subtex
 
         if (note.type == "checklist") {
             ChecklistCardPreview(note = note, titleColor = titleColor, subtextColor = subtextColor)
+        } else if (note.type == "draw" || note.type == "audio") {
+            // Neither shape is NoteContent's rich-doc-or-plain-text JSON
+            // (draw's is {paths,dimensions,text}, audio's is its own
+            // metadata blob), so previewPlainText would just leak the raw
+            // JSON string here rather than a real preview. The web shows a
+            // real vector thumbnail for a drawing (DrawingPreview.jsx) and
+            // presumably something audio-specific; a generic type label
+            // is a safe, non-guessing fallback for both until either gets
+            // its own native preview renderer.
+            Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
         } else {
             val preview = remember(note.content) { NoteContent.previewPlainText(note.content) }
             if (preview.isNotBlank()) {

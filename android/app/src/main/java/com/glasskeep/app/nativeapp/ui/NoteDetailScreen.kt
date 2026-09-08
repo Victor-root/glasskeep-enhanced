@@ -77,6 +77,9 @@ import com.glasskeep.app.nativeapp.NoteExporter
 import com.glasskeep.app.nativeapp.data.ChecklistItemData
 import com.glasskeep.app.nativeapp.data.ChecklistItems
 import com.glasskeep.app.nativeapp.data.DeleteResult
+import com.glasskeep.app.nativeapp.data.DrawingContent
+import com.glasskeep.app.nativeapp.data.DrawingDimensionsDto
+import com.glasskeep.app.nativeapp.data.DrawingStrokeDto
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.NoteImageData
 import com.glasskeep.app.nativeapp.data.NoteImages
@@ -99,6 +102,8 @@ import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -129,6 +134,14 @@ private data class Editability(
      *  is the top-level `richBlocks` state, same split as bodyText. */
     val isRichEditableType: Boolean = false,
     val originalRichBlocks: List<RichBlock>? = null,
+    /** True when DrawingContent.parse approved a "draw" note's content.
+     *  The three original* fields are the as-loaded snapshot the drawing
+     *  autosave's dimensions/caption fall back on; the live, edited
+     *  strokes are the top-level `drawingPaths` state. */
+    val isDrawType: Boolean = false,
+    val originalDrawingPaths: List<DrawingStrokeDto>? = null,
+    val originalDrawingDimensions: DrawingDimensionsDto? = null,
+    val originalDrawingCaptionText: String? = null,
 )
 
 /** One entry in the tag suggestion list: a tag already used on at least one
@@ -199,6 +212,17 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     var pendingRichFocus by remember { mutableStateOf<String?>(null) }
     var showLinkDialog by remember { mutableStateOf(false) }
     var linkDialogTarget by remember { mutableStateOf<LinkTarget?>(null) }
+
+    // Drawing notes: autosaved (debounced, see scheduleDrawingAutosave)
+    // rather than through the shared title/body Save button, matching the
+    // web editor's own autosave-while-drawing behavior instead of forcing
+    // an explicit-Save mental model onto a continuous gesture.
+    var drawingPaths by remember { mutableStateOf<List<DrawingStrokeDto>>(emptyList()) }
+    var drawingDimensions by remember { mutableStateOf<DrawingDimensionsDto?>(null) }
+    var drawingCaptionText by remember { mutableStateOf<String?>(null) }
+    var drawingUndoStack by remember { mutableStateOf<List<List<DrawingStrokeDto>>>(emptyList()) }
+    var drawingRedoStack by remember { mutableStateOf<List<List<DrawingStrokeDto>>>(emptyList()) }
+    var drawingSaveJob by remember { mutableStateOf<Job?>(null) }
 
     // Content images (text/checklist notes only, see edit.isTextType /
     // isChecklistType below); parsed once on load same as checklist items,
@@ -647,6 +671,74 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         pendingRichFocus = newBlock.id
     }
 
+    // ---------- Drawing note edits (DrawingContent.parse-approved notes only) ----------
+
+    /** Debounced autosave: cancels and restarts on every stroke/erase/
+     *  clear/undo/redo/title edit, same 500-ish ms idea as the web
+     *  editor's own drawing autosave (App.jsx), so a fast burst of strokes
+     *  sends one PATCH after the user actually pauses rather than one per
+     *  gesture. Deliberately its own function, not save(): save() also
+     *  navigates back on success, which is right for an explicit Save
+     *  button press but would be wrong here, autosave firing mid-drawing
+     *  must never suddenly leave the screen. */
+    fun scheduleDrawingAutosave() {
+        drawingSaveJob?.cancel()
+        drawingSaveJob = scope.launch {
+            delay(600)
+            if (note == null) return@launch
+            saveError = null
+            try {
+                val encoded = DrawingContent.encode(drawingPaths, drawingDimensions, drawingCaptionText)
+                when (repository.patchNote(noteId, titleText, encoded)) {
+                    is SaveNoteResult.Saved -> NativeDebug.d("NoteDetailScreen drawing autosave OK id=$noteId")
+                    SaveNoteResult.Stale -> saveNotice = staleMessage
+                    SaveNoteResult.ReadOnly -> saveNotice = readOnlyMessage
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("NoteDetailScreen drawing autosave failed", t)
+                saveError = String.format(errorSaveTemplate, t.message ?: t.javaClass.simpleName)
+            }
+        }
+    }
+
+    /** Every drawing mutation (a completed stroke, an erase, a clear, an
+     *  undo/redo) funnels through here or through undoDrawing/redoDrawing:
+     *  push the pre-change state so it can be undone, matching
+     *  useDrawingHistory.js's own pushPaths() exactly, capped at the same
+     *  80 entries. The very first mutation also fixes this drawing's
+     *  reference dimensions from whatever size the canvas measured itself
+     *  at, so later renders (here or on another device) scale consistently
+     *  against that same original size instead of the current screen's. */
+    fun commitDrawingChange(newPaths: List<DrawingStrokeDto>, canvasWidthDp: Float, canvasHeightDp: Float) {
+        if (drawingDimensions == null) {
+            drawingDimensions = DrawingDimensionsDto(width = canvasWidthDp, height = canvasHeightDp)
+        }
+        drawingUndoStack = (drawingUndoStack + listOf(drawingPaths)).takeLast(80)
+        drawingRedoStack = emptyList()
+        drawingPaths = newPaths
+        scheduleDrawingAutosave()
+    }
+
+    fun undoDrawing() {
+        val previous = drawingUndoStack.lastOrNull() ?: return
+        drawingRedoStack = drawingRedoStack + listOf(drawingPaths)
+        drawingUndoStack = drawingUndoStack.dropLast(1)
+        drawingPaths = previous
+        scheduleDrawingAutosave()
+    }
+
+    fun redoDrawing() {
+        val next = drawingRedoStack.lastOrNull() ?: return
+        drawingUndoStack = (drawingUndoStack + listOf(drawingPaths)).takeLast(80)
+        drawingRedoStack = drawingRedoStack.dropLast(1)
+        drawingPaths = next
+        scheduleDrawingAutosave()
+    }
+
+    fun clearDrawing(canvasWidthDp: Float, canvasHeightDp: Float) {
+        commitDrawingChange(emptyList(), canvasWidthDp, canvasHeightDp)
+    }
+
     // ---------- Content images (text/checklist notes only) ----------
 
     /** Persists the given image list and, on success, resyncs local state
@@ -814,10 +906,30 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                         checklistItems = ChecklistItems.parseFlat(fetched.items),
                     )
                 }
+                "draw" -> {
+                    val drawing = DrawingContent.parse(fetched.content)
+                    if (drawing != null) {
+                        Editability(
+                            isTextType = false,
+                            bodyEditable = false,
+                            isLegacyPlain = false,
+                            bodyPlainText = "",
+                            isDrawType = true,
+                            originalDrawingPaths = drawing.paths,
+                            originalDrawingDimensions = drawing.dimensions,
+                            originalDrawingCaptionText = drawing.text,
+                        )
+                    } else {
+                        Editability(isTextType = false, bodyEditable = false, isLegacyPlain = false, bodyPlainText = "")
+                    }
+                }
                 else -> Editability(isTextType = false, bodyEditable = false, isLegacyPlain = false, bodyPlainText = "")
             }
             bodyText = editability?.bodyPlainText.orEmpty()
             richBlocks = editability?.originalRichBlocks
+            drawingPaths = editability?.originalDrawingPaths.orEmpty()
+            drawingDimensions = editability?.originalDrawingDimensions
+            drawingCaptionText = editability?.originalDrawingCaptionText
         } catch (t: Throwable) {
             NativeDebug.e("NoteDetailScreen load failed", t)
             loadError = String.format(errorLoadTemplate, t.message ?: t.javaClass.simpleName)
@@ -1095,20 +1207,22 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                 .border(width = 1.dp, color = cardBorder, shape = cardShape)
                                 .padding(20.dp),
                         ) {
-                            if (edit.isTextType || edit.isChecklistType) {
-                                NoteImagesSection(
-                                    images = images,
-                                    subtextColor = subtextColor,
-                                    enabled = !changingImages,
-                                    onImageClick = { index -> viewerIndex = index },
-                                    onAddClick = {
-                                        photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                    },
-                                )
-                                Spacer(Modifier.height(14.dp))
+                            if (edit.isTextType || edit.isChecklistType || edit.isDrawType) {
+                                if (edit.isTextType || edit.isChecklistType) {
+                                    NoteImagesSection(
+                                        images = images,
+                                        subtextColor = subtextColor,
+                                        enabled = !changingImages,
+                                        onImageClick = { index -> viewerIndex = index },
+                                        onAddClick = {
+                                            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                        },
+                                    )
+                                    Spacer(Modifier.height(14.dp))
+                                }
                                 OutlinedTextField(
                                     value = titleText,
-                                    onValueChange = { titleText = it },
+                                    onValueChange = { titleText = it; if (edit.isDrawType) scheduleDrawingAutosave() },
                                     label = { Text(stringResource(R.string.native_note_detail_title_label)) },
                                     textStyle = MaterialTheme.typography.titleMedium,
                                     singleLine = true,
@@ -1160,6 +1274,49 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                         onRemove = { id -> removeChecklistItem(id) },
                                         onAddItem = { addChecklistItemAtEnd() },
                                     )
+                                }
+                            } else if (edit.isDrawType) {
+                                DrawingEditor(
+                                    paths = drawingPaths,
+                                    canvasWidthDp = drawingDimensions?.width,
+                                    canvasHeightDp = drawingDimensions?.height,
+                                    canvasBackground = if (dark) DarkBgColor else Color.White,
+                                    titleColor = titleColor,
+                                    subtextColor = subtextColor,
+                                    canUndo = drawingUndoStack.isNotEmpty(),
+                                    canRedo = drawingRedoStack.isNotEmpty(),
+                                    onStrokeCompleted = { stroke, w, h -> commitDrawingChange(drawingPaths + stroke, w, h) },
+                                    onErase = { afterErase, w, h -> commitDrawingChange(afterErase, w, h) },
+                                    onClear = { w, h -> clearDrawing(w, h) },
+                                    onUndo = { undoDrawing() },
+                                    onRedo = { redoDrawing() },
+                                )
+                                val captionPlainText = remember(drawingCaptionText) {
+                                    val text = drawingCaptionText
+                                    if (text.isNullOrBlank()) {
+                                        null
+                                    } else {
+                                        val doc = NoteContent.parseRichDoc(text)
+                                        (if (doc != null) NoteContent.docToPlainText(doc) else text).ifBlank { null }
+                                    }
+                                }
+                                captionPlainText?.let { caption ->
+                                    Spacer(Modifier.height(14.dp))
+                                    Text(
+                                        stringResource(R.string.native_drawing_caption_notice),
+                                        color = subtextColor,
+                                        fontSize = 12.sp,
+                                    )
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(caption, color = titleColor, fontSize = 14.sp)
+                                }
+                                saveError?.let {
+                                    Spacer(Modifier.height(10.dp))
+                                    Text(it, color = ErrorColor, fontSize = 12.sp)
+                                }
+                                saveNotice?.let {
+                                    Spacer(Modifier.height(10.dp))
+                                    Text(it, color = subtextColor, fontSize = 12.sp)
                                 }
                             } else if (!edit.isTextType) {
                                 Box(

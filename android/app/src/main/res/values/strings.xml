@@ -135,6 +135,13 @@
     <string name="native_richtext_link_placeholder">https://example.com</string>
     <string name="native_richtext_link_apply">Apply</string>
     <string name="native_richtext_link_remove">Remove link</string>
+    <string name="native_drawing_pen">Pen</string>
+    <string name="native_drawing_eraser">Eraser</string>
+    <string name="native_drawing_clear">Clear</string>
+    <string name="native_drawing_clear_confirm">Confirm?</string>
+    <string name="native_drawing_undo">Undo</string>
+    <string name="native_drawing_redo">Redo</string>
+    <string name="native_drawing_caption_notice">Caption (not yet editable natively):</string>
 
     <!-- App shortcut: long-press the launcher icon to open the QR
          scanner straight away (sign in to a PC paired with this phone). -->

@@ -128,6 +128,13 @@
     <string name="native_richtext_link_placeholder">https://exemple.com</string>
     <string name="native_richtext_link_apply">Appliquer</string>
     <string name="native_richtext_link_remove">Retirer le lien</string>
+    <string name="native_drawing_pen">Crayon</string>
+    <string name="native_drawing_eraser">Gomme</string>
+    <string name="native_drawing_clear">Effacer</string>
+    <string name="native_drawing_clear_confirm">Confirmer ?</string>
+    <string name="native_drawing_undo">Annuler</string>
+    <string name="native_drawing_redo">Rétablir</string>
+    <string name="native_drawing_caption_notice">Légende (pas encore modifiable nativement) :</string>
 
     <string name="shortcut_qr_short">Scanner QRCODE</string>
     <string name="shortcut_qr_long">Scanner QRCODE</string>
