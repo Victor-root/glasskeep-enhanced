@@ -84,6 +84,15 @@ async function rawFetchStatus(token, timeoutMs = 4000) {
             const data = await res.json().catch(() => null);
             return { ok: true, status: data };
         }
+        // Behind a reverse proxy (Nginx, Caddy...), the moment step 4
+        // restarts the glass-keep service itself, the proxy answers
+        // with a real 502/503/504 instead of a connection error, so
+        // the catch block below never sees an exception. Treat those
+        // exactly like a network hiccup so polling keeps going
+        // instead of giving up mid-update.
+        if (res.status === 502 || res.status === 503 || res.status === 504) {
+            return { ok: false, transient: true, code: res.status };
+        }
         return { ok: false, transient: false, code: res.status };
     } catch (e) {
         clearTimeout(t);

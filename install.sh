@@ -1309,7 +1309,7 @@ action_update() {
 
     # shellcheck disable=SC2059
     step "$(printf "$MSG_STEP_PULL" "$latest_tag")" \
-        bash -c "cd '${INSTALL_DIR}' && git fetch --depth=1 origin 'refs/tags/${latest_tag}:refs/tags/${latest_tag}' && git reset --hard 'refs/tags/${latest_tag}' && git branch | grep -v '^\* ' | xargs -r git branch -D 2>/dev/null || true"
+        bash -c "cd '${INSTALL_DIR}' && git fetch --depth=1 origin '+refs/tags/${latest_tag}:refs/tags/${latest_tag}' && git reset --hard 'refs/tags/${latest_tag}' && git branch | grep -v '^\* ' | xargs -r git branch -D 2>/dev/null || true"
 
     info "${DIM}${MSG_HINT_LONG}${RESET}"
     step "$MSG_STEP_NPM_UPDATE" \

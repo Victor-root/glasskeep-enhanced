@@ -310,7 +310,12 @@ write_status "fetching" "$CURRENT_STEP" "Downloading the latest version..." ""
         # its tag, never the tracked branch's current tip, which may
         # already be ahead of the last tagged release.
         echo "[self-update] target release: v${TARGET_VERSION}"
-        git fetch --depth=1 origin "refs/tags/v${TARGET_VERSION}:refs/tags/v${TARGET_VERSION}"
+        # Forced (+): a local tag ref of the same name left over from an
+        # earlier attempt must not silently win over what origin actually
+        # has for that tag today. Without the +, git rejects the update
+        # instead of failing loudly, and the reset below would then run
+        # against stale data.
+        git fetch --depth=1 origin "+refs/tags/v${TARGET_VERSION}:refs/tags/v${TARGET_VERSION}"
         git reset --hard "refs/tags/v${TARGET_VERSION}"
     else
         # No release recorded — a manual `systemctl start`, outside the
