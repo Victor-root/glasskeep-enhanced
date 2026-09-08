@@ -1,8 +1,14 @@
 package com.glasskeep.app.nativeapp
 
+import android.app.Activity
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowInsetsControllerCompat
 import com.glasskeep.app.nativeapp.ui.NativeNavHost
 import com.glasskeep.app.ui.theme.GlassKeepTheme
 
@@ -23,6 +29,21 @@ class NativeAppActivity : ComponentActivity() {
         val container = NativeAppContainer(applicationContext)
 
         setContent {
+            val dark = isSystemInDarkTheme()
+            val view = LocalView.current
+            // Same status/nav bar treatment as MainActivity's onboarding
+            // (same two colors as SetupScreen's own light/dark background),
+            // so the system bars never clash with the native screens below.
+            SideEffect {
+                val window = (view.context as Activity).window
+                val bgColor = Color.parseColor(if (dark) "#1a1a1a" else "#f0e8ff")
+                window.statusBarColor = bgColor
+                window.navigationBarColor = bgColor
+                WindowInsetsControllerCompat(window, view).apply {
+                    isAppearanceLightStatusBars = !dark
+                    isAppearanceLightNavigationBars = !dark
+                }
+            }
             GlassKeepTheme {
                 NativeNavHost(container = container, serverUrl = serverUrl)
             }

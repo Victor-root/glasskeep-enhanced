@@ -19,6 +19,23 @@
     <string name="download_started">Téléchargement lancé…</string>
     <string name="download_complete">Enregistré : %1$s</string>
     <string name="download_error">Erreur de téléchargement</string>
+
+    <string name="native_login_title">GlassKeep, aperçu natif</string>
+    <string name="native_login_email">E-mail</string>
+    <string name="native_login_password">Mot de passe</string>
+    <string name="native_login_submit">Se connecter</string>
+    <string name="native_login_error_rejected">Connexion refusée (code %1$d). Vérifiez l\'e-mail et le mot de passe.</string>
+    <string name="native_login_error_network">Impossible de joindre le serveur : %1$s</string>
+    <string name="native_notes_title">Notes (%1$d)</string>
+    <string name="native_notes_refresh">Actualiser</string>
+    <string name="native_notes_empty">Aucune note pour le moment.</string>
+    <string name="native_notes_error_sync">Synchronisation impossible : %1$s</string>
+    <string name="native_notes_untitled">Sans titre</string>
+    <string name="native_notes_pinned">Épinglée</string>
+    <string name="native_note_type_text">Texte</string>
+    <string name="native_note_type_checklist">Liste</string>
+    <string name="native_note_type_draw">Dessin</string>
+    <string name="native_note_type_audio">Note audio</string>
     <string name="shortcut_qr_short">Scanner QRCODE</string>
     <string name="shortcut_qr_long">Scanner QRCODE</string>
     <string name="shortcut_new_text_short">Note texte</string>
