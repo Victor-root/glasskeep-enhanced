@@ -28,9 +28,10 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import com.glasskeep.app.net.CleartextPolicy
 
 class WebViewActivity : AppCompatActivity() {
@@ -544,7 +545,9 @@ class WebViewActivity : AppCompatActivity() {
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
-                databaseEnabled = true
+                // No databaseEnabled: it only ever controlled WebSQL, which
+                // Chromium has removed entirely, the flag is dead on any
+                // WebView build actually running it.
                 cacheMode = WebSettings.LOAD_DEFAULT
                 mediaPlaybackRequiresUserGesture = false
 
@@ -882,15 +885,16 @@ class WebViewActivity : AppCompatActivity() {
     private fun applySystemBarColor(hexColor: String) {
         try {
             val color = Color.parseColor(hexColor)
-            window.statusBarColor = color
-            window.navigationBarColor = color
 
             val luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
             val isLight = luminance > 0.5
 
-            val controller = WindowInsetsControllerCompat(window, window.decorView)
-            controller.isAppearanceLightStatusBars = isLight
-            controller.isAppearanceLightNavigationBars = isLight
+            // This activity is already edge-to-edge (see
+            // setDecorFitsSystemWindows(window, false) above), so this is
+            // just the non-deprecated way to paint the scrim color behind
+            // the transparent system bars, not a switch to edge-to-edge.
+            val style = if (isLight) SystemBarStyle.light(color, color) else SystemBarStyle.dark(color)
+            enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
         } catch (_: Exception) { }
     }
 

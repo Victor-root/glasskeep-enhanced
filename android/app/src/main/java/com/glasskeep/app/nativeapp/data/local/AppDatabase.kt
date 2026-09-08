@@ -24,7 +24,7 @@ abstract class AppDatabase : RoomDatabase() {
                     // never the source of truth, so a schema bump just
                     // drops and recreates it instead of writing a real
                     // migration. Safe as long as that stays true.
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }
     }
