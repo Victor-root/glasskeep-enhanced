@@ -6,8 +6,8 @@
 
 [![Easy install](https://img.shields.io/badge/Easy-install%20script-2ea44f?style=for-the-badge\&logo=gnubash\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced#-installation)
 [![Docker](https://img.shields.io/badge/Docker-GHCR-2496ED?style=for-the-badge\&logo=docker\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced#-docker-installation)
-[![Android](https://img.shields.io/badge/Android-APK-3DDC84?style=for-the-badge\&logo=android\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.5.0/GlassKeep-v1.4.6.apk)
-[![Android TV](https://img.shields.io/badge/Android%20TV-supported-3DDC84?style=for-the-badge\&logo=androidtv\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.5.0/GlassKeep-v1.4.6.apk)
+[![Android](https://img.shields.io/badge/Android-APK-3DDC84?style=for-the-badge\&logo=android\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.6.0/GlassKeep-v1.4.7.apk)
+[![Android TV](https://img.shields.io/badge/Android%20TV-supported-3DDC84?style=for-the-badge\&logo=androidtv\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.6.0/GlassKeep-v1.4.7.apk)
 [![PWA](https://img.shields.io/badge/PWA-ready-5A0FC8?style=for-the-badge\&logo=pwa\&logoColor=white)](https://github.com/Victor-root/glasskeep-enhanced)
 
 <a href="https://victor-root.github.io/glasskeep-enhanced/"><picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/website-dark.webp"><img width="820" alt="The GlassKeep website: the feature list, real screenshots, the six workspace themes, and the install instructions" src=".github/assets/website-light.webp" /></picture></a>
@@ -81,11 +81,11 @@ The **same APK also runs on Android TV**: the app detects leanback hardware (or 
 
 The launcher icon, the Android TV banner, the PWA install icon, and the favicon have all been redrawn from a single master so the app looks coherent across every surface.
 
-[Download latest Android APK](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.5.0/GlassKeep-v1.4.6.apk)
+[Download latest Android APK](https://github.com/Victor-root/glasskeep-enhanced/releases/download/v2.6.0/GlassKeep-v1.4.7.apk)
 
 [![Get it on Omnify](https://victor-root.github.io/Omnify/assets/get-it-on-omnify.svg)](https://victor-root.github.io/Omnify/add?url=https%3A%2F%2Fgithub.com%2FVictor-root%2Fglasskeep-enhanced) <a href="https://github.com/Victor-root/glasskeep-enhanced/releases"><img src="docs/badges/get-it-on-github.svg" alt="Get it on GitHub"/></a>
 
-Current APK version: `1.4.6`
+Current APK version: `1.4.7`
 
 > The Android source code is available in the `android/` directory.
 
