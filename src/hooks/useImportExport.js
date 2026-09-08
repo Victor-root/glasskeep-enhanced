@@ -271,6 +271,12 @@ export default function useImportExport(token, { currentUser, loadNotes }) {
           const title = String(obj.title || "");
           const hasChecklist =
             Array.isArray(obj.listContent) && obj.listContent.length > 0;
+          // Google Takeout's listContent entries only ever carry `text` and
+          // `isChecked` (verified against real Takeout exports, JSON and
+          // HTML alike): Google does not export which items are indented
+          // under another. There is nothing to read here, so imported items
+          // stay flat; normalizeItems already treats a missing `indent` as
+          // 0, which matches reality for this source.
           const items = hasChecklist
             ? obj.listContent.map((it) => ({
                 id: uid(),
