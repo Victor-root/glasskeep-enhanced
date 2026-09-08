@@ -9,11 +9,13 @@ import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
+import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 
 /** Outcome of a note save. Stale/ReadOnly are real, expected server
  *  answers (see PATCH /api/notes/:id), not bugs, the caller shows each
@@ -75,6 +77,21 @@ class NotesRepository(
         val note = response.body()
         if (!response.isSuccessful || note == null) {
             val error = "POST /api/notes failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        noteDao.upsertAll(listOf(note.toEntity()))
+        return note
+    }
+
+    /** Creates a new, empty checklist note (no seeded item: matches the
+     *  web's own fresh checklist draft, see useDraftNote.js). */
+    suspend fun createChecklistNote(): NoteDto {
+        NativeDebug.d("NotesRepository.createChecklistNote")
+        val response = api.createNote(CreateNoteRequest(type = "checklist"))
+        val note = response.body()
+        if (!response.isSuccessful || note == null) {
+            val error = "POST /api/notes (checklist) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }
@@ -354,6 +371,48 @@ class NotesRepository(
         val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (tags): ok response with no note")
         noteDao.upsertAll(listOf(saved.toEntity()))
         return SaveNoteResult.Saved(saved)
+    }
+
+    /** Replaces a checklist note's items (see ChecklistItems for the
+     *  flat/no-section shape this expects). Same PATCH endpoint, same
+     *  narrow-body pattern as setColor()/setTags(), plus `type`/`content`
+     *  because that's what the web's own syncChecklistItems() sends
+     *  (App.jsx) for this exact call. */
+    suspend fun setChecklistItems(id: String, items: List<JsonElement>): SaveNoteResult {
+        NativeDebug.d("NotesRepository.setChecklistItems id=$id count=${items.size}")
+        val response = api.setChecklistItems(id, SetChecklistItemsRequest(items = items, clientUpdatedAt = nowIso()))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "PATCH /api/notes/$id (items) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        if (body.stale) {
+            NativeDebug.d("NotesRepository.setChecklistItems id=$id: stale, not applied")
+            return SaveNoteResult.Stale
+        }
+        val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (items): ok response with no note")
+        noteDao.upsertAll(listOf(saved.toEntity()))
+        return SaveNoteResult.Saved(saved)
+    }
+
+    /** This user's saved "new checklist item position" preference
+     *  ("top"/"bottom", see App.jsx's checklistInsertPosition), read from
+     *  the generic settings blob so the native editor's Enter-to-add-item
+     *  behavior matches whatever the user already has configured on the
+     *  web app instead of guessing a hardcoded default. Best-effort: native
+     *  has no settings screen to surface a failure in, and a wrong-but
+     *  harmless default (the web's own fresh-install default) is a better
+     *  outcome here than blocking checklist editing on this one read. */
+    suspend fun fetchChecklistInsertPosition(): String {
+        return try {
+            val response = api.getUserSettings()
+            val position = response.body()?.checklistInsertPosition
+            if (response.isSuccessful && position == "bottom") "bottom" else "top"
+        } catch (t: Throwable) {
+            NativeDebug.e("NotesRepository.fetchChecklistInsertPosition failed, defaulting to top", t)
+            "top"
+        }
     }
 }
 

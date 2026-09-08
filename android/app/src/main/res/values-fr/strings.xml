@@ -100,6 +100,12 @@
     <string name="native_note_detail_tags_none_found">Aucun tag trouvé</string>
     <string name="native_note_detail_tags_create">Créer \"%1$s\"</string>
     <string name="native_note_detail_tags_remove">Retirer le tag %1$s</string>
+    <string name="native_checklist_empty">Aucun élément pour le moment.</string>
+    <string name="native_checklist_add_item">Ajouter un élément</string>
+    <string name="native_checklist_remove_item">Retirer l\'élément</string>
+    <string name="native_checklist_indent">Augmenter le retrait</string>
+    <string name="native_checklist_outdent">Réduire le retrait</string>
+    <string name="native_checklist_sections_notice">Cette liste utilise des sections. La modification native des sections n\'est pas encore disponible, seul un aperçu en lecture seule est affiché ci-dessous.</string>
 
     <string name="shortcut_qr_short">Scanner QRCODE</string>
     <string name="shortcut_qr_long">Scanner QRCODE</string>

@@ -42,7 +42,7 @@
     <string name="native_note_type_draw">Drawing</string>
     <string name="native_note_type_audio">Audio note</string>
 
-    <!-- "New note" FAB and its dial. Only the text option is wired up
+    <!-- "New note" FAB and its dial. Only text and checklist are wired up
          (see NoteDetailScreen's own editing scope); the rest show
          native_fab_type_unavailable instead of creating a note nobody
          could then edit. -->
@@ -107,6 +107,12 @@
     <string name="native_note_detail_tags_none_found">No tags found</string>
     <string name="native_note_detail_tags_create">Create \"%1$s\"</string>
     <string name="native_note_detail_tags_remove">Remove tag %1$s</string>
+    <string name="native_checklist_empty">No items yet.</string>
+    <string name="native_checklist_add_item">Add item</string>
+    <string name="native_checklist_remove_item">Remove item</string>
+    <string name="native_checklist_indent">Increase indent</string>
+    <string name="native_checklist_outdent">Decrease indent</string>
+    <string name="native_checklist_sections_notice">This checklist uses sections. Native editing for sections isn\'t available yet, only a read-only preview is shown below.</string>
 
     <!-- App shortcut: long-press the launcher icon to open the QR
          scanner straight away (sign in to a PC paired with this phone). -->

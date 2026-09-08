@@ -131,6 +131,29 @@ data class SetTagsRequest(
     @SerialName("client_updated_at") val clientUpdatedAt: String,
 )
 
+/** Body for a checklist-items PATCH /api/notes/:id. `items` is relayed as
+ *  fully opaque JSON server-side (see server/index.js: no per-item
+ *  validation, just "must be an array"), so JsonElement here mirrors
+ *  NoteDto.items exactly. `type` is resent because that's what the web's
+ *  own syncChecklistItems() sends (App.jsx), and `content` stays empty:
+ *  a checklist note's content always does (see the PATCH handler's own
+ *  type-aware content handling). */
+@Serializable
+data class SetChecklistItemsRequest(
+    val items: List<JsonElement>,
+    val type: String = "checklist",
+    val content: String = "",
+    @SerialName("client_updated_at") val clientUpdatedAt: String,
+)
+
+/** Body-less read of this user's saved settings blob (GET /api/user/settings
+ *  returns whatever arbitrary keys are stored; only the ones native reads
+ *  are declared here, `ignoreUnknownKeys` covers the rest). */
+@Serializable
+data class UserSettingsDto(
+    val checklistInsertPosition: String? = null,
+)
+
 /** Shared response shape for PUT/PATCH on a note: `stale` means someone
  *  else changed it first (LWW lost, `note` is the server's current copy,
  *  nothing was written); `readOnly` means the caller isn't allowed to
@@ -185,4 +208,10 @@ interface GlassKeepApi {
 
     @PATCH("api/notes/{id}")
     suspend fun setTags(@Path("id") id: String, @Body body: SetTagsRequest): Response<NoteMutationResponse>
+
+    @PATCH("api/notes/{id}")
+    suspend fun setChecklistItems(@Path("id") id: String, @Body body: SetChecklistItemsRequest): Response<NoteMutationResponse>
+
+    @GET("api/user/settings")
+    suspend fun getUserSettings(): Response<UserSettingsDto>
 }
