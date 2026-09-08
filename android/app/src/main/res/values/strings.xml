@@ -56,6 +56,10 @@
     <string name="native_fab_audio_note">Audio note</string>
     <string name="native_fab_audio_note_desc">Voice memo from microphone</string>
     <string name="native_fab_type_unavailable">Not available in the native app yet.</string>
+    <string name="native_notes_search">Search</string>
+    <string name="native_notes_search_placeholder">Search notes…</string>
+    <string name="native_notes_search_close">Close search</string>
+    <string name="native_notes_search_empty">No notes match your search.</string>
 
     <string name="native_note_detail_back">Back</string>
     <string name="native_note_detail_loading">Loading note…</string>

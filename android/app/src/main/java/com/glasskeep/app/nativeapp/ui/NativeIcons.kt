@@ -118,6 +118,54 @@ fun PinIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color
 }
 
 @Composable
+fun SearchIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/icons/index.jsx SearchIcon: circle r=8 at (11,11) plus a line
+    // from (21,21) to (16.65,16.65), viewBox 24x24, strokeWidth 2, round
+    // caps.
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        val strokeWidth = 2f * scale
+        drawCircle(
+            color = tint,
+            radius = 8f * scale,
+            center = Offset(11f * scale, 11f * scale),
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+        )
+        drawLine(
+            color = tint,
+            start = Offset(21f * scale, 21f * scale),
+            end = Offset(16.65f * scale, 16.65f * scale),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+    }
+}
+
+@Composable
+fun CloseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/icons/index.jsx CloseIcon: two diagonal strokes forming an "x",
+    // viewBox 24x24, strokeWidth 2.4, round caps.
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        val strokeWidth = 2.4f * scale
+        drawLine(
+            color = tint,
+            start = Offset(6f * scale, 6f * scale),
+            end = Offset(18f * scale, 18f * scale),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = tint,
+            start = Offset(18f * scale, 6f * scale),
+            end = Offset(6f * scale, 18f * scale),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+    }
+}
+
+@Composable
 fun PlusIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
     // src/components/notes/MobileCreateFab.jsx's own FAB glyph: a "+" made
     // of two strokes, x=12/y=5..19 and x=5..19/y=12, strokeWidth 2.5,

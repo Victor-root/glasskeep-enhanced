@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,11 +42,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -85,7 +93,19 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOp
     var creatingNote by remember { mutableStateOf(false) }
     var fabOpen by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+
+    // Client-side only, same fields the web app matches for a note without
+    // tags/items/images (title, content): those don't have a native data
+    // layer yet (see NoteEntity), so this is narrower than the web's own
+    // search until they do.
+    val filteredNotes = remember(notes, searchQuery) {
+        val q = searchQuery.trim()
+        if (q.isEmpty()) notes
+        else notes.filter { it.title.contains(q, ignoreCase = true) || it.content.contains(q, ignoreCase = true) }
+    }
 
     val errorSyncTemplate = stringResource(R.string.native_notes_error_sync)
     val errorCreateTemplate = stringResource(R.string.native_notes_create_error)
@@ -138,6 +158,13 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOp
                 subtextColor = subtextColor,
                 refreshing = refreshing,
                 onRefresh = { refresh() },
+                searchOpen = searchOpen,
+                onSearchOpenChange = { open ->
+                    searchOpen = open
+                    if (!open) searchQuery = ""
+                },
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
             )
 
             errorMessage?.let {
@@ -148,6 +175,10 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOp
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.native_notes_empty), color = subtextColor)
                 }
+            } else if (filteredNotes.isEmpty() && searchQuery.isNotBlank()) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.native_notes_search_empty), color = subtextColor)
+                }
             } else {
                 val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                 LazyVerticalStaggeredGrid(
@@ -157,7 +188,7 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOp
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalItemSpacing = 10.dp,
                 ) {
-                    items(notes, key = { it.id }) { note ->
+                    items(filteredNotes, key = { it.id }) { note ->
                         NoteCard(
                             note = note,
                             dark = dark,
@@ -187,6 +218,10 @@ private fun NativeHeader(
     subtextColor: Color,
     refreshing: Boolean,
     onRefresh: () -> Unit,
+    searchOpen: Boolean,
+    onSearchOpenChange: (Boolean) -> Unit,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
 ) {
     // Same indigo -> violet "glass chrome" gradient the web header uses
     // (see headerGradient()), a bottom hairline in the matching border
@@ -202,32 +237,87 @@ private fun NativeHeader(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            HamburgerIcon(size = 22.dp, tint = titleColor)
-            Spacer(Modifier.width(12.dp))
-            Image(
-                painter = painterResource(id = R.drawable.glasskeep_logo),
-                contentDescription = "GlassKeep",
-                modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)),
-            )
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Glass Keep", color = titleColor, fontWeight = FontWeight.Bold, fontSize = 19.sp)
-                Text(stringResource(R.string.native_header_notes_label), color = subtextColor, fontSize = 12.sp)
+            if (searchOpen) {
+                val focusRequester = remember { FocusRequester() }
+                val keyboard = LocalSoftwareKeyboardController.current
+                val closeSearchLabel = stringResource(R.string.native_notes_search_close)
+                SearchIcon(size = 20.dp, tint = subtextColor)
+                Spacer(Modifier.width(10.dp))
+                Box(modifier = Modifier.weight(1f)) {
+                    if (searchQuery.isEmpty()) {
+                        Text(
+                            stringResource(R.string.native_notes_search_placeholder),
+                            color = subtextColor,
+                            fontSize = 16.sp,
+                        )
+                    }
+                    BasicTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        textStyle = TextStyle(color = titleColor, fontSize = 16.sp),
+                        singleLine = true,
+                        cursorBrush = SolidColor(Indigo),
+                        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .semantics { contentDescription = closeSearchLabel }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onSearchOpenChange(false) }
+                        .padding(6.dp),
+                ) {
+                    CloseIcon(size = 20.dp, tint = titleColor)
+                }
+                LaunchedEffect(Unit) {
+                    focusRequester.requestFocus()
+                    keyboard?.show()
+                }
+            } else {
+                HamburgerIcon(size = 22.dp, tint = titleColor)
+                Spacer(Modifier.width(12.dp))
+                Image(
+                    painter = painterResource(id = R.drawable.glasskeep_logo),
+                    contentDescription = "GlassKeep",
+                    modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)),
+                )
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Glass Keep", color = titleColor, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+                    Text(stringResource(R.string.native_header_notes_label), color = subtextColor, fontSize = 12.sp)
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onSearchOpenChange(true) }
+                        .padding(8.dp),
+                ) {
+                    SearchIcon(size = 18.dp, tint = titleColor)
+                }
+                Text(
+                    stringResource(R.string.native_notes_refresh),
+                    color = if (refreshing) subtextColor else Indigo,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    modifier = Modifier
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            enabled = !refreshing,
+                            role = Role.Button,
+                        ) { onRefresh() }
+                        .padding(8.dp),
+                )
             }
-            Text(
-                stringResource(R.string.native_notes_refresh),
-                color = if (refreshing) subtextColor else Indigo,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
-                modifier = Modifier
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        enabled = !refreshing,
-                        role = Role.Button,
-                    ) { onRefresh() }
-                    .padding(8.dp),
-            )
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(headerBorderColor(dark)))
     }
