@@ -58,6 +58,7 @@ import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.NoteExporter
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.SaveNoteResult
 import com.glasskeep.app.nativeapp.data.network.NoteDto
@@ -71,7 +72,9 @@ import com.glasskeep.app.ui.LightBgGradient
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val ErrorColor = Color(0xFFdc2626)
 
@@ -127,6 +130,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     val readOnlyMessage = stringResource(R.string.native_note_detail_readonly)
     val actionErrorTemplate = stringResource(R.string.native_note_detail_action_error)
     val duplicateSuffix = stringResource(R.string.native_note_detail_duplicate_suffix)
+    val downloadErrorMessage = stringResource(R.string.native_note_detail_download_error)
 
     fun togglePin() {
         val current = note ?: return
@@ -251,6 +255,20 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                 ).show()
             } finally {
                 duplicating = false
+            }
+        }
+    }
+
+    fun downloadNote() {
+        val current = note ?: return
+        val edit = editability ?: return
+        if (!edit.isTextType) return
+        scope.launch(Dispatchers.IO) {
+            val ok = NoteExporter.exportText(context, current.title, edit.bodyPlainText)
+            if (!ok) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, downloadErrorMessage, Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -405,6 +423,13 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                     enabled = !duplicating,
                                     onClick = { menuExpanded = false; duplicateNote() },
                                 )
+                                if (editability?.isTextType == true) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.native_note_detail_download)) },
+                                        leadingIcon = { DownloadIcon(size = 18.dp, tint = titleColor) },
+                                        onClick = { menuExpanded = false; downloadNote() },
+                                    )
+                                }
                                 DropdownMenuItem(
                                     text = {
                                         Text(

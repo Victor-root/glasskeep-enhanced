@@ -283,6 +283,22 @@ fun DuplicateIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color =
 }
 
 @Composable
+fun DownloadIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/icons/index.jsx DownloadIcon (two subpaths: the arrow, then the
+    // baseline), viewBox 24x24, stroke (not filled), strokeWidth 1.8,
+    // round caps/joins.
+    val path = remember {
+        PathParser().parsePathString("M7 10l5 5m0 0l5-5m-5 5V3M5 21h14").toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+@Composable
 fun TrashIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
     // src/icons/index.jsx Trash, viewBox 24x24, stroke (not filled),
     // strokeWidth 1.5, round caps/joins.

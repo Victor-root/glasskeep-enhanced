@@ -83,6 +83,8 @@
     <string name="native_note_detail_color_title">Note color</string>
     <string name="native_note_detail_duplicate">Duplicate note</string>
     <string name="native_note_detail_duplicate_suffix">(copy)</string>
+    <string name="native_note_detail_download">Download as Markdown</string>
+    <string name="native_note_detail_download_error">Couldn\'t start the download</string>
 
     <!-- App shortcut: long-press the launcher icon to open the QR
          scanner straight away (sign in to a PC paired with this phone). -->

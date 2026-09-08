@@ -4,7 +4,12 @@
   context.cacheDir/updates/ and hands Android a content:// URI rooted at
   this path so the system installer can read the file across the process
   boundary without us needing READ/WRITE_EXTERNAL_STORAGE.
+
+  exports/ is the same idea for the native note-download feature
+  (NoteExporter.kt): a note gets written to context.cacheDir/exports/
+  and shared the same content:// way, no storage permission needed.
 -->
 <paths>
     <cache-path name="updates" path="updates/" />
+    <cache-path name="exports" path="exports/" />
 </paths>
