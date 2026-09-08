@@ -2,7 +2,10 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    // No org.jetbrains.kotlin.android here: AGP 9.0+ compiles Kotlin itself
+    // (built-in Kotlin support), applying that plugin on top now fails the
+    // build. See kotlinOptions removal below for the other half of this.
+    //
     // Native rewrite: KSP generates Room's DAO implementations at compile
     // time (no reflection, unlike kapt); the serialization plugin lets data
     // classes be marked @Serializable for the Retrofit/JSON layer below.
@@ -88,9 +91,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    // No kotlinOptions {} block anymore: with AGP's built-in Kotlin support
+    // (see the plugins block above), the Kotlin jvmTarget defaults to
+    // compileOptions.targetCompatibility above, so setting it again here
+    // is redundant.
 
     buildFeatures {
         compose = true
