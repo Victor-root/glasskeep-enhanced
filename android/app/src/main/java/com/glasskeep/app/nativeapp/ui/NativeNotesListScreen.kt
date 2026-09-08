@@ -174,6 +174,24 @@ fun NativeNotesListScreen(
         }
     }
 
+    fun createDrawingNote() {
+        if (creatingNote) return
+        creatingNote = true
+        errorMessage = null
+        scope.launch {
+            try {
+                val note = repository.createDrawingNote()
+                NativeDebug.d("Created drawing note id=${note.id}")
+                onOpenNote(note.id)
+            } catch (t: Throwable) {
+                NativeDebug.e("Create drawing note failed", t)
+                errorMessage = String.format(errorCreateTemplate, t.message ?: t.javaClass.simpleName)
+            } finally {
+                creatingNote = false
+            }
+        }
+    }
+
     LaunchedEffect(serverUrl) { refresh() }
 
     Box(Modifier.fillMaxSize().then(bgModifier)) {
@@ -235,6 +253,7 @@ fun NativeNotesListScreen(
             onOpenChange = { fabOpen = it },
             onCreateText = { createTextNote() },
             onCreateChecklist = { createChecklistNote() },
+            onCreateDrawing = { createDrawingNote() },
             onUnavailableType = { Toast.makeText(context, typeUnavailableMessage, Toast.LENGTH_SHORT).show() },
         )
     }
