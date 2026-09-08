@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -35,6 +36,7 @@ import kotlinx.coroutines.launch
  * screen is to prove the whole pipe end to end (login, /api/notes, local
  * cache, display) before building anything on top of it.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String) {
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
