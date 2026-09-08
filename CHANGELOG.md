@@ -15,7 +15,7 @@ Headline feature: **cross-server collaboration**. Pair two self-hosted GlassKeep
 - 🌍 **Project website**, published via GitHub Pages.
 
 ### 🔒 Security
-An independent audit covered the server, the Android app and the admin scripts. Every confirmed finding is fixed (details in `audit/audit-glasskeep.html`):
+An independent audit covered the server, the Android app and the admin scripts. Every confirmed finding is fixed:
 - Instance-unlock brute-force protection and its plaintext-HTTP refusal could both be bypassed via a spoofable header/value.
 - The AI feature could be used to probe your private network.
 - No rate limiting on login.
