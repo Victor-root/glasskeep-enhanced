@@ -1,6 +1,6 @@
 # 📋 Changelog
 
-## 🚀 v2.6.0 (unreleased)
+## 🚀 v2.6.0 (2026-09-08)
 
 Headline feature: **cross-server collaboration**. Pair two self-hosted GlassKeep servers and share notes across them in real time. Also in this release: a full **security audit** with every finding fixed, and a batch of pre-existing bugs found during manual testing.
 
