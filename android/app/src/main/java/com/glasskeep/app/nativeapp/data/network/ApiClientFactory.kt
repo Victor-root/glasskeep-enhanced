@@ -1,0 +1,69 @@
+package com.glasskeep.app.nativeapp.data.network
+
+import com.glasskeep.app.BuildConfig
+import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.data.TokenStore
+import kotlinx.serialization.json.Json
+import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Response
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
+
+/**
+ * Attaches `Authorization: Bearer <token>` to every request once the user
+ * is signed in. ReminderSyncWorker.kt already does the same thing for one
+ * endpoint, from a background thread with no WebView involved. This is
+ * the same pattern, now used for the whole app.
+ */
+private class AuthInterceptor(private val tokenStore: TokenStore) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val token = tokenStore.token
+        val request = if (token != null) {
+            chain.request().newBuilder()
+                .addHeader("Authorization", "Bearer $token")
+                .build()
+        } else {
+            chain.request()
+        }
+        return chain.proceed(request)
+    }
+}
+
+/**
+ * Builds a Retrofit client for one server. The native rewrite lets the
+ * user point at any self-hosted GlassKeep server, same as the WebView
+ * setup screen, so this is built fresh per server URL rather than kept as
+ * a single app-wide singleton.
+ */
+object ApiClientFactory {
+    private val json = Json {
+        ignoreUnknownKeys = true
+        coerceInputValues = true
+    }
+
+    fun create(baseUrl: String, tokenStore: TokenStore): GlassKeepApi {
+        val normalizedBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        NativeDebug.d("ApiClientFactory.create baseUrl=$normalizedBaseUrl")
+
+        val clientBuilder = OkHttpClient.Builder()
+            .addInterceptor(AuthInterceptor(tokenStore))
+
+        if (BuildConfig.DEBUG) {
+            val logging = HttpLoggingInterceptor { message -> NativeDebug.d(message) }
+            logging.level = HttpLoggingInterceptor.Level.BODY
+            clientBuilder.addInterceptor(logging)
+        }
+
+        val contentType = "application/json".toMediaType()
+        val retrofit = Retrofit.Builder()
+            .baseUrl(normalizedBaseUrl)
+            .client(clientBuilder.build())
+            .addConverterFactory(json.asConverterFactory(contentType))
+            .build()
+
+        return retrofit.create(GlassKeepApi::class.java)
+    }
+}

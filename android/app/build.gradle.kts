@@ -3,6 +3,11 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    // Native rewrite: KSP generates Room's DAO implementations at compile
+    // time (no reflection, unlike kapt); the serialization plugin lets data
+    // classes be marked @Serializable for the Retrofit/JSON layer below.
+    id("com.google.devtools.ksp")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 // Pull release-keystore credentials from android/keystore.properties.
@@ -146,4 +151,37 @@ dependencies {
     // which server addresses may be reached without TLS and touches
     // nothing Android-specific, so it is testable without a device.
     testImplementation("junit:junit:4.13.2")
+
+    // ---- Native rewrite (0-webview effort) --------------------------------
+    // Nothing above this line needed to change: the server exposes a plain
+    // JSON/HTTP API with a Bearer token, so the native app is a normal
+    // Android client, no backend changes required (see the migration report).
+
+    // Screen-to-screen navigation. Nothing in the app does this today; every
+    // "screen" so far has been a page inside the WebView.
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+
+    // Local database on the phone (offline cache of notes + the sync queue
+    // later on). Room = SQLite with generated, type-safe access.
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+
+    // HTTP client talking to the same /api/* routes the web app already
+    // uses. kotlinx.serialization decodes the JSON responses into plain
+    // Kotlin data classes.
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Prints every request/response to Logcat. Debug builds only: this is
+    // exactly the traffic to paste back when something doesn't sync right.
+    debugImplementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Encrypted on-device storage for the session token (the web app keeps
+    // it in localStorage; a native app has no such thing, and a session
+    // token is not something to leave in plain SharedPreferences).
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 }

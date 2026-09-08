@@ -11,6 +11,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowInsetsControllerCompat
+import com.glasskeep.app.nativeapp.NativeAppActivity
 import com.glasskeep.app.net.CleartextPolicy
 import com.glasskeep.app.ui.OnboardingPager
 import com.glasskeep.app.ui.theme.GlassKeepTheme
@@ -53,7 +54,7 @@ class MainActivity : ComponentActivity() {
             val urlToLoad = SHORTCUT_QUERY_PARAMS[intent?.action]
                 ?.let { (key, value) -> appendQueryParam(savedUrl, key, value) }
                 ?: savedUrl
-            launchWebView(urlToLoad)
+            launchApp(urlToLoad)
             return
         }
 
@@ -100,11 +101,26 @@ class MainActivity : ComponentActivity() {
                             .putString("server_url", url)
                             .putBoolean(KEY_URL_VETTED, true)
                             .apply()
-                        launchWebView(url)
+                        launchApp(url)
                     },
                 )
             }
         }
+    }
+
+    // Native rewrite (0-webview effort): debug builds boot straight into
+    // the native flow being built out in com.glasskeep.app.nativeapp,
+    // release builds keep the WebView exactly as before until the native
+    // side reaches feature parity. Nothing changes for real users yet.
+    private fun launchApp(url: String) {
+        if (BuildConfig.DEBUG) launchNativeApp(url) else launchWebView(url)
+    }
+
+    private fun launchNativeApp(url: String) {
+        val intent = Intent(this, NativeAppActivity::class.java)
+        intent.putExtra(NativeAppActivity.EXTRA_SERVER_URL, url)
+        startActivity(intent)
+        finish()
     }
 
     private fun launchWebView(url: String) {

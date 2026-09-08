@@ -103,6 +103,15 @@
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
 
+        <!-- Native rewrite (0-webview effort): reached only from debug
+             builds today, see MainActivity.launchApp. Not a launcher
+             entry point, MainActivity always decides which of this or
+             WebViewActivity to start. -->
+        <activity
+            android:name=".nativeapp.NativeAppActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+
         <!-- Self-update FileProvider: lets us hand the downloaded APK to
              Android's system installer (ACTION_VIEW with
              application/vnd.android.package-archive) without granting
