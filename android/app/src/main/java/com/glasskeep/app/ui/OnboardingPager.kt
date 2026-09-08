@@ -7,9 +7,13 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -78,6 +82,7 @@ fun OnboardingPager(
             dark = dark,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(bottom = 16.dp),
         )
 
@@ -89,6 +94,7 @@ fun OnboardingPager(
                 dark = dark,
                 modifier = Modifier
                     .align(Alignment.TopStart)
+                    .windowInsetsPadding(WindowInsets.statusBars)
                     .padding(start = 12.dp, top = 12.dp),
                 onClick = { scope.launch { pagerState.animateScrollToPage(0) } },
             )

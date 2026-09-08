@@ -1,6 +1,5 @@
 package com.glasskeep.app.nativeapp
 
-import android.app.Activity
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -34,7 +33,7 @@ class NativeAppActivity : ComponentActivity() {
             // (same two colors as SetupScreen's own light/dark background),
             // so the system bars never clash with the native screens below.
             SideEffect {
-                (view.context as Activity).applyThemedSystemBars(view, dark)
+                (view.context as ComponentActivity).applyThemedSystemBars(dark)
             }
             GlassKeepTheme {
                 NativeNavHost(container = container, serverUrl = serverUrl)

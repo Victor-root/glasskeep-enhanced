@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -330,7 +331,7 @@ fun SetupScreen(initialUrl: String = "", onConnect: (String) -> Unit) {
         FloatingCardsBackground(dark)
 
         Column(
-            modifier = Modifier.padding(horizontal = 32.dp),
+            modifier = Modifier.safeDrawingPadding().padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Image(

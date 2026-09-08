@@ -1,6 +1,5 @@
 package com.glasskeep.app
 
-import android.app.Activity
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
@@ -61,7 +60,7 @@ class MainActivity : ComponentActivity() {
             val dark = isSystemInDarkTheme()
             val view = LocalView.current
             SideEffect {
-                (view.context as Activity).applyThemedSystemBars(view, dark)
+                (view.context as ComponentActivity).applyThemedSystemBars(dark)
             }
             GlassKeepTheme {
                 // Both screens live inside one HorizontalPager so the
