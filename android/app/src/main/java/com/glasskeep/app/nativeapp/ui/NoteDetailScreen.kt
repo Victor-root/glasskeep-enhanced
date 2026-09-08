@@ -80,6 +80,11 @@ import com.glasskeep.app.nativeapp.data.DeleteResult
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.NoteImageData
 import com.glasskeep.app.nativeapp.data.NoteImages
+import com.glasskeep.app.nativeapp.data.RichBlock
+import com.glasskeep.app.nativeapp.data.RichBlockKind
+import com.glasskeep.app.nativeapp.data.RichDoc
+import com.glasskeep.app.nativeapp.data.RichMark
+import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.SaveNoteResult
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.network.NoteDto
@@ -100,10 +105,11 @@ import kotlinx.coroutines.withContext
 private val ErrorColor = Color(0xFFdc2626)
 
 /** What the loaded note allows natively, decided once from its content
- *  shape (see NoteContent.isDocPlainStructure). Title is always editable
- *  for a text note: the original `content` string is resent untouched
- *  when the body itself isn't safe to touch, so a title-only edit never
- *  risks the note's formatting. */
+ *  shape (see RichDoc.parse, then NoteContent.isDocPlainStructure as the
+ *  fallback for whatever RichDoc doesn't understand). Title is always
+ *  editable for a text note: the original `content` string is resent
+ *  untouched when the body itself isn't safe to touch, so a title-only
+ *  edit never risks the note's formatting. */
 private data class Editability(
     val isTextType: Boolean,
     val bodyEditable: Boolean,
@@ -115,19 +121,33 @@ private data class Editability(
      *  this null triggers below. Irrelevant (always null) when
      *  isChecklistType is false. */
     val checklistItems: List<ChecklistItemData>? = null,
+    /** True when RichDoc.parse approved the note's content: the real
+     *  formatting editor (RichTextEditor) handles it instead of the
+     *  plain-text/notice fallback below. [originalRichBlocks] is the
+     *  as-loaded snapshot save()/hasChanges diff against, same role
+     *  [bodyPlainText] plays for a plain-text note; the live, edited copy
+     *  is the top-level `richBlocks` state, same split as bodyText. */
+    val isRichEditableType: Boolean = false,
+    val originalRichBlocks: List<RichBlock>? = null,
 )
 
 /** One entry in the tag suggestion list: a tag already used on at least one
  *  of this user's notes, and how many. Mirrors App.jsx's tagsWithCounts. */
 private data class TagCount(val tag: String, val count: Int)
 
+/** Which block/range a pending Link dialog request targets, and the href
+ *  already applied there if any (prefilled, with a Remove option). */
+private data class LinkTarget(val blockId: String, val start: Int, val end: Int, val existingHref: String?)
+
 /**
- * Milestone: opening and safely editing a single text note. Deliberately
- * does not touch checklist/draw/audio notes, or the body of a formatted
- * text note (bold, colors, headings, lists...): there is no native rich
- * editor yet, and guessing here would mean silently destroying a user's
- * existing formatting. See NoteContent.kt for exactly where that line is
- * drawn.
+ * Milestone: opening and safely editing a single note. Checklist notes get
+ * their own flat editor (ChecklistItemsList); draw/audio notes are still
+ * fully unsupported. A text note's body goes through RichDoc.parse first:
+ * bold/italic/underline/strike/link, headings, and bullet/numbered lists
+ * are natively editable (RichTextEditor); anything using formatting
+ * outside that vocabulary falls back to the read-only notice below rather
+ * than guess and silently destroy it. See RichDoc.kt and NoteContent.kt
+ * for exactly where that line is drawn.
  */
 @Composable
 fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: String, onBack: () -> Unit) {
@@ -167,6 +187,18 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     var checklistInsertPosition by remember { mutableStateOf("top") }
     val checklistFocusRequesters = remember { mutableStateMapOf<String, FocusRequester>() }
     var pendingChecklistFocus by remember { mutableStateOf<String?>(null) }
+
+    // Rich-text blocks (RichDoc.parse-approved text notes only): live,
+    // edited copy, saved through the same deferred Save button as
+    // title/bodyText rather than immediately, since it's this note's core
+    // content just like bodyText is, not a discrete structural action like
+    // a tag or a checklist item. See Editability.originalRichBlocks for
+    // the as-loaded snapshot this diffs against.
+    var richBlocks by remember { mutableStateOf<List<RichBlock>?>(null) }
+    val richFocusRequesters = remember { mutableStateMapOf<String, FocusRequester>() }
+    var pendingRichFocus by remember { mutableStateOf<String?>(null) }
+    var showLinkDialog by remember { mutableStateOf(false) }
+    var linkDialogTarget by remember { mutableStateOf<LinkTarget?>(null) }
 
     // Content images (text/checklist notes only, see edit.isTextType /
     // isChecklistType below); parsed once on load same as checklist items,
@@ -532,6 +564,89 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         pendingChecklistFocus = newItem.id
     }
 
+    // ---------- Rich text block edits (RichDoc.parse-approved notes only) ----------
+
+    fun changeRichBlockText(id: String, newText: String, newMarks: List<RichMark>) {
+        val blocks = richBlocks ?: return
+        richBlocks = blocks.map { if (it.id == id) it.copy(text = newText, marks = newMarks) else it }
+    }
+
+    fun setRichBlockKind(id: String, kind: RichBlockKind) {
+        val blocks = richBlocks ?: return
+        richBlocks = blocks.map { if (it.id == id) it.copy(kind = kind) else it }
+    }
+
+    fun toggleRichMark(id: String, start: Int, end: Int, type: RichMarkType) {
+        val blocks = richBlocks ?: return
+        richBlocks = blocks.map { if (it.id == id) it.copy(marks = RichDoc.toggleMark(it.marks, type, start, end)) else it }
+    }
+
+    fun closeLinkDialog() {
+        showLinkDialog = false
+        linkDialogTarget = null
+    }
+
+    fun setRichLink(href: String) {
+        val target = linkDialogTarget ?: return
+        val blocks = richBlocks ?: return
+        richBlocks = blocks.map { block ->
+            if (block.id == target.blockId) {
+                block.copy(marks = RichDoc.setMark(block.marks, RichMarkType.LINK, target.start, target.end, normalizeRichLinkUrl(href)))
+            } else {
+                block
+            }
+        }
+        closeLinkDialog()
+    }
+
+    fun removeRichLink() {
+        val target = linkDialogTarget ?: return
+        val blocks = richBlocks ?: return
+        richBlocks = blocks.map { block ->
+            if (block.id == target.blockId) block.copy(marks = RichDoc.clearMark(block.marks, RichMarkType.LINK, target.start, target.end))
+            else block
+        }
+        closeLinkDialog()
+    }
+
+    /** Enter inside a block: splits it at [position] into two. The new
+     *  block continues the same list kind, so pressing Enter partway
+     *  through a list keeps adding list items; any other kind's
+     *  continuation is a plain paragraph, matching how most editors treat
+     *  Enter at the end of a heading. */
+    fun splitRichBlock(id: String, position: Int) {
+        val blocks = richBlocks ?: return
+        val idx = blocks.indexOfFirst { it.id == id }
+        if (idx < 0) return
+        val block = blocks[idx]
+        val continuesList = block.kind == RichBlockKind.BULLET_ITEM || block.kind == RichBlockKind.NUMBERED_ITEM
+        val newBlock = RichDoc.newBlock(if (continuesList) block.kind else RichBlockKind.PARAGRAPH).copy(
+            text = block.text.substring(position),
+            marks = RichDoc.clipMarks(block.marks, position, block.text.length),
+        )
+        val updated = blocks.toMutableList()
+        updated[idx] = block.copy(text = block.text.substring(0, position), marks = RichDoc.clipMarks(block.marks, 0, position))
+        updated.add(idx + 1, newBlock)
+        richBlocks = updated
+        pendingRichFocus = newBlock.id
+    }
+
+    /** Explicit remove button, mirrors removeChecklistItem; refuses to drop
+     *  the last remaining block, same "a doc always has at least one
+     *  paragraph" invariant RichDoc.encode falls back to on an empty list. */
+    fun removeRichBlock(id: String) {
+        val blocks = richBlocks ?: return
+        if (blocks.size <= 1) return
+        richBlocks = blocks.filterNot { it.id == id }
+    }
+
+    fun addRichBlockAtEnd() {
+        val blocks = richBlocks ?: return
+        val newBlock = RichDoc.newBlock()
+        richBlocks = blocks + newBlock
+        pendingRichFocus = newBlock.id
+    }
+
     // ---------- Content images (text/checklist notes only) ----------
 
     /** Persists the given image list and, on success, resyncs local state
@@ -663,16 +778,28 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
             images = NoteImages.parse(fetched.images)
             editability = when (fetched.type) {
                 "text" -> {
-                    val richDoc = NoteContent.parseRichDoc(fetched.content)
-                    when {
-                        richDoc == null -> Editability(true, bodyEditable = true, isLegacyPlain = true, bodyPlainText = fetched.content)
-                        NoteContent.isDocPlainStructure(richDoc) -> {
-                            val plain = NoteContent.docToPlainText(richDoc)
-                            Editability(true, bodyEditable = true, isLegacyPlain = false, bodyPlainText = plain)
-                        }
-                        else -> {
-                            val plain = NoteContent.docToPlainText(richDoc)
-                            Editability(true, bodyEditable = false, isLegacyPlain = false, bodyPlainText = plain)
+                    val parsedRichBlocks = RichDoc.parse(fetched.content)
+                    if (parsedRichBlocks != null) {
+                        Editability(
+                            isTextType = true,
+                            bodyEditable = false,
+                            isLegacyPlain = false,
+                            bodyPlainText = "",
+                            isRichEditableType = true,
+                            originalRichBlocks = parsedRichBlocks,
+                        )
+                    } else {
+                        val richDoc = NoteContent.parseRichDoc(fetched.content)
+                        when {
+                            richDoc == null -> Editability(true, bodyEditable = true, isLegacyPlain = true, bodyPlainText = fetched.content)
+                            NoteContent.isDocPlainStructure(richDoc) -> {
+                                val plain = NoteContent.docToPlainText(richDoc)
+                                Editability(true, bodyEditable = true, isLegacyPlain = false, bodyPlainText = plain)
+                            }
+                            else -> {
+                                val plain = NoteContent.docToPlainText(richDoc)
+                                Editability(true, bodyEditable = false, isLegacyPlain = false, bodyPlainText = plain)
+                            }
                         }
                     }
                 }
@@ -690,6 +817,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                 else -> Editability(isTextType = false, bodyEditable = false, isLegacyPlain = false, bodyPlainText = "")
             }
             bodyText = editability?.bodyPlainText.orEmpty()
+            richBlocks = editability?.originalRichBlocks
         } catch (t: Throwable) {
             NativeDebug.e("NoteDetailScreen load failed", t)
             loadError = String.format(errorLoadTemplate, t.message ?: t.javaClass.simpleName)
@@ -714,6 +842,22 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         pendingChecklistFocus = null
     }
 
+    // Same reasoning as the checklist auto-focus above: a freshly
+    // split-off or appended block isn't laid out the instant
+    // pendingRichFocus is set, and FocusRequester.requestFocus() throws if
+    // called before its target attaches, so this is best-effort.
+    LaunchedEffect(pendingRichFocus, richBlocks) {
+        val id = pendingRichFocus ?: return@LaunchedEffect
+        val blocks = richBlocks ?: return@LaunchedEffect
+        if (blocks.none { it.id == id }) return@LaunchedEffect
+        try {
+            richFocusRequesters.getOrPut(id) { FocusRequester() }.requestFocus()
+        } catch (t: Throwable) {
+            NativeDebug.e("NoteDetailScreen rich block auto-focus failed for id=$id", t)
+        }
+        pendingRichFocus = null
+    }
+
     fun save() {
         val current = note ?: return
         val edit = editability ?: return
@@ -727,6 +871,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                     // lives entirely in items (saved separately, see
                     // saveChecklistItems); this only ever saves the title.
                     edit.isChecklistType -> ""
+                    edit.isRichEditableType -> RichDoc.encode(richBlocks ?: edit.originalRichBlocks.orEmpty())
                     !edit.bodyEditable -> current.content
                     edit.isLegacyPlain -> bodyText
                     else -> NoteContent.plainTextToRichContent(bodyText)
@@ -1032,6 +1177,23 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                         fontSize = 13.sp,
                                     )
                                 }
+                            } else if (edit.isRichEditableType) {
+                                RichTextEditor(
+                                    blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
+                                    titleColor = titleColor,
+                                    subtextColor = subtextColor,
+                                    focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
+                                    onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
+                                    onEnter = { id, position -> splitRichBlock(id, position) },
+                                    onRemoveBlock = { id -> removeRichBlock(id) },
+                                    onSetBlockKind = { id, kind -> setRichBlockKind(id, kind) },
+                                    onToggleMark = { id, start, end, type -> toggleRichMark(id, start, end, type) },
+                                    onLinkRequest = { id, start, end, existingHref ->
+                                        linkDialogTarget = LinkTarget(id, start, end, existingHref)
+                                        showLinkDialog = true
+                                    },
+                                    onAddBlock = { addRichBlockAtEnd() },
+                                )
                             } else {
                                 if (!edit.bodyEditable) {
                                     Text(
@@ -1066,6 +1228,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                             }
 
                             val hasChanges = titleText != currentNote.title ||
+                                (edit.isRichEditableType && richBlocks != edit.originalRichBlocks) ||
                                 (edit.bodyEditable && bodyText != edit.bodyPlainText)
                             Box(
                                 modifier = Modifier
@@ -1336,6 +1499,21 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
             )
         }
 
+        if (showLinkDialog) {
+            linkDialogTarget?.let { target ->
+                RichLinkDialog(
+                    dark = dark,
+                    titleColor = titleColor,
+                    subtextColor = subtextColor,
+                    borderColor = borderColor,
+                    initialHref = target.existingHref,
+                    onDismiss = { closeLinkDialog() },
+                    onConfirm = { href -> setRichLink(href) },
+                    onRemove = { removeRichLink() },
+                )
+            }
+        }
+
         viewerIndex?.let { index ->
             FullscreenImageViewer(
                 images = images,
@@ -1392,8 +1570,22 @@ private fun TagChipsRow(tags: List<String>, enabled: Boolean, onRemove: (String)
     }
 }
 
+/** Auto-prepends https:// for a bare domain typed without one, a smaller
+ *  version of the web's LinkPopover ensureSchemeURL (no email/phone-number
+ *  scheme detection, a reasonable cut for a notes app's own links). */
+private fun normalizeRichLinkUrl(input: String): String {
+    val trimmed = input.trim()
+    return if (trimmed.contains("://") || trimmed.startsWith("mailto:") || trimmed.startsWith("tel:")) {
+        trimmed
+    } else {
+        "https://$trimmed"
+    }
+}
+
+// internal, not private: Kotlin's top-level `private` is file-scoped, and
+// RichTextEditor.kt's link dialog reuses this exact styling.
 @Composable
-private fun detailFieldColors(textColor: Color, subtextColor: Color, borderColor: Color) =
+internal fun detailFieldColors(textColor: Color, subtextColor: Color, borderColor: Color) =
     OutlinedTextFieldDefaults.colors(
         focusedTextColor = textColor,
         unfocusedTextColor = textColor,

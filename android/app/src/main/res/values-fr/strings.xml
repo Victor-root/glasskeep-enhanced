@@ -71,7 +71,7 @@
     <string name="native_note_detail_save_error">Impossible d\'enregistrer : %1$s</string>
     <string name="native_note_detail_stale">Cette note a changé ailleurs. Rouvrez-la pour voir la dernière version.</string>
     <string name="native_note_detail_readonly">Cette note ne peut pas être modifiée pour le moment.</string>
-    <string name="native_note_detail_formatted_notice">Cette note contient de la mise en forme (gras, couleurs, listes...). L\'édition native des notes formatées n\'est pas encore disponible, seul le texte brut est affiché ci-dessous.</string>
+    <string name="native_note_detail_formatted_notice">Cette note utilise une mise en forme que l\'application ne sait pas encore modifier nativement (couleur, alignement, code...). Seul le texte brut est affiché ci-dessous.</string>
     <string name="native_note_detail_type_unsupported">Ce type de note (%1$s) n\'est pas encore modifiable en natif.</string>
     <string name="native_note_detail_pin">Épingler la note</string>
     <string name="native_note_detail_unpin">Désépingler la note</string>
@@ -113,6 +113,21 @@
     <string name="native_note_detail_image_remove">Retirer l\'image</string>
     <string name="native_note_detail_image_previous">Précédent</string>
     <string name="native_note_detail_image_next">Suivant</string>
+    <string name="native_richtext_paragraph">Paragraphe</string>
+    <string name="native_richtext_heading_level">Titre de niveau %1$d</string>
+    <string name="native_richtext_bullet_list">Liste à puces</string>
+    <string name="native_richtext_numbered_list">Liste numérotée</string>
+    <string name="native_richtext_bold">Gras</string>
+    <string name="native_richtext_italic">Italique</string>
+    <string name="native_richtext_underline">Souligné</string>
+    <string name="native_richtext_strikethrough">Barré</string>
+    <string name="native_richtext_link">Lien</string>
+    <string name="native_richtext_remove_block">Retirer ce bloc</string>
+    <string name="native_richtext_add_block">Ajouter un paragraphe</string>
+    <string name="native_richtext_link_title">Lien</string>
+    <string name="native_richtext_link_placeholder">https://exemple.com</string>
+    <string name="native_richtext_link_apply">Appliquer</string>
+    <string name="native_richtext_link_remove">Retirer le lien</string>
 
     <string name="shortcut_qr_short">Scanner QRCODE</string>
     <string name="shortcut_qr_long">Scanner QRCODE</string>

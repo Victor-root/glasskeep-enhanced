@@ -78,7 +78,7 @@
     <string name="native_note_detail_save_error">Couldn\'t save: %1$s</string>
     <string name="native_note_detail_stale">This note changed elsewhere. Reopen it to see the latest version.</string>
     <string name="native_note_detail_readonly">This note can\'t be edited right now.</string>
-    <string name="native_note_detail_formatted_notice">This note has formatting (bold, colors, lists…). Native editing for formatted notes isn\'t available yet, so only the plain text is shown below.</string>
+    <string name="native_note_detail_formatted_notice">This note uses formatting this app can\'t edit natively yet (color, alignment, code, and similar). Only the plain text is shown below.</string>
     <string name="native_note_detail_type_unsupported">This note type (%1$s) isn\'t editable natively yet.</string>
     <string name="native_note_detail_pin">Pin note</string>
     <string name="native_note_detail_unpin">Unpin note</string>
@@ -120,6 +120,21 @@
     <string name="native_note_detail_image_remove">Remove image</string>
     <string name="native_note_detail_image_previous">Previous</string>
     <string name="native_note_detail_image_next">Next</string>
+    <string name="native_richtext_paragraph">Paragraph</string>
+    <string name="native_richtext_heading_level">Heading level %1$d</string>
+    <string name="native_richtext_bullet_list">Bullet list</string>
+    <string name="native_richtext_numbered_list">Numbered list</string>
+    <string name="native_richtext_bold">Bold</string>
+    <string name="native_richtext_italic">Italic</string>
+    <string name="native_richtext_underline">Underline</string>
+    <string name="native_richtext_strikethrough">Strikethrough</string>
+    <string name="native_richtext_link">Link</string>
+    <string name="native_richtext_remove_block">Remove this block</string>
+    <string name="native_richtext_add_block">Add a paragraph</string>
+    <string name="native_richtext_link_title">Link</string>
+    <string name="native_richtext_link_placeholder">https://example.com</string>
+    <string name="native_richtext_link_apply">Apply</string>
+    <string name="native_richtext_link_remove">Remove link</string>
 
     <!-- App shortcut: long-press the launcher icon to open the QR
          scanner straight away (sign in to a PC paired with this phone). -->
