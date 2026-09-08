@@ -52,8 +52,12 @@ object ApiClientFactory {
             .addInterceptor(AuthInterceptor(tokenStore))
 
         if (BuildConfig.DEBUG) {
+            // BASIC only: method, URL, response code and timing. Never
+            // HEADERS or BODY, those print the Authorization header (the
+            // session token, attached above) and, on login, the password
+            // itself, straight into Logcat. Never turn this back up.
             val logging = HttpLoggingInterceptor { message -> NativeDebug.d(message) }
-            logging.level = HttpLoggingInterceptor.Level.BODY
+            logging.level = HttpLoggingInterceptor.Level.BASIC
             clientBuilder.addInterceptor(logging)
         }
 
