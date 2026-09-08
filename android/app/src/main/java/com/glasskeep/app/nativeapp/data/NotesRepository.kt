@@ -11,6 +11,7 @@ import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
+import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
 import kotlinx.coroutines.flow.Flow
@@ -393,6 +394,31 @@ class NotesRepository(
         }
         val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (items): ok response with no note")
         noteDao.upsertAll(listOf(saved.toEntity()))
+        return SaveNoteResult.Saved(saved)
+    }
+
+    /** Replaces a note's image list. Same narrow-body PATCH pattern as
+     *  setColor()/setTags()/setChecklistItems(); the web instead folds
+     *  images into a general metadata-autosave payload, but the server
+     *  accepts any subset of fields in a PATCH either way (see
+     *  SetImagesRequest). Not cached into Room: the main list's local
+     *  cache deliberately doesn't carry full-resolution image data for
+     *  every note (see NoteEntity), so this only updates `note` in the
+     *  caller, same as how checklist items are handled. */
+    suspend fun setImages(id: String, images: List<JsonElement>): SaveNoteResult {
+        NativeDebug.d("NotesRepository.setImages id=$id count=${images.size}")
+        val response = api.setImages(id, SetImagesRequest(images = images, clientUpdatedAt = nowIso()))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "PATCH /api/notes/$id (images) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        if (body.stale) {
+            NativeDebug.d("NotesRepository.setImages id=$id: stale, not applied")
+            return SaveNoteResult.Stale
+        }
+        val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (images): ok response with no note")
         return SaveNoteResult.Saved(saved)
     }
 

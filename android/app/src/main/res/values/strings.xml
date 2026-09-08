@@ -113,6 +113,13 @@
     <string name="native_checklist_indent">Increase indent</string>
     <string name="native_checklist_outdent">Decrease indent</string>
     <string name="native_checklist_sections_notice">This checklist uses sections. Native editing for sections isn\'t available yet, only a read-only preview is shown below.</string>
+    <string name="native_note_detail_add_image">Add an image</string>
+    <string name="native_note_detail_add_image_error">Couldn\'t add that image</string>
+    <string name="native_note_detail_image_close">Close</string>
+    <string name="native_note_detail_image_download">Download</string>
+    <string name="native_note_detail_image_remove">Remove image</string>
+    <string name="native_note_detail_image_previous">Previous</string>
+    <string name="native_note_detail_image_next">Next</string>
 
     <!-- App shortcut: long-press the launcher icon to open the QR
          scanner straight away (sign in to a PC paired with this phone). -->

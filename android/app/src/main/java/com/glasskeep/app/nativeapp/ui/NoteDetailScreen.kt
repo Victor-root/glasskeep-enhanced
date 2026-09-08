@@ -1,6 +1,10 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -66,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
+import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NoteExporter
@@ -73,6 +78,8 @@ import com.glasskeep.app.nativeapp.data.ChecklistItemData
 import com.glasskeep.app.nativeapp.data.ChecklistItems
 import com.glasskeep.app.nativeapp.data.DeleteResult
 import com.glasskeep.app.nativeapp.data.NoteContent
+import com.glasskeep.app.nativeapp.data.NoteImageData
+import com.glasskeep.app.nativeapp.data.NoteImages
 import com.glasskeep.app.nativeapp.data.SaveNoteResult
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.network.NoteDto
@@ -161,6 +168,13 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     val checklistFocusRequesters = remember { mutableStateMapOf<String, FocusRequester>() }
     var pendingChecklistFocus by remember { mutableStateOf<String?>(null) }
 
+    // Content images (text/checklist notes only, see edit.isTextType /
+    // isChecklistType below); parsed once on load same as checklist items,
+    // not cached in Room (see NotesRepository.setImages).
+    var images by remember { mutableStateOf<List<NoteImageData>>(emptyList()) }
+    var changingImages by remember { mutableStateOf(false) }
+    var viewerIndex by remember { mutableStateOf<Int?>(null) }
+
     // Tag suggestions need every note's tags, not just the open one (same
     // as App.jsx's allNotesForTags -> tagsWithCounts), so this reads the
     // repository's whole local cache, same source NativeNotesListScreen
@@ -185,6 +199,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     val actionErrorTemplate = stringResource(R.string.native_note_detail_action_error)
     val duplicateSuffix = stringResource(R.string.native_note_detail_duplicate_suffix)
     val downloadErrorMessage = stringResource(R.string.native_note_detail_download_error)
+    val imageAddErrorMessage = stringResource(R.string.native_note_detail_add_image_error)
 
     fun togglePin() {
         val current = note ?: return
@@ -517,6 +532,87 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         pendingChecklistFocus = newItem.id
     }
 
+    // ---------- Content images (text/checklist notes only) ----------
+
+    /** Persists the given image list and, on success, resyncs local state
+     *  from the server's own copy (unlike checklist items, there's no
+     *  concurrent free-text edit an image add/remove could clobber, so
+     *  reflecting the fresh server truth here is simplest). A private
+     *  helper, not its own guarded action: callers (addImages/removeImage)
+     *  own the changingImages in-flight flag around it. */
+    suspend fun saveImages(newImages: List<NoteImageData>) {
+        val current = note ?: return
+        try {
+            when (val result = repository.setImages(current.id, NoteImages.encode(newImages))) {
+                is SaveNoteResult.Saved -> {
+                    NativeDebug.d("NoteDetailScreen saveImages OK id=${current.id}")
+                    note = result.note
+                    images = NoteImages.parse(result.note.images)
+                }
+                SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
+                SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
+            }
+        } catch (t: Throwable) {
+            NativeDebug.e("NoteDetailScreen saveImages failed", t)
+            Toast.makeText(
+                context,
+                String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    /** Compresses every picked image off the main thread (resize + encode,
+     *  see ImageCompression) before attaching any of them, same as the
+     *  web's own fileToCompressedDataURL() always running before a data:
+     *  URL is ever added to the note. A picked file that fails to decode
+     *  is skipped rather than aborting the whole batch, same as the web's
+     *  per-file try/catch in addImagesToState(). */
+    fun addImages(uris: List<Uri>) {
+        if (uris.isEmpty() || changingImages) return
+        changingImages = true
+        scope.launch {
+            try {
+                val compressed = withContext(Dispatchers.IO) {
+                    uris.mapNotNull { uri ->
+                        val dataUrl = ImageCompression.compressToDataUrl(context, uri) ?: return@mapNotNull null
+                        NoteImages.newImage(dataUrl, ImageCompression.displayNameFor(context, uri) ?: "")
+                    }
+                }
+                if (compressed.isEmpty()) {
+                    Toast.makeText(context, imageAddErrorMessage, Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                saveImages(images + compressed)
+            } finally {
+                changingImages = false
+            }
+        }
+    }
+
+    fun removeImage(image: NoteImageData) {
+        if (changingImages) return
+        changingImages = true
+        scope.launch {
+            try {
+                saveImages(images.filterNot { it.id == image.id })
+            } finally {
+                changingImages = false
+            }
+        }
+    }
+
+    fun downloadImage(image: NoteImageData) {
+        scope.launch(Dispatchers.IO) {
+            val ok = NoteExporter.exportImage(context, image.src, image.name)
+            if (!ok) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, downloadErrorMessage, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     fun duplicateNote() {
         val current = note ?: return
         if (duplicating) return
@@ -555,11 +651,16 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         }
     }
 
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(),
+    ) { uris -> addImages(uris) }
+
     LaunchedEffect(noteId) {
         try {
             val fetched = repository.fetchNoteDetail(noteId)
             note = fetched
             titleText = fetched.title
+            images = NoteImages.parse(fetched.images)
             editability = when (fetched.type) {
                 "text" -> {
                     val richDoc = NoteContent.parseRichDoc(fetched.content)
@@ -850,6 +951,16 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                 .padding(20.dp),
                         ) {
                             if (edit.isTextType || edit.isChecklistType) {
+                                NoteImagesSection(
+                                    images = images,
+                                    subtextColor = subtextColor,
+                                    enabled = !changingImages,
+                                    onImageClick = { index -> viewerIndex = index },
+                                    onAddClick = {
+                                        photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    },
+                                )
+                                Spacer(Modifier.height(14.dp))
                                 OutlinedTextField(
                                     value = titleText,
                                     onValueChange = { titleText = it },
@@ -1222,6 +1333,17 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                         Text(stringResource(R.string.native_note_detail_trash_confirm_cancel))
                     }
                 },
+            )
+        }
+
+        viewerIndex?.let { index ->
+            FullscreenImageViewer(
+                images = images,
+                initialIndex = index,
+                removeEnabled = !changingImages,
+                onClose = { viewerIndex = null },
+                onRemove = { image -> removeImage(image) },
+                onDownload = { image -> downloadImage(image) },
             )
         }
     }

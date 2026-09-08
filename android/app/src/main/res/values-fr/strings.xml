@@ -106,6 +106,13 @@
     <string name="native_checklist_indent">Augmenter le retrait</string>
     <string name="native_checklist_outdent">Réduire le retrait</string>
     <string name="native_checklist_sections_notice">Cette liste utilise des sections. La modification native des sections n\'est pas encore disponible, seul un aperçu en lecture seule est affiché ci-dessous.</string>
+    <string name="native_note_detail_add_image">Ajouter une image</string>
+    <string name="native_note_detail_add_image_error">Impossible d\'ajouter cette image</string>
+    <string name="native_note_detail_image_close">Fermer</string>
+    <string name="native_note_detail_image_download">Télécharger</string>
+    <string name="native_note_detail_image_remove">Retirer l\'image</string>
+    <string name="native_note_detail_image_previous">Précédent</string>
+    <string name="native_note_detail_image_next">Suivant</string>
 
     <string name="shortcut_qr_short">Scanner QRCODE</string>
     <string name="shortcut_qr_long">Scanner QRCODE</string>

@@ -33,9 +33,9 @@ data class LoginResponse(
 
 /**
  * Mirrors serializeNote() in server/index.js field for field. Fields the
- * native app doesn't use yet (items/tags/images and friends) are still
- * declared so a future milestone can read them without touching this DTO;
- * `ignoreUnknownKeys` (see ApiClientFactory) covers whatever's left out.
+ * native app doesn't use yet are still declared so a future milestone can
+ * read them without touching this DTO; `ignoreUnknownKeys` (see
+ * ApiClientFactory) covers whatever's left out (icon, collaborators, ...).
  */
 @Serializable
 data class NoteDto(
@@ -46,6 +46,7 @@ data class NoteDto(
     val content: String,
     val items: List<JsonElement> = emptyList(),
     val tags: List<String> = emptyList(),
+    val images: List<JsonElement> = emptyList(),
     val color: String,
     val pinned: Boolean = false,
     val position: Double = 0.0,
@@ -146,6 +147,19 @@ data class SetChecklistItemsRequest(
     @SerialName("client_updated_at") val clientUpdatedAt: String,
 )
 
+/** Body for an images-only PATCH /api/notes/:id. Same opaque-relay pattern
+ *  as items/tags: the server only checks "is this an array" (see
+ *  server/index.js), so JsonElement mirrors NoteDto.images exactly. Unlike
+ *  the web (which folds images into a general metadata-autosave payload
+ *  alongside title/content/tags/color), this stays as narrow a body as the
+ *  rest of this file's Set*Request types, so title/content aren't touched
+ *  by an image add/remove. */
+@Serializable
+data class SetImagesRequest(
+    val images: List<JsonElement>,
+    @SerialName("client_updated_at") val clientUpdatedAt: String,
+)
+
 /** Body-less read of this user's saved settings blob (GET /api/user/settings
  *  returns whatever arbitrary keys are stored; only the ones native reads
  *  are declared here, `ignoreUnknownKeys` covers the rest). */
@@ -211,6 +225,9 @@ interface GlassKeepApi {
 
     @PATCH("api/notes/{id}")
     suspend fun setChecklistItems(@Path("id") id: String, @Body body: SetChecklistItemsRequest): Response<NoteMutationResponse>
+
+    @PATCH("api/notes/{id}")
+    suspend fun setImages(@Path("id") id: String, @Body body: SetImagesRequest): Response<NoteMutationResponse>
 
     @GET("api/user/settings")
     suspend fun getUserSettings(): Response<UserSettingsDto>
