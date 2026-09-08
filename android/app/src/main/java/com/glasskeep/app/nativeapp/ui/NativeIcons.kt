@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -251,6 +253,31 @@ fun PaletteIcon(modifier: Modifier = Modifier, size: Dp = 24.dp) {
                 drawCircle(color = outline, radius = radius, center = center, style = Stroke(width = 0.5f))
             }
             drawCircle(color = outline, radius = 1.3f, center = Offset(12f, 11f))
+        }
+    }
+}
+
+@Composable
+fun DuplicateIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/App.jsx's own inline duplicate glyph (kept inline there too, a
+    // one-shot icon not worth vendoring): a rounded rect behind a
+    // connecting stroke path, viewBox 24x24, strokeWidth 2, round
+    // caps/joins.
+    val path = remember {
+        PathParser().parsePathString("M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1").toPath()
+    }
+    val stroke = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = stroke)
+            drawRoundRect(
+                color = tint,
+                topLeft = Offset(9f, 9f),
+                size = Size(11f, 11f),
+                cornerRadius = CornerRadius(2f, 2f),
+                style = stroke,
+            )
         }
     }
 }

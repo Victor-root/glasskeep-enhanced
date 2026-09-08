@@ -71,11 +71,19 @@ data class PatchNoteRequest(
     @SerialName("client_updated_at") val clientUpdatedAt: String,
 )
 
-/** Body for POST /api/notes. The server defaults every other field (title,
- *  content, items...) to empty on its own, so creating a blank note only
- *  needs the type. */
+/** Body for POST /api/notes. The server defaults every field but `type` to
+ *  empty on its own, so creating a blank note only needs the type. The
+ *  other fields exist for duplicateNote(), which fills them in from the
+ *  note being copied; `items` stays opaque JSON (never inspected, just
+ *  relayed) since native doesn't understand checklist item shape yet. */
 @Serializable
-data class CreateNoteRequest(val type: String = "text")
+data class CreateNoteRequest(
+    val type: String = "text",
+    val title: String? = null,
+    val content: String? = null,
+    val color: String? = null,
+    val items: List<JsonElement>? = null,
+)
 
 /** Body for a pin-only PATCH /api/notes/:id. Pin is per-user state, not
  *  LWW-protected content, so unlike PatchNoteRequest this deliberately

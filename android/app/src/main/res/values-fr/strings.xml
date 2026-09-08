@@ -74,6 +74,8 @@
     <string name="native_note_detail_action_error">Action impossible : %1$s</string>
     <string name="native_note_detail_change_color">Changer la couleur</string>
     <string name="native_note_detail_color_title">Couleur de la note</string>
+    <string name="native_note_detail_duplicate">Dupliquer la note</string>
+    <string name="native_note_detail_duplicate_suffix">(copie)</string>
 
     <string name="shortcut_qr_short">Scanner QRCODE</string>
     <string name="shortcut_qr_long">Scanner QRCODE</string>

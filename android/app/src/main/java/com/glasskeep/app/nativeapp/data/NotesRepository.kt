@@ -74,6 +74,37 @@ class NotesRepository(
         return note
     }
 
+    /**
+     * Duplicates a note: creates a new one with the same type, content,
+     * items and color (caller already worked out the new title, e.g. with
+     * a "(copy)" suffix). Safe for every note type, not just text: unlike
+     * creating a blank note of an unsupported type, a duplicate is just
+     * another fully-formed note of a type native can already view
+     * (read-only, same as the original), never a dead end. Tags and
+     * images aren't carried over yet, native has no data layer for
+     * either.
+     */
+    suspend fun duplicateNote(source: NoteDto, newTitle: String): NoteDto {
+        NativeDebug.d("NotesRepository.duplicateNote id=${source.id}")
+        val response = api.createNote(
+            CreateNoteRequest(
+                type = source.type,
+                title = newTitle,
+                content = source.content,
+                color = source.color,
+                items = source.items,
+            )
+        )
+        val note = response.body()
+        if (!response.isSuccessful || note == null) {
+            val error = "POST /api/notes (duplicate) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        noteDao.upsertAll(listOf(note.toEntity()))
+        return note
+    }
+
     /** Full detail for one note (content/items included, unlike the
      *  cached list entries). Always goes to the server, no local cache for
      *  detail yet, so opening a note requires connectivity for now. */

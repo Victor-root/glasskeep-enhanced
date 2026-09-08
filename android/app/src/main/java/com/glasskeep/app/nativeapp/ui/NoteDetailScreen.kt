@@ -119,12 +119,14 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     var trashing by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf(false) }
     var changingColor by remember { mutableStateOf(false) }
+    var duplicating by remember { mutableStateOf(false) }
 
     val errorLoadTemplate = stringResource(R.string.native_note_detail_error)
     val errorSaveTemplate = stringResource(R.string.native_note_detail_save_error)
     val staleMessage = stringResource(R.string.native_note_detail_stale)
     val readOnlyMessage = stringResource(R.string.native_note_detail_readonly)
     val actionErrorTemplate = stringResource(R.string.native_note_detail_action_error)
+    val duplicateSuffix = stringResource(R.string.native_note_detail_duplicate_suffix)
 
     fun togglePin() {
         val current = note ?: return
@@ -225,6 +227,30 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                 ).show()
             } finally {
                 changingColor = false
+            }
+        }
+    }
+
+    fun duplicateNote() {
+        val current = note ?: return
+        if (duplicating) return
+        duplicating = true
+        val baseTitle = current.title.trim()
+        val newTitle = if (baseTitle.isNotEmpty()) "$baseTitle $duplicateSuffix" else duplicateSuffix
+        scope.launch {
+            try {
+                val created = repository.duplicateNote(current, newTitle)
+                NativeDebug.d("NoteDetailScreen duplicateNote OK newId=${created.id}")
+                onBack()
+            } catch (t: Throwable) {
+                NativeDebug.e("NoteDetailScreen duplicateNote failed", t)
+                Toast.makeText(
+                    context,
+                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } finally {
+                duplicating = false
             }
         }
     }
@@ -372,6 +398,12 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                     text = { Text(stringResource(R.string.native_note_detail_change_color)) },
                                     leadingIcon = { PaletteIcon(size = 18.dp) },
                                     onClick = { menuExpanded = false; showColorPicker = true },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.native_note_detail_duplicate)) },
+                                    leadingIcon = { DuplicateIcon(size = 18.dp, tint = titleColor) },
+                                    enabled = !duplicating,
+                                    onClick = { menuExpanded = false; duplicateNote() },
                                 )
                                 DropdownMenuItem(
                                     text = {
