@@ -69,6 +69,16 @@
     <string name="native_note_detail_readonly">This note can\'t be edited right now.</string>
     <string name="native_note_detail_formatted_notice">This note has formatting (bold, colors, lists…). Native editing for formatted notes isn\'t available yet, so only the plain text is shown below.</string>
     <string name="native_note_detail_type_unsupported">This note type (%1$s) isn\'t editable natively yet.</string>
+    <string name="native_note_detail_pin">Pin note</string>
+    <string name="native_note_detail_unpin">Unpin note</string>
+    <string name="native_note_detail_more">More options</string>
+    <string name="native_note_detail_archive">Archive</string>
+    <string name="native_note_detail_unarchive">Unarchive</string>
+    <string name="native_note_detail_move_to_trash">Move to trash</string>
+    <string name="native_note_detail_trash_confirm_title">Move to trash?</string>
+    <string name="native_note_detail_trash_confirm_body">You\'ll find it in the trash on the web app.</string>
+    <string name="native_note_detail_trash_confirm_cancel">Cancel</string>
+    <string name="native_note_detail_action_error">Action failed: %1$s</string>
 
     <!-- App shortcut: long-press the launcher icon to open the QR
          scanner straight away (sign in to a PC paired with this phone). -->

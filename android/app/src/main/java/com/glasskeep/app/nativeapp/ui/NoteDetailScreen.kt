@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,11 +22,15 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,8 +43,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -86,6 +94,7 @@ private data class Editability(
 @Composable
 fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: String, onBack: () -> Unit) {
     val dark = isSystemInDarkTheme()
+    val context = LocalContext.current
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val scope = rememberCoroutineScope()
 
@@ -99,10 +108,92 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     var saveError by remember { mutableStateOf<String?>(null) }
     var saveNotice by remember { mutableStateOf<String?>(null) }
 
+    var pinning by remember { mutableStateOf(false) }
+    var archiving by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showTrashConfirm by remember { mutableStateOf(false) }
+    var trashing by remember { mutableStateOf(false) }
+
     val errorLoadTemplate = stringResource(R.string.native_note_detail_error)
     val errorSaveTemplate = stringResource(R.string.native_note_detail_save_error)
     val staleMessage = stringResource(R.string.native_note_detail_stale)
     val readOnlyMessage = stringResource(R.string.native_note_detail_readonly)
+    val actionErrorTemplate = stringResource(R.string.native_note_detail_action_error)
+
+    fun togglePin() {
+        val current = note ?: return
+        if (pinning) return
+        pinning = true
+        scope.launch {
+            try {
+                note = repository.setPinned(current.id, !current.pinned)
+            } catch (t: Throwable) {
+                NativeDebug.e("NoteDetailScreen togglePin failed", t)
+                Toast.makeText(
+                    context,
+                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } finally {
+                pinning = false
+            }
+        }
+    }
+
+    fun toggleArchive() {
+        val current = note ?: return
+        if (archiving) return
+        archiving = true
+        scope.launch {
+            try {
+                when (repository.setArchived(current.id, !current.archived)) {
+                    is SaveNoteResult.Saved -> {
+                        NativeDebug.d("NoteDetailScreen toggleArchive OK id=${current.id}")
+                        onBack()
+                    }
+                    SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
+                    SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("NoteDetailScreen toggleArchive failed", t)
+                Toast.makeText(
+                    context,
+                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } finally {
+                archiving = false
+            }
+        }
+    }
+
+    fun confirmTrash() {
+        val current = note ?: return
+        showTrashConfirm = false
+        if (trashing) return
+        trashing = true
+        scope.launch {
+            try {
+                when (repository.trashNote(current.id)) {
+                    is SaveNoteResult.Saved -> {
+                        NativeDebug.d("NoteDetailScreen trash OK id=${current.id}")
+                        onBack()
+                    }
+                    SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
+                    SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("NoteDetailScreen trash failed", t)
+                Toast.makeText(
+                    context,
+                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } finally {
+                trashing = false
+            }
+        }
+    }
 
     LaunchedEffect(noteId) {
         try {
@@ -167,6 +258,11 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
     val cardBg = note?.let { noteColorFor(it.color, dark) } ?: (if (dark) DarkBgColor else Color.White)
+    // Same amber/red the web kebab menu uses for these two entries
+    // (ModalFooter.jsx), so "archive" and "delete" keep reading as
+    // distinct from the rest of the menu on native too.
+    val archiveMenuColor = if (dark) Color(0xFFfbbf24) else Color(0xFFa16207)
+    val trashMenuColor = if (dark) Color(0xFFf87171) else Color(0xFFdc2626)
 
     Box(Modifier.fillMaxSize().then(bgModifier)) {
         Column(Modifier.fillMaxSize()) {
@@ -198,8 +294,66 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                             modifier = Modifier.padding(start = 6.dp),
                         )
                     }
-                    if (note?.pinned == true) {
-                        PinIcon(size = 20.dp, tint = Indigo, filled = true)
+                    note?.let { currentNote ->
+                        val pinLabel = stringResource(
+                            if (currentNote.pinned) R.string.native_note_detail_unpin else R.string.native_note_detail_pin
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .semantics { contentDescription = pinLabel }
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    role = Role.Button,
+                                    enabled = !pinning,
+                                    onClick = { togglePin() },
+                                )
+                                .padding(6.dp),
+                        ) {
+                            PinIcon(
+                                size = 20.dp,
+                                tint = if (currentNote.pinned) Indigo else subtextColor,
+                                filled = currentNote.pinned,
+                            )
+                        }
+                        Box {
+                            val moreLabel = stringResource(R.string.native_note_detail_more)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .semantics { contentDescription = moreLabel }
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        role = Role.Button,
+                                        onClick = { menuExpanded = true },
+                                    )
+                                    .padding(6.dp),
+                            ) {
+                                KebabIcon(size = 20.dp, tint = titleColor)
+                            }
+                            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            stringResource(
+                                                if (currentNote.archived) R.string.native_note_detail_unarchive
+                                                else R.string.native_note_detail_archive
+                                            )
+                                        )
+                                    },
+                                    leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
+                                    enabled = !archiving,
+                                    onClick = { menuExpanded = false; toggleArchive() },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.native_note_detail_move_to_trash)) },
+                                    leadingIcon = { TrashIcon(size = 18.dp, tint = trashMenuColor) },
+                                    onClick = { menuExpanded = false; showTrashConfirm = true },
+                                )
+                            }
+                        }
                     }
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(headerBorderColor(dark)))
@@ -338,6 +492,24 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                     }
                 }
             }
+        }
+
+        if (showTrashConfirm) {
+            AlertDialog(
+                onDismissRequest = { showTrashConfirm = false },
+                title = { Text(stringResource(R.string.native_note_detail_trash_confirm_title)) },
+                text = { Text(stringResource(R.string.native_note_detail_trash_confirm_body)) },
+                confirmButton = {
+                    TextButton(onClick = { confirmTrash() }, enabled = !trashing) {
+                        Text(stringResource(R.string.native_note_detail_move_to_trash), color = trashMenuColor)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showTrashConfirm = false }) {
+                        Text(stringResource(R.string.native_note_detail_trash_confirm_cancel))
+                    }
+                },
+            )
         }
     }
 }

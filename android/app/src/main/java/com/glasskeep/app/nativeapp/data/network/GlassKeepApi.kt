@@ -77,6 +77,26 @@ data class PatchNoteRequest(
 @Serializable
 data class CreateNoteRequest(val type: String = "text")
 
+/** Body for a pin-only PATCH /api/notes/:id. Pin is per-user state, not
+ *  LWW-protected content, so unlike PatchNoteRequest this deliberately
+ *  carries no client_updated_at: sending only `pinned` is what makes the
+ *  server take its fast per-user path instead of the shared-content one
+ *  (see the handler's hasSharedChange check). */
+@Serializable
+data class SetPinnedRequest(val pinned: Boolean)
+
+/** Body for POST /api/notes/:id/archive. */
+@Serializable
+data class ArchiveNoteRequest(
+    val archived: Boolean,
+    @SerialName("client_updated_at") val clientUpdatedAt: String,
+)
+
+/** Body for POST /api/notes/:id/trash (soft delete, the modern replacement
+ *  for the deprecated DELETE /api/notes/:id, which now returns 410). */
+@Serializable
+data class TrashNoteRequest(@SerialName("client_updated_at") val clientUpdatedAt: String)
+
 /** Shared response shape for PUT/PATCH on a note: `stale` means someone
  *  else changed it first (LWW lost, `note` is the server's current copy,
  *  nothing was written); `readOnly` means the caller isn't allowed to
@@ -104,4 +124,13 @@ interface GlassKeepApi {
 
     @PATCH("api/notes/{id}")
     suspend fun patchNote(@Path("id") id: String, @Body body: PatchNoteRequest): Response<NoteMutationResponse>
+
+    @PATCH("api/notes/{id}")
+    suspend fun setPinned(@Path("id") id: String, @Body body: SetPinnedRequest): Response<NoteMutationResponse>
+
+    @POST("api/notes/{id}/archive")
+    suspend fun archiveNote(@Path("id") id: String, @Body body: ArchiveNoteRequest): Response<NoteMutationResponse>
+
+    @POST("api/notes/{id}/trash")
+    suspend fun trashNote(@Path("id") id: String, @Body body: TrashNoteRequest): Response<NoteMutationResponse>
 }

@@ -62,6 +62,16 @@
     <string name="native_note_detail_readonly">Cette note ne peut pas être modifiée pour le moment.</string>
     <string name="native_note_detail_formatted_notice">Cette note contient de la mise en forme (gras, couleurs, listes...). L\'édition native des notes formatées n\'est pas encore disponible, seul le texte brut est affiché ci-dessous.</string>
     <string name="native_note_detail_type_unsupported">Ce type de note (%1$s) n\'est pas encore modifiable en natif.</string>
+    <string name="native_note_detail_pin">Épingler la note</string>
+    <string name="native_note_detail_unpin">Désépingler la note</string>
+    <string name="native_note_detail_more">Plus d\'options</string>
+    <string name="native_note_detail_archive">Archiver</string>
+    <string name="native_note_detail_unarchive">Désarchiver</string>
+    <string name="native_note_detail_move_to_trash">Mettre à la corbeille</string>
+    <string name="native_note_detail_trash_confirm_title">Mettre à la corbeille ?</string>
+    <string name="native_note_detail_trash_confirm_body">Vous la retrouverez dans la corbeille de l\'application web.</string>
+    <string name="native_note_detail_trash_confirm_cancel">Annuler</string>
+    <string name="native_note_detail_action_error">Action impossible : %1$s</string>
 
     <string name="shortcut_qr_short">Scanner QRCODE</string>
     <string name="shortcut_qr_long">Scanner QRCODE</string>

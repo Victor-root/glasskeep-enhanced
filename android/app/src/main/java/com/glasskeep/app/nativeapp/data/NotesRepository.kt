@@ -3,10 +3,13 @@ package com.glasskeep.app.nativeapp.data
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.local.NoteDao
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
+import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
 import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
+import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
+import com.glasskeep.app.nativeapp.data.network.TrashNoteRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonArray
 
@@ -110,6 +113,76 @@ class NotesRepository(
         }
         val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id: ok response with no note")
         noteDao.upsertAll(listOf(saved.toEntity()))
+        return SaveNoteResult.Saved(saved)
+    }
+
+    /**
+     * Pin/unpin. Deliberately its own call, not patchNote(): pin is
+     * per-user state on the server (see SetPinnedRequest), not LWW-guarded
+     * shared content, so there's no stale/readOnly outcome to report, only
+     * success or a thrown exception.
+     */
+    suspend fun setPinned(id: String, pinned: Boolean): NoteDto {
+        NativeDebug.d("NotesRepository.setPinned id=$id pinned=$pinned")
+        val response = api.setPinned(id, SetPinnedRequest(pinned))
+        val note = response.body()?.note
+        if (!response.isSuccessful || note == null) {
+            val error = "PATCH /api/notes/$id (pinned) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        noteDao.upsertAll(listOf(note.toEntity()))
+        return note
+    }
+
+    /** Archive or unarchive. Archived notes stay in the local cache (they
+     *  still exist, just hidden from the active list by the server's own
+     *  listing query), same as how patchNote() mirrors edits. */
+    suspend fun setArchived(id: String, archived: Boolean): SaveNoteResult {
+        NativeDebug.d("NotesRepository.setArchived id=$id archived=$archived")
+        val response = api.archiveNote(id, ArchiveNoteRequest(archived, nowIso()))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "POST /api/notes/$id/archive failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        if (body.stale) {
+            NativeDebug.d("NotesRepository.setArchived id=$id: stale, not applied")
+            return SaveNoteResult.Stale
+        }
+        val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/archive: ok response with no note")
+        noteDao.upsertAll(listOf(saved.toEntity()))
+        return SaveNoteResult.Saved(saved)
+    }
+
+    /**
+     * Soft-deletes (moves to trash). Scoped to the simple, non-collaborative
+     * case for now: the server's /trash route also handles leaving a shared
+     * note or deleting it for every collaborator, but native has no sharing
+     * UI at all yet, so those response shapes (`left`, `deletedForAll`,
+     * no `note` field) aren't something a real native user can trigger
+     * today. If one ever came back anyway, the null-note check below turns
+     * it into a clear error instead of silently mishandling it.
+     *
+     * Removed from the local cache immediately: there is no trash-browsing
+     * screen in the native app yet for it to keep showing up in.
+     */
+    suspend fun trashNote(id: String): SaveNoteResult {
+        NativeDebug.d("NotesRepository.trashNote id=$id")
+        val response = api.trashNote(id, TrashNoteRequest(nowIso()))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "POST /api/notes/$id/trash failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        if (body.stale) {
+            NativeDebug.d("NotesRepository.trashNote id=$id: stale, not applied")
+            return SaveNoteResult.Stale
+        }
+        val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/trash: ok response with no note")
+        noteDao.deleteById(id)
         return SaveNoteResult.Saved(saved)
     }
 
