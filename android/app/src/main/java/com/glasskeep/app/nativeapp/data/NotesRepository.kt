@@ -13,6 +13,7 @@ import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
 import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
+import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonArray
@@ -450,6 +451,30 @@ class NotesRepository(
         return SaveNoteResult.Saved(saved)
     }
 
+    /** Sets, moves, or clears (reminderAtIso == null) a note's reminder.
+     *  Its own dedicated route (see GlassKeepApi.setReminder), not the
+     *  generic PATCH, but the same narrow-body/stale-checked shape as
+     *  setColor()/setTags(). Mirrored into the local cache so the list
+     *  card's reminder chip and NativeNavHost's alarm reconciliation (see
+     *  ReminderSync.kt) see the change immediately, without a refresh(). */
+    suspend fun setReminder(id: String, reminderAtIso: String?): SaveNoteResult {
+        NativeDebug.d("NotesRepository.setReminder id=$id reminderAt=$reminderAtIso")
+        val response = api.setReminder(id, SetReminderRequest(reminderAtIso, nowIso()))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "POST /api/notes/$id/reminder failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        if (body.stale) {
+            NativeDebug.d("NotesRepository.setReminder id=$id: stale, not applied")
+            return SaveNoteResult.Stale
+        }
+        val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/reminder: ok response with no note")
+        noteDao.upsertAll(listOf(saved.toEntity()))
+        return SaveNoteResult.Saved(saved)
+    }
+
     /** This user's saved "new checklist item position" preference
      *  ("top"/"bottom", see App.jsx's checklistInsertPosition), read from
      *  the generic settings blob so the native editor's Enter-to-add-item
@@ -485,4 +510,5 @@ internal fun NoteDto.toEntity() = NoteEntity(
     content = content,
     itemsJson = JsonArray(items).toString(),
     tagsJson = TagsJson.encode(tags),
+    reminderAt = reminderAt,
 )

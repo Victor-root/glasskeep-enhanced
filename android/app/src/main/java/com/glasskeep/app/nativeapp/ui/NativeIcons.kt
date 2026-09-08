@@ -402,6 +402,47 @@ fun TrashIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Col
     }
 }
 
+@Composable
+fun BellIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // tabler/bell.svg, viewBox 24x24, stroke (not filled), strokeWidth 2,
+    // round caps/joins.
+    val path = remember {
+        PathParser().parsePathString(
+            "M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6 " +
+                "M9 17v1a3 3 0 0 0 6 0v-1"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+@Composable
+fun BellRingingFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // tabler/bell-ringing-filled.svg, viewBox 24x24, filled (no stroke).
+    val path = remember {
+        PathParser().parsePathString(
+            "M17.451 2.344a1 1 0 0 1 1.41 -.099a12.05 12.05 0 0 1 3.048 4.064a1 1 0 1 1 -1.818 .836a10.05 10.05 0 0 0 " +
+                "-2.54 -3.39a1 1 0 0 1 -.1 -1.41z " +
+                "M5.136 2.245a1 1 0 0 1 1.41 1.41a10.05 10.05 0 0 0 -2.54 3.39a1 1 0 1 1 -1.817 -.835a12.05 12.05 0 0 1 " +
+                "3.047 -4.065z " +
+                "M14.235 19c.865 0 1.322 1.024 .745 1.668a3.992 3.992 0 0 1 -2.98 1.332a3.992 3.992 0 0 1 -2.98 " +
+                "-1.332c-.552 -.616 -.158 -1.579 .634 -1.661l.11 -.006h4.471z " +
+                "M12 2a7 7 0 0 1 7 7v4l1.524 3.045c.162 .324 .176 .703 .038 1.04a1.2 1.2 0 0 1 -1.114 " +
+                ".749h-14.895a1.2 1.2 0 0 1 -1.114 -.748a1.2 1.2 0 0 1 .038 -1.04l1.524 -3.046v-4a7 7 0 0 1 7 -7z"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint)
+        }
+    }
+}
+
 // The seven icons below back the rich-text toolbar (RichTextEditor.kt). Same
 // source discipline as the rest of this file: exact path data from the
 // Tabler Icons set (MIT) this project already vendors under

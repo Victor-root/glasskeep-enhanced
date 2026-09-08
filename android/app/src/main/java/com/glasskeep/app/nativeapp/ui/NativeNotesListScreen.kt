@@ -63,7 +63,9 @@ import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.ChecklistPreview
 import com.glasskeep.app.nativeapp.data.NoteContent
+import com.glasskeep.app.nativeapp.data.isReminderPast
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
+import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
@@ -71,6 +73,10 @@ import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightBgGradient
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.launch
 
 private val ErrorColor = Color(0xFFdc2626)
@@ -477,6 +483,69 @@ internal fun NoteCard(note: NoteEntity, dark: Boolean, titleColor: Color, subtex
             } else if (note.type != "text") {
                 Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
             }
+        }
+
+        // Its own row, same as NoteCardFooter.jsx: a reminder's date/time
+        // stays readable instead of competing with the preview above it.
+        note.reminderAt?.let { reminderAt ->
+            Spacer(Modifier.height(6.dp))
+            ReminderChip(reminderAt = reminderAt, dark = dark)
+        }
+    }
+}
+
+/** Mirrors NoteReminderChip.jsx: a neutral pill, bell glyph, muted once the
+ *  instant has passed, an accent tint while it's still upcoming. */
+@Composable
+private fun ReminderChip(reminderAt: String, dark: Boolean) {
+    val label = formatReminderLabel(reminderAt)
+    if (label.isBlank()) return
+    val past = isReminderPast(reminderAt)
+    val bg = if (dark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.06f)
+    val fg = when {
+        past -> if (dark) Color(0xFF9ca3af) else Color(0xFF6b7280)
+        else -> if (dark) Color(0xFFa5b4fc) else Indigo
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(bg)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        BellIcon(size = 12.dp, tint = fg)
+        Text(label, color = fg, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Compact, localized label relative to now, mirroring
+ *  src/utils/reminder.js's formatReminderLabel: today/tomorrow get a
+ *  relative word, anything else a short date (year only when it differs
+ *  from the current one). Locale-driven (device locale, same axis every
+ *  other native string already resolves on), not the system 12h/24h clock
+ *  setting: DatePickerDialog/TimePickerDialog (see launchReminderPicker in
+ *  NoteDetailScreen.kt) are chrome and should follow that system setting,
+ *  but this is app content, like the web's own per-language formatting. */
+@Composable
+private fun formatReminderLabel(reminderAt: String): String {
+    val ms = parseIsoToEpochMillis(reminderAt) ?: return ""
+    val isFrench = Locale.getDefault().language == "fr"
+    val time = SimpleDateFormat(if (isFrench) "HH:mm" else "h:mm a", Locale.getDefault()).format(Date(ms))
+
+    val target = Calendar.getInstance().apply { timeInMillis = ms }
+    val now = Calendar.getInstance()
+    val tomorrow = (now.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, 1) }
+    fun sameDay(a: Calendar, b: Calendar) =
+        a.get(Calendar.YEAR) == b.get(Calendar.YEAR) && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
+
+    return when {
+        sameDay(target, now) -> stringResource(R.string.native_reminder_chip_today, time)
+        sameDay(target, tomorrow) -> stringResource(R.string.native_reminder_chip_tomorrow, time)
+        else -> {
+            val datePattern = if (target.get(Calendar.YEAR) != now.get(Calendar.YEAR)) "d MMM yyyy" else "d MMM"
+            val date = SimpleDateFormat(datePattern, Locale.getDefault()).format(Date(ms))
+            stringResource(R.string.native_reminder_chip_date, date, time)
         }
     }
 }

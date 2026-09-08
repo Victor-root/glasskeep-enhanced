@@ -106,10 +106,14 @@
         <!-- Native rewrite (0-webview effort): reached only from debug
              builds today, see MainActivity.launchApp. Not a launcher
              entry point, MainActivity always decides which of this or
-             WebViewActivity to start. -->
+             WebViewActivity to start. singleTask (same as WebViewActivity
+             above) so a reminder notification tap deep-links into the
+             already-running instance via onNewIntent instead of starting
+             a duplicate one. -->
         <activity
             android:name=".nativeapp.NativeAppActivity"
             android:exported="false"
+            android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
 
         <!-- Self-update FileProvider: lets us hand the downloaded APK to

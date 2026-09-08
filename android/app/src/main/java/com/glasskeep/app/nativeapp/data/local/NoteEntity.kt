@@ -7,8 +7,8 @@ import androidx.room.PrimaryKey
  * Local cache of a note, enough to render the list screen's card previews
  * offline (real content/checklist-item preview, not just the title), and to
  * compute the note detail screen's tag suggestions (every note's tags, not
- * just the open one). Images and reminders aren't modeled yet, nothing in
- * the native UI reads them so far.
+ * just the open one). Images aren't modeled yet, nothing in the native UI
+ * reads them from this cache so far.
  */
 @Entity(tableName = "notes")
 data class NoteEntity(
@@ -28,4 +28,9 @@ data class NoteEntity(
      *  itemsJson. Per-user (see server's note_user_tags table), already
      *  scoped to the signed-in user by the time it reaches here. */
     val tagsJson: String,
+    /** Same ISO-8601 UTC instant as NoteDto.reminderAt, or null. Cached
+     *  locally (not just fetched on demand) so the list card can show a
+     *  reminder chip offline, and so NativeNavHost's alarm reconciliation
+     *  (see ReminderSync.kt) can react to it without a network round trip. */
+    val reminderAt: String? = null,
 )

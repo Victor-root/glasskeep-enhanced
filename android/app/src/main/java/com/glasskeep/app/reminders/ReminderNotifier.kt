@@ -8,15 +8,19 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.R
 import com.glasskeep.app.WebViewActivity
+import com.glasskeep.app.nativeapp.NativeAppActivity
 
 /**
  * Posts a local "reminder due" notification. Mirrors UpdateNotifier: a
  * HIGH-importance channel so it fires as a heads-up banner. Tapping the
- * notification (or its "Open" action) deep-links straight to the note — it
- * hands WebViewActivity the note id, which the web app opens via its
- * window.__glasskeepOpenNote hook.
+ * notification (or its "Open" action) deep-links straight to the note: on
+ * a release build it hands WebViewActivity the note id, which the web app
+ * opens via its window.__glasskeepOpenNote hook; on a debug build (see
+ * MainActivity.launchApp) it instead hands NativeAppActivity the note id,
+ * which NativeNavHost opens directly (see buildOpenNoteIntent).
  *
  * This is a LOCAL notification raised by ReminderAlarmReceiver when an
  * AlarmManager alarm fires — no server push / Firebase involved, so it
@@ -70,25 +74,58 @@ internal object ReminderNotifier {
     }
 
     /**
-     * PendingIntent that re-opens the app on the given note. Targets
-     * WebViewActivity directly (it falls back to the saved server_url when
-     * launched cold) and carries the note id as EXTRA_OPEN_NOTE_ID.
+     * PendingIntent that re-opens the app on the given note. Debug builds
+     * (see MainActivity.launchApp) deep-link into NativeAppActivity
+     * instead of WebViewActivity, since that's the flow actually running
+     * there; release builds are unchanged. Carries the note id as each
+     * Activity's own EXTRA_OPEN_NOTE_ID.
      */
     private fun buildOpenNoteIntent(context: Context, noteId: String): PendingIntent {
-        val intent = Intent(context, WebViewActivity::class.java).apply {
-            putExtra(WebViewActivity.EXTRA_OPEN_NOTE_ID, noteId)
-            addFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP,
-            )
+        val nativeIntent = if (BuildConfig.DEBUG) {
+            resolveNativeServerUrl(context)?.let { url ->
+                Intent(context, NativeAppActivity::class.java).apply {
+                    putExtra(NativeAppActivity.EXTRA_SERVER_URL, url)
+                    putExtra(NativeAppActivity.EXTRA_OPEN_NOTE_ID, noteId)
+                }
+            }
+        } else {
+            null
         }
+        // NativeAppActivity requires EXTRA_SERVER_URL (see its onCreate) and
+        // has no fallback if one can't be resolved (e.g. no session was ever
+        // established on this device), so this falls back to the same
+        // WebView target release builds always use rather than risk a crash.
+        val intent = nativeIntent ?: Intent(context, WebViewActivity::class.java).apply {
+            putExtra(WebViewActivity.EXTRA_OPEN_NOTE_ID, noteId)
+        }
+        intent.addFlags(
+            Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP,
+        )
         return PendingIntent.getActivity(
             context,
             noteId.hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+    }
+
+    /** Best-effort server URL for the debug deep-link target, tried in the
+     *  same order ReminderSyncWorker resolves its own session: the
+     *  WebView-era shared prefs first, then native's own encrypted session
+     *  store, read only (never written here, see TokenStore's own doc
+     *  comment on why native and the WebView-era prefs must not cross-write).
+     *  Null when neither has one, e.g. no session was ever established. */
+    private fun resolveNativeServerUrl(context: Context): String? {
+        val legacy = context.getSharedPreferences("glasskeep", Context.MODE_PRIVATE)
+            .getString("server_url", null)?.trimEnd('/')
+        if (!legacy.isNullOrBlank()) return legacy
+        return try {
+            com.glasskeep.app.nativeapp.data.TokenStore(context).serverUrl?.trimEnd('/')?.ifBlank { null }
+        } catch (t: Throwable) {
+            null
+        }
     }
 
     private fun ensureChannel(context: Context) {

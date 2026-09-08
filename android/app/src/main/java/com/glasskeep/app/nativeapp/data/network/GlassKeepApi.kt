@@ -55,6 +55,16 @@ data class NoteDto(
     @SerialName("client_updated_at") val clientUpdatedAt: String? = null,
     val archived: Boolean = false,
     val trashed: Boolean = false,
+    /** ISO-8601 UTC instant, or null when the note has no reminder. Plain
+     *  columns server-side, never encrypted (see server/index.js's
+     *  ensureNoteColumns migration), so unlike title/content this is
+     *  always readable regardless of at-rest encryption unlock state. */
+    val reminderAt: String? = null,
+    /** When the scheduler already dispatched this reminder's notification
+     *  (null = still pending/not due). Native doesn't read this today
+     *  (see NotesRepository.setReminder, which always clears it server-side
+     *  on set/move), declared for parity with serializeNote(). */
+    val reminderFiredAt: String? = null,
 )
 
 /**
@@ -160,6 +170,18 @@ data class SetImagesRequest(
     @SerialName("client_updated_at") val clientUpdatedAt: String,
 )
 
+/** Body for POST /api/notes/:id/reminder, its own dedicated route rather
+ *  than the generic notes PATCH: reminder columns are plain (never
+ *  encrypted), so the server keeps this out of the sensitive-field write
+ *  path (see server/index.js). `reminderAt` null clears the reminder;
+ *  a non-null value sets or moves it and clears reminder_fired_at
+ *  server-side so it re-arms. */
+@Serializable
+data class SetReminderRequest(
+    val reminderAt: String?,
+    @SerialName("client_updated_at") val clientUpdatedAt: String,
+)
+
 /** Body-less read of this user's saved settings blob (GET /api/user/settings
  *  returns whatever arbitrary keys are stored; only the ones native reads
  *  are declared here, `ignoreUnknownKeys` covers the rest). */
@@ -228,6 +250,9 @@ interface GlassKeepApi {
 
     @PATCH("api/notes/{id}")
     suspend fun setImages(@Path("id") id: String, @Body body: SetImagesRequest): Response<NoteMutationResponse>
+
+    @POST("api/notes/{id}/reminder")
+    suspend fun setReminder(@Path("id") id: String, @Body body: SetReminderRequest): Response<NoteMutationResponse>
 
     @GET("api/user/settings")
     suspend fun getUserSettings(): Response<UserSettingsDto>

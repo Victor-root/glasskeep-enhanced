@@ -1,6 +1,9 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.net.Uri
+import android.text.format.DateFormat
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -84,6 +87,8 @@ import com.glasskeep.app.nativeapp.data.DrawingContent
 import com.glasskeep.app.nativeapp.data.DrawingDimensionsDto
 import com.glasskeep.app.nativeapp.data.DrawingStrokeDto
 import com.glasskeep.app.nativeapp.data.NoteContent
+import com.glasskeep.app.nativeapp.data.formatIso
+import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.data.NoteImageData
 import com.glasskeep.app.nativeapp.data.NoteImages
 import com.glasskeep.app.nativeapp.data.RichBlock
@@ -104,6 +109,8 @@ import com.glasskeep.app.ui.LightBgGradient
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
+import java.util.Calendar
+import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -204,6 +211,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     var showTagsPicker by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
     var changingTags by remember { mutableStateOf(false) }
+    var changingReminder by remember { mutableStateOf(false) }
 
     // "top"/"bottom", read from this user's own web settings once the note
     // turns out to be a checklist (see LaunchedEffect below); defaults to
@@ -433,6 +441,40 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                 ).show()
             } finally {
                 changingColor = false
+            }
+        }
+    }
+
+    /** Sets, moves, or clears (reminderAtIso == null) this note's reminder.
+     *  The actual alarm isn't armed/cancelled from here: it follows from
+     *  the local cache update inside repository.setReminder(), which
+     *  NativeNavHost's own reconciliation reacts to (see ReminderSync.kt),
+     *  same separation of concerns as the web, where the reminder-sync
+     *  effect watches the notes array rather than being called inline from
+     *  every place a reminder can change. */
+    fun setReminder(reminderAtIso: String?) {
+        val current = note ?: return
+        if (changingReminder) return
+        changingReminder = true
+        scope.launch {
+            try {
+                when (val result = repository.setReminder(current.id, reminderAtIso)) {
+                    is SaveNoteResult.Saved -> {
+                        NativeDebug.d("NoteDetailScreen setReminder OK id=${current.id}")
+                        note = result.note
+                    }
+                    SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
+                    SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("NoteDetailScreen setReminder failed", t)
+                Toast.makeText(
+                    context,
+                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } finally {
+                changingReminder = false
             }
         }
     }
@@ -1138,6 +1180,8 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     // distinct from the rest of the menu on native too.
     val archiveMenuColor = if (dark) Color(0xFFfbbf24) else Color(0xFFa16207)
     val trashMenuColor = if (dark) Color(0xFFf87171) else Color(0xFFdc2626)
+    // Same dedicated orange ModalFooter.jsx uses for its "Reminder" entry.
+    val reminderMenuColor = if (dark) Color(0xFFfb923c) else Color(0xFFea580c)
 
     Box(Modifier.fillMaxSize().then(bgModifier)) {
         Column(Modifier.fillMaxSize()) {
@@ -1236,6 +1280,31 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                     } else null,
                                     onClick = { menuExpanded = false; tagInput = ""; showTagsPicker = true },
                                 )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.native_note_detail_reminder)) },
+                                    leadingIcon = {
+                                        if (currentNote.reminderAt != null) {
+                                            BellRingingFilledIcon(size = 18.dp, tint = reminderMenuColor)
+                                        } else {
+                                            BellIcon(size = 18.dp, tint = titleColor)
+                                        }
+                                    },
+                                    enabled = !changingReminder,
+                                    onClick = {
+                                        menuExpanded = false
+                                        launchReminderPicker(context, currentNote.reminderAt) { picked ->
+                                            setReminder(formatIso(picked))
+                                        }
+                                    },
+                                )
+                                if (currentNote.reminderAt != null) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.native_note_detail_reminder_remove)) },
+                                        leadingIcon = { BellIcon(size = 18.dp, tint = titleColor) },
+                                        enabled = !changingReminder,
+                                        onClick = { menuExpanded = false; setReminder(null) },
+                                    )
+                                }
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.native_note_detail_duplicate)) },
                                     leadingIcon = { DuplicateIcon(size = 18.dp, tint = titleColor) },
@@ -1884,6 +1953,64 @@ private fun normalizeRichLinkUrl(input: String): String {
     } else {
         "https://$trimmed"
     }
+}
+
+/**
+ * Date then time, via the system's own DatePickerDialog/TimePickerDialog,
+ * not a bespoke calendar like ReminderPicker.jsx's MiniCalendar/TimePicker,
+ * a deliberately trimmed native v1 (see this milestone's commit message).
+ * [currentReminderIso] prefills the dialogs on the existing reminder when
+ * there is one and it's still in the future, else the same "tomorrow
+ * 09:00" default ReminderPicker.jsx itself falls back to.
+ *
+ * A same-day pick can still land in the past (there's no min-time on the
+ * time dialog, only a min-date on the date one, mirroring the web's own
+ * calendar which only disables past days, not past times today), left
+ * to ReminderScheduler.schedule()'s own existing safety net, which already
+ * fires a past/now alarm almost immediately rather than losing it.
+ */
+private fun launchReminderPicker(context: android.content.Context, currentReminderIso: String?, onPicked: (Date) -> Unit) {
+    val cal = Calendar.getInstance()
+    val currentMillis = currentReminderIso?.let(::parseIsoToEpochMillis)
+    if (currentMillis != null && currentMillis > System.currentTimeMillis()) {
+        cal.timeInMillis = currentMillis
+    } else {
+        cal.add(Calendar.DAY_OF_MONTH, 1)
+        cal.set(Calendar.HOUR_OF_DAY, 9)
+        cal.set(Calendar.MINUTE, 0)
+    }
+    cal.set(Calendar.SECOND, 0)
+    cal.set(Calendar.MILLISECOND, 0)
+
+    val todayStart = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+
+    DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            cal.set(year, month, dayOfMonth)
+            TimePickerDialog(
+                context,
+                { _, hourOfDay, minute ->
+                    cal.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                    cal.set(Calendar.MINUTE, minute)
+                    onPicked(cal.time)
+                },
+                cal.get(Calendar.HOUR_OF_DAY),
+                cal.get(Calendar.MINUTE),
+                DateFormat.is24HourFormat(context),
+            ).show()
+        },
+        cal.get(Calendar.YEAR),
+        cal.get(Calendar.MONTH),
+        cal.get(Calendar.DAY_OF_MONTH),
+    ).apply {
+        datePicker.minDate = todayStart.timeInMillis
+    }.show()
 }
 
 // internal, not private: Kotlin's top-level `private` is file-scoped, and

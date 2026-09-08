@@ -1,11 +1,19 @@
 package com.glasskeep.app.nativeapp.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.glasskeep.app.nativeapp.NativeAppContainer
+import com.glasskeep.app.nativeapp.syncReminderAlarms
+import com.glasskeep.app.reminders.ReminderScheduler
+import com.glasskeep.app.reminders.ReminderSyncWorker
 
 /**
  * The native rewrite's navigation graph. One route per real screen; grows
@@ -13,9 +21,59 @@ import com.glasskeep.app.nativeapp.NativeAppContainer
  * report's difficulty tiers for the order that makes sense).
  */
 @Composable
-fun NativeNavHost(container: NativeAppContainer, serverUrl: String) {
+fun NativeNavHost(
+    container: NativeAppContainer,
+    serverUrl: String,
+    pendingOpenNoteId: String? = null,
+    onPendingOpenNoteIdConsumed: () -> Unit = {},
+) {
     val navController: NavHostController = rememberNavController()
     val startDestination = if (container.tokenStore.token != null) "notes" else "login"
+    val context = LocalContext.current
+
+    // Reminder alarms, kept in sync with this device's local note cache for
+    // as long as the native app is running, same placement/lifetime as
+    // App.jsx's own androidReminderSyncRef effect (the top-level app
+    // component), so it reacts to a reminder set/changed/cleared from any
+    // screen, and to a note being trashed/restored, not just the one
+    // action that happens to be on screen right now. See ReminderSync.kt.
+    val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
+    val notes by repository.observeNotes().collectAsState(initial = null)
+    LaunchedEffect(notes) {
+        notes?.let { syncReminderAlarms(context, it) }
+    }
+
+    // Background reminder sync (WorkManager): arms the periodic "ask the
+    // server for upcoming reminders" job and runs one immediately, so a
+    // reminder set on another device, or missed while this device was
+    // offline, is picked up without waiting on the local cache above.
+    // Deliberately NOT ReminderSyncWorker.setAuthToken(): that writes into
+    // the WebView-era shared prefs, which TokenStore's own doc comment
+    // says the two apps "must not silently share or corrupt" between
+    // each other. schedulePeriodic()/syncNow() only enqueue WorkManager
+    // jobs; ReminderSyncWorker itself falls back to reading TokenStore
+    // read-only when those legacy prefs are empty (see its own doc
+    // comment), which is what actually lets this work for a native-only
+    // sign-in with no WebView session on the device at all.
+    LaunchedEffect(startDestination) {
+        if (startDestination == "notes") {
+            ReminderScheduler.schedulePeriodic(context)
+            ReminderSyncWorker.syncNow(context)
+        }
+    }
+
+    // Deep-link from a reminder notification tap (NativeAppActivity's
+    // EXTRA_OPEN_NOTE_ID / onNewIntent). Only handles the "already signed
+    // in" case: startDestination is fixed for this composition's lifetime,
+    // so a cold start with no session (startDestination == "login") is
+    // instead handled from onLoggedIn below, once there's actually
+    // somewhere to navigate to.
+    LaunchedEffect(pendingOpenNoteId, startDestination) {
+        if (pendingOpenNoteId != null && startDestination == "notes") {
+            navController.navigate("notes/$pendingOpenNoteId")
+            onPendingOpenNoteIdConsumed()
+        }
+    }
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable("login") {
@@ -23,8 +81,14 @@ fun NativeNavHost(container: NativeAppContainer, serverUrl: String) {
                 container = container,
                 serverUrl = serverUrl,
                 onLoggedIn = {
+                    ReminderScheduler.schedulePeriodic(context)
+                    ReminderSyncWorker.syncNow(context)
                     navController.navigate("notes") {
                         popUpTo("login") { inclusive = true }
+                    }
+                    pendingOpenNoteId?.let {
+                        navController.navigate("notes/$it")
+                        onPendingOpenNoteIdConsumed()
                     }
                 },
             )
