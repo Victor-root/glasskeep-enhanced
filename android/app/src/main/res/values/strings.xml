@@ -39,6 +39,20 @@
     <string name="native_note_type_checklist">Checklist</string>
     <string name="native_note_type_draw">Drawing</string>
     <string name="native_note_type_audio">Audio note</string>
+
+    <string name="native_note_detail_back">Back</string>
+    <string name="native_note_detail_loading">Loading note…</string>
+    <string name="native_note_detail_error">Couldn\'t load this note: %1$s</string>
+    <string name="native_note_detail_title_label">Title</string>
+    <string name="native_note_detail_body_label">Note</string>
+    <string name="native_note_detail_save">Save</string>
+    <string name="native_note_detail_saving">Saving…</string>
+    <string name="native_note_detail_save_error">Couldn\'t save: %1$s</string>
+    <string name="native_note_detail_stale">This note changed elsewhere. Reopen it to see the latest version.</string>
+    <string name="native_note_detail_readonly">This note can\'t be edited right now.</string>
+    <string name="native_note_detail_formatted_notice">This note has formatting (bold, colors, lists…). Native editing for formatted notes isn\'t available yet, so only the plain text is shown below.</string>
+    <string name="native_note_detail_type_unsupported">This note type (%1$s) isn\'t editable natively yet.</string>
+
     <!-- App shortcut: long-press the launcher icon to open the QR
          scanner straight away (sign in to a PC paired with this phone). -->
     <string name="shortcut_qr_short">Scan QRCODE</string>

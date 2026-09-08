@@ -36,6 +36,20 @@
     <string name="native_note_type_checklist">Liste</string>
     <string name="native_note_type_draw">Dessin</string>
     <string name="native_note_type_audio">Note audio</string>
+
+    <string name="native_note_detail_back">Retour</string>
+    <string name="native_note_detail_loading">Chargement de la note…</string>
+    <string name="native_note_detail_error">Impossible de charger cette note : %1$s</string>
+    <string name="native_note_detail_title_label">Titre</string>
+    <string name="native_note_detail_body_label">Note</string>
+    <string name="native_note_detail_save">Enregistrer</string>
+    <string name="native_note_detail_saving">Enregistrement…</string>
+    <string name="native_note_detail_save_error">Impossible d\'enregistrer : %1$s</string>
+    <string name="native_note_detail_stale">Cette note a changé ailleurs. Rouvrez-la pour voir la dernière version.</string>
+    <string name="native_note_detail_readonly">Cette note ne peut pas être modifiée pour le moment.</string>
+    <string name="native_note_detail_formatted_notice">Cette note contient de la mise en forme (gras, couleurs, listes...). L\'édition native des notes formatées n\'est pas encore disponible, seul le texte brut est affiché ci-dessous.</string>
+    <string name="native_note_detail_type_unsupported">Ce type de note (%1$s) n\'est pas encore modifiable en natif.</string>
+
     <string name="shortcut_qr_short">Scanner QRCODE</string>
     <string name="shortcut_qr_long">Scanner QRCODE</string>
     <string name="shortcut_new_text_short">Note texte</string>

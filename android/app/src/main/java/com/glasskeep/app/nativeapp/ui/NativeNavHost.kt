@@ -30,7 +30,20 @@ fun NativeNavHost(container: NativeAppContainer, serverUrl: String) {
             )
         }
         composable("notes") {
-            NativeNotesListScreen(container = container, serverUrl = serverUrl)
+            NativeNotesListScreen(
+                container = container,
+                serverUrl = serverUrl,
+                onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
+            )
+        }
+        composable("notes/{noteId}") { backStackEntry ->
+            val noteId = backStackEntry.arguments?.getString("noteId") ?: return@composable
+            NoteDetailScreen(
+                container = container,
+                serverUrl = serverUrl,
+                noteId = noteId,
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }

@@ -6,7 +6,9 @@ import kotlinx.serialization.json.JsonElement
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.Path
 
 @Serializable
 data class LoginRequest(val email: String, val password: String)
@@ -53,10 +55,44 @@ data class NoteDto(
     val trashed: Boolean = false,
 )
 
+/**
+ * Body for PATCH /api/notes/:id. Deliberately narrow: only title/content
+ * are ever sent from the native note-detail screen today. The server only
+ * touches fields actually present in the request (see server/index.js,
+ * the `p` object in the PATCH handler defaults everything else to null),
+ * so items/images/tags/color/type on the note are left exactly as they
+ * were. PUT would be the wrong endpoint here: it's a full replace and
+ * silently wipes any field you don't resend.
+ */
+@Serializable
+data class PatchNoteRequest(
+    val title: String,
+    val content: String,
+    @SerialName("client_updated_at") val clientUpdatedAt: String,
+)
+
+/** Shared response shape for PUT/PATCH on a note: `stale` means someone
+ *  else changed it first (LWW lost, `note` is the server's current copy,
+ *  nothing was written); `readOnly` means the caller isn't allowed to
+ *  edit it right now (revoked access, or a federation mirror). */
+@Serializable
+data class NoteMutationResponse(
+    val ok: Boolean = false,
+    val stale: Boolean = false,
+    val readOnly: Boolean = false,
+    val note: NoteDto? = null,
+)
+
 interface GlassKeepApi {
     @POST("api/login")
     suspend fun login(@Body body: LoginRequest): Response<LoginResponse>
 
     @GET("api/notes")
     suspend fun getNotes(): Response<List<NoteDto>>
+
+    @GET("api/notes/{id}")
+    suspend fun getNote(@Path("id") id: String): Response<NoteDto>
+
+    @PATCH("api/notes/{id}")
+    suspend fun patchNote(@Path("id") id: String, @Body body: PatchNoteRequest): Response<NoteMutationResponse>
 }

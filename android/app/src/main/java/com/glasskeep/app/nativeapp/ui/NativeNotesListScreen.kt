@@ -62,7 +62,7 @@ private val ErrorColor = Color(0xFFdc2626)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String) {
+fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOpenNote: (String) -> Unit) {
     val dark = isSystemInDarkTheme()
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val notes by repository.observeNotes().collectAsState(initial = emptyList())
@@ -142,7 +142,13 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String) {
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         items(notes, key = { it.id }) { note ->
-                            NoteRow(note = note, dark = dark, titleColor = titleColor, subtextColor = subtextColor)
+                            NoteRow(
+                                note = note,
+                                dark = dark,
+                                titleColor = titleColor,
+                                subtextColor = subtextColor,
+                                onClick = { onOpenNote(note.id) },
+                            )
                         }
                     }
                 }
@@ -152,12 +158,18 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String) {
 }
 
 @Composable
-private fun NoteRow(note: NoteEntity, dark: Boolean, titleColor: Color, subtextColor: Color) {
+private fun NoteRow(note: NoteEntity, dark: Boolean, titleColor: Color, subtextColor: Color, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(noteColorFor(note.color, dark))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
             .padding(16.dp),
     ) {
         Text(
@@ -183,8 +195,10 @@ private fun NoteRow(note: NoteEntity, dark: Boolean, titleColor: Color, subtextC
     }
 }
 
+// internal, not private: NoteDetailScreen.kt (same package, different
+// file) needs this too. Kotlin's top-level `private` is file-scoped.
 @Composable
-private fun noteTypeLabel(type: String): String = when (type) {
+internal fun noteTypeLabel(type: String): String = when (type) {
     "checklist" -> stringResource(R.string.native_note_type_checklist)
     "draw" -> stringResource(R.string.native_note_type_draw)
     "audio" -> stringResource(R.string.native_note_type_audio)
