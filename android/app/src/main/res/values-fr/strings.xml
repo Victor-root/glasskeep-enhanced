@@ -26,6 +26,17 @@
     <string name="native_login_submit">Se connecter</string>
     <string name="native_login_error_rejected">Connexion refusée (code %1$d). Vérifiez l\'e-mail et le mot de passe.</string>
     <string name="native_login_error_network">Impossible de joindre le serveur : %1$s</string>
+    <string name="native_login_passkey_signin">Se connecter avec une clé d\'accès</string>
+    <string name="native_login_passkey_in_progress">En attente de votre clé d\'accès…</string>
+    <string name="native_login_passkey_error">Impossible de se connecter avec une clé d\'accès (code %1$d).</string>
+    <string name="native_settings_passkeys_section">Clés d\'accès</string>
+    <string name="native_settings_passkeys_empty">Aucune clé d\'accès pour le moment.</string>
+    <string name="native_settings_passkeys_add">Ajouter une clé d\'accès</string>
+    <string name="native_settings_passkeys_add_name_placeholder">ex. Mon téléphone</string>
+    <string name="native_settings_passkeys_untitled">Clé d\'accès</string>
+    <string name="native_settings_passkeys_delete">Supprimer</string>
+    <string name="native_settings_passkeys_delete_confirm_title">Supprimer cette clé d\'accès ?</string>
+    <string name="native_settings_passkeys_delete_confirm_body">Vous devrez vous connecter autrement si c\'était votre seule clé d\'accès.</string>
     <string name="native_header_notes_label">Notes</string>
     <string name="native_notes_refresh">Actualiser</string>
     <string name="native_notes_empty">Aucune note pour le moment.</string>

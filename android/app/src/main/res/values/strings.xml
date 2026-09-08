@@ -29,6 +29,17 @@
     <string name="native_login_submit">Sign in</string>
     <string name="native_login_error_rejected">Sign-in refused (code %1$d). Check the email and password.</string>
     <string name="native_login_error_network">Couldn\'t reach the server: %1$s</string>
+    <string name="native_login_passkey_signin">Sign in with a passkey</string>
+    <string name="native_login_passkey_in_progress">Waiting for your passkey…</string>
+    <string name="native_login_passkey_error">Couldn\'t sign in with a passkey (code %1$d).</string>
+    <string name="native_settings_passkeys_section">Passkeys</string>
+    <string name="native_settings_passkeys_empty">No passkeys yet.</string>
+    <string name="native_settings_passkeys_add">Add a passkey</string>
+    <string name="native_settings_passkeys_add_name_placeholder">e.g. My phone</string>
+    <string name="native_settings_passkeys_untitled">Passkey</string>
+    <string name="native_settings_passkeys_delete">Delete</string>
+    <string name="native_settings_passkeys_delete_confirm_title">Delete this passkey?</string>
+    <string name="native_settings_passkeys_delete_confirm_body">You\'ll need to sign in another way if this was your only one.</string>
     <string name="native_header_notes_label">Notes</string>
     <string name="native_notes_refresh">Refresh</string>
     <string name="native_notes_empty">No notes yet.</string>

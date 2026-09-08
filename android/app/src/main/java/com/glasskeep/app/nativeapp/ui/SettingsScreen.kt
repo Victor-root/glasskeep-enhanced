@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.app.Activity
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -49,6 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -64,8 +66,12 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.NativePasskeys
+import com.glasskeep.app.nativeapp.PasskeyCeremonyResult
 import com.glasskeep.app.nativeapp.data.ChangePasswordResult
+import com.glasskeep.app.nativeapp.data.network.PasskeyDto
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
+import com.glasskeep.app.nativeapp.isUserCancellation
 import com.glasskeep.app.ui.ButtonGradient
 import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.DarkBorderColor
@@ -81,19 +87,21 @@ import com.glasskeep.app.ui.LightTitleColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 
 private val ErrorColor = Color(0xFFdc2626)
 
 /**
  * Milestone: a real Settings screen, reachable from the notes list's
  * hamburger menu. Scope is deliberately narrower than SettingsPanel.jsx's
- * full 9 sections (see this milestone's commit message for the itemized
- * cut list: admin-only sections, passkeys/QR (their own deferred login
- * task), push notifications (Web Push doesn't exist in a Kotlin app),
- * data import/export, typography, AI assistant): profile (avatar,
+ * full 9 sections (see each milestone's own commit message for the
+ * itemized cut list: admin-only sections, QR sign-in (its own deferred
+ * login task), push notifications (Web Push doesn't exist in a Kotlin
+ * app), data import/export, typography, AI assistant): profile (avatar,
  * read-only name/email, language, show-on-login), security (change
- * password), appearance (the six workspace themes), and the one
- * already-half-wired Notes preference (checklist insert position).
+ * password), passkeys (list/add/delete, see NativePasskeys.kt), appearance
+ * (the six workspace themes), and the one already-half-wired Notes
+ * preference (checklist insert position).
  */
 @Composable
 fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () -> Unit) {
@@ -102,16 +110,20 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val activity = LocalView.current.context as Activity
 
     var profile by remember { mutableStateOf<ProfileDto?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var checklistInsertPosition by remember { mutableStateOf("top") }
+    var passkeys by remember { mutableStateOf<List<PasskeyDto>>(emptyList()) }
 
     var changingAvatar by remember { mutableStateOf(false) }
     var changingShowOnLogin by remember { mutableStateOf(false) }
     var changingLanguage by remember { mutableStateOf(false) }
     var changingTheme by remember { mutableStateOf(false) }
     var changingChecklistPosition by remember { mutableStateOf(false) }
+    var addingPasskey by remember { mutableStateOf(false) }
+    var removingPasskeyId by remember { mutableStateOf<String?>(null) }
 
     var showPasswordDialog by remember { mutableStateOf(false) }
     var changingPassword by remember { mutableStateOf(false) }
@@ -120,12 +132,17 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var confirmPasswordInput by remember { mutableStateOf("") }
     var passwordDialogError by remember { mutableStateOf<String?>(null) }
 
+    var showAddPasskeyDialog by remember { mutableStateOf(false) }
+    var addPasskeyNameInput by remember { mutableStateOf("") }
+    var pendingDeletePasskeyId by remember { mutableStateOf<String?>(null) }
+
     val errorLoadTemplate = stringResource(R.string.native_settings_error)
     val actionErrorTemplate = stringResource(R.string.native_settings_action_error)
     val passwordMismatchMessage = stringResource(R.string.native_settings_password_mismatch)
     val passwordTooShortMessage = stringResource(R.string.native_settings_password_too_short)
     val passwordErrorTemplate = stringResource(R.string.native_settings_password_error)
     val passwordSuccessMessage = stringResource(R.string.native_settings_password_success)
+    val passkeyUntitledLabel = stringResource(R.string.native_settings_passkeys_untitled)
 
     val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
@@ -143,8 +160,65 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
         }
     }
 
+    // Its own effect, not folded into the one above: a passkey-list
+    // failure is a lot less important than the profile fetch above (the
+    // rest of the screen works fine without it), so it shouldn't turn
+    // into the same full-screen loadError.
+    LaunchedEffect(serverUrl) {
+        try {
+            passkeys = repository.listPasskeys()
+        } catch (t: Throwable) {
+            NativeDebug.e("SettingsScreen listPasskeys failed", t)
+        }
+    }
+
     fun reportActionError(t: Throwable) {
         Toast.makeText(context, String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName), Toast.LENGTH_SHORT).show()
+    }
+
+    fun addPasskey(name: String) {
+        if (addingPasskey) return
+        addingPasskey = true
+        scope.launch {
+            try {
+                val options = repository.fetchPasskeyRegisterOptions()
+                when (val ceremony = NativePasskeys.register(activity, options.options.toString())) {
+                    is PasskeyCeremonyResult.Success -> {
+                        repository.verifyPasskeyRegistration(Json.parseToJsonElement(ceremony.responseJson), options.challengeId, name)
+                        passkeys = repository.listPasskeys()
+                        showAddPasskeyDialog = false
+                        addPasskeyNameInput = ""
+                    }
+                    is PasskeyCeremonyResult.Failed -> {
+                        // Same silent-no-op treatment as the login
+                        // screen's own submitPasskeyLogin: the user
+                        // dismissing the system picker isn't a failure.
+                        if (!ceremony.isUserCancellation()) reportActionError(IllegalStateException(ceremony.message))
+                    }
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen addPasskey failed", t)
+                reportActionError(t)
+            } finally {
+                addingPasskey = false
+            }
+        }
+    }
+
+    fun deletePasskey(credentialId: String) {
+        if (removingPasskeyId != null) return
+        removingPasskeyId = credentialId
+        scope.launch {
+            try {
+                repository.deletePasskey(credentialId)
+                passkeys = passkeys.filter { it.credentialId != credentialId }
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen deletePasskey failed", t)
+                reportActionError(t)
+            } finally {
+                removingPasskeyId = null
+            }
+        }
     }
 
     val avatarPickerLauncher = rememberLauncherForActivityResult(
@@ -444,6 +518,39 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                             )
                         }
 
+                        SettingsSection(stringResource(R.string.native_settings_passkeys_section), subtextColor, cardBg, borderColor) {
+                            if (passkeys.isEmpty()) {
+                                Text(stringResource(R.string.native_settings_passkeys_empty), color = subtextColor, fontSize = 13.sp)
+                                Spacer(Modifier.height(10.dp))
+                            } else {
+                                passkeys.forEachIndexed { index, passkey ->
+                                    if (index > 0) SettingsDivider(borderColor)
+                                    PasskeyRow(
+                                        passkey = passkey,
+                                        untitledLabel = passkeyUntitledLabel,
+                                        titleColor = titleColor,
+                                        subtextColor = subtextColor,
+                                        removing = removingPasskeyId == passkey.credentialId,
+                                        onDelete = { pendingDeletePasskeyId = passkey.credentialId },
+                                    )
+                                }
+                                Spacer(Modifier.height(10.dp))
+                            }
+                            Text(
+                                stringResource(R.string.native_settings_passkeys_add),
+                                color = Indigo,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                modifier = Modifier
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        enabled = !addingPasskey,
+                                        role = Role.Button,
+                                    ) { addPasskeyNameInput = ""; showAddPasskeyDialog = true },
+                            )
+                        }
+
                         SettingsSection(stringResource(R.string.native_settings_appearance_section), subtextColor, cardBg, borderColor) {
                             Text(stringResource(R.string.native_settings_theme_title), color = titleColor, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                             Spacer(Modifier.height(10.dp))
@@ -523,6 +630,58 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                 },
             )
         }
+
+        if (showAddPasskeyDialog) {
+            AlertDialog(
+                onDismissRequest = { if (!addingPasskey) showAddPasskeyDialog = false },
+                title = { Text(stringResource(R.string.native_settings_passkeys_add)) },
+                text = {
+                    OutlinedTextField(
+                        value = addPasskeyNameInput,
+                        onValueChange = { addPasskeyNameInput = it },
+                        placeholder = { Text(stringResource(R.string.native_settings_passkeys_add_name_placeholder)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        colors = detailFieldColors(titleColor, subtextColor, borderColor),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { addPasskey(addPasskeyNameInput.trim()) }, enabled = !addingPasskey) {
+                        Text(stringResource(R.string.native_settings_passkeys_add))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAddPasskeyDialog = false }, enabled = !addingPasskey) {
+                        Text(stringResource(R.string.native_dialog_cancel))
+                    }
+                },
+            )
+        }
+
+        val deletePasskeyTargetId = pendingDeletePasskeyId
+        if (deletePasskeyTargetId != null) {
+            AlertDialog(
+                onDismissRequest = { pendingDeletePasskeyId = null },
+                title = { Text(stringResource(R.string.native_settings_passkeys_delete_confirm_title)) },
+                text = { Text(stringResource(R.string.native_settings_passkeys_delete_confirm_body)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            pendingDeletePasskeyId = null
+                            deletePasskey(deletePasskeyTargetId)
+                        },
+                    ) {
+                        Text(stringResource(R.string.native_settings_passkeys_delete), color = Color(0xFFdc2626))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingDeletePasskeyId = null }) {
+                        Text(stringResource(R.string.native_dialog_cancel))
+                    }
+                },
+            )
+        }
     }
 }
 
@@ -553,6 +712,48 @@ private fun SettingsDivider(borderColor: Color) {
     Spacer(Modifier.height(14.dp))
     Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
     Spacer(Modifier.height(14.dp))
+}
+
+/** One row in the Passkeys section: name (or a generic fallback, the
+ *  server itself allows an unnamed passkey) and a delete action. No
+ *  rename here (disclosed cut, see this milestone's commit message):
+ *  the server route exists (PATCH /api/passkeys/:id) but the row would
+ *  need its own small text-edit dialog for one secondary action. */
+@Composable
+private fun PasskeyRow(
+    passkey: PasskeyDto,
+    untitledLabel: String,
+    titleColor: Color,
+    subtextColor: Color,
+    removing: Boolean,
+    onDelete: () -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        KeyIcon(size = 18.dp, tint = subtextColor)
+        Spacer(Modifier.width(10.dp))
+        Text(
+            passkey.name?.takeIf { it.isNotBlank() } ?: untitledLabel,
+            color = titleColor,
+            fontSize = 14.sp,
+            modifier = Modifier.weight(1f),
+        )
+        if (removing) {
+            CircularProgressIndicator(color = Indigo, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+        } else {
+            Text(
+                stringResource(R.string.native_settings_passkeys_delete),
+                color = Color(0xFFdc2626),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onDelete() },
+            )
+        }
+    }
 }
 
 @Composable

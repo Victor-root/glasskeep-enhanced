@@ -9,6 +9,9 @@ import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
 import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NoteDto
+import com.glasskeep.app.nativeapp.data.network.PasskeyCeremonyOptionsResponse
+import com.glasskeep.app.nativeapp.data.network.PasskeyDto
+import com.glasskeep.app.nativeapp.data.network.PasskeyRegisterVerifyRequest
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
 import com.glasskeep.app.nativeapp.data.network.SetAvatarRequest
@@ -635,6 +638,61 @@ class NotesRepository(
             return ChangePasswordResult.Rejected(response.code())
         }
         return ChangePasswordResult.Saved(token, user)
+    }
+
+    /** Registered passkeys for this account (Settings screen's passkey
+     *  management section). */
+    suspend fun listPasskeys(): List<PasskeyDto> {
+        NativeDebug.d("NotesRepository.listPasskeys")
+        val response = api.listPasskeys()
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "GET /api/passkeys failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body.passkeys
+    }
+
+    /** Starts a passkey registration ceremony: the caller re-serializes
+     *  the returned `options` to a string and hands it to
+     *  NativePasskeys.register(), then calls [verifyPasskeyRegistration]
+     *  with what comes back. Kept as two separate calls rather than one
+     *  that also drives Credential Manager, so this repository stays
+     *  Activity-agnostic; the orchestration lives in SettingsScreen. */
+    suspend fun fetchPasskeyRegisterOptions(): PasskeyCeremonyOptionsResponse {
+        NativeDebug.d("NotesRepository.fetchPasskeyRegisterOptions")
+        val response = api.passkeyRegisterOptions()
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "POST /api/passkeys/register/options failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body
+    }
+
+    /** [responseJson] is Credential Manager's own RegistrationResponseJSON
+     *  string, already parsed into a JsonElement by the caller (see
+     *  PasskeyRegisterVerifyRequest.response's own doc comment for why). */
+    suspend fun verifyPasskeyRegistration(responseJson: JsonElement, challengeId: String, name: String) {
+        NativeDebug.d("NotesRepository.verifyPasskeyRegistration")
+        val response = api.passkeyRegisterVerify(PasskeyRegisterVerifyRequest(responseJson, challengeId, name))
+        if (!response.isSuccessful || response.body()?.ok != true) {
+            val error = "POST /api/passkeys/register/verify failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    suspend fun deletePasskey(credentialId: String) {
+        NativeDebug.d("NotesRepository.deletePasskey id=$credentialId")
+        val response = api.deletePasskey(credentialId)
+        if (!response.isSuccessful) {
+            val error = "DELETE /api/passkeys/$credentialId failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
     }
 }
 

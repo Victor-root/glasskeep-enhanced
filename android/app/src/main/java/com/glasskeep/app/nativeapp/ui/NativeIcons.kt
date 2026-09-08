@@ -421,6 +421,24 @@ fun SettingsIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = 
 }
 
 @Composable
+fun KeyIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/components/auth/PasskeyLoginButton.jsx's own KeyIcon, viewBox
+    // 24x24, stroke (not filled), strokeWidth 2, round caps/joins.
+    val circleCenter = Offset(7.5f, 15.5f)
+    val circleRadius = 3.5f
+    val path = remember {
+        PathParser().parsePathString("M21 7l-9.5 9.5M14 14l3 3M18 10l3 3").toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawCircle(color = tint, radius = circleRadius, center = circleCenter, style = Stroke(width = 2f))
+            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+@Composable
 fun BellIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
     // tabler/bell.svg, viewBox 24x24, stroke (not filled), strokeWidth 2,
     // round caps/joins.

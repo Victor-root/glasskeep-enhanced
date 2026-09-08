@@ -287,6 +287,72 @@ data class ChangePasswordResponse(
     @SerialName("must_change_password") val mustChangePassword: Boolean = false,
 )
 
+/** One registered passkey (GET /api/passkeys), mirrors passkeyRoutes.js's
+ *  own serialization field for field. */
+@Serializable
+data class PasskeyDto(
+    val credentialId: String,
+    val name: String? = null,
+    val deviceType: String? = null,
+    val backedUp: Boolean = false,
+    val prfSupported: Boolean = false,
+    val canUnlockInstance: Boolean = false,
+    val createdAt: String? = null,
+    val lastUsedAt: String? = null,
+)
+
+@Serializable
+data class PasskeyListResponse(
+    val available: Boolean = false,
+    val passkeys: List<PasskeyDto> = emptyList(),
+)
+
+/** Response shared by POST /api/passkeys/register/options and
+ *  /login/options. `options` is an opaque WebAuthn
+ *  PublicKeyCredentialCreationOptionsJSON / ...RequestOptionsJSON object
+ *  from @simplewebauthn/server, deliberately never hand-modeled field by
+ *  field (a future @simplewebauthn/server upgrade could change it):
+ *  re-serialized as-is and handed straight to
+ *  CreatePublicKeyCredentialRequest/GetPublicKeyCredentialOption (see
+ *  NativePasskeys.kt), which parse that exact shape themselves. */
+@Serializable
+data class PasskeyCeremonyOptionsResponse(
+    val options: JsonElement,
+    val challengeId: String,
+)
+
+/** Body for POST /api/passkeys/register/verify. `response` is Credential
+ *  Manager's own RegistrationResponseJSON string, parsed back into a
+ *  JsonElement so it serializes here as a nested object (matching what
+ *  the server destructures from its own request body) rather than a
+ *  doubly-escaped string. Same opaque-relay reasoning as
+ *  PasskeyCeremonyOptionsResponse.options. */
+@Serializable
+data class PasskeyRegisterVerifyRequest(
+    val response: JsonElement,
+    val challengeId: String,
+    val name: String,
+)
+
+@Serializable
+data class PasskeyRegisterVerifyResponse(
+    val ok: Boolean = false,
+    val credentialId: String? = null,
+    val prfSupported: Boolean = false,
+    val backedUp: Boolean = false,
+)
+
+/** Body for POST /api/passkeys/login/verify. Same opaque AuthenticationResponseJSON
+ *  relay as PasskeyRegisterVerifyRequest.response. */
+@Serializable
+data class PasskeyLoginVerifyRequest(
+    val response: JsonElement,
+    val challengeId: String,
+)
+
+@Serializable
+data class PasskeyMutationResponse(val ok: Boolean = false)
+
 /** Shared response shape for PUT/PATCH on a note: `stale` means someone
  *  else changed it first (LWW lost, `note` is the server's current copy,
  *  nothing was written); `readOnly` means the caller isn't allowed to
@@ -377,4 +443,32 @@ interface GlassKeepApi {
 
     @POST("api/user/change-password")
     suspend fun changePassword(@Body body: ChangePasswordRequest): Response<ChangePasswordResponse>
+
+    @GET("api/passkeys")
+    suspend fun listPasskeys(): Response<PasskeyListResponse>
+
+    @POST("api/passkeys/register/options")
+    suspend fun passkeyRegisterOptions(): Response<PasskeyCeremonyOptionsResponse>
+
+    @POST("api/passkeys/register/verify")
+    suspend fun passkeyRegisterVerify(@Body body: PasskeyRegisterVerifyRequest): Response<PasskeyRegisterVerifyResponse>
+
+    @DELETE("api/passkeys/{id}")
+    suspend fun deletePasskey(@Path("id") id: String): Response<PasskeyMutationResponse>
+
+    // Deliberately no @Path/@Body auth here: both routes are pre-login by
+    // design (see server/routes/passkeyRoutes.js's usernameless flow),
+    // called directly from NativeLoginScreen the same way it already
+    // calls login() below, not through NotesRepository (which requires an
+    // existing session).
+    @POST("api/passkeys/login/options")
+    suspend fun passkeyLoginOptions(): Response<PasskeyCeremonyOptionsResponse>
+
+    // Response reuses LoginResponse: the server keeps this route's shape
+    // in lockstep with /api/login (its own comment says so), and the one
+    // extra "ok" field that route's response carries is silently dropped
+    // by ignoreUnknownKeys (see ApiClientFactory) since nothing here needs
+    // it beyond the HTTP status this call already checks.
+    @POST("api/passkeys/login/verify")
+    suspend fun passkeyLoginVerify(@Body body: PasskeyLoginVerifyRequest): Response<LoginResponse>
 }
