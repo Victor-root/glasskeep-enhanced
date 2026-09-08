@@ -2,6 +2,7 @@ package com.glasskeep.app.nativeapp.ui
 
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -74,6 +75,8 @@ import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NoteExporter
+import com.glasskeep.app.nativeapp.data.AudioClipDto
+import com.glasskeep.app.nativeapp.data.AudioContent
 import com.glasskeep.app.nativeapp.data.ChecklistItemData
 import com.glasskeep.app.nativeapp.data.ChecklistItems
 import com.glasskeep.app.nativeapp.data.DeleteResult
@@ -142,6 +145,12 @@ private data class Editability(
     val originalDrawingPaths: List<DrawingStrokeDto>? = null,
     val originalDrawingDimensions: DrawingDimensionsDto? = null,
     val originalDrawingCaptionText: String? = null,
+    /** True when AudioContent.parse approved an "audio" note's content.
+     *  Same autosave-no-button pattern as drawing (see scheduleAudioAutosave),
+     *  the live, edited clip list is the top-level `audioClips` state. */
+    val isAudioType: Boolean = false,
+    val originalAudioClips: List<AudioClipDto>? = null,
+    val originalAudioCaptionText: String? = null,
 )
 
 /** One entry in the tag suggestion list: a tag already used on at least one
@@ -153,14 +162,16 @@ private data class TagCount(val tag: String, val count: Int)
 private data class LinkTarget(val blockId: String, val start: Int, val end: Int, val existingHref: String?)
 
 /**
- * Milestone: opening and safely editing a single note. Checklist notes get
- * their own flat editor (ChecklistItemsList); draw/audio notes are still
- * fully unsupported. A text note's body goes through RichDoc.parse first:
- * bold/italic/underline/strike/link, headings, and bullet/numbered lists
- * are natively editable (RichTextEditor); anything using formatting
- * outside that vocabulary falls back to the read-only notice below rather
- * than guess and silently destroy it. See RichDoc.kt and NoteContent.kt
- * for exactly where that line is drawn.
+ * Milestone: opening and safely editing a single note, every note type the
+ * server knows about. Checklist notes get their own flat editor
+ * (ChecklistItemsList); drawing notes their own canvas (DrawingEditor);
+ * audio notes their own recorder/player (AudioClipsSection). A text note's
+ * body goes through RichDoc.parse first: bold/italic/underline/strike/
+ * link, headings, and bullet/numbered lists are natively editable
+ * (RichTextEditor); anything using formatting outside that vocabulary
+ * falls back to the read-only notice below rather than guess and silently
+ * destroy it. See RichDoc.kt and NoteContent.kt for exactly where that
+ * line is drawn.
  */
 @Composable
 fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: String, onBack: () -> Unit) {
@@ -223,6 +234,12 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     var drawingUndoStack by remember { mutableStateOf<List<List<DrawingStrokeDto>>>(emptyList()) }
     var drawingRedoStack by remember { mutableStateOf<List<List<DrawingStrokeDto>>>(emptyList()) }
     var drawingSaveJob by remember { mutableStateOf<Job?>(null) }
+
+    // Audio notes: same debounced-autosave shape as drawing notes above,
+    // see scheduleAudioAutosave.
+    var audioClips by remember { mutableStateOf<List<AudioClipDto>>(emptyList()) }
+    var audioCaptionText by remember { mutableStateOf<String?>(null) }
+    var audioSaveJob by remember { mutableStateOf<Job?>(null) }
 
     // Content images (text/checklist notes only, see edit.isTextType /
     // isChecklistType below); parsed once on load same as checklist items,
@@ -681,23 +698,27 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
      *  navigates back on success, which is right for an explicit Save
      *  button press but would be wrong here, autosave firing mid-drawing
      *  must never suddenly leave the screen. */
+    suspend fun performDrawingSave() {
+        if (note == null) return
+        saveError = null
+        try {
+            val encoded = DrawingContent.encode(drawingPaths, drawingDimensions, drawingCaptionText)
+            when (repository.patchNote(noteId, titleText, encoded)) {
+                is SaveNoteResult.Saved -> NativeDebug.d("NoteDetailScreen drawing autosave OK id=$noteId")
+                SaveNoteResult.Stale -> saveNotice = staleMessage
+                SaveNoteResult.ReadOnly -> saveNotice = readOnlyMessage
+            }
+        } catch (t: Throwable) {
+            NativeDebug.e("NoteDetailScreen drawing autosave failed", t)
+            saveError = String.format(errorSaveTemplate, t.message ?: t.javaClass.simpleName)
+        }
+    }
+
     fun scheduleDrawingAutosave() {
         drawingSaveJob?.cancel()
         drawingSaveJob = scope.launch {
             delay(600)
-            if (note == null) return@launch
-            saveError = null
-            try {
-                val encoded = DrawingContent.encode(drawingPaths, drawingDimensions, drawingCaptionText)
-                when (repository.patchNote(noteId, titleText, encoded)) {
-                    is SaveNoteResult.Saved -> NativeDebug.d("NoteDetailScreen drawing autosave OK id=$noteId")
-                    SaveNoteResult.Stale -> saveNotice = staleMessage
-                    SaveNoteResult.ReadOnly -> saveNotice = readOnlyMessage
-                }
-            } catch (t: Throwable) {
-                NativeDebug.e("NoteDetailScreen drawing autosave failed", t)
-                saveError = String.format(errorSaveTemplate, t.message ?: t.javaClass.simpleName)
-            }
+            performDrawingSave()
         }
     }
 
@@ -737,6 +758,51 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
 
     fun clearDrawing(canvasWidthDp: Float, canvasHeightDp: Float) {
         commitDrawingChange(emptyList(), canvasWidthDp, canvasHeightDp)
+    }
+
+    // ---------- Audio note edits (AudioContent.parse-approved notes only) ----------
+
+    /** Same debounced-no-button shape as scheduleDrawingAutosave, reused
+     *  as-is rather than merged into one generic function: they persist
+     *  different content shapes and there is no third note type waiting
+     *  to reuse a unified version yet. */
+    suspend fun performAudioSave() {
+        if (note == null) return
+        saveError = null
+        try {
+            val encoded = AudioContent.encode(audioClips, audioCaptionText.orEmpty())
+            when (repository.patchNote(noteId, titleText, encoded)) {
+                is SaveNoteResult.Saved -> NativeDebug.d("NoteDetailScreen audio autosave OK id=$noteId")
+                SaveNoteResult.Stale -> saveNotice = staleMessage
+                SaveNoteResult.ReadOnly -> saveNotice = readOnlyMessage
+            }
+        } catch (t: Throwable) {
+            NativeDebug.e("NoteDetailScreen audio autosave failed", t)
+            saveError = String.format(errorSaveTemplate, t.message ?: t.javaClass.simpleName)
+        }
+    }
+
+    fun scheduleAudioAutosave() {
+        audioSaveJob?.cancel()
+        audioSaveJob = scope.launch {
+            delay(600)
+            performAudioSave()
+        }
+    }
+
+    fun addAudioClip(clip: AudioClipDto) {
+        audioClips = audioClips + clip
+        scheduleAudioAutosave()
+    }
+
+    fun removeAudioClip(id: String) {
+        audioClips = audioClips.filterNot { it.id == id }
+        scheduleAudioAutosave()
+    }
+
+    fun renameAudioClip(id: String, newName: String) {
+        audioClips = audioClips.map { if (it.id == id) it.copy(name = newName) else it }
+        scheduleAudioAutosave()
     }
 
     // ---------- Content images (text/checklist notes only) ----------
@@ -923,6 +989,22 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                         Editability(isTextType = false, bodyEditable = false, isLegacyPlain = false, bodyPlainText = "")
                     }
                 }
+                "audio" -> {
+                    val audio = AudioContent.parse(fetched.content)
+                    if (audio != null) {
+                        Editability(
+                            isTextType = false,
+                            bodyEditable = false,
+                            isLegacyPlain = false,
+                            bodyPlainText = "",
+                            isAudioType = true,
+                            originalAudioClips = audio.clips,
+                            originalAudioCaptionText = audio.text,
+                        )
+                    } else {
+                        Editability(isTextType = false, bodyEditable = false, isLegacyPlain = false, bodyPlainText = "")
+                    }
+                }
                 else -> Editability(isTextType = false, bodyEditable = false, isLegacyPlain = false, bodyPlainText = "")
             }
             bodyText = editability?.bodyPlainText.orEmpty()
@@ -930,6 +1012,8 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
             drawingPaths = editability?.originalDrawingPaths.orEmpty()
             drawingDimensions = editability?.originalDrawingDimensions
             drawingCaptionText = editability?.originalDrawingCaptionText
+            audioClips = editability?.originalAudioClips.orEmpty()
+            audioCaptionText = editability?.originalAudioCaptionText
         } catch (t: Throwable) {
             NativeDebug.e("NoteDetailScreen load failed", t)
             loadError = String.format(errorLoadTemplate, t.message ?: t.javaClass.simpleName)
@@ -1005,6 +1089,45 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         }
     }
 
+    /** What both the header's own Back row and the system back
+     *  gesture/button (see the BackHandler below) actually trigger: a
+     *  drawing/audio note autosaves on a debounce
+     *  (scheduleDrawingAutosave/scheduleAudioAutosave), so the very last
+     *  stroke or recording before backing out could still be sitting in
+     *  that debounce window, about to be cancelled along with everything
+     *  else once this screen leaves composition. Flushing the pending save
+     *  here first, and only actually navigating back once it resolves,
+     *  closes that gap for the two exit paths a user actually backs out
+     *  through. Other exits (archive/trash/duplicate right in that same
+     *  instant) don't get this treatment, a narrower, disclosed gap rather
+     *  than threading it through every action that also calls onBack(). */
+    fun goBack() {
+        val edit = editability
+        when {
+            edit?.isDrawType == true -> {
+                drawingSaveJob?.cancel()
+                scope.launch {
+                    performDrawingSave()
+                    onBack()
+                }
+            }
+            edit?.isAudioType == true -> {
+                audioSaveJob?.cancel()
+                scope.launch {
+                    performAudioSave()
+                    onBack()
+                }
+            }
+            else -> onBack()
+        }
+    }
+
+    // The system back gesture/button bypasses the header's own Back row
+    // entirely (Navigation Compose would otherwise just pop the back
+    // stack directly), so it needs the exact same flush-before-navigating
+    // treatment routed through it explicitly.
+    BackHandler(onBack = ::goBack)
+
     val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
@@ -1034,7 +1157,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                                 role = Role.Button,
-                            ) { onBack() }
+                            ) { goBack() }
                             .padding(6.dp)
                             .weight(1f),
                     ) {
@@ -1207,7 +1330,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                 .border(width = 1.dp, color = cardBorder, shape = cardShape)
                                 .padding(20.dp),
                         ) {
-                            if (edit.isTextType || edit.isChecklistType || edit.isDrawType) {
+                            if (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType) {
                                 if (edit.isTextType || edit.isChecklistType) {
                                     NoteImagesSection(
                                         images = images,
@@ -1222,7 +1345,11 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                 }
                                 OutlinedTextField(
                                     value = titleText,
-                                    onValueChange = { titleText = it; if (edit.isDrawType) scheduleDrawingAutosave() },
+                                    onValueChange = {
+                                        titleText = it
+                                        if (edit.isDrawType) scheduleDrawingAutosave()
+                                        if (edit.isAudioType) scheduleAudioAutosave()
+                                    },
                                     label = { Text(stringResource(R.string.native_note_detail_title_label)) },
                                     textStyle = MaterialTheme.typography.titleMedium,
                                     singleLine = true,
@@ -1310,6 +1437,26 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                     Spacer(Modifier.height(6.dp))
                                     Text(caption, color = titleColor, fontSize = 14.sp)
                                 }
+                                saveError?.let {
+                                    Spacer(Modifier.height(10.dp))
+                                    Text(it, color = ErrorColor, fontSize = 12.sp)
+                                }
+                                saveNotice?.let {
+                                    Spacer(Modifier.height(10.dp))
+                                    Text(it, color = subtextColor, fontSize = 12.sp)
+                                }
+                            } else if (edit.isAudioType) {
+                                AudioClipsSection(
+                                    clips = audioClips,
+                                    dark = dark,
+                                    titleColor = titleColor,
+                                    subtextColor = subtextColor,
+                                    borderColor = borderColor,
+                                    enabled = true,
+                                    onClipAdded = { clip -> addAudioClip(clip) },
+                                    onClipRemoved = { id -> removeAudioClip(id) },
+                                    onClipRenamed = { id, newName -> renameAudioClip(id, newName) },
+                                )
                                 saveError?.let {
                                     Spacer(Modifier.height(10.dp))
                                     Text(it, color = ErrorColor, fontSize = 12.sp)

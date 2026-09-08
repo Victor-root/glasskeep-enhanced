@@ -523,3 +523,57 @@ fun NumberedListIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Colo
         }
     }
 }
+
+// The three icons below back the audio note player (AudioClipEditor.kt).
+// Play/pause/stop are plain geometric shapes (a triangle, two bars, a
+// square), simple enough to draw directly rather than needing exact
+// vendored path data the way a lettered or curved glyph would.
+
+@Composable
+fun PlayIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        val path = Path().apply {
+            moveTo(7f * scale, 5f * scale)
+            lineTo(19f * scale, 12f * scale)
+            lineTo(7f * scale, 19f * scale)
+            close()
+        }
+        drawPath(path, color = tint)
+    }
+}
+
+@Composable
+fun PauseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        val barWidth = 5f * scale
+        val barHeight = 16f * scale
+        val top = 4f * scale
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(6f * scale, top),
+            size = Size(barWidth, barHeight),
+            cornerRadius = CornerRadius(1.5f * scale, 1.5f * scale),
+        )
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(13f * scale, top),
+            size = Size(barWidth, barHeight),
+            cornerRadius = CornerRadius(1.5f * scale, 1.5f * scale),
+        )
+    }
+}
+
+@Composable
+fun StopIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(5f * scale, 5f * scale),
+            size = Size(14f * scale, 14f * scale),
+            cornerRadius = CornerRadius(2f * scale, 2f * scale),
+        )
+    }
+}

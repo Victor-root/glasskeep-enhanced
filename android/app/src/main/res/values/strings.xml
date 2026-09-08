@@ -42,10 +42,9 @@
     <string name="native_note_type_draw">Drawing</string>
     <string name="native_note_type_audio">Audio note</string>
 
-    <!-- "New note" FAB and its dial. Only text and checklist are wired up
-         (see NoteDetailScreen's own editing scope); the rest show
-         native_fab_type_unavailable instead of creating a note nobody
-         could then edit. -->
+    <!-- "New note" FAB and its dial: every option creates a note of its
+         own type, matching what NoteDetailScreen can edit natively for
+         each one (see its own doc comment). -->
     <string name="native_fab_add_note">Add Note</string>
     <string name="native_fab_text_note">Text note</string>
     <string name="native_fab_text_note_desc">Text and formatting</string>
@@ -55,7 +54,6 @@
     <string name="native_fab_drawing_desc">Freehand sketch</string>
     <string name="native_fab_audio_note">Audio note</string>
     <string name="native_fab_audio_note_desc">Voice memo from microphone</string>
-    <string name="native_fab_type_unavailable">Not available in the native app yet.</string>
     <string name="native_notes_search">Search</string>
     <string name="native_notes_search_placeholder">Search notes…</string>
     <string name="native_notes_search_close">Close search</string>
@@ -142,6 +140,13 @@
     <string name="native_drawing_undo">Undo</string>
     <string name="native_drawing_redo">Redo</string>
     <string name="native_drawing_caption_notice">Caption (not yet editable natively):</string>
+    <string name="native_audio_record">Record</string>
+    <string name="native_audio_record_error">Couldn\'t record audio</string>
+    <string name="native_audio_playback_error">Couldn\'t play this recording on this device</string>
+    <string name="native_audio_remove_clip">Remove recording</string>
+    <string name="native_audio_rename_clip">Rename recording</string>
+    <string name="native_audio_rename_title">Rename recording</string>
+    <string name="native_audio_untitled_clip">Recording</string>
 
     <!-- App shortcut: long-press the launcher icon to open the QR
          scanner straight away (sign in to a PC paired with this phone). -->

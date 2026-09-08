@@ -67,10 +67,7 @@ class NotesRepository(
     /**
      * Creates a new blank text note and mirrors it into the local list
      * cache immediately, so it shows up without waiting for the next
-     * refresh(). Audio creation isn't wired up yet: the native detail
-     * screen can't edit that type either (see NoteDetailScreen), so
-     * creating one would just strand the user on a note they can't do
-     * anything with.
+     * refresh().
      */
     suspend fun createTextNote(): NoteDto {
         NativeDebug.d("NotesRepository.createTextNote")
@@ -109,6 +106,21 @@ class NotesRepository(
         val note = response.body()
         if (!response.isSuccessful || note == null) {
             val error = "POST /api/notes (draw) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        noteDao.upsertAll(listOf(note.toEntity()))
+        return note
+    }
+
+    /** Creates a new, empty audio note (no clips yet: AudioContent.parse
+     *  treats a blank/new note the same way, no seeded content needed). */
+    suspend fun createAudioNote(): NoteDto {
+        NativeDebug.d("NotesRepository.createAudioNote")
+        val response = api.createNote(CreateNoteRequest(type = "audio"))
+        val note = response.body()
+        if (!response.isSuccessful || note == null) {
+            val error = "POST /api/notes (audio) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }

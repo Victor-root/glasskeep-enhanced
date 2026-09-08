@@ -1,6 +1,5 @@
 package com.glasskeep.app.nativeapp.ui
 
-import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -48,7 +47,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -94,7 +92,6 @@ fun NativeNotesListScreen(
     onOpenTrash: () -> Unit,
 ) {
     val dark = isSystemInDarkTheme()
-    val context = LocalContext.current
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val notes by repository.observeNotes().collectAsState(initial = emptyList())
     var refreshing by remember { mutableStateOf(false) }
@@ -117,7 +114,6 @@ fun NativeNotesListScreen(
 
     val errorSyncTemplate = stringResource(R.string.native_notes_error_sync)
     val errorCreateTemplate = stringResource(R.string.native_notes_create_error)
-    val typeUnavailableMessage = stringResource(R.string.native_fab_type_unavailable)
 
     val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
@@ -192,6 +188,24 @@ fun NativeNotesListScreen(
         }
     }
 
+    fun createAudioNote() {
+        if (creatingNote) return
+        creatingNote = true
+        errorMessage = null
+        scope.launch {
+            try {
+                val note = repository.createAudioNote()
+                NativeDebug.d("Created audio note id=${note.id}")
+                onOpenNote(note.id)
+            } catch (t: Throwable) {
+                NativeDebug.e("Create audio note failed", t)
+                errorMessage = String.format(errorCreateTemplate, t.message ?: t.javaClass.simpleName)
+            } finally {
+                creatingNote = false
+            }
+        }
+    }
+
     LaunchedEffect(serverUrl) { refresh() }
 
     Box(Modifier.fillMaxSize().then(bgModifier)) {
@@ -254,7 +268,7 @@ fun NativeNotesListScreen(
             onCreateText = { createTextNote() },
             onCreateChecklist = { createChecklistNote() },
             onCreateDrawing = { createDrawingNote() },
-            onUnavailableType = { Toast.makeText(context, typeUnavailableMessage, Toast.LENGTH_SHORT).show() },
+            onCreateAudio = { createAudioNote() },
         )
     }
 }

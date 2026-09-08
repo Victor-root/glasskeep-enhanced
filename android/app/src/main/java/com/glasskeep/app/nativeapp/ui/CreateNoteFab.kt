@@ -44,10 +44,8 @@ import com.glasskeep.app.R
 /**
  * Same bottom-right "speed dial" as MobileCreateFab.jsx: a round "+"
  * button that spins into an "x" and opens four labelled options above it.
- * Text, checklist and drawing actually create a note today, same scope
- * NoteDetailScreen already draws the line at (audio doesn't yet), tapping
- * that remaining option says so rather than creating a note the app then
- * can't let you edit.
+ * Every option actually creates a note now, matching what NoteDetailScreen
+ * can edit natively for each type.
  */
 @Composable
 fun CreateNoteFab(
@@ -57,7 +55,7 @@ fun CreateNoteFab(
     onCreateText: () -> Unit,
     onCreateChecklist: () -> Unit,
     onCreateDrawing: () -> Unit,
-    onUnavailableType: () -> Unit,
+    onCreateAudio: () -> Unit,
 ) {
     Box(Modifier.fillMaxSize()) {
         AnimatedVisibility(
@@ -96,7 +94,7 @@ fun CreateNoteFab(
                         description = stringResource(R.string.native_fab_audio_note_desc),
                         icon = { tint -> MicIcon(size = 20.dp, tint = tint) },
                         colors = if (dark) DialColors.AudioDark else DialColors.AudioLight,
-                        onClick = { onOpenChange(false); onUnavailableType() },
+                        onClick = { onOpenChange(false); onCreateAudio() },
                     )
                     DialButton(
                         title = stringResource(R.string.native_fab_drawing),
