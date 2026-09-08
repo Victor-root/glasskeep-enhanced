@@ -35,6 +35,7 @@ fun NativeNavHost(container: NativeAppContainer, serverUrl: String) {
                 serverUrl = serverUrl,
                 onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
                 onOpenArchived = { navController.navigate("archived") },
+                onOpenTrash = { navController.navigate("trash") },
             )
         }
         composable("notes/{noteId}") { backStackEntry ->
@@ -48,6 +49,14 @@ fun NativeNavHost(container: NativeAppContainer, serverUrl: String) {
         }
         composable("archived") {
             ArchivedNotesScreen(
+                container = container,
+                serverUrl = serverUrl,
+                onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable("trash") {
+            TrashScreen(
                 container = container,
                 serverUrl = serverUrl,
                 onOpenNote = { noteId -> navController.navigate("notes/$noteId") },

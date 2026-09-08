@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -101,10 +102,12 @@ data class ArchiveNoteRequest(
     @SerialName("client_updated_at") val clientUpdatedAt: String,
 )
 
-/** Body for POST /api/notes/:id/trash (soft delete, the modern replacement
- *  for the deprecated DELETE /api/notes/:id, which now returns 410). */
+/** Body shape shared by every LWW-protected note action that needs nothing
+ *  but a timestamp: POST .../trash (soft delete, the modern replacement for
+ *  the deprecated DELETE /api/notes/:id, which now returns 410), POST
+ *  .../restore, and DELETE .../permanent. */
 @Serializable
-data class TrashNoteRequest(@SerialName("client_updated_at") val clientUpdatedAt: String)
+data class ClientUpdatedAtRequest(@SerialName("client_updated_at") val clientUpdatedAt: String)
 
 /** Body for a color-only PATCH /api/notes/:id. Separate from
  *  PatchNoteRequest (title/content) so title/content stay untouched: the
@@ -150,6 +153,9 @@ interface GlassKeepApi {
     @GET("api/notes/archived")
     suspend fun getArchivedNotes(): Response<List<NoteDto>>
 
+    @GET("api/notes/trashed")
+    suspend fun getTrashedNotes(): Response<List<NoteDto>>
+
     @POST("api/notes")
     suspend fun createNote(@Body body: CreateNoteRequest): Response<NoteDto>
 
@@ -166,7 +172,13 @@ interface GlassKeepApi {
     suspend fun archiveNote(@Path("id") id: String, @Body body: ArchiveNoteRequest): Response<NoteMutationResponse>
 
     @POST("api/notes/{id}/trash")
-    suspend fun trashNote(@Path("id") id: String, @Body body: TrashNoteRequest): Response<NoteMutationResponse>
+    suspend fun trashNote(@Path("id") id: String, @Body body: ClientUpdatedAtRequest): Response<NoteMutationResponse>
+
+    @POST("api/notes/{id}/restore")
+    suspend fun restoreNote(@Path("id") id: String, @Body body: ClientUpdatedAtRequest): Response<NoteMutationResponse>
+
+    @DELETE("api/notes/{id}/permanent")
+    suspend fun deleteNotePermanently(@Path("id") id: String, @Body body: ClientUpdatedAtRequest): Response<NoteMutationResponse>
 
     @PATCH("api/notes/{id}")
     suspend fun setColor(@Path("id") id: String, @Body body: SetColorRequest): Response<NoteMutationResponse>

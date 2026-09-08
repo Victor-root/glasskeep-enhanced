@@ -64,6 +64,9 @@
     <string name="native_archived_title">Archived</string>
     <string name="native_archived_empty">No archived notes.</string>
     <string name="native_archived_error">Couldn\'t load archived notes: %1$s</string>
+    <string name="native_trash_title">Trash</string>
+    <string name="native_trash_empty">Trash is empty.</string>
+    <string name="native_trash_error">Couldn\'t load trash: %1$s</string>
 
     <string name="native_note_detail_back">Back</string>
     <string name="native_note_detail_loading">Loading note…</string>
@@ -93,6 +96,10 @@
     <string name="native_note_detail_duplicate_suffix">(copy)</string>
     <string name="native_note_detail_download">Download as Markdown</string>
     <string name="native_note_detail_download_error">Couldn\'t start the download</string>
+    <string name="native_note_detail_restore">Restore</string>
+    <string name="native_note_detail_delete_permanently">Delete permanently</string>
+    <string name="native_note_detail_permanent_delete_confirm_title">Permanently delete this note?</string>
+    <string name="native_note_detail_permanent_delete_confirm_body">This action cannot be undone. The note will be permanently removed.</string>
     <string name="native_note_detail_tags">Tags</string>
     <string name="native_note_detail_tags_title">Note tags</string>
     <string name="native_note_detail_tags_search_placeholder">Search or create…</string>

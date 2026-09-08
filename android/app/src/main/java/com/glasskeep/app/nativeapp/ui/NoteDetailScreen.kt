@@ -67,6 +67,7 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NoteExporter
+import com.glasskeep.app.nativeapp.data.DeleteResult
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.SaveNoteResult
 import com.glasskeep.app.nativeapp.data.TagsJson
@@ -130,9 +131,12 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
 
     var pinning by remember { mutableStateOf(false) }
     var archiving by remember { mutableStateOf(false) }
+    var restoring by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
     var showTrashConfirm by remember { mutableStateOf(false) }
     var trashing by remember { mutableStateOf(false) }
+    var showPermanentDeleteConfirm by remember { mutableStateOf(false) }
+    var deletingPermanently by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf(false) }
     var changingColor by remember { mutableStateOf(false) }
     var duplicating by remember { mutableStateOf(false) }
@@ -212,6 +216,36 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         }
     }
 
+    /** Restores a trashed note (see repository.restoreNote for what that
+     *  also does to its archived flag). Only ever offered from a trashed
+     *  note's own kebab menu, in place of Archive/Unarchive there. */
+    fun restoreNote() {
+        val current = note ?: return
+        if (restoring) return
+        restoring = true
+        scope.launch {
+            try {
+                when (repository.restoreNote(current.id)) {
+                    is SaveNoteResult.Saved -> {
+                        NativeDebug.d("NoteDetailScreen restoreNote OK id=${current.id}")
+                        onBack()
+                    }
+                    SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
+                    SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("NoteDetailScreen restoreNote failed", t)
+                Toast.makeText(
+                    context,
+                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } finally {
+                restoring = false
+            }
+        }
+    }
+
     fun confirmTrash() {
         val current = note ?: return
         showTrashConfirm = false
@@ -236,6 +270,36 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                 ).show()
             } finally {
                 trashing = false
+            }
+        }
+    }
+
+    /** Permanently deletes a trashed note (irreversible, see
+     *  repository.deleteNotePermanently). Only ever offered from a trashed
+     *  note's own kebab menu, in place of Move to trash there. */
+    fun confirmPermanentDelete() {
+        val current = note ?: return
+        showPermanentDeleteConfirm = false
+        if (deletingPermanently) return
+        deletingPermanently = true
+        scope.launch {
+            try {
+                when (repository.deleteNotePermanently(current.id)) {
+                    DeleteResult.Deleted -> {
+                        NativeDebug.d("NoteDetailScreen deleteNotePermanently OK id=${current.id}")
+                        onBack()
+                    }
+                    DeleteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("NoteDetailScreen deleteNotePermanently failed", t)
+                Toast.makeText(
+                    context,
+                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } finally {
+                deletingPermanently = false
             }
         }
     }
@@ -538,24 +602,48 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                         onClick = { menuExpanded = false; downloadNote() },
                                     )
                                 }
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            stringResource(
-                                                if (currentNote.archived) R.string.native_note_detail_unarchive
-                                                else R.string.native_note_detail_archive
+                                if (currentNote.trashed) {
+                                    // A trashed note has no active/archived state to
+                                    // toggle: restoring it is the only option, same
+                                    // slot in the menu the web reuses for this
+                                    // (ModalFooter.jsx's isTrashed ? restoreFromTrash).
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.native_note_detail_restore)) },
+                                        leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
+                                        enabled = !restoring,
+                                        onClick = { menuExpanded = false; restoreNote() },
+                                    )
+                                } else {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                stringResource(
+                                                    if (currentNote.archived) R.string.native_note_detail_unarchive
+                                                    else R.string.native_note_detail_archive
+                                                )
                                             )
-                                        )
-                                    },
-                                    leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
-                                    enabled = !archiving,
-                                    onClick = { menuExpanded = false; toggleArchive() },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.native_note_detail_move_to_trash)) },
-                                    leadingIcon = { TrashIcon(size = 18.dp, tint = trashMenuColor) },
-                                    onClick = { menuExpanded = false; showTrashConfirm = true },
-                                )
+                                        },
+                                        leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
+                                        enabled = !archiving,
+                                        onClick = { menuExpanded = false; toggleArchive() },
+                                    )
+                                }
+                                if (currentNote.trashed) {
+                                    // Same reuse on the web side: the trash button
+                                    // itself becomes "permanently delete" once the
+                                    // note is already in the trash.
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.native_note_detail_delete_permanently)) },
+                                        leadingIcon = { TrashIcon(size = 18.dp, tint = trashMenuColor) },
+                                        onClick = { menuExpanded = false; showPermanentDeleteConfirm = true },
+                                    )
+                                } else {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.native_note_detail_move_to_trash)) },
+                                        leadingIcon = { TrashIcon(size = 18.dp, tint = trashMenuColor) },
+                                        onClick = { menuExpanded = false; showTrashConfirm = true },
+                                    )
+                                }
                             }
                         }
                     }
@@ -915,6 +1003,24 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                 },
                 dismissButton = {
                     TextButton(onClick = { showTrashConfirm = false }) {
+                        Text(stringResource(R.string.native_note_detail_trash_confirm_cancel))
+                    }
+                },
+            )
+        }
+
+        if (showPermanentDeleteConfirm) {
+            AlertDialog(
+                onDismissRequest = { showPermanentDeleteConfirm = false },
+                title = { Text(stringResource(R.string.native_note_detail_permanent_delete_confirm_title)) },
+                text = { Text(stringResource(R.string.native_note_detail_permanent_delete_confirm_body)) },
+                confirmButton = {
+                    TextButton(onClick = { confirmPermanentDelete() }, enabled = !deletingPermanently) {
+                        Text(stringResource(R.string.native_note_detail_delete_permanently), color = trashMenuColor)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showPermanentDeleteConfirm = false }) {
                         Text(stringResource(R.string.native_note_detail_trash_confirm_cancel))
                     }
                 },

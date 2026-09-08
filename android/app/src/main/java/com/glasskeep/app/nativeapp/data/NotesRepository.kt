@@ -4,6 +4,7 @@ import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.local.NoteDao
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
+import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
 import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NoteDto
@@ -11,7 +12,6 @@ import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
-import com.glasskeep.app.nativeapp.data.network.TrashNoteRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonArray
 
@@ -22,6 +22,13 @@ sealed class SaveNoteResult {
     data class Saved(val note: NoteDto) : SaveNoteResult()
     data object Stale : SaveNoteResult()
     data object ReadOnly : SaveNoteResult()
+}
+
+/** Outcome of a permanent delete: unlike SaveNoteResult, success leaves no
+ *  note to hand back, the row is gone (see DELETE /api/notes/:id/permanent). */
+sealed class DeleteResult {
+    data object Deleted : DeleteResult()
+    data object Stale : DeleteResult()
 }
 
 class NotesRepository(
@@ -142,6 +149,21 @@ class NotesRepository(
         return notes
     }
 
+    /** Trashed notes only (GET /api/notes/trashed). Same server-only, no
+     *  local cache tradeoff as fetchArchivedNotes(), for the same reason:
+     *  the main list's Room table only ever holds active notes. */
+    suspend fun fetchTrashedNotes(): List<NoteDto> {
+        NativeDebug.d("NotesRepository.fetchTrashedNotes")
+        val response = api.getTrashedNotes()
+        val notes = response.body()
+        if (!response.isSuccessful || notes == null) {
+            val error = "GET /api/notes/trashed failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return notes
+    }
+
     /**
      * Saves a title/content edit via PATCH (see GlassKeepApi.patchNote for
      * why not PUT). On success, mirrors the server's fresh copy into the
@@ -219,12 +241,13 @@ class NotesRepository(
      * today. If one ever came back anyway, the null-note check below turns
      * it into a clear error instead of silently mishandling it.
      *
-     * Removed from the local cache immediately: there is no trash-browsing
-     * screen in the native app yet for it to keep showing up in.
+     * Removed from the local (active-list) cache immediately: it's no
+     * longer an active note. The trash screen itself doesn't read this
+     * cache at all, it always fetches fresh (see fetchTrashedNotes()).
      */
     suspend fun trashNote(id: String): SaveNoteResult {
         NativeDebug.d("NotesRepository.trashNote id=$id")
-        val response = api.trashNote(id, TrashNoteRequest(nowIso()))
+        val response = api.trashNote(id, ClientUpdatedAtRequest(nowIso()))
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             val error = "POST /api/notes/$id/trash failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
@@ -238,6 +261,54 @@ class NotesRepository(
         val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/trash: ok response with no note")
         noteDao.deleteById(id)
         return SaveNoteResult.Saved(saved)
+    }
+
+    /** Restores a trashed note back to the active list. Also un-archives it
+     *  if it had been archived before being trashed, that's the server's
+     *  own restore semantics (see POST /:id/restore), not a native choice:
+     *  the trash screen only offers one action, so it must make the note
+     *  reappear wherever the user goes looking for it. No readOnly outcome
+     *  here, same as setArchived(): restoring your own trashed note isn't
+     *  a shared-content permission concern. Mirrors the restored note back
+     *  into the local cache so it shows up in the main list right away. */
+    suspend fun restoreNote(id: String): SaveNoteResult {
+        NativeDebug.d("NotesRepository.restoreNote id=$id")
+        val response = api.restoreNote(id, ClientUpdatedAtRequest(nowIso()))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "POST /api/notes/$id/restore failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        if (body.stale) {
+            NativeDebug.d("NotesRepository.restoreNote id=$id: stale, not applied")
+            return SaveNoteResult.Stale
+        }
+        val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/restore: ok response with no note")
+        noteDao.upsertAll(listOf(saved.toEntity()))
+        return SaveNoteResult.Saved(saved)
+    }
+
+    /** Permanently deletes a note already in trash. The trash screen is the
+     *  only place this is offered from, so "note must be in trash" (the
+     *  server's own guard on this route) is never a real concern here. Not
+     *  in the local cache to begin with (trashed notes aren't cached, see
+     *  fetchTrashedNotes()), so there's nothing to clean up locally on
+     *  success. */
+    suspend fun deleteNotePermanently(id: String): DeleteResult {
+        NativeDebug.d("NotesRepository.deleteNotePermanently id=$id")
+        val response = api.deleteNotePermanently(id, ClientUpdatedAtRequest(nowIso()))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "DELETE /api/notes/$id/permanent failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        if (body.stale) {
+            NativeDebug.d("NotesRepository.deleteNotePermanently id=$id: stale, not applied")
+            return DeleteResult.Stale
+        }
+        return DeleteResult.Deleted
     }
 
     /** Changes a note's color. Shares the general PATCH endpoint with

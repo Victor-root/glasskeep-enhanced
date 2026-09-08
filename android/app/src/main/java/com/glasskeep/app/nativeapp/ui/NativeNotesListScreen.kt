@@ -91,6 +91,7 @@ fun NativeNotesListScreen(
     serverUrl: String,
     onOpenNote: (String) -> Unit,
     onOpenArchived: () -> Unit,
+    onOpenTrash: () -> Unit,
 ) {
     val dark = isSystemInDarkTheme()
     val context = LocalContext.current
@@ -166,6 +167,7 @@ fun NativeNotesListScreen(
                 refreshing = refreshing,
                 onRefresh = { refresh() },
                 onOpenArchived = onOpenArchived,
+                onOpenTrash = onOpenTrash,
                 searchOpen = searchOpen,
                 onSearchOpenChange = { open ->
                     searchOpen = open
@@ -227,6 +229,7 @@ private fun NativeHeader(
     refreshing: Boolean,
     onRefresh: () -> Unit,
     onOpenArchived: () -> Unit,
+    onOpenTrash: () -> Unit,
     searchOpen: Boolean,
     onSearchOpenChange: (Boolean) -> Unit,
     searchQuery: String,
@@ -236,9 +239,10 @@ private fun NativeHeader(
     // (see headerGradient()), a bottom hairline in the matching border
     // token, and the real Hamburger glyph. The web header also
     // backdrop-blurs whatever scrolls behind it. There's no full sidebar
-    // yet, so the hamburger opens a plain dropdown instead of a drawer for
-    // now; it'll grow entries (trash, ...) alongside those screens rather
-    // than needing a drawer rebuild for each one.
+    // yet, so the hamburger opens a plain dropdown (archived, trash)
+    // instead of a drawer for now; it can grow more entries the same way
+    // as more of the web sidebar gets native screens, without needing a
+    // drawer rebuild for each one.
     Column {
         Row(
             modifier = Modifier
@@ -309,6 +313,11 @@ private fun NativeHeader(
                             text = { Text(stringResource(R.string.native_archived_title)) },
                             leadingIcon = { ArchiveIcon(size = 18.dp, tint = titleColor) },
                             onClick = { mainMenuExpanded = false; onOpenArchived() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.native_trash_title)) },
+                            leadingIcon = { TrashIcon(size = 18.dp, tint = titleColor) },
+                            onClick = { mainMenuExpanded = false; onOpenTrash() },
                         )
                     }
                 }

@@ -57,6 +57,9 @@
     <string name="native_archived_title">Archivées</string>
     <string name="native_archived_empty">Aucune note archivée.</string>
     <string name="native_archived_error">Impossible de charger les notes archivées : %1$s</string>
+    <string name="native_trash_title">Corbeille</string>
+    <string name="native_trash_empty">La corbeille est vide.</string>
+    <string name="native_trash_error">Impossible de charger la corbeille : %1$s</string>
 
     <string name="native_note_detail_back">Retour</string>
     <string name="native_note_detail_loading">Chargement de la note…</string>
@@ -86,6 +89,10 @@
     <string name="native_note_detail_duplicate_suffix">(copie)</string>
     <string name="native_note_detail_download">Télécharger en Markdown</string>
     <string name="native_note_detail_download_error">Impossible de démarrer le téléchargement</string>
+    <string name="native_note_detail_restore">Restaurer</string>
+    <string name="native_note_detail_delete_permanently">Supprimer définitivement</string>
+    <string name="native_note_detail_permanent_delete_confirm_title">Supprimer définitivement cette note ?</string>
+    <string name="native_note_detail_permanent_delete_confirm_body">Cette action est irréversible. La note sera définitivement supprimée.</string>
     <string name="native_note_detail_tags">Tags</string>
     <string name="native_note_detail_tags_title">Tags de la note</string>
     <string name="native_note_detail_tags_search_placeholder">Rechercher ou créer…</string>
