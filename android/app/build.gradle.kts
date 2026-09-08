@@ -36,7 +36,14 @@ val hasReleaseSigning =
 
 android {
     namespace = "com.glasskeep.app"
-    compileSdk = 34
+    // Bumped from 34 (Sept 2026 toolchain upgrade): the Compose BOM
+    // 2026.08.00 above ships Compose 1.12, which needs compileSdk 37 to
+    // even link, Gradle refuses to build otherwise. compileSdk only
+    // changes which APIs are available at compile time, it does not
+    // change runtime behavior. targetSdk below is untouched (still 34):
+    // that is the one that changes how the app behaves for real users,
+    // including the WebView flow, and is a separate decision.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.glasskeep.app"
@@ -182,9 +189,15 @@ dependencies {
 
     // Local database on the phone (offline cache of notes + the sync queue
     // later on). Room = SQLite with generated, type-safe access.
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    //
+    // Bumped from 2.6.1 (Sept 2026 toolchain upgrade): that version's
+    // annotation processor crashes under KSP 2.3.11 with "unexpected jvm
+    // signature V", a known incompatibility fixed in Room 2.7.0+. room-ktx
+    // is gone on purpose, not forgotten: since Room 2.7.0 that artifact is
+    // an empty shell (its contents moved into room-runtime), and this
+    // project never imported anything from the androidx.room.ktx package.
+    implementation("androidx.room:room-runtime:2.8.4")
+    ksp("androidx.room:room-compiler:2.8.4")
 
     // HTTP client talking to the same /api/* routes the web app already
     // uses. kotlinx.serialization decodes the JSON responses into plain
