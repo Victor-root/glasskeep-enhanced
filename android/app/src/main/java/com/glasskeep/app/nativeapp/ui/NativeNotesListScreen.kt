@@ -29,6 +29,8 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -79,12 +81,17 @@ private val ErrorColor = Color(0xFFdc2626)
  * Notes list: a two-column masonry grid with real card previews (text
  * snippet, or the first few unchecked checklist items), and a header
  * carrying the app's own branding, same shape as NotesHeader.jsx /
- * NoteCard.jsx on the web side (search, AI search, view toggle, admin
- * panel and the rest of that header's icon cluster aren't native features
- * yet, so they're not faked here, only what's real is shown).
+ * NoteCard.jsx on the web side (AI search, view toggle, admin panel and
+ * the rest of that header's icon cluster aren't native features yet, so
+ * they're not faked here, only what's real is shown).
  */
 @Composable
-fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOpenNote: (String) -> Unit) {
+fun NativeNotesListScreen(
+    container: NativeAppContainer,
+    serverUrl: String,
+    onOpenNote: (String) -> Unit,
+    onOpenArchived: () -> Unit,
+) {
     val dark = isSystemInDarkTheme()
     val context = LocalContext.current
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
@@ -158,6 +165,7 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOp
                 subtextColor = subtextColor,
                 refreshing = refreshing,
                 onRefresh = { refresh() },
+                onOpenArchived = onOpenArchived,
                 searchOpen = searchOpen,
                 onSearchOpenChange = { open ->
                     searchOpen = open
@@ -218,6 +226,7 @@ private fun NativeHeader(
     subtextColor: Color,
     refreshing: Boolean,
     onRefresh: () -> Unit,
+    onOpenArchived: () -> Unit,
     searchOpen: Boolean,
     onSearchOpenChange: (Boolean) -> Unit,
     searchQuery: String,
@@ -226,8 +235,10 @@ private fun NativeHeader(
     // Same indigo -> violet "glass chrome" gradient the web header uses
     // (see headerGradient()), a bottom hairline in the matching border
     // token, and the real Hamburger glyph. The web header also
-    // backdrop-blurs whatever scrolls behind it; there's no sidebar to
-    // open yet so the icon is decorative for now, not a dead menu.
+    // backdrop-blurs whatever scrolls behind it. There's no full sidebar
+    // yet, so the hamburger opens a plain dropdown instead of a drawer for
+    // now; it'll grow entries (trash, ...) alongside those screens rather
+    // than needing a drawer rebuild for each one.
     Column {
         Row(
             modifier = Modifier
@@ -279,7 +290,28 @@ private fun NativeHeader(
                     keyboard?.show()
                 }
             } else {
-                HamburgerIcon(size = 22.dp, tint = titleColor)
+                var mainMenuExpanded by remember { mutableStateOf(false) }
+                Box {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Button,
+                            ) { mainMenuExpanded = true }
+                            .padding(6.dp),
+                    ) {
+                        HamburgerIcon(size = 22.dp, tint = titleColor)
+                    }
+                    DropdownMenu(expanded = mainMenuExpanded, onDismissRequest = { mainMenuExpanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.native_archived_title)) },
+                            leadingIcon = { ArchiveIcon(size = 18.dp, tint = titleColor) },
+                            onClick = { mainMenuExpanded = false; onOpenArchived() },
+                        )
+                    }
+                }
                 Spacer(Modifier.width(12.dp))
                 Image(
                     painter = painterResource(id = R.drawable.glasskeep_logo),
@@ -329,8 +361,11 @@ private fun NativeHeader(
 // is the closest native equivalent, not a byte-for-byte port.
 private val CardShadowTint = Color(0xFF8B5CF6)
 
+// internal, not private: ArchivedNotesScreen.kt (same package, different
+// file) reuses this for the exact same card rendering. Kotlin's top-level
+// `private` is file-scoped.
 @Composable
-private fun NoteCard(note: NoteEntity, dark: Boolean, titleColor: Color, subtextColor: Color, onClick: () -> Unit) {
+internal fun NoteCard(note: NoteEntity, dark: Boolean, titleColor: Color, subtextColor: Color, onClick: () -> Unit) {
     val borderColor = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
     val shape = RoundedCornerShape(12.dp)
     Column(

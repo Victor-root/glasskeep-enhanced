@@ -147,6 +147,9 @@ interface GlassKeepApi {
     @GET("api/notes")
     suspend fun getNotes(): Response<List<NoteDto>>
 
+    @GET("api/notes/archived")
+    suspend fun getArchivedNotes(): Response<List<NoteDto>>
+
     @POST("api/notes")
     suspend fun createNote(@Body body: CreateNoteRequest): Response<NoteDto>
 

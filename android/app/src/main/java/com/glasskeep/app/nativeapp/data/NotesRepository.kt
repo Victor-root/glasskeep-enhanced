@@ -122,6 +122,26 @@ class NotesRepository(
         return note
     }
 
+    /** Archived notes only (GET /api/notes/archived), server-only, no local
+     *  cache: the main list's Room table is only ever populated from
+     *  GET /api/notes, which already excludes archived notes, so caching
+     *  archived ones there too would either get wiped by the very next
+     *  refresh() or leak into the main grid's query. Same "always hits the
+     *  server" tradeoff as fetchNoteDetail(), for the same reason: a
+     *  secondary, occasionally-viewed screen doesn't need offline support
+     *  as much as the main list does. */
+    suspend fun fetchArchivedNotes(): List<NoteDto> {
+        NativeDebug.d("NotesRepository.fetchArchivedNotes")
+        val response = api.getArchivedNotes()
+        val notes = response.body()
+        if (!response.isSuccessful || notes == null) {
+            val error = "GET /api/notes/archived failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return notes
+    }
+
     /**
      * Saves a title/content edit via PATCH (see GlassKeepApi.patchNote for
      * why not PUT). On success, mirrors the server's fresh copy into the
@@ -264,19 +284,21 @@ class NotesRepository(
         noteDao.upsertAll(listOf(saved.toEntity()))
         return SaveNoteResult.Saved(saved)
     }
-
-    // Full content/items are cached now too (not just the summary fields),
-    // so the list's cards can show a real preview, like the web app's own
-    // NoteCard.jsx, instead of just a title.
-    private fun NoteDto.toEntity() = NoteEntity(
-        id = id,
-        type = type,
-        title = title,
-        color = color,
-        pinned = pinned,
-        updatedAt = updatedAt,
-        content = content,
-        itemsJson = JsonArray(items).toString(),
-        tagsJson = TagsJson.encode(tags),
-    )
 }
+
+// Full content/items are cached now too (not just the summary fields), so
+// the list's cards can show a real preview, like the web app's own
+// NoteCard.jsx, instead of just a title. Top-level and internal (not a
+// class member) so ArchivedNotesScreen can reuse it too, for the same
+// NoteCard rendering, without duplicating this mapping.
+internal fun NoteDto.toEntity() = NoteEntity(
+    id = id,
+    type = type,
+    title = title,
+    color = color,
+    pinned = pinned,
+    updatedAt = updatedAt,
+    content = content,
+    itemsJson = JsonArray(items).toString(),
+    tagsJson = TagsJson.encode(tags),
+)

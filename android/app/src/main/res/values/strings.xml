@@ -61,6 +61,10 @@
     <string name="native_notes_search_close">Close search</string>
     <string name="native_notes_search_empty">No notes match your search.</string>
 
+    <string name="native_archived_title">Archived</string>
+    <string name="native_archived_empty">No archived notes.</string>
+    <string name="native_archived_error">Couldn\'t load archived notes: %1$s</string>
+
     <string name="native_note_detail_back">Back</string>
     <string name="native_note_detail_loading">Loading note…</string>
     <string name="native_note_detail_error">Couldn\'t load this note: %1$s</string>

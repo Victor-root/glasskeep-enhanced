@@ -54,6 +54,10 @@
     <string name="native_notes_search_close">Fermer la recherche</string>
     <string name="native_notes_search_empty">Aucune note ne correspond à votre recherche.</string>
 
+    <string name="native_archived_title">Archivées</string>
+    <string name="native_archived_empty">Aucune note archivée.</string>
+    <string name="native_archived_error">Impossible de charger les notes archivées : %1$s</string>
+
     <string name="native_note_detail_back">Retour</string>
     <string name="native_note_detail_loading">Chargement de la note…</string>
     <string name="native_note_detail_error">Impossible de charger cette note : %1$s</string>
