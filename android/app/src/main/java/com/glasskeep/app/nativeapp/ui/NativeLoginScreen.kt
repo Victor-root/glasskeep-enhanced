@@ -47,6 +47,7 @@ import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkCardBg
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
+import com.glasskeep.app.ui.FloatingCardsBackground
 import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightBgGradient
 import com.glasskeep.app.ui.LightBorderColor
@@ -120,6 +121,11 @@ fun NativeLoginScreen(
     }
 
     Box(Modifier.fillMaxSize().then(bgModifier), contentAlignment = Alignment.Center) {
+        // Same floating note-card decoration as SetupScreen.kt: this
+        // screen reuses that screen's visual language on purpose, not a
+        // trimmed-down version of it.
+        FloatingCardsBackground(dark)
+
         Column(
             modifier = Modifier.padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
