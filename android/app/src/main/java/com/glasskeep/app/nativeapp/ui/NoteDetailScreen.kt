@@ -215,26 +215,46 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                 .background(cardBg)
                                 .padding(20.dp),
                         ) {
-                            OutlinedTextField(
-                                value = titleText,
-                                onValueChange = { titleText = it },
-                                label = { Text(stringResource(R.string.native_note_detail_title_label)) },
-                                textStyle = MaterialTheme.typography.titleMedium,
-                                singleLine = true,
-                                colors = detailFieldColors(titleColor, subtextColor, borderColor),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                            if (edit.isTextType) {
+                                OutlinedTextField(
+                                    value = titleText,
+                                    onValueChange = { titleText = it },
+                                    label = { Text(stringResource(R.string.native_note_detail_title_label)) },
+                                    textStyle = MaterialTheme.typography.titleMedium,
+                                    singleLine = true,
+                                    colors = detailFieldColors(titleColor, subtextColor, borderColor),
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            } else {
+                                // Not an OutlinedTextField: nothing typed here could
+                                // ever be saved (no Save button renders below for an
+                                // unsupported type), so a field that looks editable
+                                // would just be a trap. Plain heading text instead.
+                                Text(
+                                    titleText.ifBlank { stringResource(R.string.native_notes_untitled) },
+                                    color = titleColor,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
                             Spacer(Modifier.height(14.dp))
 
                             if (!edit.isTextType) {
-                                Text(
-                                    String.format(
-                                        stringResource(R.string.native_note_detail_type_unsupported),
-                                        noteTypeLabel(currentNote.type),
-                                    ),
-                                    color = subtextColor,
-                                    fontSize = 13.sp,
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(subtextColor.copy(alpha = 0.14f))
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                ) {
+                                    Text(
+                                        String.format(
+                                            stringResource(R.string.native_note_detail_type_unsupported),
+                                            noteTypeLabel(currentNote.type),
+                                        ),
+                                        color = titleColor,
+                                        fontSize = 13.sp,
+                                    )
+                                }
                             } else {
                                 if (!edit.bodyEditable) {
                                     Text(
