@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [NoteEntity::class], version = 1, exportSchema = false)
+@Database(entities = [NoteEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
 
@@ -18,7 +18,14 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "glasskeep_native.db",
-                ).build().also { instance = it }
+                )
+                    // This table is a disposable mirror of the server's
+                    // notes (refresh() always rebuilds it from scratch),
+                    // never the source of truth, so a schema bump just
+                    // drops and recreates it instead of writing a real
+                    // migration. Safe as long as that stays true.
+                    .fallbackToDestructiveMigration()
+                    .build().also { instance = it }
             }
     }
 }

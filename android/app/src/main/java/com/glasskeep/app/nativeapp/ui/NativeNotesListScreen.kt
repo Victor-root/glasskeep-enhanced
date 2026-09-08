@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -9,17 +10,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -32,20 +34,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.data.ChecklistPreview
+import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.ui.DarkBgColor
+import com.glasskeep.app.ui.DarkCardBg
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightBgGradient
+import com.glasskeep.app.ui.LightCardBg
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import kotlinx.coroutines.launch
@@ -53,14 +61,13 @@ import kotlinx.coroutines.launch
 private val ErrorColor = Color(0xFFdc2626)
 
 /**
- * Milestone 0 of the native rewrite: read-only list, no editing, no
- * checklists/rich text/drawing/audio rendering yet. The point of this
- * screen is to prove the whole pipe end to end (login, /api/notes, local
- * cache, display) before building anything on top of it. Uses the same
- * background, palette and note-color swatches as the rest of the app
- * (SetupScreen.kt, src/utils/colors.js) instead of bare Material3 defaults.
+ * Notes list: a two-column masonry grid with real card previews (text
+ * snippet, or the first few unchecked checklist items), and a header
+ * carrying the app's own branding, same shape as NotesHeader.jsx /
+ * NoteCard.jsx on the web side (search, AI search, view toggle, admin
+ * panel and the rest of that header's icon cluster aren't native features
+ * yet, so they're not faked here, only what's real is shown).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOpenNote: (String) -> Unit) {
     val dark = isSystemInDarkTheme()
@@ -75,6 +82,7 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOp
     val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
+    val headerBg = if (dark) DarkCardBg else LightCardBg
 
     fun refresh() {
         refreshing = true
@@ -94,62 +102,39 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOp
     LaunchedEffect(serverUrl) { refresh() }
 
     Box(Modifier.fillMaxSize().then(bgModifier)) {
-        Scaffold(
-            containerColor = Color.Transparent,
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            String.format(stringResource(R.string.native_notes_title), notes.size),
-                            color = titleColor,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
-                    actions = {
-                        Text(
-                            stringResource(R.string.native_notes_refresh),
-                            color = if (refreshing) subtextColor else Indigo,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier
-                                .padding(end = 16.dp)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    enabled = !refreshing,
-                                    role = Role.Button,
-                                ) { refresh() },
-                        )
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        titleContentColor = titleColor,
-                    ),
-                )
-            },
-        ) { padding ->
-            Column(Modifier.padding(padding).fillMaxSize()) {
-                errorMessage?.let {
-                    Text(it, color = ErrorColor, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+        Column(Modifier.fillMaxSize()) {
+            NativeHeader(
+                titleColor = titleColor,
+                subtextColor = subtextColor,
+                headerBg = headerBg,
+                refreshing = refreshing,
+                onRefresh = { refresh() },
+            )
+
+            errorMessage?.let {
+                Text(it, color = ErrorColor, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
+
+            if (notes.isEmpty() && !refreshing && errorMessage == null) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.native_notes_empty), color = subtextColor)
                 }
-                if (notes.isEmpty() && !refreshing && errorMessage == null) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(stringResource(R.string.native_notes_empty), color = subtextColor)
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        items(notes, key = { it.id }) { note ->
-                            NoteRow(
-                                note = note,
-                                dark = dark,
-                                titleColor = titleColor,
-                                subtextColor = subtextColor,
-                                onClick = { onOpenNote(note.id) },
-                            )
-                        }
+            } else {
+                LazyVerticalStaggeredGrid(
+                    columns = StaggeredGridCells.Fixed(2),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalItemSpacing = 10.dp,
+                ) {
+                    items(notes, key = { it.id }) { note ->
+                        NoteCard(
+                            note = note,
+                            dark = dark,
+                            titleColor = titleColor,
+                            subtextColor = subtextColor,
+                            onClick = { onOpenNote(note.id) },
+                        )
                     }
                 }
             }
@@ -158,7 +143,49 @@ fun NativeNotesListScreen(container: NativeAppContainer, serverUrl: String, onOp
 }
 
 @Composable
-private fun NoteRow(note: NoteEntity, dark: Boolean, titleColor: Color, subtextColor: Color, onClick: () -> Unit) {
+private fun NativeHeader(
+    titleColor: Color,
+    subtextColor: Color,
+    headerBg: Color,
+    refreshing: Boolean,
+    onRefresh: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(headerBg)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.glasskeep_logo),
+            contentDescription = "GlassKeep",
+            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)),
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Glass Keep", color = titleColor, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+            Text(stringResource(R.string.native_header_notes_label), color = subtextColor, fontSize = 12.sp)
+        }
+        Text(
+            stringResource(R.string.native_notes_refresh),
+            color = if (refreshing) subtextColor else Indigo,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            modifier = Modifier
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    enabled = !refreshing,
+                    role = Role.Button,
+                ) { onRefresh() }
+                .padding(8.dp),
+        )
+    }
+}
+
+@Composable
+private fun NoteCard(note: NoteEntity, dark: Boolean, titleColor: Color, subtextColor: Color, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -170,27 +197,77 @@ private fun NoteRow(note: NoteEntity, dark: Boolean, titleColor: Color, subtextC
                 role = Role.Button,
                 onClick = onClick,
             )
-            .padding(16.dp),
+            .padding(14.dp),
     ) {
         Text(
             note.title.ifBlank { stringResource(R.string.native_notes_untitled) },
             color = titleColor,
-            fontWeight = FontWeight.Medium,
-            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
-            if (note.pinned) {
+        Spacer(Modifier.height(6.dp))
+
+        if (note.type == "checklist") {
+            ChecklistCardPreview(note = note, titleColor = titleColor, subtextColor = subtextColor)
+        } else {
+            val preview = remember(note.content) { NoteContent.previewPlainText(note.content) }
+            if (preview.isNotBlank()) {
+                Text(preview, color = titleColor, fontSize = 13.sp, lineHeight = 18.sp)
+            } else if (note.type != "text") {
+                Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
+            }
+        }
+
+        if (note.pinned) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "• " + stringResource(R.string.native_notes_pinned),
+                color = Indigo,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+/** Same rule as NoteCard.jsx's own preview: only unchecked items are
+ *  listed (what's left to do), capped at a handful, checked ones only
+ *  count toward the "done/total" footer. */
+@Composable
+private fun ChecklistCardPreview(note: NoteEntity, titleColor: Color, subtextColor: Color) {
+    val items = remember(note.itemsJson) { ChecklistPreview.parse(note.itemsJson) }
+    val total = items.size
+    val done = items.count { it.done }
+    val unchecked = items.filter { !it.done }
+    val shown = unchecked.take(5)
+    val extra = unchecked.size - shown.size
+
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        for (item in shown) {
+            Row(modifier = if (item.indented) Modifier.padding(start = 14.dp) else Modifier) {
+                Text("☐ ", color = subtextColor, fontSize = 13.sp)
                 Text(
-                    "• " + stringResource(R.string.native_notes_pinned),
-                    color = Indigo,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    item.text,
+                    color = titleColor,
+                    fontSize = 13.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+        if (extra > 0) {
+            Text(
+                String.format(stringResource(R.string.native_notes_more_items), extra),
+                color = subtextColor,
+                fontSize = 12.sp,
+            )
+        }
+        if (total > 0) {
+            Text(
+                String.format(stringResource(R.string.native_notes_completed_fraction), done, total),
+                color = subtextColor,
+                fontSize = 12.sp,
+            )
         }
     }
 }

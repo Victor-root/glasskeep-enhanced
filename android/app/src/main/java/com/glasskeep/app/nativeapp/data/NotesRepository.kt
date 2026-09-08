@@ -7,6 +7,7 @@ import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonArray
 
 /** Outcome of a note save. Stale/ReadOnly are real, expected server
  *  answers (see PATCH /api/notes/:id), not bugs, the caller shows each
@@ -90,6 +91,9 @@ class NotesRepository(
         return SaveNoteResult.Saved(saved)
     }
 
+    // Full content/items are cached now too (not just the summary fields),
+    // so the list's cards can show a real preview, like the web app's own
+    // NoteCard.jsx, instead of just a title.
     private fun NoteDto.toEntity() = NoteEntity(
         id = id,
         type = type,
@@ -97,5 +101,7 @@ class NotesRepository(
         color = color,
         pinned = pinned,
         updatedAt = updatedAt,
+        content = content,
+        itemsJson = JsonArray(items).toString(),
     )
 }

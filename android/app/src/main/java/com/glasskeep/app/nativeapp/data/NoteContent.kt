@@ -134,4 +134,16 @@ object NoteContent {
         }
         return envelope.toString()
     }
+
+    /** Short plain-text snippet for a card preview, rich or legacy content
+     *  alike. Mirrors the intent of NoteCard.jsx's own preview truncation
+     *  (a fixed character budget so a long note doesn't blow out a grid
+     *  cell), not a byte-for-byte port since the web side truncates
+     *  rendered HTML and this truncates plain text instead. */
+    fun previewPlainText(content: String, maxChars: Int = 220): String {
+        val doc = parseRichDoc(content)
+        val raw = if (doc != null) docToPlainText(doc) else content
+        val trimmed = raw.trim()
+        return if (trimmed.length > maxChars) trimmed.take(maxChars).trimEnd() + "…" else trimmed
+    }
 }

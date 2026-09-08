@@ -29,12 +29,14 @@
     <string name="native_login_submit">Sign in</string>
     <string name="native_login_error_rejected">Sign-in refused (code %1$d). Check the email and password.</string>
     <string name="native_login_error_network">Couldn\'t reach the server: %1$s</string>
-    <string name="native_notes_title">Notes (%1$d)</string>
+    <string name="native_header_notes_label">Notes</string>
     <string name="native_notes_refresh">Refresh</string>
     <string name="native_notes_empty">No notes yet.</string>
     <string name="native_notes_error_sync">Couldn\'t sync: %1$s</string>
     <string name="native_notes_untitled">Untitled</string>
     <string name="native_notes_pinned">Pinned</string>
+    <string name="native_notes_more_items">+%1$d more…</string>
+    <string name="native_notes_completed_fraction">%1$d/%2$d completed</string>
     <string name="native_note_type_text">Text</string>
     <string name="native_note_type_checklist">Checklist</string>
     <string name="native_note_type_draw">Drawing</string>

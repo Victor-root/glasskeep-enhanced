@@ -26,12 +26,14 @@
     <string name="native_login_submit">Se connecter</string>
     <string name="native_login_error_rejected">Connexion refusée (code %1$d). Vérifiez l\'e-mail et le mot de passe.</string>
     <string name="native_login_error_network">Impossible de joindre le serveur : %1$s</string>
-    <string name="native_notes_title">Notes (%1$d)</string>
+    <string name="native_header_notes_label">Notes</string>
     <string name="native_notes_refresh">Actualiser</string>
     <string name="native_notes_empty">Aucune note pour le moment.</string>
     <string name="native_notes_error_sync">Synchronisation impossible : %1$s</string>
     <string name="native_notes_untitled">Sans titre</string>
     <string name="native_notes_pinned">Épinglée</string>
+    <string name="native_notes_more_items">+%1$d de plus…</string>
+    <string name="native_notes_completed_fraction">%1$d/%2$d terminés</string>
     <string name="native_note_type_text">Texte</string>
     <string name="native_note_type_checklist">Liste</string>
     <string name="native_note_type_draw">Dessin</string>
