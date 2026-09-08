@@ -46,6 +46,12 @@ fun noteColorFor(colorKey: String?, dark: Boolean): Color {
     return Color(swatch.r / 255f, swatch.g / 255f, swatch.b / 255f, swatch.a)
 }
 
+/** Same order as COLOR_ORDER in src/utils/colors.js, for the color picker. */
+val NOTE_COLOR_ORDER = listOf(
+    "default", "red", "yellow", "green", "blue", "purple",
+    "peach", "sage", "mint", "sky", "sand", "mauve",
+)
+
 /**
  * The header's "glass chrome" gradient, ported from globalCSS.js's
  * default GlassKeep theme (--gk-chrome-1/2/3, both light and dark). The

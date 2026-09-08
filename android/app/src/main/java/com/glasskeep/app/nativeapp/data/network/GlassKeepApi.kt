@@ -97,6 +97,17 @@ data class ArchiveNoteRequest(
 @Serializable
 data class TrashNoteRequest(@SerialName("client_updated_at") val clientUpdatedAt: String)
 
+/** Body for a color-only PATCH /api/notes/:id. Separate from
+ *  PatchNoteRequest (title/content) so title/content stay untouched: the
+ *  server only writes fields actually present in the JSON body, and color
+ *  is LWW-guarded shared content, unlike pin, so client_updated_at is
+ *  required here. */
+@Serializable
+data class SetColorRequest(
+    val color: String,
+    @SerialName("client_updated_at") val clientUpdatedAt: String,
+)
+
 /** Shared response shape for PUT/PATCH on a note: `stale` means someone
  *  else changed it first (LWW lost, `note` is the server's current copy,
  *  nothing was written); `readOnly` means the caller isn't allowed to
@@ -133,4 +144,7 @@ interface GlassKeepApi {
 
     @POST("api/notes/{id}/trash")
     suspend fun trashNote(@Path("id") id: String, @Body body: TrashNoteRequest): Response<NoteMutationResponse>
+
+    @PATCH("api/notes/{id}")
+    suspend fun setColor(@Path("id") id: String, @Body body: SetColorRequest): Response<NoteMutationResponse>
 }

@@ -8,6 +8,7 @@ import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
+import com.glasskeep.app.nativeapp.data.network.SetColorRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.TrashNoteRequest
 import kotlinx.coroutines.flow.Flow
@@ -183,6 +184,27 @@ class NotesRepository(
         }
         val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/trash: ok response with no note")
         noteDao.deleteById(id)
+        return SaveNoteResult.Saved(saved)
+    }
+
+    /** Changes a note's color. Shares the general PATCH endpoint with
+     *  patchNote(), but with its own narrow request body so title/content
+     *  are left out of the JSON entirely and stay untouched server-side. */
+    suspend fun setColor(id: String, color: String): SaveNoteResult {
+        NativeDebug.d("NotesRepository.setColor id=$id color=$color")
+        val response = api.setColor(id, SetColorRequest(color, nowIso()))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "PATCH /api/notes/$id (color) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        if (body.stale) {
+            NativeDebug.d("NotesRepository.setColor id=$id: stale, not applied")
+            return SaveNoteResult.Stale
+        }
+        val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (color): ok response with no note")
+        noteDao.upsertAll(listOf(saved.toEntity()))
         return SaveNoteResult.Saved(saved)
     }
 

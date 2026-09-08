@@ -79,6 +79,8 @@
     <string name="native_note_detail_trash_confirm_body">You\'ll find it in the trash on the web app.</string>
     <string name="native_note_detail_trash_confirm_cancel">Cancel</string>
     <string name="native_note_detail_action_error">Action failed: %1$s</string>
+    <string name="native_note_detail_change_color">Change color</string>
+    <string name="native_note_detail_color_title">Note color</string>
 
     <!-- App shortcut: long-press the launcher icon to open the QR
          scanner straight away (sign in to a PC paired with this phone). -->

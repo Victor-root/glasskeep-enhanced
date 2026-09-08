@@ -223,6 +223,39 @@ fun ArchiveIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = C
 }
 
 @Composable
+fun PaletteIcon(modifier: Modifier = Modifier, size: Dp = 24.dp) {
+    // src/components/common/PaletteColorIcon.jsx: a palette outline with
+    // 5 colored dots. Not tinted like the icons above, it always draws its
+    // own fixed colors, since showing actual color is the whole point of
+    // this one (used on the "change color" menu entry).
+    val bodyPath = remember {
+        PathParser().parsePathString(
+            "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 " +
+                "0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-4.97-4.48-9-10-9z"
+        ).toPath()
+    }
+    val outline = Color(0xFF1e293b)
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(bodyPath, color = Color(0xFFFF9E00).copy(alpha = 0.34f))
+            drawPath(bodyPath, color = outline, style = Stroke(width = 1.1f))
+            val dots = listOf(
+                Triple(Offset(9f, 7.5f), 1.65f, Color(0xFFef4444)),
+                Triple(Offset(6.5f, 12.5f), 1.65f, Color(0xFFf59e0b)),
+                Triple(Offset(15.5f, 7.5f), 1.65f, Color(0xFF10b981)),
+                Triple(Offset(16.5f, 13.5f), 1.65f, Color(0xFF3b82f6)),
+            )
+            for ((center, radius, color) in dots) {
+                drawCircle(color = color, radius = radius, center = center)
+                drawCircle(color = outline, radius = radius, center = center, style = Stroke(width = 0.5f))
+            }
+            drawCircle(color = outline, radius = 1.3f, center = Offset(12f, 11f))
+        }
+    }
+}
+
+@Composable
 fun TrashIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
     // src/icons/index.jsx Trash, viewBox 24x24, stroke (not filled),
     // strokeWidth 1.5, round caps/joins.

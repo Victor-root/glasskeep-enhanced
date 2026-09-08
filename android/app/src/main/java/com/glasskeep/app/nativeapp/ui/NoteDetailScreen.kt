@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,9 +18,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -51,6 +54,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
@@ -113,6 +117,8 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     var menuExpanded by remember { mutableStateOf(false) }
     var showTrashConfirm by remember { mutableStateOf(false) }
     var trashing by remember { mutableStateOf(false) }
+    var showColorPicker by remember { mutableStateOf(false) }
+    var changingColor by remember { mutableStateOf(false) }
 
     val errorLoadTemplate = stringResource(R.string.native_note_detail_error)
     val errorSaveTemplate = stringResource(R.string.native_note_detail_save_error)
@@ -191,6 +197,34 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                 ).show()
             } finally {
                 trashing = false
+            }
+        }
+    }
+
+    fun changeColor(colorKey: String) {
+        val current = note ?: return
+        showColorPicker = false
+        if (current.color == colorKey || changingColor) return
+        changingColor = true
+        scope.launch {
+            try {
+                when (val result = repository.setColor(current.id, colorKey)) {
+                    is SaveNoteResult.Saved -> {
+                        NativeDebug.d("NoteDetailScreen changeColor OK id=${current.id}")
+                        note = result.note
+                    }
+                    SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
+                    SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("NoteDetailScreen changeColor failed", t)
+                Toast.makeText(
+                    context,
+                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } finally {
+                changingColor = false
             }
         }
     }
@@ -334,6 +368,11 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                 KebabIcon(size = 20.dp, tint = titleColor)
                             }
                             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.native_note_detail_change_color)) },
+                                    leadingIcon = { PaletteIcon(size = 18.dp) },
+                                    onClick = { menuExpanded = false; showColorPicker = true },
+                                )
                                 DropdownMenuItem(
                                     text = {
                                         Text(
@@ -489,6 +528,51 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                             }
                             Spacer(Modifier.height(24.dp))
                         }
+                    }
+                }
+            }
+        }
+
+        if (showColorPicker) {
+            val currentColorKey = note?.color ?: "default"
+            Dialog(onDismissRequest = { showColorPicker = false }) {
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (dark) DarkBgColor else Color.White)
+                        .padding(20.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.native_note_detail_color_title),
+                        color = titleColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    NOTE_COLOR_ORDER.chunked(4).forEach { rowKeys ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            rowKeys.forEach { colorKey ->
+                                val selected = colorKey == currentColorKey
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(noteColorFor(colorKey, dark))
+                                        .border(
+                                            width = if (selected) 3.dp else 1.dp,
+                                            color = if (selected) Indigo else borderColor,
+                                            shape = CircleShape,
+                                        )
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                            enabled = !changingColor,
+                                            role = Role.Button,
+                                        ) { changeColor(colorKey) },
+                                ) {}
+                            }
+                        }
+                        Spacer(Modifier.height(14.dp))
                     }
                 }
             }
