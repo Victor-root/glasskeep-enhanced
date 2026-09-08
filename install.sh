@@ -100,7 +100,8 @@ setup_i18n() {
         MSG_NODE_OK="Node.js %s déjà installé — aucune action requise."
         MSG_NODE_INSTALLING="Installation de Node.js %s..."
         MSG_NODE_DONE="Node.js %s installé."
-        MSG_STEP_CLONE="Clonage du dépôt dans %s"
+        MSG_STEP_CLONE="Clonage de la version %s dans %s"
+        MSG_NO_RELEASE_TAG="Impossible de trouver la dernière version publiée (dépôt injoignable, ou aucun tag). Vérifiez votre connexion réseau."
         MSG_WARN_DIR_EXISTS="Le dossier %s existe déjà. Suppression avant réinstallation..."
         MSG_STEP_NPM="Installation des dépendances npm"
         MSG_STEP_BUILD="Build de l'application (Vite)"
@@ -127,7 +128,7 @@ setup_i18n() {
         MSG_WARN_SERVICE="Le service ne semble pas démarré. Vérifiez les logs :"
 
         MSG_STEP_STOP="Arrêt du service %s"
-        MSG_STEP_PULL="Récupération des dernières modifications (git pull)"
+        MSG_STEP_PULL="Récupération de la version %s (dernière publiée)"
         MSG_STEP_NPM_UPDATE="Mise à jour des dépendances npm"
         MSG_STEP_REBUILD="Rebuild de l'application"
         MSG_STEP_START="Redémarrage du service %s"
@@ -246,7 +247,8 @@ setup_i18n() {
         MSG_NODE_OK="Node.js %s already installed — nothing to do."
         MSG_NODE_INSTALLING="Installing Node.js %s..."
         MSG_NODE_DONE="Node.js %s installed."
-        MSG_STEP_CLONE="Cloning repository into %s"
+        MSG_STEP_CLONE="Cloning release %s into %s"
+        MSG_NO_RELEASE_TAG="Could not find the latest published release (repository unreachable, or no tags). Check your network connection."
         MSG_WARN_DIR_EXISTS="Directory %s already exists. Removing before reinstall..."
         MSG_STEP_NPM="Installing npm dependencies"
         MSG_STEP_BUILD="Building the application (Vite)"
@@ -273,7 +275,7 @@ setup_i18n() {
         MSG_WARN_SERVICE="Service does not appear to be running. Check logs:"
 
         MSG_STEP_STOP="Stopping service %s"
-        MSG_STEP_PULL="Fetching latest changes (git pull)"
+        MSG_STEP_PULL="Fetching release %s (latest published)"
         MSG_STEP_NPM_UPDATE="Updating npm dependencies"
         MSG_STEP_REBUILD="Rebuilding the application"
         MSG_STEP_START="Restarting service %s"
@@ -585,6 +587,22 @@ compute_build_heap_mb() {
 
 is_installed() {
     [[ -d "$INSTALL_DIR" ]] && [[ -f "$SERVICE_FILE" ]]
+}
+
+# The latest published release, e.g. "v2.6.0". Queried straight from the
+# remote (no local clone needed yet), so an install, a restore, or the
+# in-script update always land on a real release instead of whatever
+# currently sits on the tracked branch, which can run ahead of the last
+# tag between releases. Mirrors self-update.sh's own reasoning for the
+# admin-panel one-click update.
+latest_release_tag() {
+    local tag
+    tag=$(git ls-remote --tags --refs --sort=-v:refname "$REPO_URL" 'v*' 2>/dev/null \
+        | head -n1 | sed 's#.*refs/tags/##')
+    if [[ -z "$tag" ]]; then
+        die "$MSG_NO_RELEASE_TAG"
+    fi
+    echo "$tag"
 }
 
 # Variables set by ask_ssl_config
@@ -1120,9 +1138,12 @@ action_install() {
         rm -rf "$INSTALL_DIR"
     fi
 
+    local latest_tag
+    latest_tag="$(latest_release_tag)"
+
     # shellcheck disable=SC2059
-    step "$(printf "$MSG_STEP_CLONE" "$INSTALL_DIR")" \
-        git clone --depth=1 --no-single-branch "$REPO_URL" "$INSTALL_DIR"
+    step "$(printf "$MSG_STEP_CLONE" "$latest_tag" "$INSTALL_DIR")" \
+        git clone --depth=1 --no-single-branch --branch "$latest_tag" "$REPO_URL" "$INSTALL_DIR"
 
     info "${DIM}${MSG_HINT_LONG}${RESET}"
     step "$MSG_STEP_NPM" \
@@ -1283,8 +1304,12 @@ action_update() {
     step "$(printf "$MSG_STEP_STOP" "$SERVICE_NAME")" \
         systemctl stop "$SERVICE_NAME"
 
-    step "$MSG_STEP_PULL" \
-        bash -c "cd '${INSTALL_DIR}' && git fetch origin && git checkout main && git reset --hard origin/main && git branch | grep -v '^\* ' | xargs git branch -D 2>/dev/null || true"
+    local latest_tag
+    latest_tag="$(latest_release_tag)"
+
+    # shellcheck disable=SC2059
+    step "$(printf "$MSG_STEP_PULL" "$latest_tag")" \
+        bash -c "cd '${INSTALL_DIR}' && git fetch --depth=1 origin 'refs/tags/${latest_tag}:refs/tags/${latest_tag}' && git reset --hard 'refs/tags/${latest_tag}' && git branch | grep -v '^\* ' | xargs -r git branch -D 2>/dev/null || true"
 
     info "${DIM}${MSG_HINT_LONG}${RESET}"
     step "$MSG_STEP_NPM_UPDATE" \
@@ -1410,9 +1435,12 @@ action_restore() {
         rm -rf "$INSTALL_DIR"
     fi
 
+    local latest_tag
+    latest_tag="$(latest_release_tag)"
+
     # shellcheck disable=SC2059
-    step "$(printf "$MSG_STEP_CLONE" "$INSTALL_DIR")" \
-        git clone --depth=1 --no-single-branch "$REPO_URL" "$INSTALL_DIR"
+    step "$(printf "$MSG_STEP_CLONE" "$latest_tag" "$INSTALL_DIR")" \
+        git clone --depth=1 --no-single-branch --branch "$latest_tag" "$REPO_URL" "$INSTALL_DIR"
 
     info "${DIM}${MSG_HINT_LONG}${RESET}"
     step "$MSG_STEP_NPM" \
