@@ -1027,6 +1027,21 @@ fun CheckFilledIcon(modifier: Modifier = Modifier, size: Dp = 20.dp, tint: Color
     }
 }
 
+/** tabler/text-color.svg, the footer button that opens the formatting
+ *  sheet (`ModalFooter.jsx:601-611`). */
+@Composable
+fun TextColorIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M9 15v-7a3 3 0 0 1 6 0v7 M9 11h6 M5 19h14",
+    modifier, size, tint,
+)
+
+/** tabler/clear-formatting.svg. */
+@Composable
+fun ClearFormattingIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M17 15l4 4m0 -4l-4 4 M7 6v-1h11v1 M7 19l4 0 M13 5l-4 14",
+    modifier, size, tint,
+)
+
 @Composable
 fun RefreshIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
     "M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4 " +

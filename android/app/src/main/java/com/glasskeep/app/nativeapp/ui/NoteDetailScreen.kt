@@ -6,9 +6,13 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -66,7 +70,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -76,6 +84,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
@@ -222,6 +231,9 @@ fun NoteDetailScreen(
     var changingTags by remember { mutableStateOf(false) }
     var changingReminder by remember { mutableStateOf(false) }
     var showReminderPicker by remember { mutableStateOf(false) }
+    var showFormatSheet by remember { mutableStateOf(false) }
+    val richEditorState = rememberRichEditorState()
+    val keyboardController = LocalSoftwareKeyboardController.current
     // The reminder picker's quick-time chips, shared with the web through
     // the same settings blob; empty until read, which makes the picker
     // fall back on its own defaults.
@@ -667,6 +679,20 @@ fun NoteDetailScreen(
         richBlocks = blocks.map { if (it.id == id) it.copy(marks = RichDoc.toggleMark(it.marks, type, start, end)) else it }
     }
 
+    /** The toolbar's eraser, `clearNodes().unsetAllMarks()` on the web:
+     *  the selection loses every mark and the block goes back to being a
+     *  plain paragraph. */
+    fun clearRichFormatting(id: String, start: Int, end: Int) {
+        val blocks = richBlocks ?: return
+        richBlocks = blocks.map { block ->
+            if (block.id == id) {
+                block.copy(kind = RichBlockKind.PARAGRAPH, marks = RichDoc.clearAllMarks(block.marks, start, end))
+            } else {
+                block
+            }
+        }
+    }
+
     fun closeLinkDialog() {
         showLinkDialog = false
         linkDialogTarget = null
@@ -1058,6 +1084,15 @@ fun NoteDetailScreen(
         }
     }
 
+    // Opening the sheet puts the keyboard away, the same intent as the
+    // web's inputmode="none" + blur (NoteModal.jsx:419-442): you can pick
+    // a passage by long press and format it without the keyboard fighting
+    // for the screen. Hidden rather than unfocused, so the selection the
+    // toolbar acts on survives.
+    LaunchedEffect(showFormatSheet) {
+        if (showFormatSheet) keyboardController?.hide()
+    }
+
     // Read only when the picker actually opens: the chips are useless
     // anywhere else on this screen, and most notes are opened without
     // ever touching the reminder.
@@ -1171,7 +1206,8 @@ fun NoteDetailScreen(
     // fixed order App.jsx's own popstate stack walks (the colour and tag
     // popovers dismiss themselves, being focusable popups).
     BackHandler(enabled = showReminderPicker) { showReminderPicker = false }
-    BackHandler(enabled = !showReminderPicker, onBack = ::goBack)
+    BackHandler(enabled = !showReminderPicker && showFormatSheet) { showFormatSheet = false }
+    BackHandler(enabled = !showReminderPicker && !showFormatSheet, onBack = ::goBack)
 
     // The open note is painted in its own color, edge to edge: no card, no
     // radius, no shadow, no page padding. NoteModal.jsx hardcodes
@@ -1423,18 +1459,13 @@ fun NoteDetailScreen(
                             } else if (edit.isRichEditableType) {
                                 RichTextEditor(
                                     blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
+                                    state = richEditorState,
                                     titleColor = titleColor,
                                     subtextColor = subtextColor,
                                     focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
                                     onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
                                     onEnter = { id, position -> splitRichBlock(id, position) },
                                     onRemoveBlock = { id -> removeRichBlock(id) },
-                                    onSetBlockKind = { id, kind -> setRichBlockKind(id, kind) },
-                                    onToggleMark = { id, start, end, type -> toggleRichMark(id, start, end, type) },
-                                    onLinkRequest = { id, start, end, existingHref ->
-                                        linkDialogTarget = LinkTarget(id, start, end, existingHref)
-                                        showLinkDialog = true
-                                    },
                                     onAddBlock = { addRichBlockAtEnd() },
                                 )
                             } else {
@@ -1485,6 +1516,34 @@ fun NoteDetailScreen(
                 }
             }
 
+            // The formatting sheet is a flex child between the scroll area
+            // and the footer (NoteModal.jsx:927-948), so opening it shrinks
+            // the note above instead of covering it.
+            editability?.let { edit ->
+                if (edit.isRichEditableType && !isReadOnlyAccess) {
+                    FormatSheet(
+                        open = showFormatSheet,
+                        dark = dark,
+                        background = modalBg,
+                        onClose = { showFormatSheet = false },
+                    ) {
+                        RichFormatToolbar(
+                            blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
+                            state = richEditorState,
+                            dark = dark,
+                            titleColor = titleColor,
+                            onSetBlockKind = { id, kind -> setRichBlockKind(id, kind) },
+                            onToggleMark = { id, start, end, type -> toggleRichMark(id, start, end, type) },
+                            onClearFormatting = { id, start, end -> clearRichFormatting(id, start, end) },
+                            onLinkRequest = { id, start, end, existingHref ->
+                                linkDialogTarget = LinkTarget(id, start, end, existingHref)
+                                showLinkDialog = true
+                            },
+                        )
+                    }
+                }
+            }
+
             note?.let { currentNote ->
                 editability?.let { edit ->
                     NoteModalFooter(
@@ -1500,6 +1559,8 @@ fun NoteDetailScreen(
                         showColorButton = !isReadOnlyAccess,
                         showImageButton = (edit.isTextType || edit.isChecklistType) && !isReadOnlyAccess,
                         showTagsButton = !isReadOnlyAccess,
+                        showFormatButton = edit.isRichEditableType && !isReadOnlyAccess,
+                        formatOpen = showFormatSheet,
                         // The web keeps Collaborate and Trash in the footer for
                         // every type except a text note being edited, where they
                         // move into the kebab. Native text notes are always in
@@ -1512,6 +1573,7 @@ fun NoteDetailScreen(
                             photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         },
                         onTagsClick = { tagInput = ""; showTagsPicker = true },
+                        onFormatClick = { showFormatSheet = !showFormatSheet },
                         onCollaborateClick = { onOpenCollaborators() },
                         onTrashClick = { showTrashConfirm = true },
                         onKebabClick = { menuExpanded = true },
@@ -2457,11 +2519,14 @@ private fun NoteModalFooter(
     showColorButton: Boolean,
     showImageButton: Boolean,
     showTagsButton: Boolean,
+    showFormatButton: Boolean,
+    formatOpen: Boolean,
     showCollaborateButton: Boolean,
     showTrashButton: Boolean,
     onColorClick: () -> Unit,
     onImageClick: () -> Unit,
     onTagsClick: () -> Unit,
+    onFormatClick: () -> Unit,
     onCollaborateClick: () -> Unit,
     onTrashClick: () -> Unit,
     onKebabClick: () -> Unit,
@@ -2512,6 +2577,26 @@ private fun NoteModalFooter(
                     tagsPanel()
                 }
             }
+            if (showFormatButton) {
+                // .modal-footer-btn--fmt.is-active (globalCSS.js:1779-1786):
+                // the only footer button with a lit background of its own.
+                val formatColor = if (formatOpen) {
+                    if (dark) Color(0xFFA5B4FC) else Color(0xFF6366F1)
+                } else {
+                    iconColor
+                }
+                FooterIconButton(
+                    contentDescription = stringResource(R.string.native_richtext_format),
+                    onClick = onFormatClick,
+                    background = when {
+                        !formatOpen -> Color.Transparent
+                        dark -> Color(0xFF818CF8).copy(alpha = 0.22f)
+                        else -> Color(0xFF6366F1).copy(alpha = 0.14f)
+                    },
+                ) {
+                    TextColorIcon(size = 20.dp, tint = formatColor)
+                }
+            }
             if (showCollaborateButton) {
                 FooterIconButton(
                     contentDescription = stringResource(R.string.native_collaborators_title),
@@ -2543,6 +2628,147 @@ private fun NoteModalFooter(
     }
 }
 
+/**
+ * `.mobile-fmt-sheet` (globalCSS.js:1584-1699): the formatting sheet the
+ * web slots between the note's scroll area and its footer. It is the
+ * note's own colour one shade darker, keeps a 12px radius on its top
+ * corners only, carries a 16px shadow band under that edge, and opens by
+ * growing its height over 0.32s while fading in over 0.22s.
+ *
+ * The grabber drags the height 1:1 with the finger - the editor above
+ * grows back as it shrinks, so the note stays readable during the
+ * gesture - and lets go past 60px to close, exactly as NoteModal.jsx's
+ * own pointer handlers do.
+ */
+@Composable
+private fun FormatSheet(
+    open: Boolean,
+    dark: Boolean,
+    background: Color,
+    onClose: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val maxHeight = remember(configuration.screenHeightDp) {
+        minOf(configuration.screenHeightDp * 0.58f, 460f).dp
+    }
+    val easing = remember { CubicBezierEasing(0.32f, 0.72f, 0f, 1f) }
+    var dragHeight by remember { mutableStateOf<Dp?>(null) }
+    val animatedHeight by animateDpAsState(
+        targetValue = if (open) maxHeight else 0.dp,
+        animationSpec = tween(durationMillis = 320, easing = easing),
+        label = "formatSheetHeight",
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (open) 1f else 0f,
+        animationSpec = tween(durationMillis = 220, easing = easing),
+        label = "formatSheetAlpha",
+    )
+    val height = dragHeight ?: animatedHeight
+    if (!open && dragHeight == null && height <= 0.dp) return
+
+    var grabberPressed by remember { mutableStateOf(false) }
+    val grabberColor by animateColorAsState(
+        targetValue = when {
+            dark && grabberPressed -> Color.White.copy(alpha = 0.5f)
+            dark -> Color.White.copy(alpha = 0.32f)
+            grabberPressed -> Color.Black.copy(alpha = 0.45f)
+            else -> Color.Black.copy(alpha = 0.28f)
+        },
+        animationSpec = tween(durationMillis = 120),
+        label = "grabberColor",
+    )
+    val grabberScale by animateFloatAsState(
+        targetValue = if (grabberPressed) 1.15f else 1f,
+        animationSpec = tween(durationMillis = 120),
+        label = "grabberScale",
+    )
+
+    val shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(height)
+            .graphicsLayer { this.alpha = alpha }
+            .clip(shape)
+            .background(background)
+            // The sheet reads one shade darker than the note itself: a
+            // flat veil over its colour, not a different colour.
+            .background(Color.Black.copy(alpha = if (dark) 0.18f else 0.07f))
+            .border(
+                width = 1.dp,
+                color = if (dark) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.15f),
+                shape = shape,
+            ),
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .pointerInput(open) {
+                        var dragged = 0f
+                        var base = 0.dp
+                        detectVerticalDragGestures(
+                            onDragStart = {
+                                grabberPressed = true
+                                dragged = 0f
+                                base = maxHeight
+                                dragHeight = maxHeight
+                            },
+                            onVerticalDrag = { change, delta ->
+                                change.consume()
+                                dragged = (dragged + delta).coerceAtLeast(0f)
+                                dragHeight = (base - with(density) { dragged.toDp() }).coerceAtLeast(0.dp)
+                            },
+                            onDragEnd = {
+                                grabberPressed = false
+                                val closed = with(density) { dragged.toDp() } > 60.dp
+                                dragHeight = null
+                                if (closed) onClose()
+                            },
+                            onDragCancel = {
+                                grabberPressed = false
+                                dragHeight = null
+                            },
+                        )
+                    },
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer { scaleX = grabberScale }
+                        .width(42.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(grabberColor),
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                content()
+            }
+        }
+        // The ::before shadow band under the top edge.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(16.dp)
+                .background(
+                    if (dark) {
+                        SolidColor(Color.White.copy(alpha = 0.32f))
+                    } else {
+                        Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.12f), Color.Transparent))
+                    },
+                ),
+        )
+    }
+}
+
 /** One 34dp round button of the footer bar, with the optional counter
  *  badge the web pins to its top-right corner (16dp, 10sp bold, filled
  *  with the workspace theme's own gradient). */
@@ -2552,6 +2778,7 @@ private fun FooterIconButton(
     onClick: () -> Unit,
     badgeCount: Int = 0,
     badgeGradient: Brush? = null,
+    background: Color = Color.Transparent,
     content: @Composable () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -2563,6 +2790,7 @@ private fun FooterIconButton(
                 .size(34.dp)
                 .graphicsLayer { scaleX = scale; scaleY = scale }
                 .clip(CircleShape)
+                .background(background)
                 .semantics { this.contentDescription = contentDescription }
                 .clickable(
                     interactionSource = interaction,

@@ -355,6 +355,11 @@ object RichDoc {
         return result.sortedBy { it.start }
     }
 
+    /** The mark half of the web's `clearNodes().unsetAllMarks()`: every
+     *  type dropped from `[start, end)` at once. */
+    fun clearAllMarks(marks: List<RichMark>, start: Int, end: Int): List<RichMark> =
+        RichMarkType.entries.fold(marks) { acc, type -> clearMark(acc, type, start, end) }
+
     /** Applies [type] (with [href] for a link) over `[start, end)`, first
      *  clearing any existing same-type mark from that range so instances of
      *  one type never overlap each other. */
