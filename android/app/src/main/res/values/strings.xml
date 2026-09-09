@@ -234,6 +234,13 @@
     <string name="native_note_color_sand">Sand</string>
     <string name="native_note_color_mauve">Mauve</string>
     <string name="native_note_detail_duplicate">Duplicate note</string>
+    <string name="native_note_detail_convert_to_checklist">Convert to checklist</string>
+    <string name="native_note_detail_convert_to_text">Convert to text note</string>
+    <string name="native_note_detail_convert_to_checklist_confirm">Each line of your note will become a checklist item. You can convert it back later, but the result may not be identical to the original.</string>
+    <string name="native_note_detail_convert_to_text_confirm">Each checklist item will become a line of text. You can convert it back later, but the result may not be identical to the original.</string>
+    <string name="native_note_detail_convert_action">Convert</string>
+    <string name="native_note_detail_converted_to_checklist">Note converted to checklist</string>
+    <string name="native_note_detail_converted_to_text">Note converted to text</string>
     <string name="native_note_detail_duplicate_suffix">(copy)</string>
     <string name="native_note_detail_download">Download as Markdown</string>
     <string name="native_note_detail_download_error">Couldn\'t start the download</string>

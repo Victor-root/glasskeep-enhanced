@@ -103,6 +103,7 @@ import com.glasskeep.app.nativeapp.data.DrawingContent
 import com.glasskeep.app.nativeapp.data.DrawingDimensionsDto
 import com.glasskeep.app.nativeapp.data.DrawingStrokeDto
 import com.glasskeep.app.nativeapp.data.NoteContent
+import com.glasskeep.app.nativeapp.data.NoteConversion
 import com.glasskeep.app.nativeapp.data.formatIso
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.data.NoteImageData
@@ -264,6 +265,8 @@ fun NoteDetailScreen(
     var richBlocks by remember { mutableStateOf<List<RichBlock>?>(null) }
     val richFocusRequesters = remember { mutableStateMapOf<String, FocusRequester>() }
     var pendingRichFocus by remember { mutableStateOf<String?>(null) }
+    var showConvertConfirm by remember { mutableStateOf(false) }
+    var converting by remember { mutableStateOf(false) }
     var showLinkDialog by remember { mutableStateOf(false) }
     var linkDialogTarget by remember { mutableStateOf<LinkTarget?>(null) }
 
@@ -327,6 +330,8 @@ fun NoteDetailScreen(
     val readOnlyMessage = stringResource(R.string.native_note_detail_readonly)
     val syncingLabel = stringResource(R.string.native_note_detail_syncing)
     val actionErrorTemplate = stringResource(R.string.native_note_detail_action_error)
+    val convertedToChecklistMessage = stringResource(R.string.native_note_detail_converted_to_checklist)
+    val convertedToTextMessage = stringResource(R.string.native_note_detail_converted_to_text)
     val duplicateSuffix = stringResource(R.string.native_note_detail_duplicate_suffix)
     val downloadErrorMessage = stringResource(R.string.native_note_detail_download_error)
     val imageAddErrorMessage = stringResource(R.string.native_note_detail_add_image_error)
@@ -1225,6 +1230,92 @@ fun NoteDetailScreen(
         pendingRichFocus = null
     }
 
+    /**
+     * performConvertNoteType() (App.jsx:6841-6928): rewrites the open note
+     * as the other kind, in place. Text becomes a checklist by reading the
+     * body as plain lines (a heading turns into a section, a `- [x]` line
+     * into a ticked row); a checklist becomes a text note whose sections
+     * are level-2 headings and whose rows are a task list, so nothing about
+     * it is actually lost. Both directions are one PATCH carrying the new
+     * type, content and items together, queued like every other edit so it
+     * survives being offline.
+     */
+    fun performConvertNoteType() {
+        val current = note ?: return
+        val edit = editability ?: return
+        if (converting || current.trashed || isReadOnlyAccess) return
+        if (!edit.isTextType && !edit.isChecklistType) return
+        converting = true
+        val toChecklist = edit.isTextType
+        scope.launch {
+            try {
+                if (toChecklist) {
+                    val text = when {
+                        edit.isRichEditableType ->
+                            NoteConversion.richBlocksToPlainText(richBlocks ?: edit.originalRichBlocks.orEmpty())
+                        edit.bodyEditable -> bodyText
+                        else -> edit.bodyPlainText
+                    }
+                    val entries = NoteConversion.textToChecklistEntries(text)
+                    val encoded = ChecklistItems.encode(entries)
+                    repository.convertNoteTypeQueued(noteId, "checklist", "", encoded)
+                    checklistInsertPosition = repository.fetchChecklistInsertPosition()
+                    note = current.copy(type = "checklist", content = "", items = encoded)
+                    editability = Editability(
+                        isTextType = false,
+                        bodyEditable = false,
+                        isLegacyPlain = false,
+                        bodyPlainText = "",
+                        isChecklistType = true,
+                        checklistItems = entries,
+                    )
+                    richBlocks = null
+                    bodyText = ""
+                } else {
+                    val blocks = NoteConversion
+                        .checklistEntriesToRichBlocks(edit.checklistItems.orEmpty())
+                        .ifEmpty { listOf(RichDoc.newBlock()) }
+                    val content = RichDoc.encode(blocks)
+                    repository.convertNoteTypeQueued(noteId, "text", content, emptyList())
+                    note = current.copy(type = "text", content = content, items = emptyList())
+                    editability = Editability(
+                        isTextType = true,
+                        bodyEditable = false,
+                        isLegacyPlain = false,
+                        bodyPlainText = "",
+                        isRichEditableType = true,
+                        originalRichBlocks = blocks,
+                    )
+                    richBlocks = blocks
+                    bodyText = ""
+                }
+                SyncQueueWorker.triggerNow(context)
+                history.reset(
+                    NoteSnapshot(
+                        title = titleText,
+                        body = bodyText,
+                        richBlocks = richBlocks,
+                        checklistItems = editability?.checklistItems,
+                    ),
+                )
+                Toast.makeText(
+                    context,
+                    if (toChecklist) convertedToChecklistMessage else convertedToTextMessage,
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } catch (t: Throwable) {
+                NativeDebug.e("NoteDetailScreen convertNoteType failed", t)
+                Toast.makeText(
+                    context,
+                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } finally {
+                converting = false
+            }
+        }
+    }
+
     fun save() {
         val current = note ?: return
         val edit = editability ?: return
@@ -1320,6 +1411,7 @@ fun NoteDetailScreen(
     val reminderMenuColor = if (dark) Color(0xFFfb923c) else Color(0xFFea580c)
     val collaborateColor = if (dark) Color(0xFFc4b5fd) else Color(0xFF7c3aed)
     val duplicateColor = if (dark) Color(0xFF67e8f9) else Color(0xFF0891b2)
+    val convertColor = if (dark) Color(0xFFc4b5fd) else Color(0xFF7c3aed)
     val downloadColor = if (dark) Color(0xFF4ade80) else Color(0xFF16a34a)
     val imageButtonColor = if (dark) Color(0xFF7dd3fc) else Color(0xFF0284c7)
 
@@ -1783,6 +1875,25 @@ fun NoteDetailScreen(
                                             DuplicateIcon(size = 16.dp, tint = duplicateColor)
                                         }
                                     }
+                                    if (!currentNote.trashed && !isReadOnlyAccess &&
+                                        (edit.isTextType || edit.isChecklistType)
+                                    ) {
+                                        PopoverMenuItem(
+                                            label = stringResource(
+                                                if (edit.isTextType) R.string.native_note_detail_convert_to_checklist
+                                                else R.string.native_note_detail_convert_to_text
+                                            ),
+                                            color = convertColor,
+                                            enabled = !converting,
+                                            onClick = { menuExpanded = false; showConvertConfirm = true },
+                                        ) {
+                                            if (edit.isTextType) {
+                                                ChecklistIcon(size = 16.dp, tint = convertColor)
+                                            } else {
+                                                TextNoteIcon(size = 16.dp, tint = convertColor)
+                                            }
+                                        }
+                                    }
                                     if (edit.isTextType) {
                                         PopoverMenuItem(
                                             label = stringResource(R.string.native_note_detail_download),
@@ -1831,6 +1942,28 @@ fun NoteDetailScreen(
                     )
                 }
             }
+        }
+        if (showConvertConfirm) {
+            val toChecklist = editability?.isTextType == true
+            GkConfirmDialog(
+                title = stringResource(
+                    if (toChecklist) R.string.native_note_detail_convert_to_checklist
+                    else R.string.native_note_detail_convert_to_text
+                ),
+                message = stringResource(
+                    if (toChecklist) R.string.native_note_detail_convert_to_checklist_confirm
+                    else R.string.native_note_detail_convert_to_text_confirm
+                ),
+                confirmLabel = stringResource(R.string.native_note_detail_convert_action),
+                cancelLabel = stringResource(R.string.native_note_detail_trash_confirm_cancel),
+                themeId = container.themeState.themeId,
+                dark = dark,
+                borderColor = borderColor,
+                titleColor = titleColor,
+                subtextColor = subtextColor,
+                onConfirm = { performConvertNoteType() },
+                onDismiss = { showConvertConfirm = false },
+            )
         }
         if (showTrashConfirm) {
             // The owner of a note that has collaborators gets an explicit

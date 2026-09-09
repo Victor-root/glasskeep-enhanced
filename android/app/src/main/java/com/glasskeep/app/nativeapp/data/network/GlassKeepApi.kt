@@ -310,6 +310,20 @@ data class SetChecklistItemsRequest(
     @SerialName("client_updated_at") val clientUpdatedAt: String,
 )
 
+/** Body for the note-type conversion PATCH /api/notes/:id (text becomes
+ *  a checklist or the other way round). Unlike every other narrow body in
+ *  this file it carries three fields at once, because the three only make
+ *  sense together: the server's own handler treats a `type` that differs
+ *  from the stored one as a content change and rewrites the note from
+ *  `content` + `items` in the same transaction (server/index.js:2708). */
+@Serializable
+data class ConvertNoteTypeRequest(
+    val type: String,
+    val content: String,
+    val items: List<JsonElement>,
+    @SerialName("client_updated_at") val clientUpdatedAt: String,
+)
+
 /** Body for an images-only PATCH /api/notes/:id. Same opaque-relay pattern
  *  as items/tags: the server only checks "is this an array" (see
  *  server/index.js), so JsonElement mirrors NoteDto.images exactly. Unlike
@@ -689,6 +703,9 @@ interface GlassKeepApi {
 
     @PATCH("api/notes/{id}")
     suspend fun setImages(@Path("id") id: String, @Body body: SetImagesRequest): Response<NoteMutationResponse>
+
+    @PATCH("api/notes/{id}")
+    suspend fun convertNoteType(@Path("id") id: String, @Body body: ConvertNoteTypeRequest): Response<NoteMutationResponse>
 
     @POST("api/notes/{id}/reminder")
     suspend fun setReminder(@Path("id") id: String, @Body body: SetReminderRequest): Response<NoteMutationResponse>

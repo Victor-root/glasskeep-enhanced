@@ -10,6 +10,7 @@ import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ChangePasswordRequest
 import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
 import com.glasskeep.app.nativeapp.data.network.CollaboratorDto
+import com.glasskeep.app.nativeapp.data.network.ConvertNoteTypeRequest
 import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
 import com.glasskeep.app.nativeapp.data.network.DeviceLinkInfoResponse
 import com.glasskeep.app.nativeapp.data.network.DeviceLinkTokenRequest
@@ -554,6 +555,42 @@ class NotesRepository(
         val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (items): ok response with no note")
         noteDao.upsertAll(listOf(saved.toEntity()))
         return SaveNoteResult.Saved(saved)
+    }
+
+    /**
+     * Converts a note between "text" and "checklist", rewriting its body
+     * in the same PATCH: a checklist has its content emptied and its rows
+     * in `items`, a text note the other way round. Cached into Room like
+     * every other content write so the list shows the new shape at once.
+     */
+    suspend fun convertNoteType(
+        id: String,
+        type: String,
+        content: String,
+        items: List<JsonElement>,
+        clientUpdatedAt: String = nowIso(),
+    ): SaveNoteResult {
+        NativeDebug.d("NotesRepository.convertNoteType id=$id type=$type")
+        val response = api.convertNoteType(id, ConvertNoteTypeRequest(type, content, items, clientUpdatedAt))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "PATCH /api/notes/$id (convert) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        if (body.stale) {
+            NativeDebug.d("NotesRepository.convertNoteType id=$id: stale, not applied")
+            return SaveNoteResult.Stale
+        }
+        val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (convert): ok response with no note")
+        noteDao.upsertAll(listOf(saved.toEntity()))
+        return SaveNoteResult.Saved(saved)
+    }
+
+    suspend fun convertNoteTypeQueued(id: String, type: String, content: String, items: List<JsonElement>) {
+        NativeDebug.d("NotesRepository.convertNoteTypeQueued id=$id type=$type")
+        val request = ConvertNoteTypeRequest(type, content, items, nowIso())
+        syncQueueDao.enqueue(id, SyncQueueType.CONVERT_TYPE.name, Json.encodeToString(request), System.currentTimeMillis())
     }
 
     /** Replaces a note's image list. Same narrow-body PATCH pattern as

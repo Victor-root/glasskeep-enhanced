@@ -49,6 +49,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.PathEffect
@@ -413,6 +414,9 @@ internal fun GkGradientButton(
     enabled: Boolean = true,
     horizontalPadding: Dp = 16.dp,
     verticalPadding: Dp = 8.dp,
+    // Non-null only for the semantic variants that must not follow the
+    // workspace accent (see GkConfirmVariant).
+    gradient: Brush? = null,
     trailing: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
 ) {
@@ -428,7 +432,7 @@ internal fun GkGradientButton(
             .scale(scale)
             .alpha(if (enabled) 1f else 0.5f)
             .clip(RoundedCornerShape(8.dp))
-            .background(WorkspaceTheme.accentGradient(themeId))
+            .background(gradient ?: WorkspaceTheme.accentGradient(themeId))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -528,6 +532,71 @@ internal fun GkDialog(
                 .padding(24.dp),
             content = content,
         )
+    }
+}
+
+/** GenericConfirmDialog.jsx's three button palettes: the brand gradient
+ *  by default, flat red for a destructive action, an emerald gradient for
+ *  a positive one. The two semantic variants deliberately ignore the
+ *  workspace theme (the web marks them `gk-fixed-btn` for the same
+ *  reason): a delete button stays red whatever the accent colour is. */
+enum class GkConfirmVariant { DEFAULT, DANGER, SUCCESS }
+
+/**
+ * GenericConfirmDialog.jsx: the one confirmation used all over the web app
+ * (converting a note, resetting the note order, restarting the server).
+ * Title 18sp semibold, message 14sp muted, then Cancel and the confirm
+ * button right-aligned 20dp below.
+ */
+@Composable
+internal fun GkConfirmDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    cancelLabel: String,
+    themeId: String?,
+    dark: Boolean,
+    borderColor: Color,
+    titleColor: Color,
+    subtextColor: Color,
+    variant: GkConfirmVariant = GkConfirmVariant.DEFAULT,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    GkDialog(onDismissRequest = onDismiss, dark = dark, borderColor = borderColor, maxWidth = 384.dp) {
+        Text(title, color = titleColor, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+        Text(message, color = subtextColor, fontSize = 14.sp, lineHeight = 20.sp)
+        Spacer(Modifier.height(20.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GkSecondaryButton(
+                label = cancelLabel,
+                borderColor = borderColor,
+                textColor = titleColor,
+                onClick = onDismiss,
+            )
+            when (variant) {
+                GkConfirmVariant.DANGER -> GkDangerButton(
+                    label = confirmLabel,
+                    onClick = { onDismiss(); onConfirm() },
+                )
+                GkConfirmVariant.SUCCESS -> GkGradientButton(
+                    label = confirmLabel,
+                    themeId = null,
+                    gradient = Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF16A34A))),
+                    onClick = { onDismiss(); onConfirm() },
+                )
+                GkConfirmVariant.DEFAULT -> GkGradientButton(
+                    label = confirmLabel,
+                    themeId = themeId,
+                    onClick = { onDismiss(); onConfirm() },
+                )
+            }
+        }
     }
 }
 

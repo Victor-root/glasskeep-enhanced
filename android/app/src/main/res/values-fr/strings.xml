@@ -228,6 +228,13 @@
     <string name="native_note_color_sand">Sable</string>
     <string name="native_note_color_mauve">Mauve</string>
     <string name="native_note_detail_duplicate">Dupliquer la note</string>
+    <string name="native_note_detail_convert_to_checklist">Convertir en liste de tâches</string>
+    <string name="native_note_detail_convert_to_text">Convertir en note texte</string>
+    <string name="native_note_detail_convert_to_checklist_confirm">Chaque ligne de votre note deviendra un élément de la liste. Vous pourrez reconvertir plus tard, mais le résultat ne sera pas forcément identique à l\'original.</string>
+    <string name="native_note_detail_convert_to_text_confirm">Chaque élément de la liste deviendra une ligne de texte. Vous pourrez reconvertir plus tard, mais le résultat ne sera pas forcément identique à l\'original.</string>
+    <string name="native_note_detail_convert_action">Convertir</string>
+    <string name="native_note_detail_converted_to_checklist">Note convertie en liste de tâches</string>
+    <string name="native_note_detail_converted_to_text">Note convertie en texte</string>
     <string name="native_note_detail_duplicate_suffix">(copie)</string>
     <string name="native_note_detail_download">Télécharger en Markdown</string>
     <string name="native_note_detail_download_error">Impossible de démarrer le téléchargement</string>

@@ -20,6 +20,7 @@ import com.glasskeep.app.nativeapp.data.local.SyncQueueType
 import com.glasskeep.app.nativeapp.data.network.ApiClientFactory
 import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
+import com.glasskeep.app.nativeapp.data.network.ConvertNoteTypeRequest
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ReorderNotesRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
@@ -110,6 +111,10 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
             SyncQueueType.CHECKLIST_ITEMS -> {
                 val body = Json.decodeFromString<SetChecklistItemsRequest>(item.payloadJson)
                 repository.setChecklistItems(item.noteId, body.items, body.clientUpdatedAt)
+            }
+            SyncQueueType.CONVERT_TYPE -> {
+                val body = Json.decodeFromString<ConvertNoteTypeRequest>(item.payloadJson)
+                repository.convertNoteType(item.noteId, body.type, body.content, body.items, body.clientUpdatedAt)
             }
             SyncQueueType.IMAGES -> {
                 val body = Json.decodeFromString<SetImagesRequest>(item.payloadJson)
