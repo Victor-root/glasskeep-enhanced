@@ -29,14 +29,21 @@ object NoteExporter {
             append(body)
         }
         val filename = sanitizeFilename(title.ifBlank { "note" }) + ".md"
+        return exportTextFile(context, filename, markdown, "text/markdown")
+    }
+
+    /** Any already-named text file (the account export, the recovery key):
+     *  the share sheet is this app's answer to the browser download the
+     *  web's own downloadText()/triggerJSONDownload() start. */
+    fun exportTextFile(context: Context, filename: String, content: String, mimeType: String): Boolean {
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }
         val file = File(dir, filename)
         return try {
-            file.writeText(markdown)
-            shareFile(context, file, "text/markdown")
+            file.writeText(content)
+            shareFile(context, file, mimeType)
             true
         } catch (e: Exception) {
-            NativeDebug.e("NoteExporter.exportText failed", e)
+            NativeDebug.e("NoteExporter.exportTextFile failed for $filename", e)
             false
         }
     }
@@ -79,6 +86,6 @@ object NoteExporter {
     }
 
     // Same replacement set as sanitizeFilename() in src/utils/helpers.js.
-    private fun sanitizeFilename(name: String): String =
+    fun sanitizeFilename(name: String): String =
         name.trim().replace(Regex("[/\\\\?%*:|\"<>]"), "-").take(64)
 }

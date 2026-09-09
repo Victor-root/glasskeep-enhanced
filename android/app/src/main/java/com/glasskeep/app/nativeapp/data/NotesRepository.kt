@@ -33,6 +33,8 @@ import com.glasskeep.app.nativeapp.data.network.SetChecklistInsertPositionReques
 import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
 import com.glasskeep.app.nativeapp.data.network.SetCollaboratorAccessRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
+import com.glasskeep.app.nativeapp.data.network.ImportNotesRequest
+import com.glasskeep.app.nativeapp.data.network.ImportNotesResponse
 import com.glasskeep.app.nativeapp.data.network.SetEdgeToEdgeLandscapeRequest
 import com.glasskeep.app.nativeapp.data.network.SetEditorToolbarModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetFloatingCardsRequest
@@ -1000,6 +1002,35 @@ class NotesRepository(
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }
+    }
+
+    /** The whole account as one JSON document (GET /api/notes/export). */
+    suspend fun exportNotes(): JsonElement {
+        NativeDebug.d("NotesRepository.exportNotes")
+        val response = api.exportNotes()
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "GET /api/notes/export failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body
+    }
+
+    /** Sends [notes] to POST /api/notes/import and refreshes the local
+     *  cache with what actually landed, the way the web reloads its own
+     *  list right after (useImportExport.js:207). */
+    suspend fun importNotes(notes: JsonArray): ImportNotesResponse {
+        NativeDebug.d("NotesRepository.importNotes count=${notes.size}")
+        val response = api.importNotes(ImportNotesRequest(notes))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "POST /api/notes/import failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        refresh()
+        return body
     }
 
     /** Sets how the notes screen lays its cards out ("list" or "grid"). */

@@ -3,6 +3,7 @@ package com.glasskeep.app.nativeapp.data.network
 import com.glasskeep.app.nativeapp.data.TypographyPresetsDto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import retrofit2.Response
 import retrofit2.http.Body
@@ -454,6 +455,24 @@ data class SetFloatingCardsRequest(val floatingCardsEnabled: Boolean)
 @Serializable
 data class SetViewModeRequest(val viewMode: String)
 
+/** Body for POST /api/notes/import. The notes stay raw JSON objects
+ *  rather than a DTO so an export file round-trips through this app
+ *  losing nothing the server understands and this app does not. */
+@Serializable
+data class ImportNotesRequest(val notes: JsonArray)
+
+/** The server's own breakdown of what an import did (server/index.js:4565).
+ *  `rejected` is data actually lost, unlike `skipped` (a duplicate it
+ *  stepped over), so the two are reported apart. */
+@Serializable
+data class ImportNotesResponse(
+    val ok: Boolean = false,
+    val imported: Int = 0,
+    val updated: Int = 0,
+    val skipped: Int = 0,
+    val rejected: Int = 0,
+)
+
 /** Body for a PATCH /api/user/settings that sets only where the
  *  notification pill sits on a phone. */
 @Serializable
@@ -685,6 +704,16 @@ interface GlassKeepApi {
 
     @GET("api/notes")
     suspend fun getNotes(): Response<List<NoteDto>>
+
+    /** The whole account as one JSON document, the file the Data section
+     *  hands to the share sheet. Kept as a raw [JsonElement]: it is only
+     *  ever written out and read back, never inspected field by field, and
+     *  a DTO here would quietly drop whatever the server adds next. */
+    @GET("api/notes/export")
+    suspend fun exportNotes(): Response<JsonElement>
+
+    @POST("api/notes/import")
+    suspend fun importNotes(@Body body: ImportNotesRequest): Response<ImportNotesResponse>
 
     @GET("api/notes/archived")
     suspend fun getArchivedNotes(): Response<List<NoteDto>>

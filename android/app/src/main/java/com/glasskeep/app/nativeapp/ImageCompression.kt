@@ -6,7 +6,9 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Base64
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 
 /**
  * Ports fileToCompressedDataURL() (src/utils/helpers.js) to Android: resize
@@ -40,17 +42,33 @@ object ImageCompression {
         uri: Uri,
         maxDimension: Int = MAX_DIMENSION,
         jpegQuality: Int = JPEG_QUALITY,
+    ): String? = compressStream({ context.contentResolver.openInputStream(uri) }, maxDimension, jpegQuality)
+
+    /** Same thing for bytes already in hand: an image pulled out of a
+     *  Google Takeout .zip has no URI of its own to reopen. */
+    fun compressToDataUrl(
+        bytes: ByteArray,
+        maxDimension: Int = MAX_DIMENSION,
+        jpegQuality: Int = JPEG_QUALITY,
+    ): String? = compressStream({ ByteArrayInputStream(bytes) }, maxDimension, jpegQuality)
+
+    /** [openStream] is called twice, once for the bounds-only pass and
+     *  once for the real decode, so it hands back a fresh stream each
+     *  time rather than one the first pass has already consumed. */
+    private fun compressStream(
+        openStream: () -> InputStream?,
+        maxDimension: Int,
+        jpegQuality: Int,
     ): String? {
         return try {
-            val resolver = context.contentResolver
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            openStream()?.use { BitmapFactory.decodeStream(it, null, bounds) }
                 ?: return null
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
             val sampleSize = computeInSampleSize(bounds.outWidth, bounds.outHeight, maxDimension)
             val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-            val sampled = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, decodeOptions) }
+            val sampled = openStream()?.use { BitmapFactory.decodeStream(it, null, decodeOptions) }
                 ?: return null
 
             val scale = minOf(1f, maxDimension.toFloat() / maxOf(sampled.width, sampled.height))
@@ -76,7 +94,7 @@ object ImageCompression {
             val mimeType = if (usePng) "image/png" else "image/jpeg"
             "data:$mimeType;base64,$base64"
         } catch (t: Throwable) {
-            NativeDebug.e("ImageCompression.compressToDataUrl failed for uri=$uri", t)
+            NativeDebug.e("ImageCompression.compressStream failed", t)
             null
         }
     }

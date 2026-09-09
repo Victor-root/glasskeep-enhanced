@@ -1207,6 +1207,39 @@ fun RefreshIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = C
     modifier, size, tint,
 )
 
+/** tabler/upload.svg. */
+@Composable
+fun UploadIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2 " +
+        "M7 9l5 -5l5 5 " +
+        "M12 4l0 12",
+    modifier, size, tint,
+)
+
+/** tabler/brand-google.svg. */
+@Composable
+fun BrandGoogleIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M20.945 11a9 9 0 1 1 -3.284 -5.997l-2.655 2.392a5.5 5.5 0 1 0 2.119 6.605h-4.125v-3h7.945z",
+    modifier, size, tint,
+)
+
+/** tabler/file-text.svg. */
+@Composable
+fun FileTextIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M14 3v4a1 1 0 0 0 1 1h4 " +
+        "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z " +
+        "M9 9l1 0 M9 13l6 0 M9 17l6 0",
+    modifier, size, tint,
+)
+
+/** tabler/arrows-sort.svg. */
+@Composable
+fun ArrowsSortIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 9l4 -4l4 4 M7 5l0 14 " +
+        "M21 15l-4 4l-4 -4 M17 5l0 14",
+    modifier, size, tint,
+)
+
 /** tabler/device-mobile-rotated.svg. */
 @Composable
 fun DeviceMobileRotatedIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(

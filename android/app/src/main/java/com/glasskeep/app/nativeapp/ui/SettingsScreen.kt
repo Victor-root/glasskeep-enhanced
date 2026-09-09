@@ -79,34 +79,48 @@ import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.MainActivity
 import com.glasskeep.app.R
-import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.AppLanguage
+import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NativePasskeys
+import com.glasskeep.app.nativeapp.NoteExporter
 import com.glasskeep.app.nativeapp.PasskeyCeremonyResult
 import com.glasskeep.app.nativeapp.data.ChangePasswordResult
+import com.glasskeep.app.nativeapp.data.NoteTransfer
+import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TypographyPresets
+import com.glasskeep.app.nativeapp.data.local.NoteEntity
+import com.glasskeep.app.nativeapp.data.network.ImportNotesResponse
 import com.glasskeep.app.nativeapp.data.network.PasskeyDto
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.isUserCancellation
-import com.glasskeep.app.update.ReleaseInfo
-import com.glasskeep.app.update.UpdateManager
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightTitleColor
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
+import com.glasskeep.app.update.ReleaseInfo
+import com.glasskeep.app.update.UpdateManager
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 
 /** `red-500`, the "remove photo" link. */
+/** The export file is written the way the web writes its own:
+ *  JSON.stringify(payload, null, 2) (useImportExport.js:156). The
+ *  two-space indent is what needs the opt-in; the rest is stable API. */
+@OptIn(ExperimentalSerializationApi::class)
+private val prettyJson = Json { prettyPrint = true; prettyPrintIndent = "  " }
+
 private val LinkRed = Color(0xFFEF4444)
 private val PasskeyDeleteBorderLight = Color(0xFFFCA5A5)
 private val PasskeyDeleteBorderDark = Color(0xFF991B1B)
@@ -189,6 +203,9 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var generatingSecretKey by remember { mutableStateOf(false) }
     var generatedSecretKey by remember { mutableStateOf<String?>(null) }
 
+    var transferRunning by remember { mutableStateOf(false) }
+    var showResetOrderConfirm by remember { mutableStateOf(false) }
+
     var showChangeServerDialog by remember { mutableStateOf(false) }
     var availableUpdate by remember { mutableStateOf<ReleaseInfo?>(UpdateManager.getStoredRelease(context)) }
     val installedFromFdroid = remember { UpdateManager.isFdroidInstall(context) }
@@ -217,6 +234,26 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     val passkeyTestOkMessage = stringResource(R.string.native_settings_passkeys_test_ok)
     val passkeyTestFailedMessage = stringResource(R.string.native_settings_passkeys_test_failed)
     val copiedMessage = stringResource(R.string.native_settings_secret_key_copied)
+    val exportFailedMessage = stringResource(R.string.native_settings_export_failed)
+    val importFailedMessage = stringResource(R.string.native_settings_import_failed)
+    val importInvalidJsonMessage = stringResource(R.string.native_settings_import_invalid_json)
+    val importNoNotesMessage = stringResource(R.string.native_settings_import_no_notes)
+    val importedTemplate = stringResource(R.string.native_settings_import_done)
+    val importedWithSkippedTemplate = stringResource(R.string.native_settings_import_done_skipped)
+    val importAllSkippedTemplate = stringResource(R.string.native_settings_import_all_skipped)
+    val importAllUpdatedTemplate = stringResource(R.string.native_settings_import_all_updated)
+    val importAlsoUpdatedTemplate = stringResource(R.string.native_settings_import_also_updated)
+    val importRejectedTemplate = stringResource(R.string.native_settings_import_rejected)
+    val gkeepNoneMessage = stringResource(R.string.native_settings_import_gkeep_none)
+    val gkeepImportedTemplate = stringResource(R.string.native_settings_import_gkeep_done)
+    val gkeepFailedMessage = stringResource(R.string.native_settings_import_gkeep_failed)
+    val markdownNoneMessage = stringResource(R.string.native_settings_import_md_none)
+    val markdownImportedTemplate = stringResource(R.string.native_settings_import_md_done)
+    val markdownFailedMessage = stringResource(R.string.native_settings_import_md_failed)
+    val secretKeySavedMessage = stringResource(R.string.native_settings_secret_key_downloaded)
+    val orderResetMessage = stringResource(R.string.native_settings_reset_order_done)
+    val forgotPasswordLabel = stringResource(R.string.native_login_forgot_password)
+    val secretLoginLabel = stringResource(R.string.native_secret_login_title)
     val updateCheckingMessage = stringResource(R.string.update_checking)
     val updateUpToDateMessage = stringResource(R.string.update_up_to_date)
     val updateDownloadingMessage = stringResource(R.string.update_downloading)
@@ -366,6 +403,168 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
             } finally {
                 generatingSecretKey = false
             }
+        }
+    }
+
+    /** buildImportMessage() (useImportExport.js:36-66): imported, restored,
+     *  skipped and rejected each get said out loud, since a restore that
+     *  only updates would otherwise report nothing at all. */
+    fun importMessage(result: ImportNotesResponse, attempted: Int, successTemplate: String): String {
+        val imported = result.imported
+        val base = when {
+            result.skipped > 0 && imported == 0 -> importAllSkippedTemplate.replace("{skipped}", "${result.skipped}")
+            result.skipped > 0 -> importedWithSkippedTemplate
+                .replace("{count}", "$imported")
+                .replace("{skipped}", "${result.skipped}")
+            else -> successTemplate.replace("{count}", "${if (imported > 0) imported else attempted}")
+        }
+        val withUpdated = when {
+            result.updated == 0 -> base
+            imported == 0 && result.skipped == 0 ->
+                importAllUpdatedTemplate.replace("{updated}", "${result.updated}")
+            else -> "$base ${importAlsoUpdatedTemplate.replace("{updated}", "${result.updated}")}"
+        }
+        if (result.rejected == 0) return withUpdated
+        return "$withUpdated ${importRejectedTemplate.replace("{rejected}", "${result.rejected}")}"
+    }
+
+    /** The three imports differ only in how the files are read; everything
+     *  after that (nothing usable, send, report) is the same. */
+    fun runImport(
+        emptyMessage: String,
+        successTemplate: String,
+        failureMessage: String,
+        read: suspend () -> NoteTransfer.ImportPayload?,
+    ) {
+        if (transferRunning) return
+        transferRunning = true
+        scope.launch {
+            try {
+                val payload = withContext(Dispatchers.IO) { read() }
+                if (payload == null) {
+                    toasts.error(importInvalidJsonMessage)
+                    return@launch
+                }
+                if (payload.notes.isEmpty()) {
+                    toasts.error(emptyMessage)
+                    return@launch
+                }
+                val result = repository.importNotes(payload.notes)
+                toasts.success(importMessage(result, payload.attempted, successTemplate))
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen import failed", t)
+                toasts.error(failureMessage)
+            } finally {
+                transferRunning = false
+            }
+        }
+    }
+
+    fun exportAllNotes() {
+        if (transferRunning) return
+        transferRunning = true
+        scope.launch {
+            try {
+                val payload = repository.exportNotes()
+                val filename = NoteTransfer.exportFilename(profile?.email) + ".json"
+                val pretty = withContext(Dispatchers.IO) { prettyJson.encodeToString(JsonElement.serializer(), payload) }
+                val shared = withContext(Dispatchers.IO) {
+                    NoteExporter.exportTextFile(context, NoteExporter.sanitizeFilename(filename), pretty, "application/json")
+                }
+                if (!shared) toasts.error(exportFailedMessage)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen exportAllNotes failed", t)
+                toasts.error(exportFailedMessage)
+            } finally {
+                transferRunning = false
+            }
+        }
+    }
+
+    fun downloadSecretKey() {
+        if (generatingSecretKey) return
+        generatingSecretKey = true
+        scope.launch {
+            try {
+                val key = repository.generateSecretKey()
+                val content = NoteTransfer.secretKeyFile(key, forgotPasswordLabel, secretLoginLabel)
+                val shared = withContext(Dispatchers.IO) {
+                    NoteExporter.exportTextFile(context, NoteTransfer.secretKeyFilename(), content, "text/plain")
+                }
+                // The key is also shown, and copyable: the file leaves
+                // through the share sheet, which the user may well cancel.
+                generatedSecretKey = key
+                if (shared) toasts.success(secretKeySavedMessage)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen downloadSecretKey failed", t)
+                reportActionError(t)
+            } finally {
+                generatingSecretKey = false
+            }
+        }
+    }
+
+    /**
+     * resetNoteOrder() (App.jsx:6614): pinned first, then most recently
+     * updated, then most recently created, sent through the same reorder
+     * the drag-and-drop uses. The web's own "override positions" checkbox
+     * has no counterpart here: it only decides whether ITS in-memory copy
+     * gets provisional positions before the server answers, and the server
+     * assigns the real ones from the id lists either way
+     * (server/index.js:2917-2933), which this app's optimistic reorder
+     * already mirrors.
+     */
+    fun resetNoteOrder() {
+        if (transferRunning) return
+        transferRunning = true
+        scope.launch {
+            try {
+                val all = repository.observeNotes().first()
+                // Pinned first, then most recently modified. The web adds
+                // creation date as a last tie-break; the local cache does
+                // not keep one (see NoteEntity), so two notes modified in
+                // the very same millisecond keep whatever order they had.
+                val sorted = all.sortedWith(
+                    compareByDescending<NoteEntity> { it.pinned }
+                        .thenByDescending { it.updatedAt?.let(::parseIsoToEpochMillis) ?: 0L },
+                )
+                repository.reorderQueued(sorted.filter { it.pinned }, sorted.filterNot { it.pinned })
+                SyncQueueWorker.triggerNow(context)
+                toasts.success(orderResetMessage)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen resetNoteOrder failed", t)
+                reportActionError(t)
+            } finally {
+                transferRunning = false
+            }
+        }
+    }
+
+    val importJsonLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        runImport(importNoNotesMessage, importedTemplate, importFailedMessage) {
+            val raw = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
+            raw?.let { NoteTransfer.readGlassKeepExport(it) }
+        }
+    }
+
+    val importGkeepLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        runImport(gkeepNoneMessage, gkeepImportedTemplate, gkeepFailedMessage) {
+            NoteTransfer.readGoogleKeep(context, uris)
+        }
+    }
+
+    val importMarkdownLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        runImport(markdownNoneMessage, markdownImportedTemplate, markdownFailedMessage) {
+            NoteTransfer.readMarkdown(context, uris)
         }
     }
 
@@ -1164,6 +1363,53 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                     onToggle = { dataOpen = !dataOpen },
                                 ) {
                                     SettingsCardButton(
+                                        title = stringResource(R.string.native_settings_export_all),
+                                        subtitle = stringResource(R.string.native_settings_export_all_desc),
+                                        themeId = themeId,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        borderColor = borderColor,
+                                        enabled = !transferRunning,
+                                        icon = { tint -> UploadIcon(size = 20.dp, tint = tint) },
+                                        onClick = { exportAllNotes() },
+                                    )
+                                    SettingsCardButton(
+                                        title = stringResource(R.string.native_settings_import_json),
+                                        subtitle = stringResource(R.string.native_settings_import_json_desc),
+                                        themeId = themeId,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        borderColor = borderColor,
+                                        enabled = !transferRunning,
+                                        icon = { tint -> TablerDownloadIcon(size = 20.dp, tint = tint) },
+                                        // "*/*" as well: a .json picked from a
+                                        // file manager often reports as
+                                        // application/octet-stream.
+                                        onClick = { importJsonLauncher.launch(arrayOf("application/json", "*/*")) },
+                                    )
+                                    SettingsCardButton(
+                                        title = stringResource(R.string.native_settings_import_gkeep),
+                                        subtitle = stringResource(R.string.native_settings_import_gkeep_desc),
+                                        themeId = themeId,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        borderColor = borderColor,
+                                        enabled = !transferRunning,
+                                        icon = { tint -> BrandGoogleIcon(size = 20.dp, tint = tint) },
+                                        onClick = { importGkeepLauncher.launch(arrayOf("application/zip", "application/json", "image/*", "*/*")) },
+                                    )
+                                    SettingsCardButton(
+                                        title = stringResource(R.string.native_settings_import_markdown),
+                                        subtitle = stringResource(R.string.native_settings_import_markdown_desc),
+                                        themeId = themeId,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        borderColor = borderColor,
+                                        enabled = !transferRunning,
+                                        icon = { tint -> FileTextIcon(size = 20.dp, tint = tint) },
+                                        onClick = { importMarkdownLauncher.launch(arrayOf("text/markdown", "text/plain", "*/*")) },
+                                    )
+                                    SettingsCardButton(
                                         title = stringResource(R.string.native_settings_secret_key_generate),
                                         subtitle = stringResource(R.string.native_settings_secret_key_desc),
                                         themeId = themeId,
@@ -1172,7 +1418,18 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                         borderColor = borderColor,
                                         enabled = !generatingSecretKey,
                                         icon = { tint -> TablerKeyIcon(size = 20.dp, tint = tint) },
-                                        onClick = { generateSecretKey() },
+                                        onClick = { downloadSecretKey() },
+                                    )
+                                    SettingsCardButton(
+                                        title = stringResource(R.string.native_settings_reset_order),
+                                        subtitle = stringResource(R.string.native_settings_reset_order_desc),
+                                        themeId = themeId,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        borderColor = borderColor,
+                                        enabled = !transferRunning,
+                                        icon = { tint -> ArrowsSortIcon(size = 20.dp, tint = tint) },
+                                        onClick = { showResetOrderConfirm = true },
                                     )
                                 }
 
@@ -1536,6 +1793,22 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                     )
                 }
             }
+        }
+
+        if (showResetOrderConfirm) {
+            GkConfirmDialog(
+                title = stringResource(R.string.native_settings_reset_order),
+                message = stringResource(R.string.native_settings_reset_order_confirm),
+                confirmLabel = stringResource(R.string.native_settings_reset_order_action),
+                cancelLabel = stringResource(R.string.native_dialog_cancel),
+                themeId = themeId,
+                dark = dark,
+                borderColor = borderColor,
+                titleColor = titleColor,
+                subtextColor = subtextColor,
+                onConfirm = { showResetOrderConfirm = false; resetNoteOrder() },
+                onDismiss = { showResetOrderConfirm = false },
+            )
         }
 
         if (showChangeServerDialog) {
