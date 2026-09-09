@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.content.Context
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -95,6 +96,7 @@ import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NoteExporter
 import com.glasskeep.app.nativeapp.data.AudioClipDto
 import com.glasskeep.app.nativeapp.data.AudioContent
+import com.glasskeep.app.nativeapp.data.ChecklistEntry
 import com.glasskeep.app.nativeapp.data.ChecklistItemData
 import com.glasskeep.app.nativeapp.data.ChecklistItems
 import com.glasskeep.app.nativeapp.data.DrawingContent
@@ -145,11 +147,10 @@ private data class Editability(
     val isLegacyPlain: Boolean,
     val bodyPlainText: String,
     val isChecklistType: Boolean = false,
-    /** Editable rows, or null when the checklist has section markers: see
-     *  ChecklistItems.parseFlat, and the sections-fallback read-only view
-     *  this null triggers below. Irrelevant (always null) when
+    /** The checklist's own entries, rows and section markers in one flat
+     *  array (see ChecklistItems). Irrelevant (always null) when
      *  isChecklistType is false. */
-    val checklistItems: List<ChecklistItemData>? = null,
+    val checklistItems: List<ChecklistEntry>? = null,
     /** True when RichDoc.parse approved the note's content: the real
      *  formatting editor (RichTextEditor) handles it instead of the
      *  plain-text/notice fallback below. [originalRichBlocks] is the
@@ -185,7 +186,7 @@ private data class LinkTarget(val blockId: String, val start: Int, val end: Int,
 /**
  * Milestone: opening and safely editing a single note, every note type the
  * server knows about. Checklist notes get their own flat editor
- * (ChecklistItemsList); drawing notes their own canvas (DrawingEditor);
+ * (ChecklistEditorBody); drawing notes their own canvas (DrawingEditor);
  * audio notes their own recorder/player (AudioClipsSection). A text note's
  * body goes through RichDoc.parse first: bold/italic/underline/strike/
  * link, headings, and bullet/numbered lists are natively editable
@@ -245,6 +246,11 @@ fun NoteDetailScreen(
     // turns out to be a checklist (see LaunchedEffect below); defaults to
     // "top" until then, same as the web's own fresh-install default.
     var checklistInsertPosition by remember { mutableStateOf("top") }
+    // The "Done" area's collapsed state is per-device, exactly like the
+    // web's own localStorage["ck-done-<noteId>"]: unlike a section's own
+    // collapsed flag, it is never synced.
+    val checklistPrefs = remember { context.getSharedPreferences("glasskeep_checklist", Context.MODE_PRIVATE) }
+    var doneSectionCollapsed by remember(noteId) { mutableStateOf(checklistPrefs.getBoolean("ck-done-$noteId", false)) }
     val checklistFocusRequesters = remember { mutableStateMapOf<String, FocusRequester>() }
     var pendingChecklistFocus by remember { mutableStateOf<String?>(null) }
 
@@ -567,7 +573,7 @@ fun NoteDetailScreen(
      * syncEntries(); this app's usual pattern elsewhere is to save once
      * explicitly, but checklist edits are inherently a sequence of small,
      * separately-meaningful mutations, not one big free-text edit. */
-    fun saveChecklistItems(newItems: List<ChecklistItemData>) {
+    fun saveChecklistItems(newItems: List<ChecklistEntry>) {
         val current = note ?: return
         scope.launch {
             try {
@@ -585,83 +591,17 @@ fun NoteDetailScreen(
         }
     }
 
-    fun toggleChecklistItem(id: String, checked: Boolean) {
-        val items = editability?.checklistItems ?: return
-        // Cascades to indented children, Google Keep style, same as the
-        // web's own modal editor (toggleItem, ChecklistEditor.jsx).
-        val children = ChecklistItems.indentedChildren(items, id)
-        val idsToUpdate = (listOf(id) + children.map { it.id }).toSet()
-        val updated = items.map { if (it.id in idsToUpdate) it.copy(done = checked) else it }
-        editability = editability?.copy(checklistItems = updated)
-        saveChecklistItems(updated)
+    fun setDoneSectionCollapsed(collapsed: Boolean) {
+        doneSectionCollapsed = collapsed
+        checklistPrefs.edit().putBoolean("ck-done-$noteId", collapsed).apply()
     }
 
-    /** Local-only, no network save: see blurChecklistItem for when the
-     *  edit actually persists. */
-    fun changeChecklistItemText(id: String, text: String) {
-        val items = editability?.checklistItems ?: return
-        editability = editability?.copy(checklistItems = items.map { if (it.id == id) it.copy(text = text) else it })
-    }
-
-    /** Blurring an item saves its (possibly just-edited) text, unless it's
-     *  now blank, in which case it's removed instead, same as the web's own
-     *  blur-on-empty auto-delete (ChecklistRow.jsx). */
-    fun blurChecklistItem(id: String) {
-        val items = editability?.checklistItems ?: return
-        val item = items.find { it.id == id } ?: return
-        if (item.text.isBlank()) {
-            val updated = ChecklistItems.normalize(items.filterNot { it.id == id })
-            editability = editability?.copy(checklistItems = updated)
-            saveChecklistItems(updated)
-        } else {
-            saveChecklistItems(items)
-        }
-    }
-
-    fun removeChecklistItem(id: String) {
-        val items = editability?.checklistItems ?: return
-        val updated = ChecklistItems.normalize(items.filterNot { it.id == id })
-        editability = editability?.copy(checklistItems = updated)
-        saveChecklistItems(updated)
-    }
-
-    fun indentToggleChecklistItem(id: String) {
-        val items = editability?.checklistItems ?: return
-        val item = items.find { it.id == id } ?: return
-        val allowed = if (item.indent == 1) true else ChecklistItems.canIndent(items, id)
-        if (!allowed) return
-        val updated = ChecklistItems.normalize(
-            items.map { if (it.id == id) it.copy(indent = if (item.indent == 1) 0 else 1) else it }
-        )
-        editability = editability?.copy(checklistItems = updated)
-        saveChecklistItems(updated)
-    }
-
-    /** Enter inside an item: inserts a new empty item adjacent to it,
-     *  above or below depending on checklistInsertPosition, matching
-     *  addItemAdjacent() (ChecklistEditor.jsx) minus its caret-at-start
-     *  override (see ChecklistItemsList's own doc comment for why). */
-    fun addChecklistItemAdjacent(anchorId: String) {
-        val items = editability?.checklistItems ?: return
-        val idx = items.indexOfFirst { it.id == anchorId }
-        if (idx < 0) return
-        val newItem = ChecklistItems.newItem()
-        val insertAt = if (checklistInsertPosition == "top") idx else idx + 1
-        val updated = items.toMutableList().apply { add(insertAt, newItem) }
-        editability = editability?.copy(checklistItems = updated)
-        saveChecklistItems(updated)
-        pendingChecklistFocus = newItem.id
-    }
-
-    /** The trailing "add item" row: inserts at the very top or bottom of
-     *  the whole list, matching addItemTopOrBottom() (ChecklistEditor.jsx). */
-    fun addChecklistItemAtEnd() {
-        val items = editability?.checklistItems ?: return
-        val newItem = ChecklistItems.newItem()
-        val updated = if (checklistInsertPosition == "top") listOf(newItem) + items else items + newItem
-        editability = editability?.copy(checklistItems = updated)
-        saveChecklistItems(updated)
-        pendingChecklistFocus = newItem.id
+    /** The editor hands back a whole new entry list for any structural
+     *  change; typing hands one back with persist = false, since the web
+     *  only saves a row's text once it loses focus. */
+    fun updateChecklistEntries(entries: List<ChecklistEntry>, persist: Boolean) {
+        editability = editability?.copy(checklistItems = entries)
+        if (persist) saveChecklistItems(entries)
     }
 
     // ---------- Rich text block edits (RichDoc.parse-approved notes only) ----------
@@ -1035,7 +975,7 @@ fun NoteDetailScreen(
                         isLegacyPlain = false,
                         bodyPlainText = "",
                         isChecklistType = true,
-                        checklistItems = ChecklistItems.parseFlat(fetched.items),
+                        checklistItems = ChecklistItems.parse(fetched.items),
                     )
                 }
                 "draw" -> {
@@ -1434,35 +1374,26 @@ fun NoteDetailScreen(
                             }
 
                             if (edit.isChecklistType) {
-                                val checklistItems = edit.checklistItems
-                                if (checklistItems == null || isReadOnlyAccess) {
-                                    // Has section markers: not natively editable
-                                    // yet (see ChecklistItems.parseFlat), fall
-                                    // back to the same read-only preview the
-                                    // list's own cards use rather than risk
-                                    // scrambling the note's organization.
-                                    Text(
-                                        stringResource(R.string.native_checklist_sections_notice),
-                                        color = subtextColor,
-                                        fontSize = 12.sp,
+                                val checklistEntries = edit.checklistItems.orEmpty()
+                                if (isReadOnlyAccess) {
+                                    ChecklistReadOnlyPreview(
+                                        items = currentNote.items,
+                                        titleColor = titleColor,
+                                        subtextColor = subtextColor,
                                     )
-                                    Spacer(Modifier.height(10.dp))
-                                    ChecklistReadOnlyPreview(items = currentNote.items, titleColor = titleColor, subtextColor = subtextColor)
                                 } else {
-                                    ChecklistItemsList(
-                                        items = checklistItems,
+                                    ChecklistEditorBody(
+                                        entries = checklistEntries,
+                                        insertPosition = checklistInsertPosition,
+                                        dark = dark,
                                         titleColor = titleColor,
                                         subtextColor = subtextColor,
                                         borderColor = borderColor,
+                                        doneCollapsed = doneSectionCollapsed,
                                         focusRequesterFor = { id -> checklistFocusRequesters.getOrPut(id) { FocusRequester() } },
-                                        onToggle = { id, checked -> toggleChecklistItem(id, checked) },
-                                        onTextChange = { id, text -> changeChecklistItemText(id, text) },
-                                        onBlur = { id -> blurChecklistItem(id) },
-                                        onEnter = { id -> addChecklistItemAdjacent(id) },
-                                        onIndentToggle = { id -> indentToggleChecklistItem(id) },
-                                        canIndent = { id -> ChecklistItems.canIndent(checklistItems, id) },
-                                        onRemove = { id -> removeChecklistItem(id) },
-                                        onAddItem = { addChecklistItemAtEnd() },
+                                        onEntriesChange = { updated, persist -> updateChecklistEntries(updated, persist) },
+                                        onFocusItem = { id -> pendingChecklistFocus = id },
+                                        onDoneCollapsedChange = { collapsed -> setDoneSectionCollapsed(collapsed) },
                                     )
                                 }
                             } else if (edit.isDrawType) {

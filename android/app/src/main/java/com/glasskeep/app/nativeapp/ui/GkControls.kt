@@ -41,13 +41,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -712,6 +720,53 @@ internal fun FooterPopover(
                 drawPath(arrow, color = background)
             }
         }
+    }
+}
+
+/** Lets a block spill past its parent's horizontal padding, the way the
+ *  checklist deliberately does on a phone (`max-sm:-mx-4`). */
+internal fun Modifier.bleedHorizontally(amount: Dp): Modifier = layout { measurable, constraints ->
+    val extra = amount.roundToPx() * 2
+    val placeable = measurable.measure(
+        constraints.copy(minWidth = 0, maxWidth = constraints.maxWidth + extra),
+    )
+    layout(placeable.width - extra, placeable.height) {
+        placeable.place(-amount.roundToPx(), 0)
+    }
+}
+
+/** A 1px line under the content, in the given colour (null draws
+ *  nothing), without adding a full border box. */
+internal fun Modifier.bottomHairline(color: Color?): Modifier =
+    if (color == null) this else drawBehind {
+        val stroke = 1.dp.toPx()
+        drawRect(
+            color = color,
+            topLeft = Offset(0f, size.height - stroke),
+            size = Size(size.width, stroke),
+        )
+    }
+
+/** The 3px left accent bar a coloured section block carries
+ *  (ChecklistEditor.jsx:353). */
+internal fun Modifier.drawSectionAccent(color: Color, dark: Boolean): Modifier = drawBehind {
+    drawRect(
+        color = color.copy(alpha = if (dark) 0.8f else 0.6f),
+        size = Size(3.dp.toPx(), size.height),
+    )
+}
+
+/** The dashed outline of the "add section" button. */
+internal fun Modifier.dashedBorder(color: Color, shape: Shape): Modifier = drawBehind {
+    val stroke = Stroke(
+        width = 1.dp.toPx(),
+        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())),
+    )
+    val outline = shape.createOutline(size, layoutDirection, this)
+    when (outline) {
+        is Outline.Rounded -> drawPath(Path().apply { addRoundRect(outline.roundRect) }, color, style = stroke)
+        is Outline.Generic -> drawPath(outline.path, color, style = stroke)
+        is Outline.Rectangle -> drawRect(color, style = stroke)
     }
 }
 

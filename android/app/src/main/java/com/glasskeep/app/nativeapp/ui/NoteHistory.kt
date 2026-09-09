@@ -5,7 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.glasskeep.app.nativeapp.data.ChecklistItemData
+import com.glasskeep.app.nativeapp.data.ChecklistEntry
 import com.glasskeep.app.nativeapp.data.RichBlock
 
 /**
@@ -22,7 +22,7 @@ internal data class NoteSnapshot(
     val title: String,
     val body: String,
     val richBlocks: List<RichBlock>?,
-    val checklistItems: List<ChecklistItemData>?,
+    val checklistItems: List<ChecklistEntry>?,
 )
 
 internal class NoteHistory {

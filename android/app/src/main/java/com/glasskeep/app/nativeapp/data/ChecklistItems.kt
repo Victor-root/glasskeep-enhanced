@@ -10,99 +10,233 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import java.util.UUID
 
+/** One entry of a checklist: either a row or a section marker. */
+sealed interface ChecklistEntry {
+    val id: String
+}
+
 /** One editable checklist row. Mirrors src/utils/checklist.js's item shape
  *  (`{id, text, done, indent}`); `indent` is 0 or 1 only, single level, same
  *  "Google Keep style, no sub-sub-items" rule the web enforces. */
 data class ChecklistItemData(
-    val id: String,
+    override val id: String,
     val text: String,
     val done: Boolean,
     val indent: Int,
+) : ChecklistEntry
+
+/** A section marker, `{id, kind:"section", title, color?, collapsed?}`.
+ *  Everything after it belongs to that section until the next marker. */
+data class ChecklistSectionData(
+    override val id: String,
+    val title: String,
+    val color: String? = null,
+    val collapsed: Boolean = false,
+) : ChecklistEntry
+
+/** One logical section and the rows under it, checked ones included and in
+ *  their original order. `section` is null for the implicit default block
+ *  that holds everything before the first marker. */
+data class ChecklistBlock(
+    val section: ChecklistSectionData?,
+    val items: List<ChecklistItemData>,
 )
 
 /**
- * (De)serializes NoteDto.items for the flat (no-section) case the native
- * checklist editor supports so far. src/utils/checklist.js's items live in
- * one flat array alongside section markers (`{kind:"section", title}`);
- * native doesn't understand those yet (no editor UI for them), so
- * [parseFlat] returns null the moment it sees one rather than silently
- * dropping or misrendering it, that null is exactly NoteDetailScreen's
- * signal to fall back to a read-only view instead of an editor that could
- * scramble a sectioned checklist's organization.
+ * (De)serializes NoteDto.items, the one flat array where src/utils/checklist.js
+ * keeps rows and section markers side by side. The array order IS the logical
+ * order: checking a row never moves it, only where it is drawn changes, so
+ * unchecking puts it back exactly where it was for free.
  */
 object ChecklistItems {
-    fun hasSections(items: List<JsonElement>): Boolean = items.any { el ->
-        val kind = (el as? JsonObject)?.get("kind") as? JsonPrimitive
-        kind?.contentOrNull == "section"
-    }
+    const val SECTION_KIND = "section"
 
-    /** Parses items into editable rows, or null if any section marker is
-     *  present. Also re-applies the indent invariant on every parse (a
-     *  malformed/legacy item's indent still normalizes to 0/1, first item
-     *  is never indented), same rule as normalizeItems() on the web,
-     *  applied eagerly here instead of only at render time. */
-    fun parseFlat(items: List<JsonElement>): List<ChecklistItemData>? {
-        if (hasSections(items)) return null
-        val parsed = items.mapNotNull { el ->
-            val obj = el as? JsonObject ?: return@mapNotNull null
-            val text = (obj["text"] as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
+    /** Reads the note's items, applying the web's own normalisation:
+     *  duplicate ids dropped, missing fields defaulted, and the first row
+     *  of the list (or of any section) never indented, since it would
+     *  have nothing above it to nest under. */
+    fun parse(items: List<JsonElement>): List<ChecklistEntry> {
+        val seen = mutableSetOf<String>()
+        val out = mutableListOf<ChecklistEntry>()
+        var atSectionStart = true
+        for (element in items) {
+            val obj = element as? JsonObject ?: continue
             val id = (obj["id"] as? JsonPrimitive)?.contentOrNull ?: UUID.randomUUID().toString()
-            val done = (obj["done"] as? JsonPrimitive)?.booleanOrNull ?: false
-            val indent = (obj["indent"] as? JsonPrimitive)?.intOrNull ?: 0
-            ChecklistItemData(id = id, text = text, done = done, indent = if (indent == 1) 1 else 0)
+            if (!seen.add(id)) continue
+            if ((obj["kind"] as? JsonPrimitive)?.contentOrNull == SECTION_KIND) {
+                out.add(
+                    ChecklistSectionData(
+                        id = id,
+                        title = (obj["title"] as? JsonPrimitive)?.contentOrNull.orEmpty(),
+                        color = (obj["color"] as? JsonPrimitive)?.contentOrNull,
+                        collapsed = (obj["collapsed"] as? JsonPrimitive)?.booleanOrNull ?: false,
+                    ),
+                )
+                atSectionStart = true
+            } else {
+                val indent = (obj["indent"] as? JsonPrimitive)?.intOrNull ?: 0
+                out.add(
+                    ChecklistItemData(
+                        id = id,
+                        text = (obj["text"] as? JsonPrimitive)?.contentOrNull.orEmpty(),
+                        done = (obj["done"] as? JsonPrimitive)?.booleanOrNull ?: false,
+                        indent = if (atSectionStart || indent != 1) 0 else 1,
+                    ),
+                )
+                atSectionStart = false
+            }
         }
-        return normalizeIndent(parsed)
+        return out
     }
 
     /** Re-applies the indent invariant to a list already being edited
      *  in-memory (e.g. after a removal could leave a formerly-second item
      *  as an invalid indented first item). Cheap and idempotent, safe to
      *  call after any structural edit. */
-    fun normalize(items: List<ChecklistItemData>): List<ChecklistItemData> = normalizeIndent(items)
+    fun normalize(entries: List<ChecklistEntry>): List<ChecklistEntry> {
+        var atSectionStart = true
+        return entries.map { entry ->
+            when (entry) {
+                is ChecklistSectionData -> {
+                    atSectionStart = true
+                    entry
+                }
+                is ChecklistItemData -> {
+                    val indent = if (atSectionStart || entry.indent != 1) 0 else 1
+                    atSectionStart = false
+                    if (indent == entry.indent) entry else entry.copy(indent = indent)
+                }
+            }
+        }
+    }
 
-    fun encode(items: List<ChecklistItemData>): List<JsonElement> =
-        normalizeIndent(items).map { item ->
-            buildJsonObject {
-                put("id", item.id)
-                put("text", item.text)
-                put("done", item.done)
-                put("indent", item.indent)
+    fun encode(entries: List<ChecklistEntry>): List<JsonElement> =
+        normalize(entries).map { entry ->
+            when (entry) {
+                is ChecklistSectionData -> buildJsonObject {
+                    put("id", entry.id)
+                    put("kind", SECTION_KIND)
+                    put("title", entry.title)
+                    entry.color?.let { put("color", it) }
+                    if (entry.collapsed) put("collapsed", true)
+                }
+                is ChecklistItemData -> buildJsonObject {
+                    put("id", entry.id)
+                    put("text", entry.text)
+                    put("done", entry.done)
+                    put("indent", entry.indent)
+                }
             }
         }
 
     fun newItem(): ChecklistItemData = ChecklistItemData(UUID.randomUUID().toString(), "", false, 0)
 
-    /** The contiguous run of indent=1 rows right after `parentId`, same
-     *  positional definition as getIndentedChildren() (checklist.js): scan
-     *  forward until the first non-indented row. Used to cascade a
-     *  done/undone toggle onto a parent's children, Google Keep style. */
-    fun indentedChildren(items: List<ChecklistItemData>, parentId: String): List<ChecklistItemData> {
-        val idx = items.indexOfFirst { it.id == parentId }
-        if (idx < 0) return emptyList()
-        val result = mutableListOf<ChecklistItemData>()
-        for (i in idx + 1 until items.size) {
-            val row = items[i]
-            if (row.indent != 1) break
-            result.add(row)
+    fun newSection(): ChecklistSectionData = ChecklistSectionData(UUID.randomUUID().toString(), "")
+
+    /** Splits the flat array into its logical blocks. The first block is
+     *  always the implicit default one, even when empty, so callers can
+     *  treat every checklist the same way (getSections()). */
+    fun blocks(entries: List<ChecklistEntry>): List<ChecklistBlock> {
+        val out = mutableListOf<ChecklistBlock>()
+        var currentSection: ChecklistSectionData? = null
+        var currentItems = mutableListOf<ChecklistItemData>()
+        for (entry in entries) {
+            when (entry) {
+                is ChecklistSectionData -> {
+                    out.add(ChecklistBlock(currentSection, currentItems))
+                    currentSection = entry
+                    currentItems = mutableListOf()
+                }
+                is ChecklistItemData -> currentItems.add(entry)
+            }
         }
-        return result
+        out.add(ChecklistBlock(currentSection, currentItems))
+        return out
     }
 
-    /** Same rule as canIndentItem() (checklist.js) for the flat, no-section
-     *  case: the very first row has nothing above it to nest under, and an
-     *  already-indented row can't nest further (single level only). */
-    fun canIndent(items: List<ChecklistItemData>, id: String): Boolean {
-        val idx = items.indexOfFirst { it.id == id }
-        if (idx <= 0) return false
-        return items[idx].indent == 0
+    /** The section marker an item sits under, or null for the default
+     *  block. */
+    fun sectionIdForItem(entries: List<ChecklistEntry>, itemId: String): String? {
+        var current: String? = null
+        for (entry in entries) {
+            when (entry) {
+                is ChecklistSectionData -> current = entry.id
+                is ChecklistItemData -> if (entry.id == itemId) return current
+            }
+        }
+        return null
     }
 
-    /** First row can never be indented (nothing above it to nest under);
-     *  every other row's indent is clamped to 0/1. Re-applied on every
-     *  parse/encode so a stray bad value can never round-trip or persist. */
-    private fun normalizeIndent(items: List<ChecklistItemData>): List<ChecklistItemData> =
-        items.mapIndexed { i, item ->
-            val indent = if (item.indent == 1) 1 else 0
-            if (i == 0 && indent == 1) item.copy(indent = 0) else item.copy(indent = indent)
+    /**
+     * The contiguous run of indented rows right after a non-indented one:
+     * its "children" for check/uncheck cascading, Google Keep style. Stops
+     * at a section marker or at the first unchecked top-level row; an
+     * already-checked top-level row is SKIPPED rather than ending the run,
+     * because it is drawn under "Done" and so is invisible between a
+     * parent and its children (getIndentedChildren, checklist.js).
+     */
+    fun indentedChildren(entries: List<ChecklistEntry>, parentId: String): List<ChecklistItemData> {
+        val index = entries.indexOfFirst { it.id == parentId }
+        if (index < 0) return emptyList()
+        val parent = entries[index] as? ChecklistItemData ?: return emptyList()
+        if (parent.indent == 1) return emptyList()
+        val children = mutableListOf<ChecklistItemData>()
+        for (i in index + 1 until entries.size) {
+            when (val entry = entries[i]) {
+                is ChecklistSectionData -> return children
+                is ChecklistItemData -> when {
+                    entry.indent == 1 -> children.add(entry)
+                    entry.done -> Unit
+                    else -> return children
+                }
+            }
         }
+        return children
+    }
+
+    /** Same rule as canIndentItem(): a row can only be indented when it is
+     *  not already indented and not the first of its section. */
+    fun canIndent(entries: List<ChecklistEntry>, id: String): Boolean {
+        val item = entries.firstOrNull { it.id == id } as? ChecklistItemData ?: return false
+        if (item.indent == 1) return false
+        var atSectionStart = true
+        for (entry in entries) {
+            when (entry) {
+                is ChecklistSectionData -> atSectionStart = true
+                is ChecklistItemData -> {
+                    if (entry.id == id) return !atSectionStart
+                    atSectionStart = false
+                }
+            }
+        }
+        return false
+    }
+
+    /**
+     * Orders one block's checked rows for the "Done" area so an indented
+     * row always lands right after its own parent, even when an unrelated
+     * checked row sits between them in the raw array
+     * (orderCheckedForDisplay, checklist.js). Display only: nothing moves
+     * in the stored array.
+     */
+    fun orderCheckedForDisplay(items: List<ChecklistItemData>): List<ChecklistItemData> {
+        val anchorOf = mutableMapOf<String, String?>()
+        var currentAnchor: String? = null
+        for (item in items) {
+            if (item.indent == 1) {
+                anchorOf[item.id] = currentAnchor
+            } else {
+                anchorOf[item.id] = item.id
+                // A checked top-level row is invisible in the normal view,
+                // so it only takes the anchor role when nothing else holds
+                // it yet.
+                if (!item.done || currentAnchor == null) currentAnchor = item.id
+            }
+        }
+        val groups = LinkedHashMap<String?, MutableList<ChecklistItemData>>()
+        for (item in items) {
+            groups.getOrPut(anchorOf[item.id]) { mutableListOf() }.add(item)
+        }
+        return groups.values.flatten().filter { it.done }
+    }
 }
