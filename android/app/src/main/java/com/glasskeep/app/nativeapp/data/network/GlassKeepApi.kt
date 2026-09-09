@@ -156,6 +156,11 @@ data class NotificationIdsRequest(val ids: List<Int>)
 @Serializable
 data class NotificationActionResponse(val ok: Boolean = false)
 
+/** Body for POST /api/notifications/remove: the ids to delete for good
+ *  (one swiped-away card, or several at once). */
+@Serializable
+data class NotificationRemoveRequest(val ids: List<Int>)
+
 /** Body for POST /api/notes/:id/collaborate. access is always sent
  *  explicitly ("read" or "write"), even though the server defaults it to
  *  "write" when omitted: one code path, no optional-omission branch. */
@@ -820,4 +825,13 @@ interface GlassKeepApi {
     // panel marks everything shown as delivered" behavior.
     @POST("api/notifications/mark-delivered")
     suspend fun markNotificationsDelivered(@Body body: NotificationIdsRequest): Response<NotificationActionResponse>
+
+    // "Clear" in the notification centre's header: wipes this user's whole
+    // history server-side, so every other device drops it too.
+    @POST("api/notifications/clear")
+    suspend fun clearNotifications(): Response<NotificationActionResponse>
+
+    // One swiped-away card: a real delete, not a dismissal.
+    @POST("api/notifications/remove")
+    suspend fun removeNotifications(@Body body: NotificationRemoveRequest): Response<NotificationActionResponse>
 }

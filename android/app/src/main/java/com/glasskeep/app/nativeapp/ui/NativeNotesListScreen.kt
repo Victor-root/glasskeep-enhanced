@@ -116,7 +116,6 @@ fun NativeNotesListScreen(
     onOpenArchived: () -> Unit,
     onOpenTrash: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenNotifications: () -> Unit = {},
 ) {
     val dark = isSystemInDarkTheme()
     val themeId = container.themeState.themeId
@@ -133,6 +132,8 @@ fun NativeNotesListScreen(
     var fabOpen by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var searchOpen by remember { mutableStateOf(false) }
+    var notificationsOpen by remember { mutableStateOf(false) }
+    var unreadNotifications by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -400,6 +401,14 @@ fun NativeNotesListScreen(
 
     LaunchedEffect(serverUrl) { refresh() }
 
+    // The bell's red dot: how many notifications are still pending, read
+    // once on load and again every time the panel closes (opening it is
+    // what marks them delivered).
+    LaunchedEffect(serverUrl, notificationsOpen) {
+        if (notificationsOpen) return@LaunchedEffect
+        unreadNotifications = repository.fetchPendingNotifications().size
+    }
+
     BackHandler(enabled = selectionMode) { exitSelection() }
 
     Box(Modifier.fillMaxSize().then(bgModifier)) {
@@ -423,7 +432,9 @@ fun NativeNotesListScreen(
                 searchQuery = searchQuery,
                 onSearchQueryChange = { searchQuery = it },
                 onEnterSelection = { selectionMode = true },
-                onOpenNotifications = onOpenNotifications,
+                notificationsOpen = notificationsOpen,
+                hasUnreadNotifications = unreadNotifications > 0,
+                onOpenNotifications = { notificationsOpen = !notificationsOpen },
             )
 
             errorMessage?.let {
@@ -569,7 +580,21 @@ fun NativeNotesListScreen(
                 onDismiss = { showBulkColorPicker = false },
             )
         }
+
+        // The notification centre is a sheet over this screen, not a screen
+        // of its own: that is where the web puts it too (it hangs off the
+        // bell, the notes stay visible around it).
+        NotificationCenter(
+            container = container,
+            serverUrl = serverUrl,
+            open = notificationsOpen,
+            dark = dark,
+            onOpenNote = { id -> notificationsOpen = false; onOpenNote(id) },
+            onDismiss = { notificationsOpen = false },
+        )
     }
+
+    BackHandler(enabled = notificationsOpen) { notificationsOpen = false }
 }
 
 @Composable
@@ -589,6 +614,8 @@ private fun NativeHeader(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onEnterSelection: () -> Unit,
+    notificationsOpen: Boolean,
+    hasUnreadNotifications: Boolean,
     onOpenNotifications: () -> Unit,
 ) {
     // Flat --gk-statusbar fill, no gradient and no blur: header.glass-card's
@@ -717,7 +744,26 @@ private fun NativeHeader(
                         ) { onOpenNotifications() }
                         .padding(8.dp),
                 ) {
-                    BellIcon(size = 18.dp, tint = titleColor)
+                    if (notificationsOpen) {
+                        BellRingingFilledIcon(size = 18.dp, tint = titleColor)
+                    } else {
+                        BellIcon(size = 18.dp, tint = titleColor)
+                    }
+                    // .gk-notif-bell-dot: a plain red dot, never a count
+                    // (the web dropped the counter with the read/unread
+                    // distinction, see NotificationBell.jsx:56-59).
+                    if (hasUnreadNotifications) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(9.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(if (dark) Color(0xFF1C1C22) else Color.White)
+                                .padding(2.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(Color(0xFFEF4444)),
+                        )
+                    }
                 }
                 val refreshLabel = stringResource(R.string.native_notes_refresh)
                 Box(

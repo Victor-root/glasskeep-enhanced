@@ -825,6 +825,13 @@ internal fun Modifier.drawSectionAccent(color: Color, dark: Boolean): Modifier =
     )
 }
 
+/** The mirror of [bottomHairline] for a strip that sits under content:
+ *  one hairline along the TOP edge (the notification sheet's grabber). */
+internal fun Modifier.topHairline(color: Color): Modifier = drawBehind {
+    val stroke = 1.dp.toPx()
+    drawRect(color = color, size = Size(size.width, stroke))
+}
+
 /** The dashed outline of the "add section" button. */
 /** `border-bottom: 1px dashed`: the rule under the typography modal's
  *  live preview (globalCSS.js:4470-4476). */

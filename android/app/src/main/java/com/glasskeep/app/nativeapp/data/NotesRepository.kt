@@ -18,6 +18,7 @@ import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.network.NotificationIdsRequest
+import com.glasskeep.app.nativeapp.data.network.NotificationRemoveRequest
 import com.glasskeep.app.nativeapp.data.network.PasskeyCeremonyOptionsResponse
 import com.glasskeep.app.nativeapp.data.network.PasskeyDto
 import com.glasskeep.app.nativeapp.data.network.PasskeyLoginVerifyRequest
@@ -1346,6 +1347,30 @@ class NotesRepository(
             val error = "POST /api/notifications/mark-delivered failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
             NativeDebug.e(error)
             throw IllegalStateException(error)
+        }
+    }
+
+    /** The centre's "Clear" button: drops this user's whole notification
+     *  history server-side. Best-effort like the two reads above, the
+     *  panel has already emptied itself locally by the time this runs. */
+    suspend fun clearNotifications() {
+        NativeDebug.d("NotesRepository.clearNotifications")
+        try {
+            api.clearNotifications()
+        } catch (t: Throwable) {
+            NativeDebug.e("NotesRepository.clearNotifications failed", t)
+        }
+    }
+
+    /** One swiped-away card. Same fire-and-forget shape as the clear
+     *  above: the card is already gone from the list. */
+    suspend fun removeNotifications(ids: List<Int>) {
+        if (ids.isEmpty()) return
+        NativeDebug.d("NotesRepository.removeNotifications count=${ids.size}")
+        try {
+            api.removeNotifications(NotificationRemoveRequest(ids))
+        } catch (t: Throwable) {
+            NativeDebug.e("NotesRepository.removeNotifications failed", t)
         }
     }
 }

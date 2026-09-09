@@ -217,7 +217,6 @@ fun NativeNavHost(
                 onOpenArchived = { navController.navigate("archived") },
                 onOpenTrash = { navController.navigate("trash") },
                 onOpenSettings = { navController.navigate("settings") },
-                onOpenNotifications = { navController.navigate("notifications") },
             )
         }
         // The web's settings panel is a full-width sheet that slides in
@@ -269,14 +268,6 @@ fun NativeNavHost(
                 container = container,
                 serverUrl = serverUrl,
                 noteId = noteId,
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable("notifications") {
-            NotificationsScreen(
-                container = container,
-                serverUrl = serverUrl,
-                onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
                 onBack = { navController.popBackStack() },
             )
         }
