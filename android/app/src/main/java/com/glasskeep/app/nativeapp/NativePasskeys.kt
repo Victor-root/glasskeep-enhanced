@@ -37,23 +37,15 @@ sealed class PasskeyCeremonyResult {
 }
 
 /**
- * Direct (non-WebView) Credential Manager caller for the native login
- * screen and the Settings screen's passkey management section. Mirrors
- * com.glasskeep.app.WebAuthnBridge exactly (same CredentialManager calls,
- * same cancellation-detection heuristic: CredentialManagerCallback
- * doesn't give a clean "the user cancelled" signal on its own, it's spread
- * across several exception types and locale-dependent messages), minus
- * everything that file only needs for its JS-bridge role (no
- * @JavascriptInterface, no callback-id map, no window.__glasskeepResolvePasskey
- * round-trip): native code already runs on Kotlin coroutines, so this
- * wraps the same callback API in suspendCancellableCoroutine instead of a
- * hand-rolled Promise bridge.
+ * Direct Credential Manager caller for the native login screen and the
+ * Settings screen's passkey management section. CredentialManagerCallback
+ * doesn't give a clean "the user cancelled" signal on its own, so the
+ * mapping below covers its several exception types while this API wraps
+ * callbacks in suspendCancellableCoroutine for native callers.
  *
  * Needs no new server-side config: a passkey ceremony's expected origin
  * (see the server's androidApkOrigins()) is a function of which signed
- * package made the call, not of which Activity or UI framework (WebView
- * vs. Compose) issued it: NativeAppActivity ships in the exact same
- * signed APK as WebViewActivity already does.
+ * package made the call, not of which Activity issued it.
  */
 object NativePasskeys {
     suspend fun register(activity: Activity, optionsJson: String): PasskeyCeremonyResult {
@@ -140,8 +132,7 @@ object NativePasskeys {
         }
     }
 
-    // Same cancellation-detection rationale as WebAuthnBridge's own create
-    // branch: CredentialManagerCallback surfaces "user dismissed the
+    // CredentialManagerCallback surfaces "user dismissed the
     // picker" through several exception classes, plus a possibly-localized
     // message we can't grep for "cancel" in reliably.
     private fun mapCreateError(e: CreateCredentialException): PasskeyCeremonyResult.Failed {

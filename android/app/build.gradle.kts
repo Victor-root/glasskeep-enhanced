@@ -41,8 +41,7 @@ android {
     // even link, Gradle refuses to build otherwise. compileSdk only
     // changes which APIs are available at compile time, it does not
     // change runtime behavior. targetSdk below is untouched (still 34):
-    // that is the one that changes how the app behaves for real users,
-    // including the WebView flow, and is a separate decision.
+    // that is the one that changes how the app behaves for real users.
     compileSdk = 37
 
     defaultConfig {
@@ -71,7 +70,7 @@ android {
             // install a passkey-capable APK without going through the
             // "Generate Signed Bundle / APK" wizard. The fingerprint
             // matches /.well-known/assetlinks.json, so Credential Manager
-            // accepts the WebView's WebAuthn calls.
+            // accepts the native app's passkey ceremonies.
             //
             // When keystore.properties is missing, Gradle falls back to
             // its auto-generated debug key — useful for forks who haven't
@@ -152,22 +151,11 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.webkit:webkit:1.9.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
-
-    // Custom Tabs: opens external URLs as an overlay on top of the
-    // app (Chrome / Brave / Firefox custom-tab UI) instead of cold-
-    // launching the full browser app. The user stays in our task
-    // stack — back returns to the WebView — and the page renders in
-    // their default browser's engine + session cookies.
-    implementation("androidx.browser:browser:1.8.0")
 
     // Credential Manager: Android's unified API for passkeys, passwords
-    // and federated sign-in. Bridges the WebView's WebAuthn calls into
-    // the OS-level passkey UI (Google Password Manager / 1Password /
-    // Bitwarden / etc.) so passkeys work inside the app instead of
-    // forcing users back to a browser.
+    // and federated sign-in. NativePasskeys calls it directly to open the
+    // OS-level passkey UI (Google Password Manager / 1Password / Bitwarden).
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
 
@@ -182,18 +170,11 @@ dependencies {
     implementation("androidx.camera:camera-view:1.6.2")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
-    // Plain JVM unit tests (./gradlew test). net/CleartextPolicy decides
-    // which server addresses may be reached without TLS and touches
-    // nothing Android-specific, so it is testable without a device.
+    // Plain JVM unit tests (./gradlew test) for platform-independent
+    // policies such as cleartext-server checks and session migration.
     testImplementation("junit:junit:4.13.2")
 
-    // ---- Native rewrite (0-webview effort) --------------------------------
-    // Nothing above this line needed to change: the server exposes a plain
-    // JSON/HTTP API with a Bearer token, so the native app is a normal
-    // Android client, no backend changes required (see the migration report).
-
-    // Screen-to-screen navigation. Nothing in the app does this today; every
-    // "screen" so far has been a page inside the WebView.
+    // Native screen-to-screen navigation.
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")

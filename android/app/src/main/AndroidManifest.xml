@@ -4,12 +4,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
     <!-- In-app self-update: fetch the latest APK from GitHub Releases,
          drop it into our private cache, then hand it to Android's
          system installer via the FileProvider declared below. The user
@@ -51,7 +45,7 @@
          GlassKeep. It is no longer a blanket permission: which addresses
          may be reached in the clear is decided by net/CleartextPolicy,
          applied where the address is chosen (ui/SetupScreen), where a
-         stored one is reused (MainActivity, WebViewActivity) and where
+         stored one is reused (MainActivity) and where
          the session token is sent in the background (ReminderSyncWorker).
          An address pointing at the open internet is refused.
 
@@ -88,20 +82,6 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
-
-        <!-- adjustResize is what makes the framework report the keyboard as a
-             WindowInsets.Type.ime() inset. Without it the mode resolves to
-             adjustPan, which pans a window that has nothing to pan (the WebView
-             already fills it) and reports no inset at all, so the page never
-             learns the keyboard is there. The window itself is not resized:
-             setDecorFitsSystemWindows(false) keeps the edge-to-edge layout and
-             WebViewActivity forwards the inset to the page. -->
-        <activity
-            android:name=".WebViewActivity"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
 
         <!-- Native app entry point. MainActivity supplies the configured
              server URL; singleTask lets reminder notification taps deep-link

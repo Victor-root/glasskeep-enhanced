@@ -95,9 +95,8 @@ internal val Indigo = Color(0xFF6366f1)
 // dark TV backdrop.
 private val CleartextNoticeColor = Color(0xFFd97706)
 
-/** True on Android TV / leanback devices — matches the logic
- *  WebViewActivity.kt uses to flip the WebView into TV mode. We rely
- *  on it to swap the setup screen's theme to a dark-violet 10-foot
+/** True on Android TV / leanback devices. We rely on it to swap the
+ *  setup screen's theme to a dark-violet 10-foot
  *  layout (same vibe as the in-app TvLogin) without touching the
  *  phone / tablet experience. */
 @Composable

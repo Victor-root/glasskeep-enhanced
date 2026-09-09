@@ -33,9 +33,8 @@ object UpdateManager {
     internal const val PREFS = "glasskeep_updater"
     private const val KEY_LAST_CHECK = "lastCheckMs"
     // Last successful check result, mirrored so the Settings panel
-    // can render its "Version X.Y.Z available" card across launches
-    // (the in-memory state would be lost the moment WebViewActivity
-    // is recreated).
+    // can render its "Version X.Y.Z available" card across launches and
+    // process recreation.
     internal const val KEY_AVAILABLE_VERSION = "availableVersion"
     internal const val KEY_AVAILABLE_ASSET = "availableAsset"
     internal const val KEY_AVAILABLE_URL = "availableUrl"

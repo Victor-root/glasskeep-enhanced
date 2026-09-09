@@ -470,9 +470,8 @@ private fun AuthLink(label: String, modifier: Modifier = Modifier, onClick: () -
 }
 
 /**
- * PasskeyLoginButton: always offered, same as WebAuthnBridge.isAvailable()'s
- * own hardcoded true. Neither probes whether this device actually has
- * Credential Manager: the system picker says "nothing to use here" on its
+ * PasskeyLoginButton: always offered. It does not probe whether this device
+ * actually has Credential Manager: the system picker says "nothing to use here" on its
  * own if there is genuinely no provider, rather than us guessing first.
  */
 @Composable

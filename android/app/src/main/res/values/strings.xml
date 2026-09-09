@@ -17,12 +17,7 @@
     <string name="dialog_change_message">Go back to setup screen?</string>
     <string name="dialog_yes">Yes, change</string>
     <string name="dialog_no">No</string>
-    <string name="download_started">Download started…</string>
-    <string name="download_complete">Saved: %1$s</string>
-    <string name="download_error">Download error</string>
-
-    <!-- Native rewrite (0-webview effort), milestone 0: login + read-only
-         notes list. Grows alongside the native screens themselves. -->
+    <!-- Native application strings. -->
     <string name="native_login_password">Password</string>
     <string name="native_login_submit">Sign in</string>
     <string name="native_login_error_rejected">Sign-in refused (code %1$d). Check the email and password.</string>

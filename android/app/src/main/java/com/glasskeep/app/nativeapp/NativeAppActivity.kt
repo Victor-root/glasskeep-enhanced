@@ -19,16 +19,12 @@ import com.glasskeep.app.ui.applyThemedSystemBars
 import com.glasskeep.app.ui.theme.GlassKeepTheme
 
 /**
- * Entry point for the native (0-webview) app: every screen in
+ * Entry point for the native app: every screen in
  * com.glasskeep.app.nativeapp hangs off the nav graph this hosts.
- *
- * Every build reaches this one now: MainActivity.launchApp no longer
- * boots WebViewActivity at all.
  */
 class NativeAppActivity : ComponentActivity() {
     // Deep-link target when launched from a reminder notification (see
-    // ReminderNotifier.buildOpenNoteIntent), same role as WebViewActivity's
-    // own pendingOpenNoteId. Compose State, not a plain var: singleTask
+    // ReminderNotifier.buildOpenNoteIntent). Compose State, not a plain var: singleTask
     // (see AndroidManifest.xml) means onNewIntent can update it while this
     // same Activity instance is already showing a screen, and NativeNavHost
     // needs to react to that.
@@ -94,8 +90,7 @@ class NativeAppActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // singleTask: a reminder tap on the already-running app lands here
-        // instead of a cold onCreate. Same adopt-and-deep-link shape as
-        // WebViewActivity's own onNewIntent.
+        // instead of a cold onCreate.
         setIntent(intent)
         intent.getStringExtra(EXTRA_OPEN_NOTE_ID)?.let { pendingOpenNoteId = it }
         if (intent.getBooleanExtra(EXTRA_OPEN_QR_SCANNER, false)) pendingOpenQrScanner = true

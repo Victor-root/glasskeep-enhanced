@@ -10,7 +10,7 @@ plugins {
     // now fails the build outright. The Kotlin version for the plugins
     // below still comes from their own "version 2.4.20", not from this one.
     id("com.android.application") version "9.4.0" apply false
-    // Native rewrite (0-webview effort): Room's annotation processor and the
+    // Native app: Room's annotation processor and the
     // JSON serializer for the Retrofit API client both need a Gradle plugin
     // declared at the root, then applied (without a version) in app/build.gradle.kts.
     // KSP decoupled its own version numbering from Kotlin's a while back

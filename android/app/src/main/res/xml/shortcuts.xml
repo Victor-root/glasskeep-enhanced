@@ -6,10 +6,9 @@
     before the user has opened the app for the first time.
 
     Each shortcut's intent action is consumed by MainActivity (see
-    MainActivity.kt onCreate). MainActivity appends a one-shot query
-    parameter to the configured server URL before handing off to
-    WebViewActivity; the SPA reads the param at boot and triggers the
-    matching action (only if the user has a valid session).
+    MainActivity.kt onCreate), which forwards it as a typed one-shot extra
+    to NativeAppActivity. The native navigation layer triggers the matching
+    action only when the user has a valid session.
 
     Ordering matters: launchers typically display shortcuts in REVERSE
     declaration order on long-press (most-recently declared first).

@@ -2210,9 +2210,8 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     }
 }
 
-/** f-droid.org resolves to whichever F-Droid client is installed, same
- *  as WebViewActivity's own openFdroidPage(): the section only shows
- *  this when the APK came from one of them. */
+/** f-droid.org resolves to whichever F-Droid client is installed; the
+ *  section only shows this when the APK came from one of them. */
 private fun openFdroidPage(context: Context) {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://f-droid.org/packages/${context.packageName}/"))
     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

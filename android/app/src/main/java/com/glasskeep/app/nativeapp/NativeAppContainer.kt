@@ -37,8 +37,7 @@ class NativeAppContainer(context: Context) {
     /**
      * Rebuilds the Retrofit client only when the server URL actually
      * changes, so one container instance can follow the user switching
-     * servers (see WebViewActivity's "change server" dialog for the
-     * existing precedent).
+     * servers.
      */
     fun api(serverUrl: String): GlassKeepApi {
         val existing = cachedApi

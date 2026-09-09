@@ -16,10 +16,6 @@
     <string name="dialog_change_message">Revenir à l\'écran de configuration ?</string>
     <string name="dialog_yes">Oui, changer</string>
     <string name="dialog_no">Non</string>
-    <string name="download_started">Téléchargement lancé…</string>
-    <string name="download_complete">Enregistré : %1$s</string>
-    <string name="download_error">Erreur de téléchargement</string>
-
     <string name="native_login_password">Mot de passe</string>
     <string name="native_login_submit">Se connecter</string>
     <string name="native_login_error_rejected">Connexion refusée (code %1$d). Vérifiez l\'e-mail et le mot de passe.</string>

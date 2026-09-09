@@ -5,10 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 
-// Status/nav bar treatment for the onboarding flow and the native rewrite,
-// same mechanism WebViewActivity already uses for the production app
-// (see WebViewActivity.applySystemBarColor). Each screen underneath is
-// responsible for padding its own content away from the bars with
+// Status/nav bar treatment for the onboarding flow and native app. Each
+// screen underneath is responsible for padding its own content away from the bars with
 // safeDrawingPadding()/windowInsetsPadding() where it matters.
 //
 // [overrideColorInt] lets a caller past onboarding (NativeAppActivity, once

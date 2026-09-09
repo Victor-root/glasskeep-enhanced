@@ -79,13 +79,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Every build boots the native app now (com.glasskeep.app.nativeapp);
-    // WebViewActivity is no longer an entry point at all.
-    //
-    // A launcher shortcut travels as its own Intent extra rather than as
-    // the boot-URL query parameter the WebView era used, since nothing
-    // boots a URL any more. Same mechanism EXTRA_OPEN_NOTE_ID already
-    // uses for a reminder notification tap.
+    // Every build boots the native app (com.glasskeep.app.nativeapp).
+    // Launcher shortcuts travel as typed Intent extras, using the same
+    // mechanism as a reminder notification's EXTRA_OPEN_NOTE_ID.
     private fun launchApp(url: String) {
         val target = Intent(this, NativeAppActivity::class.java)
         target.putExtra(NativeAppActivity.EXTRA_SERVER_URL, url)
@@ -111,9 +107,8 @@ class MainActivity : ComponentActivity() {
 
         // Set when the setup screen accepted an address after examining
         // where it actually points. The app's own "change server" clears
-        // it along with the address itself (see AuthShell and the
-        // Settings screen; WebViewActivity still does the same for the
-        // one path that can still reach it).
+        // it along with the address itself (see
+        // NativeAppContainer.clearForServerChange).
         const val KEY_URL_VETTED = "server_url_vetted"
 
         // Action strings must match res/xml/shortcuts.xml. Each of the
