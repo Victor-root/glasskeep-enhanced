@@ -45,6 +45,8 @@
     <string name="native_notes_refresh">Refresh</string>
     <string name="native_notes_syncing_count">%1$d syncing…</string>
     <string name="native_notes_empty">No notes yet.</string>
+    <string name="native_notes_section_pinned">Pinned</string>
+    <string name="native_notes_section_others">Others</string>
     <string name="native_notes_error_sync">Couldn\'t sync: %1$s</string>
     <string name="native_notes_create_error">Couldn\'t create the note: %1$s</string>
     <string name="native_notes_untitled">Untitled</string>
@@ -79,6 +81,11 @@
     <string name="native_bulk_unarchived_success">%1$d note(s) unarchived</string>
     <string name="native_bulk_restored_success">%1$d note(s) restored</string>
     <string name="native_bulk_partial_failure">%1$d failed</string>
+
+    <string name="native_sidebar_open">Open menu</string>
+    <string name="native_sidebar_tags_title">Tags</string>
+    <string name="native_sidebar_tags_empty">No tags yet</string>
+    <string name="native_notes_more_options">More options</string>
 
     <string name="native_archived_title">Archived</string>
     <string name="native_archived_empty">No archived notes.</string>

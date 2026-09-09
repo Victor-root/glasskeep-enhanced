@@ -734,3 +734,66 @@ fun PencilIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Co
         }
     }
 }
+
+// The three icons below back the notes drawer (TagSidebar.kt) and the
+// header's sync-status indicator. Same source discipline as the rest of
+// this file: exact path data from the web's own SVGs, not eyeballed.
+
+@Composable
+fun NotesIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/icons/sidebarIcons.jsx NotesIcon, viewBox 24x24, stroke (not
+    // filled), strokeWidth 1.8, round caps/joins.
+    val path = remember {
+        PathParser().parsePathString(
+            "M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4 " +
+                "M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4 " +
+                "M9 9L15 9 " +
+                "M9 13L15 13 " +
+                "M9 17L13 17"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+@Composable
+fun CloudCheckIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/sync/SyncStatusIcon.jsx's CloudCheck (the "synced" state), viewBox
+    // 24x24, stroke (not filled), strokeWidth 1.5, round caps/joins.
+    val path = remember {
+        PathParser().parsePathString(
+            "M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25 " +
+                "M9 12L11.5 14.5L15 10"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 1.5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+@Composable
+fun CloudPendingIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/sync/SyncStatusIcon.jsx's CloudPending (queued writes waiting to
+    // reach the server), viewBox 24x24, stroke (not filled), strokeWidth
+    // 1.5, round caps/joins.
+    val path = remember {
+        PathParser().parsePathString(
+            "M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25 " +
+                "M12 11L12 15 " +
+                "M10 13L14 13"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 1.5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}

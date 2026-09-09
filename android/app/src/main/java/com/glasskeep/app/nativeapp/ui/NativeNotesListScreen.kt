@@ -28,6 +28,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.item
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -74,6 +76,7 @@ import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.ChecklistPreview
 import com.glasskeep.app.nativeapp.data.NoteContent
+import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.isReminderPast
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
@@ -91,6 +94,13 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 private val ErrorColor = Color(0xFFdc2626)
+
+// Real web border tokens (--border-light/--border-dark, src/styles/
+// globalCSS.js), shared by note cards and the bulk color-picker dialog
+// below - both were already drawing from the same value before this,
+// just the wrong one (a plain black/white tint instead of these).
+private val CardBorderLight = Color(0xFFD1D5DB).copy(alpha = 0.3f)
+private val CardBorderDark = Color(0xFF4B5563).copy(alpha = 0.3f)
 
 /**
  * Notes list: a two-column masonry grid with real card previews (text
@@ -131,14 +141,30 @@ fun NativeNotesListScreen(
     var showBulkTrashConfirm by remember { mutableStateOf(false) }
     var showBulkColorPicker by remember { mutableStateOf(false) }
     var bulkActionRunning by remember { mutableStateOf(false) }
+    var sidebarOpen by remember { mutableStateOf(false) }
+    var activeTagFilter by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+
+    // Tag list + per-tag note count for the drawer (TagSidebar.kt), same
+    // "derive from what's already loaded" approach as filteredNotes below:
+    // no dedicated tags table/query, just a client-side tally over the
+    // notes already observed for this screen.
+    val tagCounts = remember(notes) {
+        val counts = LinkedHashMap<String, Int>()
+        for (note in notes) {
+            for (tag in TagsJson.parse(note.tagsJson)) {
+                counts[tag] = (counts[tag] ?: 0) + 1
+            }
+        }
+        counts.toList().sortedBy { it.first.lowercase() }
+    }
 
     // Manual drag reorder (see NotesRepository.reorderQueued). Disabled
     // during multi-select (matches the web's own canDrag = !multiMode)
-    // and while searching: filteredNotes is then a subset of notes, and
-    // a reorder needs every id in each pinned/unpinned group, not just
-    // what's currently visible.
-    val reorderEnabled = !selectionMode && searchQuery.isBlank()
+    // and while searching or tag-filtered: filteredNotes is then a subset
+    // of notes, and a reorder needs every id in each pinned/unpinned
+    // group, not just what's currently visible.
+    val reorderEnabled = !selectionMode && searchQuery.isBlank() && activeTagFilter == null
     // Last-reported on-screen bounds per card (see ReorderableNoteCard's
     // onGloballyPositioned), read only at drag-end to hit-test the drop
     // target - doesn't need to be a State, nothing should recompose when
@@ -201,10 +227,11 @@ fun NativeNotesListScreen(
     // tags/items/images (title, content): those don't have a native data
     // layer yet (see NoteEntity), so this is narrower than the web's own
     // search until they do.
-    val filteredNotes = remember(notes, searchQuery) {
+    val filteredNotes = remember(notes, searchQuery, activeTagFilter) {
+        val byTag = activeTagFilter?.let { tag -> notes.filter { tag in TagsJson.parse(it.tagsJson) } } ?: notes
         val q = searchQuery.trim()
-        if (q.isEmpty()) notes
-        else notes.filter { it.title.contains(q, ignoreCase = true) || it.content.contains(q, ignoreCase = true) }
+        if (q.isEmpty()) byTag
+        else byTag.filter { it.title.contains(q, ignoreCase = true) || it.content.contains(q, ignoreCase = true) }
     }
 
     val errorSyncTemplate = stringResource(R.string.native_notes_error_sync)
@@ -223,7 +250,7 @@ fun NativeNotesListScreen(
     val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
-    val borderColor = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
+    val borderColor = if (dark) CardBorderDark else CardBorderLight
 
     fun reportOutcome(successTemplate: String, outcome: BulkOutcome) {
         val message = String.format(successTemplate, outcome.succeeded) +
@@ -384,11 +411,11 @@ fun NativeNotesListScreen(
                 themeId = themeId,
                 titleColor = titleColor,
                 subtextColor = subtextColor,
+                activeTagLabel = activeTagFilter,
                 refreshing = refreshing,
                 syncingCount = syncingCount,
                 onRefresh = { refresh() },
-                onOpenArchived = onOpenArchived,
-                onOpenTrash = onOpenTrash,
+                onOpenSidebar = { sidebarOpen = true },
                 onOpenSettings = onOpenSettings,
                 searchOpen = searchOpen,
                 onSearchOpenChange = { open ->
@@ -409,49 +436,75 @@ fun NativeNotesListScreen(
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.native_notes_empty), color = subtextColor)
                 }
-            } else if (filteredNotes.isEmpty() && searchQuery.isNotBlank()) {
+            } else if (filteredNotes.isEmpty() && (searchQuery.isNotBlank() || activeTagFilter != null)) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.native_notes_search_empty), color = subtextColor)
                 }
             } else {
                 val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                val pinnedNotes = remember(filteredNotes) { filteredNotes.filter { it.pinned } }
+                val otherNotes = remember(filteredNotes) { filteredNotes.filter { !it.pinned } }
+                val renderNoteCard: @Composable (NoteEntity) -> Unit = { note ->
+                    ReorderableNoteCard(
+                        note = note,
+                        dark = dark,
+                        titleColor = titleColor,
+                        subtextColor = subtextColor,
+                        onClick = { onOpenNote(note.id) },
+                        selectionMode = selectionMode,
+                        selected = note.id in selectedIds,
+                        onToggleSelect = {
+                            selectedIds = if (note.id in selectedIds) selectedIds - note.id else selectedIds + note.id
+                        },
+                        syncing = note.id in pendingSyncNoteIds,
+                        reorderEnabled = reorderEnabled,
+                        isDragged = note.id == draggedNoteId,
+                        dragOffset = if (note.id == draggedNoteId) dragOffset else Offset.Zero,
+                        onBoundsChanged = { rect -> cardBounds[note.id] = rect },
+                        onDragStart = {
+                            NativeDebug.d("NativeNotesListScreen reorder: drag start ${note.id}")
+                            draggedNoteId = note.id
+                            dragOffset = Offset.Zero
+                        },
+                        onDragDelta = { delta -> dragOffset += delta },
+                        onDragEnd = { handleDragEnd(note.id) },
+                        onDragCancel = { endDrag() },
+                    )
+                }
                 LazyVerticalStaggeredGrid(
                     columns = StaggeredGridCells.Fixed(2),
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 12.dp + navBarBottom),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalItemSpacing = 10.dp,
+                    contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + navBarBottom),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalItemSpacing = 12.dp,
                 ) {
-                    items(filteredNotes, key = { it.id }) { note ->
-                        ReorderableNoteCard(
-                            note = note,
-                            dark = dark,
-                            titleColor = titleColor,
-                            subtextColor = subtextColor,
-                            onClick = { onOpenNote(note.id) },
-                            selectionMode = selectionMode,
-                            selected = note.id in selectedIds,
-                            onToggleSelect = {
-                                selectedIds = if (note.id in selectedIds) selectedIds - note.id else selectedIds + note.id
-                            },
-                            syncing = note.id in pendingSyncNoteIds,
-                            reorderEnabled = reorderEnabled,
-                            isDragged = note.id == draggedNoteId,
-                            dragOffset = if (note.id == draggedNoteId) dragOffset else Offset.Zero,
-                            onBoundsChanged = { rect -> cardBounds[note.id] = rect },
-                            onDragStart = {
-                                NativeDebug.d("NativeNotesListScreen reorder: drag start ${note.id}")
-                                draggedNoteId = note.id
-                                dragOffset = Offset.Zero
-                            },
-                            onDragDelta = { delta -> dragOffset += delta },
-                            onDragEnd = { handleDragEnd(note.id) },
-                            onDragCancel = { endDrag() },
-                        )
+                    if (pinnedNotes.isNotEmpty()) {
+                        item(span = StaggeredGridItemSpan.FullLine, key = "section-pinned") {
+                            SectionLabel(stringResource(R.string.native_notes_section_pinned), subtextColor)
+                        }
                     }
+                    items(pinnedNotes, key = { it.id }) { note -> renderNoteCard(note) }
+                    if (pinnedNotes.isNotEmpty()) {
+                        item(span = StaggeredGridItemSpan.FullLine, key = "section-others") {
+                            SectionLabel(stringResource(R.string.native_notes_section_others), subtextColor)
+                        }
+                    }
+                    items(otherNotes, key = { it.id }) { note -> renderNoteCard(note) }
                 }
             }
         }
+
+        TagSidebar(
+            open = sidebarOpen,
+            dark = dark,
+            tags = tagCounts,
+            activeTag = activeTagFilter,
+            onSelectNotes = { activeTagFilter = null; sidebarOpen = false },
+            onSelectTag = { tag -> activeTagFilter = tag; sidebarOpen = false },
+            onOpenArchived = { sidebarOpen = false; onOpenArchived() },
+            onOpenTrash = { sidebarOpen = false; onOpenTrash() },
+            onClose = { sidebarOpen = false },
+        )
 
         if (selectionMode) {
             SelectionActionBar(
@@ -527,11 +580,11 @@ private fun NativeHeader(
     themeId: String,
     titleColor: Color,
     subtextColor: Color,
+    activeTagLabel: String?,
     refreshing: Boolean,
     syncingCount: Int,
     onRefresh: () -> Unit,
-    onOpenArchived: () -> Unit,
-    onOpenTrash: () -> Unit,
+    onOpenSidebar: () -> Unit,
     onOpenSettings: () -> Unit,
     searchOpen: Boolean,
     onSearchOpenChange: (Boolean) -> Unit,
@@ -540,22 +593,22 @@ private fun NativeHeader(
     onEnterSelection: () -> Unit,
     onOpenNotifications: () -> Unit,
 ) {
-    // The web header's own "glass chrome" gradient, following whichever of
-    // the six workspace themes the account has picked (see WorkspaceTheme.kt
-    // and the Settings screen's own theme picker), a bottom hairline in the
-    // matching border token, and the real Hamburger glyph. The web header
-    // also backdrop-blurs whatever scrolls behind it. There's no full
-    // sidebar yet, so the hamburger opens a plain dropdown (archived,
-    // trash, settings) instead of a drawer for now; it can grow more
-    // entries the same way as more of the web sidebar gets native screens,
-    // without needing a drawer rebuild for each one.
+    // Flat --gk-statusbar fill, no gradient and no blur: header.glass-card's
+    // desktop two-gradient-plus-blur look is fully replaced by a flat
+    // background under the site's own `pointer: coarse` media query (see
+    // src/styles/globalCSS.js) - i.e. on every real phone, which is this
+    // app's only target - so this flat fill IS the faithful port, not a
+    // simplification of the desktop look. WorkspaceTheme.headerGradient
+    // stays in use for TagSidebar's own header row below, for the same
+    // reason it never applied here to begin with.
+    val accentColor = if (dark) Color(0xFF818cf8) else Color(0xFF4f46e5)
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(WorkspaceTheme.headerGradient(themeId, dark))
+                .background(WorkspaceTheme.statusBarColor(themeId, dark))
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 10.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (searchOpen) {
@@ -600,66 +653,51 @@ private fun NativeHeader(
                     keyboard?.show()
                 }
             } else {
-                var mainMenuExpanded by remember { mutableStateOf(false) }
-                Box {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                role = Role.Button,
-                            ) { mainMenuExpanded = true }
-                            .padding(6.dp),
-                    ) {
-                        HamburgerIcon(size = 22.dp, tint = titleColor)
-                    }
-                    DropdownMenu(expanded = mainMenuExpanded, onDismissRequest = { mainMenuExpanded = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.native_archived_title)) },
-                            leadingIcon = { ArchiveIcon(size = 18.dp, tint = titleColor) },
-                            onClick = { mainMenuExpanded = false; onOpenArchived() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.native_trash_title)) },
-                            leadingIcon = { TrashIcon(size = 18.dp, tint = titleColor) },
-                            onClick = { mainMenuExpanded = false; onOpenTrash() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.native_settings_title)) },
-                            leadingIcon = { SettingsIcon(size = 18.dp, tint = titleColor) },
-                            onClick = { mainMenuExpanded = false; onOpenSettings() },
-                        )
-                    }
+                val openSidebarLabel = stringResource(R.string.native_sidebar_open)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .semantics { contentDescription = openSidebarLabel }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onOpenSidebar() }
+                        .padding(6.dp),
+                ) {
+                    HamburgerIcon(size = 22.dp, tint = titleColor)
                 }
                 Spacer(Modifier.width(12.dp))
                 Image(
                     painter = painterResource(id = R.drawable.glasskeep_logo),
                     contentDescription = "GlassKeep",
-                    modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)),
+                    modifier = Modifier.size(28.dp).clip(RoundedCornerShape(12.dp)),
                 )
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Glass Keep", color = titleColor, fontWeight = FontWeight.Bold, fontSize = 19.sp)
-                    Text(stringResource(R.string.native_header_notes_label), color = subtextColor, fontSize = 12.sp)
+                    Text("Glass Keep", color = titleColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (activeTagLabel != null) {
+                            TagIcon(size = 12.dp, tint = accentColor)
+                        } else {
+                            NotesIcon(size = 12.dp, tint = accentColor)
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            activeTagLabel ?: stringResource(R.string.native_header_notes_label),
+                            color = accentColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
-                val selectLabel = stringResource(R.string.native_notes_select_mode)
+                val searchLabel = stringResource(R.string.native_notes_search)
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
-                        .semantics { contentDescription = selectLabel }
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onEnterSelection() }
-                        .padding(8.dp),
-                ) {
-                    CheckSquareIcon(size = 18.dp, tint = titleColor)
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
+                        .semantics { contentDescription = searchLabel }
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -683,20 +721,11 @@ private fun NativeHeader(
                 ) {
                     BellIcon(size = 18.dp, tint = titleColor)
                 }
-                if (syncingCount > 0) {
-                    Text(
-                        String.format(stringResource(R.string.native_notes_syncing_count), syncingCount),
-                        color = subtextColor,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(end = 4.dp),
-                    )
-                }
-                Text(
-                    stringResource(R.string.native_notes_refresh),
-                    color = if (refreshing) subtextColor else Indigo,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp,
+                val refreshLabel = stringResource(R.string.native_notes_refresh)
+                Box(
                     modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .semantics { contentDescription = refreshLabel }
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -704,11 +733,60 @@ private fun NativeHeader(
                             role = Role.Button,
                         ) { onRefresh() }
                         .padding(8.dp),
-                )
+                ) {
+                    when {
+                        refreshing -> CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Indigo, strokeWidth = 2.dp)
+                        syncingCount > 0 -> CloudPendingIcon(size = 18.dp, tint = if (dark) Color(0xFFfbbf24) else Color(0xFFd97706))
+                        else -> CloudCheckIcon(size = 18.dp, tint = if (dark) Color(0xFF34d399) else Color(0xFF059669))
+                    }
+                }
+                var moreMenuExpanded by remember { mutableStateOf(false) }
+                val moreLabel = stringResource(R.string.native_notes_more_options)
+                Box {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .semantics { contentDescription = moreLabel }
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Button,
+                            ) { moreMenuExpanded = true }
+                            .padding(8.dp),
+                    ) {
+                        KebabIcon(size = 18.dp, tint = titleColor)
+                    }
+                    DropdownMenu(expanded = moreMenuExpanded, onDismissRequest = { moreMenuExpanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.native_settings_title)) },
+                            leadingIcon = { SettingsIcon(size = 18.dp, tint = titleColor) },
+                            onClick = { moreMenuExpanded = false; onOpenSettings() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.native_notes_select_mode)) },
+                            leadingIcon = { CheckSquareIcon(size = 18.dp, tint = titleColor) },
+                            onClick = { moreMenuExpanded = false; onEnterSelection() },
+                        )
+                    }
+                }
             }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(WorkspaceTheme.headerBorderColor(themeId, dark)))
     }
+}
+
+// "Pinned"/"Others" group labels above the grid below, matching
+// NotesSections.jsx's own gk-section-label (uppercase, 12sp/600, 4dp
+// start margin, 12dp bottom margin before the cards start).
+@Composable
+private fun SectionLabel(text: String, color: Color) {
+    Text(
+        text.uppercase(),
+        color = color,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(start = 4.dp, bottom = 12.dp),
+    )
 }
 
 // Violet-tinted card shadow, standing in for the web card's own
@@ -814,13 +892,13 @@ internal fun NoteCard(
     onToggleSelect: (() -> Unit)? = null,
     syncing: Boolean = false,
 ) {
-    val borderColor = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
+    val borderColor = if (dark) CardBorderDark else CardBorderLight
     val shape = RoundedCornerShape(12.dp)
     Box(Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(elevation = 3.dp, shape = shape, ambientColor = CardShadowTint, spotColor = CardShadowTint)
+                .shadow(elevation = 2.dp, shape = shape, ambientColor = CardShadowTint.copy(alpha = 0.06f), spotColor = CardShadowTint.copy(alpha = 0.06f))
                 .clip(shape)
                 .background(noteColorFor(note.color, dark))
                 .border(width = 1.dp, color = borderColor, shape = shape)
@@ -830,14 +908,14 @@ internal fun NoteCard(
                     role = Role.Button,
                     onClick = { if (selectionMode) onToggleSelect?.invoke() else onClick() },
                 )
-                .padding(14.dp),
+                .padding(8.dp),
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 Text(
                     note.title.ifBlank { stringResource(R.string.native_notes_untitled) },
                     color = titleColor,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
+                    fontSize = 14.sp,
                     modifier = Modifier.weight(1f).padding(end = if (selectionMode) 30.dp else 0.dp),
                 )
                 if (syncing && !selectionMode) {
@@ -865,7 +943,7 @@ internal fun NoteCard(
             } else {
                 val preview = remember(note.content) { NoteContent.previewPlainText(note.content) }
                 if (preview.isNotBlank()) {
-                    Text(preview, color = titleColor, fontSize = 13.sp, lineHeight = 18.sp)
+                    Text(preview, color = titleColor, fontSize = 14.sp, lineHeight = 20.sp)
                 } else if (note.type != "text") {
                     Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
                 }

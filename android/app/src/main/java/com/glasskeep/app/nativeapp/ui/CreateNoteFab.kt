@@ -1,6 +1,7 @@
 package com.glasskeep.app.nativeapp.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -29,9 +30,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -57,12 +58,13 @@ fun CreateNoteFab(
     onCreateDrawing: () -> Unit,
     onCreateAudio: () -> Unit,
 ) {
+    val density = LocalDensity.current
     Box(Modifier.fillMaxSize()) {
         AnimatedVisibility(
             visible = open,
             modifier = Modifier.fillMaxSize(),
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(animationSpec = tween(200)),
+            exit = fadeOut(animationSpec = tween(200)),
         ) {
             Box(
                 Modifier
@@ -85,8 +87,8 @@ fun CreateNoteFab(
         ) {
             AnimatedVisibility(
                 visible = open,
-                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }),
-                exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 4 }),
+                enter = fadeIn(animationSpec = tween(200)) + slideInVertically(animationSpec = tween(200)) { with(density) { 12.dp.roundToPx() } },
+                exit = fadeOut(animationSpec = tween(200)) + slideOutVertically(animationSpec = tween(200)) { with(density) { 12.dp.roundToPx() } },
             ) {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     DialButton(
@@ -124,7 +126,6 @@ fun CreateNoteFab(
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .shadow(elevation = 6.dp, shape = RoundedCornerShape(16.dp))
                     .clip(RoundedCornerShape(16.dp))
                     .background(FabGradient)
                     .semantics { contentDescription = addNoteLabel }
@@ -179,7 +180,7 @@ private fun DialButton(
         }
         Spacer(Modifier.width(10.dp))
         Column {
-            Text(title, color = colors.text, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text(title, color = colors.text, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             Text(
                 description,
                 color = colors.text.copy(alpha = 0.8f),
