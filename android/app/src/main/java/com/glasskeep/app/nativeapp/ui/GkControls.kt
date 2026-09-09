@@ -648,15 +648,19 @@ internal fun GkTextField(
  */
 @Composable
 internal fun FooterPopover(
-    width: Dp,
     gap: Dp,
     background: Color,
     borderColor: Color,
     onDismiss: () -> Unit,
+    width: Dp? = null,
+    minWidth: Dp = 0.dp,
+    cornerRadius: Dp = 16.dp,
+    elevation: Dp = 24.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val density = LocalDensity.current
     var arrowLeft by remember { mutableStateOf(0.dp) }
+    var panelWidth by remember { mutableStateOf(width ?: minWidth) }
     val positionProvider = remember(density, width, gap) {
         object : PopupPositionProvider {
             override fun calculatePosition(
@@ -665,7 +669,7 @@ internal fun FooterPopover(
                 layoutDirection: LayoutDirection,
                 popupContentSize: IntSize,
             ): IntOffset {
-                val widthPx = with(density) { width.roundToPx() }
+                val widthPx = width?.let { with(density) { it.roundToPx() } } ?: popupContentSize.width
                 val marginPx = with(density) { 8.dp.roundToPx() }
                 val gapPx = with(density) { gap.roundToPx() }
                 val left = minOf(anchorBounds.left, windowSize.width - widthPx - marginPx)
@@ -674,6 +678,7 @@ internal fun FooterPopover(
                 // button's centre.
                 val halfArrowPx = with(density) { 6.dp.roundToPx() }
                 arrowLeft = with(density) { (anchorBounds.center.x - left - halfArrowPx).toDp() }
+                panelWidth = with(density) { widthPx.toDp() }
                 return IntOffset(left, anchorBounds.top - gapPx - popupContentSize.height)
             }
         }
@@ -683,19 +688,19 @@ internal fun FooterPopover(
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
-        Column(Modifier.width(width)) {
+        Column(if (width != null) Modifier.width(width) else Modifier.widthIn(min = minWidth)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .shadow(elevation = 24.dp, shape = RoundedCornerShape(16.dp))
-                    .clip(RoundedCornerShape(16.dp))
+                    .shadow(elevation = elevation, shape = RoundedCornerShape(cornerRadius))
+                    .clip(RoundedCornerShape(cornerRadius))
                     .background(background)
-                    .border(1.dp, borderColor, RoundedCornerShape(16.dp)),
+                    .border(1.dp, borderColor, RoundedCornerShape(cornerRadius)),
                 content = content,
             )
             Canvas(
                 modifier = Modifier
-                    .padding(start = arrowLeft.coerceIn(12.dp, width - 24.dp))
+                    .padding(start = arrowLeft.coerceIn(12.dp, (panelWidth - 24.dp).coerceAtLeast(12.dp)))
                     .size(width = 12.dp, height = 6.dp),
             ) {
                 val arrow = Path().apply {
@@ -707,6 +712,36 @@ internal fun FooterPopover(
                 drawPath(arrow, color = background)
             }
         }
+    }
+}
+
+/** One entry of the note footer's kebab menu (`ModalFooter.jsx:700-807`):
+ *  12/8px padding, an 8px gap, and the entry's own colour on the label
+ *  as much as on the icon. */
+@Composable
+internal fun PopoverMenuItem(
+    label: String,
+    color: Color,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.5f)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+            ) { onClick() }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        icon()
+        Text(label, color = color, fontSize = 14.sp)
     }
 }
 

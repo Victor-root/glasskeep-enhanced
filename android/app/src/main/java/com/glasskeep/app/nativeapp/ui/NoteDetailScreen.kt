@@ -43,8 +43,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -1561,100 +1559,119 @@ fun NoteDetailScreen(
                             }
                         },
                         menu = {
-                            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                                if (!currentNote.trashed) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.native_note_detail_reminder)) },
-                                        leadingIcon = {
+                            if (menuExpanded) {
+                                FooterPopover(
+                                    gap = 8.dp,
+                                    minWidth = 180.dp,
+                                    cornerRadius = 8.dp,
+                                    elevation = 10.dp,
+                                    background = if (dark) KebabBgDark else Color.White,
+                                    borderColor = borderColor,
+                                    onDismiss = { menuExpanded = false },
+                                ) {
+                                    if (!currentNote.trashed) {
+                                        PopoverMenuItem(
+                                            label = stringResource(R.string.native_note_detail_reminder),
+                                            color = reminderMenuColor,
+                                            enabled = !changingReminder,
+                                            onClick = { menuExpanded = false; showReminderPicker = true },
+                                        ) {
                                             if (currentNote.reminderAt != null) {
                                                 BellRingingFilledIcon(size = 18.dp, tint = reminderMenuColor)
                                             } else {
                                                 BellIcon(size = 18.dp, tint = reminderMenuColor)
                                             }
-                                        },
-                                        enabled = !changingReminder,
-                                        onClick = {
-                                            menuExpanded = false
-                                            showReminderPicker = true
-                                        },
-                                    )
-                                    if (currentNote.reminderAt != null) {
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.native_note_detail_reminder_remove)) },
-                                            leadingIcon = { BellIcon(size = 18.dp, tint = reminderMenuColor) },
-                                            enabled = !changingReminder,
-                                            onClick = { menuExpanded = false; setReminder(null) },
-                                        )
+                                        }
+                                        if (currentNote.reminderAt != null) {
+                                            PopoverMenuItem(
+                                                label = stringResource(R.string.native_note_detail_reminder_remove),
+                                                color = reminderMenuColor,
+                                                enabled = !changingReminder,
+                                                onClick = { menuExpanded = false; setReminder(null) },
+                                            ) {
+                                                BellIcon(size = 18.dp, tint = reminderMenuColor)
+                                            }
+                                        }
                                     }
-                                }
-                                // Archive/restore are owner-only on the server (see
-                                // NoteDto.access's own doc comment), stricter than
-                                // the read/write split gating everything above.
-                                if (isOwnerAccess) {
-                                    if (currentNote.trashed) {
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.native_note_detail_restore)) },
-                                            leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
-                                            enabled = !restoring,
-                                            onClick = { menuExpanded = false; restoreNote() },
-                                        )
-                                    } else {
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    stringResource(
-                                                        if (currentNote.archived) R.string.native_note_detail_unarchive
-                                                        else R.string.native_note_detail_archive
-                                                    )
-                                                )
-                                            },
-                                            leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
-                                            enabled = !archiving,
-                                            onClick = { menuExpanded = false; toggleArchive() },
-                                        )
-                                    }
-                                }
-                                if (!currentNote.trashed) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.native_note_detail_duplicate)) },
-                                        leadingIcon = { DuplicateIcon(size = 18.dp, tint = duplicateColor) },
-                                        enabled = !duplicating,
-                                        onClick = { menuExpanded = false; duplicateNote() },
-                                    )
-                                }
-                                if (edit.isTextType) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.native_note_detail_download)) },
-                                        leadingIcon = { DownloadIcon(size = 18.dp, tint = downloadColor) },
-                                        onClick = { menuExpanded = false; downloadNote() },
-                                    )
-                                }
-                                // Any participant may VIEW the roster, not just the
-                                // owner (see CollaboratorsScreen.kt's own doc
-                                // comment). The owner also gets it with zero
-                                // collaborators: its "+" action is the only way to
-                                // add the very first one.
-                                if (edit.isTextType && (isOwnerAccess || !currentNote.collaborators.isNullOrEmpty())) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.native_collaborators_title)) },
-                                        leadingIcon = { CollaborateIcon(size = 18.dp, tint = collaborateColor) },
-                                        onClick = { menuExpanded = false; onOpenCollaborators() },
-                                    )
-                                }
-                                if (currentNote.trashed) {
+                                    // Archive/restore are owner-only on the server (see
+                                    // NoteDto.access's own doc comment), stricter than
+                                    // the read/write split gating everything above.
                                     if (isOwnerAccess) {
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.native_note_detail_delete_permanently)) },
-                                            leadingIcon = { TrashIcon(size = 18.dp, tint = trashMenuColor) },
-                                            onClick = { menuExpanded = false; showPermanentDeleteConfirm = true },
-                                        )
+                                        if (currentNote.trashed) {
+                                            PopoverMenuItem(
+                                                label = stringResource(R.string.native_note_detail_restore),
+                                                color = archiveMenuColor,
+                                                enabled = !restoring,
+                                                onClick = { menuExpanded = false; restoreNote() },
+                                            ) {
+                                                ArchiveIcon(size = 16.dp, tint = archiveMenuColor)
+                                            }
+                                        } else {
+                                            PopoverMenuItem(
+                                                label = stringResource(
+                                                    if (currentNote.archived) R.string.native_note_detail_unarchive
+                                                    else R.string.native_note_detail_archive
+                                                ),
+                                                color = archiveMenuColor,
+                                                enabled = !archiving,
+                                                onClick = { menuExpanded = false; toggleArchive() },
+                                            ) {
+                                                ArchiveIcon(size = 16.dp, tint = archiveMenuColor)
+                                            }
+                                        }
                                     }
-                                } else if (edit.isTextType) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.native_note_detail_move_to_trash)) },
-                                        leadingIcon = { TrashIcon(size = 18.dp, tint = trashMenuColor) },
-                                        onClick = { menuExpanded = false; showTrashConfirm = true },
-                                    )
+                                    if (!currentNote.trashed) {
+                                        PopoverMenuItem(
+                                            label = stringResource(R.string.native_note_detail_duplicate),
+                                            color = duplicateColor,
+                                            enabled = !duplicating,
+                                            onClick = { menuExpanded = false; duplicateNote() },
+                                        ) {
+                                            DuplicateIcon(size = 16.dp, tint = duplicateColor)
+                                        }
+                                    }
+                                    if (edit.isTextType) {
+                                        PopoverMenuItem(
+                                            label = stringResource(R.string.native_note_detail_download),
+                                            color = downloadColor,
+                                            onClick = { menuExpanded = false; downloadNote() },
+                                        ) {
+                                            DownloadIcon(size = 20.dp, tint = downloadColor)
+                                        }
+                                    }
+                                    // Any participant may VIEW the roster, not just the
+                                    // owner (see CollaboratorsScreen.kt's own doc
+                                    // comment). The owner also gets it with zero
+                                    // collaborators: its "+" action is the only way to
+                                    // add the very first one.
+                                    if (edit.isTextType && (isOwnerAccess || !currentNote.collaborators.isNullOrEmpty())) {
+                                        PopoverMenuItem(
+                                            label = stringResource(R.string.native_collaborators_title),
+                                            color = collaborateColor,
+                                            onClick = { menuExpanded = false; onOpenCollaborators() },
+                                        ) {
+                                            CollaborateIcon(size = 16.dp, tint = collaborateColor)
+                                        }
+                                    }
+                                    if (currentNote.trashed) {
+                                        if (isOwnerAccess) {
+                                            PopoverMenuItem(
+                                                label = stringResource(R.string.native_note_detail_delete_permanently),
+                                                color = trashMenuColor,
+                                                onClick = { menuExpanded = false; showPermanentDeleteConfirm = true },
+                                            ) {
+                                                TrashIcon(size = 20.dp, tint = trashMenuColor)
+                                            }
+                                        }
+                                    } else if (edit.isTextType) {
+                                        PopoverMenuItem(
+                                            label = stringResource(R.string.native_note_detail_move_to_trash),
+                                            color = trashMenuColor,
+                                            onClick = { menuExpanded = false; showTrashConfirm = true },
+                                        ) {
+                                            TrashIcon(size = 20.dp, tint = trashMenuColor)
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -1805,6 +1822,9 @@ private fun TagChipsRow(
     }
 }
 
+/** The kebab menu's own dark fill, set inline on the web
+ *  (ModalFooter.jsx:695) rather than through a Tailwind class. */
+private val KebabBgDark = Color(0xFF222222)
 private val ColorPanelBgLight = Color(0xFAFFFFFF)
 private val ColorPanelBgDark = Color(0xFA111827)
 private val ColorPanelBorderLight = Color(0xCCF3F4F6)
