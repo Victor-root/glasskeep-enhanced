@@ -40,16 +40,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
+import com.glasskeep.app.nativeapp.EditorPrefsState
+import com.glasskeep.app.nativeapp.NotificationDing
+import com.glasskeep.app.nativeapp.data.NotifCategory
+import com.glasskeep.app.nativeapp.data.NotifVariantKey
 import kotlinx.coroutines.delay
 
 /** The four variants a notification can carry, and the accent each paints
  *  with (globalCSS.js:5009-5048). Shared by the toast pill and the
  *  notification centre's own cards. */
-enum class NotifVariant(val accent: Color, val tintAlpha: Float) {
-    INFO(Color(0xFF3B82F6), 0.06f),
-    SUCCESS(Color(0xFF10B981), 0.06f),
-    WARNING(Color(0xFFF59E0B), 0.07f),
-    ERROR(Color(0xFFEF4444), 0.06f),
+enum class NotifVariant(val accent: Color, val tintAlpha: Float, val categoryKey: NotifVariantKey) {
+    INFO(Color(0xFF3B82F6), 0.06f, NotifVariantKey.INFO),
+    SUCCESS(Color(0xFF10B981), 0.06f, NotifVariantKey.SUCCESS),
+    WARNING(Color(0xFFF59E0B), 0.07f, NotifVariantKey.WARNING),
+    ERROR(Color(0xFFEF4444), 0.06f, NotifVariantKey.ERROR),
 }
 
 /** Where the pill sits: the user's `notificationsPositionMobile`, bottom
@@ -87,14 +91,30 @@ class ToastController {
      *  pill entirely for as long as the panel is up (App.jsx:7933-7935). */
     var suppressed by mutableStateOf(false)
 
+    /**
+     * The user's Notifications settings, once NativeNavHost has them. The
+     * web wires the same two things around its own notify(): a category
+     * this user muted never reaches the screen at all, and a new arrival
+     * rings unless its category is muted for sound (App.jsx:792-823).
+     */
+    var prefs: EditorPrefsState? = null
+
     fun show(
         message: String,
         variant: NotifVariant = NotifVariant.INFO,
         title: String? = null,
         actionLabel: String? = null,
         action: (() -> Unit)? = null,
+        /** The server's own notification type when this pill is echoing
+         *  one; null for a message the app raised itself, which is then
+         *  categorised by its variant alone. */
+        type: String? = null,
     ) {
+        val category = NotifCategory.of(type, variant.categoryKey)
+        val settings = prefs
+        if (settings != null && !settings.allowsNotification(category)) return
         queue.add(GkToast(nextId++, title, message, variant, actionLabel, action))
+        if (settings != null && settings.ringsFor(category)) NotificationDing.play()
     }
 
     fun error(message: String) = show(message, NotifVariant.ERROR)

@@ -41,8 +41,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -52,12 +52,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -76,6 +76,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.glasskeep.app.ui.ButtonGradient
 
 /**
  * The web app's own controls, rebuilt natively.
@@ -163,6 +164,57 @@ internal fun GkSwitch(
                 .align(Alignment.CenterStart)
                 .offset(x = knobOffset)
                 .size(16.dp)
+                .clip(CircleShape)
+                .background(Color.White),
+        )
+    }
+}
+
+/**
+ * The 36x20 track / 14px knob switch inside the notification sub-lists
+ * (`SettingsPanel.jsx:855-864`). Its ON fill is the app's own indigo to
+ * violet gradient, not the flat theme colour [GkSwitch] uses.
+ */
+@Composable
+internal fun GkSmallSwitch(
+    checked: Boolean,
+    enabled: Boolean,
+    dark: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val offColor = if (dark) SwitchOffDark else SwitchOffLight
+    val knobOffset by animateDpAsState(
+        targetValue = if (checked) 20.dp else 2.dp,
+        animationSpec = tween(durationMillis = 150, easing = GkStandardEasing),
+        label = "smallSwitchKnob",
+    )
+    Box(
+        modifier = Modifier
+            .alpha(if (enabled) 1f else 0.5f)
+            .width(36.dp)
+            .height(20.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .then(
+                if (checked) {
+                    Modifier.background(ButtonGradient)
+                } else {
+                    Modifier.background(offColor)
+                },
+            )
+            .toggleable(
+                value = checked,
+                enabled = enabled,
+                role = Role.Switch,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onValueChange = onCheckedChange,
+            ),
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = knobOffset)
+                .size(14.dp)
                 .clip(CircleShape)
                 .background(Color.White),
         )

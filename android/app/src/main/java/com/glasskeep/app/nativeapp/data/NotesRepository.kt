@@ -40,6 +40,9 @@ import com.glasskeep.app.nativeapp.data.network.SetEditorToolbarModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetFloatingCardsRequest
 import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
 import com.glasskeep.app.nativeapp.data.network.SetLanguageRequest
+import com.glasskeep.app.nativeapp.data.network.SetNotificationsFilterTypesRequest
+import com.glasskeep.app.nativeapp.data.network.SetNotificationsSoundRequest
+import com.glasskeep.app.nativeapp.data.network.SetNotificationsSoundTypesRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetReadModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
@@ -957,6 +960,9 @@ class NotesRepository(
                     null
                 },
                 toastPosition = body.notificationsPositionMobile,
+                notificationsSound = body.notificationsSound,
+                notificationsSoundTypes = body.notificationsSoundTypes,
+                notificationsFilterTypes = body.notificationsFilterTypes,
                 toastDurationMs = body.notificationsDuration,
                 readModeEnabled = body.readModeEnabled,
                 edgeToEdgeLandscape = body.edgeToEdgeLandscape,
@@ -1031,6 +1037,38 @@ class NotesRepository(
         }
         refresh()
         return body
+    }
+
+    /** The three Notifications settings: whether a new one rings, and the
+     *  per-category opt-outs for the ring and for showing it at all. */
+    suspend fun setNotificationsSound(enabled: Boolean) {
+        NativeDebug.d("NotesRepository.setNotificationsSound enabled=$enabled")
+        val response = api.setNotificationsSound(SetNotificationsSoundRequest(enabled))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (notificationsSound) failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    suspend fun setNotificationsSoundTypes(flags: Map<String, Boolean>) {
+        NativeDebug.d("NotesRepository.setNotificationsSoundTypes")
+        val response = api.setNotificationsSoundTypes(SetNotificationsSoundTypesRequest(flags))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (notificationsSoundTypes) failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    suspend fun setNotificationsFilterTypes(flags: Map<String, Boolean>) {
+        NativeDebug.d("NotesRepository.setNotificationsFilterTypes")
+        val response = api.setNotificationsFilterTypes(SetNotificationsFilterTypesRequest(flags))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (notificationsFilterTypes) failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
     }
 
     /** Sets how the notes screen lays its cards out ("list" or "grid"). */

@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.data.NotifCategory
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import kotlin.math.abs
@@ -124,7 +125,12 @@ fun NotificationCenter(
         try {
             val pending = repository.fetchPendingNotifications()
             val history = repository.fetchNotificationHistory()
-            notifications = (pending + history).distinctBy { it.id }.sortedByDescending { it.createdAt }
+            // The web drops a muted category before it ever reaches its
+            // store (App.jsx:792-801), so it never shows here either.
+            notifications = (pending + history)
+                .distinctBy { it.id }
+                .filter { container.editorPrefs.allowsNotification(categoryOf(it)) }
+                .sortedByDescending { it.createdAt }
             if (pending.isNotEmpty()) repository.markNotificationsDelivered(pending.map { it.id })
         } catch (t: Throwable) {
             NativeDebug.e("NotificationCenter load failed", t)
@@ -526,6 +532,12 @@ private fun NotificationIcon(type: String, accent: Color) {
         else -> BellIcon(size = 22.dp, tint = accent)
     }
 }
+
+/** Which of the display filter's eight buckets this row falls in. The
+ *  server's own `type` decides first; only a generic row falls back to
+ *  its variant (filterCategoryFor, App.jsx:767-787). */
+private fun categoryOf(notification: NotificationDto): NotifCategory =
+    NotifCategory.of(notification.type, variantOf(notification).categoryKey)
 
 private fun variantOf(notification: NotificationDto): NotifVariant = when (notification.type) {
     "note_shared", "reminder", "pending_user_registered" -> NotifVariant.INFO

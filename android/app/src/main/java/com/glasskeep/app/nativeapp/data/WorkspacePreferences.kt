@@ -27,4 +27,9 @@ data class WorkspacePreferences(
     val floatingCardsEnabled: Boolean?,
     /** "list" or "grid": how the notes screen lays its cards out. */
     val viewMode: String?,
+    /** Whether a new notification rings, and the per-category opt-outs for
+     *  the ring and for showing it at all. */
+    val notificationsSound: Boolean?,
+    val notificationsSoundTypes: Map<String, Boolean>?,
+    val notificationsFilterTypes: Map<String, Boolean>?,
 )

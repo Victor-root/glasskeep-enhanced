@@ -30,6 +30,7 @@ import androidx.navigation.compose.rememberNavController
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.data.NotesRepository
+import com.glasskeep.app.nativeapp.data.NotifCategoryFlags
 import com.glasskeep.app.nativeapp.data.RealtimeClient
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.syncReminderAlarms
@@ -190,6 +191,7 @@ fun NativeNavHost(
     // One pill for the whole app, over every screen: the web has exactly
     // one too, and it is what replaces the platform's own Toast here.
     val toasts = rememberToastController()
+    toasts.prefs = container.editorPrefs
     // "Edge-to-edge in landscape" off means the whole shell stays clear of
     // the left cutout, exactly what the web does by putting --safe-left
     // back on <body> (App.jsx:1703). Left only: the other three edges are
@@ -344,4 +346,7 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     prefs.edgeToEdgeLandscape?.let { container.shellPrefs.applyEdgeToEdgeLandscape(it) }
     prefs.floatingCardsEnabled?.let { container.shellPrefs.applyFloatingCards(it) }
     prefs.viewMode?.let { container.shellPrefs.applyListView(it == "list") }
+    prefs.notificationsSound?.let { container.editorPrefs.applyNotificationsSound(it) }
+    prefs.notificationsSoundTypes?.let { container.editorPrefs.applyNotificationsSoundTypes(NotifCategoryFlags(it)) }
+    prefs.notificationsFilterTypes?.let { container.editorPrefs.applyNotificationsFilterTypes(NotifCategoryFlags(it)) }
 }

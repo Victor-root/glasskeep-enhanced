@@ -1207,6 +1207,56 @@ fun RefreshIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = C
     modifier, size, tint,
 )
 
+/** tabler/volume.svg. */
+@Composable
+fun VolumeIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M15 8a5 5 0 0 1 0 8 " +
+        "M17.7 5a9 9 0 0 1 0 14 " +
+        "M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l3.5 -4.5a.8 .8 0 0 1 1.5 .5v14a.8 .8 0 0 1 -1.5 .5l-3.5 -4.5",
+    modifier, size, tint,
+)
+
+/** tabler/user-share.svg. */
+@Composable
+fun UserShareIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0 " +
+        "M6 21v-2a4 4 0 0 1 4 -4h3 " +
+        "M16 22l5 -5 M21 21.5v-4.5h-4.5",
+    modifier, size, tint,
+)
+
+/** tabler/user-x.svg. */
+@Composable
+fun UserXIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0 " +
+        "M6 21v-2a4 4 0 0 1 4 -4h4 " +
+        "M22 22l-5 -5 M17 22l5 -5",
+    modifier, size, tint,
+)
+
+/** tabler/world-www.svg, trimmed to the outline the row needs at 16dp:
+ *  the full glyph's inner meridians turn to mush that small. */
+@Composable
+fun WorldWwwIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M19.5 7a9 9 0 0 0 -7.5 -4a8.991 8.991 0 0 0 -7.484 4 " +
+        "M11.5 3a16.989 16.989 0 0 0 -1.826 4 " +
+        "M12.5 3a16.989 16.989 0 0 1 1.828 4 " +
+        "M19.5 17a9 9 0 0 1 -7.5 4a8.991 8.991 0 0 1 -7.484 -4 " +
+        "M11.5 21a16.989 16.989 0 0 1 -1.826 -4 " +
+        "M12.5 21a16.989 16.989 0 0 0 1.828 -4",
+    modifier, size, tint,
+)
+
+/** tabler/circle-check-filled.svg. */
+@Composable
+fun CircleCheckFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M17 3.34a10 10 0 1 1 -15 8.66l.005 -.324a10 10 0 0 1 14.995 -8.336z" +
+        "m-1.293 5.953a1 1 0 0 0 -1.32 -.083l-.094 .083l-3.293 3.292l-1.293 -1.292l-.094 -.083" +
+        "a1 1 0 0 0 -1.403 1.403l.083 .094l2 2l.094 .083a1 1 0 0 0 1.226 0l.094 -.083l4 -4l.083 -.094" +
+        "a1 1 0 0 0 -.083 -1.32z",
+    modifier, size, tint,
+)
+
 /** tabler/upload.svg. */
 @Composable
 fun UploadIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(

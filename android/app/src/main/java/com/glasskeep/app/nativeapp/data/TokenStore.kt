@@ -91,6 +91,28 @@ class TokenStore(context: Context) {
             prefs.edit().putLong(KEY_TOAST_DURATION, value).apply()
         }
 
+    /** Cached "play a sound on a new notification" preference. Off by
+     *  default like the web's own, so a fresh install never surprises
+     *  anyone with a ding (App.jsx:391-402). */
+    var notificationsSound: Boolean
+        get() = prefs.getBoolean(KEY_NOTIF_SOUND, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_NOTIF_SOUND, value).apply()
+        }
+
+    /** The two per-category maps, as the same JSON the server stores. */
+    var notificationsSoundTypesJson: String?
+        get() = prefs.getString(KEY_NOTIF_SOUND_TYPES, null)
+        set(value) {
+            prefs.edit().putString(KEY_NOTIF_SOUND_TYPES, value).apply()
+        }
+
+    var notificationsFilterTypesJson: String?
+        get() = prefs.getString(KEY_NOTIF_FILTER_TYPES, null)
+        set(value) {
+            prefs.edit().putString(KEY_NOTIF_FILTER_TYPES, value).apply()
+        }
+
     /** Cached "notes open in read mode" preference, on by default like
      *  the web's own. */
     var readModeEnabled: Boolean
@@ -152,6 +174,9 @@ class TokenStore(context: Context) {
         private const val KEY_LIST_VIEW = "list_view"
         private const val KEY_EDGE_TO_EDGE_LANDSCAPE = "edge_to_edge_landscape"
         private const val KEY_FLOATING_CARDS = "floating_cards_enabled"
+        private const val KEY_NOTIF_SOUND = "notifications_sound"
+        private const val KEY_NOTIF_SOUND_TYPES = "notifications_sound_types"
+        private const val KEY_NOTIF_FILTER_TYPES = "notifications_filter_types"
         private const val KEY_TOAST_POSITION = "toast_position"
         private const val KEY_TOAST_DURATION = "toast_duration_ms"
 

@@ -54,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -88,6 +89,8 @@ import com.glasskeep.app.nativeapp.NoteExporter
 import com.glasskeep.app.nativeapp.PasskeyCeremonyResult
 import com.glasskeep.app.nativeapp.data.ChangePasswordResult
 import com.glasskeep.app.nativeapp.data.NoteTransfer
+import com.glasskeep.app.nativeapp.data.NotifCategory
+import com.glasskeep.app.nativeapp.data.NotifCategoryFlags
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TypographyPresets
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
@@ -180,6 +183,9 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var changingEdgeToEdge by remember { mutableStateOf(false) }
     var changingFloatingCards by remember { mutableStateOf(false) }
     var changingToastPrefs by remember { mutableStateOf(false) }
+    var changingNotifPrefs by remember { mutableStateOf(false) }
+    var notifSoundTypesOpen by rememberSaveable { mutableStateOf(false) }
+    var notifFilterTypesOpen by rememberSaveable { mutableStateOf(false) }
     var toastDurationMenuOpen by remember { mutableStateOf(false) }
     var showTypographyModal by remember { mutableStateOf(false) }
     var addingPasskey by remember { mutableStateOf(false) }
@@ -723,6 +729,62 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
         }
     }
 
+    fun toggleNotificationsSound(enabled: Boolean) {
+        if (changingNotifPrefs) return
+        changingNotifPrefs = true
+        val previous = container.editorPrefs.notificationsSound
+        container.editorPrefs.applyNotificationsSound(enabled)
+        scope.launch {
+            try {
+                repository.setNotificationsSound(enabled)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen setNotificationsSound failed", t)
+                container.editorPrefs.applyNotificationsSound(previous)
+                reportActionError(t)
+            } finally {
+                changingNotifPrefs = false
+            }
+        }
+    }
+
+    fun toggleSoundCategory(category: NotifCategory, enabled: Boolean) {
+        if (changingNotifPrefs) return
+        changingNotifPrefs = true
+        val previous = container.editorPrefs.notificationsSoundTypes
+        val next = previous.with(category, enabled)
+        container.editorPrefs.applyNotificationsSoundTypes(next)
+        scope.launch {
+            try {
+                repository.setNotificationsSoundTypes(next.values)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen setNotificationsSoundTypes failed", t)
+                container.editorPrefs.applyNotificationsSoundTypes(previous)
+                reportActionError(t)
+            } finally {
+                changingNotifPrefs = false
+            }
+        }
+    }
+
+    fun toggleFilterCategory(category: NotifCategory, enabled: Boolean) {
+        if (changingNotifPrefs) return
+        changingNotifPrefs = true
+        val previous = container.editorPrefs.notificationsFilterTypes
+        val next = previous.with(category, enabled)
+        container.editorPrefs.applyNotificationsFilterTypes(next)
+        scope.launch {
+            try {
+                repository.setNotificationsFilterTypes(next.values)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen setNotificationsFilterTypes failed", t)
+                container.editorPrefs.applyNotificationsFilterTypes(previous)
+                reportActionError(t)
+            } finally {
+                changingNotifPrefs = false
+            }
+        }
+    }
+
     fun toggleEdgeToEdgeLandscape(enabled: Boolean) {
         if (changingEdgeToEdge) return
         changingEdgeToEdge = true
@@ -1190,6 +1252,105 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                                 onSelect = { changeToastPosition(it) },
                                             )
                                         }
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                SettingsRowIcon(themeId, dark) { tint -> VolumeIcon(size = 20.dp, tint = tint) }
+                                                Spacer(Modifier.width(12.dp))
+                                                Column {
+                                                    Text(
+                                                        stringResource(R.string.native_settings_notif_sound),
+                                                        color = titleColor,
+                                                        fontSize = 16.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                    )
+                                                    Text(
+                                                        stringResource(R.string.native_settings_notif_sound_desc),
+                                                        color = SettingsSubtleColor,
+                                                        fontSize = 14.sp,
+                                                        lineHeight = 20.sp,
+                                                    )
+                                                }
+                                            }
+                                            Spacer(Modifier.width(4.dp))
+                                            CategoryListToggle(
+                                                open = notifSoundTypesOpen,
+                                                label = stringResource(R.string.native_settings_notif_sound_types),
+                                                themeId = themeId,
+                                                dark = dark,
+                                                onClick = { notifSoundTypesOpen = !notifSoundTypesOpen },
+                                            )
+                                            Spacer(Modifier.width(4.dp))
+                                            GkSwitch(
+                                                checked = container.editorPrefs.notificationsSound,
+                                                enabled = !changingNotifPrefs,
+                                                themeId = themeId,
+                                                dark = dark,
+                                                onCheckedChange = { toggleNotificationsSound(it) },
+                                            )
+                                        }
+                                        if (notifSoundTypesOpen) {
+                                            NotifCategoryList(
+                                                categories = NotifCategory.SOUND,
+                                                flags = container.editorPrefs.notificationsSoundTypes,
+                                                // Every row greys out while the
+                                                // master switch is off: nothing
+                                                // would ring anyway.
+                                                enabled = container.editorPrefs.notificationsSound && !changingNotifPrefs,
+                                                dark = dark,
+                                                titleColor = titleColor,
+                                                borderColor = borderColor,
+                                                onToggle = { category, on -> toggleSoundCategory(category, on) },
+                                            )
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                SettingsRowIcon(themeId, dark) { tint -> BellIcon(size = 20.dp, tint = tint) }
+                                                Spacer(Modifier.width(12.dp))
+                                                Column {
+                                                    Text(
+                                                        stringResource(R.string.native_settings_notif_filter),
+                                                        color = titleColor,
+                                                        fontSize = 16.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                    )
+                                                    Text(
+                                                        stringResource(R.string.native_settings_notif_filter_desc),
+                                                        color = SettingsSubtleColor,
+                                                        fontSize = 14.sp,
+                                                        lineHeight = 20.sp,
+                                                    )
+                                                }
+                                            }
+                                            Spacer(Modifier.width(4.dp))
+                                            CategoryListToggle(
+                                                open = notifFilterTypesOpen,
+                                                label = stringResource(R.string.native_settings_notif_filter_types),
+                                                themeId = themeId,
+                                                dark = dark,
+                                                onClick = { notifFilterTypesOpen = !notifFilterTypesOpen },
+                                            )
+                                        }
+                                        if (notifFilterTypesOpen) {
+                                            NotifCategoryList(
+                                                categories = NotifCategory.FILTER,
+                                                flags = container.editorPrefs.notificationsFilterTypes,
+                                                enabled = !changingNotifPrefs,
+                                                dark = dark,
+                                                titleColor = titleColor,
+                                                borderColor = borderColor,
+                                                onToggle = { category, on -> toggleFilterCategory(category, on) },
+                                            )
+                                        }
+
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             SettingsRowIcon(themeId, dark) { tint -> RefreshIcon(size = 20.dp, tint = tint) }
                                             Spacer(Modifier.width(12.dp))
@@ -1970,7 +2131,121 @@ private fun UpdateAvailableCard(
     }
 }
 
-/** The language row and its popover (`SettingsPanel.jsx:1506-1569`). */
+/**
+ * The chevron next to a Notifications row that opens its per-category
+ * list (SettingsPanel.jsx:804-816): a small square that fills with the
+ * accent while the list is open, and whose glyph flips over.
+ */
+@Composable
+private fun CategoryListToggle(
+    open: Boolean,
+    label: String,
+    themeId: String?,
+    dark: Boolean,
+    onClick: () -> Unit,
+) {
+    val tint = if (open) WorkspaceTheme.accent(themeId, dark) else SettingsSubtleColor
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (open) WorkspaceTheme.accentSoftBg(themeId, dark) else Color.Transparent)
+            .semantics { contentDescription = label }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+            ) { onClick() }
+            .padding(6.dp),
+    ) {
+        ChevronDownIcon(
+            size = 16.dp,
+            tint = tint,
+            modifier = Modifier.graphicsLayer { rotationZ = if (open) 180f else 0f },
+        )
+    }
+}
+
+/**
+ * The per-category list under a Notifications row: one line per bucket,
+ * each with its own glyph and a smaller switch, inside a bordered, faintly
+ * tinted panel indented to clear the row's icon above
+ * (SettingsPanel.jsx:834-864).
+ */
+@Composable
+private fun NotifCategoryList(
+    categories: List<NotifCategory>,
+    flags: NotifCategoryFlags,
+    enabled: Boolean,
+    dark: Boolean,
+    titleColor: Color,
+    borderColor: Color,
+    onToggle: (NotifCategory, Boolean) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 40.dp, top = 8.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (dark) Color.White.copy(alpha = 0.03f) else Color.Black.copy(alpha = 0.02f))
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        for (category in categories) {
+            val on = flags[category]
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(if (enabled) 1f else 0.5f)
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    NotifCategoryIcon(category, dark)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(notifCategoryLabel(category)), color = titleColor, fontSize = 14.sp)
+                }
+                Spacer(Modifier.width(12.dp))
+                GkSmallSwitch(
+                    checked = on,
+                    enabled = enabled,
+                    dark = dark,
+                    onCheckedChange = { onToggle(category, it) },
+                )
+            }
+        }
+    }
+}
+
+/** The glyph each category carries, and the fixed colour the filled ones
+ *  paint with (SettingsPanel.jsx:838-843 and 926-933). */
+@Composable
+private fun NotifCategoryIcon(category: NotifCategory, dark: Boolean) {
+    val neutral = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
+    when (category) {
+        NotifCategory.FEDERATION -> WorldWwwIcon(size = 16.dp, tint = neutral)
+        NotifCategory.SHARE -> UserShareIcon(size = 16.dp, tint = neutral)
+        NotifCategory.ACCESS -> UserXIcon(size = 16.dp, tint = neutral)
+        NotifCategory.REMINDER -> BellRingingFilledIcon(size = 16.dp, tint = Color(0xFF6366F1))
+        NotifCategory.SUCCESS -> CircleCheckFilledIcon(size = 16.dp, tint = Color(0xFF10B981))
+        NotifCategory.WARNING -> AlertFilledIcon(size = 16.dp, tint = Color(0xFFF59E0B))
+        NotifCategory.ERROR -> InfoFilledIcon(size = 16.dp, tint = Color(0xFFEF4444))
+        NotifCategory.INFO -> InfoFilledIcon(size = 16.dp, tint = Color(0xFF3B82F6))
+    }
+}
+
+private fun notifCategoryLabel(category: NotifCategory): Int = when (category) {
+    NotifCategory.FEDERATION -> R.string.native_settings_notif_type_federation
+    NotifCategory.SHARE -> R.string.native_settings_notif_type_share
+    NotifCategory.ACCESS -> R.string.native_settings_notif_type_access
+    NotifCategory.REMINDER -> R.string.native_settings_notif_type_reminder
+    NotifCategory.SUCCESS -> R.string.native_settings_notif_type_success
+    NotifCategory.WARNING -> R.string.native_settings_notif_type_warning
+    NotifCategory.ERROR -> R.string.native_settings_notif_type_error
+    NotifCategory.INFO -> R.string.native_settings_notif_type_info
+}
+
 /** The five durations the web offers, "Persistent" included: a pill that
  *  opens a small popover, same shape as the language row below. */
 @Composable

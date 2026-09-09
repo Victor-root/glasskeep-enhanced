@@ -404,6 +404,12 @@ data class UserSettingsDto(
     val viewMode: String? = null,
     /** Where the notification pill sits on a phone: "top" or "bottom". */
     val notificationsPositionMobile: String? = null,
+    /** Whether a new notification rings, and the per-category opt-outs
+     *  for the ring and for showing the notification at all
+     *  (App.jsx:391-470). Absent keys mean "on". */
+    val notificationsSound: Boolean? = null,
+    val notificationsSoundTypes: Map<String, Boolean>? = null,
+    val notificationsFilterTypes: Map<String, Boolean>? = null,
     /** How long the pill stays, in milliseconds; null (or absent) means
      *  it stays until dismissed. */
     val notificationsDuration: Long? = null,
@@ -454,6 +460,17 @@ data class SetFloatingCardsRequest(val floatingCardsEnabled: Boolean)
  *  layout ("list" or "grid"). */
 @Serializable
 data class SetViewModeRequest(val viewMode: String)
+
+/** Bodies for the three PATCH /api/user/settings the Notifications
+ *  section sends. */
+@Serializable
+data class SetNotificationsSoundRequest(val notificationsSound: Boolean)
+
+@Serializable
+data class SetNotificationsSoundTypesRequest(val notificationsSoundTypes: Map<String, Boolean>)
+
+@Serializable
+data class SetNotificationsFilterTypesRequest(val notificationsFilterTypes: Map<String, Boolean>)
 
 /** Body for POST /api/notes/import. The notes stay raw JSON objects
  *  rather than a DTO so an export file round-trips through this app
@@ -840,6 +857,15 @@ interface GlassKeepApi {
 
     @PATCH("api/user/settings")
     suspend fun setViewMode(@Body body: SetViewModeRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setNotificationsSound(@Body body: SetNotificationsSoundRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setNotificationsSoundTypes(@Body body: SetNotificationsSoundTypesRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setNotificationsFilterTypes(@Body body: SetNotificationsFilterTypesRequest): Response<UserSettingsDto>
 
     @PATCH("api/user/settings")
     suspend fun setToastPosition(@Body body: SetToastPositionRequest): Response<UserSettingsDto>
