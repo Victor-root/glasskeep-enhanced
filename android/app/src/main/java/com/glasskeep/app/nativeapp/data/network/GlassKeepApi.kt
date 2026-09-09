@@ -167,6 +167,28 @@ data class AddCollaboratorRequest(val username: String, val access: String)
 @Serializable
 data class AddCollaboratorResponse(val ok: Boolean = false, val message: String? = null, val collaborator: CollaboratorDto? = null)
 
+/** Body for PATCH /api/notes/:id/collaborate/:userId. */
+@Serializable
+data class SetCollaboratorAccessRequest(val access: String)
+
+@Serializable
+data class SetCollaboratorAccessResponse(val ok: Boolean = false, val access: String = "")
+
+/** Body for DELETE /api/notes/:id/collaborate/:userId. mode is optional and
+ *  only "keep_copy" has any server-side effect (a live, standalone copy of
+ *  the note for the removed collaborator); anything else, including a null
+ *  mode, is a clean removal with no copy. See NotesRepository.
+ *  removeCollaborator, which exposes this as a plain keepCopy Boolean. */
+@Serializable
+data class RemoveCollaboratorRequest(val mode: String? = null)
+
+/** copyNoteId is non-null only when mode was "keep_copy" AND the caller is
+ *  the owner removing someone else (a collaborator removing themselves
+ *  never gets a copy through this route, see NotesRepository.kt's own doc
+ *  comment on that asymmetry). */
+@Serializable
+data class RemoveCollaboratorResponse(val ok: Boolean = false, val message: String? = null, val copyNoteId: String? = null)
+
 /**
  * Body for PATCH /api/notes/:id. Deliberately narrow: only title/content
  * are ever sent from the native note-detail screen today. The server only
@@ -545,6 +567,20 @@ interface GlassKeepApi {
     // never actually surfaced to a real user.
     @POST("api/notes/{id}/collaborate")
     suspend fun addCollaborator(@Path("id") id: String, @Body body: AddCollaboratorRequest): Response<AddCollaboratorResponse>
+
+    // Owner-only server-side, same "resolve as owner-or-collaborator, then
+    // refuse the action" 403-not-404 pattern as the DELETE route below.
+    @PATCH("api/notes/{id}/collaborate/{userId}")
+    suspend fun setCollaboratorAccess(@Path("id") id: String, @Path("userId") userId: Int, @Body body: SetCollaboratorAccessRequest): Response<SetCollaboratorAccessResponse>
+
+    // Owner removing someone else, or anyone removing themselves (that's
+    // how "leave a shared note" works server-side); a non-owner targeting
+    // someone else gets 403. Native never lets a non-owner reach this call
+    // with a foreign userId (see CollaboratorsScreen.kt's own gating), so
+    // that 403 is a practically unreachable case here, not one this route
+    // bothers distinguishing from a 404.
+    @DELETE("api/notes/{id}/collaborate/{userId}")
+    suspend fun removeCollaborator(@Path("id") id: String, @Path("userId") userId: Int, @Body body: RemoveCollaboratorRequest): Response<RemoveCollaboratorResponse>
 
     // Empty q intentionally returns every local (non-federated) user, up
     // to the server's own 500-row cap: see NotesRepository.searchUsers.

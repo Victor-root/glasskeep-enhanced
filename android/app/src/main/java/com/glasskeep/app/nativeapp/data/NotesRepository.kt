@@ -95,6 +95,28 @@ sealed class AddCollaboratorResult {
 @Serializable
 private data class CollaborateErrorBody(val error: String? = null)
 
+/** Outcome of PATCH .../collaborate/:userId. NotFound covers the server's
+ *  "Collaborator not found" 404 (they were removed from another device/
+ *  session moments ago, a benign race): there's only one 404 reason on
+ *  this route, unlike AddCollaboratorResult's, so no error-body peek is
+ *  needed to tell it apart from anything else. */
+sealed class SetCollaboratorAccessResult {
+    data object Updated : SetCollaboratorAccessResult()
+    data object NotFound : SetCollaboratorAccessResult()
+    data class Rejected(val httpCode: Int) : SetCollaboratorAccessResult()
+}
+
+/** Outcome of DELETE .../collaborate/:userId. Same NotFound reasoning as
+ *  SetCollaboratorAccessResult above. copyNoteId on Removed is non-null
+ *  only when keepCopy was true AND the caller is the owner removing
+ *  someone else (see NotesRepository.removeCollaborator's own doc
+ *  comment). */
+sealed class RemoveCollaboratorResult {
+    data class Removed(val copyNoteId: String?) : RemoveCollaboratorResult()
+    data object NotFound : RemoveCollaboratorResult()
+    data class Rejected(val httpCode: Int) : RemoveCollaboratorResult()
+}
+
 class NotesRepository(
     private val api: GlassKeepApi,
     private val noteDao: NoteDao,
@@ -1010,6 +1032,56 @@ class NotesRepository(
         }
         NativeDebug.e("NotesRepository.addCollaborator noteId=$noteId rejected: HTTP ${response.code()}")
         return AddCollaboratorResult.Rejected(response.code())
+    }
+
+    /** Changes an existing collaborator's [access] ("read" or "write").
+     *  Owner-only server-side: native never lets a non-owner reach this
+     *  call (see CollaboratorsScreen.kt's own canManage gating), so the
+     *  403 the server returns for "you're not the owner" is a practically
+     *  unreachable case here, folded into Rejected like everywhere else in
+     *  this file. No confirmation, no optimistic local state: matches the
+     *  web's own AccessToggle, which fires on every click with nothing to
+     *  guard against (setting the same access twice is a no-op server
+     *  side) and just reloads the roster from the server after. */
+    suspend fun setCollaboratorAccess(noteId: String, userId: Int, access: String): SetCollaboratorAccessResult {
+        NativeDebug.d("NotesRepository.setCollaboratorAccess noteId=$noteId userId=$userId access=$access")
+        val response = api.setCollaboratorAccess(noteId, userId, SetCollaboratorAccessRequest(access))
+        if (response.isSuccessful) return SetCollaboratorAccessResult.Updated
+        if (response.code() == 404) {
+            NativeDebug.d("NotesRepository.setCollaboratorAccess noteId=$noteId userId=$userId: not found")
+            return SetCollaboratorAccessResult.NotFound
+        }
+        NativeDebug.e("NotesRepository.setCollaboratorAccess noteId=$noteId userId=$userId rejected: HTTP ${response.code()}")
+        return SetCollaboratorAccessResult.Rejected(response.code())
+    }
+
+    /** Removes a collaborator (owner removing someone else) or leaves a
+     *  shared note (a collaborator removing themselves via this same
+     *  route). [keepCopy] only ever has an effect for the former: the
+     *  server grants a live, standalone copy of the note to the removed
+     *  person solely when the caller is the owner, removing someone else,
+     *  with keepCopy true (see server/index.js's shouldGrantCopy check) -
+     *  a collaborator leaving on their own never gets one through this
+     *  route, [keepCopy] is simply ignored for that case. Native only
+     *  ever calls this for the owner-removes-someone-else case today (see
+     *  CollaboratorsScreen.kt's own canManage gating); leaving is instead
+     *  handled by the existing trash flow (see SaveNoteResult.Left),
+     *  which does grant the leaver a trashed copy. */
+    suspend fun removeCollaborator(noteId: String, userId: Int, keepCopy: Boolean): RemoveCollaboratorResult {
+        NativeDebug.d("NotesRepository.removeCollaborator noteId=$noteId userId=$userId keepCopy=$keepCopy")
+        val mode = if (keepCopy) "keep_copy" else null
+        val response = api.removeCollaborator(noteId, userId, RemoveCollaboratorRequest(mode))
+        if (response.isSuccessful) {
+            val body = response.body()
+                ?: throw IllegalStateException("DELETE /api/notes/$noteId/collaborate/$userId: ok response with no body")
+            return RemoveCollaboratorResult.Removed(body.copyNoteId)
+        }
+        if (response.code() == 404) {
+            NativeDebug.d("NotesRepository.removeCollaborator noteId=$noteId userId=$userId: not found")
+            return RemoveCollaboratorResult.NotFound
+        }
+        NativeDebug.e("NotesRepository.removeCollaborator noteId=$noteId userId=$userId rejected: HTTP ${response.code()}")
+        return RemoveCollaboratorResult.Rejected(response.code())
     }
 
     /** Not-yet-acknowledged share/collaboration notifications (see

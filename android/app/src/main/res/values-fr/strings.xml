@@ -280,6 +280,13 @@
     <string name="native_collaborators_add_confirm">Ajouter (%1$d)</string>
     <string name="native_collaborators_added_success">%1$d collaborateur(s) ajouté(s)</string>
     <string name="native_collaborators_add_failed">%1$d n\'ont pas pu être ajoutés</string>
+    <string name="native_collaborators_remove_action">Retirer</string>
+    <string name="native_collaborators_access_failed">Impossible de modifier l\'accès : %1$s</string>
+    <string name="native_collaborators_remove_failed">Impossible de retirer ce collaborateur : %1$s</string>
+    <string name="native_collaborators_remove_question">Retirer %1$s de cette note ?</string>
+    <string name="native_collaborators_remove_subtitle">Souhaitez-vous laisser à cette personne une copie indépendante de la note ?</string>
+    <string name="native_collaborators_remove_keep_copy">Retirer et laisser une copie</string>
+    <string name="native_collaborators_remove_no_copy">Retirer sans laisser de copie</string>
 
     <string name="native_notifications_title">Notifications</string>
     <string name="native_notifications_error">Impossible de charger les notifications : %1$s</string>

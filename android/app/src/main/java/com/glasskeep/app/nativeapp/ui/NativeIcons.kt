@@ -691,3 +691,45 @@ fun CheckSquareIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color
         }
     }
 }
+
+// The two icons below back CollaboratorsScreen.kt's per-row access toggle
+// (read-only vs can-edit). Same source discipline as the rest of this
+// file: exact path data from the Tabler Icons set (MIT) this project
+// already vendors under src/icons/editor/tabler/ for the web's own
+// CollaborationModal.jsx AccessToggle (TI.Eye / TI.Pencil), not eyeballed.
+
+@Composable
+fun EyeIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // tabler/eye.svg, viewBox 24x24, stroke (not filled), strokeWidth 2,
+    // round caps/joins.
+    val path = remember {
+        PathParser().parsePathString(
+            "M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0 " +
+                "M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+@Composable
+fun PencilIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // tabler/pencil.svg, viewBox 24x24, stroke (not filled), strokeWidth 2,
+    // round caps/joins.
+    val path = remember {
+        PathParser().parsePathString(
+            "M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4 " +
+                "M13.5 6.5l4 4"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}

@@ -292,6 +292,13 @@
     <string name="native_collaborators_add_confirm">Add (%1$d)</string>
     <string name="native_collaborators_added_success">Added %1$d collaborator(s)</string>
     <string name="native_collaborators_add_failed">%1$d couldn\'t be added</string>
+    <string name="native_collaborators_remove_action">Remove</string>
+    <string name="native_collaborators_access_failed">Couldn\'t update access: %1$s</string>
+    <string name="native_collaborators_remove_failed">Couldn\'t remove collaborator: %1$s</string>
+    <string name="native_collaborators_remove_question">Remove %1$s from this note?</string>
+    <string name="native_collaborators_remove_subtitle">Should this person keep an independent copy of the note?</string>
+    <string name="native_collaborators_remove_keep_copy">Remove and keep a copy</string>
+    <string name="native_collaborators_remove_no_copy">Remove without keeping a copy</string>
 
     <string name="native_notifications_title">Notifications</string>
     <string name="native_notifications_error">Couldn\'t load notifications: %1$s</string>

@@ -52,6 +52,8 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.AddCollaboratorResult
+import com.glasskeep.app.nativeapp.data.RemoveCollaboratorResult
+import com.glasskeep.app.nativeapp.data.SetCollaboratorAccessResult
 import com.glasskeep.app.nativeapp.data.network.CollaboratorDto
 import com.glasskeep.app.nativeapp.data.network.UserDto
 import com.glasskeep.app.ui.ButtonGradient
@@ -89,18 +91,23 @@ fun CollaboratorsScreen(
     val dark = isSystemInDarkTheme()
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     var collaborators by remember { mutableStateOf<List<CollaboratorDto>>(emptyList()) }
     var isOwner by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var pendingRemoval by remember { mutableStateOf<CollaboratorDto?>(null) }
 
     val errorTemplate = stringResource(R.string.native_collaborators_error)
     val ownerLabel = stringResource(R.string.native_collaborators_owner)
     val writeLabel = stringResource(R.string.native_collaborators_can_write)
     val readOnlyLabel = stringResource(R.string.native_collaborators_read_only)
     val addLabel = stringResource(R.string.native_collaborators_add_action)
+    val removeLabel = stringResource(R.string.native_collaborators_remove_action)
+    val accessFailedTemplate = stringResource(R.string.native_collaborators_access_failed)
+    val removeFailedTemplate = stringResource(R.string.native_collaborators_remove_failed)
 
     suspend fun load() {
         loading = true
@@ -121,6 +128,42 @@ fun CollaboratorsScreen(
             errorMessage = String.format(errorTemplate, t.message ?: t.javaClass.simpleName)
         } finally {
             loading = false
+        }
+    }
+
+    fun changeAccess(collaborator: CollaboratorDto, access: String) {
+        scope.launch {
+            try {
+                when (val result = repository.setCollaboratorAccess(noteId, collaborator.id, access)) {
+                    SetCollaboratorAccessResult.Updated -> load()
+                    SetCollaboratorAccessResult.NotFound -> load()
+                    is SetCollaboratorAccessResult.Rejected -> {
+                        Toast.makeText(context, String.format(accessFailedTemplate, "HTTP ${result.httpCode}"), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("CollaboratorsScreen changeAccess failed", t)
+                Toast.makeText(context, String.format(accessFailedTemplate, t.message ?: t.javaClass.simpleName), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun removeCollaborator(collaborator: CollaboratorDto, keepCopy: Boolean) {
+        scope.launch {
+            try {
+                when (val result = repository.removeCollaborator(noteId, collaborator.id, keepCopy)) {
+                    is RemoveCollaboratorResult.Removed -> load()
+                    RemoveCollaboratorResult.NotFound -> load()
+                    is RemoveCollaboratorResult.Rejected -> {
+                        Toast.makeText(context, String.format(removeFailedTemplate, "HTTP ${result.httpCode}"), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("CollaboratorsScreen removeCollaborator failed", t)
+                Toast.makeText(context, String.format(removeFailedTemplate, t.message ?: t.javaClass.simpleName), Toast.LENGTH_SHORT).show()
+            } finally {
+                pendingRemoval = null
+            }
         }
     }
 
@@ -201,6 +244,10 @@ fun CollaboratorsScreen(
                             ownerLabel = ownerLabel,
                             writeLabel = writeLabel,
                             readOnlyLabel = readOnlyLabel,
+                            removeLabel = removeLabel,
+                            canManage = isOwner && !collaborator.isOwner,
+                            onSetAccess = { access -> changeAccess(collaborator, access) },
+                            onRemove = { pendingRemoval = collaborator },
                         )
                     }
                 }
@@ -221,6 +268,15 @@ fun CollaboratorsScreen(
             },
         )
     }
+
+    pendingRemoval?.let { collaborator ->
+        RemoveCollaboratorDialog(
+            collaboratorName = collaborator.name,
+            dark = dark,
+            onDismiss = { pendingRemoval = null },
+            onConfirm = { keepCopy -> removeCollaborator(collaborator, keepCopy) },
+        )
+    }
 }
 
 @Composable
@@ -231,6 +287,10 @@ private fun CollaboratorRow(
     ownerLabel: String,
     writeLabel: String,
     readOnlyLabel: String,
+    removeLabel: String,
+    canManage: Boolean,
+    onSetAccess: (String) -> Unit,
+    onRemove: () -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -259,11 +319,59 @@ private fun CollaboratorRow(
             }
         }
         if (!collaborator.isOwner) {
-            Text(
-                if (collaborator.canWrite != 0) writeLabel else readOnlyLabel,
-                color = subtextColor,
-                fontSize = 12.sp,
-            )
+            if (canManage) {
+                val readOnly = collaborator.canWrite == 0
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (readOnly) Indigo.copy(alpha = 0.14f) else Color.Transparent)
+                            .semantics { contentDescription = readOnlyLabel }
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Button,
+                            ) { if (!readOnly) onSetAccess("read") }
+                            .padding(6.dp),
+                    ) {
+                        EyeIcon(size = 16.dp, tint = if (readOnly) Indigo else subtextColor)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (!readOnly) Indigo.copy(alpha = 0.14f) else Color.Transparent)
+                            .semantics { contentDescription = writeLabel }
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Button,
+                            ) { if (readOnly) onSetAccess("write") }
+                            .padding(6.dp),
+                    ) {
+                        PencilIcon(size = 16.dp, tint = if (!readOnly) Indigo else subtextColor)
+                    }
+                    Spacer(Modifier.width(2.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .semantics { contentDescription = removeLabel }
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Button,
+                            ) { onRemove() }
+                            .padding(6.dp),
+                    ) {
+                        CloseIcon(size = 16.dp, tint = ErrorColor)
+                    }
+                }
+            } else {
+                Text(
+                    if (collaborator.canWrite != 0) writeLabel else readOnlyLabel,
+                    color = subtextColor,
+                    fontSize = 12.sp,
+                )
+            }
         }
     }
 }
@@ -511,5 +619,98 @@ private fun AccessChip(label: String, selected: Boolean, dark: Boolean, onClick:
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Text(label, color = fg, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+/** Confirm step before the owner removes a collaborator: mirrors the
+ *  web's own ConfirmRemoveCollaboratorDialog.jsx exactly (same three
+ *  choices, same meaning) rather than a single button + toggle, since the
+ *  two remove modes are equally-weighted, mutually exclusive actions, not
+ *  a default with an optional modifier. Never shown for a collaborator
+ *  removing themselves (native has no such affordance here, see
+ *  CollaboratorsScreen.kt's own canManage gating - leaving is the
+ *  existing trash flow instead), so keepCopy is only ever meaningful on
+ *  the confirmed path here. */
+@Composable
+private fun RemoveCollaboratorDialog(
+    collaboratorName: String,
+    dark: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (keepCopy: Boolean) -> Unit,
+) {
+    val titleColor = if (dark) DarkTitleColor else LightTitleColor
+    val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
+    val borderColor = if (dark) DarkBorderColor else LightBorderColor
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(if (dark) DarkBgColor else Color.White)
+                .padding(20.dp),
+        ) {
+            Text(
+                String.format(stringResource(R.string.native_collaborators_remove_question), collaboratorName),
+                color = titleColor,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.native_collaborators_remove_subtitle),
+                color = subtextColor,
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(16.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, borderColor, RoundedCornerShape(10.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onConfirm(true) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(stringResource(R.string.native_collaborators_remove_keep_copy), color = titleColor, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(ErrorColor)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onConfirm(false) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(stringResource(R.string.native_collaborators_remove_no_copy), color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onDismiss() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(stringResource(R.string.native_dialog_cancel), color = subtextColor, fontSize = 14.sp)
+            }
+        }
     }
 }
