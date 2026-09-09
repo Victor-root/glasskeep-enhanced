@@ -97,6 +97,9 @@ import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.network.ImportNotesResponse
 import com.glasskeep.app.nativeapp.data.network.PasskeyDto
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
+import com.glasskeep.app.nativeapp.data.network.UserAiSettingsDto
+import com.glasskeep.app.nativeapp.data.network.UserAiSettingsRequest
+import com.glasskeep.app.nativeapp.data.network.UserAiTestRequest
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.isUserCancellation
 import com.glasskeep.app.ui.DarkBorderColor
@@ -212,6 +215,12 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var transferRunning by remember { mutableStateOf(false) }
     var showResetOrderConfirm by remember { mutableStateOf(false) }
 
+    var aiSettings by remember { mutableStateOf<UserAiSettingsDto?>(null) }
+    var aiDraft by remember { mutableStateOf(AiSettingsDraft("", "", "", "0.3", "800", false)) }
+    var aiTestOutcome by remember { mutableStateOf<AiTestOutcome?>(null) }
+    var savingAi by remember { mutableStateOf(false) }
+    var testingAi by remember { mutableStateOf(false) }
+
     var showChangeServerDialog by remember { mutableStateOf(false) }
     var availableUpdate by remember { mutableStateOf<ReleaseInfo?>(UpdateManager.getStoredRelease(context)) }
     val installedFromFdroid = remember { UpdateManager.isFdroidInstall(context) }
@@ -225,6 +234,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var notificationsOpen by rememberSaveable { mutableStateOf(false) }
     var notesOpen by rememberSaveable { mutableStateOf(false) }
     var dataOpen by rememberSaveable { mutableStateOf(false) }
+    var aiOpen by rememberSaveable { mutableStateOf(false) }
     var languageOpen by rememberSaveable { mutableStateOf(false) }
     var appOpen by rememberSaveable { mutableStateOf(false) }
     var passkeyListOpen by rememberSaveable { mutableStateOf(false) }
@@ -240,6 +250,10 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     val passkeyTestOkMessage = stringResource(R.string.native_settings_passkeys_test_ok)
     val passkeyTestFailedMessage = stringResource(R.string.native_settings_passkeys_test_failed)
     val copiedMessage = stringResource(R.string.native_settings_secret_key_copied)
+    val aiSavedMessage = stringResource(R.string.native_settings_ai_saved)
+    val aiKeyClearedMessage = stringResource(R.string.native_settings_ai_api_key_cleared)
+    val aiTestOkMessage = stringResource(R.string.native_settings_ai_test_ok)
+    val aiTestFailedMessage = stringResource(R.string.native_settings_ai_test_failed)
     val exportFailedMessage = stringResource(R.string.native_settings_export_failed)
     val importFailedMessage = stringResource(R.string.native_settings_import_failed)
     val importInvalidJsonMessage = stringResource(R.string.native_settings_import_invalid_json)
@@ -289,6 +303,28 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
         } catch (t: Throwable) {
             NativeDebug.e("SettingsScreen listPasskeys failed", t)
         }
+    }
+
+    /** The server always answers with its own public shape, so applying
+     *  its response, never the values just sent, is what keeps the form
+     *  honest (applyConfig, UserAiSettingsSection.jsx:63-80). */
+    fun applyAiSettings(config: UserAiSettingsDto) {
+        aiSettings = config
+        aiDraft = AiSettingsDraft(
+            baseUrl = config.baseUrl,
+            model = config.model,
+            // Never prefilled: a stored key never comes back.
+            apiKey = "",
+            temperature = config.temperature.toString(),
+            maxTokens = config.maxTokens.toString(),
+            showApiKey = false,
+        )
+    }
+
+    // Its own effect, best-effort like the passkey list: an instance with
+    // no AI at all simply shows the section switched off.
+    LaunchedEffect(serverUrl) {
+        repository.fetchUserAiSettings()?.let { applyAiSettings(it) }
     }
 
     fun reportActionError(t: Throwable) {
@@ -724,6 +760,78 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                 reportActionError(t)
             } finally {
                 changingToastPrefs = false
+            }
+        }
+    }
+
+    /** buildPatch() (UserAiSettingsSection.jsx:118-129): the whole config
+     *  every time, with [overrides] for the one field the caller is
+     *  actually changing, and the key only when something was typed. */
+    fun aiPatch(
+        enabled: Boolean = aiSettings?.enabled ?: false,
+        mode: String = aiSettings?.mode ?: "server",
+        apiKey: String? = aiDraft.apiKey.takeIf { it.isNotEmpty() },
+    ) = UserAiSettingsRequest(
+        enabled = enabled,
+        mode = mode,
+        baseUrl = aiDraft.baseUrl.trim(),
+        model = aiDraft.model.trim(),
+        temperature = aiDraft.temperature.trim().toDoubleOrNull() ?: 0.3,
+        maxTokens = aiDraft.maxTokens.trim().toIntOrNull() ?: 800,
+        apiKey = apiKey,
+    )
+
+    fun saveAiSettings(request: UserAiSettingsRequest, successMessage: String?) {
+        if (savingAi) return
+        savingAi = true
+        aiTestOutcome = null
+        scope.launch {
+            try {
+                applyAiSettings(repository.setUserAiSettings(request))
+                successMessage?.let { toasts.success(it) }
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen setUserAiSettings failed", t)
+                reportActionError(t)
+            } finally {
+                savingAi = false
+            }
+        }
+    }
+
+    fun testAiSettings() {
+        val current = aiSettings ?: return
+        if (testingAi) return
+        testingAi = true
+        aiTestOutcome = null
+        scope.launch {
+            try {
+                val request = if (current.mode == "custom") {
+                    UserAiTestRequest(
+                        mode = "custom",
+                        baseUrl = aiDraft.baseUrl.trim(),
+                        model = aiDraft.model.trim(),
+                        temperature = aiDraft.temperature.trim().toDoubleOrNull() ?: 0.3,
+                        maxTokens = aiDraft.maxTokens.trim().toIntOrNull() ?: 800,
+                        apiKey = aiDraft.apiKey.takeIf { it.isNotEmpty() },
+                    )
+                } else {
+                    UserAiTestRequest(mode = "server")
+                }
+                val result = repository.testUserAi(request)
+                aiTestOutcome = if (result.ok) {
+                    // The reply itself is worth showing: it is how you
+                    // tell a working endpoint from a reachable one.
+                    val reply = result.reply?.takeIf { it.isNotBlank() }
+                    AiTestOutcome(true, if (reply != null) "$aiTestOkMessage : $reply" else aiTestOkMessage)
+                } else {
+                    val detail = result.error?.takeIf { it.isNotBlank() }
+                    AiTestOutcome(false, if (detail != null) "$aiTestFailedMessage : $detail" else aiTestFailedMessage)
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen testUserAi failed", t)
+                aiTestOutcome = AiTestOutcome(false, "$aiTestFailedMessage : ${t.message ?: t.javaClass.simpleName}")
+            } finally {
+                testingAi = false
             }
         }
     }
@@ -1640,6 +1748,44 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                         icon = { tint -> ArrowsSortIcon(size = 20.dp, tint = tint) },
                                         onClick = { showResetOrderConfirm = true },
                                     )
+                                }
+
+                                aiSettings?.let { ai ->
+                                    SettingsAccordionSection(
+                                        title = stringResource(R.string.native_settings_ai_section),
+                                        expanded = aiOpen,
+                                        themeId = themeId,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        icon = { tint -> BrainIcon(size = 20.dp, tint = tint) },
+                                        onToggle = { aiOpen = !aiOpen },
+                                    ) {
+                                        AiSettingsSection(
+                                            settings = ai,
+                                            draft = aiDraft,
+                                            testOutcome = aiTestOutcome,
+                                            busy = savingAi,
+                                            testing = testingAi,
+                                            themeId = themeId,
+                                            dark = dark,
+                                            titleColor = titleColor,
+                                            borderColor = borderColor,
+                                            onToggleEnabled = { saveAiSettings(aiPatch(enabled = it), null) },
+                                            onSelectMode = { mode ->
+                                                if (mode != ai.mode) saveAiSettings(aiPatch(mode = mode), null)
+                                            },
+                                            onDraftChange = { aiDraft = it },
+                                            // The one call that sends an
+                                            // empty key on purpose: that is
+                                            // how the server is told to
+                                            // forget the stored one.
+                                            onClearApiKey = {
+                                                saveAiSettings(aiPatch(apiKey = ""), aiKeyClearedMessage)
+                                            },
+                                            onTest = { testAiSettings() },
+                                            onSave = { saveAiSettings(aiPatch(), aiSavedMessage) },
+                                        )
+                                    }
                                 }
 
                                 SettingsAccordionSection(

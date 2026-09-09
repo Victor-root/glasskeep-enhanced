@@ -478,6 +478,64 @@ data class SetNotificationsSoundTypesRequest(val notificationsSoundTypes: Map<St
 @Serializable
 data class SetNotificationsFilterTypesRequest(val notificationsFilterTypes: Map<String, Boolean>)
 
+/**
+ * GET/PUT /api/user/ai/settings' own shape (getUserPublicConfig,
+ * server/ai/aiSettings.js:272-292). The API key itself never comes back:
+ * only [hasApiKey] says whether one is stored.
+ *
+ * [serverAiAvailable] is true when the administrator both enabled the
+ * shared server AI and configured it; [adminAiEnabled] is the master
+ * switch, and when it is off nothing here can be turned on.
+ */
+@Serializable
+data class UserAiSettingsDto(
+    val enabled: Boolean = false,
+    val mode: String = "server",
+    val baseUrl: String = "",
+    val model: String = "",
+    val temperature: Double = 0.3,
+    val maxTokens: Int = 800,
+    val hasApiKey: Boolean = false,
+    val serverAiAvailable: Boolean = false,
+    val adminAiEnabled: Boolean = true,
+)
+
+/**
+ * Body for PUT /api/user/ai/settings. `apiKey` follows the server's own
+ * three-way convention: absent keeps the stored key, "" clears it, any
+ * other value replaces it (aiRoutes.js:247-248), which is why it is
+ * nullable here and dropped when null.
+ */
+@Serializable
+data class UserAiSettingsRequest(
+    val enabled: Boolean,
+    val mode: String,
+    val baseUrl: String,
+    val model: String,
+    val temperature: Double,
+    val maxTokens: Int,
+    val apiKey: String? = null,
+)
+
+/** Body for POST /api/user/ai/test: the configuration to try, which may
+ *  differ from the saved one (that is the point of the button). */
+@Serializable
+data class UserAiTestRequest(
+    val mode: String,
+    val baseUrl: String? = null,
+    val model: String? = null,
+    val temperature: Double? = null,
+    val maxTokens: Int? = null,
+    val apiKey: String? = null,
+)
+
+@Serializable
+data class UserAiTestResponse(
+    val ok: Boolean = false,
+    val reply: String? = null,
+    val error: String? = null,
+)
+
 /** Body for POST /api/notes/import. The notes stay raw JSON objects
  *  rather than a DTO so an export file round-trips through this app
  *  losing nothing the server understands and this app does not. */
@@ -737,6 +795,15 @@ interface GlassKeepApi {
 
     @POST("api/notes/import")
     suspend fun importNotes(@Body body: ImportNotesRequest): Response<ImportNotesResponse>
+
+    @GET("api/user/ai/settings")
+    suspend fun getUserAiSettings(): Response<UserAiSettingsDto>
+
+    @PUT("api/user/ai/settings")
+    suspend fun setUserAiSettings(@Body body: UserAiSettingsRequest): Response<UserAiSettingsDto>
+
+    @POST("api/user/ai/test")
+    suspend fun testUserAi(@Body body: UserAiTestRequest): Response<UserAiTestResponse>
 
     @GET("api/notes/archived")
     suspend fun getArchivedNotes(): Response<List<NoteDto>>

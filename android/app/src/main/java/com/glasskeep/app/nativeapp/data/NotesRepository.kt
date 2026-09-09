@@ -49,6 +49,10 @@ import com.glasskeep.app.nativeapp.data.network.SetReadModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderTimeChipsRequest
 import com.glasskeep.app.nativeapp.data.network.SetShellThemeRequest
+import com.glasskeep.app.nativeapp.data.network.UserAiSettingsDto
+import com.glasskeep.app.nativeapp.data.network.UserAiSettingsRequest
+import com.glasskeep.app.nativeapp.data.network.UserAiTestRequest
+import com.glasskeep.app.nativeapp.data.network.UserAiTestResponse
 import com.glasskeep.app.nativeapp.data.network.SetViewModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetToastDurationRequest
 import com.glasskeep.app.nativeapp.data.network.SetToastPositionRequest
@@ -161,6 +165,10 @@ sealed class RemoveCollaboratorResult {
  *  own doc comment) - matches the web's own syncEngine.js convention for
  *  the same operation. */
 private const val REORDER_QUEUE_NOTE_ID = "__reorder__"
+
+/** Only used to read a server error body back out, which Retrofit hands
+ *  over as a raw string rather than a parsed DTO. */
+private val errorJson = Json { ignoreUnknownKeys = true }
 
 class NotesRepository(
     private val api: GlassKeepApi,
@@ -1019,6 +1027,50 @@ class NotesRepository(
         }
         refresh()
         return body
+    }
+
+    /** This user's own AI configuration. Best-effort like the workspace
+     *  preferences above: the Settings screen simply shows the section
+     *  switched off when the read fails rather than an error nobody
+     *  asked for (UserAiSettingsSection.jsx:104-110). */
+    suspend fun fetchUserAiSettings(): UserAiSettingsDto? {
+        return try {
+            val response = api.getUserAiSettings()
+            response.body().takeIf { response.isSuccessful }
+        } catch (t: Throwable) {
+            NativeDebug.e("NotesRepository.fetchUserAiSettings failed", t)
+            null
+        }
+    }
+
+    /** Saves it. Unlike the read, a deliberate action that surfaces its
+     *  failure; the server answers with the same public shape, which the
+     *  caller applies rather than trusting what it just sent. */
+    suspend fun setUserAiSettings(request: UserAiSettingsRequest): UserAiSettingsDto {
+        NativeDebug.d("NotesRepository.setUserAiSettings mode=${request.mode} enabled=${request.enabled}")
+        val response = api.setUserAiSettings(request)
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "PUT /api/user/ai/settings failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body
+    }
+
+    /** Tries a configuration without saving it. A refusal is an answer
+     *  here, not a failure: the server's own message is what the panel
+     *  shows, so it is read out of the error body too. */
+    suspend fun testUserAi(request: UserAiTestRequest): UserAiTestResponse {
+        NativeDebug.d("NotesRepository.testUserAi mode=${request.mode}")
+        val response = api.testUserAi(request)
+        response.body()?.let { return it }
+        val raw = response.errorBody()?.string()
+        NativeDebug.e("POST /api/user/ai/test failed: HTTP ${response.code()} $raw")
+        val message = raw?.let {
+            runCatching { errorJson.decodeFromString<UserAiTestResponse>(it).error }.getOrNull()
+        }
+        return UserAiTestResponse(ok = false, error = message ?: "HTTP ${response.code()}")
     }
 
     /** Sets what a removed checklist section does with its items
