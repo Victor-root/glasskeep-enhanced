@@ -98,6 +98,7 @@ import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.SaveNoteResult
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
+import com.glasskeep.app.nativeapp.data.toEntity
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.ui.ButtonGradient
 import com.glasskeep.app.ui.DarkBgColor
@@ -325,7 +326,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         archiving = true
         scope.launch {
             try {
-                repository.setArchivedQueued(current, !current.archived)
+                repository.setArchivedQueued(current.toEntity(), !current.archived)
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen toggleArchive queued id=${current.id}")
                 onBack()
@@ -351,7 +352,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         restoring = true
         scope.launch {
             try {
-                repository.restoreNoteQueued(current)
+                repository.restoreNoteQueued(current.toEntity())
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen restoreNote queued id=${current.id}")
                 onBack()

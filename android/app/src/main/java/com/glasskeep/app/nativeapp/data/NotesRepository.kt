@@ -562,14 +562,17 @@ class NotesRepository(
      *  which would otherwise race the still-pending queued item and
      *  silently undo this action until it actually reaches the server
      *  (see NoteDao.replaceAll's own doc comment for the other half of
-     *  this fix). [note] provides the full row: unarchiving needs it to
-     *  reinsert the note into the active-list cache, not just archiving's
-     *  own removal. */
-    suspend fun setArchivedQueued(note: NoteDto, archived: Boolean) {
-        NativeDebug.d("NotesRepository.setArchivedQueued id=${note.id} archived=$archived")
+     *  this fix). Takes the entity directly, not a NoteDto: unarchiving
+     *  needs a full row to reinsert into the active-list cache, not just
+     *  archiving's own removal, and callers already holding a NoteDto can
+     *  get one via its own toEntity(), but NativeNotesListScreen.kt's bulk
+     *  archive (always archiving, never un-) only ever has the NoteEntity
+     *  its own Room-backed list already observes, no NoteDto in sight. */
+    suspend fun setArchivedQueued(entity: NoteEntity, archived: Boolean) {
+        NativeDebug.d("NotesRepository.setArchivedQueued id=${entity.id} archived=$archived")
         val request = ArchiveNoteRequest(archived, nowIso())
-        syncQueueDao.enqueue(note.id, SyncQueueType.ARCHIVE.name, Json.encodeToString(request), System.currentTimeMillis())
-        if (archived) noteDao.deleteById(note.id) else noteDao.upsertAll(listOf(note.toEntity()))
+        syncQueueDao.enqueue(entity.id, SyncQueueType.ARCHIVE.name, Json.encodeToString(request), System.currentTimeMillis())
+        if (archived) noteDao.deleteById(entity.id) else noteDao.upsertAll(listOf(entity))
     }
 
     suspend fun trashNoteQueued(id: String) {
@@ -579,15 +582,14 @@ class NotesRepository(
         noteDao.deleteById(id)
     }
 
-    /** [note] is the trashed note being restored (as loaded by
-     *  NoteDetailScreen, still carrying its pre-trash fields): reinserted
-     *  into the active-list cache optimistically, same reasoning as
+    /** [entity] is the trashed note being restored, reinserted into the
+     *  active-list cache optimistically: same reasoning and shape as
      *  setArchivedQueued's unarchive branch. */
-    suspend fun restoreNoteQueued(note: NoteDto) {
-        NativeDebug.d("NotesRepository.restoreNoteQueued id=${note.id}")
+    suspend fun restoreNoteQueued(entity: NoteEntity) {
+        NativeDebug.d("NotesRepository.restoreNoteQueued id=${entity.id}")
         val request = ClientUpdatedAtRequest(nowIso())
-        syncQueueDao.enqueue(note.id, SyncQueueType.RESTORE.name, Json.encodeToString(request), System.currentTimeMillis())
-        noteDao.upsertAll(listOf(note.toEntity()))
+        syncQueueDao.enqueue(entity.id, SyncQueueType.RESTORE.name, Json.encodeToString(request), System.currentTimeMillis())
+        noteDao.upsertAll(listOf(entity))
     }
 
     /** No noteDao mutation: a trashed note was never cached locally to
