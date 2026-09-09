@@ -4,6 +4,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,16 +17,21 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
@@ -35,6 +41,7 @@ import com.glasskeep.app.nativeapp.data.RealtimeClient
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.syncReminderAlarms
 import com.glasskeep.app.reminders.ReminderSyncWorker
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -52,7 +59,16 @@ fun NativeNavHost(
     onPendingOpenQrScannerConsumed: () -> Unit = {},
 ) {
     val navController: NavHostController = rememberNavController()
-    val startDestination = if (container.tokenStore.token != null) "notes" else "login"
+    // Set when the unlock screen signs an admin in (its passkey path does)
+    // on a cold start, i.e. before the NavHost has ever composed and so
+    // before there is a graph to navigate: the start destination below is
+    // what carries the must-change-password detour in that one case.
+    var unlockedIntoForcedPasswordChange by remember { mutableStateOf(false) }
+    val startDestination = when {
+        unlockedIntoForcedPasswordChange -> "force-change-password"
+        container.tokenStore.token != null -> "notes"
+        else -> "login"
+    }
     val context = LocalContext.current
 
     // Reminder alarms, kept in sync with this device's local note cache for
@@ -74,11 +90,20 @@ fun NativeNavHost(
     // app's foreground/background state - no need for the heavier,
     // separate androidx.lifecycle:lifecycle-process/ProcessLifecycleOwner
     // dependency this app doesn't otherwise pull in.
+    //
+    // The two lock callbacks below are at-rest encryption's instant paths,
+    // the server's own broadcast to every connected client (App.jsx:3769),
+    // alongside the scheduled read further down. "Unlocked" is not taken
+    // on trust: it only pokes that read into running now instead of on its
+    // next tick, same as the web's own listener calling refresh().
+    var lockPokes by remember { mutableIntStateOf(0) }
     val realtimeClient = remember(serverUrl) {
         RealtimeClient(
             serverUrl = serverUrl,
             tokenStore = container.tokenStore,
             onRefreshNeeded = { repository.refresh() },
+            onInstanceLocked = { container.lockState.markLocked() },
+            onInstanceUnlocked = { lockPokes++ },
         )
     }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -97,6 +122,26 @@ fun NativeNavHost(
         }
     }
 
+    // The lock read itself, on the two cadences useInstanceLockStatus.js
+    // polls at and for its reasons: 30s while unlocked (locking is rare
+    // and the endpoint should not be hammered), 3s while locked (the
+    // screen shown then is exactly where the user waits for it to flip
+    // back). repeatOnLifecycle also covers the web's visibilitychange /
+    // focus listeners: coming back to the foreground restarts the loop,
+    // which reads immediately. A failed read is left alone rather than
+    // treated as a lock, so a phone with no signal keeps its cached notes.
+    LaunchedEffect(lifecycleOwner, lockPokes) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                runCatching { container.api(serverUrl).instanceStatus() }
+                    .getOrNull()
+                    ?.body()
+                    ?.let { container.lockState.apply(it) }
+                delay(if (container.lockState.isLocked) LOCK_POLL_LOCKED_MS else LOCK_POLL_UNLOCKED_MS)
+            }
+        }
+    }
+
     // Background reminder sync (WorkManager): arms the periodic "ask the
     // server for upcoming reminders" job and runs one immediately, so a
     // reminder set on another device, or missed while this device was
@@ -110,7 +155,7 @@ fun NativeNavHost(
     // comment), which is what actually lets this work for a native-only
     // sign-in with no WebView session on the device at all.
     LaunchedEffect(startDestination) {
-        if (startDestination == "notes") {
+        if (startDestination != "login") {
             ReminderSyncWorker.schedulePeriodic(context)
             ReminderSyncWorker.syncNow(context)
             SyncQueueWorker.schedulePeriodic(context)
@@ -126,7 +171,7 @@ fun NativeNavHost(
     // same "fetch on load, apply if different" shape as the web's own
     // applyStoredShellTheme()-then-server-sync design.
     LaunchedEffect(startDestination) {
-        if (startDestination == "notes") {
+        if (startDestination != "login") {
             applyWorkspacePreferences(container, repository)
         }
     }
@@ -201,8 +246,58 @@ fun NativeNavHost(
     } else {
         Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Left))
     }
+    // Which of the unlock screen and the banner a locked server gets, on
+    // App.jsx:7367's own two rules. "Signed in" is read off the current
+    // route rather than off the token: it is the app's own answer to that
+    // question, and unlike the token it is Compose state, so signing out
+    // moves the screen straight to the full unlock version.
+    val currentEntry by navController.currentBackStackEntryAsState()
+    val route = currentEntry?.destination?.route ?: startDestination
+    val signedIn = route != "login" && route != "login-secret"
+    val lock = container.lockState
+    val showUnlockScreen = lock.isLocked && (!signedIn || lock.overlayOpen)
+    val showLockedBanner = lock.isLocked && signedIn && !lock.bannerDismissed && !lock.overlayOpen
+
     CompositionLocalProvider(LocalGkToasts provides toasts) {
         Box(Modifier.fillMaxSize().then(safeLeft)) {
+            if (showUnlockScreen) {
+                InstanceUnlockScreen(
+                    container = container,
+                    serverUrl = serverUrl,
+                    // The next status read confirms it; closing the overlay
+                    // now is what stops the screen lingering for the
+                    // round-trip (App.jsx:7381).
+                    onUnlocked = { lock.overlayOpen = false; lockPokes++ },
+                    onUnlockedWithSession = { mustChangePassword ->
+                        lock.overlayOpen = false
+                        lockPokes++
+                        // handleLoggedIn navigates, which needs a graph.
+                        // A cold start behind this screen never composed
+                        // the NavHost and has none; it is about to compose
+                        // with the session now in place, so all that has
+                        // to carry over is the password detour.
+                        if (currentEntry != null) {
+                            handleLoggedIn(mustChangePassword)
+                        } else {
+                            unlockedIntoForcedPasswordChange = mustChangePassword
+                        }
+                    },
+                    // Only from the banner's CTA: a cold start with no
+                    // session has no local cache to go back to.
+                    onBackToOffline = if (signedIn) {
+                        { lock.overlayOpen = false; lock.bannerDismissed = true }
+                    } else {
+                        null
+                    },
+                )
+            } else Column(Modifier.fillMaxSize()) {
+                if (showLockedBanner) {
+                    LockedBanner(
+                        dark = LocalGkDark.current,
+                        onUnlock = { lock.overlayOpen = true },
+                        onDismiss = { lock.bannerDismissed = true },
+                    )
+                }
             NavHost(navController = navController, startDestination = startDestination) {
                 composable("login") {
                     NativeLoginScreen(
@@ -320,6 +415,7 @@ fun NativeNavHost(
                         onBack = { navController.popBackStack() },
                     )
                 }
+                }
             }
             GkToastHost(
                 controller = toasts,
@@ -340,6 +436,7 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     prefs.editorToolbarMode?.let { container.editorPrefs.applyToolbarMode(it) }
     container.editorPrefs.applyTypography(prefs.typography)
     AppLanguage.apply(prefs.language)
+    prefs.isAdmin?.let { container.shellPrefs.applyIsAdmin(it) }
     prefs.toastPosition?.let { container.editorPrefs.applyToastPosition(it) }
     container.editorPrefs.applyToastDuration(prefs.toastDurationMs)
     prefs.readModeEnabled?.let { container.editorPrefs.applyReadMode(it) }
@@ -359,3 +456,7 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
         container.shellPrefs.applyAiAssistant(it.enabled && it.adminAiEnabled)
     }
 }
+
+// useInstanceLockStatus.js's own two cadences, kept as-is.
+private const val LOCK_POLL_UNLOCKED_MS = 30_000L
+private const val LOCK_POLL_LOCKED_MS = 3_000L

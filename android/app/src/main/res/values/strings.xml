@@ -644,4 +644,37 @@
     <string name="native_relative_minutes">%1$d min ago</string>
     <string name="native_relative_hours">%1$d h ago</string>
     <string name="native_relative_days">%1$d d ago</string>
+
+    <!-- Instance lock (at-rest encryption): lock/InstanceUnlockScreen.jsx,
+         lock/LockedBanner.jsx, lock/PasskeyUnlockPanel.jsx. -->
+    <string name="native_instance_locked_title">Instance locked</string>
+    <string name="native_instance_locked_explain">An administrator must unlock this instance with the passphrase or the recovery key before anyone can read or edit notes.</string>
+    <string name="native_instance_locked_scope_title">What this protects</string>
+    <string name="native_instance_locked_scope_protects">Protects notes against theft of the server, the disk, the database file, or backups.</string>
+    <string name="native_instance_locked_scope_not_protect">Does NOT protect against the server administrator or against an already-unlocked, compromised server.</string>
+    <string name="native_instance_locked_tab_passphrase">Passphrase</string>
+    <string name="native_instance_locked_tab_recovery">Recovery key</string>
+    <string name="native_instance_locked_tab_passkey">Passkey</string>
+    <string name="native_instance_locked_passphrase_placeholder">Instance passphrase</string>
+    <string name="native_instance_locked_unlock_cta">Unlock instance</string>
+    <string name="native_instance_locked_unlocking">Unlocking\u2026</string>
+    <string name="native_instance_locked_cli_hint">If the web UI is unreachable, run \"cd /opt/glass-keep/app &amp;&amp; npm run unlock-instance\" on the server (Docker users: run the equivalent inside the container).</string>
+    <string name="native_instance_locked_back_to_offline">Back to my offline notes</string>
+    <string name="native_unlock_failed">Unlock failed (code %1$d).</string>
+    <string name="native_err_invalid_passphrase">Invalid passphrase.</string>
+    <string name="native_err_invalid_recovery_key">Invalid recovery key.</string>
+    <string name="native_err_too_many_unlock">Too many unlock attempts. Please try again later.</string>
+    <string name="native_err_plaintext_http">Refusing to send the unlock secret over plaintext HTTP. Use HTTPS, set TRUST_PROXY=true if you have a reverse proxy, or unlock from localhost.</string>
+    <string name="native_err_encryption_not_enabled">At-rest encryption is not enabled.</string>
+    <string name="native_passkey_unlock_explain">Approach or activate your admin passkey (Windows Hello, Touch ID, hardware key\u2026) to unlock the encrypted instance.</string>
+    <string name="native_passkey_unlock_cta">Unlock with a passkey</string>
+    <string name="native_passkey_unlock_in_progress">Unlocking\u2026</string>
+    <string name="native_passkey_unlock_cancelled">Passkey unlock cancelled.</string>
+    <string name="native_passkey_unlock_fallback_hint">If your passkey doesn\'t work (PRF unsupported, key not authorised, etc.), switch back to the \"Passphrase\" or \"Recovery key\" tab.</string>
+    <string name="native_passkey_no_prf_output">This passkey did not return a PRF output. Use the passphrase or recovery key.</string>
+    <string name="native_locked_banner_message">The server has been locked (by an administrator, or following a service restart). Your notes stay readable from this device, but changes won\'t sync until an admin unlocks the instance.</string>
+    <string name="native_locked_banner_unlock">Unlock now</string>
+    <string name="native_dismiss">Dismiss</string>
+    <string name="native_lock_instance">Lock the instance</string>
+    <string name="native_lock_instance_failed">Failed to lock the instance.</string>
 </resources>

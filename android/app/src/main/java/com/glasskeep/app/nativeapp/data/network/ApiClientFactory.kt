@@ -31,6 +31,29 @@ private class AuthInterceptor(private val tokenStore: TokenStore) : Interceptor 
 }
 
 /**
+ * Notices the HTTP 423 a locked server answers with on every route but its
+ * own small allowlist (server/index.js's LOCK_ALLOW_PATHS), so any call at
+ * all is enough to drop the app to the unlock screen. Exactly what the
+ * web's api.js does with the same status, and the reason its own comment
+ * gives for it: the status poll would find out too, but up to 30 seconds
+ * later.
+ */
+private class InstanceLockInterceptor(private val onInstanceLocked: () -> Unit) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val response = chain.proceed(chain.request())
+        if (response.code == HTTP_LOCKED) {
+            NativeDebug.d("HTTP 423 on ${chain.request().url.encodedPath}: instance is locked")
+            onInstanceLocked()
+        }
+        return response
+    }
+
+    private companion object {
+        const val HTTP_LOCKED = 423
+    }
+}
+
+/**
  * Builds a Retrofit client for one server. The native rewrite lets the
  * user point at any self-hosted GlassKeep server, same as the WebView
  * setup screen, so this is built fresh per server URL rather than kept as
@@ -47,22 +70,23 @@ object ApiClientFactory {
      *  SSE stream Retrofit's @GET/suspend-fun interface pattern can't
      *  model) - kept in one place so the two never drift apart on
      *  auth/logging setup. */
-    fun okHttpClient(tokenStore: TokenStore): OkHttpClient {
+    fun okHttpClient(tokenStore: TokenStore, onInstanceLocked: () -> Unit): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(AuthInterceptor(tokenStore))
+            .addInterceptor(InstanceLockInterceptor(onInstanceLocked))
             // A no-op in release, see NetworkLogging.kt's two versions.
             .addNetworkLogging()
             .build()
     }
 
-    fun create(baseUrl: String, tokenStore: TokenStore): GlassKeepApi {
+    fun create(baseUrl: String, tokenStore: TokenStore, onInstanceLocked: () -> Unit): GlassKeepApi {
         val normalizedBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
         NativeDebug.d("ApiClientFactory.create baseUrl=$normalizedBaseUrl")
 
         val contentType = "application/json".toMediaType()
         val retrofit = Retrofit.Builder()
             .baseUrl(normalizedBaseUrl)
-            .client(okHttpClient(tokenStore))
+            .client(okHttpClient(tokenStore, onInstanceLocked))
             .addConverterFactory(json.asConverterFactory(contentType))
             .build()
 

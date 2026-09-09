@@ -1566,3 +1566,13 @@ fun InfoFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color 
         "m.01 -3l-.127 .007a1 1 0 0 0 0 1.986l.117 .007l.127 -.007a1 1 0 0 0 0 -1.986l-.117 -.007z",
     modifier, size, tint,
 )
+
+/** tabler/lock.svg: the header menu's "lock the instance" entry and the
+ *  locked banner (icons/index.jsx:416). */
+@Composable
+fun LockIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6 " +
+        "M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0 " +
+        "M8 11v-4a4 4 0 1 1 8 0v4",
+    modifier, size, tint,
+)

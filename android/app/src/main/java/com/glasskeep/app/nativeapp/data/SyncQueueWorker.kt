@@ -69,7 +69,12 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
         if (pending.isEmpty()) return Result.success()
 
         val repository = NotesRepository(
-            ApiClientFactory.create(serverUrl, tokenStore),
+            // No lock-state callback: this runs with no UI on screen, so a
+            // 423 has nothing to redirect. The queue's own retry already
+            // does the right thing (the items stay pending until the
+            // instance is unlocked), and NativeNavHost reads the lock state
+            // fresh whenever the app comes back to the foreground.
+            ApiClientFactory.create(serverUrl, tokenStore, onInstanceLocked = {}),
             AppDatabase.get(applicationContext).noteDao(),
             queueDao,
         )

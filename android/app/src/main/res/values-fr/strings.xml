@@ -632,4 +632,37 @@
     <string name="native_relative_minutes">il y a %1$d min</string>
     <string name="native_relative_hours">il y a %1$d h</string>
     <string name="native_relative_days">il y a %1$d j</string>
+
+    <!-- Instance lock (at-rest encryption): lock/InstanceUnlockScreen.jsx,
+         lock/LockedBanner.jsx, lock/PasskeyUnlockPanel.jsx. -->
+    <string name="native_instance_locked_title">Instance verrouill\u00e9e</string>
+    <string name="native_instance_locked_explain">Un administrateur doit d\u00e9verrouiller cette instance avec la passphrase ou la recovery key avant que les notes puissent \u00eatre lues ou modifi\u00e9es.</string>
+    <string name="native_instance_locked_scope_title">Ce que cela prot\u00e8ge</string>
+    <string name="native_instance_locked_scope_protects">Prot\u00e8ge les notes contre le vol du serveur, du disque, du fichier de base de donn\u00e9es ou des sauvegardes.</string>
+    <string name="native_instance_locked_scope_not_protect">Ne prot\u00e8ge PAS contre l\'administrateur du serveur ni contre un serveur d\u00e9j\u00e0 d\u00e9verrouill\u00e9 qui serait compromis.</string>
+    <string name="native_instance_locked_tab_passphrase">Passphrase</string>
+    <string name="native_instance_locked_tab_recovery">Recovery key</string>
+    <string name="native_instance_locked_tab_passkey">Cl\u00e9 d\'acc\u00e8s</string>
+    <string name="native_instance_locked_passphrase_placeholder">Passphrase de l\'instance</string>
+    <string name="native_instance_locked_unlock_cta">D\u00e9verrouiller l\'instance</string>
+    <string name="native_instance_locked_unlocking">D\u00e9verrouillage\u2026</string>
+    <string name="native_instance_locked_cli_hint">Si l\'interface web est inaccessible, lancez \u00ab cd /opt/glass-keep/app &amp;&amp; npm run unlock-instance \u00bb sur le serveur (utilisateurs Docker : la commande \u00e9quivalente dans le conteneur).</string>
+    <string name="native_instance_locked_back_to_offline">Revenir \u00e0 mes notes hors-ligne</string>
+    <string name="native_unlock_failed">\u00c9chec du d\u00e9verrouillage (code %1$d).</string>
+    <string name="native_err_invalid_passphrase">Passphrase incorrecte.</string>
+    <string name="native_err_invalid_recovery_key">Recovery key invalide.</string>
+    <string name="native_err_too_many_unlock">Trop de tentatives de d\u00e9verrouillage. R\u00e9essayez plus tard.</string>
+    <string name="native_err_plaintext_http">Refus d\'envoyer le secret de d\u00e9verrouillage en HTTP non chiffr\u00e9. Utilisez HTTPS, posez TRUST_PROXY=true si vous avez un reverse proxy, ou d\u00e9verrouillez depuis localhost.</string>
+    <string name="native_err_encryption_not_enabled">Le chiffrement au repos n\'est pas activ\u00e9.</string>
+    <string name="native_passkey_unlock_explain">Approchez ou activez votre cl\u00e9 d\'acc\u00e8s admin (Windows Hello, Touch ID, cl\u00e9 physique\u2026) pour d\u00e9verrouiller l\'instance chiffr\u00e9e.</string>
+    <string name="native_passkey_unlock_cta">D\u00e9verrouiller avec une cl\u00e9 d\'acc\u00e8s</string>
+    <string name="native_passkey_unlock_in_progress">D\u00e9verrouillage\u2026</string>
+    <string name="native_passkey_unlock_cancelled">D\u00e9verrouillage par cl\u00e9 d\'acc\u00e8s annul\u00e9.</string>
+    <string name="native_passkey_unlock_fallback_hint">Si votre cl\u00e9 d\'acc\u00e8s ne fonctionne pas (PRF non support\u00e9, cl\u00e9 non autoris\u00e9e, etc.), repassez sur l\'onglet \u00ab Passphrase \u00bb ou \u00ab Recovery key \u00bb.</string>
+    <string name="native_passkey_no_prf_output">Cette cl\u00e9 d\'acc\u00e8s n\'a pas renvoy\u00e9 de sortie PRF. Utilisez la passphrase ou la recovery key.</string>
+    <string name="native_locked_banner_message">Le serveur a \u00e9t\u00e9 verrouill\u00e9 (par un administrateur ou suite \u00e0 un red\u00e9marrage du service). Vos notes restent lisibles depuis cet appareil, mais les modifications ne se synchroniseront qu\'apr\u00e8s le d\u00e9verrouillage par un administrateur.</string>
+    <string name="native_locked_banner_unlock">D\u00e9verrouiller</string>
+    <string name="native_dismiss">Fermer</string>
+    <string name="native_lock_instance">Verrouiller l\'instance</string>
+    <string name="native_lock_instance_failed">\u00c9chec du verrouillage de l\'instance.</string>
 </resources>

@@ -270,6 +270,7 @@ fun NativeNotesListScreen(
     val archiveLabel = stringResource(R.string.native_note_detail_archive)
     val pinLabel = stringResource(R.string.native_note_detail_pin)
     val colorLabel = stringResource(R.string.native_note_detail_change_color)
+    val lockInstanceFailed = stringResource(R.string.native_lock_instance_failed)
     val context = LocalContext.current
     val toasts = LocalGkToasts.current
 
@@ -386,6 +387,27 @@ fun NativeNotesListScreen(
             }
             container.tokenStore.clearSession()
             onSignedOut()
+        }
+    }
+
+    /** The header menu's admin-only "lock the instance": drop the at-rest
+     *  key from the server's RAM so it is locked again right away. The
+     *  server broadcasts the lock to every connected client, this device
+     *  included, so nothing here has to move the screen itself. */
+    fun lockInstance() {
+        scope.launch {
+            try {
+                val response = container.api(serverUrl).lockInstance()
+                if (response.isSuccessful) {
+                    container.lockState.markLocked()
+                } else {
+                    NativeDebug.e("Lock instance failed: HTTP ${response.code()}")
+                    toasts.error(lockInstanceFailed)
+                }
+            } catch (t: Throwable) {
+                NativeDebug.e("Lock instance network error", t)
+                toasts.error(lockInstanceFailed)
+            }
         }
     }
 
@@ -527,6 +549,9 @@ fun NativeNotesListScreen(
                 onToggleViewMode = { toggleViewMode() },
                 onToggleDark = { container.shellPrefs.toggleDark(dark) },
                 onOpenQrScanner = onOpenQrScanner,
+                // NotesHeader.jsx:100's own two conditions.
+                showLockInstance = container.shellPrefs.isAdmin && container.lockState.status?.enabled == true,
+                onLockInstance = { lockInstance() },
                 onSignOut = { signOut() },
                 notificationsOpen = notificationsOpen,
                 hasUnreadNotifications = unreadNotifications > 0,
@@ -745,6 +770,8 @@ private fun NativeHeader(
     onToggleViewMode: () -> Unit,
     onToggleDark: () -> Unit,
     onOpenQrScanner: () -> Unit,
+    showLockInstance: Boolean,
+    onLockInstance: () -> Unit,
     onSignOut: () -> Unit,
     notificationsOpen: Boolean,
     hasUnreadNotifications: Boolean,
@@ -972,6 +999,8 @@ private fun NativeHeader(
                         onToggleDark = { moreMenuExpanded = false; onToggleDark() },
                         onEnterSelection = { moreMenuExpanded = false; onEnterSelection() },
                         onOpenQrScanner = { moreMenuExpanded = false; onOpenQrScanner() },
+                        showLockInstance = showLockInstance,
+                        onLockInstance = { moreMenuExpanded = false; onLockInstance() },
                         onSignOut = { moreMenuExpanded = false; onSignOut() },
                     )
                 }
@@ -1100,21 +1129,23 @@ private fun AiAnswerCard(
  * Material DropdownMenu: the web's panel has its own geometry (it opens
  * over the kebab rather than under it, hugs its widest row, and scrolls
  * past 72% of the screen) and its own row shape (16sp label, 12dp gap,
- * one accent colour per action). Everything an admin-only surface would
- * add - the admin panel, the instance lock - is left out because this app
- * has neither.
+ * one accent colour per action). The admin panel is left out because this
+ * app has none; the instance lock IS here, on the web's own two conditions
+ * (an admin, and at-rest encryption switched on).
  */
 @Composable
 private fun HeaderMenu(
     expanded: Boolean,
     dark: Boolean,
     listView: Boolean,
+    showLockInstance: Boolean,
     onDismiss: () -> Unit,
     onOpenSettings: () -> Unit,
     onToggleViewMode: () -> Unit,
     onToggleDark: () -> Unit,
     onEnterSelection: () -> Unit,
     onOpenQrScanner: () -> Unit,
+    onLockInstance: () -> Unit,
     onSignOut: () -> Unit,
 ) {
     if (!expanded) return
@@ -1173,6 +1204,16 @@ private fun HeaderMenu(
             ) { tint -> QrCodeIcon(size = 20.dp, tint = tint) }
             // The whole row is red on the web, glyph and label alike.
             val signOutColor = if (dark) Color(0xFFF87171) else Color(0xFFDC2626)
+            if (showLockInstance) {
+                // Red glyph, ordinary label: the row above sign-out on the
+                // web reddens only its icon (NotesHeader.jsx:719).
+                HeaderMenuItem(
+                    label = stringResource(R.string.native_lock_instance),
+                    iconTint = signOutColor,
+                    dark = dark,
+                    onClick = onLockInstance,
+                ) { tint -> LockIcon(size = 20.dp, tint = tint) }
+            }
             HeaderMenuItem(
                 label = stringResource(R.string.native_notes_sign_out),
                 iconTint = signOutColor,

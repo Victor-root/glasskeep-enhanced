@@ -13,8 +13,10 @@ data class WorkspacePreferences(
     val editorToolbarMode: String?,
     val typography: TypographyPresets,
     /** The account's interface language ("en", "fr"), or null to follow
-     *  the device. Lives on the profile rather than the settings blob. */
+     *  the device, and whether this user administers the instance. Both
+     *  live on the profile rather than the settings blob. */
     val language: String?,
+    val isAdmin: Boolean?,
     /** Where the notification pill sits, and how long it stays (null =
      *  until dismissed). */
     val toastPosition: String?,

@@ -36,6 +36,20 @@ class ShellPrefsState(private val tokenStore: TokenStore) {
     }
 
     /**
+     * Whether this account administers the instance, which is what gates
+     * the header menu's "lock the instance" entry (NotesHeader.jsx:100).
+     * Deliberately NOT cached, unlike everything above: it is a server
+     * fact rather than a look-and-feel preference, and a stale copy would
+     * offer an action the server would only refuse.
+     */
+    var isAdmin: Boolean by mutableStateOf(false)
+        private set
+
+    fun applyIsAdmin(admin: Boolean) {
+        isAdmin = admin
+    }
+
+    /**
      * The light/dark choice made from the header menu, or null to follow
      * the system. Deliberately NOT cached: the web keeps this one in
      * sessionStorage (App.jsx:2240), so it lasts the session and the

@@ -705,6 +705,29 @@ data class PasskeyLoginVerifyRequest(
     val challengeId: String,
 )
 
+/** Response of POST /api/instance/unlock-passkey/options. Same opaque
+ *  relay as PasskeyCeremonyOptionsResponse, but both fields are optional
+ *  here: the route answers `{ alreadyUnlocked: true }` and nothing else
+ *  when someone unlocked the instance between the screen appearing and
+ *  the button being pressed (passkeyRoutes.js:660). */
+@Serializable
+data class UnlockPasskeyOptionsResponse(
+    val options: JsonElement? = null,
+    val challengeId: String? = null,
+    val alreadyUnlocked: Boolean = false,
+)
+
+/** Body for POST /api/instance/unlock-passkey/verify. Same opaque relay as
+ *  PasskeyLoginVerifyRequest, plus the PRF output the ceremony produced:
+ *  the server needs it to unwrap the data key, and refuses the request
+ *  outright without one (passkeyRoutes.js:722). */
+@Serializable
+data class UnlockPasskeyVerifyRequest(
+    val response: JsonElement,
+    val challengeId: String,
+    val prfOutput: String,
+)
+
 /** Body for PATCH /api/passkeys/:id. The server trims and truncates to
  *  64 characters itself, and rejects an empty name with a 400. */
 @Serializable
@@ -712,6 +735,41 @@ data class PasskeyRenameRequest(val name: String)
 
 @Serializable
 data class PasskeyMutationResponse(val ok: Boolean = false)
+
+/** GET /api/instance/status, the one route that answers even while the
+ *  server is locked (see server/index.js's LOCK_ALLOW_PATHS). `enabled`
+ *  is "at-rest encryption is configured at all", `locked` its current
+ *  state; both must be true for the unlock screen to take over. */
+@Serializable
+data class InstanceStatusResponse(
+    val enabled: Boolean = false,
+    val locked: Boolean = false,
+    val unlocked: Boolean = false,
+)
+
+/** Body for POST /api/instance/unlock. */
+@Serializable
+data class UnlockPassphraseRequest(val passphrase: String)
+
+/** Body for POST /api/instance/unlock-recovery. The server normalizes the
+ *  key itself (dashes, case, spacing), so this sends it as typed. */
+@Serializable
+data class UnlockRecoveryRequest(val recoveryKey: String)
+
+/** Shared response of the three unlock routes and of POST
+ *  /api/instance/lock. The passphrase and recovery-key routes answer with
+ *  `ok` alone; the passkey route also signs the admin in, so it carries
+ *  the same session fields LoginResponse does (passkeyRoutes.js:825), and
+ *  the native screen installs that session exactly like a password login.
+ *  `alreadyUnlocked` means someone else won the race: nothing to do. */
+@Serializable
+data class UnlockResponse(
+    val ok: Boolean = false,
+    val alreadyUnlocked: Boolean = false,
+    val token: String? = null,
+    val user: UserDto? = null,
+    @SerialName("must_change_password") val mustChangePassword: Boolean = false,
+)
 
 /** Response for GET /api/device-link/info, the PC's own user-agent and a
  *  masked IP (see deviceLinkRoutes.js's own maskIp()) so the phone can
@@ -1006,6 +1064,34 @@ interface GlassKeepApi {
     // it beyond the HTTP status this call already checks.
     @POST("api/passkeys/login/verify")
     suspend fun passkeyLoginVerify(@Body body: PasskeyLoginVerifyRequest): Response<LoginResponse>
+
+    // At-rest encryption's runtime lock. Every route here except lock()
+    // is pre-login and answers even while the server is locked: they sit
+    // on server/index.js's own LOCK_ALLOW_PATHS, which is the whole point
+    // (a locked server 423s everything else, so without these there would
+    // be no way back in). Called straight from InstanceUnlockScreen, not
+    // through NotesRepository, same reason as the passkey login pair
+    // above.
+    @GET("api/instance/status")
+    suspend fun instanceStatus(): Response<InstanceStatusResponse>
+
+    @POST("api/instance/unlock")
+    suspend fun unlockInstance(@Body body: UnlockPassphraseRequest): Response<UnlockResponse>
+
+    @POST("api/instance/unlock-recovery")
+    suspend fun unlockInstanceWithRecoveryKey(@Body body: UnlockRecoveryRequest): Response<UnlockResponse>
+
+    @POST("api/instance/unlock-passkey/options")
+    suspend fun unlockPasskeyOptions(): Response<UnlockPasskeyOptionsResponse>
+
+    @POST("api/instance/unlock-passkey/verify")
+    suspend fun unlockPasskeyVerify(@Body body: UnlockPasskeyVerifyRequest): Response<UnlockResponse>
+
+    // The one authenticated, admin-only route of the set: drops the data
+    // key from the server's RAM so the instance is locked again right
+    // away (the header menu's own entry, NotesHeader.jsx:719).
+    @POST("api/instance/lock")
+    suspend fun lockInstance(): Response<UnlockResponse>
 
     // Cross-device QR sign-in, phone side only (see QrScanScreen.kt): the
     // phone that already has a session scans a QR shown on a PC's login

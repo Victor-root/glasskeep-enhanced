@@ -931,20 +931,22 @@ class NotesRepository(
             val response = api.getUserSettings()
             val body = response.body()
             if (!response.isSuccessful || body == null) return null
+            // The interface language and the admin flag live on the
+            // profile, not in the settings blob, but both are needed at
+            // exactly the same moment, so they ride along rather than
+            // costing a second round trip on some other screen.
+            val profile = try {
+                api.getProfile().body()
+            } catch (t: Throwable) {
+                NativeDebug.e("NotesRepository.fetchWorkspacePreferences: profile read failed", t)
+                null
+            }
             WorkspacePreferences(
                 shellTheme = body.shellTheme,
                 editorToolbarMode = body.editorToolbarMode,
                 typography = TypographyPresets.normalize(body.typographyPresets),
-                // The interface language lives on the profile, not in the
-                // settings blob, but it is needed at exactly the same
-                // moment, so it rides along rather than costing a second
-                // round trip on some other screen.
-                language = try {
-                    api.getProfile().body()?.language
-                } catch (t: Throwable) {
-                    NativeDebug.e("NotesRepository.fetchWorkspacePreferences: profile read failed", t)
-                    null
-                },
+                language = profile?.language,
+                isAdmin = profile?.isAdmin,
                 toastPosition = body.notificationsPositionMobile,
                 notificationsSound = body.notificationsSound,
                 notificationsSoundTypes = body.notificationsSoundTypes,

@@ -53,6 +53,8 @@ class RealtimeClient(
     private val serverUrl: String,
     private val tokenStore: TokenStore,
     private val onRefreshNeeded: suspend () -> Unit,
+    private val onInstanceLocked: () -> Unit,
+    private val onInstanceUnlocked: () -> Unit,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -100,7 +102,7 @@ class RealtimeClient(
         // interceptors (auth, logging) and only overrides this one
         // setting - generous enough to tolerate a missed ping or two,
         // not so long that a truly dead connection goes undetected.
-        val client = ApiClientFactory.okHttpClient(tokenStore).newBuilder()
+        val client = ApiClientFactory.okHttpClient(tokenStore, onInstanceLocked).newBuilder()
             .readTimeout(60, TimeUnit.SECONDS)
             .build()
         val normalizedBaseUrl = if (serverUrl.endsWith("/")) serverUrl else "$serverUrl/"
@@ -147,6 +149,22 @@ class RealtimeClient(
             if (payloadType != null && payloadType in REFRESH_TRIGGER_TYPES) {
                 NativeDebug.d("RealtimeClient event type=$payloadType, refreshing")
                 triggerRefresh()
+            }
+            // At-rest encryption's two lock-state frames, the one pair the
+            // server sends to EVERY connected client rather than to one
+            // user (server/routes/unlockRoutes.js's broadcastToAll). They
+            // carry no note data: their whole job is to move the app to or
+            // from the unlock screen at once, instead of up to 30 seconds
+            // later on the next status read (App.jsx:3769).
+            when (payloadType) {
+                "instance_locked" -> {
+                    NativeDebug.d("RealtimeClient event type=instance_locked")
+                    onInstanceLocked()
+                }
+                "instance_unlocked" -> {
+                    NativeDebug.d("RealtimeClient event type=instance_unlocked")
+                    onInstanceUnlocked()
+                }
             }
         }
 

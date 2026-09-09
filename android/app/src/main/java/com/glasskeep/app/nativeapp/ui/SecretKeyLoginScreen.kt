@@ -4,14 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -36,16 +32,7 @@ import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.network.SecretKeyLoginRequest
 import com.glasskeep.app.ui.ButtonGradient
-import com.glasskeep.app.ui.DarkBorderColor
-import com.glasskeep.app.ui.DarkCardBg
-import com.glasskeep.app.ui.DarkSubtextColor
-import com.glasskeep.app.ui.DarkTitleColor
-import com.glasskeep.app.ui.FloatingCardsBackground
 import com.glasskeep.app.ui.Indigo
-import com.glasskeep.app.ui.LightBorderColor
-import com.glasskeep.app.ui.LightCardBg
-import com.glasskeep.app.ui.LightSubtextColor
-import com.glasskeep.app.ui.LightTitleColor
 import kotlinx.coroutines.launch
 
 private val ErrorColor = Color(0xFFdc2626)
@@ -66,7 +53,6 @@ fun SecretKeyLoginScreen(
     onLoggedIn: (mustChangePassword: Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
-    val dark = LocalGkDark.current
     var key by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -74,12 +60,6 @@ fun SecretKeyLoginScreen(
 
     val errorRejectedTemplate = stringResource(R.string.native_login_error_rejected)
     val errorNetworkTemplate = stringResource(R.string.native_login_error_network)
-
-    val bgModifier = Modifier.background(WorkspaceTheme.appBackground(container.themeState.themeId, dark))
-    val titleColor = if (dark) DarkTitleColor else LightTitleColor
-    val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
-    val cardBg = if (dark) DarkCardBg else LightCardBg
-    val borderColor = if (dark) DarkBorderColor else LightBorderColor
 
     fun submit() {
         val trimmed = key.trim()
@@ -109,82 +89,58 @@ fun SecretKeyLoginScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize().then(bgModifier), contentAlignment = Alignment.Center) {
-        if (container.shellPrefs.floatingCards) FloatingCardsBackground(dark)
+    AuthShell(container = container) { colors ->
+        OutlinedTextField(
+            value = key,
+            onValueChange = { key = it; errorMessage = null },
+            placeholder = { Text(stringResource(R.string.native_secret_login_placeholder)) },
+            colors = detailFieldColors(colors.title, colors.subtext, colors.border),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
+        )
+        Spacer(Modifier.height(16.dp))
 
-        Column(
-            modifier = Modifier.safeDrawingPadding().padding(horizontal = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        errorMessage?.let {
+            Text(it, color = ErrorColor, fontSize = 12.sp)
+            Spacer(Modifier.height(12.dp))
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(ButtonGradient)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    enabled = !loading,
+                    role = Role.Button,
+                ) { submit() },
+            contentAlignment = Alignment.Center,
         ) {
             Text(
-                stringResource(R.string.native_secret_login_title),
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = titleColor,
-                textAlign = TextAlign.Center,
+                stringResource(if (loading) R.string.connecting else R.string.native_secret_login_title),
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                fontSize = 16.sp,
             )
-            Spacer(Modifier.height(24.dp))
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(cardBg)
-                    .padding(24.dp),
-            ) {
-                OutlinedTextField(
-                    value = key,
-                    onValueChange = { key = it; errorMessage = null },
-                    placeholder = { Text(stringResource(R.string.native_secret_login_placeholder)) },
-                    colors = detailFieldColors(titleColor, subtextColor, borderColor),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
-                )
-                Spacer(Modifier.height(16.dp))
-
-                errorMessage?.let {
-                    Text(it, color = ErrorColor, fontSize = 12.sp)
-                    Spacer(Modifier.height(12.dp))
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(ButtonGradient)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            enabled = !loading,
-                            role = Role.Button,
-                        ) { submit() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        stringResource(if (loading) R.string.connecting else R.string.native_secret_login_title),
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        fontSize = 16.sp,
-                    )
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                Text(
-                    stringResource(R.string.native_secret_login_back),
-                    color = Indigo,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onBack() },
-                )
-            }
         }
+
+        Spacer(Modifier.height(16.dp))
+
+        Text(
+            stringResource(R.string.native_secret_login_back),
+            color = Indigo,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    role = Role.Button,
+                ) { onBack() },
+        )
     }
 }

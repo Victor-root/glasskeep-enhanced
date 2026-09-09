@@ -19,6 +19,7 @@ class NativeAppContainer(context: Context) {
     val themeState = ThemeState(tokenStore)
     val editorPrefs = EditorPrefsState(tokenStore)
     val shellPrefs = ShellPrefsState(tokenStore)
+    val lockState = InstanceLockState()
     val noteAiStore = NoteAiStore(context)
     private val db = AppDatabase.get(context)
     private val syncQueueDb = SyncQueueDatabase.get(context)
@@ -36,7 +37,7 @@ class NativeAppContainer(context: Context) {
         val existing = cachedApi
         if (existing != null && cachedApiServerUrl == serverUrl) return existing
         NativeDebug.d("NativeAppContainer.api: (re)building client for $serverUrl")
-        val fresh = ApiClientFactory.create(serverUrl, tokenStore)
+        val fresh = ApiClientFactory.create(serverUrl, tokenStore, lockState::markLocked)
         cachedApi = fresh
         cachedApiServerUrl = serverUrl
         return fresh
