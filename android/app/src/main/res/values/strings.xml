@@ -677,4 +677,36 @@
     <string name="native_dismiss">Dismiss</string>
     <string name="native_lock_instance">Lock the instance</string>
     <string name="native_lock_instance_failed">Failed to lock the instance.</string>
+
+    <!-- Header sync status: src/sync/SyncStatusIcon.jsx. -->
+    <string name="native_sync_status_synced">All changes saved to cloud</string>
+    <string name="native_sync_status_pending">Local changes waiting to sync</string>
+    <string name="native_sync_status_syncing">Syncing with server\u2026</string>
+    <string name="native_sync_status_offline">Server unavailable, saved locally</string>
+    <string name="native_sync_status_error">Sync error, some changes not saved</string>
+    <string name="native_sync_server_checking">Checking server\u2026</string>
+    <string name="native_sync_server_reachable">Server reachable</string>
+    <string name="native_sync_server_unreachable">Server unreachable</string>
+    <string name="native_sync_instance_locked">Instance locked, sync paused, waiting for an admin to unlock</string>
+    <string name="native_sync_failed_checks">%1$d failed reconnection attempt(s)</string>
+    <string name="native_sync_queue_syncing">Syncing (%1$d active, %2$d waiting)</string>
+    <string name="native_sync_queue_waiting">%1$d change(s) waiting to sync</string>
+    <string name="native_sync_retrying_title">Retrying</string>
+    <string name="native_sync_retry_count">%1$d attempt(s)</string>
+    <string name="native_sync_errors_title">Sync errors</string>
+    <string name="native_sync_now">Sync now</string>
+    <string name="native_sync_safe_to_close">All changes saved, safe to close</string>
+    <string name="native_sync_not_safe_to_close">Local changes not yet saved to server</string>
+    <string name="native_sync_just_now">just now</string>
+    <string name="native_sync_ago_seconds">%1$ds</string>
+    <string name="native_sync_ago_minutes">%1$dm</string>
+    <string name="native_sync_ago_hours">%1$dh</string>
+    <string name="native_sync_ago_days">%1$dd</string>
+    <string name="native_sync_action_update">Update</string>
+    <string name="native_sync_action_patch">Patch</string>
+    <string name="native_sync_action_archive">Archive</string>
+    <string name="native_sync_action_trash">Trash</string>
+    <string name="native_sync_action_restore">Restore</string>
+    <string name="native_sync_action_delete">Delete</string>
+    <string name="native_sync_action_reorder">Reorder</string>
 </resources>

@@ -122,22 +122,39 @@ fun NativeNavHost(
         }
     }
 
-    // The lock read itself, on the two cadences useInstanceLockStatus.js
-    // polls at and for its reasons: 30s while unlocked (locking is rare
-    // and the endpoint should not be hammered), 3s while locked (the
-    // screen shown then is exactly where the user waits for it to flip
-    // back). repeatOnLifecycle also covers the web's visibilitychange /
-    // focus listeners: coming back to the foreground restarts the loop,
-    // which reads immediately. A failed read is left alone rather than
-    // treated as a lock, so a phone with no signal keeps its cached notes.
+    // The one read this app makes on its own schedule, doing both jobs the
+    // web splits across two: it reports the lock state AND, by answering at
+    // all, whether the server is reachable (the header's cloud icon and its
+    // panel read that, see SyncStatusState). Cadence is syncEngine.js's own
+    // health-check one; repeatOnLifecycle also covers the web's
+    // visibilitychange / focus listeners, since coming back to the
+    // foreground restarts the loop and it reads immediately. A failed read
+    // marks the server unreachable but never a lock, so a phone with no
+    // signal keeps its cached notes instead of landing on the unlock screen.
+    val pendingSyncIds by repository.observePendingSyncNoteIds().collectAsState(initial = emptySet())
     LaunchedEffect(lifecycleOwner, lockPokes) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
-                runCatching { container.api(serverUrl).instanceStatus() }
-                    .getOrNull()
-                    ?.body()
-                    ?.let { container.lockState.apply(it) }
-                delay(if (container.lockState.isLocked) LOCK_POLL_LOCKED_MS else LOCK_POLL_UNLOCKED_MS)
+                val outcome = runCatching { container.api(serverUrl).instanceStatus() }
+                val body = outcome.getOrNull()?.takeIf { it.isSuccessful }?.body()
+                if (body != null) {
+                    container.lockState.apply(body)
+                    container.syncStatus.recordReachable(System.currentTimeMillis())
+                } else {
+                    val error = outcome.exceptionOrNull()
+                    container.syncStatus.recordUnreachable(
+                        error?.message ?: error?.javaClass?.simpleName
+                            ?: outcome.getOrNull()?.let { "HTTP ${it.code()}" },
+                    )
+                }
+                delay(
+                    when {
+                        container.syncStatus.serverReachable == false -> HEALTH_OFFLINE_MS
+                        container.lockState.isLocked -> HEALTH_OFFLINE_MS
+                        pendingSyncIds.isNotEmpty() -> HEALTH_PENDING_MS
+                        else -> HEALTH_IDLE_MS
+                    },
+                )
             }
         }
     }
@@ -462,6 +479,10 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     }
 }
 
-// useInstanceLockStatus.js's own two cadences, kept as-is.
-private const val LOCK_POLL_UNLOCKED_MS = 30_000L
-private const val LOCK_POLL_LOCKED_MS = 3_000L
+// syncEngine.js's own health-check cadences (its lines 20-22), which the
+// read above follows: it is both this app's reachability probe and its
+// lock-status poll, so the tighter of the two schedules wins. The web
+// polls the lock endpoint at 3s while locked too (useInstanceLockStatus.js).
+private const val HEALTH_IDLE_MS = 10_000L
+private const val HEALTH_PENDING_MS = 5_000L
+private const val HEALTH_OFFLINE_MS = 3_000L

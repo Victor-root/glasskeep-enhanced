@@ -81,12 +81,15 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.SyncState
 import com.glasskeep.app.nativeapp.data.AiClient
 import com.glasskeep.app.nativeapp.data.ChecklistPreview
 import com.glasskeep.app.nativeapp.data.NoteContent
+import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.isReminderPast
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
+import com.glasskeep.app.nativeapp.data.local.SyncQueueEntity
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
@@ -136,10 +139,18 @@ fun NativeNotesListScreen(
     val notes by repository.observeNotes().collectAsState(initial = emptyList())
     // Notes with a queued edit still waiting to reach the server (any
     // type, any screen, see SyncQueueDao.observePendingNoteIds's own doc
-    // comment): drives both a per-card spinner and this header's own
-    // aggregate count below.
+    // comment): drives the per-card spinner.
     val pendingSyncNoteIds by repository.observePendingSyncNoteIds().collectAsState(initial = emptySet())
-    val syncingCount = remember(pendingSyncNoteIds, notes) { notes.count { it.id in pendingSyncNoteIds } }
+    // The whole queue, for the header's cloud icon and its panel: the set
+    // above is per-note, this one is per queued action, which is the
+    // number the web's own badge shows.
+    val syncQueue by repository.observeSyncQueue().collectAsState(initial = emptyList())
+    val syncState = container.syncStatus.state(
+        pending = syncQueue.count { it.status == SyncQueueEntity.STATUS_PENDING && it.attempts == 0 },
+        retrying = syncQueue.count { it.status == SyncQueueEntity.STATUS_PENDING && it.attempts > 0 },
+        failed = syncQueue.count { it.status == SyncQueueEntity.STATUS_FAILED },
+    )
+    var syncSheetOpen by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
     var creatingNote by remember { mutableStateOf(false) }
     var fabOpen by remember { mutableStateOf(false) }
@@ -414,14 +425,22 @@ fun NativeNotesListScreen(
     fun refresh() {
         refreshing = true
         errorMessage = null
+        // The queue drains alongside the pull, so the cloud icon reads
+        // "syncing" for both halves at once, like the web's own
+        // _processing || _pulling (syncEngine.js:730).
+        container.syncStatus.markSyncing(true)
+        SyncQueueWorker.triggerNow(context)
         scope.launch {
             try {
                 repository.refresh()
+                container.syncStatus.recordReachable(System.currentTimeMillis())
             } catch (t: Throwable) {
                 NativeDebug.e("Notes refresh failed", t)
+                container.syncStatus.recordUnreachable(t.message ?: t.javaClass.simpleName)
                 errorMessage = String.format(errorSyncTemplate, t.message ?: t.javaClass.simpleName)
             } finally {
                 refreshing = false
+                container.syncStatus.markSyncing(false)
             }
         }
     }
@@ -530,9 +549,10 @@ fun NativeNotesListScreen(
                     else -> activeTagFilter
                 },
                 activeLens = activeTagFilter?.takeIf { it == SidebarAllImages || it == SidebarReminders },
-                refreshing = refreshing,
-                syncingCount = syncingCount,
-                onRefresh = { refresh() },
+                syncState = syncState,
+                queuedCount = syncQueue.size,
+                instanceLocked = container.lockState.isLocked,
+                onOpenSyncStatus = { syncSheetOpen = !syncSheetOpen },
                 onOpenSidebar = { sidebarOpen = true },
                 onOpenSettings = onOpenSettings,
                 searchOpen = searchOpen,
@@ -739,9 +759,18 @@ fun NativeNotesListScreen(
             onOpenNote = { id -> notificationsOpen = false; onOpenNote(id) },
             onDismiss = { notificationsOpen = false },
         )
+        SyncStatusSheet(
+            container = container,
+            serverUrl = serverUrl,
+            open = syncSheetOpen,
+            dark = dark,
+            onDismiss = { syncSheetOpen = false },
+            onSyncNow = { refresh() },
+        )
     }
 
     BackHandler(enabled = notificationsOpen) { notificationsOpen = false }
+    BackHandler(enabled = syncSheetOpen) { syncSheetOpen = false }
 }
 
 @Composable
@@ -754,9 +783,10 @@ private fun NativeHeader(
     /** Which of the drawer's two lenses is on, if either: the header row
      *  shows their own glyph rather than the tag one. */
     activeLens: String?,
-    refreshing: Boolean,
-    syncingCount: Int,
-    onRefresh: () -> Unit,
+    syncState: SyncState,
+    queuedCount: Int,
+    instanceLocked: Boolean,
+    onOpenSyncStatus: () -> Unit,
     onOpenSidebar: () -> Unit,
     onOpenSettings: () -> Unit,
     searchOpen: Boolean,
@@ -954,26 +984,13 @@ private fun NativeHeader(
                         )
                     }
                 }
-                val refreshLabel = stringResource(R.string.native_notes_refresh)
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .semantics { contentDescription = refreshLabel }
-                        .gkTooltip(refreshLabel)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            enabled = !refreshing,
-                            role = Role.Button,
-                        ) { onRefresh() }
-                        .padding(8.dp),
-                ) {
-                    when {
-                        refreshing -> CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Indigo, strokeWidth = 2.dp)
-                        syncingCount > 0 -> CloudPendingIcon(size = 18.dp, tint = if (dark) Color(0xFFfbbf24) else Color(0xFFd97706))
-                        else -> CloudCheckIcon(size = 18.dp, tint = if (dark) Color(0xFF34d399) else Color(0xFF059669))
-                    }
-                }
+                SyncStatusButton(
+                    state = syncState,
+                    queued = queuedCount,
+                    locked = instanceLocked,
+                    dark = dark,
+                    onClick = onOpenSyncStatus,
+                )
                 var moreMenuExpanded by remember { mutableStateOf(false) }
                 val moreLabel = stringResource(R.string.native_notes_more_options)
                 Box {

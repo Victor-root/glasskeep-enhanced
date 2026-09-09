@@ -665,4 +665,36 @@
     <string name="native_dismiss">Fermer</string>
     <string name="native_lock_instance">Verrouiller l\'instance</string>
     <string name="native_lock_instance_failed">\u00c9chec du verrouillage de l\'instance.</string>
+
+    <!-- Header sync status: src/sync/SyncStatusIcon.jsx. -->
+    <string name="native_sync_status_synced">Tout est sauvegard\u00e9 dans le cloud</string>
+    <string name="native_sync_status_pending">Modifications locales en attente</string>
+    <string name="native_sync_status_syncing">Synchronisation en cours\u2026</string>
+    <string name="native_sync_status_offline">Serveur indisponible, sauvegard\u00e9 localement</string>
+    <string name="native_sync_status_error">Erreur de synchronisation, certains changements non sauv\u00e9s</string>
+    <string name="native_sync_server_checking">V\u00e9rification du serveur\u2026</string>
+    <string name="native_sync_server_reachable">Serveur joignable</string>
+    <string name="native_sync_server_unreachable">Serveur injoignable</string>
+    <string name="native_sync_instance_locked">Instance verrouill\u00e9e, sync en pause, en attente de d\u00e9verrouillage par un administrateur</string>
+    <string name="native_sync_failed_checks">%1$d tentative(s) de reconnexion \u00e9chou\u00e9e(s)</string>
+    <string name="native_sync_queue_syncing">Synchronisation en cours (%1$d en cours, %2$d en attente)</string>
+    <string name="native_sync_queue_waiting">%1$d modification(s) en attente de synchronisation</string>
+    <string name="native_sync_retrying_title">Nouvelles tentatives en cours</string>
+    <string name="native_sync_retry_count">%1$d tentative(s)</string>
+    <string name="native_sync_errors_title">Erreurs de synchronisation</string>
+    <string name="native_sync_now">Synchroniser maintenant</string>
+    <string name="native_sync_safe_to_close">Tout est sauvegard\u00e9, vous pouvez fermer</string>
+    <string name="native_sync_not_safe_to_close">Modifications locales non sauv\u00e9es sur le serveur</string>
+    <string name="native_sync_just_now">\u00e0 l\'instant</string>
+    <string name="native_sync_ago_seconds">%1$ds</string>
+    <string name="native_sync_ago_minutes">%1$dmin</string>
+    <string name="native_sync_ago_hours">%1$dh</string>
+    <string name="native_sync_ago_days">%1$dj</string>
+    <string name="native_sync_action_update">Mise \u00e0 jour</string>
+    <string name="native_sync_action_patch">Modification</string>
+    <string name="native_sync_action_archive">Archivage</string>
+    <string name="native_sync_action_trash">Corbeille</string>
+    <string name="native_sync_action_restore">Restauration</string>
+    <string name="native_sync_action_delete">Suppression</string>
+    <string name="native_sync_action_reorder">R\u00e9organisation</string>
 </resources>

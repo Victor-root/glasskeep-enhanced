@@ -70,10 +70,10 @@ import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
-private val NotifSheetEasing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
+internal val TopSheetEasing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
 
 /** MOBILE_CLOSE_THRESHOLD_PX (NotificationCenter.jsx:28). */
-private val SheetCloseThreshold = 60.dp
+internal val TopSheetCloseThreshold = 60.dp
 
 /** SWIPE_DISMISS_THRESHOLD (NotificationCard.jsx). */
 private val SwipeDismissThreshold = 80.dp
@@ -156,7 +156,7 @@ fun NotificationCenter(
 
     val slide by animateFloatAsState(
         targetValue = if (open) 0f else -1f,
-        animationSpec = tween(durationMillis = 600, easing = NotifSheetEasing),
+        animationSpec = tween(durationMillis = 600, easing = TopSheetEasing),
         label = "notifCenterSlide",
     )
 
@@ -235,12 +235,12 @@ fun NotificationCenter(
                 }
             }
 
-            NotificationCenterGrabber(
+            TopSheetGrabber(
                 dark = dark,
                 onDrag = { dy -> dragOffset = (dragOffset + dy).coerceAtMost(0f) },
                 onDragEnd = {
                     val pulled = with(density) { (-dragOffset).toDp() }
-                    if (pulled > SheetCloseThreshold) onDismiss() else dragOffset = 0f
+                    if (pulled > TopSheetCloseThreshold) onDismiss() else dragOffset = 0f
                 },
                 onDragCancel = { dragOffset = 0f },
             )
@@ -336,10 +336,11 @@ private fun NotificationCenterHeader(
     }
 }
 
-/** `.gk-notif-center-grabber`: the 18dp strip at the foot of the sheet,
- *  pulled UP to close. A downward pull does nothing. */
+/** `.gk-notif-center-grabber`: the 18dp strip at the foot of a top sheet,
+ *  pulled UP to close. A downward pull does nothing. Shared with the sync
+ *  sheet, which the web builds from the same parts. */
 @Composable
-private fun NotificationCenterGrabber(
+internal fun TopSheetGrabber(
     dark: Boolean,
     onDrag: (Float) -> Unit,
     onDragEnd: () -> Unit,

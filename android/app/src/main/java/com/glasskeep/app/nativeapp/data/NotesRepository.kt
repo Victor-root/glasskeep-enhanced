@@ -4,6 +4,7 @@ import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.local.NoteDao
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.local.SyncQueueDao
+import com.glasskeep.app.nativeapp.data.local.SyncQueueEntity
 import com.glasskeep.app.nativeapp.data.local.SyncQueueType
 import com.glasskeep.app.nativeapp.data.network.AddCollaboratorRequest
 import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
@@ -854,6 +855,9 @@ class NotesRepository(
      *  observePendingNoteIds's own doc comment for why this is
      *  deliberately untyped, unlike getProtectedNoteIds above). */
     fun observePendingSyncNoteIds(): Flow<Set<String>> = syncQueueDao.observePendingNoteIds().map { it.toSet() }
+
+    /** The whole queue, for the header's sync panel (see SyncStatusSheet). */
+    fun observeSyncQueue(): Flow<List<SyncQueueEntity>> = syncQueueDao.observeAll()
 
     /** Sets, moves, or clears (reminderAtIso == null) a note's reminder.
      *  Its own dedicated route (see GlassKeepApi.setReminder), not the

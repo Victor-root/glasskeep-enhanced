@@ -90,4 +90,10 @@ interface SyncQueueDao {
      *  actually rendering. */
     @Query("SELECT DISTINCT noteId FROM sync_queue WHERE status = '${SyncQueueEntity.STATUS_PENDING}'")
     fun observePendingNoteIds(): Flow<List<String>>
+
+    /** Everything still queued, failed items included: the header's sync
+     *  panel lists them by name with their retry count (SyncStatusIcon.jsx's
+     *  own two sections). Oldest first, the order they will be replayed in. */
+    @Query("SELECT * FROM sync_queue ORDER BY createdAt ASC")
+    fun observeAll(): Flow<List<SyncQueueEntity>>
 }

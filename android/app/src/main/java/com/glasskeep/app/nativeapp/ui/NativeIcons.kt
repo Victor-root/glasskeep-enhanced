@@ -917,6 +917,44 @@ fun CloudPendingIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Colo
     }
 }
 
+/** The shape [CloudCheckIcon] and its four siblings share: the same
+ *  1.5-stroke cloud outline the web draws, with one glyph inside it. */
+@Composable
+private fun CloudIcon(pathData: String, modifier: Modifier, size: Dp, tint: Color) {
+    val path = remember(pathData) { PathParser().parsePathString(pathData).toPath() }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 1.5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+/** SyncStatusIcon.jsx's CloudSync: a drain is running right now. */
+@Composable
+fun CloudSyncIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = CloudIcon(
+    "M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25 " +
+        "M8 14l2-2 2 2 M10 12v5 M16 13l-2 2-2-2 M14 15v-5",
+    modifier, size, tint,
+)
+
+/** SyncStatusIcon.jsx's CloudOff: the server did not answer. */
+@Composable
+fun CloudOffIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = CloudIcon(
+    "M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0 4 15h9a5 5 0 0 0 1.7-.3 " +
+        "M1 1L23 23",
+    modifier, size, tint,
+)
+
+/** SyncStatusIcon.jsx's CloudError: everything still queued has given up. */
+@Composable
+fun CloudErrorIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = CloudIcon(
+    "M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25 " +
+        "M12 10L12 14 " +
+        "M12 16.6a0.5 0.5 0 1 0 0 0.8a0.5 0.5 0 0 0 0 -0.8",
+    modifier, size, tint,
+)
+
 /** The counterpart of [TablerIcon] for the web's own hand-drawn set
  *  (src/icons/index.jsx), which draws at strokeWidth 2. */
 @Composable

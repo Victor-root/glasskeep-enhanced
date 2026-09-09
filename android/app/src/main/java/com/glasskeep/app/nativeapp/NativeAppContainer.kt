@@ -20,6 +20,7 @@ class NativeAppContainer(context: Context) {
     val editorPrefs = EditorPrefsState(tokenStore)
     val shellPrefs = ShellPrefsState(tokenStore)
     val lockState = InstanceLockState()
+    val syncStatus = SyncStatusState()
     val noteAiStore = NoteAiStore(context)
     private val db = AppDatabase.get(context)
     private val syncQueueDb = SyncQueueDatabase.get(context)
