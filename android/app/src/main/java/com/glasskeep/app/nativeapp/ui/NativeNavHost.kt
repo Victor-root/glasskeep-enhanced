@@ -19,7 +19,6 @@ import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.data.RealtimeClient
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.syncReminderAlarms
-import com.glasskeep.app.reminders.ReminderScheduler
 import com.glasskeep.app.reminders.ReminderSyncWorker
 import kotlinx.coroutines.launch
 
@@ -97,7 +96,7 @@ fun NativeNavHost(
     // sign-in with no WebView session on the device at all.
     LaunchedEffect(startDestination) {
         if (startDestination == "notes") {
-            ReminderScheduler.schedulePeriodic(context)
+            ReminderSyncWorker.schedulePeriodic(context)
             ReminderSyncWorker.syncNow(context)
             SyncQueueWorker.schedulePeriodic(context)
             SyncQueueWorker.triggerNow(context)
@@ -152,7 +151,7 @@ fun NativeNavHost(
     // whichever of "login"/"login-secret" is on the back stack either way,
     // since popUpTo removes everything up to and including its target.
     fun handleLoggedIn(mustChangePassword: Boolean) {
-        ReminderScheduler.schedulePeriodic(context)
+        ReminderSyncWorker.schedulePeriodic(context)
         ReminderSyncWorker.syncNow(context)
         SyncQueueWorker.schedulePeriodic(context)
         SyncQueueWorker.triggerNow(context)

@@ -1881,7 +1881,7 @@ fun NoteDetailScreen(
             // unchanged - the server's own default mode already does the
             // right thing for both of those without native needing to say
             // so explicitly (see TrashNoteRequest's own doc comment).
-            if (isOwnerAccess && !currentNote.collaborators.isNullOrEmpty()) {
+            if (isOwnerAccess && !note?.collaborators.isNullOrEmpty()) {
                 DeleteSharedNoteDialog(
                     dark = dark,
                     onDismiss = { showTrashConfirm = false },

@@ -74,7 +74,7 @@ private val ErrorColor = Color(0xFFdc2626)
  *  it from the archived toolbar and the active-notes-only pin button has
  *  no restore-from-trash / unarchive equivalent to share a slot with
  *  here). */
-internal enum class SecondaryBulkCapability { UNARCHIVE, TRASH, RESTORE, DELETE_PERMANENTLY, COLOR }
+enum class SecondaryBulkCapability { UNARCHIVE, TRASH, RESTORE, DELETE_PERMANENTLY, COLOR }
 
 /**
  * Shared shell for a read-only, secondary notes list: archived

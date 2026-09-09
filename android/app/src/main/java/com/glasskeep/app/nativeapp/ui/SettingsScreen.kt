@@ -4,6 +4,7 @@ import android.app.Activity
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -475,7 +476,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                     avatarUrl = current.avatarUrl,
                                     name = current.name.ifBlank { current.email },
                                     size = 64.dp,
-                                    onClick = { avatarPickerLauncher.launch(ActivityResultContracts.PickVisualMedia.ImageOnly) },
+                                    onClick = { avatarPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                                 )
                                 Spacer(Modifier.width(14.dp))
                                 Column(Modifier.weight(1f)) {
@@ -494,7 +495,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                                     indication = null,
                                                     enabled = !changingAvatar,
                                                     role = Role.Button,
-                                                ) { avatarPickerLauncher.launch(ActivityResultContracts.PickVisualMedia.ImageOnly) },
+                                                ) { avatarPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                                         )
                                         if (current.avatarUrl != null) {
                                             Spacer(Modifier.width(14.dp))
@@ -756,7 +757,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (dark) DarkBgColor else LightBgGradient)
+                                .then(if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient))
                                 .padding(12.dp),
                         )
                         Spacer(Modifier.height(10.dp))
