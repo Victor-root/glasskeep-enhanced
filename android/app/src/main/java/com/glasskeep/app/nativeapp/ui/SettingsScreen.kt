@@ -82,6 +82,7 @@ import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.MainActivity
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.ImageCompression
+import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NativePasskeys
@@ -431,6 +432,9 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
             try {
                 val confirmed = repository.setLanguage(value)
                 profile = profile?.copy(language = confirmed)
+                // Applied to this app's own UI too, not just saved on the
+                // account: this restarts the Activity in the new language.
+                AppLanguage.apply(confirmed)
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen setLanguage failed", t)
                 reportActionError(t)

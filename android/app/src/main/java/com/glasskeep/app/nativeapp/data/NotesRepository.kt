@@ -926,6 +926,16 @@ class NotesRepository(
                 shellTheme = body.shellTheme,
                 editorToolbarMode = body.editorToolbarMode,
                 typography = TypographyPresets.normalize(body.typographyPresets),
+                // The interface language lives on the profile, not in the
+                // settings blob, but it is needed at exactly the same
+                // moment, so it rides along rather than costing a second
+                // round trip on some other screen.
+                language = try {
+                    api.getProfile().body()?.language
+                } catch (t: Throwable) {
+                    NativeDebug.e("NotesRepository.fetchWorkspacePreferences: profile read failed", t)
+                    null
+                },
             )
         } catch (t: Throwable) {
             NativeDebug.e("NotesRepository.fetchWorkspacePreferences failed", t)

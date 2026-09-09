@@ -18,6 +18,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.RealtimeClient
@@ -298,4 +299,5 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     prefs.shellTheme?.let { container.themeState.apply(it) }
     prefs.editorToolbarMode?.let { container.editorPrefs.applyToolbarMode(it) }
     container.editorPrefs.applyTypography(prefs.typography)
+    AppLanguage.apply(prefs.language)
 }
