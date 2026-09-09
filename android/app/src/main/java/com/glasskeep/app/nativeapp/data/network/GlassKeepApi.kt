@@ -345,6 +345,10 @@ data class UserSettingsDto(
     /** Chosen workspace theme id (see WorkspaceTheme.kt), or null for a
      *  user who never picked one (defaults to "glasskeep"). */
     val shellTheme: String? = null,
+    /** The reminder picker's quick-time chips ("09:00", "12:00"…), at
+     *  most five, or null while the user never edited them (the picker
+     *  falls back to its own defaults). */
+    val reminderTimeChips: List<String>? = null,
 )
 
 /** Body for a PATCH /api/user/settings that sets only the workspace theme.
@@ -359,6 +363,11 @@ data class SetShellThemeRequest(val shellTheme: String)
  *  merge-only shape as SetShellThemeRequest. */
 @Serializable
 data class SetChecklistInsertPositionRequest(val checklistInsertPosition: String)
+
+/** Body for a PATCH /api/user/settings that sets only the reminder
+ *  picker's quick-time chips. Same narrow-body shape as the two above. */
+@Serializable
+data class SetReminderTimeChipsRequest(val reminderTimeChips: List<String>)
 
 /** GET /api/user/profile response. Mirrors serializeNote()-adjacent
  *  server code (server/index.js) field for field; `name`/`email` are
@@ -675,6 +684,9 @@ interface GlassKeepApi {
 
     @PATCH("api/user/settings")
     suspend fun setChecklistInsertPosition(@Body body: SetChecklistInsertPositionRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setReminderTimeChips(@Body body: SetReminderTimeChipsRequest): Response<UserSettingsDto>
 
     @GET("api/user/profile")
     suspend fun getProfile(): Response<ProfileDto>

@@ -35,6 +35,7 @@ import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
 import com.glasskeep.app.nativeapp.data.network.SetLanguageRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
+import com.glasskeep.app.nativeapp.data.network.SetReminderTimeChipsRequest
 import com.glasskeep.app.nativeapp.data.network.SetShellThemeRequest
 import com.glasskeep.app.nativeapp.data.network.SetShowOnLoginRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
@@ -841,6 +842,32 @@ class NotesRepository(
             val error = "PATCH /api/user/settings (checklistInsertPosition) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
             NativeDebug.e(error)
             throw IllegalStateException(error)
+        }
+    }
+
+    /** Best-effort read of the reminder picker's quick-time chips, same
+     *  settings blob as above. Null when the user never edited them, so
+     *  the picker keeps its own defaults (the web does the same). */
+    suspend fun fetchReminderTimeChips(): List<String>? {
+        return try {
+            val response = api.getUserSettings()
+            if (response.isSuccessful) response.body()?.reminderTimeChips?.takeIf { it.isNotEmpty() } else null
+        } catch (t: Throwable) {
+            NativeDebug.e("NotesRepository.fetchReminderTimeChips failed", t)
+            null
+        }
+    }
+
+    /** Saves the edited chips. Fire-and-forget like the web's own
+     *  handleReminderTimeChipsChange, which never surfaces a failure:
+     *  the chips are a convenience, and the picker already shows the
+     *  new list locally. */
+    suspend fun setReminderTimeChips(chips: List<String>) {
+        NativeDebug.d("NotesRepository.setReminderTimeChips count=${chips.size}")
+        try {
+            api.setReminderTimeChips(SetReminderTimeChipsRequest(chips))
+        } catch (t: Throwable) {
+            NativeDebug.e("NotesRepository.setReminderTimeChips failed", t)
         }
     }
 

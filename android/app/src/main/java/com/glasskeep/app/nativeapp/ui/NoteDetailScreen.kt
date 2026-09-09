@@ -1,9 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
-import android.app.DatePickerDialog
-import android.app.TimePickerDialog
 import android.net.Uri
-import android.text.format.DateFormat
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -118,7 +115,6 @@ import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -227,6 +223,11 @@ fun NoteDetailScreen(
     var tagInput by remember { mutableStateOf("") }
     var changingTags by remember { mutableStateOf(false) }
     var changingReminder by remember { mutableStateOf(false) }
+    var showReminderPicker by remember { mutableStateOf(false) }
+    // The reminder picker's quick-time chips, shared with the web through
+    // the same settings blob; empty until read, which makes the picker
+    // fall back on its own defaults.
+    var reminderTimeChips by remember { mutableStateOf<List<String>>(emptyList()) }
 
     // "top"/"bottom", read from this user's own web settings once the note
     // turns out to be a checklist (see LaunchedEffect below); defaults to
@@ -1059,6 +1060,14 @@ fun NoteDetailScreen(
         }
     }
 
+    // Read only when the picker actually opens: the chips are useless
+    // anywhere else on this screen, and most notes are opened without
+    // ever touching the reminder.
+    LaunchedEffect(showReminderPicker) {
+        if (!showReminderPicker || reminderTimeChips.isNotEmpty()) return@LaunchedEffect
+        repository.fetchReminderTimeChips()?.let { reminderTimeChips = it }
+    }
+
     // Focus a checklist row after it's actually in composition (freshly
     // inserted rows aren't laid out yet the instant pendingChecklistFocus
     // is set). Guarded with try/catch: FocusRequester.requestFocus()
@@ -1160,7 +1169,11 @@ fun NoteDetailScreen(
     // entirely (Navigation Compose would otherwise just pop the back
     // stack directly), so it needs the exact same flush-before-navigating
     // treatment routed through it explicitly.
-    BackHandler(onBack = ::goBack)
+    // Back closes the topmost overlay first, the note last, the same
+    // fixed order App.jsx's own popstate stack walks (the colour and tag
+    // popovers dismiss themselves, being focusable popups).
+    BackHandler(enabled = showReminderPicker) { showReminderPicker = false }
+    BackHandler(enabled = !showReminderPicker, onBack = ::goBack)
 
     // The open note is painted in its own color, edge to edge: no card, no
     // radius, no shadow, no page padding. NoteModal.jsx hardcodes
@@ -1562,9 +1575,7 @@ fun NoteDetailScreen(
                                         enabled = !changingReminder,
                                         onClick = {
                                             menuExpanded = false
-                                            launchReminderPicker(context, currentNote.reminderAt) { picked ->
-                                                setReminder(formatIso(picked))
-                                            }
+                                            showReminderPicker = true
                                         },
                                     )
                                     if (currentNote.reminderAt != null) {
@@ -1714,6 +1725,28 @@ fun NoteDetailScreen(
                 onClose = { viewerIndex = null },
                 onRemove = { image -> removeImage(image) },
                 onDownload = { image -> downloadImage(image) },
+            )
+        }
+
+        if (showReminderPicker) {
+            ReminderPickerOverlay(
+                currentReminderIso = note?.reminderAt,
+                timeChips = reminderTimeChips,
+                themeId = container.themeState.themeId,
+                dark = dark,
+                onChipsChange = { chips ->
+                    reminderTimeChips = chips
+                    scope.launch { repository.setReminderTimeChips(chips) }
+                },
+                onSave = { picked ->
+                    setReminder(formatIso(picked))
+                    showReminderPicker = false
+                },
+                onRemove = {
+                    setReminder(null)
+                    showReminderPicker = false
+                },
+                onDismiss = { showReminderPicker = false },
             )
         }
     }
@@ -2133,63 +2166,6 @@ private fun normalizeRichLinkUrl(input: String): String {
     }
 }
 
-/**
- * Date then time, via the system's own DatePickerDialog/TimePickerDialog,
- * not a bespoke calendar like ReminderPicker.jsx's MiniCalendar/TimePicker,
- * a deliberately trimmed native v1 (see this milestone's commit message).
- * [currentReminderIso] prefills the dialogs on the existing reminder when
- * there is one and it's still in the future, else the same "tomorrow
- * 09:00" default ReminderPicker.jsx itself falls back to.
- *
- * A same-day pick can still land in the past (there's no min-time on the
- * time dialog, only a min-date on the date one, mirroring the web's own
- * calendar which only disables past days, not past times today), left
- * to ReminderScheduler.schedule()'s own existing safety net, which already
- * fires a past/now alarm almost immediately rather than losing it.
- */
-private fun launchReminderPicker(context: android.content.Context, currentReminderIso: String?, onPicked: (Date) -> Unit) {
-    val cal = Calendar.getInstance()
-    val currentMillis = currentReminderIso?.let(::parseIsoToEpochMillis)
-    if (currentMillis != null && currentMillis > System.currentTimeMillis()) {
-        cal.timeInMillis = currentMillis
-    } else {
-        cal.add(Calendar.DAY_OF_MONTH, 1)
-        cal.set(Calendar.HOUR_OF_DAY, 9)
-        cal.set(Calendar.MINUTE, 0)
-    }
-    cal.set(Calendar.SECOND, 0)
-    cal.set(Calendar.MILLISECOND, 0)
-
-    val todayStart = Calendar.getInstance().apply {
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }
-
-    DatePickerDialog(
-        context,
-        { _, year, month, dayOfMonth ->
-            cal.set(year, month, dayOfMonth)
-            TimePickerDialog(
-                context,
-                { _, hourOfDay, minute ->
-                    cal.set(Calendar.HOUR_OF_DAY, hourOfDay)
-                    cal.set(Calendar.MINUTE, minute)
-                    onPicked(cal.time)
-                },
-                cal.get(Calendar.HOUR_OF_DAY),
-                cal.get(Calendar.MINUTE),
-                DateFormat.is24HourFormat(context),
-            ).show()
-        },
-        cal.get(Calendar.YEAR),
-        cal.get(Calendar.MONTH),
-        cal.get(Calendar.DAY_OF_MONTH),
-    ).apply {
-        datePicker.minDate = todayStart.timeInMillis
-    }.show()
-}
 
 // internal, not private: Kotlin's top-level `private` is file-scoped, and
 // RichTextEditor.kt's link dialog reuses this exact styling.

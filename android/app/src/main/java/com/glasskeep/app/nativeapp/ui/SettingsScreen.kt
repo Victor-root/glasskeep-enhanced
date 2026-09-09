@@ -572,7 +572,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
-                val closeLabel = stringResource(R.string.native_settings_close)
+                val closeLabel = stringResource(R.string.native_common_close)
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
