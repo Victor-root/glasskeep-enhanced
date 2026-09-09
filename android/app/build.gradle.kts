@@ -217,6 +217,12 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Realtime cross-device updates (see RealtimeClient.kt): a small
+    // sibling OkHttp module for GET /api/events (text/event-stream),
+    // not something Retrofit's own @GET/suspend-fun interface pattern
+    // can model. Same version as the okhttp/logging-interceptor above:
+    // every okhttp3 module ships from one release in lockstep.
+    implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
     // Prints every request/response to Logcat. Debug builds only: this is
     // exactly the traffic to paste back when something doesn't sync right.
     debugImplementation("com.squareup.okhttp3:logging-interceptor:4.12.0")

@@ -1,17 +1,22 @@
 package com.glasskeep.app.nativeapp.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.glasskeep.app.nativeapp.NativeAppContainer
+import com.glasskeep.app.nativeapp.data.RealtimeClient
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.syncReminderAlarms
 import com.glasskeep.app.reminders.ReminderScheduler
@@ -48,6 +53,36 @@ fun NativeNavHost(
         notes?.let { syncReminderAlarms(context, it) }
     }
 
+    // Realtime cross-device updates (see RealtimeClient.kt's own doc
+    // comment for why this is foreground-only, not spanning the whole
+    // session the way the web's browser-tab EventSource does). A single
+    // Activity app, so LocalLifecycleOwner already reflects the whole
+    // app's foreground/background state - no need for the heavier,
+    // separate androidx.lifecycle:lifecycle-process/ProcessLifecycleOwner
+    // dependency this app doesn't otherwise pull in.
+    val realtimeClient = remember(serverUrl) {
+        RealtimeClient(
+            serverUrl = serverUrl,
+            tokenStore = container.tokenStore,
+            onRefreshNeeded = { repository.refresh() },
+        )
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, realtimeClient) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> if (container.tokenStore.token != null) realtimeClient.start()
+                Lifecycle.Event.ON_STOP -> realtimeClient.stop()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            realtimeClient.stop()
+        }
+    }
+
     // Background reminder sync (WorkManager): arms the periodic "ask the
     // server for upcoming reminders" job and runs one immediately, so a
     // reminder set on another device, or missed while this device was
@@ -66,6 +101,7 @@ fun NativeNavHost(
             ReminderSyncWorker.syncNow(context)
             SyncQueueWorker.schedulePeriodic(context)
             SyncQueueWorker.triggerNow(context)
+            realtimeClient.start()
         }
     }
 
@@ -120,6 +156,7 @@ fun NativeNavHost(
         ReminderSyncWorker.syncNow(context)
         SyncQueueWorker.schedulePeriodic(context)
         SyncQueueWorker.triggerNow(context)
+        realtimeClient.start()
         scope.launch { repository.fetchShellTheme()?.let { container.themeState.apply(it) } }
         if (mustChangePassword) {
             navController.navigate("force-change-password") {

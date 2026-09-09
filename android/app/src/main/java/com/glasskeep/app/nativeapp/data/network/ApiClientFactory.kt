@@ -44,10 +44,12 @@ object ApiClientFactory {
         coerceInputValues = true
     }
 
-    fun create(baseUrl: String, tokenStore: TokenStore): GlassKeepApi {
-        val normalizedBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
-        NativeDebug.d("ApiClientFactory.create baseUrl=$normalizedBaseUrl")
-
+    /** Shared by create() below (wrapped in Retrofit) and RealtimeClient
+     *  (used directly against a raw okhttp3.Request, for the long-lived
+     *  SSE stream Retrofit's @GET/suspend-fun interface pattern can't
+     *  model) - kept in one place so the two never drift apart on
+     *  auth/logging setup. */
+    fun okHttpClient(tokenStore: TokenStore): OkHttpClient {
         val clientBuilder = OkHttpClient.Builder()
             .addInterceptor(AuthInterceptor(tokenStore))
 
@@ -61,10 +63,17 @@ object ApiClientFactory {
             clientBuilder.addInterceptor(logging)
         }
 
+        return clientBuilder.build()
+    }
+
+    fun create(baseUrl: String, tokenStore: TokenStore): GlassKeepApi {
+        val normalizedBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        NativeDebug.d("ApiClientFactory.create baseUrl=$normalizedBaseUrl")
+
         val contentType = "application/json".toMediaType()
         val retrofit = Retrofit.Builder()
             .baseUrl(normalizedBaseUrl)
-            .client(clientBuilder.build())
+            .client(okHttpClient(tokenStore))
             .addConverterFactory(json.asConverterFactory(contentType))
             .build()
 
