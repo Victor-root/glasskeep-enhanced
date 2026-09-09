@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,6 +41,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
@@ -75,9 +75,11 @@ private val ErrorColor = Color(0xFFdc2626)
 /**
  * Milestone 0 of the native rewrite: a plain email/password form calling
  * the same `/api/login` the web app uses, since grown a passkey sign-in
- * option (see submitPasskeyLogin/NativePasskeys.kt). QR sign-in and the
- * recovery-key flow are still follow-up milestones, not skipped on
- * purpose.
+ * option (see submitPasskeyLogin/NativePasskeys.kt) and a "Forgot
+ * username/password?" link to SecretKeyLoginScreen. QR sign-in lives on
+ * its own screen, reached from Settings rather than from here (see
+ * QrScanScreen.kt's own doc comment for why it's phone-scans-PC only,
+ * never the other way around).
  *
  * Deliberately reuses SetupScreen's palette and layout language (gradient
  * backdrop, logo, white/dark card, indigo-to-violet button) instead of
@@ -87,7 +89,8 @@ private val ErrorColor = Color(0xFFdc2626)
 fun NativeLoginScreen(
     container: NativeAppContainer,
     serverUrl: String,
-    onLoggedIn: () -> Unit,
+    onLoggedIn: (mustChangePassword: Boolean) -> Unit,
+    onForgotPassword: () -> Unit,
 ) {
     val dark = isSystemInDarkTheme()
     var email by remember { mutableStateOf("") }
@@ -123,7 +126,7 @@ fun NativeLoginScreen(
                     NativeDebug.d("Login OK for uid=${body.user.id}")
                     container.tokenStore.serverUrl = serverUrl
                     container.tokenStore.token = body.token
-                    onLoggedIn()
+                    onLoggedIn(body.mustChangePassword)
                 } else {
                     NativeDebug.e("Login failed: HTTP ${response.code()} ${response.errorBody()?.string()}")
                     errorMessage = String.format(errorRejectedTemplate, response.code())
@@ -168,7 +171,7 @@ fun NativeLoginScreen(
                             NativeDebug.d("Passkey login OK for uid=${verifyBody.user.id}")
                             container.tokenStore.serverUrl = serverUrl
                             container.tokenStore.token = verifyBody.token
-                            onLoggedIn()
+                            onLoggedIn(verifyBody.mustChangePassword)
                         } else {
                             NativeDebug.e("Passkey login verify failed: HTTP ${verifyResponse.code()} ${verifyResponse.errorBody()?.string()}")
                             errorMessage = String.format(passkeyErrorTemplate, verifyResponse.code())
@@ -236,7 +239,7 @@ fun NativeLoginScreen(
                     label = { Text(stringResource(R.string.native_login_email)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    colors = fieldColors(titleColor, subtextColor, borderColor),
+                    colors = detailFieldColors(titleColor, subtextColor, borderColor),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(12.dp))
@@ -247,7 +250,7 @@ fun NativeLoginScreen(
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    colors = fieldColors(titleColor, subtextColor, borderColor),
+                    colors = detailFieldColors(titleColor, subtextColor, borderColor),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(16.dp))
@@ -311,19 +314,24 @@ fun NativeLoginScreen(
                         fontSize = 14.sp,
                     )
                 }
+
+                Spacer(Modifier.height(16.dp))
+
+                Text(
+                    stringResource(R.string.native_login_forgot_password),
+                    color = Indigo,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onForgotPassword() },
+                )
             }
         }
     }
 }
-
-@Composable
-private fun fieldColors(textColor: Color, subtextColor: Color, borderColor: Color) =
-    OutlinedTextFieldDefaults.colors(
-        focusedTextColor = textColor,
-        unfocusedTextColor = textColor,
-        focusedBorderColor = Indigo,
-        unfocusedBorderColor = borderColor,
-        focusedLabelColor = Indigo,
-        unfocusedLabelColor = subtextColor,
-        cursorColor = Indigo,
-    )

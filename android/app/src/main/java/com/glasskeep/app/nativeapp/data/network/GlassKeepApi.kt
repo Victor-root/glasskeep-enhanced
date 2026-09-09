@@ -33,6 +33,18 @@ data class LoginResponse(
     @SerialName("must_change_password") val mustChangePassword: Boolean = false,
 )
 
+/** Body for POST /api/login/secret. Server compares against every
+ *  account's hashed secret key and returns the exact same shape as
+ *  /api/login (see LoginResponse), reused here rather than re-declared. */
+@Serializable
+data class SecretKeyLoginRequest(val key: String)
+
+/** Response for POST /api/secret-key: a freshly generated, rotated key,
+ *  shown to the user exactly once (the server only ever stores its hash,
+ *  see server/index.js's generateSecretKey/updateSecretForUser). */
+@Serializable
+data class SecretKeyResponse(val key: String)
+
 /**
  * Mirrors serializeNote() in server/index.js field for field. Fields the
  * native app doesn't use yet are still declared so a future milestone can
@@ -390,6 +402,19 @@ data class NoteMutationResponse(
 interface GlassKeepApi {
     @POST("api/login")
     suspend fun login(@Body body: LoginRequest): Response<LoginResponse>
+
+    // Pre-login, same as passkeyLoginOptions/Verify below: called directly
+    // from NativeLoginScreen/SecretKeyLoginScreen, not through
+    // NotesRepository (no session exists yet to route it through).
+    @POST("api/login/secret")
+    suspend fun loginWithSecretKey(@Body body: SecretKeyLoginRequest): Response<LoginResponse>
+
+    // Authenticated: rotates the caller's own secret key (see
+    // SettingsScreen.kt's Security section). The server only ever
+    // returns the plaintext key from this one call; it stores just the
+    // hash from then on.
+    @POST("api/secret-key")
+    suspend fun generateSecretKey(): Response<SecretKeyResponse>
 
     @GET("api/notes")
     suspend fun getNotes(): Response<List<NoteDto>>

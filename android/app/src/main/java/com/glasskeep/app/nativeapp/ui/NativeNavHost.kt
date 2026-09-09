@@ -105,17 +105,56 @@ fun NativeNavHost(
 
     val scope = rememberCoroutineScope()
 
+    // Shared by every login path (password, passkey, secret key): same
+    // reminder/theme bootstrap regardless of which screen signed the user
+    // in, and the same must_change_password branch (see
+    // ForceChangePasswordScreen.kt) instead of ever landing on "notes"
+    // with a temporary password still active. popUpTo("login") clears
+    // whichever of "login"/"login-secret" is on the back stack either way,
+    // since popUpTo removes everything up to and including its target.
+    fun handleLoggedIn(mustChangePassword: Boolean) {
+        ReminderScheduler.schedulePeriodic(context)
+        ReminderSyncWorker.syncNow(context)
+        scope.launch { repository.fetchShellTheme()?.let { container.themeState.apply(it) } }
+        if (mustChangePassword) {
+            navController.navigate("force-change-password") {
+                popUpTo("login") { inclusive = true }
+            }
+        } else {
+            navController.navigate("notes") {
+                popUpTo("login") { inclusive = true }
+            }
+            pendingOpenNoteId?.let {
+                navController.navigate("notes/$it")
+                onPendingOpenNoteIdConsumed()
+            }
+        }
+    }
+
     NavHost(navController = navController, startDestination = startDestination) {
         composable("login") {
             NativeLoginScreen(
                 container = container,
                 serverUrl = serverUrl,
-                onLoggedIn = {
-                    ReminderScheduler.schedulePeriodic(context)
-                    ReminderSyncWorker.syncNow(context)
-                    scope.launch { repository.fetchShellTheme()?.let { container.themeState.apply(it) } }
+                onLoggedIn = { mustChangePassword -> handleLoggedIn(mustChangePassword) },
+                onForgotPassword = { navController.navigate("login-secret") },
+            )
+        }
+        composable("login-secret") {
+            SecretKeyLoginScreen(
+                container = container,
+                serverUrl = serverUrl,
+                onLoggedIn = { mustChangePassword -> handleLoggedIn(mustChangePassword) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable("force-change-password") {
+            ForceChangePasswordScreen(
+                container = container,
+                serverUrl = serverUrl,
+                onChanged = {
                     navController.navigate("notes") {
-                        popUpTo("login") { inclusive = true }
+                        popUpTo("force-change-password") { inclusive = true }
                     }
                     pendingOpenNoteId?.let {
                         navController.navigate("notes/$it")

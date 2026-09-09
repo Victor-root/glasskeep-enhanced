@@ -642,6 +642,21 @@ class NotesRepository(
         return ChangePasswordResult.Saved(token, user)
     }
 
+    /** Rotates and returns this account's secret recovery key in plain
+     *  text (Settings screen's Security section). The server never
+     *  returns it again after this call, only its hash is kept. */
+    suspend fun generateSecretKey(): String {
+        NativeDebug.d("NotesRepository.generateSecretKey")
+        val response = api.generateSecretKey()
+        val key = response.body()?.key
+        if (!response.isSuccessful || key == null) {
+            val error = "POST /api/secret-key failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return key
+    }
+
     /** Registered passkeys for this account (Settings screen's passkey
      *  management section). */
     suspend fun listPasskeys(): List<PasskeyDto> {

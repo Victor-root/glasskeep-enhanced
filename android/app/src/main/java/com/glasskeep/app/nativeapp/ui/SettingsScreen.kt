@@ -49,12 +49,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -99,9 +102,11 @@ private val ErrorColor = Color(0xFFdc2626)
  * doesn't exist in a Kotlin app), data import/export, typography, AI
  * assistant): profile (avatar, read-only name/email, language,
  * show-on-login), security (change password, cross-device QR sign-in,
- * see QrScanScreen.kt), passkeys (list/add/delete, see
- * NativePasskeys.kt), appearance (the six workspace themes), and the one
- * already-half-wired Notes preference (checklist insert position).
+ * see QrScanScreen.kt, and generating a new secret recovery key, see
+ * SecretKeyLoginScreen.kt for where it's used to sign in), passkeys
+ * (list/add/delete, see NativePasskeys.kt), appearance (the six
+ * workspace themes), and the one already-half-wired Notes preference
+ * (checklist insert position).
  */
 @Composable
 fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () -> Unit, onOpenQrScanner: () -> Unit) {
@@ -111,6 +116,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val activity = LocalView.current.context as Activity
+    val clipboardManager = LocalClipboardManager.current
 
     var profile by remember { mutableStateOf<ProfileDto?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
@@ -136,6 +142,9 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var addPasskeyNameInput by remember { mutableStateOf("") }
     var pendingDeletePasskeyId by remember { mutableStateOf<String?>(null) }
 
+    var generatingSecretKey by remember { mutableStateOf(false) }
+    var generatedSecretKey by remember { mutableStateOf<String?>(null) }
+
     val errorLoadTemplate = stringResource(R.string.native_settings_error)
     val actionErrorTemplate = stringResource(R.string.native_settings_action_error)
     val passwordMismatchMessage = stringResource(R.string.native_settings_password_mismatch)
@@ -143,6 +152,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     val passwordErrorTemplate = stringResource(R.string.native_settings_password_error)
     val passwordSuccessMessage = stringResource(R.string.native_settings_password_success)
     val passkeyUntitledLabel = stringResource(R.string.native_settings_passkeys_untitled)
+    val copiedMessage = stringResource(R.string.native_settings_secret_key_copied)
 
     val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
@@ -217,6 +227,28 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                 reportActionError(t)
             } finally {
                 removingPasskeyId = null
+            }
+        }
+    }
+
+    // No confirmation step, matching useImportExport.js's own
+    // downloadSecretKey(): the server always rotates on this call (there
+    // is no separate "just show me the existing one" route), so tapping
+    // the action link goes straight to a fresh key, shown here instead of
+    // downloaded as a .txt file (a file picker ceremony for one short
+    // string is friction the web's browser download button doesn't have
+    // to pay).
+    fun generateSecretKey() {
+        if (generatingSecretKey) return
+        generatingSecretKey = true
+        scope.launch {
+            try {
+                generatedSecretKey = repository.generateSecretKey()
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen generateSecretKey failed", t)
+                reportActionError(t)
+            } finally {
+                generatingSecretKey = false
             }
         }
     }
@@ -529,6 +561,20 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                         role = Role.Button,
                                     ) { onOpenQrScanner() },
                             )
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                stringResource(R.string.native_settings_secret_key_generate),
+                                color = Indigo,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                modifier = Modifier
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        enabled = !generatingSecretKey,
+                                        role = Role.Button,
+                                    ) { generateSecretKey() },
+                            )
                         }
 
                         SettingsSection(stringResource(R.string.native_settings_passkeys_section), subtextColor, cardBg, borderColor) {
@@ -690,6 +736,43 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                 },
                 dismissButton = {
                     TextButton(onClick = { pendingDeletePasskeyId = null }) {
+                        Text(stringResource(R.string.native_dialog_cancel))
+                    }
+                },
+            )
+        }
+
+        generatedSecretKey?.let { key ->
+            AlertDialog(
+                onDismissRequest = { generatedSecretKey = null },
+                title = { Text(stringResource(R.string.native_settings_secret_key_dialog_title)) },
+                text = {
+                    Column {
+                        Text(
+                            key,
+                            color = titleColor,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (dark) DarkBgColor else LightBgGradient)
+                                .padding(12.dp),
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text(stringResource(R.string.native_settings_secret_key_warning), color = subtextColor, fontSize = 12.sp)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        clipboardManager.setText(AnnotatedString(key))
+                        Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                    }) {
+                        Text(stringResource(R.string.native_settings_secret_key_copy))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { generatedSecretKey = null }) {
                         Text(stringResource(R.string.native_dialog_cancel))
                     }
                 },

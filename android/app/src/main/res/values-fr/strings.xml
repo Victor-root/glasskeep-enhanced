@@ -29,6 +29,7 @@
     <string name="native_login_passkey_signin">Se connecter avec une clé d\'accès</string>
     <string name="native_login_passkey_in_progress">En attente de votre clé d\'accès…</string>
     <string name="native_login_passkey_error">Impossible de se connecter avec une clé d\'accès (code %1$d).</string>
+    <string name="native_login_forgot_password">Nom d\'utilisateur / mot de passe oublié ?</string>
     <string name="native_settings_passkeys_section">Clés d\'accès</string>
     <string name="native_settings_passkeys_empty">Aucune clé d\'accès pour le moment.</string>
     <string name="native_settings_passkeys_add">Ajouter une clé d\'accès</string>
@@ -113,6 +114,17 @@
     <string name="native_qr_scan_close">Fermer</string>
     <string name="native_qr_scan_permission_denied">L\'accès à la caméra est nécessaire pour scanner un QR code.</string>
     <string name="native_qr_scan_error_generic">Impossible de terminer la connexion : %1$s</string>
+    <string name="native_secret_login_title">Connexion avec clé secrète</string>
+    <string name="native_secret_login_placeholder">Collez votre clé secrète ici</string>
+    <string name="native_secret_login_back">Connexion avec e-mail et mot de passe</string>
+    <string name="native_force_password_title">Changement de mot de passe requis</string>
+    <string name="native_force_password_desc">Votre compte a un mot de passe temporaire. Veuillez choisir un nouveau mot de passe pour continuer.</string>
+    <string name="native_force_password_error">Impossible de changer le mot de passe (code %1$d).</string>
+    <string name="native_settings_secret_key_generate">Générer une nouvelle clé secrète</string>
+    <string name="native_settings_secret_key_dialog_title">Votre clé secrète</string>
+    <string name="native_settings_secret_key_warning">Conservez-la en lieu sûr : toute personne possédant cette clé peut se connecter à votre place. Elle ne sera plus jamais affichée, et en générer une nouvelle empêche l\'ancienne de fonctionner.</string>
+    <string name="native_settings_secret_key_copy">Copier</string>
+    <string name="native_settings_secret_key_copied">Copié dans le presse-papiers.</string>
     <string name="native_settings_appearance_section">Apparence</string>
     <string name="native_settings_theme_title">Thème de l\'espace</string>
     <string name="native_settings_notes_section">Notes</string>

@@ -32,6 +32,7 @@
     <string name="native_login_passkey_signin">Sign in with a passkey</string>
     <string name="native_login_passkey_in_progress">Waiting for your passkey…</string>
     <string name="native_login_passkey_error">Couldn\'t sign in with a passkey (code %1$d).</string>
+    <string name="native_login_forgot_password">Forgot username/password?</string>
     <string name="native_settings_passkeys_section">Passkeys</string>
     <string name="native_settings_passkeys_empty">No passkeys yet.</string>
     <string name="native_settings_passkeys_add">Add a passkey</string>
@@ -119,6 +120,17 @@
     <string name="native_qr_scan_close">Close</string>
     <string name="native_qr_scan_permission_denied">Camera access is required to scan a QR code.</string>
     <string name="native_qr_scan_error_generic">Couldn\'t complete the sign-in: %1$s</string>
+    <string name="native_secret_login_title">Sign in with secret key</string>
+    <string name="native_secret_login_placeholder">Paste your secret key here</string>
+    <string name="native_secret_login_back">Sign in with email &amp; password</string>
+    <string name="native_force_password_title">Password change required</string>
+    <string name="native_force_password_desc">Your account has a temporary password. Please choose a new password to continue.</string>
+    <string name="native_force_password_error">Couldn\'t change password (code %1$d).</string>
+    <string name="native_settings_secret_key_generate">Generate a new secret key</string>
+    <string name="native_settings_secret_key_dialog_title">Your secret key</string>
+    <string name="native_settings_secret_key_warning">Save this somewhere safe: anyone with this key can sign in as you. It won\'t be shown again, and generating a new one stops the old one from working.</string>
+    <string name="native_settings_secret_key_copy">Copy</string>
+    <string name="native_settings_secret_key_copied">Copied to clipboard.</string>
     <string name="native_settings_appearance_section">Appearance</string>
     <string name="native_settings_theme_title">Workspace theme</string>
     <string name="native_settings_notes_section">Notes</string>
