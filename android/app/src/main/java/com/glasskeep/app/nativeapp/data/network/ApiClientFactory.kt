@@ -1,6 +1,5 @@
 package com.glasskeep.app.nativeapp.data.network
 
-import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.TokenStore
 import kotlinx.serialization.json.Json
@@ -8,7 +7,6 @@ import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Response
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 
@@ -50,20 +48,11 @@ object ApiClientFactory {
      *  model) - kept in one place so the two never drift apart on
      *  auth/logging setup. */
     fun okHttpClient(tokenStore: TokenStore): OkHttpClient {
-        val clientBuilder = OkHttpClient.Builder()
+        return OkHttpClient.Builder()
             .addInterceptor(AuthInterceptor(tokenStore))
-
-        if (BuildConfig.DEBUG) {
-            // BASIC only: method, URL, response code and timing. Never
-            // HEADERS or BODY, those print the Authorization header (the
-            // session token, attached above) and, on login, the password
-            // itself, straight into Logcat. Never turn this back up.
-            val logging = HttpLoggingInterceptor { message -> NativeDebug.d(message) }
-            logging.level = HttpLoggingInterceptor.Level.BASIC
-            clientBuilder.addInterceptor(logging)
-        }
-
-        return clientBuilder.build()
+            // A no-op in release, see NetworkLogging.kt's two versions.
+            .addNetworkLogging()
+            .build()
     }
 
     fun create(baseUrl: String, tokenStore: TokenStore): GlassKeepApi {
