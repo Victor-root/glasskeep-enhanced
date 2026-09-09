@@ -1632,3 +1632,16 @@ fun ServerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Co
         "M7 8l0 .01 M7 16l0 .01",
     modifier, size, tint,
 )
+
+/** tabler/photo-circle-plus, the web's own LogoIcon (icons/index.jsx:504):
+ *  the note's icon, in the footer and in the image sub-menu. */
+@Composable
+fun LogoIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M15 8h.01 " +
+        "M20.964 12.806a9 9 0 0 0 -8.964 -9.806a9 9 0 0 0 -9 9a9 9 0 0 0 9.397 8.991 " +
+        "M4 15l4 -4c.928 -.893 2.072 -.893 3 0l4 4 " +
+        "M14 14l1 -1c.928 -.893 2.072 -.893 3 0 " +
+        "M16 19.33h6 " +
+        "M19 16.33v6",
+    modifier, size, tint,
+)

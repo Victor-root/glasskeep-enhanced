@@ -44,4 +44,9 @@ data class NoteEntity(
      *  the list cache, and the only thing the list needs to know is
      *  whether the drawer's "All images" lens should keep this row. */
     val hasImages: Boolean = false,
+    /** This user's own icon for the note, if they set one: the data URL
+     *  the card's top-right badge draws, and its label. Cached like the
+     *  rest of the note so the badge is right on the first frame. */
+    val iconSrc: String? = null,
+    val iconName: String? = null,
 )

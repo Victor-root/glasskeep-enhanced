@@ -20,6 +20,16 @@ interface NoteDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(notes: List<NoteEntity>)
 
+    /** One cached note, for the few writes that touch a single field and
+     *  have to keep the rest of the row as-is (see the note-icon path in
+     *  NotesRepository). */
+    @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): NoteEntity?
+
+    /** [upsertAll] for one note, same replace-on-conflict semantics. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(note: NoteEntity)
+
     @Query("DELETE FROM notes")
     suspend fun deleteAll()
 

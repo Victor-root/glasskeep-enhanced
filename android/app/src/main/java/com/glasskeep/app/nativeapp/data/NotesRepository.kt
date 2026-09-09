@@ -12,11 +12,14 @@ import com.glasskeep.app.nativeapp.data.network.ChangePasswordRequest
 import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
 import com.glasskeep.app.nativeapp.data.network.CollaboratorDto
 import com.glasskeep.app.nativeapp.data.network.ConvertNoteTypeRequest
+import com.glasskeep.app.nativeapp.data.network.CreateLogoRequest
 import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
 import com.glasskeep.app.nativeapp.data.network.DeviceLinkInfoResponse
 import com.glasskeep.app.nativeapp.data.network.DeviceLinkTokenRequest
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
+import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.nativeapp.data.network.NoteDto
+import com.glasskeep.app.nativeapp.data.network.NoteIconDto
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.network.NotificationIdsRequest
 import com.glasskeep.app.nativeapp.data.network.NotificationRemoveRequest
@@ -31,6 +34,7 @@ import com.glasskeep.app.nativeapp.data.network.RemoveCollaboratorRequest
 import com.glasskeep.app.nativeapp.data.network.ReorderNotesRequest
 import com.glasskeep.app.nativeapp.data.network.SetAvatarRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistInsertPositionRequest
+import com.glasskeep.app.nativeapp.data.network.SetNoteIconRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
 import com.glasskeep.app.nativeapp.data.network.SetCollaboratorAccessRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
@@ -859,6 +863,42 @@ class NotesRepository(
     /** The whole queue, for the header's sync panel (see SyncStatusSheet). */
     fun observeSyncQueue(): Flow<List<SyncQueueEntity>> = syncQueueDao.observeAll()
 
+    /** Sets or clears this user's own icon for a note, and mirrors it into
+     *  the local cache so the card's badge follows immediately. Deliberate
+     *  user action, and a private per-user marker with no other device's
+     *  copy to race against, so it is a direct call rather than a queued
+     *  one (see GlassKeepApi.setNoteIcon's own comment). */
+    suspend fun setNoteIcon(id: String, icon: NoteIconDto?) {
+        NativeDebug.d("NotesRepository.setNoteIcon id=$id present=${icon != null}")
+        val response = if (icon == null) api.clearNoteIcon(id) else api.setNoteIcon(id, SetNoteIconRequest(icon))
+        if (!response.isSuccessful) {
+            val error = "note icon update failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        val stored = response.body()?.icon ?: icon.takeIf { response.body()?.ok == true && icon != null }
+        noteDao.getById(id)?.let { entity ->
+            noteDao.upsert(entity.copy(iconSrc = stored?.src, iconName = stored?.name))
+        }
+    }
+
+    /** The account's own logo library, which the icon picker lists. */
+    suspend fun fetchLogos(): List<LogoDto> {
+        val response = api.listLogos()
+        return if (response.isSuccessful) response.body().orEmpty() else emptyList()
+    }
+
+    /** Adds one logo to the library. The server dedupes by src, so this
+     *  returns the existing entry when the same image is uploaded twice. */
+    suspend fun createLogo(name: String, src: String): LogoDto? {
+        val response = api.createLogo(CreateLogoRequest(name = name, src = src))
+        return if (response.isSuccessful) response.body() else null
+    }
+
+    /** Removes a logo from the library. Notes already using it keep their
+     *  own copy, which is why nothing else has to be touched here. */
+    suspend fun deleteLogo(id: String): Boolean = api.deleteLogo(id).isSuccessful
+
     /** Sets, moves, or clears (reminderAtIso == null) a note's reminder.
      *  Its own dedicated route (see GlassKeepApi.setReminder), not the
      *  generic PATCH, but the same narrow-body/stale-checked shape as
@@ -1611,4 +1651,6 @@ internal fun NoteDto.toEntity() = NoteEntity(
     reminderAt = reminderAt,
     position = position,
     hasImages = images.isNotEmpty(),
+    iconSrc = icon?.src,
+    iconName = icon?.name,
 )

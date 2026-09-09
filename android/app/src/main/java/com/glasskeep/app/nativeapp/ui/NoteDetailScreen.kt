@@ -117,7 +117,9 @@ import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.formatIso
+import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.nativeapp.data.network.NoteDto
+import com.glasskeep.app.nativeapp.data.network.NoteIconDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.data.toEntity
 import com.glasskeep.app.ui.DarkBgColor
@@ -306,6 +308,11 @@ fun NoteDetailScreen(
     // isChecklistType below); parsed once on load same as checklist items,
     // not cached in Room (see NotesRepository.setImages).
     var images by remember { mutableStateOf<List<NoteImageData>>(emptyList()) }
+    // The image footer button's sub-menu, and the logo library behind its
+    // second entry (AddImageMenu.jsx + LogoPickerPopover.jsx).
+    var showImageMenu by remember { mutableStateOf(false) }
+    var showLogoPicker by remember { mutableStateOf(false) }
+    var logos by remember { mutableStateOf<List<LogoDto>>(emptyList()) }
     var changingImages by remember { mutableStateOf(false) }
     var viewerIndex by remember { mutableStateOf<Int?>(null) }
 
@@ -355,6 +362,7 @@ fun NoteDetailScreen(
     val downloadErrorMessage = stringResource(R.string.native_note_detail_download_error)
     val aiErrorMessage = stringResource(R.string.native_note_ai_error)
     val imageAddErrorMessage = stringResource(R.string.native_note_detail_add_image_error)
+    val iconErrorMessage = stringResource(R.string.native_note_icon_error)
     val editedPrefix = stringResource(R.string.native_note_detail_edited_prefix)
 
     fun togglePin() {
@@ -1063,6 +1071,81 @@ fun NoteDetailScreen(
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(),
     ) { uris -> addImages(uris) }
+
+    // ---------- The note's own icon, and the account's logo library ----------
+    fun applyIcon(icon: NoteIconDto?) {
+        scope.launch {
+            try {
+                repository.setNoteIcon(noteId, icon)
+                note = note?.copy(icon = icon)
+            } catch (t: Throwable) {
+                NativeDebug.e("Note icon update failed", t)
+                toasts.error(iconErrorMessage)
+            }
+        }
+    }
+
+    /** A picked image becomes a library entry first, then this note's icon:
+     *  the web uploads through the same POST so the logo is reusable
+     *  afterwards (LogoPickerPopover's own onUploadNew). */
+    val logoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        val picked = uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val dataUrl = withContext(Dispatchers.IO) {
+                    ImageCompression.compressToDataUrl(context, picked)
+                } ?: return@launch
+                val name = ImageCompression.displayNameFor(context, picked) ?: ""
+                val logo = repository.createLogo(name, dataUrl)
+                logos = repository.fetchLogos()
+                applyIcon(NoteIconDto(id = logo?.id, src = logo?.src ?: dataUrl, name = logo?.name ?: name))
+            } catch (t: Throwable) {
+                NativeDebug.e("Logo upload failed", t)
+                toasts.error(iconErrorMessage)
+            }
+        }
+    }
+
+    fun openLogoPicker() {
+        showLogoPicker = true
+        scope.launch {
+            try {
+                logos = repository.fetchLogos()
+            } catch (t: Throwable) {
+                NativeDebug.e("Logo library load failed", t)
+            }
+        }
+    }
+
+    fun removeLogoFromLibrary(logo: LogoDto) {
+        scope.launch {
+            if (repository.deleteLogo(logo.id)) logos = logos.filterNot { it.id == logo.id }
+        }
+    }
+
+    val logoPickerPanel: @Composable () -> Unit = {
+        if (showLogoPicker) {
+            LogoPickerPopover(
+                logos = logos,
+                selectedSrc = note?.icon?.src,
+                dark = dark,
+                onPick = { logo ->
+                    showLogoPicker = false
+                    applyIcon(NoteIconDto(id = logo.id, src = logo.src, name = logo.name))
+                },
+                onUploadNew = {
+                    showLogoPicker = false
+                    logoPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                onDelete = { logo -> removeLogoFromLibrary(logo) },
+                onDismiss = { showLogoPicker = false },
+            )
+        }
+    }
 
     LaunchedEffect(noteId) {
         try {
@@ -1827,6 +1910,9 @@ fun NoteDetailScreen(
                         trashColor = trashMenuColor,
                         showColorButton = !isReadOnlyAccess,
                         showImageButton = (edit.isTextType || edit.isChecklistType) && !isReadOnlyAccess,
+                        // ModalFooter.jsx:297: an audio note has no image
+                        // affordance, so its logo gets a button of its own.
+                        showLogoButton = edit.isAudioType && !isReadOnlyAccess,
                         showTagsButton = !isReadOnlyAccess,
                         // Undo/redo track the title and the body, so they
                         // are hidden for the two types whose content they
@@ -1850,9 +1936,8 @@ fun NoteDetailScreen(
                             (isOwnerAccess || !currentNote.collaborators.isNullOrEmpty()),
                         showTrashButton = !edit.isTextType && !currentNote.trashed,
                         onColorClick = { showColorPicker = true },
-                        onImageClick = {
-                            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        },
+                        onImageClick = { showImageMenu = true },
+                        onLogoClick = { openLogoPicker() },
                         onTagsClick = { tagInput = ""; showTagsPicker = true },
                         onUndoClick = { undoNote() },
                         onRedoClick = { redoNote() },
@@ -1861,6 +1946,27 @@ fun NoteDetailScreen(
                         onCollaborateClick = { onOpenCollaborators() },
                         onTrashClick = { showTrashConfirm = true },
                         onKebabClick = { menuExpanded = true },
+                        imagePanel = {
+                            if (showImageMenu) {
+                                AddImageMenu(
+                                    dark = dark,
+                                    hasIcon = currentNote.icon != null,
+                                    onAddImage = {
+                                        photoPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                        )
+                                    },
+                                    onAddIcon = { openLogoPicker() },
+                                    onRemoveIcon = { applyIcon(null) },
+                                    onDismiss = { showImageMenu = false },
+                                )
+                            }
+                            logoPickerPanel()
+                        },
+                        // The two buttons are mutually exclusive (an image
+                        // note never has the audio one and back), so both
+                        // slots hang the same picker off whichever is there.
+                        logoPanel = { logoPickerPanel() },
                         colorPanel = {
                             if (showColorPicker) {
                                 NoteColorPopover(
@@ -2912,6 +3018,7 @@ private fun NoteModalFooter(
     trashColor: Color,
     showColorButton: Boolean,
     showImageButton: Boolean,
+    showLogoButton: Boolean,
     showTagsButton: Boolean,
     showHistoryButtons: Boolean,
     canUndo: Boolean,
@@ -2924,6 +3031,7 @@ private fun NoteModalFooter(
     showTrashButton: Boolean,
     onColorClick: () -> Unit,
     onImageClick: () -> Unit,
+    onLogoClick: () -> Unit,
     onTagsClick: () -> Unit,
     onUndoClick: () -> Unit,
     onRedoClick: () -> Unit,
@@ -2933,6 +3041,8 @@ private fun NoteModalFooter(
     onTrashClick: () -> Unit,
     onKebabClick: () -> Unit,
     colorPanel: @Composable () -> Unit,
+    imagePanel: @Composable () -> Unit,
+    logoPanel: @Composable () -> Unit,
     tagsPanel: @Composable () -> Unit,
     menu: @Composable () -> Unit,
 ) {
@@ -2959,11 +3069,27 @@ private fun NoteModalFooter(
                 }
             }
             if (showImageButton) {
-                FooterIconButton(
-                    contentDescription = stringResource(R.string.native_note_detail_add_image),
-                    onClick = onImageClick,
-                ) {
-                    AddImageIcon(size = 20.dp, tint = imageButtonColor)
+                Box {
+                    FooterIconButton(
+                        contentDescription = stringResource(R.string.native_note_detail_add_image),
+                        onClick = onImageClick,
+                    ) {
+                        AddImageIcon(size = 20.dp, tint = imageButtonColor)
+                    }
+                    imagePanel()
+                }
+            }
+            // An audio note has no image affordance to hang the logo entry
+            // off, so the web gives it a button of its own (ModalFooter.jsx:297).
+            if (showLogoButton) {
+                Box {
+                    FooterIconButton(
+                        contentDescription = stringResource(R.string.native_add_logo),
+                        onClick = onLogoClick,
+                    ) {
+                        LogoIcon(size = 20.dp, tint = imageButtonColor)
+                    }
+                    logoPanel()
                 }
             }
             if (showTagsButton) {

@@ -718,4 +718,15 @@
     <string name="native_fed_read_only_locked">%1$s is locked. This note stays read-only until it\'s unlocked.</string>
     <string name="native_fed_read_only_incompatible">%1$s is out of date. This note stays read-only until both servers are updated.</string>
     <string name="native_fed_read_only_unknown">Connecting to %1$s. This note is temporarily read-only.</string>
+
+    <!-- Note icon and the account's logo library: modal/AddImageMenu.jsx
+         and modal/LogoPickerPopover.jsx. -->
+    <string name="native_note_icon">Note icon</string>
+    <string name="native_add_an_image">Add an image</string>
+    <string name="native_add_logo">Add a logo</string>
+    <string name="native_replace_logo">Replace logo</string>
+    <string name="native_remove_logo">Remove logo</string>
+    <string name="native_delete_logo">Delete logo</string>
+    <string name="native_no_logos_yet">No logos yet, tap + to upload one</string>
+    <string name="native_note_icon_error">Couldn\'t change the note icon.</string>
 </resources>

@@ -62,6 +62,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -1458,6 +1459,23 @@ internal fun NoteCard(
             note.reminderAt?.let { reminderAt ->
                 Spacer(Modifier.height(6.dp))
                 ReminderChip(reminderAt = reminderAt, dark = dark)
+            }
+        }
+
+        // The note's own icon, in the corner and out of the way while
+        // picking notes (NoteCard.jsx:258): 28dp, letterboxed rather than
+        // cropped, over the card content like the checkbox below.
+        if (!selectionMode) {
+            note.iconSrc?.let { src ->
+                rememberDecodedImage(src)?.let { bitmap ->
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = note.iconName?.takeIf { it.isNotBlank() }
+                            ?: stringResource(R.string.native_note_icon),
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(28.dp),
+                    )
+                }
             }
         }
 

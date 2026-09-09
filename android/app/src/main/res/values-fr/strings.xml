@@ -706,4 +706,15 @@
     <string name="native_fed_read_only_locked">%1$s est verrouill\u00e9. La note reste en lecture seule tant qu\'il n\'est pas d\u00e9verrouill\u00e9.</string>
     <string name="native_fed_read_only_incompatible">%1$s n\'est pas \u00e0 jour. La note reste en lecture seule jusqu\'\u00e0 la mise \u00e0 jour des deux serveurs.</string>
     <string name="native_fed_read_only_unknown">Connexion \u00e0 %1$s en cours. La note est temporairement en lecture seule.</string>
+
+    <!-- Note icon and the account's logo library: modal/AddImageMenu.jsx
+         and modal/LogoPickerPopover.jsx. -->
+    <string name="native_note_icon">Ic\u00f4ne de la note</string>
+    <string name="native_add_an_image">Ajouter une image</string>
+    <string name="native_add_logo">Ajouter un logo</string>
+    <string name="native_replace_logo">Remplacer le logo</string>
+    <string name="native_remove_logo">Retirer le logo</string>
+    <string name="native_delete_logo">Supprimer le logo</string>
+    <string name="native_no_logos_yet">Aucun logo, touchez + pour en importer un</string>
+    <string name="native_note_icon_error">Impossible de changer l\'ic\u00f4ne de la note.</string>
 </resources>

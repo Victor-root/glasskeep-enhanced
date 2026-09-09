@@ -67,7 +67,7 @@ data class SecretKeyResponse(val key: String)
  * Mirrors serializeNote() in server/index.js field for field. Fields the
  * native app doesn't use yet are still declared so a future milestone can
  * read them without touching this DTO; `ignoreUnknownKeys` (see
- * ApiClientFactory) covers whatever's left out (icon, collaborators, ...).
+ * ApiClientFactory) covers whatever's left out.
  */
 @Serializable
 data class NoteDto(
@@ -116,12 +116,49 @@ data class NoteDto(
      *  roster screen" for NoteDetailScreen.kt, reached from every list
      *  through the same GET /api/notes/:id. */
     val collaborators: List<CollaboratorDto>? = null,
+    /** This user's own icon for the note, the small badge its card shows
+     *  in the top-right corner. Private per participant and stored in its
+     *  own table server-side, never in `images` (see NoteImages.kt). */
+    val icon: NoteIconDto? = null,
     /** Non-null only on a note mirrored from another GlassKeep server
      *  (server/index.js:949). Editing a mirror is paused whenever its
      *  authority peer can't be reached, which is what the detail screen's
      *  own banner says (FederationReadOnlyBanner.jsx). */
     val federation: NoteFederationDto? = null,
 )
+
+/** A note's own icon, and an entry in the account's logo library: the two
+ *  are the same shape (the picker hands one straight to the other), and
+ *  only `src`, a data URL, is required (server/index.js:2866). */
+@Serializable
+data class NoteIconDto(
+    val id: String? = null,
+    val src: String,
+    val name: String? = null,
+)
+
+/** Body for PUT /api/notes/:id/icon. A null icon clears it, same as the
+ *  DELETE route. */
+@Serializable
+data class SetNoteIconRequest(val icon: NoteIconDto? = null)
+
+@Serializable
+data class NoteIconResponse(val ok: Boolean = false, val icon: NoteIconDto? = null)
+
+/** One entry of GET /api/logos: the account's own reusable logos, kept
+ *  independently of the notes that point at them (server/index.js:4612). */
+@Serializable
+data class LogoDto(
+    val id: String,
+    val name: String = "",
+    val src: String,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+/** Body for POST /api/logos. The server dedupes by `src`, so re-uploading
+ *  the same image returns the existing entry rather than a second one. */
+@Serializable
+data class CreateLogoRequest(val name: String, val src: String)
 
 /** noteFederationInfo() (server/federation/notes.js:1468): why a mirrored
  *  note is read-only right now, and which peer it belongs to. `state` is
@@ -1080,6 +1117,25 @@ interface GlassKeepApi {
     // it beyond the HTTP status this call already checks.
     @POST("api/passkeys/login/verify")
     suspend fun passkeyLoginVerify(@Body body: PasskeyLoginVerifyRequest): Response<LoginResponse>
+
+    // The note's own icon, and the account's logo library the picker
+    // fills itself from. Both are per-user and never broadcast: an icon
+    // is a private marker, so nothing here goes through the sync queue
+    // (there is no other device's copy to lose a race against).
+    @PUT("api/notes/{id}/icon")
+    suspend fun setNoteIcon(@Path("id") id: String, @Body body: SetNoteIconRequest): Response<NoteIconResponse>
+
+    @DELETE("api/notes/{id}/icon")
+    suspend fun clearNoteIcon(@Path("id") id: String): Response<NoteIconResponse>
+
+    @GET("api/logos")
+    suspend fun listLogos(): Response<List<LogoDto>>
+
+    @POST("api/logos")
+    suspend fun createLogo(@Body body: CreateLogoRequest): Response<LogoDto>
+
+    @DELETE("api/logos/{id}")
+    suspend fun deleteLogo(@Path("id") id: String): Response<Unit>
 
     // At-rest encryption's runtime lock. Every route here except lock()
     // is pre-login and answers even while the server is locked: they sit
