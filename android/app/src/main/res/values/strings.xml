@@ -248,6 +248,8 @@
     <string name="native_note_detail_tags_none_found">No tags found</string>
     <string name="native_note_detail_tags_create">Create \"%1$s\"</string>
     <string name="native_note_detail_tags_remove">Remove tag %1$s</string>
+    <string name="native_note_detail_undo">Undo</string>
+    <string name="native_note_detail_redo">Redo</string>
     <string name="native_note_detail_reminder">Reminder</string>
     <string name="native_note_detail_reminder_remove">Remove reminder</string>
     <string name="native_common_close">Close</string>

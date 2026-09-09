@@ -61,6 +61,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
@@ -233,6 +234,7 @@ fun NoteDetailScreen(
     var showReminderPicker by remember { mutableStateOf(false) }
     var showFormatSheet by remember { mutableStateOf(false) }
     val richEditorState = rememberRichEditorState()
+    val history = rememberNoteHistory()
     val keyboardController = LocalSoftwareKeyboardController.current
     // The reminder picker's quick-time chips, shared with the web through
     // the same settings blob; empty until read, which makes the picker
@@ -1078,10 +1080,80 @@ fun NoteDetailScreen(
             drawingCaptionText = editability?.originalDrawingCaptionText
             audioClips = editability?.originalAudioClips.orEmpty()
             audioCaptionText = editability?.originalAudioCaptionText
+            history.reset(
+                NoteSnapshot(
+                    title = titleText,
+                    body = bodyText,
+                    richBlocks = richBlocks,
+                    checklistItems = editability?.checklistItems,
+                ),
+            )
         } catch (t: Throwable) {
             NativeDebug.e("NoteDetailScreen load failed", t)
             loadError = String.format(errorLoadTemplate, t.message ?: t.javaClass.simpleName)
         }
+    }
+
+    // One snapshot per second of quiet, so a burst of typing collapses
+    // into a single undoable step (useModalHistory.js's own DEBOUNCE_MS).
+    // Restarting this effect on every keystroke is the debounce: the
+    // previous delay is cancelled with it.
+    LaunchedEffect(titleText, bodyText, richBlocks, editability?.checklistItems) {
+        if (note == null) return@LaunchedEffect
+        if (history.restoring) {
+            history.restoring = false
+            return@LaunchedEffect
+        }
+        delay(1000)
+        history.record(
+            NoteSnapshot(
+                title = titleText,
+                body = bodyText,
+                richBlocks = richBlocks,
+                checklistItems = editability?.checklistItems,
+            ),
+        )
+    }
+
+    fun applySnapshot(snapshot: NoteSnapshot) {
+        val unchanged = snapshot.title == titleText &&
+            snapshot.body == bodyText &&
+            snapshot.richBlocks == richBlocks &&
+            snapshot.checklistItems == editability?.checklistItems
+        // Only arm the guard when the state really moves: otherwise no
+        // recomposition follows to clear it, and the next real edit
+        // would be swallowed.
+        if (unchanged) return
+        history.restoring = true
+        titleText = snapshot.title
+        bodyText = snapshot.body
+        richBlocks = snapshot.richBlocks
+        if (snapshot.checklistItems != null && snapshot.checklistItems != editability?.checklistItems) {
+            editability = editability?.copy(checklistItems = snapshot.checklistItems)
+            // Checklist rows persist as they change rather than through
+            // the Save button, so stepping back through them has to
+            // persist too.
+            saveChecklistItems(snapshot.checklistItems)
+        }
+    }
+
+    fun undoNote() {
+        // The web flushes its pending debounce first, so whatever was
+        // typed in the last second becomes its own step instead of being
+        // swallowed by the undo (useModalHistory.js's flush()).
+        history.record(
+            NoteSnapshot(
+                title = titleText,
+                body = bodyText,
+                richBlocks = richBlocks,
+                checklistItems = editability?.checklistItems,
+            ),
+        )
+        history.undo()?.let { applySnapshot(it) }
+    }
+
+    fun redoNote() {
+        history.redo()?.let { applySnapshot(it) }
     }
 
     // Opening the sheet puts the keyboard away, the same intent as the
@@ -1559,6 +1631,13 @@ fun NoteDetailScreen(
                         showColorButton = !isReadOnlyAccess,
                         showImageButton = (edit.isTextType || edit.isChecklistType) && !isReadOnlyAccess,
                         showTagsButton = !isReadOnlyAccess,
+                        // Undo/redo track the title and the body, so they
+                        // are hidden for the two types whose content they
+                        // don't cover (ModalFooter.jsx:562): audio, and a
+                        // drawing's own canvas.
+                        showHistoryButtons = !edit.isDrawType && !edit.isAudioType && !isReadOnlyAccess,
+                        canUndo = history.canUndo,
+                        canRedo = history.canRedo,
                         showFormatButton = edit.isRichEditableType && !isReadOnlyAccess,
                         formatOpen = showFormatSheet,
                         // The web keeps Collaborate and Trash in the footer for
@@ -1573,6 +1652,8 @@ fun NoteDetailScreen(
                             photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         },
                         onTagsClick = { tagInput = ""; showTagsPicker = true },
+                        onUndoClick = { undoNote() },
+                        onRedoClick = { redoNote() },
                         onFormatClick = { showFormatSheet = !showFormatSheet },
                         onCollaborateClick = { onOpenCollaborators() },
                         onTrashClick = { showTrashConfirm = true },
@@ -2519,6 +2600,9 @@ private fun NoteModalFooter(
     showColorButton: Boolean,
     showImageButton: Boolean,
     showTagsButton: Boolean,
+    showHistoryButtons: Boolean,
+    canUndo: Boolean,
+    canRedo: Boolean,
     showFormatButton: Boolean,
     formatOpen: Boolean,
     showCollaborateButton: Boolean,
@@ -2526,6 +2610,8 @@ private fun NoteModalFooter(
     onColorClick: () -> Unit,
     onImageClick: () -> Unit,
     onTagsClick: () -> Unit,
+    onUndoClick: () -> Unit,
+    onRedoClick: () -> Unit,
     onFormatClick: () -> Unit,
     onCollaborateClick: () -> Unit,
     onTrashClick: () -> Unit,
@@ -2575,6 +2661,22 @@ private fun NoteModalFooter(
                         TagIcon(size = 18.dp, tint = iconColor)
                     }
                     tagsPanel()
+                }
+            }
+            if (showHistoryButtons) {
+                FooterIconButton(
+                    contentDescription = stringResource(R.string.native_note_detail_undo),
+                    enabled = canUndo,
+                    onClick = onUndoClick,
+                ) {
+                    UndoIcon(size = 18.dp, tint = iconColor)
+                }
+                FooterIconButton(
+                    contentDescription = stringResource(R.string.native_note_detail_redo),
+                    enabled = canRedo,
+                    onClick = onRedoClick,
+                ) {
+                    RedoIcon(size = 18.dp, tint = iconColor)
                 }
             }
             if (showFormatButton) {
@@ -2779,6 +2881,7 @@ private fun FooterIconButton(
     badgeCount: Int = 0,
     badgeGradient: Brush? = null,
     background: Color = Color.Transparent,
+    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -2789,12 +2892,14 @@ private fun FooterIconButton(
             modifier = Modifier
                 .size(34.dp)
                 .graphicsLayer { scaleX = scale; scaleY = scale }
+                .alpha(if (enabled) 1f else 0.5f)
                 .clip(CircleShape)
                 .background(background)
                 .semantics { this.contentDescription = contentDescription }
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
+                    enabled = enabled,
                     role = Role.Button,
                 ) { onClick() },
             contentAlignment = Alignment.Center,

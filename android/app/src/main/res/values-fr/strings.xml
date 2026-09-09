@@ -242,6 +242,8 @@
     <string name="native_note_detail_tags_none_found">Aucun tag trouvé</string>
     <string name="native_note_detail_tags_create">Créer \"%1$s\"</string>
     <string name="native_note_detail_tags_remove">Retirer le tag %1$s</string>
+    <string name="native_note_detail_undo">Annuler</string>
+    <string name="native_note_detail_redo">Rétablir</string>
     <string name="native_note_detail_reminder">Rappel</string>
     <string name="native_note_detail_reminder_remove">Supprimer le rappel</string>
     <string name="native_common_close">Fermer</string>
