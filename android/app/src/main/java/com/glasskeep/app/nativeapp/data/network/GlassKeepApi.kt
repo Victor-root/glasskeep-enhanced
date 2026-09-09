@@ -88,7 +88,72 @@ data class NoteDto(
      *  (see NotesRepository.setReminder, which always clears it server-side
      *  on set/move), declared for parity with serializeNote(). */
     val reminderFiredAt: String? = null,
+    /** Every OTHER participant on this note (never includes the caller
+     *  themselves), null when there are none. Only GET /api/notes and
+     *  GET /api/notes/:id embed this (server's getNoteParticipants(),
+     *  narrower than the dedicated GET /api/notes/:id/collaborators
+     *  endpoint: no isOwner/addedAt/addedBy here); archived/trashed
+     *  listings don't include it at all, which is fine, this only ever
+     *  needs to answer "does this note have collaborators worth a
+     *  roster screen" for NoteDetailScreen.kt, reached from every list
+     *  through the same GET /api/notes/:id. */
+    val collaborators: List<CollaboratorDto>? = null,
 )
+
+/** One participant on a note: mirrors participantObj() (server/index.js)
+ *  field for field. canWrite is a raw 0/1 from the server (u.can_write
+ *  === 0 ? 0 : 1), not a JSON boolean, so it's declared Int here, not
+ *  Boolean, to avoid a deserialization failure on real data.
+ *  addedAt/addedBy are only ever present on a collaborator entry (never
+ *  the owner's); isOwner is only ever true on the owner's entry, absent
+ *  (not false) on every collaborator entry. */
+@Serializable
+data class CollaboratorDto(
+    val id: Int,
+    val name: String,
+    val email: String,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    val federated: Boolean = false,
+    val serverLabel: String? = null,
+    val canWrite: Int = 1,
+    @SerialName("added_at") val addedAt: String? = null,
+    @SerialName("added_by") val addedBy: Int? = null,
+    val isOwner: Boolean = false,
+)
+
+/** One notification row. `type` is one of a fixed set the server creates
+ *  (note_shared, note_access_revoked[_with_copy], collaborator_removed
+ *  [_with_copy], collaborator_left, shared_note_deleted[_with_copy], plus
+ *  a few admin-only/reminder types this screen renders generically rather
+ *  than specially, see server/index.js's insertNotification call sites.
+ *  deliveredAt is the one read/unread bit: absent (null) on
+ *  GET /notifications/pending, present on GET /notifications/history.
+ *  persistent is a raw 0/1 from the server, not a JSON boolean, same
+ *  reasoning as CollaboratorDto.canWrite. */
+@Serializable
+data class NotificationDto(
+    val id: Int,
+    @SerialName("sender_user_id") val senderUserId: Int,
+    val type: String,
+    @SerialName("note_id") val noteId: String? = null,
+    @SerialName("note_title") val noteTitle: String = "",
+    @SerialName("sender_name") val senderName: String = "",
+    val variant: String? = null,
+    val message: String? = null,
+    val persistent: Int = 0,
+    val icon: String? = null,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("delivered_at") val deliveredAt: String? = null,
+)
+
+@Serializable
+data class NotificationListResponse(val notifications: List<NotificationDto> = emptyList())
+
+@Serializable
+data class NotificationIdsRequest(val ids: List<Int>)
+
+@Serializable
+data class NotificationActionResponse(val ok: Boolean = false)
 
 /**
  * Body for PATCH /api/notes/:id. Deliberately narrow: only title/content
@@ -452,6 +517,13 @@ interface GlassKeepApi {
     @GET("api/notes/{id}")
     suspend fun getNote(@Path("id") id: String): Response<NoteDto>
 
+    // Full roster (owner + every collaborator, unlike NoteDto.collaborators'
+    // own narrower embedded field): any participant may call this, not just
+    // the owner (server/index.js's own route comment: "user owns it or is
+    // a collaborator"). Bare array response, not wrapped.
+    @GET("api/notes/{id}/collaborators")
+    suspend fun getNoteCollaborators(@Path("id") id: String): Response<List<CollaboratorDto>>
+
     @PATCH("api/notes/{id}")
     suspend fun patchNote(@Path("id") id: String, @Body body: PatchNoteRequest): Response<NoteMutationResponse>
 
@@ -554,4 +626,24 @@ interface GlassKeepApi {
 
     @POST("api/device-link/reject")
     suspend fun rejectDeviceLink(@Body body: DeviceLinkTokenRequest): Response<DeviceLinkActionResponse>
+
+    // Notifications inbox (share/collaboration events only, see
+    // NotificationDto's own doc comment): no background polling anywhere
+    // in native (see NotificationsScreen.kt's own doc comment for why),
+    // fetched fresh whenever the inbox screen opens, same "always hits the
+    // server, no local cache" tradeoff as fetchArchivedNotes()/
+    // fetchTrashedNotes(). Pending ones have no delivered_at yet; history
+    // is capped at the 100 most-recent server-side, already sorted newest
+    // first.
+    @GET("api/notifications/pending")
+    suspend fun getPendingNotifications(): Response<NotificationListResponse>
+
+    @GET("api/notifications/history")
+    suspend fun getNotificationHistory(): Response<NotificationListResponse>
+
+    // The read/unread ack: called once, right after the inbox screen loads
+    // pending notifications, mirroring the web bell's own "opening the
+    // panel marks everything shown as delivered" behavior.
+    @POST("api/notifications/mark-delivered")
+    suspend fun markNotificationsDelivered(@Body body: NotificationIdsRequest): Response<NotificationActionResponse>
 }

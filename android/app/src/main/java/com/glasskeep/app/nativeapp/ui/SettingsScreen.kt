@@ -891,8 +891,11 @@ private fun LanguageChip(label: String, selected: Boolean, enabled: Boolean, dar
     }
 }
 
+// internal, not private: CollaboratorsScreen.kt (same package, different
+// file) reuses this for the same avatar-with-initials-fallback rendering.
+// Kotlin's top-level `private` is file-scoped.
 @Composable
-private fun AvatarCircle(avatarUrl: String?, name: String, size: Dp, onClick: () -> Unit) {
+internal fun AvatarCircle(avatarUrl: String?, name: String, size: Dp, onClick: () -> Unit) {
     val bitmap = avatarUrl?.let { rememberDecodedImage(it) }
     val label = stringResource(R.string.native_settings_avatar_description)
     val backgroundModifier = if (bitmap == null) Modifier.background(ButtonGradient) else Modifier

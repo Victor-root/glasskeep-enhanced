@@ -267,4 +267,24 @@
     <string name="welcome_install_desc">GlassKeep n\'est pas sur le Play Store, Android a donc besoin de votre autorisation pour installer le nouvel APK que nous téléchargeons pour vous.</string>
     <string name="welcome_battery_title">Optimisation de la batterie (optionnel)</string>
     <string name="welcome_battery_desc">Pour que vos rappels se déclenchent à l\'heure même quand l\'app est complètement fermée, autorisez GlassKeep à ignorer l\'optimisation de la batterie. Sans ça, Android peut retarder ou bloquer les rappels en arrière-plan. C\'est facultatif : vous pouvez refuser, les rappels fonctionneront quand même la plupart du temps.</string>
+
+    <string name="native_collaborators_title">Collaborateurs</string>
+    <string name="native_collaborators_error">Impossible de charger les collaborateurs : %1$s</string>
+    <string name="native_collaborators_owner">Propriétaire</string>
+    <string name="native_collaborators_can_write">Peut modifier</string>
+    <string name="native_collaborators_read_only">Lecture seule</string>
+
+    <string name="native_notifications_title">Notifications</string>
+    <string name="native_notifications_error">Impossible de charger les notifications : %1$s</string>
+    <string name="native_notifications_empty">Aucune notification</string>
+    <string name="native_notifications_new">Nouveau</string>
+    <string name="native_notifications_note_shared">%1$s a partagé la note « %2$s » avec vous</string>
+    <string name="native_notifications_note_shared_read_only">%1$s a partagé la note « %2$s » avec vous, en lecture seule</string>
+    <string name="native_notifications_access_revoked">%1$s vous a retiré l\'accès à la note « %2$s »</string>
+    <string name="native_notifications_access_revoked_with_copy">%1$s vous a retiré l\'accès à la note « %2$s », mais vous a laissé une copie</string>
+    <string name="native_notifications_collaborator_removed">Vous avez retiré %1$s de la note « %2$s »</string>
+    <string name="native_notifications_collaborator_removed_with_copy">Vous avez retiré %1$s de la note « %2$s » (une copie lui a été laissée)</string>
+    <string name="native_notifications_collaborator_left">%1$s a quitté la note « %2$s »</string>
+    <string name="native_notifications_shared_note_deleted">%1$s a supprimé la note « %2$s » qui était partagée avec vous</string>
+    <string name="native_notifications_shared_note_deleted_with_copy">%1$s a supprimé la note partagée « %2$s » et vous a laissé une copie</string>
 </resources>

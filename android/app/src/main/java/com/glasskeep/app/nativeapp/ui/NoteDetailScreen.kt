@@ -182,7 +182,13 @@ private data class LinkTarget(val blockId: String, val start: Int, val end: Int,
  * line is drawn.
  */
 @Composable
-fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: String, onBack: () -> Unit) {
+fun NoteDetailScreen(
+    container: NativeAppContainer,
+    serverUrl: String,
+    noteId: String,
+    onBack: () -> Unit,
+    onOpenCollaborators: () -> Unit = {},
+) {
     val dark = isSystemInDarkTheme()
     val context = LocalContext.current
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
@@ -1286,6 +1292,33 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                         leadingIcon = { BellIcon(size = 18.dp, tint = titleColor) },
                                         enabled = !changingReminder,
                                         onClick = { menuExpanded = false; setReminder(null) },
+                                    )
+                                }
+                                // Any participant may view the roster, not just the
+                                // owner (see CollaboratorsScreen.kt's own doc
+                                // comment), so this isn't gated by isOwnerAccess/
+                                // isReadOnlyAccess the way the edit/archive entries
+                                // above and below are.
+                                if (!currentNote.collaborators.isNullOrEmpty()) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.native_collaborators_title)) },
+                                        leadingIcon = { PeopleIcon(size = 18.dp, tint = titleColor) },
+                                        trailingIcon = {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(999.dp))
+                                                    .background(Indigo)
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                            ) {
+                                                Text(
+                                                    currentNote.collaborators.size.toString(),
+                                                    color = Color.White,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                )
+                                            }
+                                        },
+                                        onClick = { menuExpanded = false; onOpenCollaborators() },
                                     )
                                 }
                                 DropdownMenuItem(

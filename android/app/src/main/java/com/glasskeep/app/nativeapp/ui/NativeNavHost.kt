@@ -176,6 +176,7 @@ fun NativeNavHost(
                 onOpenArchived = { navController.navigate("archived") },
                 onOpenTrash = { navController.navigate("trash") },
                 onOpenSettings = { navController.navigate("settings") },
+                onOpenNotifications = { navController.navigate("notifications") },
             )
         }
         composable("settings") {
@@ -199,6 +200,24 @@ fun NativeNavHost(
                 container = container,
                 serverUrl = serverUrl,
                 noteId = noteId,
+                onBack = { navController.popBackStack() },
+                onOpenCollaborators = { navController.navigate("notes/$noteId/collaborators") },
+            )
+        }
+        composable("notes/{noteId}/collaborators") { backStackEntry ->
+            val noteId = backStackEntry.arguments?.getString("noteId") ?: return@composable
+            CollaboratorsScreen(
+                container = container,
+                serverUrl = serverUrl,
+                noteId = noteId,
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable("notifications") {
+            NotificationsScreen(
+                container = container,
+                serverUrl = serverUrl,
+                onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
                 onBack = { navController.popBackStack() },
             )
         }

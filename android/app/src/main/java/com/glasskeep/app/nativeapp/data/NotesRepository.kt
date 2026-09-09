@@ -8,11 +8,14 @@ import com.glasskeep.app.nativeapp.data.local.SyncQueueType
 import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ChangePasswordRequest
 import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
+import com.glasskeep.app.nativeapp.data.network.CollaboratorDto
 import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
 import com.glasskeep.app.nativeapp.data.network.DeviceLinkInfoResponse
 import com.glasskeep.app.nativeapp.data.network.DeviceLinkTokenRequest
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NoteDto
+import com.glasskeep.app.nativeapp.data.network.NotificationDto
+import com.glasskeep.app.nativeapp.data.network.NotificationIdsRequest
 import com.glasskeep.app.nativeapp.data.network.PasskeyCeremonyOptionsResponse
 import com.glasskeep.app.nativeapp.data.network.PasskeyDto
 import com.glasskeep.app.nativeapp.data.network.PasskeyRegisterVerifyRequest
@@ -892,6 +895,66 @@ class NotesRepository(
         val response = api.rejectDeviceLink(DeviceLinkTokenRequest(token))
         if (!response.isSuccessful) {
             val error = "POST /api/device-link/reject failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** Full participant roster for CollaboratorsScreen.kt (view-only this
+     *  milestone: no add/remove/change-access action anywhere yet). Any
+     *  participant may call this, not just the owner. Always hits the
+     *  server, same "secondary screen, no local cache" tradeoff as
+     *  fetchArchivedNotes()/fetchTrashedNotes(). */
+    suspend fun fetchNoteCollaborators(id: String): List<CollaboratorDto> {
+        NativeDebug.d("NotesRepository.fetchNoteCollaborators id=$id")
+        val response = api.getNoteCollaborators(id)
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "GET /api/notes/$id/collaborators failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body
+    }
+
+    /** Not-yet-acknowledged share/collaboration notifications (see
+     *  NotificationDto's own doc comment): no delivered_at yet. */
+    suspend fun fetchPendingNotifications(): List<NotificationDto> {
+        NativeDebug.d("NotesRepository.fetchPendingNotifications")
+        val response = api.getPendingNotifications()
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "GET /api/notifications/pending failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body.notifications
+    }
+
+    /** Already-acknowledged notifications, newest first, capped at the
+     *  100 most recent server-side. */
+    suspend fun fetchNotificationHistory(): List<NotificationDto> {
+        NativeDebug.d("NotesRepository.fetchNotificationHistory")
+        val response = api.getNotificationHistory()
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "GET /api/notifications/history failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body.notifications
+    }
+
+    /** Acks every id just shown to the user (see NotificationsScreen.kt's
+     *  own doc comment for when this is called). Best-effort: a failure
+     *  just means these rows are still pending and get acked again next
+     *  time the inbox opens, same tradeoff the web bell itself accepts. */
+    suspend fun markNotificationsDelivered(ids: List<Int>) {
+        if (ids.isEmpty()) return
+        NativeDebug.d("NotesRepository.markNotificationsDelivered ids=$ids")
+        val response = api.markNotificationsDelivered(NotificationIdsRequest(ids))
+        if (!response.isSuccessful) {
+            val error = "POST /api/notifications/mark-delivered failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }

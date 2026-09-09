@@ -101,6 +101,7 @@ fun NativeNotesListScreen(
     onOpenArchived: () -> Unit,
     onOpenTrash: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenNotifications: () -> Unit = {},
 ) {
     val dark = isSystemInDarkTheme()
     val themeId = container.themeState.themeId
@@ -326,6 +327,7 @@ fun NativeNotesListScreen(
                 searchQuery = searchQuery,
                 onSearchQueryChange = { searchQuery = it },
                 onEnterSelection = { selectionMode = true },
+                onOpenNotifications = onOpenNotifications,
             )
 
             errorMessage?.let {
@@ -453,6 +455,7 @@ private fun NativeHeader(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onEnterSelection: () -> Unit,
+    onOpenNotifications: () -> Unit,
 ) {
     // The web header's own "glass chrome" gradient, following whichever of
     // the six workspace themes the account has picked (see WorkspaceTheme.kt
@@ -582,6 +585,20 @@ private fun NativeHeader(
                         .padding(8.dp),
                 ) {
                     SearchIcon(size = 18.dp, tint = titleColor)
+                }
+                val notificationsLabel = stringResource(R.string.native_notifications_title)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .semantics { contentDescription = notificationsLabel }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onOpenNotifications() }
+                        .padding(8.dp),
+                ) {
+                    BellIcon(size = 18.dp, tint = titleColor)
                 }
                 if (syncingCount > 0) {
                     Text(

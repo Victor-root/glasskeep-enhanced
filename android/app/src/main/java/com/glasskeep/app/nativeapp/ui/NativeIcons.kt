@@ -479,6 +479,25 @@ fun BellRingingFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint:
     }
 }
 
+@Composable
+fun PeopleIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // Not from the Tabler set like the icons above: this one matches the
+    // web's own collaboration-button glyph exactly instead, an inline SVG
+    // in ModalFooter.jsx (not part of its shared src/icons/index.jsx),
+    // viewBox 20x20, filled (no stroke).
+    val path = remember {
+        PathParser().parsePathString(
+            "M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 20f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint)
+        }
+    }
+}
+
 // The seven icons below back the rich-text toolbar (RichTextEditor.kt). Same
 // source discipline as the rest of this file: exact path data from the
 // Tabler Icons set (MIT) this project already vendors under
