@@ -156,6 +156,7 @@
     <string name="native_note_detail_save_error">Couldn\'t save: %1$s</string>
     <string name="native_note_detail_stale">This note changed elsewhere. Reopen it to see the latest version.</string>
     <string name="native_note_detail_readonly">This note can\'t be edited right now.</string>
+    <string name="native_note_detail_syncing">Syncing…</string>
     <string name="native_note_detail_formatted_notice">This note uses formatting this app can\'t edit natively yet (color, alignment, code, and similar). Only the plain text is shown below.</string>
     <string name="native_note_detail_type_unsupported">This note type (%1$s) isn\'t editable natively yet.</string>
     <string name="native_note_detail_pin">Pin note</string>

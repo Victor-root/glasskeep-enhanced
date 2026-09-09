@@ -12,6 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.glasskeep.app.nativeapp.NativeAppContainer
+import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.syncReminderAlarms
 import com.glasskeep.app.reminders.ReminderScheduler
 import com.glasskeep.app.reminders.ReminderSyncWorker
@@ -63,6 +64,8 @@ fun NativeNavHost(
         if (startDestination == "notes") {
             ReminderScheduler.schedulePeriodic(context)
             ReminderSyncWorker.syncNow(context)
+            SyncQueueWorker.schedulePeriodic(context)
+            SyncQueueWorker.triggerNow(context)
         }
     }
 
@@ -115,6 +118,8 @@ fun NativeNavHost(
     fun handleLoggedIn(mustChangePassword: Boolean) {
         ReminderScheduler.schedulePeriodic(context)
         ReminderSyncWorker.syncNow(context)
+        SyncQueueWorker.schedulePeriodic(context)
+        SyncQueueWorker.triggerNow(context)
         scope.launch { repository.fetchShellTheme()?.let { container.themeState.apply(it) } }
         if (mustChangePassword) {
             navController.navigate("force-change-password") {

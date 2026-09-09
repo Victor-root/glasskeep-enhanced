@@ -3,6 +3,8 @@ package com.glasskeep.app.nativeapp.data
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.local.NoteDao
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
+import com.glasskeep.app.nativeapp.data.local.SyncQueueDao
+import com.glasskeep.app.nativeapp.data.local.SyncQueueType
 import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ChangePasswordRequest
 import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
@@ -29,6 +31,8 @@ import com.glasskeep.app.nativeapp.data.network.SetShowOnLoginRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
 import com.glasskeep.app.nativeapp.data.network.UserDto
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 
@@ -59,6 +63,7 @@ sealed class ChangePasswordResult {
 class NotesRepository(
     private val api: GlassKeepApi,
     private val noteDao: NoteDao,
+    private val syncQueueDao: SyncQueueDao,
 ) {
     /**
      * The list screen observes this directly: it always reads the local
@@ -238,9 +243,9 @@ class NotesRepository(
      * local list cache so the title shown in the list updates without a
      * full refresh().
      */
-    suspend fun patchNote(id: String, title: String, content: String): SaveNoteResult {
+    suspend fun patchNote(id: String, title: String, content: String, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.patchNote id=$id")
-        val response = api.patchNote(id, PatchNoteRequest(title, content, nowIso()))
+        val response = api.patchNote(id, PatchNoteRequest(title, content, clientUpdatedAt))
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             val error = "PATCH /api/notes/$id failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
@@ -382,9 +387,9 @@ class NotesRepository(
     /** Changes a note's color. Shares the general PATCH endpoint with
      *  patchNote(), but with its own narrow request body so title/content
      *  are left out of the JSON entirely and stay untouched server-side. */
-    suspend fun setColor(id: String, color: String): SaveNoteResult {
+    suspend fun setColor(id: String, color: String, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setColor id=$id color=$color")
-        val response = api.setColor(id, SetColorRequest(color, nowIso()))
+        val response = api.setColor(id, SetColorRequest(color, clientUpdatedAt))
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             val error = "PATCH /api/notes/$id (color) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
@@ -406,9 +411,9 @@ class NotesRepository(
      *  server-side. Tags are per-user, but the server still treats this as
      *  a shared-content change (see SetTagsRequest), so stale/readOnly are
      *  real outcomes here too, same as setColor(). */
-    suspend fun setTags(id: String, tags: List<String>): SaveNoteResult {
+    suspend fun setTags(id: String, tags: List<String>, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setTags id=$id tags=$tags")
-        val response = api.setTags(id, SetTagsRequest(tags, nowIso()))
+        val response = api.setTags(id, SetTagsRequest(tags, clientUpdatedAt))
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             val error = "PATCH /api/notes/$id (tags) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
@@ -429,9 +434,9 @@ class NotesRepository(
      *  narrow-body pattern as setColor()/setTags(), plus `type`/`content`
      *  because that's what the web's own syncChecklistItems() sends
      *  (App.jsx) for this exact call. */
-    suspend fun setChecklistItems(id: String, items: List<JsonElement>): SaveNoteResult {
+    suspend fun setChecklistItems(id: String, items: List<JsonElement>, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setChecklistItems id=$id count=${items.size}")
-        val response = api.setChecklistItems(id, SetChecklistItemsRequest(items = items, clientUpdatedAt = nowIso()))
+        val response = api.setChecklistItems(id, SetChecklistItemsRequest(items = items, clientUpdatedAt = clientUpdatedAt))
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             val error = "PATCH /api/notes/$id (items) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
@@ -455,9 +460,9 @@ class NotesRepository(
      *  cache deliberately doesn't carry full-resolution image data for
      *  every note (see NoteEntity), so this only updates `note` in the
      *  caller, same as how checklist items are handled. */
-    suspend fun setImages(id: String, images: List<JsonElement>): SaveNoteResult {
+    suspend fun setImages(id: String, images: List<JsonElement>, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setImages id=$id count=${images.size}")
-        val response = api.setImages(id, SetImagesRequest(images = images, clientUpdatedAt = nowIso()))
+        val response = api.setImages(id, SetImagesRequest(images = images, clientUpdatedAt = clientUpdatedAt))
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             val error = "PATCH /api/notes/$id (images) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
@@ -471,6 +476,54 @@ class NotesRepository(
         val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (images): ok response with no note")
         return SaveNoteResult.Saved(saved)
     }
+
+    // ---- Offline sync queue (see SyncQueueWorker.kt) ------------------
+    // NoteDetailScreen.kt calls these instead of the five direct methods
+    // above: the intended request body is written to Room's own
+    // sync_queue table immediately (see SyncQueueDao.enqueue, which
+    // collapses a second edit to the same note+field into the still-
+    // pending one rather than stacking a duplicate) and the caller
+    // updates its own on-screen state optimistically, the same
+    // local-first shape autoSaveTextNote() uses on the web.
+    // SyncQueueWorker drains this in the background, replaying each item
+    // with ITS captured clientUpdatedAt (not a fresh one at replay time,
+    // which would corrupt the LWW comparison the timestamp exists for).
+    // The direct methods above are unchanged and still used by every
+    // other screen this milestone doesn't cover yet (see this milestone's
+    // commit message for the follow-up tasks).
+    suspend fun patchNoteQueued(id: String, title: String, content: String) {
+        NativeDebug.d("NotesRepository.patchNoteQueued id=$id")
+        val request = PatchNoteRequest(title, content, nowIso())
+        syncQueueDao.enqueue(id, SyncQueueType.TITLE_CONTENT.name, Json.encodeToString(request), System.currentTimeMillis())
+    }
+
+    suspend fun setColorQueued(id: String, color: String) {
+        NativeDebug.d("NotesRepository.setColorQueued id=$id color=$color")
+        val request = SetColorRequest(color, nowIso())
+        syncQueueDao.enqueue(id, SyncQueueType.COLOR.name, Json.encodeToString(request), System.currentTimeMillis())
+    }
+
+    suspend fun setTagsQueued(id: String, tags: List<String>) {
+        NativeDebug.d("NotesRepository.setTagsQueued id=$id tags=$tags")
+        val request = SetTagsRequest(tags, nowIso())
+        syncQueueDao.enqueue(id, SyncQueueType.TAGS.name, Json.encodeToString(request), System.currentTimeMillis())
+    }
+
+    suspend fun setChecklistItemsQueued(id: String, items: List<JsonElement>) {
+        NativeDebug.d("NotesRepository.setChecklistItemsQueued id=$id count=${items.size}")
+        val request = SetChecklistItemsRequest(items = items, clientUpdatedAt = nowIso())
+        syncQueueDao.enqueue(id, SyncQueueType.CHECKLIST_ITEMS.name, Json.encodeToString(request), System.currentTimeMillis())
+    }
+
+    suspend fun setImagesQueued(id: String, images: List<JsonElement>) {
+        NativeDebug.d("NotesRepository.setImagesQueued id=$id count=${images.size}")
+        val request = SetImagesRequest(images = images, clientUpdatedAt = nowIso())
+        syncQueueDao.enqueue(id, SyncQueueType.IMAGES.name, Json.encodeToString(request), System.currentTimeMillis())
+    }
+
+    /** How many of this note's edits are still waiting to reach the
+     *  server; drives NoteDetailScreen's small "Syncing…" indicator. */
+    fun observePendingSyncCount(noteId: String): Flow<Int> = syncQueueDao.observePendingCountForNote(noteId)
 
     /** Sets, moves, or clears (reminderAtIso == null) a note's reminder.
      *  Its own dedicated route (see GlassKeepApi.setReminder), not the

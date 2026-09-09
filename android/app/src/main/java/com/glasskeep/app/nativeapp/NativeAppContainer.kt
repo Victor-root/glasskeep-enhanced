@@ -4,6 +4,7 @@ import android.content.Context
 import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.TokenStore
 import com.glasskeep.app.nativeapp.data.local.AppDatabase
+import com.glasskeep.app.nativeapp.data.local.SyncQueueDatabase
 import com.glasskeep.app.nativeapp.data.network.ApiClientFactory
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 
@@ -16,6 +17,7 @@ class NativeAppContainer(context: Context) {
     val tokenStore = TokenStore(context)
     val themeState = ThemeState(tokenStore)
     private val db = AppDatabase.get(context)
+    private val syncQueueDb = SyncQueueDatabase.get(context)
 
     private var cachedApi: GlassKeepApi? = null
     private var cachedApiServerUrl: String? = null
@@ -36,5 +38,5 @@ class NativeAppContainer(context: Context) {
         return fresh
     }
 
-    fun notesRepository(serverUrl: String) = NotesRepository(api(serverUrl), db.noteDao())
+    fun notesRepository(serverUrl: String) = NotesRepository(api(serverUrl), db.noteDao(), syncQueueDb.syncQueueDao())
 }

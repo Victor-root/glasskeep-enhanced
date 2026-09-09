@@ -97,6 +97,7 @@ import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.RichMark
 import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.SaveNoteResult
+import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.ui.ButtonGradient
@@ -195,7 +196,6 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     var bodyText by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
-    var saveNotice by remember { mutableStateOf<String?>(null) }
 
     var pinning by remember { mutableStateOf(false) }
     var archiving by remember { mutableStateOf(false) }
@@ -261,6 +261,11 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     // repository's whole local cache, same source NativeNotesListScreen
     // observes for the grid.
     val allNotes by repository.observeNotes().collectAsState(initial = emptyList())
+    // Small "Syncing…" indicator for edits queued by the *Queued repository
+    // methods below (see SyncQueueWorker.kt): this note's own count only,
+    // not a global one, since that's what the user editing THIS note cares
+    // about seeing settle back to zero.
+    val pendingSyncCount by repository.observePendingSyncCount(noteId).collectAsState(initial = 0)
     val tagsWithCounts = remember(allNotes) {
         val counts = LinkedHashMap<String, Int>()
         for (n in allNotes) {
@@ -277,6 +282,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     val errorSaveTemplate = stringResource(R.string.native_note_detail_save_error)
     val staleMessage = stringResource(R.string.native_note_detail_stale)
     val readOnlyMessage = stringResource(R.string.native_note_detail_readonly)
+    val syncingLabel = stringResource(R.string.native_note_detail_syncing)
     val actionErrorTemplate = stringResource(R.string.native_note_detail_action_error)
     val duplicateSuffix = stringResource(R.string.native_note_detail_duplicate_suffix)
     val downloadErrorMessage = stringResource(R.string.native_note_detail_download_error)
@@ -424,14 +430,10 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         changingColor = true
         scope.launch {
             try {
-                when (val result = repository.setColor(current.id, colorKey)) {
-                    is SaveNoteResult.Saved -> {
-                        NativeDebug.d("NoteDetailScreen changeColor OK id=${current.id}")
-                        note = result.note
-                    }
-                    SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
-                    SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
-                }
+                repository.setColorQueued(current.id, colorKey)
+                note = current.copy(color = colorKey)
+                SyncQueueWorker.triggerNow(context)
+                NativeDebug.d("NoteDetailScreen changeColor queued id=${current.id}")
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen changeColor failed", t)
                 Toast.makeText(
@@ -487,14 +489,10 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         changingTags = true
         scope.launch {
             try {
-                when (val result = repository.setTags(current.id, newTags)) {
-                    is SaveNoteResult.Saved -> {
-                        NativeDebug.d("NoteDetailScreen saveTags OK id=${current.id}")
-                        note = result.note
-                    }
-                    SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
-                    SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
-                }
+                repository.setTagsQueued(current.id, newTags)
+                note = current.copy(tags = newTags)
+                SyncQueueWorker.triggerNow(context)
+                NativeDebug.d("NoteDetailScreen saveTags queued id=${current.id}")
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen saveTags failed", t)
                 Toast.makeText(
@@ -552,11 +550,9 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         val current = note ?: return
         scope.launch {
             try {
-                when (repository.setChecklistItems(current.id, ChecklistItems.encode(newItems))) {
-                    is SaveNoteResult.Saved -> NativeDebug.d("NoteDetailScreen saveChecklistItems OK id=${current.id}")
-                    SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
-                    SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
-                }
+                repository.setChecklistItemsQueued(current.id, ChecklistItems.encode(newItems))
+                SyncQueueWorker.triggerNow(context)
+                NativeDebug.d("NoteDetailScreen saveChecklistItems queued id=${current.id}")
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen saveChecklistItems failed", t)
                 Toast.makeText(
@@ -745,11 +741,9 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         saveError = null
         try {
             val encoded = DrawingContent.encode(drawingPaths, drawingDimensions, drawingCaptionText)
-            when (repository.patchNote(noteId, titleText, encoded)) {
-                is SaveNoteResult.Saved -> NativeDebug.d("NoteDetailScreen drawing autosave OK id=$noteId")
-                SaveNoteResult.Stale -> saveNotice = staleMessage
-                SaveNoteResult.ReadOnly -> saveNotice = readOnlyMessage
-            }
+            repository.patchNoteQueued(noteId, titleText, encoded)
+            SyncQueueWorker.triggerNow(context)
+            NativeDebug.d("NoteDetailScreen drawing autosave queued id=$noteId")
         } catch (t: Throwable) {
             NativeDebug.e("NoteDetailScreen drawing autosave failed", t)
             saveError = String.format(errorSaveTemplate, t.message ?: t.javaClass.simpleName)
@@ -813,11 +807,9 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         saveError = null
         try {
             val encoded = AudioContent.encode(audioClips, audioCaptionText.orEmpty())
-            when (repository.patchNote(noteId, titleText, encoded)) {
-                is SaveNoteResult.Saved -> NativeDebug.d("NoteDetailScreen audio autosave OK id=$noteId")
-                SaveNoteResult.Stale -> saveNotice = staleMessage
-                SaveNoteResult.ReadOnly -> saveNotice = readOnlyMessage
-            }
+            repository.patchNoteQueued(noteId, titleText, encoded)
+            SyncQueueWorker.triggerNow(context)
+            NativeDebug.d("NoteDetailScreen audio autosave queued id=$noteId")
         } catch (t: Throwable) {
             NativeDebug.e("NoteDetailScreen audio autosave failed", t)
             saveError = String.format(errorSaveTemplate, t.message ?: t.javaClass.simpleName)
@@ -858,15 +850,12 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     suspend fun saveImages(newImages: List<NoteImageData>) {
         val current = note ?: return
         try {
-            when (val result = repository.setImages(current.id, NoteImages.encode(newImages))) {
-                is SaveNoteResult.Saved -> {
-                    NativeDebug.d("NoteDetailScreen saveImages OK id=${current.id}")
-                    note = result.note
-                    images = NoteImages.parse(result.note.images)
-                }
-                SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
-                SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
-            }
+            val encoded = NoteImages.encode(newImages)
+            repository.setImagesQueued(current.id, encoded)
+            note = current.copy(images = encoded)
+            images = newImages
+            SyncQueueWorker.triggerNow(context)
+            NativeDebug.d("NoteDetailScreen saveImages queued id=${current.id}")
         } catch (t: Throwable) {
             NativeDebug.e("NoteDetailScreen saveImages failed", t)
             Toast.makeText(
@@ -1101,7 +1090,6 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         val edit = editability ?: return
         saving = true
         saveError = null
-        saveNotice = null
         scope.launch {
             try {
                 val contentToSend = when {
@@ -1114,14 +1102,10 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                     edit.isLegacyPlain -> bodyText
                     else -> NoteContent.plainTextToRichContent(bodyText)
                 }
-                when (repository.patchNote(noteId, titleText, contentToSend)) {
-                    is SaveNoteResult.Saved -> {
-                        NativeDebug.d("NoteDetailScreen save OK id=$noteId")
-                        onBack()
-                    }
-                    SaveNoteResult.Stale -> saveNotice = staleMessage
-                    SaveNoteResult.ReadOnly -> saveNotice = readOnlyMessage
-                }
+                repository.patchNoteQueued(noteId, titleText, contentToSend)
+                SyncQueueWorker.triggerNow(context)
+                NativeDebug.d("NoteDetailScreen save queued id=$noteId")
+                onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen save failed", t)
                 saveError = String.format(errorSaveTemplate, t.message ?: t.javaClass.simpleName)
@@ -1510,9 +1494,9 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                     Spacer(Modifier.height(10.dp))
                                     Text(it, color = ErrorColor, fontSize = 12.sp)
                                 }
-                                saveNotice?.let {
+                                if (pendingSyncCount > 0) {
                                     Spacer(Modifier.height(10.dp))
-                                    Text(it, color = subtextColor, fontSize = 12.sp)
+                                    Text(syncingLabel, color = subtextColor, fontSize = 12.sp)
                                 }
                             } else if (edit.isAudioType) {
                                 AudioClipsSection(
@@ -1530,9 +1514,9 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                     Spacer(Modifier.height(10.dp))
                                     Text(it, color = ErrorColor, fontSize = 12.sp)
                                 }
-                                saveNotice?.let {
+                                if (pendingSyncCount > 0) {
                                     Spacer(Modifier.height(10.dp))
-                                    Text(it, color = subtextColor, fontSize = 12.sp)
+                                    Text(syncingLabel, color = subtextColor, fontSize = 12.sp)
                                 }
                             } else if (!edit.isTextType) {
                                 Box(
@@ -1595,8 +1579,8 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                 Text(it, color = ErrorColor, fontSize = 12.sp)
                                 Spacer(Modifier.height(8.dp))
                             }
-                            saveNotice?.let {
-                                Text(it, color = subtextColor, fontSize = 12.sp)
+                            if (pendingSyncCount > 0) {
+                                Text(syncingLabel, color = subtextColor, fontSize = 12.sp)
                                 Spacer(Modifier.height(8.dp))
                             }
 
