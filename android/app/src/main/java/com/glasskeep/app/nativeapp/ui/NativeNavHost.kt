@@ -349,4 +349,6 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     prefs.notificationsSound?.let { container.editorPrefs.applyNotificationsSound(it) }
     prefs.notificationsSoundTypes?.let { container.editorPrefs.applyNotificationsSoundTypes(NotifCategoryFlags(it)) }
     prefs.notificationsFilterTypes?.let { container.editorPrefs.applyNotificationsFilterTypes(NotifCategoryFlags(it)) }
+    prefs.checklistInsertPosition?.let { container.editorPrefs.applyChecklistInsertPosition(it) }
+    prefs.checklistRemoveSectionBehavior?.let { container.editorPrefs.applyChecklistRemoveSectionBehavior(it) }
 }

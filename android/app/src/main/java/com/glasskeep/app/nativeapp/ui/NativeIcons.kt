@@ -1207,6 +1207,15 @@ fun RefreshIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = C
     modifier, size, tint,
 )
 
+/** tabler/filter-2-question.svg. */
+@Composable
+fun FilterQuestionIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 6h13 M5 12h9 M6 18h4 " +
+        "M19 22v.01 " +
+        "M19 19a2.003 2.003 0 0 0 .914 -3.782a1.98 1.98 0 0 0 -2.414 .483",
+    modifier, size, tint,
+)
+
 /** tabler/volume.svg. */
 @Composable
 fun VolumeIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(

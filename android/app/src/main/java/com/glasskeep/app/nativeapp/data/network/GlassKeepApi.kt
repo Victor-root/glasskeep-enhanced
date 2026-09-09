@@ -379,6 +379,9 @@ data class SetReminderRequest(
 @Serializable
 data class UserSettingsDto(
     val checklistInsertPosition: String? = null,
+    /** "cascade" (drop a removed section's items with it) or "keep" (move
+     *  them back to the top block), cascade by default. */
+    val checklistRemoveSectionBehavior: String? = null,
     /** Chosen workspace theme id (see WorkspaceTheme.kt), or null for a
      *  user who never picked one (defaults to "glasskeep"). */
     val shellTheme: String? = null,
@@ -463,6 +466,9 @@ data class SetViewModeRequest(val viewMode: String)
 
 /** Bodies for the three PATCH /api/user/settings the Notifications
  *  section sends. */
+@Serializable
+data class SetChecklistRemoveSectionRequest(val checklistRemoveSectionBehavior: String)
+
 @Serializable
 data class SetNotificationsSoundRequest(val notificationsSound: Boolean)
 
@@ -857,6 +863,9 @@ interface GlassKeepApi {
 
     @PATCH("api/user/settings")
     suspend fun setViewMode(@Body body: SetViewModeRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setChecklistRemoveSectionBehavior(@Body body: SetChecklistRemoveSectionRequest): Response<UserSettingsDto>
 
     @PATCH("api/user/settings")
     suspend fun setNotificationsSound(@Body body: SetNotificationsSoundRequest): Response<UserSettingsDto>

@@ -35,6 +35,7 @@ import com.glasskeep.app.nativeapp.data.network.SetCollaboratorAccessRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
 import com.glasskeep.app.nativeapp.data.network.ImportNotesRequest
 import com.glasskeep.app.nativeapp.data.network.ImportNotesResponse
+import com.glasskeep.app.nativeapp.data.network.SetChecklistRemoveSectionRequest
 import com.glasskeep.app.nativeapp.data.network.SetEdgeToEdgeLandscapeRequest
 import com.glasskeep.app.nativeapp.data.network.SetEditorToolbarModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetFloatingCardsRequest
@@ -872,32 +873,11 @@ class NotesRepository(
         return SaveNoteResult.Saved(saved)
     }
 
-    /** This user's saved "new checklist item position" preference
-     *  ("top"/"bottom", see App.jsx's checklistInsertPosition), read from
-     *  the generic settings blob so the native editor's Enter-to-add-item
-     *  behavior matches whatever the user already has configured on the
-     *  web app instead of guessing a hardcoded default. Best-effort: a
-     *  wrong-but-harmless default (the web's own fresh-install default) is
-     *  a better outcome for a background read like this one than blocking
-     *  checklist editing over it; SettingsScreen's own read (for the
-     *  picker itself) surfaces a real failure instead, see setReminder's
-     *  sibling actions below for that shape. */
-    suspend fun fetchChecklistInsertPosition(): String {
-        return try {
-            val response = api.getUserSettings()
-            val position = response.body()?.checklistInsertPosition
-            if (response.isSuccessful && position == "bottom") "bottom" else "top"
-        } catch (t: Throwable) {
-            NativeDebug.e("NotesRepository.fetchChecklistInsertPosition failed, defaulting to top", t)
-            "top"
-        }
-    }
-
     /** Sets the checklist insert-position preference ("top"/"bottom").
-     *  Same narrow-body PATCH /api/user/settings pattern as setShellTheme;
-     *  unlike fetchChecklistInsertPosition's own best-effort read, this is
-     *  a deliberate user action from SettingsScreen and surfaces a real
-     *  failure rather than silently keeping the old value. */
+     *  Same narrow-body PATCH /api/user/settings pattern as setShellTheme,
+     *  and like every other setter here it surfaces a real failure rather
+     *  than silently keeping the old value: the read side is the one
+     *  session-wide fetchWorkspacePreferences() above. */
     suspend fun setChecklistInsertPosition(position: String) {
         NativeDebug.d("NotesRepository.setChecklistInsertPosition position=$position")
         val response = api.setChecklistInsertPosition(SetChecklistInsertPositionRequest(position))
@@ -963,6 +943,8 @@ class NotesRepository(
                 notificationsSound = body.notificationsSound,
                 notificationsSoundTypes = body.notificationsSoundTypes,
                 notificationsFilterTypes = body.notificationsFilterTypes,
+                checklistInsertPosition = body.checklistInsertPosition,
+                checklistRemoveSectionBehavior = body.checklistRemoveSectionBehavior,
                 toastDurationMs = body.notificationsDuration,
                 readModeEnabled = body.readModeEnabled,
                 edgeToEdgeLandscape = body.edgeToEdgeLandscape,
@@ -1037,6 +1019,18 @@ class NotesRepository(
         }
         refresh()
         return body
+    }
+
+    /** Sets what a removed checklist section does with its items
+     *  ("cascade" or "keep"). */
+    suspend fun setChecklistRemoveSectionBehavior(behavior: String) {
+        NativeDebug.d("NotesRepository.setChecklistRemoveSectionBehavior behavior=$behavior")
+        val response = api.setChecklistRemoveSectionBehavior(SetChecklistRemoveSectionRequest(behavior))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (checklistRemoveSectionBehavior) failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
     }
 
     /** The three Notifications settings: whether a new one rings, and the

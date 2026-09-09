@@ -241,6 +241,41 @@ object ChecklistItems {
     }
 
     /**
+     * removeSectionWithItems() (checklist.js:339-352): drops the marker
+     * AND everything it owns, i.e. every entry up to the next marker.
+     */
+    fun removeSectionWithItems(entries: List<ChecklistEntry>, sectionId: String): List<ChecklistEntry> {
+        val start = entries.indexOfFirst { it is ChecklistSectionData && it.id == sectionId }
+        if (start < 0) return entries.toList()
+        return entries.subList(0, start) + entries.subList(sectionEnd(entries, start), entries.size)
+    }
+
+    /**
+     * removeSectionKeepItems() (checklist.js:357-378): drops the marker
+     * only, and moves what it owned back into the default block at the
+     * top, before whatever marker comes first.
+     */
+    fun removeSectionKeepItems(entries: List<ChecklistEntry>, sectionId: String): List<ChecklistEntry> {
+        val start = entries.indexOfFirst { it is ChecklistSectionData && it.id == sectionId }
+        if (start < 0) return entries.toList()
+        val end = sectionEnd(entries, start)
+        val orphans = entries.subList(start + 1, end).toList()
+        val rest = entries.subList(0, start) + entries.subList(end, entries.size)
+        val firstMarker = rest.indexOfFirst { it is ChecklistSectionData }
+        val insertAt = if (firstMarker < 0) rest.size else firstMarker
+        return rest.subList(0, insertAt) + orphans + rest.subList(insertAt, rest.size)
+    }
+
+    /** One past the last entry the marker at [start] owns: the next
+     *  marker's index, or the end of the list. */
+    private fun sectionEnd(entries: List<ChecklistEntry>, start: Int): Int {
+        for (i in start + 1 until entries.size) {
+            if (entries[i] is ChecklistSectionData) return i
+        }
+        return entries.size
+    }
+
+    /**
      * reorderSections() (checklist.js:383-423): rebuilds the flat array
      * with the section blocks in [newOrderedSectionIds]'s order. Whatever
      * sits before the first marker is the implicit default block and never

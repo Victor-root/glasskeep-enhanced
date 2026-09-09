@@ -42,6 +42,14 @@ class EditorPrefsState(private val tokenStore: TokenStore) {
     var readModeEnabled: Boolean by mutableStateOf(tokenStore.readModeEnabled)
         private set
 
+    var checklistInsertPosition: String by mutableStateOf(tokenStore.checklistInsertPosition ?: "top")
+        private set
+
+    var checklistRemoveSectionBehavior: String by mutableStateOf(
+        tokenStore.checklistRemoveSectionBehavior ?: "cascade",
+    )
+        private set
+
     var toastPosition: String by mutableStateOf(tokenStore.toastPosition ?: "bottom")
         private set
 
@@ -104,6 +112,18 @@ class EditorPrefsState(private val tokenStore: TokenStore) {
     fun applyTaskStrike(on: Boolean) {
         taskStrike = on
         tokenStore.taskStrikeChecked = on
+    }
+
+    fun applyChecklistInsertPosition(position: String) {
+        val resolved = if (position == "bottom") "bottom" else "top"
+        checklistInsertPosition = resolved
+        tokenStore.checklistInsertPosition = resolved
+    }
+
+    fun applyChecklistRemoveSectionBehavior(behavior: String) {
+        val resolved = if (behavior == "keep") "keep" else "cascade"
+        checklistRemoveSectionBehavior = resolved
+        tokenStore.checklistRemoveSectionBehavior = resolved
     }
 
     fun applyReadMode(enabled: Boolean) {

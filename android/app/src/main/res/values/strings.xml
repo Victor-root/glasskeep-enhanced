@@ -246,6 +246,10 @@
     <string name="native_settings_notif_duration_seconds">%1$d s</string>
     <string name="native_settings_notif_duration_persistent">Persistent</string>
     <string name="native_settings_checklist_group">Checklists</string>
+    <string name="native_settings_checklist_remove_section">Delete a section</string>
+    <string name="native_settings_checklist_remove_section_desc">Action applied to the items when the section is deleted.</string>
+    <string name="native_settings_checklist_remove_cascade">Delete</string>
+    <string name="native_settings_checklist_remove_keep">Keep</string>
     <string name="native_settings_checklist_insert_position">New items position</string>
     <string name="native_settings_checklist_insert_position_desc">Add new checklist items at the top or bottom of the list</string>
     <string name="native_settings_checklist_insert_top">Top</string>

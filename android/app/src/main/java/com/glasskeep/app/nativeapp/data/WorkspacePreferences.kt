@@ -32,4 +32,8 @@ data class WorkspacePreferences(
     val notificationsSound: Boolean?,
     val notificationsSoundTypes: Map<String, Boolean>?,
     val notificationsFilterTypes: Map<String, Boolean>?,
+    /** Where a new checklist item goes, and what a removed section does
+     *  with the items it owned. */
+    val checklistInsertPosition: String?,
+    val checklistRemoveSectionBehavior: String?,
 )

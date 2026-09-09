@@ -113,6 +113,22 @@ class TokenStore(context: Context) {
             prefs.edit().putString(KEY_NOTIF_FILTER_TYPES, value).apply()
         }
 
+    /** Cached checklist preferences: where a new item goes ("top"/"bottom",
+     *  top by default) and what happens to a removed section's items
+     *  ("cascade" drops them with it, "keep" moves them back to the top
+     *  block; cascade by default, App.jsx:324-331). */
+    var checklistInsertPosition: String?
+        get() = prefs.getString(KEY_CHECKLIST_INSERT, null)
+        set(value) {
+            prefs.edit().putString(KEY_CHECKLIST_INSERT, value).apply()
+        }
+
+    var checklistRemoveSectionBehavior: String?
+        get() = prefs.getString(KEY_CHECKLIST_REMOVE_SECTION, null)
+        set(value) {
+            prefs.edit().putString(KEY_CHECKLIST_REMOVE_SECTION, value).apply()
+        }
+
     /** Cached "notes open in read mode" preference, on by default like
      *  the web's own. */
     var readModeEnabled: Boolean
@@ -174,6 +190,8 @@ class TokenStore(context: Context) {
         private const val KEY_LIST_VIEW = "list_view"
         private const val KEY_EDGE_TO_EDGE_LANDSCAPE = "edge_to_edge_landscape"
         private const val KEY_FLOATING_CARDS = "floating_cards_enabled"
+        private const val KEY_CHECKLIST_INSERT = "checklist_insert_position"
+        private const val KEY_CHECKLIST_REMOVE_SECTION = "checklist_remove_section"
         private const val KEY_NOTIF_SOUND = "notifications_sound"
         private const val KEY_NOTIF_SOUND_TYPES = "notifications_sound_types"
         private const val KEY_NOTIF_FILTER_TYPES = "notifications_filter_types"

@@ -246,7 +246,6 @@ fun NoteDetailScreen(
     // "top"/"bottom", read from this user's own web settings once the note
     // turns out to be a checklist (see LaunchedEffect below); defaults to
     // "top" until then, same as the web's own fresh-install default.
-    var checklistInsertPosition by remember { mutableStateOf("top") }
     // The "Done" area's collapsed state is per-device, exactly like the
     // web's own localStorage["ck-done-<noteId>"]: unlike a section's own
     // collapsed flag, it is never synced.
@@ -1009,7 +1008,6 @@ fun NoteDetailScreen(
                     }
                 }
                 "checklist" -> {
-                    checklistInsertPosition = repository.fetchChecklistInsertPosition()
                     Editability(
                         isTextType = false,
                         bodyEditable = false,
@@ -1217,7 +1215,6 @@ fun NoteDetailScreen(
                     val entries = NoteConversion.textToChecklistEntries(text)
                     val encoded = ChecklistItems.encode(entries)
                     repository.convertNoteTypeQueued(noteId, "checklist", "", encoded)
-                    checklistInsertPosition = repository.fetchChecklistInsertPosition()
                     note = current.copy(type = "checklist", content = "", items = encoded)
                     editability = Editability(
                         isTextType = false,
@@ -1511,7 +1508,8 @@ fun NoteDetailScreen(
                                 } else {
                                     ChecklistEditorBody(
                                         entries = checklistEntries,
-                                        insertPosition = checklistInsertPosition,
+                                        insertPosition = container.editorPrefs.checklistInsertPosition,
+                                        removeSectionBehavior = container.editorPrefs.checklistRemoveSectionBehavior,
                                         dark = dark,
                                         titleColor = titleColor,
                                         subtextColor = subtextColor,

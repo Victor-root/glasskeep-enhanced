@@ -125,6 +125,7 @@ private val PlaceholderDark = Color(0xFF6A7282)
 fun ChecklistEditorBody(
     entries: List<ChecklistEntry>,
     insertPosition: String,
+    removeSectionBehavior: String,
     dark: Boolean,
     titleColor: Color,
     subtextColor: Color,
@@ -322,9 +323,17 @@ fun ChecklistEditorBody(
                         commitEntries(entries.map { if (it.id == updatedSection.id) updatedSection else it })
                     },
                     onSectionRemove = { sectionId ->
-                        // Removing a section removes its marker only: its
-                        // rows fall back into the block above.
-                        commitEntries(entries.filterNot { it.id == sectionId })
+                        // Two behaviours, the user's own choice
+                        // (ChecklistEditor.jsx:220-230): "cascade" takes
+                        // the section's rows with it, "keep" moves them
+                        // back into the block at the top.
+                        commitEntries(
+                            if (removeSectionBehavior == "keep") {
+                                ChecklistItems.removeSectionKeepItems(entries, sectionId)
+                            } else {
+                                ChecklistItems.removeSectionWithItems(entries, sectionId)
+                            },
+                        )
                     },
                     isFirstBlock = blockIndex == 0,
                 )

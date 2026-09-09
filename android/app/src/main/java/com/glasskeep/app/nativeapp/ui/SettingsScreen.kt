@@ -170,7 +170,6 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
 
     var profile by remember { mutableStateOf<ProfileDto?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
-    var checklistInsertPosition by remember { mutableStateOf("top") }
     var passkeys by remember { mutableStateOf<List<PasskeyDto>>(emptyList()) }
 
     var changingAvatar by remember { mutableStateOf(false) }
@@ -178,6 +177,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var changingLanguage by remember { mutableStateOf(false) }
     var changingTheme by remember { mutableStateOf(false) }
     var changingChecklistPosition by remember { mutableStateOf(false) }
+    var changingRemoveSection by remember { mutableStateOf(false) }
     var changingToolbarMode by remember { mutableStateOf(false) }
     var changingReadMode by remember { mutableStateOf(false) }
     var changingEdgeToEdge by remember { mutableStateOf(false) }
@@ -273,7 +273,6 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     LaunchedEffect(serverUrl) {
         try {
             profile = repository.fetchProfile()
-            checklistInsertPosition = repository.fetchChecklistInsertPosition()
         } catch (t: Throwable) {
             NativeDebug.e("SettingsScreen load failed", t)
             loadError = String.format(errorLoadTemplate, t.message ?: t.javaClass.simpleName)
@@ -676,16 +675,16 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     }
 
     fun changeChecklistInsertPosition(position: String) {
-        if (changingChecklistPosition || position == checklistInsertPosition) return
+        if (changingChecklistPosition || position == container.editorPrefs.checklistInsertPosition) return
         changingChecklistPosition = true
-        val previous = checklistInsertPosition
-        checklistInsertPosition = position
+        val previous = container.editorPrefs.checklistInsertPosition
+        container.editorPrefs.applyChecklistInsertPosition(position)
         scope.launch {
             try {
                 repository.setChecklistInsertPosition(position)
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen setChecklistInsertPosition failed", t)
-                checklistInsertPosition = previous
+                container.editorPrefs.applyChecklistInsertPosition(previous)
                 reportActionError(t)
             } finally {
                 changingChecklistPosition = false
@@ -725,6 +724,24 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                 reportActionError(t)
             } finally {
                 changingToastPrefs = false
+            }
+        }
+    }
+
+    fun changeRemoveSectionBehavior(behavior: String) {
+        if (changingRemoveSection || behavior == container.editorPrefs.checklistRemoveSectionBehavior) return
+        changingRemoveSection = true
+        val previous = container.editorPrefs.checklistRemoveSectionBehavior
+        container.editorPrefs.applyChecklistRemoveSectionBehavior(behavior)
+        scope.launch {
+            try {
+                repository.setChecklistRemoveSectionBehavior(behavior)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen setChecklistRemoveSectionBehavior failed", t)
+                container.editorPrefs.applyChecklistRemoveSectionBehavior(previous)
+                reportActionError(t)
+            } finally {
+                changingRemoveSection = false
             }
         }
     }
@@ -1504,11 +1521,42 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                                     GkSegmentOption("top", stringResource(R.string.native_settings_checklist_insert_top)),
                                                     GkSegmentOption("bottom", stringResource(R.string.native_settings_checklist_insert_bottom)),
                                                 ),
-                                                selectedId = checklistInsertPosition,
+                                                selectedId = container.editorPrefs.checklistInsertPosition,
                                                 enabled = !changingChecklistPosition,
                                                 themeId = themeId,
                                                 dark = dark,
                                                 onSelect = { changeChecklistInsertPosition(it) },
+                                            )
+                                        }
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            SettingsRowIcon(themeId, dark) { tint -> FilterQuestionIcon(size = 20.dp, tint = tint) }
+                                            Spacer(Modifier.width(12.dp))
+                                            Column {
+                                                Text(
+                                                    stringResource(R.string.native_settings_checklist_remove_section),
+                                                    color = titleColor,
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                )
+                                                Text(
+                                                    stringResource(R.string.native_settings_checklist_remove_section_desc),
+                                                    color = SettingsSubtleColor,
+                                                    fontSize = 14.sp,
+                                                    lineHeight = 20.sp,
+                                                )
+                                            }
+                                        }
+                                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                                            GkSegmented(
+                                                options = listOf(
+                                                    GkSegmentOption("cascade", stringResource(R.string.native_settings_checklist_remove_cascade)),
+                                                    GkSegmentOption("keep", stringResource(R.string.native_settings_checklist_remove_keep)),
+                                                ),
+                                                selectedId = container.editorPrefs.checklistRemoveSectionBehavior,
+                                                enabled = !changingRemoveSection,
+                                                themeId = themeId,
+                                                dark = dark,
+                                                onSelect = { changeRemoveSectionBehavior(it) },
                                             )
                                         }
                                     }
