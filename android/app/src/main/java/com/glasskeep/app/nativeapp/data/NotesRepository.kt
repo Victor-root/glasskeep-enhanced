@@ -31,12 +31,14 @@ import com.glasskeep.app.nativeapp.data.network.SetChecklistInsertPositionReques
 import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
 import com.glasskeep.app.nativeapp.data.network.SetCollaboratorAccessRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
+import com.glasskeep.app.nativeapp.data.network.SetEditorToolbarModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
 import com.glasskeep.app.nativeapp.data.network.SetLanguageRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderTimeChipsRequest
 import com.glasskeep.app.nativeapp.data.network.SetShellThemeRequest
+import com.glasskeep.app.nativeapp.data.network.SetTypographyPresetsRequest
 import com.glasskeep.app.nativeapp.data.network.SetShowOnLoginRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
 import com.glasskeep.app.nativeapp.data.network.TrashNoteRequest
@@ -871,18 +873,49 @@ class NotesRepository(
         }
     }
 
-    /** Best-effort read of this user's saved workspace theme id (see
-     *  WorkspaceTheme.kt), same settings blob as fetchChecklistInsertPosition.
-     *  Null on any failure or if the user never picked one; the caller
-     *  (ThemeState) decides the default rather than this data-layer class
-     *  depending on the ui-layer WorkspaceTheme object for one constant. */
-    suspend fun fetchShellTheme(): String? {
+    /** Best-effort read of the three preferences every screen needs at
+     *  startup, in ONE GET rather than one per setting: the workspace
+     *  theme id (see WorkspaceTheme.kt), which formatting bar the editor
+     *  shows, and the typography presets. Null on any failure; each caller
+     *  (ThemeState, EditorPrefsState) decides its own default rather than
+     *  this data-layer class depending on the ui layer for a constant. */
+    suspend fun fetchWorkspacePreferences(): WorkspacePreferences? {
         return try {
             val response = api.getUserSettings()
-            if (response.isSuccessful) response.body()?.shellTheme else null
+            val body = response.body()
+            if (!response.isSuccessful || body == null) return null
+            WorkspacePreferences(
+                shellTheme = body.shellTheme,
+                editorToolbarMode = body.editorToolbarMode,
+                typography = TypographyPresets.normalize(body.typographyPresets),
+            )
         } catch (t: Throwable) {
-            NativeDebug.e("NotesRepository.fetchShellTheme failed", t)
+            NativeDebug.e("NotesRepository.fetchWorkspacePreferences failed", t)
             null
+        }
+    }
+
+    /** Sets which formatting bar the rich-text editor shows ("simple" or
+     *  "advanced"). Deliberate user action from SettingsScreen, surfaces a
+     *  real failure. */
+    suspend fun setEditorToolbarMode(mode: String) {
+        NativeDebug.d("NotesRepository.setEditorToolbarMode mode=$mode")
+        val response = api.setEditorToolbarMode(SetEditorToolbarModeRequest(mode))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (editorToolbarMode) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** Saves the edited typography profiles. */
+    suspend fun setTypographyPresets(presets: TypographyPresets) {
+        NativeDebug.d("NotesRepository.setTypographyPresets active=${presets.active}")
+        val response = api.setTypographyPresets(SetTypographyPresetsRequest(presets.toDto()))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (typographyPresets) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
         }
     }
 

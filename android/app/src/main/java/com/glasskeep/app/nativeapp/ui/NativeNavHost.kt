@@ -19,6 +19,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.glasskeep.app.nativeapp.NativeAppContainer
+import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.RealtimeClient
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.syncReminderAlarms
@@ -107,14 +108,15 @@ fun NativeNavHost(
         }
     }
 
-    // Workspace theme: TokenStore's cache already made the right chrome
-    // live from the very first frame (see ThemeState); this reconciles it
-    // against the server's own copy, the source of truth, exactly once
-    // per session, same "fetch on load, apply if different" shape as the
-    // web's own applyStoredShellTheme()-then-server-sync design.
+    // Workspace theme, formatting bar and typography: TokenStore's cache
+    // already made all three right from the very first frame (see
+    // ThemeState/EditorPrefsState); this reconciles them against the
+    // server's own copy, the source of truth, exactly once per session,
+    // same "fetch on load, apply if different" shape as the web's own
+    // applyStoredShellTheme()-then-server-sync design.
     LaunchedEffect(startDestination) {
         if (startDestination == "notes") {
-            repository.fetchShellTheme()?.let { container.themeState.apply(it) }
+            applyWorkspacePreferences(container, repository)
         }
     }
 
@@ -159,7 +161,7 @@ fun NativeNavHost(
         SyncQueueWorker.schedulePeriodic(context)
         SyncQueueWorker.triggerNow(context)
         realtimeClient.start()
-        scope.launch { repository.fetchShellTheme()?.let { container.themeState.apply(it) } }
+        scope.launch { applyWorkspacePreferences(container, repository) }
         if (mustChangePassword) {
             navController.navigate("force-change-password") {
                 popUpTo("login") { inclusive = true }
@@ -295,4 +297,14 @@ fun NativeNavHost(
             )
         }
     }
+}
+
+/** One settings read, applied to both live states. Best-effort: a failure
+ *  leaves whatever the local cache already made live, which is the right
+ *  behaviour for a look-and-feel read on a phone that may be offline. */
+private suspend fun applyWorkspacePreferences(container: NativeAppContainer, repository: NotesRepository) {
+    val prefs = repository.fetchWorkspacePreferences() ?: return
+    prefs.shellTheme?.let { container.themeState.apply(it) }
+    prefs.editorToolbarMode?.let { container.editorPrefs.applyToolbarMode(it) }
+    container.editorPrefs.applyTypography(prefs.typography)
 }

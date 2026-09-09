@@ -16,6 +16,7 @@ import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 class NativeAppContainer(context: Context) {
     val tokenStore = TokenStore(context)
     val themeState = ThemeState(tokenStore)
+    val editorPrefs = EditorPrefsState(tokenStore)
     private val db = AppDatabase.get(context)
     private val syncQueueDb = SyncQueueDatabase.get(context)
 

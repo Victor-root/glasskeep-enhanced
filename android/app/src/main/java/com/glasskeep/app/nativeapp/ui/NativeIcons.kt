@@ -1185,3 +1185,102 @@ fun TablerDownloadIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Co
     "M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2 M7 11l5 5l5 -5 M12 4l0 12",
     modifier, size, tint,
 )
+
+// ---------------------------------------------------------------------------
+// Rich-text toolbar glyphs (RichIcons.jsx). Same Tabler sources, same 24x24
+// viewBox, same 1.75 rendered stroke width as every icon above.
+
+@Composable
+fun HighlightIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 19h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4 " +
+        "M12.5 5.5l4 4 M4.5 13.5l4 4 M21 15v4h-8l4 -4l4 0",
+    modifier, size, tint,
+)
+
+@Composable
+fun TaskListIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3.5 5.5l1.5 1.5l2.5 -2.5 M3.5 11.5l1.5 1.5l2.5 -2.5 M3.5 17.5l1.5 1.5l2.5 -2.5 " +
+        "M11 6l9 0 M11 12l9 0 M11 18l9 0",
+    modifier, size, tint,
+)
+
+@Composable
+fun AlignLeftIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 6l16 0 M4 12l10 0 M4 18l14 0",
+    modifier, size, tint,
+)
+
+@Composable
+fun AlignCenterIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 6l16 0 M8 12l8 0 M6 18l12 0",
+    modifier, size, tint,
+)
+
+@Composable
+fun AlignRightIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 6l16 0 M10 12l10 0 M6 18l14 0",
+    modifier, size, tint,
+)
+
+@Composable
+fun AlignJustifyIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 6l16 0 M4 12l16 0 M4 18l12 0",
+    modifier, size, tint,
+)
+
+@Composable
+fun SeparatorIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 12l16 0 M8 8l4 -4l4 4 M16 16l-4 4l-4 -4",
+    modifier, size, tint,
+)
+
+@Composable
+fun SubscriptIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M5 7l8 10m-8 0l8 -10 M21 20h-4l3.5 -4a1.73 1.73 0 0 0 -3.5 -2",
+    modifier, size, tint,
+)
+
+@Composable
+fun SuperscriptIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M5 7l8 10m-8 0l8 -10 M21 11h-4l3.5 -4a1.73 1.73 0 0 0 -3.5 -2",
+    modifier, size, tint,
+)
+
+@Composable
+fun TextIncreaseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 19v-10.5a3.5 3.5 0 1 1 7 0v10.5 M4 13h7 M18 9v6 M21 12h-6",
+    modifier, size, tint,
+)
+
+@Composable
+fun TextDecreaseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 19v-10.5a3.5 3.5 0 1 1 7 0v10.5 M4 13h7 M21 12h-6",
+    modifier, size, tint,
+)
+
+@Composable
+fun IndentDecreaseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M20 6l-7 0 M20 12l-9 0 M20 18l-7 0 M8 8l-4 4l4 4",
+    modifier, size, tint,
+)
+
+@Composable
+fun InlineCodeIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M7 8l-4 4l4 4 M17 8l4 4l-4 4 M14 4l-4 16",
+    modifier, size, tint,
+)
+
+@Composable
+fun CodeBlockIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M8 9l3 3l-3 3 M13 15l3 0 " +
+        "M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z",
+    modifier, size, tint,
+)
+
+@Composable
+fun QuoteIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M6 15h15 M21 19h-15 M15 11h6 M21 7h-6 " +
+        "M9 9h1a1 1 0 1 1 -1 1v-2.5a2 2 0 0 1 2 -2 " +
+        "M3 9h1a1 1 0 1 1 -1 1v-2.5a2 2 0 0 1 2 -2",
+    modifier, size, tint,
+)

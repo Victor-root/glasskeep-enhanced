@@ -108,6 +108,7 @@ import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.data.NoteImageData
 import com.glasskeep.app.nativeapp.data.NoteImages
 import com.glasskeep.app.nativeapp.data.RichBlock
+import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlockKind
 import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.RichMark
@@ -611,14 +612,67 @@ fun NoteDetailScreen(
         richBlocks = blocks.map { if (it.id == id) it.copy(text = newText, marks = newMarks) else it }
     }
 
+    /** The toolbar's block buttons are toggles on the web
+     *  (toggleBulletList, toggleTaskList, toggleBlockquote,
+     *  smartToggleCodeBlock): pressing the one already active turns the
+     *  block back into a plain paragraph. The heading gallery is the
+     *  exception, setHeading() always sets. */
     fun setRichBlockKind(id: String, kind: RichBlockKind) {
         val blocks = richBlocks ?: return
-        richBlocks = blocks.map { if (it.id == id) it.copy(kind = kind) else it }
+        val togglesOff = kind == RichBlockKind.BULLET_ITEM || kind == RichBlockKind.NUMBERED_ITEM ||
+            kind == RichBlockKind.TASK_ITEM || kind == RichBlockKind.QUOTE || kind == RichBlockKind.CODE_BLOCK
+        richBlocks = blocks.map { block ->
+            if (block.id != id) {
+                block
+            } else {
+                block.copy(kind = if (togglesOff && block.kind == kind) RichBlockKind.PARAGRAPH else kind)
+            }
+        }
     }
 
     fun toggleRichMark(id: String, start: Int, end: Int, type: RichMarkType) {
         val blocks = richBlocks ?: return
         richBlocks = blocks.map { if (it.id == id) it.copy(marks = RichDoc.toggleMark(it.marks, type, start, end)) else it }
+    }
+
+    fun setRichMark(id: String, start: Int, end: Int, type: RichMarkType, value: String?, color: String?) {
+        val blocks = richBlocks ?: return
+        richBlocks = blocks.map { if (it.id == id) it.copy(marks = RichDoc.setMark(it.marks, type, start, end, value, color)) else it }
+    }
+
+    fun clearRichMark(id: String, start: Int, end: Int, type: RichMarkType) {
+        val blocks = richBlocks ?: return
+        richBlocks = blocks.map { if (it.id == id) it.copy(marks = RichDoc.clearMark(it.marks, type, start, end)) else it }
+    }
+
+    fun setRichAlign(id: String, align: RichAlign) {
+        val blocks = richBlocks ?: return
+        richBlocks = blocks.map { if (it.id == id) it.copy(align = align) else it }
+    }
+
+    /** indent()/outdent(), bounded to the same 0..8 range Indent.js uses. */
+    fun shiftRichIndent(id: String, delta: Int) {
+        val blocks = richBlocks ?: return
+        richBlocks = blocks.map { if (it.id == id) it.copy(indent = (it.indent + delta).coerceIn(0, 8)) else it }
+    }
+
+    /** setHorizontalRule(): drops a rule after the focused block, then a
+     *  fresh paragraph so there is always something to type into after it
+     *  (the web's own setHorizontalRule leaves the cursor in the paragraph
+     *  the rule pushed down). */
+    fun insertRichDivider(id: String) {
+        val blocks = richBlocks ?: return
+        val idx = blocks.indexOfFirst { it.id == id }
+        if (idx < 0) return
+        val rule = RichDoc.newBlock(RichBlockKind.DIVIDER)
+        val after = RichDoc.newBlock()
+        richBlocks = blocks.toMutableList().apply { addAll(idx + 1, listOf(rule, after)) }
+        pendingRichFocus = after.id
+    }
+
+    fun toggleRichChecked(id: String) {
+        val blocks = richBlocks ?: return
+        richBlocks = blocks.map { if (it.id == id) it.copy(checked = !it.checked) else it }
     }
 
     /** The toolbar's eraser, `clearNodes().unsetAllMarks()` on the web:
@@ -664,19 +718,23 @@ fun NoteDetailScreen(
     }
 
     /** Enter inside a block: splits it at [position] into two. The new
-     *  block continues the same list kind, so pressing Enter partway
-     *  through a list keeps adding list items; any other kind's
+     *  block continues a list, a task list or a quote, so pressing Enter
+     *  partway through one keeps adding items to it; any other kind's
      *  continuation is a plain paragraph, matching how most editors treat
-     *  Enter at the end of a heading. */
+     *  Enter at the end of a heading. A code block never gets here at all,
+     *  Enter inside a snippet is a real newline (see RichTextEditor). */
     fun splitRichBlock(id: String, position: Int) {
         val blocks = richBlocks ?: return
         val idx = blocks.indexOfFirst { it.id == id }
         if (idx < 0) return
         val block = blocks[idx]
-        val continuesList = block.kind == RichBlockKind.BULLET_ITEM || block.kind == RichBlockKind.NUMBERED_ITEM
-        val newBlock = RichDoc.newBlock(if (continuesList) block.kind else RichBlockKind.PARAGRAPH).copy(
+        val continues = block.kind == RichBlockKind.BULLET_ITEM || block.kind == RichBlockKind.NUMBERED_ITEM ||
+            block.kind == RichBlockKind.TASK_ITEM || block.kind == RichBlockKind.QUOTE
+        val newBlock = RichDoc.newBlock(if (continues) block.kind else RichBlockKind.PARAGRAPH).copy(
             text = block.text.substring(position),
             marks = RichDoc.clipMarks(block.marks, position, block.text.length),
+            align = block.align,
+            indent = if (continues) block.indent else 0,
         )
         val updated = blocks.toMutableList()
         updated[idx] = block.copy(text = block.text.substring(0, position), marks = RichDoc.clipMarks(block.marks, 0, position))
@@ -699,6 +757,26 @@ fun NoteDetailScreen(
         val newBlock = RichDoc.newBlock()
         richBlocks = blocks + newBlock
         pendingRichFocus = newBlock.id
+    }
+
+    // Bundled once: the formatting bar takes one actions object rather than
+    // a dozen separate lambdas, and remembering it keeps the bar from
+    // recomposing on every unrelated state change in this screen.
+    val richToolbarActions = remember {
+        RichToolbarActions(
+            setBlockKind = ::setRichBlockKind,
+            toggleMark = ::toggleRichMark,
+            setMark = ::setRichMark,
+            clearMark = ::clearRichMark,
+            clearFormatting = ::clearRichFormatting,
+            setAlign = ::setRichAlign,
+            shiftIndent = ::shiftRichIndent,
+            insertDivider = ::insertRichDivider,
+            requestLink = { id, start, end, existingHref ->
+                linkDialogTarget = LinkTarget(id, start, end, existingHref)
+                showLinkDialog = true
+            },
+        )
     }
 
     // ---------- Drawing note edits (DrawingContent.parse-approved notes only) ----------
@@ -1463,11 +1541,15 @@ fun NoteDetailScreen(
                                 RichTextEditor(
                                     blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
                                     state = richEditorState,
+                                    typography = container.editorPrefs.typography.activeProfile,
+                                    taskStrike = container.editorPrefs.taskStrike,
+                                    dark = dark,
                                     titleColor = titleColor,
                                     subtextColor = subtextColor,
                                     focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
                                     onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
                                     onEnter = { id, position -> splitRichBlock(id, position) },
+                                    onToggleChecked = { id -> toggleRichChecked(id) },
                                     onRemoveBlock = { id -> removeRichBlock(id) },
                                     onAddBlock = { addRichBlockAtEnd() },
                                 )
@@ -1533,15 +1615,12 @@ fun NoteDetailScreen(
                         RichFormatToolbar(
                             blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
                             state = richEditorState,
+                            mode = richToolbarModeOf(container.editorPrefs.toolbarMode),
                             dark = dark,
                             titleColor = titleColor,
-                            onSetBlockKind = { id, kind -> setRichBlockKind(id, kind) },
-                            onToggleMark = { id, start, end, type -> toggleRichMark(id, start, end, type) },
-                            onClearFormatting = { id, start, end -> clearRichFormatting(id, start, end) },
-                            onLinkRequest = { id, start, end, existingHref ->
-                                linkDialogTarget = LinkTarget(id, start, end, existingHref)
-                                showLinkDialog = true
-                            },
+                            taskStrike = container.editorPrefs.taskStrike,
+                            onTaskStrikeChange = { container.editorPrefs.applyTaskStrike(it) },
+                            actions = richToolbarActions,
                         )
                     }
                 }

@@ -50,6 +50,31 @@ class TokenStore(context: Context) {
             prefs.edit().putString(KEY_THEME_ID, value).apply()
         }
 
+    /** Cached "simple"/"advanced" formatting-bar choice, same first-frame
+     *  reason as [themeId]: the bar must not visibly change shape a second
+     *  after the note opens. */
+    var editorToolbarMode: String?
+        get() = prefs.getString(KEY_TOOLBAR_MODE, null)
+        set(value) {
+            prefs.edit().putString(KEY_TOOLBAR_MODE, value).apply()
+        }
+
+    /** Cached typography presets, as the same JSON the server stores. */
+    var typographyPresetsJson: String?
+        get() = prefs.getString(KEY_TYPOGRAPHY, null)
+        set(value) {
+            prefs.edit().putString(KEY_TYPOGRAPHY, value).apply()
+        }
+
+    /** "Strike through checked items" in rich-text task lists. A per-device
+     *  reading preference on the web too (localStorage["gk:taskStrikeChecked"],
+     *  see theme/taskListStrike.js), never synced to the account. */
+    var taskStrikeChecked: Boolean
+        get() = prefs.getBoolean(KEY_TASK_STRIKE, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_TASK_STRIKE, value).apply()
+        }
+
     fun clear() {
         NativeDebug.d("TokenStore.clear")
         prefs.edit().clear().apply()
@@ -59,5 +84,8 @@ class TokenStore(context: Context) {
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_TOKEN = "token"
         private const val KEY_THEME_ID = "theme_id"
+        private const val KEY_TOOLBAR_MODE = "editor_toolbar_mode"
+        private const val KEY_TYPOGRAPHY = "typography_presets"
+        private const val KEY_TASK_STRIKE = "task_strike_checked"
     }
 }

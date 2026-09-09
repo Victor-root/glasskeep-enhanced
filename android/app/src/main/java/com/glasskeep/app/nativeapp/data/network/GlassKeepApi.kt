@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.data.network
 
+import com.glasskeep.app.nativeapp.data.TypographyPresetsDto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -349,6 +350,12 @@ data class UserSettingsDto(
      *  most five, or null while the user never edited them (the picker
      *  falls back to its own defaults). */
     val reminderTimeChips: List<String>? = null,
+    /** "simple" or "advanced": which formatting bar the rich-text editor
+     *  shows (see RichToolbarMode). */
+    val editorToolbarMode: String? = null,
+    /** The three saved typography profiles and which one is active (see
+     *  TypographyPresets.kt). */
+    val typographyPresets: TypographyPresetsDto? = null,
 )
 
 /** Body for a PATCH /api/user/settings that sets only the workspace theme.
@@ -368,6 +375,16 @@ data class SetChecklistInsertPositionRequest(val checklistInsertPosition: String
  *  picker's quick-time chips. Same narrow-body shape as the two above. */
 @Serializable
 data class SetReminderTimeChipsRequest(val reminderTimeChips: List<String>)
+
+/** Body for a PATCH /api/user/settings that sets only which formatting
+ *  bar the rich-text editor shows ("simple" or "advanced"). */
+@Serializable
+data class SetEditorToolbarModeRequest(val editorToolbarMode: String)
+
+/** Body for a PATCH /api/user/settings that sets only the typography
+ *  presets blob. */
+@Serializable
+data class SetTypographyPresetsRequest(val typographyPresets: TypographyPresetsDto)
 
 /** GET /api/user/profile response. Mirrors serializeNote()-adjacent
  *  server code (server/index.js) field for field; `name`/`email` are
@@ -687,6 +704,12 @@ interface GlassKeepApi {
 
     @PATCH("api/user/settings")
     suspend fun setReminderTimeChips(@Body body: SetReminderTimeChipsRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setEditorToolbarMode(@Body body: SetEditorToolbarModeRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setTypographyPresets(@Body body: SetTypographyPresetsRequest): Response<UserSettingsDto>
 
     @GET("api/user/profile")
     suspend fun getProfile(): Response<ProfileDto>
