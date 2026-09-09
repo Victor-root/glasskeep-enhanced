@@ -770,6 +770,65 @@ internal fun Modifier.dashedBorder(color: Color, shape: Shape): Modifier = drawB
     }
 }
 
+/**
+ * ToolbarPopover (`DrawingToolbar.jsx:110-174`): a fixed-width card that
+ * opens 10px under its button, centred on it, kept 8px from the screen
+ * edges and flipped above when the bottom runs out. 16px radius, 12px of
+ * padding, and no animation.
+ */
+@Composable
+internal fun ToolbarPopover(
+    width: Dp,
+    dark: Boolean,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val density = LocalDensity.current
+    val positionProvider = remember(density, width) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset {
+                val widthPx = with(density) { width.roundToPx() }
+                val marginPx = with(density) { 8.dp.roundToPx() }
+                val gapPx = with(density) { 10.dp.roundToPx() }
+                val left = (anchorBounds.center.x - widthPx / 2)
+                    .coerceIn(marginPx, (windowSize.width - widthPx - marginPx).coerceAtLeast(marginPx))
+                val below = anchorBounds.bottom + gapPx
+                val top = if (below + popupContentSize.height + marginPx > windowSize.height) {
+                    (anchorBounds.top - gapPx - popupContentSize.height).coerceAtLeast(marginPx)
+                } else {
+                    below
+                }
+                return IntOffset(left, top)
+            }
+        }
+    }
+    Popup(
+        popupPositionProvider = positionProvider,
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true),
+    ) {
+        Column(
+            modifier = Modifier
+                .width(width)
+                .shadow(elevation = 24.dp, shape = RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(16.dp))
+                .background(if (dark) Color(0xFA111827) else Color(0xFAFFFFFF))
+                .border(
+                    width = 1.dp,
+                    color = if (dark) Color(0x80374151) else Color(0xCCF3F4F6),
+                    shape = RoundedCornerShape(16.dp),
+                )
+                .padding(12.dp),
+            content = content,
+        )
+    }
+}
+
 /** One entry of the note footer's kebab menu (`ModalFooter.jsx:700-807`):
  *  12/8px padding, an 8px gap, and the entry's own colour on the label
  *  as much as on the icon. */

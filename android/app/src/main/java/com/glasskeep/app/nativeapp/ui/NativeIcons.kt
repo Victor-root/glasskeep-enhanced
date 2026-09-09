@@ -9,6 +9,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -1023,6 +1024,81 @@ fun CheckFilledIcon(modifier: Modifier = Modifier, size: Dp = 20.dp, tint: Color
         val scale = this.size.minDimension / 24f
         scale(scale, scale, pivot = Offset.Zero) {
             drawPath(path, color = tint)
+        }
+    }
+}
+
+/** The drawing toolbar's pen, a filled Material pencil
+ *  (DrawingToolbar.jsx:78). */
+@Composable
+fun PenFilledIcon(modifier: Modifier = Modifier, size: Dp = 20.dp, tint: Color = Color.Black) {
+    val path = remember {
+        PathParser().parsePathString(
+            "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z " +
+                "M20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint)
+        }
+    }
+}
+
+/** tabler/eraser.svg, the drawing toolbar's second tool. */
+@Composable
+fun EraserIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M19 20h-10.5l-4.21 -4.3a1 1 0 0 1 0 -1.41l10 -10a1 1 0 0 1 1.41 0l5 5a1 1 0 0 1 0 1.41l-9.2 9.3 " +
+        "M18 13.3l-6.3 -6.3",
+    modifier, size, tint,
+)
+
+/** tabler/tool.svg: the drawing toolbar's "actions" button. */
+@Composable
+fun WrenchIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M7 10h3v-3l-3.5 -3.5a6 6 0 0 1 8 8l6 6a2 2 0 0 1 -3 3l-6 -6a6 6 0 0 1 -8 -8l3.5 3.5",
+    modifier, size, tint,
+)
+
+/** tabler/square-plus.svg, "add a page". */
+@Composable
+fun SquarePlusIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M9 12h6 M12 9v6 M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z",
+    modifier, size, tint,
+)
+
+/** tabler/square-minus.svg, "remove the last page". */
+@Composable
+fun SquareMinusIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M9 12h6 M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z",
+    modifier, size, tint,
+)
+
+/** PageLinesIcon (DrawingToolbar.jsx:176-182): a page with two rules,
+ *  dashed once the guides are hidden. */
+@Composable
+fun PageLinesIcon(modifier: Modifier = Modifier, size: Dp = 18.dp, tint: Color = Color.Black, dashed: Boolean = false) {
+    Canvas(modifier.size(size)) {
+        val unit = this.size.minDimension / 18f
+        val stroke = 2f * unit
+        val effect = if (dashed) PathEffect.dashPathEffect(floatArrayOf(3f * unit, 3f * unit)) else null
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(unit, unit),
+            size = Size(16f * unit, 16f * unit),
+            cornerRadius = CornerRadius(2f * unit, 2f * unit),
+            style = Stroke(width = stroke, pathEffect = effect),
+        )
+        listOf(7f, 12f).forEach { y ->
+            drawLine(
+                color = tint,
+                start = Offset(4f * unit, y * unit),
+                end = Offset(14f * unit, y * unit),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round,
+                pathEffect = effect,
+            )
         }
     }
 }
