@@ -46,11 +46,9 @@ import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
-import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.Indigo
-import com.glasskeep.app.ui.LightBgGradient
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import java.text.SimpleDateFormat
@@ -145,7 +143,7 @@ fun NotificationsScreen(
 
     LaunchedEffect(serverUrl) { load() }
 
-    val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
+    val bgModifier = Modifier.background(WorkspaceTheme.appBackground(container.themeState.themeId, dark))
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
 

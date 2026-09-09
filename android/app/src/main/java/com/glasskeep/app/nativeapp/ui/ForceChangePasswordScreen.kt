@@ -39,12 +39,10 @@ import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.ChangePasswordResult
 import com.glasskeep.app.ui.ButtonGradient
-import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkCardBg
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
-import com.glasskeep.app.ui.LightBgGradient
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightCardBg
 import com.glasskeep.app.ui.LightSubtextColor
@@ -82,7 +80,7 @@ fun ForceChangePasswordScreen(
     val tooShortMessage = stringResource(R.string.native_settings_password_too_short)
     val errorTemplate = stringResource(R.string.native_force_password_error)
 
-    val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
+    val bgModifier = Modifier.background(WorkspaceTheme.appBackground(container.themeState.themeId, dark))
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val cardBg = if (dark) DarkCardBg else LightCardBg

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
@@ -53,12 +54,10 @@ import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.toEntity
-import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.Indigo
-import com.glasskeep.app.ui.LightBgGradient
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
@@ -253,7 +252,7 @@ fun SecondaryNotesScreen(
 
     BackHandler(enabled = selectionMode) { exitSelection() }
 
-    val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
+    val bgModifier = Modifier.background(WorkspaceTheme.appBackground(container.themeState.themeId, dark))
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
@@ -264,9 +263,9 @@ fun SecondaryNotesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(WorkspaceTheme.headerGradient(container.themeState.themeId, dark))
+                        .background(WorkspaceTheme.statusBarColor(container.themeState.themeId, dark))
                         .windowInsetsPadding(WindowInsets.statusBars)
-                        .padding(horizontal = 8.dp, vertical = 10.dp),
+                        .padding(horizontal = 10.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
@@ -305,20 +304,15 @@ fun SecondaryNotesScreen(
                             CheckSquareIcon(size = 18.dp, tint = titleColor)
                         }
                     }
-                    if (syncingCount > 0) {
-                        Text(
-                            String.format(stringResource(R.string.native_notes_syncing_count), syncingCount),
-                            color = subtextColor,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(end = 4.dp),
-                        )
-                    }
-                    Text(
-                        stringResource(R.string.native_notes_refresh),
-                        color = if (loading) subtextColor else Indigo,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
+                    // Same cloud sync-status button as the main list's own
+                    // header (see NativeNotesListScreen): the web serves all
+                    // three views from one NotesHeader, so archived/trash get
+                    // the same icon cluster rather than a text link.
+                    val refreshLabel = stringResource(R.string.native_notes_refresh)
+                    Box(
                         modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .semantics { contentDescription = refreshLabel }
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -326,7 +320,13 @@ fun SecondaryNotesScreen(
                                 role = Role.Button,
                             ) { refresh() }
                             .padding(8.dp),
-                    )
+                    ) {
+                        when {
+                            loading -> CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Indigo, strokeWidth = 2.dp)
+                            syncingCount > 0 -> CloudPendingIcon(size = 18.dp, tint = if (dark) Color(0xFFfbbf24) else Color(0xFFd97706))
+                            else -> CloudCheckIcon(size = 18.dp, tint = if (dark) Color(0xFF34d399) else Color(0xFF059669))
+                        }
+                    }
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(WorkspaceTheme.headerBorderColor(container.themeState.themeId, dark)))
             }
@@ -351,9 +351,9 @@ fun SecondaryNotesScreen(
                 LazyVerticalStaggeredGrid(
                     columns = StaggeredGridCells.Fixed(2),
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 12.dp + navBarBottom),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalItemSpacing = 10.dp,
+                    contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + navBarBottom),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalItemSpacing = 12.dp,
                 ) {
                     items(notes, key = { it.id }) { note ->
                         NoteCard(

@@ -60,13 +60,11 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.network.DeviceLinkInfoResponse
-import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkCardBg
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.Indigo
-import com.glasskeep.app.ui.LightBgGradient
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightCardBg
 import com.glasskeep.app.ui.LightSubtextColor
@@ -119,7 +117,7 @@ fun QrScanScreen(container: NativeAppContainer, serverUrl: String, onBack: () ->
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
+    val bgModifier = Modifier.background(WorkspaceTheme.appBackground(themeId, dark))
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor

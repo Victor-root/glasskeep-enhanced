@@ -79,11 +79,9 @@ import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.isReminderPast
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
-import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.Indigo
-import com.glasskeep.app.ui.LightBgGradient
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import java.text.SimpleDateFormat
@@ -246,7 +244,7 @@ fun NativeNotesListScreen(
     val colorLabel = stringResource(R.string.native_note_detail_change_color)
     val context = LocalContext.current
 
-    val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
+    val bgModifier = Modifier.background(WorkspaceTheme.appBackground(themeId, dark))
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val borderColor = if (dark) CardBorderDark else CardBorderLight

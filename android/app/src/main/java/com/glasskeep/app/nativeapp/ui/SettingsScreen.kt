@@ -156,7 +156,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     val passkeyUntitledLabel = stringResource(R.string.native_settings_passkeys_untitled)
     val copiedMessage = stringResource(R.string.native_settings_secret_key_copied)
 
-    val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
+    val bgModifier = Modifier.background(WorkspaceTheme.appBackground(themeId, dark))
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
