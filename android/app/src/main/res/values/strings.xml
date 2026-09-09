@@ -23,8 +23,6 @@
 
     <!-- Native rewrite (0-webview effort), milestone 0: login + read-only
          notes list. Grows alongside the native screens themselves. -->
-    <string name="native_login_title">GlassKeep, native preview</string>
-    <string name="native_login_email">Email</string>
     <string name="native_login_password">Password</string>
     <string name="native_login_submit">Sign in</string>
     <string name="native_login_error_rejected">Sign-in refused (code %1$d). Check the email and password.</string>
@@ -33,6 +31,13 @@
     <string name="native_login_passkey_in_progress">Waiting for your passkey…</string>
     <string name="native_login_passkey_error">Couldn\'t sign in with a passkey (code %1$d).</string>
     <string name="native_login_forgot_password">Forgot username/password?</string>
+    <string name="native_login_select_profile">Who\'s watching?</string>
+    <string name="native_login_manual">Manual login</string>
+    <string name="native_login_back_to_profiles">Back</string>
+    <string name="native_login_other_account">Other account</string>
+    <string name="native_login_enter_password">Enter password</string>
+    <string name="native_login_username">Username</string>
+    <string name="native_login_slogan">Your notes, your server, your rules.</string>
     <string name="native_settings_passkeys_section">Passkeys</string>
     <string name="native_settings_passkeys_subtitle">Sign in without a password and unlock the instance.</string>
     <string name="native_settings_passkeys_explain">Passkeys let you sign in with Windows Hello, Touch ID, your phone, or a hardware key. For administrators, some can also unlock the encrypted instance.</string>

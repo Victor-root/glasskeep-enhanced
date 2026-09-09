@@ -17,6 +17,22 @@ import retrofit2.http.Query
 @Serializable
 data class LoginRequest(val email: String, val password: String)
 
+/** The other body POST /api/login accepts: a profile picked from the
+ *  sign-in screen's own list, identified by id rather than typed in
+ *  (App.jsx's signInById). */
+@Serializable
+data class LoginByIdRequest(@SerialName("user_id") val userId: Int, val password: String)
+
+/** One entry of GET /api/login/profiles: the public, deliberately
+ *  minimal shape the sign-in screen shows before anyone is signed in
+ *  (server/index.js:2287-2296). */
+@Serializable
+data class LoginProfileDto(
+    val id: Int,
+    val name: String,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+)
+
 @Serializable
 data class UserDto(
     val id: Int,
@@ -602,6 +618,14 @@ data class NoteMutationResponse(
 interface GlassKeepApi {
     @POST("api/login")
     suspend fun login(@Body body: LoginRequest): Response<LoginResponse>
+
+    @POST("api/login")
+    suspend fun loginById(@Body body: LoginByIdRequest): Response<LoginResponse>
+
+    // Public, no session needed: this is what the sign-in screen reads
+    // before anyone has signed in.
+    @GET("api/login/profiles")
+    suspend fun getLoginProfiles(): Response<List<LoginProfileDto>>
 
     // Pre-login, same as passkeyLoginOptions/Verify below: called directly
     // from NativeLoginScreen/SecretKeyLoginScreen, not through

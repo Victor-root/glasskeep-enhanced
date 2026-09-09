@@ -20,8 +20,6 @@
     <string name="download_complete">Enregistré : %1$s</string>
     <string name="download_error">Erreur de téléchargement</string>
 
-    <string name="native_login_title">GlassKeep, aperçu natif</string>
-    <string name="native_login_email">E-mail</string>
     <string name="native_login_password">Mot de passe</string>
     <string name="native_login_submit">Se connecter</string>
     <string name="native_login_error_rejected">Connexion refusée (code %1$d). Vérifiez l\'e-mail et le mot de passe.</string>
@@ -30,6 +28,13 @@
     <string name="native_login_passkey_in_progress">En attente de votre clé d\'accès…</string>
     <string name="native_login_passkey_error">Impossible de se connecter avec une clé d\'accès (code %1$d).</string>
     <string name="native_login_forgot_password">Nom d\'utilisateur / mot de passe oublié ?</string>
+    <string name="native_login_select_profile">Qui est-ce ?</string>
+    <string name="native_login_manual">Connexion manuelle</string>
+    <string name="native_login_back_to_profiles">Retour</string>
+    <string name="native_login_other_account">Autre compte</string>
+    <string name="native_login_enter_password">Entrez le mot de passe</string>
+    <string name="native_login_username">Nom d\'utilisateur</string>
+    <string name="native_login_slogan">Vos notes, votre serveur, vos règles.</string>
     <string name="native_settings_passkeys_section">Clés d\'accès</string>
     <string name="native_settings_passkeys_subtitle">Connexion sans mot de passe et déverrouillage d\'instance.</string>
     <string name="native_settings_passkeys_explain">Les clés d\'accès vous permettent de vous connecter avec Windows Hello, Touch ID, votre téléphone ou une clé physique. Pour les administrateurs, certaines peuvent aussi déverrouiller l\'instance chiffrée.</string>
