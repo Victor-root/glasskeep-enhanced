@@ -14,8 +14,8 @@ import com.glasskeep.app.nativeapp.data.network.BrandingDto
  * Cached in TokenStore for the same reason the web caches its own copy in
  * localStorage: the sign-in screen must paint the right name and logo on
  * the very first frame rather than flashing the defaults until the read
- * comes back. The one field deliberately left uncached there, the login
- * background image, is not read here at all.
+ * comes back. The background URL and its placeholder stay in live state
+ * only: the multi-megabyte image itself never enters preferences.
  */
 class BrandingState(private val tokenStore: TokenStore) {
     /** Null (or blank) means the bundled wordmark. */
@@ -30,10 +30,22 @@ class BrandingState(private val tokenStore: TokenStore) {
     var loginThemeId: String? by mutableStateOf(tokenStore.brandingLoginTheme)
         private set
 
+    var loginBackground: String? by mutableStateOf(null)
+        private set
+
+    var loginBackgroundColor: String? by mutableStateOf(null)
+        private set
+
+    var loginBackgroundBlur: Int by mutableStateOf(0)
+        private set
+
     fun apply(branding: BrandingDto) {
         appName = branding.appName.takeIf { it.isNotBlank() }
         logo = branding.logo?.takeIf { it.startsWith("data:") }
         loginThemeId = branding.loginTheme
+        loginBackground = branding.loginBackground?.takeIf { it.isNotBlank() }
+        loginBackgroundColor = branding.loginBackgroundColor
+        loginBackgroundBlur = branding.loginBackgroundBlur.coerceIn(0, 20)
         tokenStore.brandingAppName = appName
         tokenStore.brandingLogo = logo
         tokenStore.brandingLoginTheme = loginThemeId

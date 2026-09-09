@@ -16,6 +16,7 @@ import com.glasskeep.app.nativeapp.data.network.CreateLogoRequest
 import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
 import com.glasskeep.app.nativeapp.data.network.DeviceLinkInfoResponse
 import com.glasskeep.app.nativeapp.data.network.DeviceLinkTokenRequest
+import com.glasskeep.app.nativeapp.data.network.FederatedUserDto
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.nativeapp.data.network.NoteDto
@@ -1482,6 +1483,20 @@ class NotesRepository(
             throw IllegalStateException(error)
         }
         return body
+    }
+
+    /** Real users advertised by every paired federation peer. An offline
+     * peer is omitted by the server, so a partial list is still success. */
+    suspend fun searchFederatedUsers(query: String = ""): List<FederatedUserDto> {
+        NativeDebug.d("NotesRepository.searchFederatedUsers query=$query")
+        val response = api.searchFederatedUsers(query)
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "GET /api/federation/users/search failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body.users
     }
 
     /** Adds [username] (matched server-side by email or name, see

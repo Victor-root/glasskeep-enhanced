@@ -2,6 +2,7 @@ package com.glasskeep.app.nativeapp.ui
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,12 +25,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +53,7 @@ import com.glasskeep.app.MainActivity
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.data.network.ApiClientFactory
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkCardBg
 import com.glasskeep.app.ui.DarkSubtextColor
@@ -56,6 +65,10 @@ import com.glasskeep.app.ui.LightCardBg
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.Request
+import java.net.URI
 
 /** The four surface colours every screen inside [AuthShell] draws with,
  *  handed to [content] so it doesn't resolve them a second time. */
@@ -72,10 +85,10 @@ internal data class AuthShellColors(
  * caller fills, then the theme toggle, the slogan pill, "change server"
  * and the credits line, in that order and with the web's own spacing.
  *
- * Deliberately not ported, disclosed rather than silently dropped: the
- * admin-configured custom login background image (and with it the boot
- * placeholder cross-fade), plus the QR side panel, which is a wide-screen
- * layout the phone never reaches.
+ * The admin-configured login background is fetched as a normal cacheable
+ * image and decoded by Android; no browser/image-loader dependency is
+ * involved. The QR side panel remains desktop-only because this shell is
+ * the phone layout.
  */
 @Composable
 internal fun AuthShell(
@@ -114,7 +127,54 @@ internal fun AuthShell(
     // The signed-out screens wear the theme the admin picked for them, not
     // the one this account chose for its own workspace (AuthShell.jsx:33).
     val themeId = container.branding.loginThemeId ?: container.themeState.themeId
-    Box(Modifier.fillMaxSize().background(WorkspaceTheme.appBackground(themeId, dark))) {
+    val backgroundRef = container.branding.loginBackground
+    var backgroundBitmap by remember(backgroundRef) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(backgroundRef) {
+        backgroundBitmap = backgroundRef?.let { ref ->
+            withContext(Dispatchers.IO) {
+                try {
+                    if (ref.startsWith("data:")) {
+                        rememberlessDecodeDataUrl(ref)
+                    } else {
+                        val absolute = URI(container.tokenStore.serverUrl.orEmpty()).resolve(ref).toString()
+                        val client = ApiClientFactory.okHttpClient(container.tokenStore) { container.lockState.markLocked() }
+                        client.newCall(Request.Builder().url(absolute).build()).execute().use { response ->
+                            if (!response.isSuccessful) null
+                            else response.body?.bytes()?.let { bytes ->
+                                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                            }
+                        }
+                    }
+                } catch (t: Throwable) {
+                    NativeDebug.e("Auth background load failed", t)
+                    null
+                }
+            }
+        }
+    }
+    val placeholder = remember(container.branding.loginBackgroundColor) {
+        container.branding.loginBackgroundColor?.let { value ->
+            runCatching { Color(android.graphics.Color.parseColor(value)) }.getOrNull()
+        }
+    }
+    val backgroundModifier = placeholder?.let { Modifier.background(it) }
+        ?: Modifier.background(WorkspaceTheme.appBackground(themeId, dark))
+    Box(Modifier.fillMaxSize().then(backgroundModifier)) {
+        backgroundBitmap?.let { bitmap ->
+            Image(
+                bitmap = bitmap,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(container.branding.loginBackgroundBlur.dp),
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(if (dark) Color.Black.copy(alpha = 0.30f) else Color.White.copy(alpha = 0.18f)),
+            )
+        }
         if (container.shellPrefs.floatingCards) FloatingCardsBackground(dark)
 
         Column(
@@ -223,6 +283,12 @@ internal fun AuthShell(
         }
     }
 }
+
+private fun rememberlessDecodeDataUrl(dataUrl: String): ImageBitmap? = runCatching {
+    val base64 = dataUrl.substringAfter("base64,", "")
+    val bytes = android.util.Base64.decode(base64, android.util.Base64.DEFAULT)
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+}.getOrNull()
 
 /** AuthShell's footer line, deliberately untranslated on the web too. */
 private const val AuthShellCredits =

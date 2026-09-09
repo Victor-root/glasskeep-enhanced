@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -91,11 +92,8 @@ private val SwipeDismissThreshold = 80.dp
  * panel looks the same (see the .is-dismissed override the mobile
  * stylesheet cancels).
  *
- * Deliberately not ported, disclosed rather than silently dropped: the
- * two admin-only notification types with their own Approve/Reject buttons
- * (this app has no admin panel yet), and the branding logo in the header
- * (a server-configured image the native app never fetches; the app's own
- * icon stands in).
+ * Pending-registration notifications expose their Approve/Reject actions
+ * directly, matching the native admin panel.
  */
 @Composable
 fun NotificationCenter(
@@ -107,7 +105,10 @@ fun NotificationCenter(
     onDismiss: () -> Unit,
 ) {
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
+    val api = remember(serverUrl) { container.api(serverUrl) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val toasts = LocalGkToasts.current
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
 
@@ -229,6 +230,36 @@ fun NotificationCenter(
                             onDismissCard = {
                                 notifications = notifications.filterNot { it.id == notification.id }
                                 scope.launch { repository.removeNotifications(listOf(notification.id)) }
+                            },
+                            onApprovePending = notification.message?.toIntOrNull()?.let { pendingId ->
+                                {
+                                    scope.launch {
+                                        try {
+                                            val response = api.approvePendingUser(pendingId)
+                                            if (!response.isSuccessful) error("HTTP ${response.code()}")
+                                            notifications = notifications.filterNot { it.id == notification.id }
+                                            repository.removeNotifications(listOf(notification.id))
+                                            toasts.success(context.getString(R.string.native_admin_registration_approved))
+                                        } catch (t: Throwable) {
+                                            toasts.error(t.message ?: context.getString(R.string.native_admin_action_failed))
+                                        }
+                                    }
+                                }
+                            },
+                            onRejectPending = notification.message?.toIntOrNull()?.let { pendingId ->
+                                {
+                                    scope.launch {
+                                        try {
+                                            val response = api.rejectPendingUser(pendingId)
+                                            if (!response.isSuccessful) error("HTTP ${response.code()}")
+                                            notifications = notifications.filterNot { it.id == notification.id }
+                                            repository.removeNotifications(listOf(notification.id))
+                                            toasts.show(context.getString(R.string.native_admin_registration_rejected))
+                                        } catch (t: Throwable) {
+                                            toasts.error(t.message ?: context.getString(R.string.native_admin_action_failed))
+                                        }
+                                    }
+                                }
                             },
                         )
                     }
@@ -396,6 +427,8 @@ private fun NotificationCard(
     dark: Boolean,
     onOpen: () -> Unit,
     onDismissCard: () -> Unit,
+    onApprovePending: (() -> Unit)?,
+    onRejectPending: (() -> Unit)?,
 ) {
     val density = LocalDensity.current
     val variant = variantOf(notification)
@@ -513,9 +546,39 @@ private fun NotificationCard(
                         )
                     }
                 }
+                if (notification.type == "pending_user_registered" && onApprovePending != null && onRejectPending != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        NotificationAction(
+                            label = stringResource(R.string.native_admin_reject),
+                            color = Color(0xFFDC2626),
+                            onClick = onRejectPending,
+                        )
+                        NotificationAction(
+                            label = stringResource(R.string.native_admin_approve),
+                            color = Color(0xFF16A34A),
+                            onClick = onApprovePending,
+                        )
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun NotificationAction(label: String, color: Color, onClick: () -> Unit) {
+    Text(
+        label,
+        color = Color.White,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(color).clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            role = Role.Button,
+        ) { onClick() }.padding(horizontal = 14.dp, vertical = 6.dp),
+    )
 }
 
 /** SEMANTIC_ICONS (NotificationCard.jsx:34-58), for the types this app
@@ -565,6 +628,8 @@ internal fun notificationTitleRes(type: String): Int = when (type) {
     "collaborator_left" -> R.string.native_notifications_title_collaborator_left
     "shared_note_deleted", "shared_note_deleted_with_copy" -> R.string.native_notifications_title_shared_note_deleted
     "reminder" -> R.string.native_notifications_title_reminder
+    "pending_user_registered" -> R.string.native_admin_registration_request
+    "user_deleted" -> R.string.native_admin_user_deleted
     else -> R.string.native_notifications_title_generic
 }
 
@@ -583,6 +648,8 @@ internal fun notificationMessageRes(type: String, variant: String?): Int? = when
     "collaborator_left" -> R.string.native_notifications_collaborator_left
     "shared_note_deleted" -> R.string.native_notifications_shared_note_deleted
     "shared_note_deleted_with_copy" -> R.string.native_notifications_shared_note_deleted_with_copy
+    "pending_user_registered" -> R.string.native_admin_registration_notification
+    "user_deleted" -> R.string.native_admin_user_deleted_notification
     else -> null
 }
 

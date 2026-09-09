@@ -328,14 +328,23 @@ fun NativeNavHost(
         liveNotification = null
         val noteTitle = notification.noteTitle.ifBlank { context.getString(R.string.native_notes_untitled) }
         val template = notificationMessageRes(notification.type, notification.variant)
+        val opensAdmin = notification.type == "pending_user_registered"
         toasts.show(
             message = template
                 ?.let { context.getString(it, notification.senderName, noteTitle) }
                 ?: notification.message.orEmpty().ifBlank { noteTitle },
             variant = variantOf(notification),
             title = context.getString(notificationTitleRes(notification.type)),
-            actionLabel = notification.noteId?.let { context.getString(R.string.native_notifications_open) },
-            action = notification.noteId?.let { id -> { navController.navigate("notes/$id") } },
+            actionLabel = when {
+                notification.noteId != null -> context.getString(R.string.native_notifications_open)
+                opensAdmin -> context.getString(R.string.native_admin_title)
+                else -> null
+            },
+            action = when {
+                notification.noteId != null -> { { navController.navigate("notes/${notification.noteId}") } }
+                opensAdmin -> { { navController.navigate("admin") } }
+                else -> null
+            },
             type = notification.type,
         )
     }
@@ -359,7 +368,7 @@ fun NativeNavHost(
     // moves the screen straight to the full unlock version.
     val currentEntry by navController.currentBackStackEntryAsState()
     val route = currentEntry?.destination?.route ?: startDestination
-    val signedIn = route != "login" && route != "login-secret"
+    val signedIn = route != "login" && route != "login-secret" && route != "register"
     val lock = container.lockState
     val showUnlockScreen = lock.isLocked && (!signedIn || lock.overlayOpen)
     val showLockedBanner = lock.isLocked && signedIn && !lock.bannerDismissed && !lock.overlayOpen
@@ -411,6 +420,14 @@ fun NativeNavHost(
                         serverUrl = serverUrl,
                         onLoggedIn = { mustChangePassword -> handleLoggedIn(mustChangePassword) },
                         onForgotPassword = { navController.navigate("login-secret") },
+                        onRegister = { navController.navigate("register") },
+                    )
+                }
+                composable("register") {
+                    RegisterScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        onBack = { navController.popBackStack() },
                     )
                 }
                 composable("login-secret") {
@@ -444,6 +461,7 @@ fun NativeNavHost(
                         onOpenArchived = { navController.navigate("archived") },
                         onOpenTrash = { navController.navigate("trash") },
                         onOpenSettings = { navController.navigate("settings") },
+                        onOpenAdmin = { navController.navigate("admin") },
                         onOpenQrScanner = { navController.navigate("qr-scan") },
                         pendingNewNoteType = pendingNewNoteType,
                         onPendingNewNoteTypeConsumed = onPendingNewNoteTypeConsumed,
@@ -479,6 +497,13 @@ fun NativeNavHost(
                         serverUrl = serverUrl,
                         onBack = { navController.popBackStack() },
                         onOpenQrScanner = { navController.navigate("qr-scan") },
+                    )
+                }
+                composable("admin") {
+                    AdminScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        onBack = { navController.popBackStack() },
                     )
                 }
                 composable("qr-scan") {

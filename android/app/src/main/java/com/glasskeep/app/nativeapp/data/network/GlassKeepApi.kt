@@ -18,6 +18,15 @@ import retrofit2.http.Query
 @Serializable
 data class LoginRequest(val email: String, val password: String)
 
+@Serializable
+data class RegisterRequest(val name: String, val email: String, val password: String)
+
+@Serializable
+data class RegisterResponse(val pending: Boolean = false, val ok: Boolean = false, val error: String? = null)
+
+@Serializable
+data class AllowRegistrationResponse(val allowNewAccounts: Boolean = false)
+
 /** The other body POST /api/login accepts: a profile picked from the
  *  sign-in screen's own list, identified by id rather than typed in
  *  (App.jsx's signInById). */
@@ -133,10 +142,9 @@ data class NoteDto(
  * to read it before any token exists. Every field is optional, and an
  * empty one means "use the bundled default".
  *
- * `loginBackground` and its placeholders are declared for parity but not
- * read here: the background is a URL rather than a data URL, so it would
- * need an HTTP image loader this app doesn't otherwise carry (see
- * AuthShell.kt's own note on what it deliberately leaves out).
+ * `loginBackground` is a versioned URL in the public payload (the admin
+ * payload may inline the image); AuthShell resolves and decodes either form
+ * with the native HTTP stack.
  */
 @Serializable
 data class BrandingDto(
@@ -148,6 +156,248 @@ data class BrandingDto(
     val loginBackgroundBlur: Int = 0,
     val loginTheme: String? = null,
 )
+
+@Serializable
+data class PasskeyDomainStateDto(
+    val declared: String = "",
+    val effective: String = "",
+    val source: String = "none",
+    val lockedByEnv: Boolean = false,
+    val suggested: String = "",
+)
+
+@Serializable
+data class AdminSettingsDto(
+    val allowNewAccounts: Boolean = false,
+    val loginSlogan: String = "",
+    val appName: String = "",
+    val logo: String? = null,
+    val loginBackground: String? = null,
+    val loginBackgroundColor: String? = null,
+    val loginBackgroundHash: String? = null,
+    val loginBackgroundBlur: Int = 0,
+    val loginTheme: String = "glasskeep",
+    val passkeyDomain: String = "",
+    val passkeyDomainState: PasskeyDomainStateDto = PasskeyDomainStateDto(),
+)
+
+@Serializable
+data class AdminSettingsPatch(
+    val allowNewAccounts: Boolean? = null,
+    val loginSlogan: String? = null,
+    val appName: String? = null,
+    val loginBackgroundBlur: Int? = null,
+    val loginTheme: String? = null,
+    val passkeyDomain: String? = null,
+)
+
+@Serializable
+data class AdminLogoPatch(val logo: String?, val logoPwa: String? = null)
+
+@Serializable
+data class AdminBackgroundPatch(
+    val loginBackground: String?,
+    val loginBackgroundColor: String? = null,
+    val loginBackgroundHash: String? = null,
+)
+
+@Serializable
+data class AdminUserDto(
+    val id: Int,
+    val name: String,
+    val email: String,
+    @SerialName("is_admin") val isAdmin: Boolean = false,
+    val notes: Int = 0,
+    @SerialName("storage_bytes") val storageBytes: Long = 0,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+)
+
+@Serializable
+data class PendingUserDto(
+    val id: Int,
+    val name: String,
+    val email: String,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+data class CreateAdminUserRequest(
+    val name: String,
+    val email: String,
+    val password: String,
+    @SerialName("is_admin") val isAdmin: Boolean,
+)
+
+@Serializable
+data class UpdateAdminUserRequest(
+    val name: String,
+    val email: String,
+    val password: String? = null,
+    @SerialName("is_admin") val isAdmin: Boolean,
+)
+
+@Serializable
+data class DeletedAdminUserDto(val id: Int, val name: String, val email: String)
+
+@Serializable
+data class DeleteAdminUserResponse(val ok: Boolean = false, val deletedUser: DeletedAdminUserDto? = null)
+
+@Serializable
+data class OkResponse(val ok: Boolean = false)
+
+@Serializable
+data class AdminAiSettingsDto(
+    val enabled: Boolean = false,
+    val provider: String = "openai-compatible",
+    val baseUrl: String = "",
+    val model: String = "",
+    val temperature: Double = 0.3,
+    val maxTokens: Int = 800,
+    val hasApiKey: Boolean = false,
+    val allowServerAiForUsers: Boolean = false,
+    val allowPrivateAiForUsers: Boolean = false,
+)
+
+@Serializable
+data class AdminAiSettingsRequest(
+    val enabled: Boolean,
+    val baseUrl: String,
+    val model: String,
+    val temperature: Double,
+    val maxTokens: Int,
+    val allowServerAiForUsers: Boolean,
+    val allowPrivateAiForUsers: Boolean,
+    val apiKey: String? = null,
+)
+
+@Serializable
+data class AdminAiTestRequest(
+    val baseUrl: String,
+    val model: String,
+    val temperature: Double,
+    val maxTokens: Int,
+    val apiKey: String? = null,
+)
+
+@Serializable
+data class AdminAiTestResponse(val ok: Boolean = false, val reply: String? = null, val error: String? = null)
+
+@Serializable
+data class ActivateEncryptionRequest(val passphrase: String, val confirmPassphrase: String)
+
+@Serializable
+data class ChangeEncryptionPassphraseRequest(
+    val currentPassphrase: String,
+    val newPassphrase: String,
+    val confirmPassphrase: String,
+)
+
+@Serializable
+data class DeactivateEncryptionRequest(val passphrase: String)
+
+@Serializable
+data class EncryptionMutationResponse(
+    val ok: Boolean = false,
+    val recoveryKey: String? = null,
+    val enabled: Boolean? = null,
+    val locked: Boolean? = null,
+)
+
+@Serializable
+data class PromotePasskeyVerifyRequest(
+    val response: JsonElement,
+    val challengeId: String,
+    val prfOutput: String,
+)
+
+@Serializable
+data class FederatedUserDto(
+    val name: String,
+    val ref: String,
+    val avatar: String? = null,
+    val host: String,
+    val serverLabel: String? = null,
+)
+
+@Serializable
+data class FederatedUsersResponse(val users: List<FederatedUserDto> = emptyList())
+
+@Serializable
+data class FederationLinkDto(
+    val id: String,
+    val role: String = "",
+    val status: String = "",
+    val state: String = "",
+    val writable: Boolean = false,
+    val peerBaseUrl: String = "",
+    val peerLabel: String? = null,
+    val localBaseUrl: String? = null,
+    val peerReachable: Boolean? = null,
+    val peerLocked: Boolean? = null,
+    val peerAppVersion: String? = null,
+    val protocolCompatible: Boolean? = null,
+    val lastSeenAt: String? = null,
+    val lastError: String? = null,
+)
+
+@Serializable
+data class FederationLinksResponse(
+    val links: List<FederationLinkDto> = emptyList(),
+    val selfName: String = "",
+    val maxLabelLen: Int = 24,
+)
+
+@Serializable
+data class FederationSelfNameRequest(val name: String)
+
+@Serializable
+data class FederationInviteRequest(val peerBaseUrl: String, val localBaseUrl: String, val label: String? = null)
+
+@Serializable
+data class FederationAcceptRequest(val localBaseUrl: String, val label: String? = null)
+
+@Serializable
+data class FederationAddressRequest(val peerBaseUrl: String)
+
+@Serializable
+data class FederationRenameRequest(val label: String)
+
+@Serializable
+data class FederationActionResponse(val ok: Boolean = false, val link: FederationLinkDto? = null)
+
+@Serializable
+data class UpdateCheckDto(
+    val currentVersion: String? = null,
+    val latestVersion: String? = null,
+    val updateAvailable: Boolean = false,
+    val releaseUrl: String? = null,
+    val publishedAt: String? = null,
+    val stale: Boolean = false,
+)
+
+@Serializable
+data class SelfUpdateModeDto(val mode: String? = null, val oneClickAvailable: Boolean = false, val reason: String? = null)
+
+@Serializable
+data class SelfUpdateStatusDto(
+    val state: String? = null,
+    val step: String? = null,
+    val message: String? = null,
+    val fromVersion: String? = null,
+    val toVersion: String? = null,
+    val runningVersion: String? = null,
+    val inProgress: Boolean = false,
+)
+
+@Serializable
+data class StartSelfUpdateRequest(val latestVersion: String)
+
+@Serializable
+data class SelfUpdateActionResponse(val queued: Boolean = false, val cancelled: Boolean = false)
+
+@Serializable
+data class HealthDto(val startedAt: Long? = null)
 
 /** A note's own icon, and an entry in the account's logo library: the two
  *  are the same shape (the picker hands one straight to the other), and
@@ -892,6 +1142,12 @@ data class NoteMutationResponse(
 )
 
 interface GlassKeepApi {
+    @POST("api/register")
+    suspend fun register(@Body body: RegisterRequest): Response<RegisterResponse>
+
+    @GET("api/admin/allow-registration")
+    suspend fun allowRegistration(): Response<AllowRegistrationResponse>
+
     @POST("api/login")
     suspend fun login(@Body body: LoginRequest): Response<LoginResponse>
 
@@ -913,6 +1169,123 @@ interface GlassKeepApi {
     // sign-in screen reads it before anyone has signed in.
     @GET("api/branding")
     suspend fun getBranding(): Response<BrandingDto>
+
+    @GET("api/admin/settings")
+    suspend fun getAdminSettings(): Response<AdminSettingsDto>
+
+    @PATCH("api/admin/settings")
+    suspend fun patchAdminSettings(@Body body: AdminSettingsPatch): Response<AdminSettingsDto>
+
+    @PATCH("api/admin/settings")
+    suspend fun patchAdminLogo(@Body body: AdminLogoPatch): Response<AdminSettingsDto>
+
+    @PATCH("api/admin/settings")
+    suspend fun patchAdminBackground(@Body body: AdminBackgroundPatch): Response<AdminSettingsDto>
+
+    @GET("api/admin/users")
+    suspend fun getAdminUsers(): Response<List<AdminUserDto>>
+
+    @POST("api/admin/users")
+    suspend fun createAdminUser(@Body body: CreateAdminUserRequest): Response<AdminUserDto>
+
+    @PATCH("api/admin/users/{id}")
+    suspend fun updateAdminUser(@Path("id") id: Int, @Body body: UpdateAdminUserRequest): Response<AdminUserDto>
+
+    @DELETE("api/admin/users/{id}")
+    suspend fun deleteAdminUser(@Path("id") id: Int): Response<DeleteAdminUserResponse>
+
+    @GET("api/admin/pending-users")
+    suspend fun getPendingUsers(): Response<List<PendingUserDto>>
+
+    @POST("api/admin/pending-users/{id}/approve")
+    suspend fun approvePendingUser(@Path("id") id: Int): Response<AdminUserDto>
+
+    @POST("api/admin/pending-users/{id}/reject")
+    suspend fun rejectPendingUser(@Path("id") id: Int): Response<OkResponse>
+
+    @GET("api/admin/ai/settings")
+    suspend fun getAdminAiSettings(): Response<AdminAiSettingsDto>
+
+    @PUT("api/admin/ai/settings")
+    suspend fun putAdminAiSettings(@Body body: AdminAiSettingsRequest): Response<AdminAiSettingsDto>
+
+    @POST("api/admin/ai/test")
+    suspend fun testAdminAi(@Body body: AdminAiTestRequest): Response<AdminAiTestResponse>
+
+    @POST("api/instance/activate")
+    suspend fun activateEncryption(@Body body: ActivateEncryptionRequest): Response<EncryptionMutationResponse>
+
+    @POST("api/instance/passphrase")
+    suspend fun changeEncryptionPassphrase(@Body body: ChangeEncryptionPassphraseRequest): Response<OkResponse>
+
+    @POST("api/instance/deactivate")
+    suspend fun deactivateEncryption(@Body body: DeactivateEncryptionRequest): Response<EncryptionMutationResponse>
+
+    @POST("api/instance/recovery/regenerate")
+    suspend fun regenerateRecoveryKey(): Response<EncryptionMutationResponse>
+
+    @POST("api/passkeys/{id}/instance-unlock/options")
+    suspend fun promotePasskeyOptions(@Path("id") id: String): Response<PasskeyCeremonyOptionsResponse>
+
+    @POST("api/passkeys/{id}/instance-unlock/verify")
+    suspend fun promotePasskeyVerify(@Path("id") id: String, @Body body: PromotePasskeyVerifyRequest): Response<OkResponse>
+
+    @POST("api/passkeys/{id}/instance-unlock/disable")
+    suspend fun disablePasskeyUnlock(@Path("id") id: String): Response<OkResponse>
+
+    @GET("api/admin/federation/links")
+    suspend fun getFederationLinks(): Response<FederationLinksResponse>
+
+    @PUT("api/admin/federation/self-name")
+    suspend fun setFederationSelfName(@Body body: FederationSelfNameRequest): Response<FederationLinksResponse>
+
+    @POST("api/admin/federation/invite")
+    suspend fun inviteFederation(@Body body: FederationInviteRequest): Response<FederationActionResponse>
+
+    @POST("api/admin/federation/links/{id}/accept")
+    suspend fun acceptFederation(@Path("id") id: String, @Body body: FederationAcceptRequest): Response<FederationActionResponse>
+
+    @POST("api/admin/federation/links/{id}/refuse")
+    suspend fun refuseFederation(@Path("id") id: String): Response<FederationActionResponse>
+
+    @POST("api/admin/federation/links/{id}/resend")
+    suspend fun resendFederation(@Path("id") id: String, @Body body: FederationAcceptRequest): Response<FederationActionResponse>
+
+    @POST("api/admin/federation/links/{id}/address")
+    suspend fun updateFederationAddress(@Path("id") id: String, @Body body: FederationAddressRequest): Response<FederationActionResponse>
+
+    @PATCH("api/admin/federation/links/{id}")
+    suspend fun renameFederation(@Path("id") id: String, @Body body: FederationRenameRequest): Response<FederationActionResponse>
+
+    @DELETE("api/admin/federation/links/{id}")
+    suspend fun unpairFederation(@Path("id") id: String): Response<OkResponse>
+
+    @POST("api/admin/federation/links/{id}/recheck")
+    suspend fun recheckFederation(@Path("id") id: String): Response<FederationActionResponse>
+
+    @GET("api/update-check")
+    suspend fun checkServerUpdate(): Response<UpdateCheckDto>
+
+    @GET("api/admin/self-update/mode")
+    suspend fun selfUpdateMode(): Response<SelfUpdateModeDto>
+
+    @GET("api/admin/self-update/status")
+    suspend fun selfUpdateStatus(): Response<SelfUpdateStatusDto>
+
+    @POST("api/admin/self-update/start")
+    suspend fun startSelfUpdate(@Body body: StartSelfUpdateRequest): Response<SelfUpdateActionResponse>
+
+    @POST("api/admin/self-update/cancel")
+    suspend fun cancelSelfUpdate(): Response<SelfUpdateActionResponse>
+
+    @POST("api/admin/restart")
+    suspend fun restartServer(): Response<OkResponse>
+
+    @POST("api/admin/shutdown")
+    suspend fun shutdownServer(): Response<OkResponse>
+
+    @GET("api/health")
+    suspend fun health(): Response<HealthDto>
 
     // Hands back a fresh JWT for the same session. GET, not POST, and it
     // reuses LoginResponse: the server's own answer carries the same token
@@ -998,6 +1371,9 @@ interface GlassKeepApi {
     // proxy doesn't reliably honor Kotlin interface-method defaults.
     @GET("api/users/search")
     suspend fun searchUsers(@Query("q") q: String): Response<List<UserDto>>
+
+    @GET("api/federation/users/search")
+    suspend fun searchFederatedUsers(@Query("q") q: String): Response<FederatedUsersResponse>
 
     @PATCH("api/notes/{id}")
     suspend fun patchNote(@Path("id") id: String, @Body body: PatchNoteRequest): Response<NoteMutationResponse>

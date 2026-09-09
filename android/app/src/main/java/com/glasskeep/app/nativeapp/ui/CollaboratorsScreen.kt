@@ -57,7 +57,6 @@ import com.glasskeep.app.nativeapp.data.AddCollaboratorResult
 import com.glasskeep.app.nativeapp.data.RemoveCollaboratorResult
 import com.glasskeep.app.nativeapp.data.SetCollaboratorAccessResult
 import com.glasskeep.app.nativeapp.data.network.CollaboratorDto
-import com.glasskeep.app.nativeapp.data.network.UserDto
 import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
@@ -74,6 +73,18 @@ private val ErrorColor = Color(0xFFdc2626)
  *  candidates the alphabet jump-list is more clutter than help. */
 private const val LetterIndexMin = 15
 
+private data class ShareCandidate(
+    val key: String,
+    val localId: Int? = null,
+    val name: String,
+    val email: String? = null,
+    val avatarUrl: String? = null,
+    val federated: Boolean = false,
+    val serverLabel: String? = null,
+    val remoteRef: String? = null,
+    val username: String,
+)
+
 /**
  * CollaborationModal.jsx, ported: who has access to one note, and, for
  * the owner, everyone who could. One screen, not two: on a phone the web
@@ -86,10 +97,9 @@ private const val LetterIndexMin = 15
  * candidates), and a fixed footer (the access to grant, then Cancel and
  * Add). A non-owner sees only the roster and a Close button.
  *
- * Deliberately not ported, disclosed rather than silently dropped:
- * candidates from federated peer servers (the native client has no
- * /federation/users/search call yet, so only local users are offered;
- * an existing federated collaborator still shows with its server badge).
+ * The picker merges local accounts with real users advertised by paired
+ * federation peers; the opaque ref@host value is only sent to the API and
+ * never shown in place of the friendly name/server badge.
  */
 @Composable
 fun CollaboratorsScreen(
@@ -111,11 +121,11 @@ fun CollaboratorsScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var pendingRemoval by remember { mutableStateOf<CollaboratorDto?>(null) }
 
-    var candidates by remember { mutableStateOf<List<UserDto>>(emptyList()) }
+    var candidates by remember { mutableStateOf<List<ShareCandidate>>(emptyList()) }
     var candidatesLoading by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var letterFilter by remember { mutableStateOf<String?>(null) }
-    var selected by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    var selected by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var newAccess by remember { mutableStateOf("write") }
     var submitting by remember { mutableStateOf(false) }
 
@@ -197,19 +207,19 @@ fun CollaboratorsScreen(
     fun submitAdd() {
         if (submitting || selected.isEmpty()) return
         submitting = true
-        val targets = candidates.filter { it.id in selected.keys }
+        val targets = candidates.filter { it.key in selected.keys }
         scope.launch {
             var added = 0
             var failed = 0
             for (user in targets) {
                 try {
-                    when (repository.addCollaborator(noteId, user.email, selected[user.id] ?: newAccess)) {
+                    when (repository.addCollaborator(noteId, user.username, selected[user.key] ?: newAccess)) {
                         is AddCollaboratorResult.Added -> added++
                         AddCollaboratorResult.AlreadyCollaborator -> Unit
                         AddCollaboratorResult.UserNotFound, is AddCollaboratorResult.Rejected -> failed++
                     }
                 } catch (t: Throwable) {
-                    NativeDebug.e("CollaboratorsScreen add failed for user ${user.id}", t)
+                    NativeDebug.e("CollaboratorsScreen add failed for user ${user.key}", t)
                     failed++
                 }
             }
@@ -241,7 +251,20 @@ fun CollaboratorsScreen(
         if (!isOwner || candidates.isNotEmpty()) return@LaunchedEffect
         candidatesLoading = true
         try {
-            candidates = repository.searchUsers()
+            val local = repository.searchUsers().map { user ->
+                ShareCandidate(
+                    key = "local:${user.id}", localId = user.id, name = user.name,
+                    email = user.email, avatarUrl = user.avatarUrl, username = user.email,
+                )
+            }
+            val remote = runCatching { repository.searchFederatedUsers() }.getOrDefault(emptyList()).map { user ->
+                ShareCandidate(
+                    key = "remote:${user.host}|${user.ref}", name = user.name,
+                    avatarUrl = user.avatar, federated = true, serverLabel = user.serverLabel,
+                    remoteRef = user.ref, username = "${user.ref}@${user.host}",
+                )
+            }
+            candidates = local + remote
         } catch (t: Throwable) {
             NativeDebug.e("CollaboratorsScreen searchUsers failed", t)
             errorMessage = String.format(loadErrorTemplate, t.message ?: t.javaClass.simpleName)
@@ -254,11 +277,19 @@ fun CollaboratorsScreen(
     // the roster always includes the owner's own entry (the server's
     // GET .../collaborators unconditionally unshifts it).
     val existingIds = remember(collaborators) { collaborators.map { it.id }.toSet() }
-    val available = remember(candidates, existingIds) { candidates.filterNot { it.id in existingIds } }
+    val available = remember(candidates, existingIds, collaborators) {
+        candidates.filterNot { candidate ->
+            candidate.localId?.let { it in existingIds } == true ||
+                (candidate.federated && collaborators.any {
+                    it.federated && it.email == candidate.remoteRef &&
+                        (it.serverLabel.orEmpty() == candidate.serverLabel.orEmpty())
+                })
+        }
+    }
     val filtered = remember(available, query, letterFilter) {
         val trimmed = query.trim()
         available
-            .filter { trimmed.isEmpty() || it.name.contains(trimmed, ignoreCase = true) || it.email.contains(trimmed, ignoreCase = true) }
+            .filter { trimmed.isEmpty() || it.name.contains(trimmed, ignoreCase = true) || it.email.orEmpty().contains(trimmed, ignoreCase = true) || it.serverLabel.orEmpty().contains(trimmed, ignoreCase = true) }
             .filter { letterFilter == null || initialOf(it.name) == letterFilter }
     }
 
@@ -373,9 +404,9 @@ fun CollaboratorsScreen(
                     subtextColor = subtextColor,
                     borderColor = borderColor,
                     onToggle = { user ->
-                        selected = if (user.id in selected) selected - user.id else selected + (user.id to newAccess)
+                        selected = if (user.key in selected) selected - user.key else selected + (user.key to newAccess)
                     },
-                    onAccess = { user, access -> selected = selected + (user.id to access) },
+                    onAccess = { user, access -> selected = selected + (user.key to access) },
                 )
             }
         }
@@ -534,16 +565,16 @@ private fun LetterChip(label: String, selected: Boolean, dark: Boolean, titleCol
  *  web's own placeholder). */
 @Composable
 private fun CandidateList(
-    candidates: List<UserDto>,
+    candidates: List<ShareCandidate>,
     loading: Boolean,
     hasAny: Boolean,
-    selected: Map<Int, String>,
+    selected: Map<String, String>,
     dark: Boolean,
     titleColor: Color,
     subtextColor: Color,
     borderColor: Color,
-    onToggle: (UserDto) -> Unit,
-    onAccess: (UserDto, String) -> Unit,
+    onToggle: (ShareCandidate) -> Unit,
+    onAccess: (ShareCandidate, String) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -566,10 +597,10 @@ private fun CandidateList(
                 modifier = Modifier.heightIn(max = 320.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                items(candidates, key = { it.id }) { user ->
+                items(candidates, key = { it.key }) { user ->
                     CandidateRow(
                         user = user,
-                        access = selected[user.id],
+                        access = selected[user.key],
                         dark = dark,
                         titleColor = titleColor,
                         subtextColor = subtextColor,
@@ -595,7 +626,7 @@ private fun CandidatePlaceholder(text: String, subtextColor: Color) {
 
 @Composable
 private fun CandidateRow(
-    user: UserDto,
+    user: ShareCandidate,
     access: String?,
     dark: Boolean,
     titleColor: Color,
@@ -634,7 +665,13 @@ private fun CandidateRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(user.email, color = subtextColor, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (user.federated) {
+                SoftBadge(user.serverLabel ?: stringResource(R.string.native_collaborators_remote_server)) {
+                    WorldIcon(size = 14.dp, tint = Indigo)
+                }
+            } else {
+                Text(user.email.orEmpty(), color = subtextColor, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
         if (checked) {
             AccessToggle(

@@ -119,9 +119,7 @@ private val CardBorderDark = Color(0xFF4B5563).copy(alpha = 0.3f)
  * snippet, or the first few unchecked checklist items) - one column or
  * two, depending on the view chosen from the header menu - and a header
  * carrying the app's own branding, same shape as NotesHeader.jsx /
- * NoteCard.jsx on the web side. The one thing that header has and this
- * one does not is the admin cluster (AI search, the admin panel, the
- * instance lock), none of which this app has a surface for.
+ * NoteCard.jsx on the web side, including the administrator entry point.
  */
 @Composable
 fun NativeNotesListScreen(
@@ -131,6 +129,7 @@ fun NativeNotesListScreen(
     onOpenArchived: () -> Unit,
     onOpenTrash: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAdmin: () -> Unit,
     onOpenQrScanner: () -> Unit,
     /** Set when the launcher's "new text/checklist/audio note" shortcut
      *  started the app (see MainActivity's own shortcut table): the note
@@ -576,6 +575,8 @@ fun NativeNotesListScreen(
                 onOpenSyncStatus = { syncSheetOpen = !syncSheetOpen },
                 onOpenSidebar = { sidebarOpen = true },
                 onOpenSettings = onOpenSettings,
+                onOpenAdmin = onOpenAdmin,
+                showAdmin = container.shellPrefs.isAdmin,
                 searchOpen = searchOpen,
                 onSearchOpenChange = { open ->
                     searchOpen = open
@@ -813,6 +814,8 @@ private fun NativeHeader(
     onOpenSyncStatus: () -> Unit,
     onOpenSidebar: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAdmin: () -> Unit,
+    showAdmin: Boolean,
     searchOpen: Boolean,
     onSearchOpenChange: (Boolean) -> Unit,
     searchQuery: String,
@@ -1053,6 +1056,8 @@ private fun NativeHeader(
                         listView = listView,
                         onDismiss = { moreMenuExpanded = false },
                         onOpenSettings = { moreMenuExpanded = false; onOpenSettings() },
+                        showAdmin = showAdmin,
+                        onOpenAdmin = { moreMenuExpanded = false; onOpenAdmin() },
                         onToggleViewMode = { moreMenuExpanded = false; onToggleViewMode() },
                         onToggleDark = { moreMenuExpanded = false; onToggleDark() },
                         onEnterSelection = { moreMenuExpanded = false; onEnterSelection() },
@@ -1188,9 +1193,7 @@ private fun AiAnswerCard(
  * Material DropdownMenu: the web's panel has its own geometry (it opens
  * over the kebab rather than under it, hugs its widest row, and scrolls
  * past 72% of the screen) and its own row shape (16sp label, 12dp gap,
- * one accent colour per action). The admin panel is left out because this
- * app has none; the instance lock IS here, on the web's own two conditions
- * (an admin, and at-rest encryption switched on).
+ * one accent colour per action), including the admin-only entry.
  */
 @Composable
 private fun HeaderMenu(
@@ -1198,8 +1201,10 @@ private fun HeaderMenu(
     dark: Boolean,
     listView: Boolean,
     showLockInstance: Boolean,
+    showAdmin: Boolean,
     onDismiss: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAdmin: () -> Unit,
     onToggleViewMode: () -> Unit,
     onToggleDark: () -> Unit,
     onEnterSelection: () -> Unit,
@@ -1223,6 +1228,14 @@ private fun HeaderMenu(
                 .border(1.dp, if (dark) DarkBorderColor else LightBorderColor, RoundedCornerShape(8.dp))
                 .verticalScroll(rememberScrollState()),
         ) {
+            if (showAdmin) {
+                HeaderMenuItem(
+                    label = stringResource(R.string.native_admin_title),
+                    iconTint = if (dark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
+                    dark = dark,
+                    onClick = onOpenAdmin,
+                ) { tint -> PeopleIcon(size = 20.dp, tint = tint) }
+            }
             HeaderMenuItem(
                 label = stringResource(R.string.native_settings_title),
                 iconTint = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),

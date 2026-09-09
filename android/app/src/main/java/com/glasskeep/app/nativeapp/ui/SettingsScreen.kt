@@ -2748,8 +2748,8 @@ private fun PasskeysCard(
 }
 
 /** One saved passkey: name, badges, last use, then the three small
- *  bordered actions (`PasskeySettingsSection.jsx:387-460`). The
- *  admin-only instance-unlock toggle is not ported. */
+ *  bordered actions (`PasskeySettingsSection.jsx:387-460`). Instance
+ *  unlock authorization lives in the native administrator security tab. */
 @Composable
 private fun PasskeyRow(
     passkey: PasskeyDto,

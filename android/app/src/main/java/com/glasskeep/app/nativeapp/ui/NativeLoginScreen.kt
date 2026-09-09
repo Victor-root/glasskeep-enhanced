@@ -72,12 +72,9 @@ private val ErrorColor = Color(0xFFdc2626)
  * login" falls back to the username-and-password form. A server with no
  * visible profile opens straight on that form, again like the web.
  *
- * Deliberately not ported, disclosed rather than silently dropped:
- * account creation (the server holds new registrations for an admin to
- * approve, which needs an admin surface this app does not have). QR
- * sign-in lives on its own screen, reached from Settings rather than from
- * here (see QrScanScreen.kt's own doc comment for why it is
- * phone-scans-PC only).
+ * Account creation is offered only when the public registration-capability
+ * endpoint allows it; the resulting pending request is managed by the
+ * native admin surface. QR sign-in lives on its own scanner screen.
  */
 @Composable
 fun NativeLoginScreen(
@@ -85,6 +82,7 @@ fun NativeLoginScreen(
     serverUrl: String,
     onLoggedIn: (mustChangePassword: Boolean) -> Unit,
     onForgotPassword: () -> Unit,
+    onRegister: () -> Unit,
 ) {
     val dark = LocalGkDark.current
     var profiles by remember { mutableStateOf<List<LoginProfileDto>>(emptyList()) }
@@ -95,6 +93,7 @@ fun NativeLoginScreen(
     var loading by remember { mutableStateOf(false) }
     var passkeyLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var registrationAllowed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val activity = LocalView.current.context as Activity
 
@@ -165,12 +164,14 @@ fun NativeLoginScreen(
     // The visible profiles, read once. A server with none simply opens on
     // the manual form, exactly as the web decides it (LoginView:47).
     LaunchedEffect(serverUrl) {
+        val api = container.api(serverUrl)
         profiles = try {
-            container.api(serverUrl).getLoginProfiles().body().orEmpty()
+            api.getLoginProfiles().body().orEmpty()
         } catch (t: Throwable) {
             NativeDebug.e("Login profiles fetch failed", t)
             emptyList()
         }
+        registrationAllowed = runCatching { api.allowRegistration().body()?.allowNewAccounts == true }.getOrDefault(false)
         if (profiles.isEmpty()) mode = LoginMode.MANUAL
     }
 
@@ -380,6 +381,12 @@ fun NativeLoginScreen(
                         Spacer(Modifier.width(1.dp))
                     }
                     AuthLink(stringResource(R.string.native_login_forgot_password)) { onForgotPassword() }
+                }
+                if (registrationAllowed) {
+                    Spacer(Modifier.height(16.dp))
+                    AuthLink(stringResource(R.string.native_register_create_account), Modifier.fillMaxWidth()) {
+                        onRegister()
+                    }
                 }
             }
         }

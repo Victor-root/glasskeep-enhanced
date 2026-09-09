@@ -128,29 +128,36 @@ class RealtimeClient(
 
     /**
      * Rebuilds the notification the bell would have shown, out of the SSE
-     * frame's own fields. `note_access_revoked_notification` carries its
-     * real type in `notificationType` (the payload covers both sides of a
-     * revoke), and `note_shared` carries `readOnly`, which the inbox
-     * stores as the row's variant.
+     * frame's own fields. Some live-only event names differ from the type
+     * persisted in the notification table, so they are normalized here.
      */
     private fun liveNotificationOf(data: String): NotificationDto? = runCatching {
         val root = json.parseToJsonElement(data) as? JsonObject ?: return null
         fun str(key: String) = (root[key] as? JsonPrimitive)?.contentOrNull
         fun bool(key: String) = (root[key] as? JsonPrimitive)?.booleanOrNull == true
         val rawType = str("type") ?: return null
-        val type = if (rawType == "note_access_revoked_notification") {
-            str("notificationType") ?: return null
-        } else {
-            rawType
+        val type = when (rawType) {
+            "note_access_revoked_notification" -> str("notificationType") ?: return null
+            "user_deleted_notification" -> "user_deleted"
+            else -> rawType
         }
         NotificationDto(
             id = (root["notificationId"] as? JsonPrimitive)?.intOrNull ?: 0,
             senderUserId = 0,
             type = type,
             noteId = str("noteId"),
-            noteTitle = str("noteTitle").orEmpty(),
-            senderName = str("senderName").orEmpty(),
+            noteTitle = when (rawType) {
+                "pending_user_registered" -> str("email").orEmpty()
+                "user_deleted_notification" -> str("deletedName").orEmpty()
+                else -> str("noteTitle").orEmpty()
+            },
+            senderName = when (rawType) {
+                "pending_user_registered" -> str("name").orEmpty()
+                "user_deleted_notification" -> str("adminName").orEmpty()
+                else -> str("senderName").orEmpty()
+            },
             variant = if (rawType == "note_shared" && bool("readOnly")) "read_only" else null,
+            message = if (rawType == "pending_user_registered") str("pendingId") else null,
             createdAt = nowIso(),
         )
     }.getOrNull()
@@ -239,11 +246,9 @@ class RealtimeClient(
         // note_access_revoked event the server fires alongside it (see
         // server/index.js's own call sites for createShareNotification/
         // createAccessRevokedNotification, always paired with
-        // broadcastNoteUpdated or the access-revoked event). Every other
-        // type this server emits (admin panel, federation, reminders,
-        // profile/settings sync) has no corresponding native screen or
-        // mechanism to react through today, so an unrecognized type is
-        // silently ignored rather than guessed at.
+        // broadcastNoteUpdated or the access-revoked event). Events that
+        // only affect another native surface still stay out of this list;
+        // an unrecognized type is silently ignored rather than guessed at.
         private val REFRESH_TRIGGER_TYPES = setOf(
             "note_updated",
             "note_deleted",
@@ -252,12 +257,14 @@ class RealtimeClient(
             "note_access_changed",
             "note_access_revoked",
         )
-        /** The two frames that exist purely to raise a live pill. Their
-         *  own note-side effects arrive separately, through the types
-         *  above (server/index.js's own paired sends). */
+        /** Frames that exist primarily to raise a live pill. Note-side
+         *  effects, where applicable, arrive separately through the types
+         *  above; the two admin events are also persisted for the inbox. */
         private val LIVE_NOTIFICATION_TYPES = setOf(
             "note_shared",
             "note_access_revoked_notification",
+            "pending_user_registered",
+            "user_deleted_notification",
         )
         private const val RECONNECT_BASE_DELAY_MS = 1000L
         private const val RECONNECT_MAX_DELAY_MS = 30000L
