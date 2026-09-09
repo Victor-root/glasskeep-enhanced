@@ -2,6 +2,7 @@ package com.glasskeep.app.nativeapp.data
 
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.network.ApiClientFactory
+import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +14,9 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.sse.EventSource
@@ -55,6 +58,7 @@ class RealtimeClient(
     private val onRefreshNeeded: suspend () -> Unit,
     private val onInstanceLocked: () -> Unit,
     private val onInstanceUnlocked: () -> Unit,
+    private val onLiveNotification: (NotificationDto) -> Unit,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -122,6 +126,35 @@ class RealtimeClient(
         }
     }
 
+    /**
+     * Rebuilds the notification the bell would have shown, out of the SSE
+     * frame's own fields. `note_access_revoked_notification` carries its
+     * real type in `notificationType` (the payload covers both sides of a
+     * revoke), and `note_shared` carries `readOnly`, which the inbox
+     * stores as the row's variant.
+     */
+    private fun liveNotificationOf(data: String): NotificationDto? = runCatching {
+        val root = json.parseToJsonElement(data) as? JsonObject ?: return null
+        fun str(key: String) = (root[key] as? JsonPrimitive)?.contentOrNull
+        fun bool(key: String) = (root[key] as? JsonPrimitive)?.booleanOrNull == true
+        val rawType = str("type") ?: return null
+        val type = if (rawType == "note_access_revoked_notification") {
+            str("notificationType") ?: return null
+        } else {
+            rawType
+        }
+        NotificationDto(
+            id = (root["notificationId"] as? JsonPrimitive)?.intOrNull ?: 0,
+            senderUserId = 0,
+            type = type,
+            noteId = str("noteId"),
+            noteTitle = str("noteTitle").orEmpty(),
+            senderName = str("senderName").orEmpty(),
+            variant = if (rawType == "note_shared" && bool("readOnly")) "read_only" else null,
+            createdAt = nowIso(),
+        )
+    }.getOrNull()
+
     private inner class Listener : EventSourceListener() {
         override fun onOpen(eventSource: EventSource, response: Response) {
             NativeDebug.d("RealtimeClient connected")
@@ -149,6 +182,18 @@ class RealtimeClient(
             if (payloadType != null && payloadType in REFRESH_TRIGGER_TYPES) {
                 NativeDebug.d("RealtimeClient event type=$payloadType, refreshing")
                 triggerRefresh()
+            }
+            // The share/revoke frames the server pushes alongside the note
+            // event: each carries everything the pill needs, so nothing has
+            // to be fetched (App.jsx:3836). Deliberately NOT acked as
+            // delivered here, exactly as the web explains: the bell does
+            // that when the panel opens, and acking now would race the
+            // server's own notification_delivered broadcast.
+            if (payloadType != null && payloadType in LIVE_NOTIFICATION_TYPES) {
+                liveNotificationOf(data)?.let {
+                    NativeDebug.d("RealtimeClient live notification type=${it.type}")
+                    onLiveNotification(it)
+                }
             }
             // At-rest encryption's two lock-state frames, the one pair the
             // server sends to EVERY connected client rather than to one
@@ -206,6 +251,13 @@ class RealtimeClient(
             "notes_imported",
             "note_access_changed",
             "note_access_revoked",
+        )
+        /** The two frames that exist purely to raise a live pill. Their
+         *  own note-side effects arrive separately, through the types
+         *  above (server/index.js's own paired sends). */
+        private val LIVE_NOTIFICATION_TYPES = setOf(
+            "note_shared",
+            "note_access_revoked_notification",
         )
         private const val RECONNECT_BASE_DELAY_MS = 1000L
         private const val RECONNECT_MAX_DELAY_MS = 30000L

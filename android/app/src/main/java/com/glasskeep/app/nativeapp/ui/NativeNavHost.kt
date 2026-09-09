@@ -33,11 +33,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.NotifCategoryFlags
 import com.glasskeep.app.nativeapp.data.RealtimeClient
+import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.renewSessionTokenIfStale
 import com.glasskeep.app.nativeapp.syncReminderAlarms
@@ -98,6 +100,9 @@ fun NativeNavHost(
     // on trust: it only pokes that read into running now instead of on its
     // next tick, same as the web's own listener calling refresh().
     var lockPokes by remember { mutableIntStateOf(0) }
+    // The last share/revoke frame the server pushed, waiting to become a
+    // pill (the web's own showShareNotificationToast, App.jsx:3841).
+    var liveNotification by remember { mutableStateOf<NotificationDto?>(null) }
     val realtimeClient = remember(serverUrl) {
         RealtimeClient(
             serverUrl = serverUrl,
@@ -105,6 +110,7 @@ fun NativeNavHost(
             onRefreshNeeded = { repository.refresh() },
             onInstanceLocked = { container.lockState.markLocked() },
             onInstanceUnlocked = { lockPokes++ },
+            onLiveNotification = { liveNotification = it },
         )
     }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -277,6 +283,25 @@ fun NativeNavHost(
     // one too, and it is what replaces the platform's own Toast here.
     val toasts = rememberToastController()
     toasts.prefs = container.editorPrefs
+
+    // Raised from the composition rather than from the SSE thread, so the
+    // pill's own strings resolve against the app's current language.
+    LaunchedEffect(liveNotification) {
+        val notification = liveNotification ?: return@LaunchedEffect
+        liveNotification = null
+        val noteTitle = notification.noteTitle.ifBlank { context.getString(R.string.native_notes_untitled) }
+        val template = notificationMessageRes(notification.type, notification.variant)
+        toasts.show(
+            message = template
+                ?.let { context.getString(it, notification.senderName, noteTitle) }
+                ?: notification.message.orEmpty().ifBlank { noteTitle },
+            variant = variantOf(notification),
+            title = context.getString(notificationTitleRes(notification.type)),
+            actionLabel = notification.noteId?.let { context.getString(R.string.native_notifications_open) },
+            action = notification.noteId?.let { id -> { navController.navigate("notes/$id") } },
+            type = notification.type,
+        )
+    }
     // Same "one instance for the whole app" placement as the pill above,
     // and the same reason: the web keeps exactly one tooltip portal at its
     // own root (TooltipPortal.jsx).

@@ -537,10 +537,10 @@ private fun NotificationIcon(type: String, accent: Color) {
 /** Which of the display filter's eight buckets this row falls in. The
  *  server's own `type` decides first; only a generic row falls back to
  *  its variant (filterCategoryFor, App.jsx:767-787). */
-private fun categoryOf(notification: NotificationDto): NotifCategory =
+internal fun categoryOf(notification: NotificationDto): NotifCategory =
     NotifCategory.of(notification.type, variantOf(notification).categoryKey)
 
-private fun variantOf(notification: NotificationDto): NotifVariant = when (notification.type) {
+internal fun variantOf(notification: NotificationDto): NotifVariant = when (notification.type) {
     "note_shared", "reminder", "pending_user_registered" -> NotifVariant.INFO
     "note_access_revoked", "note_access_revoked_with_copy",
     "collaborator_removed", "collaborator_removed_with_copy",
@@ -554,18 +554,41 @@ private fun variantOf(notification: NotificationDto): NotifVariant = when (notif
     }
 }
 
+/** Split out of the two formatters below so the live pill (see
+ *  NativeNavHost's own realtime wiring) can build the same two strings
+ *  from outside composition, off a plain Context, rather than keeping a
+ *  second copy of this mapping. */
+internal fun notificationTitleRes(type: String): Int = when (type) {
+    "note_shared" -> R.string.native_notifications_title_note_shared
+    "note_access_revoked", "note_access_revoked_with_copy" -> R.string.native_notifications_title_access_revoked
+    "collaborator_removed", "collaborator_removed_with_copy" -> R.string.native_notifications_title_collaborator_removed
+    "collaborator_left" -> R.string.native_notifications_title_collaborator_left
+    "shared_note_deleted", "shared_note_deleted_with_copy" -> R.string.native_notifications_title_shared_note_deleted
+    "reminder" -> R.string.native_notifications_title_reminder
+    else -> R.string.native_notifications_title_generic
+}
+
+/** Null for a row with no template of its own, which prints its server
+ *  message instead. */
+internal fun notificationMessageRes(type: String, variant: String?): Int? = when (type) {
+    "note_shared" -> if (variant == "read_only") {
+        R.string.native_notifications_note_shared_read_only
+    } else {
+        R.string.native_notifications_note_shared
+    }
+    "note_access_revoked" -> R.string.native_notifications_access_revoked
+    "note_access_revoked_with_copy" -> R.string.native_notifications_access_revoked_with_copy
+    "collaborator_removed" -> R.string.native_notifications_collaborator_removed
+    "collaborator_removed_with_copy" -> R.string.native_notifications_collaborator_removed_with_copy
+    "collaborator_left" -> R.string.native_notifications_collaborator_left
+    "shared_note_deleted" -> R.string.native_notifications_shared_note_deleted
+    "shared_note_deleted_with_copy" -> R.string.native_notifications_shared_note_deleted_with_copy
+    else -> null
+}
+
 @Composable
-private fun notificationTitle(notification: NotificationDto): String = stringResource(
-    when (notification.type) {
-        "note_shared" -> R.string.native_notifications_title_note_shared
-        "note_access_revoked", "note_access_revoked_with_copy" -> R.string.native_notifications_title_access_revoked
-        "collaborator_removed", "collaborator_removed_with_copy" -> R.string.native_notifications_title_collaborator_removed
-        "collaborator_left" -> R.string.native_notifications_title_collaborator_left
-        "shared_note_deleted", "shared_note_deleted_with_copy" -> R.string.native_notifications_title_shared_note_deleted
-        "reminder" -> R.string.native_notifications_title_reminder
-        else -> R.string.native_notifications_title_generic
-    },
-)
+private fun notificationTitle(notification: NotificationDto): String =
+    stringResource(notificationTitleRes(notification.type))
 
 /** The message the web builds in useShareNotifications.js, with the note
  *  title in bold exactly where the `**...**` markers sit. */
@@ -573,24 +596,9 @@ private fun notificationTitle(notification: NotificationDto): String = stringRes
 private fun notificationMessage(notification: NotificationDto): AnnotatedString {
     val untitled = stringResource(R.string.native_notes_untitled)
     val noteTitle = notification.noteTitle.ifBlank { untitled }
-    val template = when (notification.type) {
-        "note_shared" -> stringResource(
-            if (notification.variant == "read_only") {
-                R.string.native_notifications_note_shared_read_only
-            } else {
-                R.string.native_notifications_note_shared
-            },
-        )
-        "note_access_revoked" -> stringResource(R.string.native_notifications_access_revoked)
-        "note_access_revoked_with_copy" -> stringResource(R.string.native_notifications_access_revoked_with_copy)
-        "collaborator_removed" -> stringResource(R.string.native_notifications_collaborator_removed)
-        "collaborator_removed_with_copy" -> stringResource(R.string.native_notifications_collaborator_removed_with_copy)
-        "collaborator_left" -> stringResource(R.string.native_notifications_collaborator_left)
-        "shared_note_deleted" -> stringResource(R.string.native_notifications_shared_note_deleted)
-        "shared_note_deleted_with_copy" -> stringResource(R.string.native_notifications_shared_note_deleted_with_copy)
-        else -> return buildAnnotatedString { append(notification.message ?: noteTitle) }
-    }
-    val text = String.format(template, notification.senderName, noteTitle)
+    val templateRes = notificationMessageRes(notification.type, notification.variant)
+        ?: return buildAnnotatedString { append(notification.message ?: noteTitle) }
+    val text = String.format(stringResource(templateRes), notification.senderName, noteTitle)
     return buildAnnotatedString {
         val start = text.indexOf(noteTitle)
         if (start < 0 || noteTitle.isEmpty()) {
