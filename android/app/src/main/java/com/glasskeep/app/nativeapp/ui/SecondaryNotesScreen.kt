@@ -380,7 +380,8 @@ fun SecondaryNotesScreen(
                     add(
                         BulkActionButton(
                             label = unarchiveLabel,
-                            icon = { ArchiveIcon(size = 20.dp, tint = titleColor) },
+                            tone = BulkTone.BLUE,
+                            icon = { ArchiveIcon(size = 18.dp, tint = BulkTone.BLUE.foreground(dark)) },
                             enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
                             onClick = { bulkUnarchive() },
                         ),
@@ -390,7 +391,8 @@ fun SecondaryNotesScreen(
                     add(
                         BulkActionButton(
                             label = trashLabel,
-                            icon = { TrashIcon(size = 20.dp, tint = Color(0xFFdc2626)) },
+                            tone = BulkTone.RED,
+                            icon = { TrashIcon(size = 20.dp, tint = BulkTone.RED.foreground(dark)) },
                             enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
                             onClick = { showBulkTrashConfirm = true },
                         ),
@@ -400,7 +402,8 @@ fun SecondaryNotesScreen(
                     add(
                         BulkActionButton(
                             label = restoreLabel,
-                            icon = { ArchiveIcon(size = 20.dp, tint = titleColor) },
+                            tone = BulkTone.GREEN,
+                            icon = { RefreshIcon(size = 18.dp, tint = BulkTone.GREEN.foreground(dark)) },
                             enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
                             onClick = { bulkRestore() },
                         ),
@@ -410,7 +413,8 @@ fun SecondaryNotesScreen(
                     add(
                         BulkActionButton(
                             label = deleteLabel,
-                            icon = { TrashIcon(size = 20.dp, tint = Color(0xFFdc2626)) },
+                            tone = BulkTone.RED,
+                            icon = { TrashIcon(size = 20.dp, tint = BulkTone.RED.foreground(dark)) },
                             enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
                             onClick = { showBulkDeleteConfirm = true },
                         ),
@@ -420,7 +424,8 @@ fun SecondaryNotesScreen(
                     add(
                         BulkActionButton(
                             label = colorLabel,
-                            icon = { PaletteIcon(size = 20.dp) },
+                            tone = BulkTone.VIOLET,
+                            icon = { PaletteIcon(size = 18.dp) },
                             enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
                             onClick = { showBulkColorPicker = true },
                         ),
@@ -432,7 +437,7 @@ fun SecondaryNotesScreen(
                 actions = actions,
                 onClose = { exitSelection() },
                 dark = dark,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                modifier = Modifier.align(Alignment.TopCenter),
             )
         }
 

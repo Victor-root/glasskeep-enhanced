@@ -521,32 +521,36 @@ fun NativeNotesListScreen(
                 actions = listOf(
                     BulkActionButton(
                         label = archiveLabel,
-                        icon = { ArchiveIcon(size = 20.dp, tint = titleColor) },
+                        tone = BulkTone.BLUE,
+                        icon = { ArchiveIcon(size = 18.dp, tint = BulkTone.BLUE.foreground(dark)) },
                         enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
                         onClick = { bulkArchive() },
                     ),
                     BulkActionButton(
                         label = trashLabel,
-                        icon = { TrashIcon(size = 20.dp, tint = Color(0xFFdc2626)) },
+                        tone = BulkTone.RED,
+                        icon = { TrashIcon(size = 20.dp, tint = BulkTone.RED.foreground(dark)) },
                         enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
                         onClick = { showBulkTrashConfirm = true },
                     ),
                     BulkActionButton(
                         label = pinLabel,
-                        icon = { PinIcon(size = 20.dp, tint = titleColor, filled = false) },
+                        tone = BulkTone.AMBER,
+                        icon = { PinIcon(size = 18.dp, tint = BulkTone.AMBER.foreground(dark), filled = false) },
                         enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
                         onClick = { bulkPin() },
                     ),
                     BulkActionButton(
                         label = colorLabel,
-                        icon = { PaletteIcon(size = 20.dp) },
+                        tone = BulkTone.VIOLET,
+                        icon = { PaletteIcon(size = 18.dp) },
                         enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
                         onClick = { showBulkColorPicker = true },
                     ),
                 ),
                 onClose = { exitSelection() },
                 dark = dark,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                modifier = Modifier.align(Alignment.TopCenter),
             )
         } else {
             CreateNoteFab(

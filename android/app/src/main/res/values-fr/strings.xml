@@ -87,6 +87,7 @@
     <string name="native_notes_search_empty">Aucune note ne correspond à votre recherche.</string>
     <string name="native_notes_select_mode">Sélectionner des notes</string>
     <string name="native_bulk_selected_count">%1$d sélectionnée(s)</string>
+    <string name="native_bulk_exit">Quitter la sélection multiple</string>
     <string name="native_bulk_trashed_success">%1$d note(s) envoyée(s) à la corbeille</string>
     <string name="native_bulk_deleted_success">%1$d note(s) supprimée(s) définitivement</string>
     <string name="native_bulk_archived_success">%1$d note(s) archivée(s)</string>
