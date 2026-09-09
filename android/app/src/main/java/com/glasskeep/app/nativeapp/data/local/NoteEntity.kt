@@ -33,4 +33,10 @@ data class NoteEntity(
      *  reminder chip offline, and so NativeNavHost's alarm reconciliation
      *  (see ReminderSync.kt) can react to it without a network round trip. */
     val reminderAt: String? = null,
+    /** Same meaning as NoteDto.position: higher sorts first within the
+     *  same pinned/unpinned group (see NoteDao.observeAll's own ORDER BY).
+     *  Written optimistically by NotesRepository.reorderQueued so a drag
+     *  reorder shows immediately, without waiting for the queued
+     *  POST /api/notes/reorder to round-trip. */
+    val position: Double = 0.0,
 )

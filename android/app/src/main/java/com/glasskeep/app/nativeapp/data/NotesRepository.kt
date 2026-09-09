@@ -57,6 +57,22 @@ sealed class SaveNoteResult {
     data object Left : SaveNoteResult()
 }
 
+/** Outcome of POST /api/notes/reorder. Stale means another device already
+ *  reordered more recently (per-user LWW on client_reordered_at, not
+ *  per-note): the server silently no-ops (200, not an error) rather than
+ *  applying this device's now-outdated arrangement, and the next refresh()
+ *  will show the other device's order instead. No Rejected case, unlike
+ *  AddCollaboratorResult/ChangePasswordResult: this method is only ever
+ *  called from SyncQueueWorker's replay (see reorderQueued), which relies
+ *  on a thrown exception, not a returned value, to know a write failed and
+ *  needs retrying (see SyncQueueWorker's own class doc comment) - same
+ *  reasoning as setArchived/trashNote throwing IllegalStateException
+ *  instead of returning a Rejected case. */
+sealed class ReorderResult {
+    data object Applied : ReorderResult()
+    data object Stale : ReorderResult()
+}
+
 /** Outcome of a permanent delete: unlike SaveNoteResult, success leaves no
  *  note to hand back, the row is gone (see DELETE /api/notes/:id/permanent). */
 sealed class DeleteResult {
@@ -116,6 +132,12 @@ sealed class RemoveCollaboratorResult {
     data object NotFound : RemoveCollaboratorResult()
     data class Rejected(val httpCode: Int) : RemoveCollaboratorResult()
 }
+
+/** Sentinel sync-queue note id for a manual reorder, which touches many
+ *  real notes at once rather than one (see NotesRepository.reorderQueued's
+ *  own doc comment) - matches the web's own syncEngine.js convention for
+ *  the same operation. */
+private const val REORDER_QUEUE_NOTE_ID = "__reorder__"
 
 class NotesRepository(
     private val api: GlassKeepApi,
@@ -611,6 +633,64 @@ class NotesRepository(
         val request = SetPinnedRequest(pinned)
         syncQueueDao.enqueue(entity.id, SyncQueueType.PINNED.name, Json.encodeToString(request), System.currentTimeMillis())
         noteDao.upsertAll(listOf(entity.copy(pinned = pinned)))
+    }
+
+    /** Direct (non-optimistic) call to POST /api/notes/reorder: only ever
+     *  called from SyncQueueWorker's replay. Everything else should call
+     *  reorderQueued instead. */
+    suspend fun reorderNotes(pinnedIds: List<String>, otherIds: List<String>, clientReorderedAt: String): ReorderResult {
+        NativeDebug.d("NotesRepository.reorderNotes pinned=${pinnedIds.size} others=${otherIds.size}")
+        val response = api.reorderNotes(ReorderNotesRequest(pinnedIds, otherIds, clientReorderedAt))
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "POST /api/notes/reorder failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        if (body.stale) {
+            NativeDebug.d("NotesRepository.reorderNotes: stale, not applied")
+            return ReorderResult.Stale
+        }
+        return ReorderResult.Applied
+    }
+
+    /** [pinnedEntities]/[otherEntities] are the full pinned/unpinned groups
+     *  in their new, already-dragged-into-place order (a within-group
+     *  reorder never changes which group a note is in, see
+     *  NativeNotesListScreen.kt's own drag gesture, which rejects a drop
+     *  that would cross the pinned/unpinned boundary the same way the
+     *  web's dragGroup check does) - not just the two notes the user's
+     *  finger actually touched, the server's reorder endpoint needs every
+     *  id in each group to recompute the whole arrangement.
+     *
+     *  One queue row per reorder, a fixed sentinel note id (matching the
+     *  web's own syncEngine.js "__reorder__" convention) rather than one
+     *  row per affected note: SyncQueueDao.getProtectedNoteIds() protects
+     *  a concurrent refresh() from clobbering a pending change by real
+     *  note id, which doesn't fit an action that can touch every note in
+     *  the list at once. Deliberately not protected here - the cost is a
+     *  rare, brief, self-correcting visual snap-back if a refresh() lands
+     *  in the narrow window before this item drains, the same kind of
+     *  self-healing NoteDao.replaceAll's own doc comment already accepts
+     *  elsewhere. Repeated drags before the first one drains collapse
+     *  into the latest payload (enqueue()'s normal behavior for a
+     *  repeated (noteId, type) pair): safe here because every payload is
+     *  a complete, self-consistent snapshot of the desired order, so
+     *  sending only the newest one loses nothing.
+     *
+     *  Written optimistically (same reasoning as setPinnedQueued: the
+     *  list screen is looking straight at what it just dragged) using
+     *  the same descending-by-index scheme syncEngine.js's own optimistic
+     *  local update uses - a placeholder the next refresh() replaces with
+     *  the server's own recomputed values regardless. */
+    suspend fun reorderQueued(pinnedEntities: List<NoteEntity>, otherEntities: List<NoteEntity>) {
+        NativeDebug.d("NotesRepository.reorderQueued pinned=${pinnedEntities.size} others=${otherEntities.size}")
+        val request = ReorderNotesRequest(pinnedEntities.map { it.id }, otherEntities.map { it.id }, nowIso())
+        syncQueueDao.enqueue(REORDER_QUEUE_NOTE_ID, SyncQueueType.REORDER.name, Json.encodeToString(request), System.currentTimeMillis())
+
+        val now = System.currentTimeMillis().toDouble()
+        val repositioned = (pinnedEntities + otherEntities).mapIndexed { index, entity -> entity.copy(position = now - index) }
+        noteDao.upsertAll(repositioned)
     }
 
     /** Unlike the patch-style methods above, this one (and trashNoteQueued/
@@ -1144,4 +1224,5 @@ internal fun NoteDto.toEntity() = NoteEntity(
     itemsJson = JsonArray(items).toString(),
     tagsJson = TagsJson.encode(tags),
     reminderAt = reminderAt,
+    position = position,
 )

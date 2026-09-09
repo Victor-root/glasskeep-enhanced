@@ -9,7 +9,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface NoteDao {
-    @Query("SELECT * FROM notes ORDER BY pinned DESC, updatedAt DESC")
+    // position is the manual drag-reorder rank within a pinned/unpinned
+    // group (see NoteEntity.position); updatedAt stays as the final
+    // tie-break for notes that have never been manually reordered
+    // (position 0.0 for all of them), same role it already played alone
+    // before manual reordering existed.
+    @Query("SELECT * FROM notes ORDER BY pinned DESC, position DESC, updatedAt DESC")
     fun observeAll(): Flow<List<NoteEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

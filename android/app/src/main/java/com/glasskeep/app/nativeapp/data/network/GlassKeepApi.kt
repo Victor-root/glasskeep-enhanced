@@ -228,6 +228,22 @@ data class CreateNoteRequest(
 @Serializable
 data class SetPinnedRequest(val pinned: Boolean)
 
+/** Body for POST /api/notes/reorder. pinnedIds/otherIds are camelCase on
+ *  the wire even though most other request bodies in this file use
+ *  snake_case for multi-word fields (see server/index.js's own
+ *  destructuring of this route's req.body) - client_reordered_at is the
+ *  one field here that follows the usual snake_case LWW-timestamp
+ *  convention (see ClientUpdatedAtRequest). */
+@Serializable
+data class ReorderNotesRequest(
+    val pinnedIds: List<String>,
+    val otherIds: List<String>,
+    @SerialName("client_reordered_at") val clientReorderedAt: String,
+)
+
+@Serializable
+data class ReorderNotesResponse(val ok: Boolean = false, val stale: Boolean = false)
+
 /** Body for POST /api/notes/:id/archive. */
 @Serializable
 data class ArchiveNoteRequest(
@@ -594,6 +610,16 @@ interface GlassKeepApi {
 
     @PATCH("api/notes/{id}")
     suspend fun setPinned(@Path("id") id: String, @Body body: SetPinnedRequest): Response<NoteMutationResponse>
+
+    // Whole-list manual reorder, not a per-note route: pinnedIds/otherIds
+    // must be the complete, currently-known ordering of each group, not
+    // just the two notes a drag actually touched (see NotesRepository.
+    // reorderQueued's own doc comment). LWW is per-user here, not
+    // per-note: a stale request 200s with { stale: true } rather than
+    // erroring, same as every other stale-but-not-rejected write in this
+    // file.
+    @POST("api/notes/reorder")
+    suspend fun reorderNotes(@Body body: ReorderNotesRequest): Response<ReorderNotesResponse>
 
     @POST("api/notes/{id}/archive")
     suspend fun archiveNote(@Path("id") id: String, @Body body: ArchiveNoteRequest): Response<NoteMutationResponse>

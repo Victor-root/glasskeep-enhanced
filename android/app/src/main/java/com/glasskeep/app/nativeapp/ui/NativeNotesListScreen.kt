@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -48,8 +49,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -125,6 +132,70 @@ fun NativeNotesListScreen(
     var showBulkColorPicker by remember { mutableStateOf(false) }
     var bulkActionRunning by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    // Manual drag reorder (see NotesRepository.reorderQueued). Disabled
+    // during multi-select (matches the web's own canDrag = !multiMode)
+    // and while searching: filteredNotes is then a subset of notes, and
+    // a reorder needs every id in each pinned/unpinned group, not just
+    // what's currently visible.
+    val reorderEnabled = !selectionMode && searchQuery.isBlank()
+    // Last-reported on-screen bounds per card (see ReorderableNoteCard's
+    // onGloballyPositioned), read only at drag-end to hit-test the drop
+    // target - doesn't need to be a State, nothing should recompose when
+    // it changes.
+    val cardBounds = remember { mutableMapOf<String, Rect>() }
+    var draggedNoteId by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+
+    fun endDrag() {
+        draggedNoteId = null
+        dragOffset = Offset.Zero
+    }
+
+    // Web-equivalent swap semantics (see NotesRepository.reorderQueued's
+    // own doc comment): the dragged note and whichever OTHER note it's
+    // hovering over when released trade places, nothing in between
+    // shifts. Hit-testing uses the dragged card's own center (its
+    // original bounds offset by the accumulated drag delta), not the
+    // exact finger position: simpler to reason about correctly without
+    // being able to test this interactively, at the cost of needing a
+    // slightly larger movement than the web's own pointer-exact
+    // elementFromPoint check before a neighboring card is picked up as
+    // the target.
+    fun handleDragEnd(id: String) {
+        val draggedNote = notes.find { it.id == id }
+        val draggedRect = cardBounds[id]
+        if (draggedNote == null || draggedRect == null) {
+            NativeDebug.d("NativeNotesListScreen reorder: drag end for $id, missing note or bounds")
+            endDrag()
+            return
+        }
+        val draggedCenter = Offset(draggedRect.center.x + dragOffset.x, draggedRect.center.y + dragOffset.y)
+        val target = notes.firstOrNull { other ->
+            other.id != id && other.pinned == draggedNote.pinned && cardBounds[other.id]?.contains(draggedCenter) == true
+        }
+        if (target == null) {
+            NativeDebug.d("NativeNotesListScreen reorder: no drop target for $id")
+            endDrag()
+            return
+        }
+        val group = notes.filter { it.pinned == draggedNote.pinned }.toMutableList()
+        val fromIndex = group.indexOfFirst { it.id == id }
+        val toIndex = group.indexOfFirst { it.id == target.id }
+        if (fromIndex == -1 || toIndex == -1) {
+            NativeDebug.e("NativeNotesListScreen reorder: $id or ${target.id} missing from its own pinned group, ignoring")
+            endDrag()
+            return
+        }
+        NativeDebug.d("NativeNotesListScreen reorder: swap $id <-> ${target.id} (pinned=${draggedNote.pinned})")
+        val tmp = group[fromIndex]
+        group[fromIndex] = group[toIndex]
+        group[toIndex] = tmp
+        val pinnedGroup = if (draggedNote.pinned) group else notes.filter { it.pinned }
+        val otherGroup = if (draggedNote.pinned) notes.filter { !it.pinned } else group
+        scope.launch { repository.reorderQueued(pinnedGroup, otherGroup) }
+        endDrag()
+    }
 
     // Client-side only, same fields the web app matches for a note without
     // tags/items/images (title, content): those don't have a native data
@@ -352,7 +423,7 @@ fun NativeNotesListScreen(
                     verticalItemSpacing = 10.dp,
                 ) {
                     items(filteredNotes, key = { it.id }) { note ->
-                        NoteCard(
+                        ReorderableNoteCard(
                             note = note,
                             dark = dark,
                             titleColor = titleColor,
@@ -364,6 +435,18 @@ fun NativeNotesListScreen(
                                 selectedIds = if (note.id in selectedIds) selectedIds - note.id else selectedIds + note.id
                             },
                             syncing = note.id in pendingSyncNoteIds,
+                            reorderEnabled = reorderEnabled,
+                            isDragged = note.id == draggedNoteId,
+                            dragOffset = if (note.id == draggedNoteId) dragOffset else Offset.Zero,
+                            onBoundsChanged = { rect -> cardBounds[note.id] = rect },
+                            onDragStart = {
+                                NativeDebug.d("NativeNotesListScreen reorder: drag start ${note.id}")
+                                draggedNoteId = note.id
+                                dragOffset = Offset.Zero
+                            },
+                            onDragDelta = { delta -> dragOffset += delta },
+                            onDragEnd = { handleDragEnd(note.id) },
+                            onDragCancel = { endDrag() },
                         )
                     }
                 }
@@ -633,6 +716,88 @@ private fun NativeHeader(
 // API doesn't take a CSS-style low-alpha shadow color directly, so this
 // is the closest native equivalent, not a byte-for-byte port.
 private val CardShadowTint = Color(0xFF8B5CF6)
+
+/** Wraps NoteCard with the long-press-then-drag gesture that drives manual
+ *  reordering (see NativeNotesListScreen's own handleDragEnd), leaving
+ *  NoteCard itself untouched: ArchivedNotesScreen.kt/SecondaryNotesScreen.kt
+ *  render plain NoteCards with no reorder concept (see NoteEntity.position's
+ *  own doc comment - those screens aren't Room-backed or position-aware),
+ *  so the gesture plumbing has no business being on NoteCard itself.
+ *
+ *  onGloballyPositioned reports this card's own on-screen bounds up to the
+ *  parent on every layout pass (cheap - just a Rect write into a plain
+ *  map, no recomposition) so a LATER drag-end elsewhere can hit-test
+ *  against them. The lift effect (translate-with-finger, slight scale
+ *  up, a bit of elevation) only ever applies to whichever single card
+ *  [isDragged] is currently true for. detectDragGesturesAfterLongPress's
+ *  long-press requirement is what lets a plain quick tap still reach
+ *  NoteCard's own onClick underneath: this modifier never engages at
+ *  all for a tap that releases before the long-press threshold. */
+@Composable
+private fun ReorderableNoteCard(
+    note: NoteEntity,
+    dark: Boolean,
+    titleColor: Color,
+    subtextColor: Color,
+    onClick: () -> Unit,
+    selectionMode: Boolean,
+    selected: Boolean,
+    onToggleSelect: () -> Unit,
+    syncing: Boolean,
+    reorderEnabled: Boolean,
+    isDragged: Boolean,
+    dragOffset: Offset,
+    onBoundsChanged: (Rect) -> Unit,
+    onDragStart: () -> Unit,
+    onDragDelta: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onGloballyPositioned { onBoundsChanged(it.boundsInWindow()) }
+            .then(
+                if (isDragged) {
+                    Modifier.graphicsLayer {
+                        translationX = dragOffset.x
+                        translationY = dragOffset.y
+                        scaleX = 1.04f
+                        scaleY = 1.04f
+                        shadowElevation = 12f
+                    }
+                } else {
+                    Modifier
+                },
+            )
+            .then(
+                if (reorderEnabled) {
+                    Modifier.pointerInput(note.id) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { onDragStart() },
+                            onDrag = { change, dragAmount -> change.consume(); onDragDelta(dragAmount) },
+                            onDragEnd = onDragEnd,
+                            onDragCancel = onDragCancel,
+                        )
+                    }
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
+        NoteCard(
+            note = note,
+            dark = dark,
+            titleColor = titleColor,
+            subtextColor = subtextColor,
+            onClick = onClick,
+            selectionMode = selectionMode,
+            selected = selected,
+            onToggleSelect = onToggleSelect,
+            syncing = syncing,
+        )
+    }
+}
 
 // internal, not private: ArchivedNotesScreen.kt (same package, different
 // file) reuses this for the exact same card rendering. Kotlin's top-level
