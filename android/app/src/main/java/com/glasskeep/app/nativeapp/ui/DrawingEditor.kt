@@ -512,6 +512,7 @@ private fun DrawingModeButton(
                 },
             )
             .semantics { this.contentDescription = contentDescription }
+            .gkTooltip(contentDescription)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -540,6 +541,7 @@ private fun DrawingPopoverButton(
                 shape = RoundedCornerShape(8.dp),
             )
             .semantics { this.contentDescription = contentDescription }
+            .gkTooltip(contentDescription)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -608,6 +610,7 @@ private fun DrawingColorPalette(current: String, dark: Boolean, onSelect: (Strin
                                     },
                                 )
                                 .semantics { contentDescription = swatch }
+                                .gkTooltip(swatch)
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,

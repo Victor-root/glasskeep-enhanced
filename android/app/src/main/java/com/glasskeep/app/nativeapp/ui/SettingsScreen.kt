@@ -1101,6 +1101,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
                         .semantics { contentDescription = closeLabel }
+                        .gkTooltip(closeLabel)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,

@@ -100,7 +100,7 @@ fun TagSidebar(
         val titleColor = if (dark) DarkTitleColor else LightTitleColor
         val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
         val panelBg = if (dark) DarkCardBg else LightCardBg
-        val openMenuLabel = stringResource(R.string.native_sidebar_open)
+        val closeLabel = stringResource(R.string.native_common_close)
 
         Column(
             modifier = Modifier
@@ -125,7 +125,8 @@ fun TagSidebar(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
-                        .semantics { contentDescription = openMenuLabel }
+                        .semantics { contentDescription = closeLabel }
+                        .gkTooltip(closeLabel)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,

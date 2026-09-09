@@ -253,6 +253,7 @@ private fun ViewerIconButton(
             .clip(RoundedCornerShape(999.dp))
             .background(Color.White.copy(alpha = 0.12f))
             .semantics { this.contentDescription = contentDescription }
+            .gkTooltip(contentDescription)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

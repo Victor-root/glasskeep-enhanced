@@ -834,6 +834,7 @@ private fun NativeHeader(
                         modifier = Modifier
                             .clip(RoundedCornerShape(999.dp))
                             .semantics { contentDescription = askAiLabel }
+                            .gkTooltip(askAiLabel)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -868,6 +869,7 @@ private fun NativeHeader(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
                         .semantics { contentDescription = openSidebarLabel }
+                        .gkTooltip(openSidebarLabel)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -923,6 +925,7 @@ private fun NativeHeader(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
                         .semantics { contentDescription = notificationsLabel }
+                        .gkTooltip(notificationsLabel)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -956,6 +959,7 @@ private fun NativeHeader(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
                         .semantics { contentDescription = refreshLabel }
+                        .gkTooltip(refreshLabel)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -977,6 +981,7 @@ private fun NativeHeader(
                         modifier = Modifier
                             .clip(RoundedCornerShape(999.dp))
                             .semantics { contentDescription = moreLabel }
+                            .gkTooltip(moreLabel)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -1061,6 +1066,7 @@ private fun AiAnswerCard(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
                         .semantics { contentDescription = clearLabel }
+                        .gkTooltip(clearLabel)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,

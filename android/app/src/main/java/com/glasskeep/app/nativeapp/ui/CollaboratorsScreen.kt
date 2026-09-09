@@ -290,6 +290,7 @@ fun CollaboratorsScreen(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .semantics { contentDescription = closeLabel }
+                    .gkTooltip(closeLabel)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -728,6 +729,7 @@ private fun CollaboratorRow(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .semantics { contentDescription = removeLabel }
+                    .gkTooltip(removeLabel)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -788,6 +790,7 @@ private fun AccessToggle(
             modifier = Modifier
                 .background(if (!canWrite) Indigo.copy(alpha = if (dark) 0.22f else 0.12f) else Color.Transparent)
                 .semantics { contentDescription = readLabel }
+                .gkTooltip(readLabel)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -802,6 +805,7 @@ private fun AccessToggle(
             modifier = Modifier
                 .background(if (canWrite) Indigo.copy(alpha = if (dark) 0.22f else 0.12f) else Color.Transparent)
                 .semantics { contentDescription = writeLabel }
+                .gkTooltip(writeLabel)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,

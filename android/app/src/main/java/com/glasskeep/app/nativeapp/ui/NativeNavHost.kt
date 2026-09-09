@@ -237,6 +237,10 @@ fun NativeNavHost(
     // one too, and it is what replaces the platform's own Toast here.
     val toasts = rememberToastController()
     toasts.prefs = container.editorPrefs
+    // Same "one instance for the whole app" placement as the pill above,
+    // and the same reason: the web keeps exactly one tooltip portal at its
+    // own root (TooltipPortal.jsx).
+    val tooltips = rememberTooltipController()
     // "Edge-to-edge in landscape" off means the whole shell stays clear of
     // the left cutout, exactly what the web does by putting --safe-left
     // back on <body> (App.jsx:1703). Left only: the other three edges are
@@ -258,7 +262,7 @@ fun NativeNavHost(
     val showUnlockScreen = lock.isLocked && (!signedIn || lock.overlayOpen)
     val showLockedBanner = lock.isLocked && signedIn && !lock.bannerDismissed && !lock.overlayOpen
 
-    CompositionLocalProvider(LocalGkToasts provides toasts) {
+    CompositionLocalProvider(LocalGkToasts provides toasts, LocalGkTooltips provides tooltips) {
         Box(Modifier.fillMaxSize().then(safeLeft)) {
             if (showUnlockScreen) {
                 InstanceUnlockScreen(
@@ -423,6 +427,7 @@ fun NativeNavHost(
                 dark = LocalGkDark.current,
                 durationMs = container.editorPrefs.toastDurationMs,
             )
+            GkTooltipHost(tooltips)
         }
     }
 }

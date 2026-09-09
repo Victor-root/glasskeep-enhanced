@@ -720,6 +720,7 @@ private fun AudioTransportButton(
             .clip(CircleShape)
             .background(if (dark) Color.White.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.8f))
             .semantics { this.contentDescription = contentDescription }
+            .gkTooltip(contentDescription)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -1018,6 +1019,7 @@ private fun AudioClipRow(
                 .clip(CircleShape)
                 .alpha(0.6f)
                 .semantics { contentDescription = renameLabel }
+                .gkTooltip(renameLabel)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -1041,6 +1043,7 @@ private fun AudioClipRow(
                 )
                 .alpha(if (confirmingRemove) 1f else 0.6f)
                 .semantics { contentDescription = removeLabel }
+                .gkTooltip(removeLabel)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,

@@ -2333,6 +2333,7 @@ private fun NoteColorDot(
                 },
             )
             .semantics { contentDescription = label }
+            .gkTooltip(label)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -2743,6 +2744,7 @@ private fun ModalIconButton(
             .clip(CircleShape)
             .then(if (activeBackground != null) Modifier.background(activeBackground) else Modifier)
             .semantics { this.contentDescription = contentDescription }
+            .gkTooltip(contentDescription)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -2781,6 +2783,7 @@ private fun ModalSaveButton(dark: Boolean, enabled: Boolean, contentDescription:
                 },
             )
             .semantics { this.contentDescription = contentDescription }
+            .gkTooltip(contentDescription)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -3187,6 +3190,7 @@ private fun FooterIconButton(
                 .clip(CircleShape)
                 .background(background)
                 .semantics { this.contentDescription = contentDescription }
+                .gkTooltip(contentDescription)
                 .clickable(
                     interactionSource = interaction,
                     indication = null,

@@ -573,6 +573,7 @@ private fun TimeSection(
                         .background(if (dark) BtnHoverDark else BtnHoverLight)
                         .border(1.dp, border, RoundedCornerShape(999.dp))
                         .semantics { contentDescription = editLabel }
+                        .gkTooltip(editLabel)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,

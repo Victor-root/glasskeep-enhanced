@@ -804,6 +804,7 @@ private fun ChecklistRowView(
                 .clip(CircleShape)
                 .alpha(0.8f)
                 .semantics { contentDescription = removeLabel }
+                .gkTooltip(removeLabel)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -874,6 +875,7 @@ private fun ChecklistSectionHeader(
         Box(
             modifier = Modifier
                 .semantics { contentDescription = moveLabel }
+                .gkTooltip(moveLabel)
                 .pointerInput(section.id) {
                     detectDragGestures(
                         onDragStart = { onDragStart() },
@@ -901,6 +903,7 @@ private fun ChecklistSectionHeader(
                         },
                     )
                     .semantics { contentDescription = colorLabel }
+                    .gkTooltip(colorLabel)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -990,6 +993,7 @@ private fun ChecklistSectionHeader(
                 .size(24.dp)
                 .clip(RoundedCornerShape(4.dp))
                 .semantics { contentDescription = removeLabel }
+                .gkTooltip(removeLabel)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -1266,6 +1270,7 @@ private fun ChecklistDoneRow(
                 .clip(CircleShape)
                 .alpha(0.8f)
                 .semantics { contentDescription = removeLabel }
+                .gkTooltip(removeLabel)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,

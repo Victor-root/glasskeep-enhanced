@@ -229,6 +229,7 @@ fun AiSettingsSection(
                                 .clip(RoundedCornerShape(8.dp))
                                 .border(1.dp, borderColor, RoundedCornerShape(8.dp))
                                 .semantics { contentDescription = revealLabel }
+                                .gkTooltip(revealLabel)
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,

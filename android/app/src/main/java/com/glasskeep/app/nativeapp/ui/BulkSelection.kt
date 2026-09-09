@@ -254,6 +254,7 @@ internal fun SelectionActionBar(
                             .background(action.tone.background(dark))
                             .border(1.dp, action.tone.border(dark), RoundedCornerShape(8.dp))
                             .semantics { contentDescription = action.label }
+                            .gkTooltip(action.label)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -272,6 +273,7 @@ internal fun SelectionActionBar(
                     .size(36.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .semantics { contentDescription = closeLabel }
+                    .gkTooltip(closeLabel)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,

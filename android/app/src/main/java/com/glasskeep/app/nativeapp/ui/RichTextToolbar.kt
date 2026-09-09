@@ -691,6 +691,7 @@ private fun RichToolbarButton(
             .clip(RoundedCornerShape(6.dp))
             .background(richActiveBg(active, dark))
             .semantics { this.contentDescription = contentDescription }
+            .gkTooltip(contentDescription)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -787,6 +788,7 @@ private fun RichSplitButton(
                 .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
                 .background(richActiveBg(active, dark))
                 .semantics { this.contentDescription = contentDescription }
+                .gkTooltip(contentDescription)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -842,6 +844,7 @@ private fun RichSwatchButton(
             .clip(RoundedCornerShape(6.dp))
             .background(richActiveBg(active, dark))
             .semantics { this.contentDescription = contentDescription }
+            .gkTooltip(contentDescription)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -889,6 +892,7 @@ private fun RichLinkButton(
             .clip(RoundedCornerShape(6.dp))
             .background(richActiveBg(active, dark))
             .semantics { contentDescription = label }
+            .gkTooltip(label)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

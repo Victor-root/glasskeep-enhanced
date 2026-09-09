@@ -184,6 +184,7 @@ fun NoteAiChatPanel(
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
                     .semantics { contentDescription = closeLabel }
+                    .gkTooltip(closeLabel)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -248,6 +249,7 @@ fun NoteAiChatPanel(
                             .background(background)
                             .border(1.dp, borderColor, CircleShape)
                             .semantics { contentDescription = scrollLabel }
+                            .gkTooltip(scrollLabel)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -333,6 +335,7 @@ private fun AiHeaderAction(label: String, onClick: () -> Unit, icon: @Composable
             .clip(RoundedCornerShape(8.dp))
             .background(ButtonGradient)
             .semantics { contentDescription = label }
+            .gkTooltip(label)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
