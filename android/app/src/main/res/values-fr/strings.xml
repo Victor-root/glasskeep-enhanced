@@ -272,6 +272,14 @@
     <string name="native_collaborators_owner">Propriétaire</string>
     <string name="native_collaborators_can_write">Peut modifier</string>
     <string name="native_collaborators_read_only">Lecture seule</string>
+    <string name="native_collaborators_add_action">Ajouter un collaborateur</string>
+    <string name="native_collaborators_search_error">Impossible de charger les utilisateurs : %1$s</string>
+    <string name="native_collaborators_search_placeholder">Rechercher par nom ou e-mail</string>
+    <string name="native_collaborators_search_none_found">Aucun utilisateur correspondant</string>
+    <string name="native_collaborators_access_label">Accès</string>
+    <string name="native_collaborators_add_confirm">Ajouter (%1$d)</string>
+    <string name="native_collaborators_added_success">%1$d collaborateur(s) ajouté(s)</string>
+    <string name="native_collaborators_add_failed">%1$d n\'ont pas pu être ajoutés</string>
 
     <string name="native_notifications_title">Notifications</string>
     <string name="native_notifications_error">Impossible de charger les notifications : %1$s</string>

@@ -1288,30 +1288,35 @@ fun NoteDetailScreen(
                                         onClick = { menuExpanded = false; setReminder(null) },
                                     )
                                 }
-                                // Any participant may view the roster, not just the
+                                // Any participant may VIEW the roster, not just the
                                 // owner (see CollaboratorsScreen.kt's own doc
-                                // comment), so this isn't gated by isOwnerAccess/
-                                // isReadOnlyAccess the way the edit/archive entries
-                                // above and below are.
-                                if (!currentNote.collaborators.isNullOrEmpty()) {
+                                // comment), so read/write access isn't what gates
+                                // this entry. The owner also gets it even with zero
+                                // collaborators (collaborators == null then, not
+                                // just empty): CollaboratorsScreen's own "+" action
+                                // is the only way to add the very first one, so an
+                                // owner needs a way in before any exist yet.
+                                if (isOwnerAccess || !currentNote.collaborators.isNullOrEmpty()) {
                                     DropdownMenuItem(
                                         text = { Text(stringResource(R.string.native_collaborators_title)) },
                                         leadingIcon = { PeopleIcon(size = 18.dp, tint = titleColor) },
-                                        trailingIcon = {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(999.dp))
-                                                    .background(Indigo)
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                                            ) {
-                                                Text(
-                                                    currentNote.collaborators.size.toString(),
-                                                    color = Color.White,
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                )
+                                        trailingIcon = if (!currentNote.collaborators.isNullOrEmpty()) {
+                                            {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(999.dp))
+                                                        .background(Indigo)
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                                                ) {
+                                                    Text(
+                                                        currentNote.collaborators.size.toString(),
+                                                        color = Color.White,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                    )
+                                                }
                                             }
-                                        },
+                                        } else null,
                                         onClick = { menuExpanded = false; onOpenCollaborators() },
                                     )
                                 }

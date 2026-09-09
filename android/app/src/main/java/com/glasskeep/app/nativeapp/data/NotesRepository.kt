@@ -5,6 +5,7 @@ import com.glasskeep.app.nativeapp.data.local.NoteDao
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.local.SyncQueueDao
 import com.glasskeep.app.nativeapp.data.local.SyncQueueType
+import com.glasskeep.app.nativeapp.data.network.AddCollaboratorRequest
 import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ChangePasswordRequest
 import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
@@ -35,6 +36,8 @@ import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
 import com.glasskeep.app.nativeapp.data.network.UserDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -68,6 +71,29 @@ sealed class ChangePasswordResult {
     data class Saved(val token: String, val user: UserDto) : ChangePasswordResult()
     data class Rejected(val httpCode: Int) : ChangePasswordResult()
 }
+
+/** Outcome of adding a collaborator (POST /api/notes/:id/collaborate).
+ *  AlreadyCollaborator/UserNotFound get their own cases, same as every
+ *  other sealed result in this file, because they're real, expected
+ *  answers a picker UI reacts to differently, not bugs: the server
+ *  reuses HTTP 404 for two different reasons ("Note not found" vs "User
+ *  not found"), so UserNotFound is the one case here that needs a peek at
+ *  the response body, not just the status code, to tell apart from
+ *  Rejected(404) (a genuine, practically unreachable note-not-found race,
+ *  since native never lets a non-owner or a deleted note reach this call
+ *  in the first place). */
+sealed class AddCollaboratorResult {
+    data class Added(val collaborator: CollaboratorDto) : AddCollaboratorResult()
+    data object AlreadyCollaborator : AddCollaboratorResult()
+    data object UserNotFound : AddCollaboratorResult()
+    data class Rejected(val httpCode: Int) : AddCollaboratorResult()
+}
+
+/** Just enough of POST .../collaborate's error body to tell apart the two
+ *  reasons it reuses HTTP 404 for (see AddCollaboratorResult's own doc
+ *  comment): not a general error-body framework, only this one field. */
+@Serializable
+private data class CollaborateErrorBody(val error: String? = null)
 
 class NotesRepository(
     private val api: GlassKeepApi,
@@ -933,6 +959,57 @@ class NotesRepository(
             throw IllegalStateException(error)
         }
         return body
+    }
+
+    /** Every local (non-federated) user, or those matching [query] (name or
+     *  email, case-insensitive substring), up to the server's own 500-row
+     *  cap: candidates for AddCollaboratorDialog's picker. Fetched once
+     *  with an empty query and filtered client-side on every keystroke
+     *  after that (see AddCollaboratorDialog's own doc comment for why:
+     *  this matches what the web itself actually ships, not a debounced
+     *  live search), so [query] is usually "" here, not the live search
+     *  box text. */
+    suspend fun searchUsers(query: String = ""): List<UserDto> {
+        NativeDebug.d("NotesRepository.searchUsers query=$query")
+        val response = api.searchUsers(query)
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "GET /api/users/search failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body
+    }
+
+    /** Adds [username] (matched server-side by email or name, see
+     *  server/index.js) as a collaborator with the given [access] ("read"
+     *  or "write"). Owner-only server-side: native never lets a non-owner
+     *  reach this call (see NoteDetailScreen.kt's isOwnerAccess gating),
+     *  so the plain 404 the server returns for "you don't own this note"
+     *  is a practically unreachable case here, not something this method
+     *  bothers distinguishing from a genuinely deleted note. */
+    suspend fun addCollaborator(noteId: String, username: String, access: String): AddCollaboratorResult {
+        NativeDebug.d("NotesRepository.addCollaborator noteId=$noteId username=$username access=$access")
+        val response = api.addCollaborator(noteId, AddCollaboratorRequest(username, access))
+        if (response.isSuccessful) {
+            val collaborator = response.body()?.collaborator
+                ?: throw IllegalStateException("POST /api/notes/$noteId/collaborate: ok response with no collaborator")
+            return AddCollaboratorResult.Added(collaborator)
+        }
+        if (response.code() == 409) {
+            NativeDebug.d("NotesRepository.addCollaborator noteId=$noteId: already a collaborator")
+            return AddCollaboratorResult.AlreadyCollaborator
+        }
+        if (response.code() == 404) {
+            val raw = response.errorBody()?.string()
+            val message = raw?.let { runCatching { Json.decodeFromString<CollaborateErrorBody>(it) }.getOrNull()?.error }
+            if (message == "User not found") {
+                NativeDebug.d("NotesRepository.addCollaborator noteId=$noteId: user not found")
+                return AddCollaboratorResult.UserNotFound
+            }
+        }
+        NativeDebug.e("NotesRepository.addCollaborator noteId=$noteId rejected: HTTP ${response.code()}")
+        return AddCollaboratorResult.Rejected(response.code())
     }
 
     /** Not-yet-acknowledged share/collaboration notifications (see

@@ -155,6 +155,18 @@ data class NotificationIdsRequest(val ids: List<Int>)
 @Serializable
 data class NotificationActionResponse(val ok: Boolean = false)
 
+/** Body for POST /api/notes/:id/collaborate. access is always sent
+ *  explicitly ("read" or "write"), even though the server defaults it to
+ *  "write" when omitted: one code path, no optional-omission branch. */
+@Serializable
+data class AddCollaboratorRequest(val username: String, val access: String)
+
+/** Success shape only: `collaborator` is null on every error response
+ *  (see NotesRepository.addCollaborator, which reads the HTTP status and
+ *  error body instead for those). */
+@Serializable
+data class AddCollaboratorResponse(val ok: Boolean = false, val message: String? = null, val collaborator: CollaboratorDto? = null)
+
 /**
  * Body for PATCH /api/notes/:id. Deliberately narrow: only title/content
  * are ever sent from the native note-detail screen today. The server only
@@ -523,6 +535,23 @@ interface GlassKeepApi {
     // a collaborator"). Bare array response, not wrapped.
     @GET("api/notes/{id}/collaborators")
     suspend fun getNoteCollaborators(@Path("id") id: String): Response<List<CollaboratorDto>>
+
+    // Owner-only server-side (see server/index.js's plain, owner-scoped
+    // getNote lookup for this route, stricter than getNoteCollaborators'
+    // own owner-or-collaborator check above): a non-owner calling this
+    // gets a plain 404, indistinguishable from a nonexistent note. Native
+    // never lets a non-owner reach this call in the first place (see
+    // NoteDetailScreen.kt's isOwnerAccess gating), so that ambiguity is
+    // never actually surfaced to a real user.
+    @POST("api/notes/{id}/collaborate")
+    suspend fun addCollaborator(@Path("id") id: String, @Body body: AddCollaboratorRequest): Response<AddCollaboratorResponse>
+
+    // Empty q intentionally returns every local (non-federated) user, up
+    // to the server's own 500-row cap: see NotesRepository.searchUsers.
+    // No default here (unlike that wrapper): Retrofit's reflection-based
+    // proxy doesn't reliably honor Kotlin interface-method defaults.
+    @GET("api/users/search")
+    suspend fun searchUsers(@Query("q") q: String): Response<List<UserDto>>
 
     @PATCH("api/notes/{id}")
     suspend fun patchNote(@Path("id") id: String, @Body body: PatchNoteRequest): Response<NoteMutationResponse>
