@@ -557,7 +557,10 @@ private fun CandidateList(
         when {
             loading -> CandidatePlaceholder(stringResource(R.string.native_collaborators_searching), subtextColor)
             !hasAny -> CandidatePlaceholder(stringResource(R.string.native_collaborators_none_available), subtextColor)
-            candidates.isEmpty() -> CandidatePlaceholder("—", subtextColor)
+            // The web prints exactly this one dash when the letter
+            // filter matches nobody, with no wording at all
+            // (CollaborationModal.jsx:440-441).
+            candidates.isEmpty() -> CandidatePlaceholder("\u2014", subtextColor)
             else -> LazyColumn(
                 modifier = Modifier.heightIn(max = 320.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),

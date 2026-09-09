@@ -662,9 +662,7 @@ class NotesRepository(
     // each item with ITS captured clientUpdatedAt (not a fresh one at
     // replay time, which would corrupt the LWW comparison the timestamp
     // exists for). The direct methods above are unchanged and still used
-    // by SyncQueueWorker's own replay, and by every screen besides
-    // NoteDetailScreen.kt, which don't queue yet (see this and the
-    // milestone-1 commit messages for the follow-up tasks).
+    // by SyncQueueWorker's own replay.
     suspend fun patchNoteQueued(id: String, title: String, content: String) {
         NativeDebug.d("NotesRepository.patchNoteQueued id=$id")
         val request = PatchNoteRequest(title, content, nowIso())
@@ -1404,8 +1402,7 @@ class NotesRepository(
         }
     }
 
-    /** Full participant roster for CollaboratorsScreen.kt (view-only this
-     *  milestone: no add/remove/change-access action anywhere yet). Any
+    /** Full participant roster for CollaboratorsScreen.kt. Any
      *  participant may call this, not just the owner. Always hits the
      *  server, same "secondary screen, no local cache" tradeoff as
      *  fetchArchivedNotes()/fetchTrashedNotes(). */
@@ -1607,4 +1604,5 @@ internal fun NoteDto.toEntity() = NoteEntity(
     tagsJson = TagsJson.encode(tags),
     reminderAt = reminderAt,
     position = position,
+    hasImages = images.isNotEmpty(),
 )

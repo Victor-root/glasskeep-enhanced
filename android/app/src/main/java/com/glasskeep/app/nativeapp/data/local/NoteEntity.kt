@@ -39,4 +39,9 @@ data class NoteEntity(
      *  reorder shows immediately, without waiting for the queued
      *  POST /api/notes/reorder to round-trip. */
     val position: Double = 0.0,
+    /** Whether the note carries at least one image. Just the flag, never
+     *  the images themselves: a data: URL is far too large to mirror into
+     *  the list cache, and the only thing the list needs to know is
+     *  whether the drawer's "All images" lens should keep this row. */
+    val hasImages: Boolean = false,
 )

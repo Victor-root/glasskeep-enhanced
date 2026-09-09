@@ -63,7 +63,6 @@
     <string name="native_settings_passkeys_delete_confirm_body">Cette clé d\'accès ne pourra plus servir à se connecter. Si elle pouvait déverrouiller l\'instance chiffrée, cette autorisation sera également révoquée.</string>
     <string name="native_header_notes_label">Notes</string>
     <string name="native_notes_refresh">Actualiser</string>
-    <string name="native_notes_syncing_count">%1$d en synchronisation…</string>
     <string name="native_notes_empty">Aucune note pour le moment.</string>
     <string name="native_note_detail_edited_prefix">Modifié : %1$s</string>
     <string name="native_notes_section_pinned">Épinglées</string>
@@ -123,7 +122,6 @@
     <string name="native_notes_light_mode">Mode clair</string>
     <string name="native_notes_dark_mode">Mode sombre</string>
     <string name="native_notes_sign_out">Se déconnecter</string>
-    <string name="native_bulk_selected_count">%1$d sélectionnée(s)</string>
     <string name="native_bulk_exit">Quitter la sélection multiple</string>
     <string name="native_bulk_trashed_success">%1$d note(s) envoyée(s) à la corbeille</string>
     <string name="native_bulk_deleted_success">%1$d note(s) supprimée(s) définitivement</string>
@@ -133,6 +131,8 @@
     <string name="native_bulk_partial_failure">%1$d ont échoué</string>
 
     <string name="native_sidebar_open">Ouvrir le menu</string>
+    <string name="native_sidebar_all_images">Toutes les images</string>
+    <string name="native_sidebar_reminders">Rappels</string>
     <string name="native_sidebar_tags_title">Tags</string>
     <string name="native_sidebar_tags_empty">Aucun tag pour le moment</string>
     <string name="native_notes_more_options">Plus d\'options</string>
@@ -325,7 +325,6 @@
     <string name="native_note_detail_loading">Chargement de la note…</string>
     <string name="native_note_detail_error">Impossible de charger cette note : %1$s</string>
     <string name="native_note_detail_title_label">Titre</string>
-    <string name="native_note_detail_body_label">Note</string>
     <string name="native_note_detail_save">Enregistrer</string>
     <string name="native_note_detail_saving">Enregistrement…</string>
     <string name="native_note_detail_save_error">Impossible d\'enregistrer : %1$s</string>
@@ -379,7 +378,6 @@
     <string name="native_note_detail_permanent_delete_confirm_title">Supprimer définitivement cette note ?</string>
     <string name="native_note_detail_permanent_delete_confirm_body">Cette action est irréversible. La note sera définitivement supprimée.</string>
     <string name="native_note_detail_tags">Tags</string>
-    <string name="native_note_detail_tags_title">Tags de la note</string>
     <string name="native_note_detail_tags_search_placeholder">Rechercher ou créer…</string>
     <string name="native_note_detail_tags_existing">Tags existants</string>
     <string name="native_note_detail_tags_none_found">Aucun tag trouvé</string>
@@ -524,7 +522,6 @@
     <string name="native_drawing_size_thick">Épais</string>
     <string name="native_drawing_size_large">Large</string>
     <string name="native_drawing_caption_notice">Légende (pas encore modifiable nativement) :</string>
-    <string name="native_audio_record">Enregistrer</string>
     <string name="native_audio_too_large">L\'enregistrement est trop volumineux. Essayez un enregistrement plus court.</string>
     <string name="native_audio_empty_hint">Enregistrez un mémo vocal, il sera conservé avec cette note.</string>
     <string name="native_audio_start_recording">Démarrer l\'enregistrement</string>
@@ -542,8 +539,6 @@
     <string name="native_audio_playback_error">Impossible de lire cet enregistrement sur cet appareil</string>
     <string name="native_audio_remove_clip">Retirer l\'enregistrement</string>
     <string name="native_audio_rename_clip">Renommer l\'enregistrement</string>
-    <string name="native_audio_rename_title">Renommer l\'enregistrement</string>
-    <string name="native_audio_untitled_clip">Enregistrement</string>
 
     <string name="shortcut_qr_short">Scanner QRCODE</string>
     <string name="shortcut_qr_long">Scanner QRCODE</string>

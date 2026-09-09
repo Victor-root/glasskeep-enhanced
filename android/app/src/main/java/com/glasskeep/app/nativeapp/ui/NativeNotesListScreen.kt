@@ -245,7 +245,15 @@ fun NativeNotesListScreen(
     // layer yet (see NoteEntity), so this is narrower than the web's own
     // search until they do.
     val filteredNotes = remember(notes, searchQuery, activeTagFilter) {
-        val byTag = activeTagFilter?.let { tag -> notes.filter { tag in TagsJson.parse(it.tagsJson) } } ?: notes
+        // The drawer's two lenses are not folders: they narrow the list
+        // already loaded, and the notes they hide are still in the plain
+        // view (App.jsx:7063-7077).
+        val byTag = when (activeTagFilter) {
+            null -> notes
+            SidebarAllImages -> notes.filter { it.hasImages }
+            SidebarReminders -> notes.filter { !it.reminderAt.isNullOrBlank() }
+            else -> notes.filter { activeTagFilter in TagsJson.parse(it.tagsJson) }
+        }
         val q = searchQuery.trim()
         if (q.isEmpty()) byTag
         else byTag.filter { it.title.contains(q, ignoreCase = true) || it.content.contains(q, ignoreCase = true) }
@@ -491,7 +499,15 @@ fun NativeNotesListScreen(
                 themeId = themeId,
                 titleColor = titleColor,
                 subtextColor = subtextColor,
-                activeTagLabel = activeTagFilter,
+                // The two lenses read as their own names, not as the
+                // sentinels they are stored under.
+                activeTagLabel = when (activeTagFilter) {
+                    null -> null
+                    SidebarAllImages -> stringResource(R.string.native_sidebar_all_images)
+                    SidebarReminders -> stringResource(R.string.native_sidebar_reminders)
+                    else -> activeTagFilter
+                },
+                activeLens = activeTagFilter?.takeIf { it == SidebarAllImages || it == SidebarReminders },
                 refreshing = refreshing,
                 syncingCount = syncingCount,
                 onRefresh = { refresh() },
@@ -610,6 +626,8 @@ fun NativeNotesListScreen(
             activeTag = activeTagFilter,
             onSelectNotes = { activeTagFilter = null; sidebarOpen = false },
             onSelectTag = { tag -> activeTagFilter = tag; sidebarOpen = false },
+            onSelectImages = { activeTagFilter = SidebarAllImages; sidebarOpen = false },
+            onSelectReminders = { activeTagFilter = SidebarReminders; sidebarOpen = false },
             onOpenArchived = { sidebarOpen = false; onOpenArchived() },
             onOpenTrash = { sidebarOpen = false; onOpenTrash() },
             onClose = { sidebarOpen = false },
@@ -708,6 +726,9 @@ private fun NativeHeader(
     titleColor: Color,
     subtextColor: Color,
     activeTagLabel: String?,
+    /** Which of the drawer's two lenses is on, if either: the header row
+     *  shows their own glyph rather than the tag one. */
+    activeLens: String?,
     refreshing: Boolean,
     syncingCount: Int,
     onRefresh: () -> Unit,
@@ -839,10 +860,11 @@ private fun NativeHeader(
                 Column(Modifier.weight(1f)) {
                     Text("Glass Keep", color = titleColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (activeTagLabel != null) {
-                            TagIcon(size = 12.dp, tint = accentColor)
-                        } else {
-                            NotesIcon(size = 12.dp, tint = accentColor)
+                        when {
+                            activeTagLabel == null -> NotesIcon(size = 12.dp, tint = accentColor)
+                            activeLens == SidebarAllImages -> SidebarImagesIcon(size = 12.dp, tint = accentColor)
+                            activeLens == SidebarReminders -> SidebarRemindersIcon(size = 12.dp, tint = accentColor)
+                            else -> TagIcon(size = 12.dp, tint = accentColor)
                         }
                         Spacer(Modifier.width(4.dp))
                         Text(

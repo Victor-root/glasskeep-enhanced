@@ -52,15 +52,19 @@ import com.glasskeep.app.ui.LightTitleColor
 private val SidebarActiveGradient = Brush.linearGradient(listOf(Color(0xFF6366f1), Color(0xFF7c3aed)))
 private val SidebarActiveShadowTint = Color(0xFF7C3AED)
 
+/** The two entries that are not folders but lenses over the notes
+ *  already loaded: only those carrying an image, and only those carrying
+ *  a reminder (ALL_IMAGES / REMINDERS, utils/constants.js). Sentinels
+ *  rather than an enum so they share [activeTag] with a real tag name,
+ *  exactly as the web shares one `tagFilter`. */
+internal const val SidebarAllImages = "__ALL_IMAGES__"
+internal const val SidebarReminders = "__REMINDERS__"
+
 /**
  * Notes drawer, ported from TagSidebar.jsx's own non-permanent (mobile)
  * mode: a 288dp panel sliding in from the left over a plain, non-animated
  * scrim, matching the web's own tap-outside-to-close / no-swipe-to-close
- * behaviour. Scope is narrower than the web sidebar (disclosed cut, see
- * this milestone's commit message): "All images" and "Reminders" aren't
- * native screens yet, so they're left out entirely rather than faked as
- * dead entries; everything shown here (Notes, Archived, Trash, tags)
- * already exists natively.
+ * behaviour.
  */
 @Composable
 fun TagSidebar(
@@ -70,6 +74,8 @@ fun TagSidebar(
     activeTag: String?,
     onSelectNotes: () -> Unit,
     onSelectTag: (String) -> Unit,
+    onSelectImages: () -> Unit,
+    onSelectReminders: () -> Unit,
     onOpenArchived: () -> Unit,
     onOpenTrash: () -> Unit,
     onClose: () -> Unit,
@@ -147,13 +153,29 @@ fun TagSidebar(
                 )
                 Spacer(Modifier.height(4.dp))
                 SidebarNavItem(
+                    icon = { tint -> SidebarImagesIcon(size = 20.dp, tint = tint) },
+                    label = stringResource(R.string.native_sidebar_all_images),
+                    active = activeTag == SidebarAllImages,
+                    titleColor = titleColor,
+                    onClick = onSelectImages,
+                )
+                Spacer(Modifier.height(4.dp))
+                SidebarNavItem(
                     icon = { tint -> ArchiveIcon(size = 20.dp, tint = tint) },
                     label = stringResource(R.string.native_archived_title),
                     active = false,
                     titleColor = titleColor,
                     onClick = onOpenArchived,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(4.dp))
+                SidebarNavItem(
+                    icon = { tint -> SidebarRemindersIcon(size = 20.dp, tint = tint) },
+                    label = stringResource(R.string.native_sidebar_reminders),
+                    active = activeTag == SidebarReminders,
+                    titleColor = titleColor,
+                    onClick = onSelectReminders,
+                )
+                Spacer(Modifier.height(4.dp))
                 SidebarNavItem(
                     icon = { tint -> TrashIcon(size = 20.dp, tint = tint) },
                     label = stringResource(R.string.native_trash_title),

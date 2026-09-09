@@ -66,7 +66,6 @@
     <string name="native_settings_passkeys_delete_confirm_body">This passkey can no longer be used to sign in. If it could unlock the encrypted instance, that authorisation will be revoked too.</string>
     <string name="native_header_notes_label">Notes</string>
     <string name="native_notes_refresh">Refresh</string>
-    <string name="native_notes_syncing_count">%1$d syncing…</string>
     <string name="native_notes_empty">No notes yet.</string>
     <string name="native_note_detail_edited_prefix">Edited: %1$s</string>
     <string name="native_notes_section_pinned">Pinned</string>
@@ -129,7 +128,6 @@
     <string name="native_notes_light_mode">Light mode</string>
     <string name="native_notes_dark_mode">Dark mode</string>
     <string name="native_notes_sign_out">Sign out</string>
-    <string name="native_bulk_selected_count">%1$d selected</string>
     <string name="native_bulk_exit">Exit multi-select</string>
     <string name="native_bulk_trashed_success">%1$d note(s) moved to trash</string>
     <string name="native_bulk_deleted_success">%1$d note(s) permanently deleted</string>
@@ -139,6 +137,8 @@
     <string name="native_bulk_partial_failure">%1$d failed</string>
 
     <string name="native_sidebar_open">Open menu</string>
+    <string name="native_sidebar_all_images">All Images</string>
+    <string name="native_sidebar_reminders">Reminders</string>
     <string name="native_sidebar_tags_title">Tags</string>
     <string name="native_sidebar_tags_empty">No tags yet</string>
     <string name="native_notes_more_options">More options</string>
@@ -331,7 +331,6 @@
     <string name="native_note_detail_loading">Loading note…</string>
     <string name="native_note_detail_error">Couldn\'t load this note: %1$s</string>
     <string name="native_note_detail_title_label">Title</string>
-    <string name="native_note_detail_body_label">Note</string>
     <string name="native_note_detail_save">Save</string>
     <string name="native_note_detail_saving">Saving…</string>
     <string name="native_note_detail_save_error">Couldn\'t save: %1$s</string>
@@ -385,7 +384,6 @@
     <string name="native_note_detail_permanent_delete_confirm_title">Permanently delete this note?</string>
     <string name="native_note_detail_permanent_delete_confirm_body">This action cannot be undone. The note will be permanently removed.</string>
     <string name="native_note_detail_tags">Tags</string>
-    <string name="native_note_detail_tags_title">Note tags</string>
     <string name="native_note_detail_tags_search_placeholder">Search or create…</string>
     <string name="native_note_detail_tags_existing">Existing tags</string>
     <string name="native_note_detail_tags_none_found">No tags found</string>
@@ -530,7 +528,6 @@
     <string name="native_drawing_size_thick">Thick</string>
     <string name="native_drawing_size_large">Large</string>
     <string name="native_drawing_caption_notice">Caption (not yet editable natively):</string>
-    <string name="native_audio_record">Record</string>
     <string name="native_audio_too_large">Recording is too large to save. Try a shorter recording.</string>
     <string name="native_audio_empty_hint">Record a voice memo and it will be saved with this note.</string>
     <string name="native_audio_start_recording">Start recording</string>
@@ -548,8 +545,6 @@
     <string name="native_audio_playback_error">Couldn\'t play this recording on this device</string>
     <string name="native_audio_remove_clip">Remove recording</string>
     <string name="native_audio_rename_clip">Rename recording</string>
-    <string name="native_audio_rename_title">Rename recording</string>
-    <string name="native_audio_untitled_clip">Recording</string>
 
     <!-- App shortcut: long-press the launcher icon to open the QR
          scanner straight away (sign in to a PC paired with this phone). -->

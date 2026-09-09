@@ -664,19 +664,6 @@ fun PauseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Col
 }
 
 @Composable
-fun StopIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
-    Canvas(modifier.size(size)) {
-        val scale = this.size.minDimension / 24f
-        drawRoundRect(
-            color = tint,
-            topLeft = Offset(5f * scale, 5f * scale),
-            size = Size(14f * scale, 14f * scale),
-            cornerRadius = CornerRadius(2f * scale, 2f * scale),
-        )
-    }
-}
-
-@Composable
 fun CheckSquareIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
     // src/icons/index.jsx CheckSquareIcon, viewBox 24x24, stroke (not
     // filled), strokeWidth 2, round caps/joins.
@@ -1204,6 +1191,25 @@ fun ClearFormattingIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: C
 fun RefreshIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
     "M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4 " +
         "M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4",
+    modifier, size, tint,
+)
+
+/** sidebarIcons.jsx ImagesIcon: the drawer's "All images" filter. Drawn
+ *  at the sidebar set's own 1.8 stroke rather than [WebIcon]'s 2. */
+@Composable
+fun SidebarImagesIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z " +
+        "M8.5 7a1.5 1.5 0 1 0 0 3a1.5 1.5 0 1 0 0 -3 " +
+        "M21 15l-5 -5l-11 11",
+    modifier, size, tint,
+)
+
+/** sidebarIcons.jsx RemindersSidebarIcon: the drawer's "Reminders"
+ *  filter, a plain bell distinct from the header's own [BellIcon]. */
+@Composable
+fun SidebarRemindersIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M18 8a6 6 0 0 0 -12 0c0 7 -3 9 -3 9h18s-3 -2 -3 -9 " +
+        "M13.73 21a2 2 0 0 1 -3.46 0",
     modifier, size, tint,
 )
 

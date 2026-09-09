@@ -120,13 +120,13 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
-/** `red-500`, the "remove photo" link. */
 /** The export file is written the way the web writes its own:
  *  JSON.stringify(payload, null, 2) (useImportExport.js:156). The
  *  two-space indent is what needs the opt-in; the rest is stable API. */
 @OptIn(ExperimentalSerializationApi::class)
 private val prettyJson = Json { prettyPrint = true; prettyPrintIndent = "  " }
 
+/** `red-500`, the "remove photo" link. */
 private val LinkRed = Color(0xFFEF4444)
 private val PasskeyDeleteBorderLight = Color(0xFFFCA5A5)
 private val PasskeyDeleteBorderDark = Color(0xFF991B1B)

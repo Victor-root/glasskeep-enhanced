@@ -19,11 +19,11 @@ import com.glasskeep.app.ui.applyThemedSystemBars
 import com.glasskeep.app.ui.theme.GlassKeepTheme
 
 /**
- * Entry point for the native (0-webview) rewrite. Reached only from debug
- * builds for now (see MainActivity.launchApp): this is where every native
- * screen will live as they get built one feature at a time, while
- * WebViewActivity keeps serving the real app in release builds until the
- * native side reaches parity.
+ * Entry point for the native (0-webview) app: every screen in
+ * com.glasskeep.app.nativeapp hangs off the nav graph this hosts.
+ *
+ * Which of the two entry points a build actually reaches is
+ * MainActivity.launchApp's call, still gated on BuildConfig.DEBUG there.
  */
 class NativeAppActivity : ComponentActivity() {
     // Deep-link target when launched from a reminder notification (see
@@ -52,7 +52,7 @@ class NativeAppActivity : ComponentActivity() {
         setContent {
             // The device setting, unless the header menu's light/dark entry
             // overrode it for this session (the web's own toggleDark, which
-            // likewise only lasts the session — App.jsx:2240).
+            // likewise only lasts the session, App.jsx:2240).
             val dark = container.shellPrefs.darkOverride ?: isSystemInDarkTheme()
             val view = LocalView.current
             // Signed-in only: the login screen keeps the same fixed pair
