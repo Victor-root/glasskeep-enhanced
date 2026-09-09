@@ -24,5 +24,10 @@ fun ArchivedNotesScreen(
         fetchNotes = NotesRepository::fetchArchivedNotes,
         onOpenNote = onOpenNote,
         onBack = onBack,
+        capabilities = setOf(
+            SecondaryBulkCapability.UNARCHIVE,
+            SecondaryBulkCapability.TRASH,
+            SecondaryBulkCapability.COLOR,
+        ),
     )
 }

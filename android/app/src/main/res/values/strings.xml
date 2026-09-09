@@ -70,6 +70,14 @@
     <string name="native_notes_search_placeholder">Search notes…</string>
     <string name="native_notes_search_close">Close search</string>
     <string name="native_notes_search_empty">No notes match your search.</string>
+    <string name="native_notes_select_mode">Select notes</string>
+    <string name="native_bulk_selected_count">%1$d selected</string>
+    <string name="native_bulk_trashed_success">%1$d note(s) moved to trash</string>
+    <string name="native_bulk_deleted_success">%1$d note(s) permanently deleted</string>
+    <string name="native_bulk_archived_success">%1$d note(s) archived</string>
+    <string name="native_bulk_unarchived_success">%1$d note(s) unarchived</string>
+    <string name="native_bulk_restored_success">%1$d note(s) restored</string>
+    <string name="native_bulk_partial_failure">%1$d failed</string>
 
     <string name="native_archived_title">Archived</string>
     <string name="native_archived_empty">No archived notes.</string>

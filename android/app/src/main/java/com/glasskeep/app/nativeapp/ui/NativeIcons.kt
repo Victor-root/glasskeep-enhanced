@@ -654,3 +654,21 @@ fun StopIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Colo
         )
     }
 }
+
+@Composable
+fun CheckSquareIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/icons/index.jsx CheckSquareIcon, viewBox 24x24, stroke (not
+    // filled), strokeWidth 2, round caps/joins.
+    val path = remember {
+        PathParser().parsePathString(
+            "M9 11l3 3L22 4 " +
+                "M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}

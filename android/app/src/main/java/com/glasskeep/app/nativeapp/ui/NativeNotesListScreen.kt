@@ -1,5 +1,7 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,6 +49,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -63,6 +66,7 @@ import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.ChecklistPreview
 import com.glasskeep.app.nativeapp.data.NoteContent
+import com.glasskeep.app.nativeapp.data.SaveNoteResult
 import com.glasskeep.app.nativeapp.data.isReminderPast
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
@@ -108,6 +112,11 @@ fun NativeNotesListScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var showBulkTrashConfirm by remember { mutableStateOf(false) }
+    var showBulkColorPicker by remember { mutableStateOf(false) }
+    var bulkActionRunning by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // Client-side only, same fields the web app matches for a note without
@@ -122,10 +131,78 @@ fun NativeNotesListScreen(
 
     val errorSyncTemplate = stringResource(R.string.native_notes_error_sync)
     val errorCreateTemplate = stringResource(R.string.native_notes_create_error)
+    val archivedSuccessTemplate = stringResource(R.string.native_bulk_archived_success)
+    val trashedSuccessTemplate = stringResource(R.string.native_bulk_trashed_success)
+    val partialFailureTemplate = stringResource(R.string.native_bulk_partial_failure)
+    val trashConfirmTitle = stringResource(R.string.native_note_detail_trash_confirm_title)
+    val trashConfirmBodyText = stringResource(R.string.native_note_detail_trash_confirm_body)
+    val trashLabel = stringResource(R.string.native_note_detail_move_to_trash)
+    val archiveLabel = stringResource(R.string.native_note_detail_archive)
+    val pinLabel = stringResource(R.string.native_note_detail_pin)
+    val colorLabel = stringResource(R.string.native_note_detail_change_color)
+    val context = LocalContext.current
 
     val bgModifier = if (dark) Modifier.background(DarkBgColor) else Modifier.background(LightBgGradient)
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
+    val borderColor = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
+
+    fun reportOutcome(successTemplate: String, outcome: BulkOutcome) {
+        val message = String.format(successTemplate, outcome.succeeded) +
+            if (outcome.failed > 0) " " + String.format(partialFailureTemplate, outcome.failed) else ""
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    fun exitSelection() {
+        selectionMode = false
+        selectedIds = emptySet()
+    }
+
+    fun bulkArchive() {
+        if (bulkActionRunning || selectedIds.isEmpty()) return
+        bulkActionRunning = true
+        val ids = selectedIds
+        scope.launch {
+            val outcome = runBulkAction(ids) { id -> repository.setArchived(id, true) is SaveNoteResult.Saved }
+            bulkActionRunning = false
+            reportOutcome(archivedSuccessTemplate, outcome)
+            exitSelection()
+        }
+    }
+
+    fun bulkTrash() {
+        showBulkTrashConfirm = false
+        if (bulkActionRunning || selectedIds.isEmpty()) return
+        bulkActionRunning = true
+        val ids = selectedIds
+        scope.launch {
+            val outcome = runBulkAction(ids) { id -> repository.trashNote(id) is SaveNoteResult.Saved }
+            bulkActionRunning = false
+            reportOutcome(trashedSuccessTemplate, outcome)
+            exitSelection()
+        }
+    }
+
+    fun bulkPin() {
+        if (bulkActionRunning || selectedIds.isEmpty()) return
+        bulkActionRunning = true
+        val ids = selectedIds
+        scope.launch {
+            runBulkAction(ids) { id -> repository.setPinned(id, true); true }
+            bulkActionRunning = false
+        }
+    }
+
+    fun bulkColor(colorKey: String) {
+        showBulkColorPicker = false
+        if (bulkActionRunning || selectedIds.isEmpty()) return
+        bulkActionRunning = true
+        val ids = selectedIds
+        scope.launch {
+            runBulkAction(ids) { id -> repository.setColor(id, colorKey) is SaveNoteResult.Saved }
+            bulkActionRunning = false
+        }
+    }
 
     fun refresh() {
         refreshing = true
@@ -216,6 +293,8 @@ fun NativeNotesListScreen(
 
     LaunchedEffect(serverUrl) { refresh() }
 
+    BackHandler(enabled = selectionMode) { exitSelection() }
+
     Box(Modifier.fillMaxSize().then(bgModifier)) {
         Column(Modifier.fillMaxSize()) {
             NativeHeader(
@@ -235,6 +314,7 @@ fun NativeNotesListScreen(
                 },
                 searchQuery = searchQuery,
                 onSearchQueryChange = { searchQuery = it },
+                onEnterSelection = { selectionMode = true },
             )
 
             errorMessage?.let {
@@ -265,21 +345,82 @@ fun NativeNotesListScreen(
                             titleColor = titleColor,
                             subtextColor = subtextColor,
                             onClick = { onOpenNote(note.id) },
+                            selectionMode = selectionMode,
+                            selected = note.id in selectedIds,
+                            onToggleSelect = {
+                                selectedIds = if (note.id in selectedIds) selectedIds - note.id else selectedIds + note.id
+                            },
                         )
                     }
                 }
             }
         }
 
-        CreateNoteFab(
-            dark = dark,
-            open = fabOpen,
-            onOpenChange = { fabOpen = it },
-            onCreateText = { createTextNote() },
-            onCreateChecklist = { createChecklistNote() },
-            onCreateDrawing = { createDrawingNote() },
-            onCreateAudio = { createAudioNote() },
-        )
+        if (selectionMode) {
+            SelectionActionBar(
+                selectedCount = selectedIds.size,
+                actions = listOf(
+                    BulkActionButton(
+                        label = archiveLabel,
+                        icon = { ArchiveIcon(size = 20.dp, tint = titleColor) },
+                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                        onClick = { bulkArchive() },
+                    ),
+                    BulkActionButton(
+                        label = trashLabel,
+                        icon = { TrashIcon(size = 20.dp, tint = Color(0xFFdc2626)) },
+                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                        onClick = { showBulkTrashConfirm = true },
+                    ),
+                    BulkActionButton(
+                        label = pinLabel,
+                        icon = { PinIcon(size = 20.dp, tint = titleColor, filled = false) },
+                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                        onClick = { bulkPin() },
+                    ),
+                    BulkActionButton(
+                        label = colorLabel,
+                        icon = { PaletteIcon(size = 20.dp) },
+                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                        onClick = { showBulkColorPicker = true },
+                    ),
+                ),
+                onClose = { exitSelection() },
+                dark = dark,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+            )
+        } else {
+            CreateNoteFab(
+                dark = dark,
+                open = fabOpen,
+                onOpenChange = { fabOpen = it },
+                onCreateText = { createTextNote() },
+                onCreateChecklist = { createChecklistNote() },
+                onCreateDrawing = { createDrawingNote() },
+                onCreateAudio = { createAudioNote() },
+            )
+        }
+
+        if (showBulkTrashConfirm) {
+            ConfirmActionDialog(
+                title = trashConfirmTitle,
+                body = trashConfirmBodyText,
+                confirmLabel = trashLabel,
+                confirmColor = Color(0xFFdc2626),
+                onConfirm = { bulkTrash() },
+                onDismiss = { showBulkTrashConfirm = false },
+            )
+        }
+
+        if (showBulkColorPicker) {
+            BulkColorPickerDialog(
+                dark = dark,
+                titleColor = titleColor,
+                borderColor = borderColor,
+                onPick = { colorKey -> bulkColor(colorKey) },
+                onDismiss = { showBulkColorPicker = false },
+            )
+        }
     }
 }
 
@@ -298,6 +439,7 @@ private fun NativeHeader(
     onSearchOpenChange: (Boolean) -> Unit,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
+    onEnterSelection: () -> Unit,
 ) {
     // The web header's own "glass chrome" gradient, following whichever of
     // the six workspace themes the account has picked (see WorkspaceTheme.kt
@@ -402,6 +544,20 @@ private fun NativeHeader(
                     Text("Glass Keep", color = titleColor, fontWeight = FontWeight.Bold, fontSize = 19.sp)
                     Text(stringResource(R.string.native_header_notes_label), color = subtextColor, fontSize = 12.sp)
                 }
+                val selectLabel = stringResource(R.string.native_notes_select_mode)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .semantics { contentDescription = selectLabel }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onEnterSelection() }
+                        .padding(8.dp),
+                ) {
+                    CheckSquareIcon(size = 18.dp, tint = titleColor)
+                }
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
@@ -444,64 +600,87 @@ private val CardShadowTint = Color(0xFF8B5CF6)
 // file) reuses this for the exact same card rendering. Kotlin's top-level
 // `private` is file-scoped.
 @Composable
-internal fun NoteCard(note: NoteEntity, dark: Boolean, titleColor: Color, subtextColor: Color, onClick: () -> Unit) {
+internal fun NoteCard(
+    note: NoteEntity,
+    dark: Boolean,
+    titleColor: Color,
+    subtextColor: Color,
+    onClick: () -> Unit,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onToggleSelect: (() -> Unit)? = null,
+) {
     val borderColor = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
     val shape = RoundedCornerShape(12.dp)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(elevation = 3.dp, shape = shape, ambientColor = CardShadowTint, spotColor = CardShadowTint)
-            .clip(shape)
-            .background(noteColorFor(note.color, dark))
-            .border(width = 1.dp, color = borderColor, shape = shape)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Button,
-                onClick = onClick,
-            )
-            .padding(14.dp),
-    ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Text(
-                note.title.ifBlank { stringResource(R.string.native_notes_untitled) },
-                color = titleColor,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                modifier = Modifier.weight(1f),
-            )
-            if (note.pinned) {
-                PinIcon(size = 14.dp, tint = Indigo, filled = true)
+    Box(Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(elevation = 3.dp, shape = shape, ambientColor = CardShadowTint, spotColor = CardShadowTint)
+                .clip(shape)
+                .background(noteColorFor(note.color, dark))
+                .border(width = 1.dp, color = borderColor, shape = shape)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    role = Role.Button,
+                    onClick = { if (selectionMode) onToggleSelect?.invoke() else onClick() },
+                )
+                .padding(14.dp),
+        ) {
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    note.title.ifBlank { stringResource(R.string.native_notes_untitled) },
+                    color = titleColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    modifier = Modifier.weight(1f).padding(end = if (selectionMode) 30.dp else 0.dp),
+                )
+                if (note.pinned && !selectionMode) {
+                    PinIcon(size = 14.dp, tint = Indigo, filled = true)
+                }
             }
-        }
-        Spacer(Modifier.height(6.dp))
-
-        if (note.type == "checklist") {
-            ChecklistCardPreview(note = note, titleColor = titleColor, subtextColor = subtextColor)
-        } else if (note.type == "draw" || note.type == "audio") {
-            // Neither shape is NoteContent's rich-doc-or-plain-text JSON
-            // (draw's is {paths,dimensions,text}, audio's is its own
-            // metadata blob), so previewPlainText would just leak the raw
-            // JSON string here rather than a real preview. The web shows a
-            // real vector thumbnail for a drawing (DrawingPreview.jsx) and
-            // presumably something audio-specific; a generic type label
-            // is a safe, non-guessing fallback for both until either gets
-            // its own native preview renderer.
-            Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
-        } else {
-            val preview = remember(note.content) { NoteContent.previewPlainText(note.content) }
-            if (preview.isNotBlank()) {
-                Text(preview, color = titleColor, fontSize = 13.sp, lineHeight = 18.sp)
-            } else if (note.type != "text") {
-                Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
-            }
-        }
-
-        // Its own row, same as NoteCardFooter.jsx: a reminder's date/time
-        // stays readable instead of competing with the preview above it.
-        note.reminderAt?.let { reminderAt ->
             Spacer(Modifier.height(6.dp))
-            ReminderChip(reminderAt = reminderAt, dark = dark)
+
+            if (note.type == "checklist") {
+                ChecklistCardPreview(note = note, titleColor = titleColor, subtextColor = subtextColor)
+            } else if (note.type == "draw" || note.type == "audio") {
+                // Neither shape is NoteContent's rich-doc-or-plain-text JSON
+                // (draw's is {paths,dimensions,text}, audio's is its own
+                // metadata blob), so previewPlainText would just leak the raw
+                // JSON string here rather than a real preview. The web shows a
+                // real vector thumbnail for a drawing (DrawingPreview.jsx) and
+                // presumably something audio-specific; a generic type label
+                // is a safe, non-guessing fallback for both until either gets
+                // its own native preview renderer.
+                Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
+            } else {
+                val preview = remember(note.content) { NoteContent.previewPlainText(note.content) }
+                if (preview.isNotBlank()) {
+                    Text(preview, color = titleColor, fontSize = 13.sp, lineHeight = 18.sp)
+                } else if (note.type != "text") {
+                    Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
+                }
+            }
+
+            // Its own row, same as NoteCardFooter.jsx: a reminder's date/time
+            // stays readable instead of competing with the preview above it.
+            note.reminderAt?.let { reminderAt ->
+                Spacer(Modifier.height(6.dp))
+                ReminderChip(reminderAt = reminderAt, dark = dark)
+            }
+        }
+
+        // Same top-end overlay position as NoteCard.jsx's own checkbox,
+        // absolute-positioned over the card content rather than laid out
+        // inline with it.
+        if (selectionMode) {
+            SelectionCheckbox(
+                selected = selected,
+                dark = dark,
+                onToggle = { onToggleSelect?.invoke() },
+                modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
+            )
         }
     }
 }
