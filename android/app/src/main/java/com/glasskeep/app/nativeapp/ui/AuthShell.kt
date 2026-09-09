@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -104,7 +105,10 @@ internal fun AuthShell(
         activity.finish()
     }
 
-    Box(Modifier.fillMaxSize().background(WorkspaceTheme.appBackground(container.themeState.themeId, dark))) {
+    // The signed-out screens wear the theme the admin picked for them, not
+    // the one this account chose for its own workspace (AuthShell.jsx:33).
+    val themeId = container.branding.loginThemeId ?: container.themeState.themeId
+    Box(Modifier.fillMaxSize().background(WorkspaceTheme.appBackground(themeId, dark))) {
         if (container.shellPrefs.floatingCards) FloatingCardsBackground(dark)
 
         Column(
@@ -116,17 +120,30 @@ internal fun AuthShell(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(32.dp))
-            Image(
-                painter = painterResource(id = R.drawable.glasskeep_logo),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .shadow(8.dp, RoundedCornerShape(16.dp)),
-            )
+            // A custom logo is drawn raw: it may be a transparent PNG, and
+            // the rounded tile plus shadow the bundled icon wears would put
+            // an ugly box behind it (AuthShell.jsx:38).
+            val customLogo = container.branding.logo?.let { rememberDecodedImage(it) }
+            if (customLogo != null) {
+                Image(
+                    bitmap = customLogo,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(64.dp),
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = R.drawable.glasskeep_logo),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .shadow(8.dp, RoundedCornerShape(16.dp)),
+                )
+            }
             Spacer(Modifier.height(16.dp))
             Text(
-                stringResource(R.string.app_name),
+                container.branding.appName ?: stringResource(R.string.app_name),
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.title,

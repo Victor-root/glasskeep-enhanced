@@ -550,6 +550,8 @@ fun NativeNotesListScreen(
                     else -> activeTagFilter
                 },
                 activeLens = activeTagFilter?.takeIf { it == SidebarAllImages || it == SidebarReminders },
+                appName = container.branding.appName ?: stringResource(R.string.app_name),
+                brandingLogo = container.branding.logo,
                 syncState = syncState,
                 queuedCount = syncQueue.size,
                 instanceLocked = container.lockState.isLocked,
@@ -784,6 +786,9 @@ private fun NativeHeader(
     /** Which of the drawer's two lenses is on, if either: the header row
      *  shows their own glyph rather than the tag one. */
     activeLens: String?,
+    /** The instance's own name and logo, or null for the bundled ones. */
+    appName: String,
+    brandingLogo: String?,
     syncState: SyncState,
     queuedCount: Int,
     instanceLocked: Boolean,
@@ -911,14 +916,26 @@ private fun NativeHeader(
                     HamburgerIcon(size = 22.dp, tint = titleColor)
                 }
                 Spacer(Modifier.width(12.dp))
-                Image(
-                    painter = painterResource(id = R.drawable.glasskeep_logo),
-                    contentDescription = "GlassKeep",
-                    modifier = Modifier.size(28.dp).clip(RoundedCornerShape(12.dp)),
-                )
+                // Same split as AuthShell: a custom logo is drawn raw, the
+                // bundled one keeps its rounded tile (NotesHeader.jsx:265).
+                val customLogo = brandingLogo?.let { rememberDecodedImage(it) }
+                if (customLogo != null) {
+                    Image(
+                        bitmap = customLogo,
+                        contentDescription = appName,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(28.dp),
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.glasskeep_logo),
+                        contentDescription = appName,
+                        modifier = Modifier.size(28.dp).clip(RoundedCornerShape(12.dp)),
+                    )
+                }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Glass Keep", color = titleColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(appName, color = titleColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         when {
                             activeTagLabel == null -> NotesIcon(size = 12.dp, tint = accentColor)

@@ -39,6 +39,7 @@ import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.NotifCategoryFlags
 import com.glasskeep.app.nativeapp.data.RealtimeClient
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
+import com.glasskeep.app.nativeapp.data.renewSessionTokenIfStale
 import com.glasskeep.app.nativeapp.syncReminderAlarms
 import com.glasskeep.app.reminders.ReminderSyncWorker
 import kotlinx.coroutines.delay
@@ -119,6 +120,28 @@ fun NativeNavHost(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             realtimeClient.stop()
+        }
+    }
+
+    // The instance's own name, logo and sign-in theme. Read once per
+    // session, unauthenticated, so the sign-in screen gets it too; the
+    // cached copy already painted the right one on the first frame, this
+    // just reconciles it (BrandingContext.jsx's own load-then-cache shape).
+    LaunchedEffect(serverUrl) {
+        runCatching { container.api(serverUrl).getBranding() }
+            .getOrNull()
+            ?.takeIf { it.isSuccessful }
+            ?.body()
+            ?.let { container.branding.apply(it) }
+    }
+
+    // Trade an ageing token for a fresh one whenever the app comes back to
+    // the foreground, which is this app's own "window focus" (App.jsx:207).
+    // Skipped while signed out, and a no-op on a token younger than a day.
+    LaunchedEffect(lifecycleOwner, startDestination) {
+        if (startDestination == "login") return@LaunchedEffect
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            renewSessionTokenIfStale(container.api(serverUrl), container.tokenStore)
         }
     }
 

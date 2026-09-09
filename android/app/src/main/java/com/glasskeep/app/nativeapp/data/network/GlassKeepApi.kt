@@ -127,6 +127,28 @@ data class NoteDto(
     val federation: NoteFederationDto? = null,
 )
 
+/**
+ * GET /api/branding (server/index.js:4914): the instance-wide identity an
+ * admin can set. Unauthenticated by design, since the sign-in screen has
+ * to read it before any token exists. Every field is optional, and an
+ * empty one means "use the bundled default".
+ *
+ * `loginBackground` and its placeholders are declared for parity but not
+ * read here: the background is a URL rather than a data URL, so it would
+ * need an HTTP image loader this app doesn't otherwise carry (see
+ * AuthShell.kt's own note on what it deliberately leaves out).
+ */
+@Serializable
+data class BrandingDto(
+    val appName: String = "",
+    val logo: String? = null,
+    val loginBackground: String? = null,
+    val loginBackgroundColor: String? = null,
+    val loginBackgroundHash: String? = null,
+    val loginBackgroundBlur: Int = 0,
+    val loginTheme: String? = null,
+)
+
 /** A note's own icon, and an entry in the account's logo library: the two
  *  are the same shape (the picker hands one straight to the other), and
  *  only `src`, a data URL, is required (server/index.js:2866). */
@@ -886,6 +908,17 @@ interface GlassKeepApi {
     // NotesRepository (no session exists yet to route it through).
     @POST("api/login/secret")
     suspend fun loginWithSecretKey(@Body body: SecretKeyLoginRequest): Response<LoginResponse>
+
+    // Public, no session needed, same as the profile list above: the
+    // sign-in screen reads it before anyone has signed in.
+    @GET("api/branding")
+    suspend fun getBranding(): Response<BrandingDto>
+
+    // Hands back a fresh JWT for the same session. GET, not POST, and it
+    // reuses LoginResponse: the server's own answer carries the same token
+    // and user pair a sign-in does (server/index.js:2375).
+    @GET("api/auth/renew")
+    suspend fun renewToken(): Response<LoginResponse>
 
     // Authenticated: rotates the caller's own secret key (see
     // SettingsScreen.kt's Security section). The server only ever

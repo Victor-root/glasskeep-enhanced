@@ -170,6 +170,28 @@ class TokenStore(context: Context) {
             prefs.edit().putBoolean(KEY_AI_ASSISTANT, value).apply()
         }
 
+    /** The instance's own name, logo (a data URL) and sign-in theme, as an
+     *  admin set them. Cached for the same first-frame reason as the rest:
+     *  the sign-in screen must not flash the bundled defaults before the
+     *  branding read comes back (see BrandingState). */
+    var brandingAppName: String?
+        get() = prefs.getString(KEY_BRANDING_APP_NAME, null)
+        set(value) {
+            prefs.edit().putString(KEY_BRANDING_APP_NAME, value).apply()
+        }
+
+    var brandingLogo: String?
+        get() = prefs.getString(KEY_BRANDING_LOGO, null)
+        set(value) {
+            prefs.edit().putString(KEY_BRANDING_LOGO, value).apply()
+        }
+
+    var brandingLoginTheme: String?
+        get() = prefs.getString(KEY_BRANDING_LOGIN_THEME, null)
+        set(value) {
+            prefs.edit().putString(KEY_BRANDING_LOGIN_THEME, value).apply()
+        }
+
     fun clear() {
         NativeDebug.d("TokenStore.clear")
         prefs.edit().clear().apply()
@@ -206,6 +228,9 @@ class TokenStore(context: Context) {
         private const val KEY_NOTIF_FILTER_TYPES = "notifications_filter_types"
         private const val KEY_TOAST_POSITION = "toast_position"
         private const val KEY_TOAST_DURATION = "toast_duration_ms"
+        private const val KEY_BRANDING_APP_NAME = "branding_app_name"
+        private const val KEY_BRANDING_LOGO = "branding_logo"
+        private const val KEY_BRANDING_LOGIN_THEME = "branding_login_theme"
 
         /** notificationsDuration's own default (App.jsx:478-487). */
         const val DEFAULT_TOAST_DURATION_MS = 10_000L
