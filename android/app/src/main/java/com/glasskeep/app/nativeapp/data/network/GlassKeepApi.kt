@@ -391,6 +391,9 @@ data class UserSettingsDto(
     /** The three saved typography profiles and which one is active (see
      *  TypographyPresets.kt). */
     val typographyPresets: TypographyPresetsDto? = null,
+    /** Whether a note opens in read mode, with an edit toggle in its
+     *  footer, or straight in edit mode. On by default (App.jsx:245-252). */
+    val readModeEnabled: Boolean? = null,
     /** Where the notification pill sits on a phone: "top" or "bottom". */
     val notificationsPositionMobile: String? = null,
     /** How long the pill stays, in milliseconds; null (or absent) means
@@ -425,6 +428,11 @@ data class SetEditorToolbarModeRequest(val editorToolbarMode: String)
  *  presets blob. */
 @Serializable
 data class SetTypographyPresetsRequest(val typographyPresets: TypographyPresetsDto)
+
+/** Body for a PATCH /api/user/settings that sets only whether notes open
+ *  in read mode. */
+@Serializable
+data class SetReadModeRequest(val readModeEnabled: Boolean)
 
 /** Body for a PATCH /api/user/settings that sets only where the
  *  notification pill sits on a phone. */
@@ -771,6 +779,9 @@ interface GlassKeepApi {
 
     @PATCH("api/user/settings")
     suspend fun setTypographyPresets(@Body body: SetTypographyPresetsRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setReadMode(@Body body: SetReadModeRequest): Response<UserSettingsDto>
 
     @PATCH("api/user/settings")
     suspend fun setToastPosition(@Body body: SetToastPositionRequest): Response<UserSettingsDto>

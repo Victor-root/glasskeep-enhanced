@@ -258,6 +258,95 @@ fun RichTextEditor(
     }
 }
 
+/**
+ * The same document, read-only: what the web renders in view mode
+ * (`.note-content`), which is its default for a text note until the user
+ * taps the edit toggle. Same styles as the editor above, minus every
+ * editable affordance: no text fields, no per-block remove button, no
+ * trailing "add a paragraph" row.
+ */
+@Composable
+fun RichTextReader(
+    blocks: List<RichBlock>,
+    typography: TypographyProfile,
+    taskStrike: Boolean,
+    dark: Boolean,
+    titleColor: Color,
+) {
+    val numberedPositions = remember(blocks) {
+        val map = mutableMapOf<String, Int>()
+        var counter = 0
+        for (b in blocks) {
+            when (b.kind) {
+                RichBlockKind.NUMBERED_ITEM -> {
+                    counter += 1
+                    map[b.id] = counter
+                }
+                RichBlockKind.CODE_BLOCK -> Unit
+                else -> counter = 0
+            }
+        }
+        map
+    }
+    Column(Modifier.fillMaxWidth()) {
+        for (block in blocks) {
+            val style = richBlockTextStyle(block, typography, taskStrike, dark, titleColor)
+            val indent = (block.indent * IndentStepEm * style.fontSize.value).dp
+            when (block.kind) {
+                RichBlockKind.DIVIDER -> Box(Modifier.padding(start = indent)) { RichDividerBlock(dark) }
+                RichBlockKind.CODE_BLOCK -> Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = indent, top = RemPx.dp, bottom = RemPx.dp)
+                        .clip(RoundedCornerShape((0.5f * RemPx).dp))
+                        .background(if (dark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.06f))
+                        .border(
+                            width = 1.dp,
+                            color = if (dark) RtDividerDark else RtDividerLight,
+                            shape = RoundedCornerShape((0.5f * RemPx).dp),
+                        )
+                        .padding(horizontal = (0.85f * RemPx).dp, vertical = (0.6f * RemPx).dp),
+                ) {
+                    Text(annotatedTextFor(block, style, dark), style = style)
+                }
+                RichBlockKind.QUOTE -> {
+                    val bar = if (dark) Color(0xFFA5B4FC) else Indigo.copy(alpha = 0.85f)
+                    val wash = if (dark) Color(0xFFA5B4FC).copy(alpha = 0.13f) else Indigo.copy(alpha = 0.07f)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = indent, top = (0.6f * RemPx).dp, bottom = (0.6f * RemPx).dp)
+                            .clip(RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp))
+                            .background(wash)
+                            .drawBehind { drawRect(color = bar, size = Size(8.dp.toPx(), size.height)) }
+                            .padding(
+                                start = (2.6f * RemPx).dp,
+                                end = (1.1f * RemPx).dp,
+                                top = (0.9f * RemPx).dp,
+                                bottom = (0.9f * RemPx).dp,
+                            ),
+                    ) {
+                        Text(annotatedTextFor(block, style, dark), style = style.copy(fontStyle = FontStyle.Italic))
+                    }
+                }
+                else -> Row(
+                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier.fillMaxWidth().padding(start = indent, top = 3.dp, bottom = 3.dp),
+                ) {
+                    RichBlockPrefix(
+                        block = block,
+                        style = style,
+                        dark = dark,
+                        numberedPosition = numberedPositions[block.id],
+                        onToggleChecked = {},
+                    )
+                    Text(annotatedTextFor(block, style, dark), style = style, modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun RichBlockRow(
     block: RichBlock,

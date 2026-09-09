@@ -19,4 +19,6 @@ data class WorkspacePreferences(
      *  until dismissed). */
     val toastPosition: String?,
     val toastDurationMs: Long?,
+    /** Whether notes open in read mode (the web's own default). */
+    val readModeEnabled: Boolean?,
 )

@@ -163,6 +163,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var changingTheme by remember { mutableStateOf(false) }
     var changingChecklistPosition by remember { mutableStateOf(false) }
     var changingToolbarMode by remember { mutableStateOf(false) }
+    var changingReadMode by remember { mutableStateOf(false) }
     var changingToastPrefs by remember { mutableStateOf(false) }
     var toastDurationMenuOpen by remember { mutableStateOf(false) }
     var showTypographyModal by remember { mutableStateOf(false) }
@@ -518,6 +519,24 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                 reportActionError(t)
             } finally {
                 changingToastPrefs = false
+            }
+        }
+    }
+
+    fun toggleReadMode(enabled: Boolean) {
+        if (changingReadMode) return
+        changingReadMode = true
+        val previous = container.editorPrefs.readModeEnabled
+        container.editorPrefs.applyReadMode(enabled)
+        scope.launch {
+            try {
+                repository.setReadMode(enabled)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen setReadMode failed", t)
+                container.editorPrefs.applyReadMode(previous)
+                reportActionError(t)
+            } finally {
+                changingReadMode = false
             }
         }
     }
@@ -968,6 +987,38 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                                         verticalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                SettingsRowIcon(themeId, dark) { tint -> EyeIcon(size = 20.dp, tint = tint) }
+                                                Spacer(Modifier.width(12.dp))
+                                                Column {
+                                                    Text(
+                                                        stringResource(R.string.native_settings_read_mode),
+                                                        color = titleColor,
+                                                        fontSize = 16.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                    )
+                                                    Text(
+                                                        stringResource(R.string.native_settings_read_mode_desc),
+                                                        color = SettingsSubtleColor,
+                                                        fontSize = 14.sp,
+                                                        lineHeight = 20.sp,
+                                                    )
+                                                }
+                                            }
+                                            Spacer(Modifier.width(12.dp))
+                                            GkSwitch(
+                                                checked = container.editorPrefs.readModeEnabled,
+                                                enabled = !changingReadMode,
+                                                themeId = themeId,
+                                                dark = dark,
+                                                onCheckedChange = { toggleReadMode(it) },
+                                            )
+                                        }
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             SettingsRowIcon(themeId, dark) { tint -> TextColorIcon(size = 20.dp, tint = tint) }
                                             Spacer(Modifier.width(12.dp))

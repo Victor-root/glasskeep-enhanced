@@ -91,6 +91,14 @@ class TokenStore(context: Context) {
             prefs.edit().putLong(KEY_TOAST_DURATION, value).apply()
         }
 
+    /** Cached "notes open in read mode" preference, on by default like
+     *  the web's own. */
+    var readModeEnabled: Boolean
+        get() = prefs.getBoolean(KEY_READ_MODE, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_READ_MODE, value).apply()
+        }
+
     fun clear() {
         NativeDebug.d("TokenStore.clear")
         prefs.edit().clear().apply()
@@ -103,6 +111,7 @@ class TokenStore(context: Context) {
         private const val KEY_TOOLBAR_MODE = "editor_toolbar_mode"
         private const val KEY_TYPOGRAPHY = "typography_presets"
         private const val KEY_TASK_STRIKE = "task_strike_checked"
+        private const val KEY_READ_MODE = "read_mode_enabled"
         private const val KEY_TOAST_POSITION = "toast_position"
         private const val KEY_TOAST_DURATION = "toast_duration_ms"
 

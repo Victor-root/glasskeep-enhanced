@@ -243,6 +243,8 @@
     <string name="native_note_color_sand">Sable</string>
     <string name="native_note_color_mauve">Mauve</string>
     <string name="native_note_detail_duplicate">Dupliquer la note</string>
+    <string name="native_note_detail_switch_to_view">Passer en mode lecture</string>
+    <string name="native_note_detail_switch_to_edit">Passer en mode édition</string>
     <string name="native_note_detail_convert_to_checklist">Convertir en liste de tâches</string>
     <string name="native_note_detail_convert_to_text">Convertir en note texte</string>
     <string name="native_note_detail_convert_to_checklist_confirm">Chaque ligne de votre note deviendra un élément de la liste. Vous pourrez reconvertir plus tard, mais le résultat ne sera pas forcément identique à l\'original.</string>
@@ -379,6 +381,8 @@
     <string name="native_typography_profile_2">Profil 2</string>
     <string name="native_typography_profile_3">Profil 3</string>
     <string name="native_typography_custom_color">Couleur personnalisée</string>
+    <string name="native_settings_read_mode">Mode lecture pour les notes</string>
+    <string name="native_settings_read_mode_desc">Activé : ouvre les notes en lecture seule, idéal si vous les consultez souvent et les modifiez rarement.\nDésactivé : ouvre les notes directement en édition, idéal si vous les modifiez souvent.</string>
     <string name="native_settings_editor_toolbar_mode">Mode de la barre d\'outils d\'édition</string>
     <string name="native_settings_editor_toolbar_simple">Simple</string>
     <string name="native_settings_editor_toolbar_simple_desc">Afficher uniquement les outils de mise en forme les plus courants.</string>

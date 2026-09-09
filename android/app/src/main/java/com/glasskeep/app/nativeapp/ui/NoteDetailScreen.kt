@@ -266,6 +266,9 @@ fun NoteDetailScreen(
     val richFocusRequesters = remember { mutableStateMapOf<String, FocusRequester>() }
     var pendingRichFocus by remember { mutableStateOf<String?>(null) }
     var showConvertConfirm by remember { mutableStateOf(false) }
+    // readModeEnabled decides which face a text note opens on; the
+    // footer toggle flips it for this note only (ModalFooter.jsx:860).
+    var viewMode by remember { mutableStateOf(container.editorPrefs.readModeEnabled) }
     var converting by remember { mutableStateOf(false) }
     var showLinkDialog by remember { mutableStateOf(false) }
     var linkDialogTarget by remember { mutableStateOf<LinkTarget?>(null) }
@@ -1454,6 +1457,13 @@ fun NoteDetailScreen(
                             value = titleText,
                             enabled = !isReadOnlyAccess &&
                                 (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType),
+                            // The web drops the field entirely and prints the
+                            // title as text whenever the note shows its read
+                            // face (ModalHeader.jsx:265). Checklists are its
+                            // documented exception: their body stays
+                            // interactive, so their title does too.
+                            asText = (edit.isRichEditableType && viewMode) ||
+                                (isReadOnlyAccess && !edit.isChecklistType),
                             titleColor = titleColor,
                             placeholderColor = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
                             onValueChange = { raw ->
@@ -1577,6 +1587,14 @@ fun NoteDetailScreen(
                                         fontSize = 13.sp,
                                     )
                                 }
+                            } else if (edit.isRichEditableType && viewMode) {
+                                RichTextReader(
+                                    blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
+                                    typography = container.editorPrefs.typography.activeProfile,
+                                    taskStrike = container.editorPrefs.taskStrike,
+                                    dark = dark,
+                                    titleColor = titleColor,
+                                )
                             } else if (edit.isRichEditableType) {
                                 RichTextEditor(
                                     blocks = richBlocks ?: edit.originalRichBlocks.orEmpty(),
@@ -1688,8 +1706,13 @@ fun NoteDetailScreen(
                         showHistoryButtons = !edit.isDrawType && !edit.isAudioType && !isReadOnlyAccess,
                         canUndo = history.canUndo,
                         canRedo = history.canRedo,
-                        showFormatButton = edit.isRichEditableType && !isReadOnlyAccess,
+                        showFormatButton = edit.isRichEditableType && !isReadOnlyAccess && !viewMode,
                         formatOpen = showFormatSheet,
+                        // The web only offers the toggle when the read-mode
+                        // preference is on, and only for a text note.
+                        showModeButton = edit.isTextType && !isReadOnlyAccess &&
+                            container.editorPrefs.readModeEnabled,
+                        viewMode = viewMode,
                         // The web keeps Collaborate and Trash in the footer for
                         // every type except a text note being edited, where they
                         // move into the kebab. Native text notes are always in
@@ -1704,6 +1727,7 @@ fun NoteDetailScreen(
                         onTagsClick = { tagInput = ""; showTagsPicker = true },
                         onUndoClick = { undoNote() },
                         onRedoClick = { redoNote() },
+                        onModeClick = { viewMode = !viewMode },
                         onFormatClick = { showFormatSheet = !showFormatSheet },
                         onCollaborateClick = { onOpenCollaborators() },
                         onTrashClick = { showTrashConfirm = true },
@@ -2635,6 +2659,7 @@ private fun ModalSaveButton(dark: Boolean, enabled: Boolean, contentDescription:
 private fun NoteTitleField(
     value: String,
     enabled: Boolean,
+    asText: Boolean,
     titleColor: Color,
     placeholderColor: Color,
     onValueChange: (String) -> Unit,
@@ -2644,6 +2669,20 @@ private fun NoteTitleField(
             .fillMaxWidth()
             .padding(start = 20.dp, end = 20.dp, bottom = 4.dp),
     ) {
+        if (asText) {
+            // No placeholder here on purpose: the web's read face prints
+            // nothing at all for an untitled note, it just keeps the one
+            // line of height (min-height: 1.3em).
+            Text(
+                value,
+                color = titleColor,
+                fontSize = 18.4.sp,
+                lineHeight = 23.9.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 23.9.dp),
+            )
+            return@Box
+        }
         if (value.isEmpty()) {
             Text(
                 stringResource(R.string.native_note_detail_title_label),
@@ -2696,6 +2735,8 @@ private fun NoteModalFooter(
     canRedo: Boolean,
     showFormatButton: Boolean,
     formatOpen: Boolean,
+    showModeButton: Boolean,
+    viewMode: Boolean,
     showCollaborateButton: Boolean,
     showTrashButton: Boolean,
     onColorClick: () -> Unit,
@@ -2704,6 +2745,7 @@ private fun NoteModalFooter(
     onUndoClick: () -> Unit,
     onRedoClick: () -> Unit,
     onFormatClick: () -> Unit,
+    onModeClick: () -> Unit,
     onCollaborateClick: () -> Unit,
     onTrashClick: () -> Unit,
     onKebabClick: () -> Unit,
@@ -2788,6 +2830,21 @@ private fun NoteModalFooter(
                     },
                 ) {
                     TextColorIcon(size = 20.dp, tint = formatColor)
+                }
+            }
+            if (showModeButton) {
+                FooterIconButton(
+                    contentDescription = stringResource(
+                        if (viewMode) R.string.native_note_detail_switch_to_edit
+                        else R.string.native_note_detail_switch_to_view
+                    ),
+                    onClick = onModeClick,
+                ) {
+                    if (viewMode) {
+                        PencilFilledIcon(size = 18.dp, tint = iconColor)
+                    } else {
+                        EyeFilledIcon(size = 18.dp, tint = iconColor)
+                    }
                 }
             }
             if (showCollaborateButton) {

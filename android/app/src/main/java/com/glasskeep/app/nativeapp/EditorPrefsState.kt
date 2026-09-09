@@ -32,6 +32,9 @@ class EditorPrefsState(private val tokenStore: TokenStore) {
     var taskStrike: Boolean by mutableStateOf(tokenStore.taskStrikeChecked)
         private set
 
+    var readModeEnabled: Boolean by mutableStateOf(tokenStore.readModeEnabled)
+        private set
+
     var toastPosition: String by mutableStateOf(tokenStore.toastPosition ?: "bottom")
         private set
 
@@ -58,6 +61,11 @@ class EditorPrefsState(private val tokenStore: TokenStore) {
     fun applyTaskStrike(on: Boolean) {
         taskStrike = on
         tokenStore.taskStrikeChecked = on
+    }
+
+    fun applyReadMode(enabled: Boolean) {
+        readModeEnabled = enabled
+        tokenStore.readModeEnabled = enabled
     }
 
     fun applyToastPosition(position: String) {

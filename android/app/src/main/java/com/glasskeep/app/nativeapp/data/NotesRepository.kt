@@ -37,6 +37,7 @@ import com.glasskeep.app.nativeapp.data.network.SetEditorToolbarModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
 import com.glasskeep.app.nativeapp.data.network.SetLanguageRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
+import com.glasskeep.app.nativeapp.data.network.SetReadModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderTimeChipsRequest
 import com.glasskeep.app.nativeapp.data.network.SetShellThemeRequest
@@ -940,6 +941,7 @@ class NotesRepository(
                 },
                 toastPosition = body.notificationsPositionMobile,
                 toastDurationMs = body.notificationsDuration,
+                readModeEnabled = body.readModeEnabled,
             )
         } catch (t: Throwable) {
             NativeDebug.e("NotesRepository.fetchWorkspacePreferences failed", t)
@@ -955,6 +957,17 @@ class NotesRepository(
         val response = api.setEditorToolbarMode(SetEditorToolbarModeRequest(mode))
         if (!response.isSuccessful) {
             val error = "PATCH /api/user/settings (editorToolbarMode) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** Sets whether notes open in read mode. */
+    suspend fun setReadMode(enabled: Boolean) {
+        NativeDebug.d("NotesRepository.setReadMode enabled=$enabled")
+        val response = api.setReadMode(SetReadModeRequest(enabled))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (readModeEnabled) failed: HTTP ${response.code()}"
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }

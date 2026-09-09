@@ -320,4 +320,5 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     AppLanguage.apply(prefs.language)
     prefs.toastPosition?.let { container.editorPrefs.applyToastPosition(it) }
     container.editorPrefs.applyToastDuration(prefs.toastDurationMs)
+    prefs.readModeEnabled?.let { container.editorPrefs.applyReadMode(it) }
 }
