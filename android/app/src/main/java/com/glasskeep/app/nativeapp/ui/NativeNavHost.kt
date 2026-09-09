@@ -1,5 +1,8 @@
 package com.glasskeep.app.nativeapp.ui
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -215,7 +218,25 @@ fun NativeNavHost(
                 onOpenNotifications = { navController.navigate("notifications") },
             )
         }
-        composable("settings") {
+        // The web's settings panel is a full-width sheet that slides in
+        // from the right in 200ms (SettingsPanel.jsx:295), with nothing
+        // else animated; the route reproduces that entrance and its
+        // mirror image on the way out.
+        composable(
+            route = "settings",
+            enterTransition = {
+                slideInHorizontally(
+                    animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
+                    initialOffsetX = { it },
+                )
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
+                    targetOffsetX = { it },
+                )
+            },
+        ) {
             SettingsScreen(
                 container = container,
                 serverUrl = serverUrl,

@@ -19,7 +19,9 @@ import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.network.NotificationIdsRequest
 import com.glasskeep.app.nativeapp.data.network.PasskeyCeremonyOptionsResponse
 import com.glasskeep.app.nativeapp.data.network.PasskeyDto
+import com.glasskeep.app.nativeapp.data.network.PasskeyLoginVerifyRequest
 import com.glasskeep.app.nativeapp.data.network.PasskeyRegisterVerifyRequest
+import com.glasskeep.app.nativeapp.data.network.PasskeyRenameRequest
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
 import com.glasskeep.app.nativeapp.data.network.RemoveCollaboratorRequest
@@ -1007,6 +1009,41 @@ class NotesRepository(
         val response = api.passkeyRegisterVerify(PasskeyRegisterVerifyRequest(responseJson, challengeId, name))
         if (!response.isSuccessful || response.body()?.ok != true) {
             val error = "POST /api/passkeys/register/verify failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    suspend fun renamePasskey(credentialId: String, name: String) {
+        NativeDebug.d("NotesRepository.renamePasskey id=$credentialId")
+        val response = api.renamePasskey(credentialId, PasskeyRenameRequest(name))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/passkeys/$credentialId failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** First half of the "test this passkey" ceremony: the caller runs
+     *  NativePasskeys.authenticate() on the returned options, then calls
+     *  [verifyPasskeyTest]. Same split as registration above. */
+    suspend fun fetchPasskeyTestOptions(credentialId: String): PasskeyCeremonyOptionsResponse {
+        NativeDebug.d("NotesRepository.fetchPasskeyTestOptions id=$credentialId")
+        val response = api.passkeyTestOptions(credentialId)
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "POST /api/passkeys/$credentialId/test/options failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body
+    }
+
+    suspend fun verifyPasskeyTest(credentialId: String, responseJson: JsonElement, challengeId: String) {
+        NativeDebug.d("NotesRepository.verifyPasskeyTest id=$credentialId")
+        val response = api.passkeyTestVerify(credentialId, PasskeyLoginVerifyRequest(responseJson, challengeId))
+        if (!response.isSuccessful) {
+            val error = "POST /api/passkeys/$credentialId/test/verify failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }

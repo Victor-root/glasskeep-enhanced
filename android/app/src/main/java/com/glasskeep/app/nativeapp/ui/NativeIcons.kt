@@ -928,3 +928,122 @@ fun CloudPendingIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Colo
         }
     }
 }
+
+// Tabler icons used by the settings panel's section headers and rows,
+// taken from the same src/icons/editor/tabler/*.svg files the web
+// imports. `.tabler-icon` renders them at strokeWidth 1.75 with round
+// caps/joins (globalCSS.js:3322-3340), which is what these use.
+
+@Composable
+private fun TablerIcon(pathData: String, modifier: Modifier, size: Dp, tint: Color) {
+    val path = remember(pathData) { PathParser().parsePathString(pathData).toPath() }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 1.75f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+@Composable
+fun ShieldLockIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3 " +
+        "M12 11m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0 " +
+        "M12 12l0 2.5",
+    modifier, size, tint,
+)
+
+@Composable
+fun AdjustmentsIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M14 6m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M4 6l8 0 M16 6l4 0 " +
+        "M8 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M4 12l2 0 M10 12l10 0 " +
+        "M17 18m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M4 18l11 0 M19 18l1 0",
+    modifier, size, tint,
+)
+
+@Composable
+fun NoteTablerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M13 20l7 -7 " +
+        "M13 20v-6a1 1 0 0 1 1 -1h6v-7a2 2 0 0 0 -2 -2h-12a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7",
+    modifier, size, tint,
+)
+
+@Composable
+fun DatabaseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3 " +
+        "M4 6v6c0 1.657 3.582 3 8 3s8 -1.343 8 -3v-6 " +
+        "M4 12v6c0 1.657 3.582 3 8 3s8 -1.343 8 -3v-6",
+    modifier, size, tint,
+)
+
+@Composable
+fun WorldIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0 M3.6 9h16.8 M3.6 15h16.8 " +
+        "M11.5 3a17 17 0 0 0 0 18 M12.5 3a17 17 0 0 1 0 18",
+    modifier, size, tint,
+)
+
+@Composable
+fun ChevronDownIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M6 9l6 6l6 -6",
+    modifier, size, tint,
+)
+
+@Composable
+fun PaintRollerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M5 5a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -2 " +
+        "M19 6h1a2 2 0 0 1 2 2a5 5 0 0 1 -5 5l-5 0v2 " +
+        "M10 16a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -4",
+    modifier, size, tint,
+)
+
+@Composable
+fun QrCodeIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 4m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z " +
+        "M4 14m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z " +
+        "M14 4m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z " +
+        "M14 14h3 M14 14v3 M17 17h3v3 M20 14v.01 M14 20h.01 M17 20h.01 M20 17h.01 M20 20h.01",
+    modifier, size, tint,
+)
+
+@Composable
+fun IndentIncreaseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M20 6l-11 0 M20 12l-7 0 M20 18l-11 0 M4 8l4 4l-4 4",
+    modifier, size, tint,
+)
+
+@Composable
+fun RefreshIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4 " +
+        "M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4",
+    modifier, size, tint,
+)
+
+@Composable
+fun SparklesIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2z " +
+        "M16 6a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2z " +
+        "M9 18a6 6 0 0 1 6 -6a6 6 0 0 1 -6 -6a6 6 0 0 1 -6 6a6 6 0 0 1 6 6z",
+    modifier, size, tint,
+)
+
+/** tabler/key.svg. Distinct from [KeyIcon], which is the web's own
+ *  hand-drawn glyph on the login button: the settings rows use the
+ *  Tabler set instead. */
+@Composable
+fun TablerKeyIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M16.555 3.843l3.602 3.602a2.877 2.877 0 0 1 0 4.069l-2.643 2.643a2.877 2.877 0 0 1 -4.069 0l-.301 -.301" +
+        "l-6.558 6.558a2 2 0 0 1 -1.239 .578l-.175 .008h-1.172a1 1 0 0 1 -.993 -.883l-.007 -.117v-1.172" +
+        "a2 2 0 0 1 .467 -1.284l.119 -.13l.414 -.414h2v-2h2v-2l2.144 -2.144l-.301 -.301" +
+        "a2.877 2.877 0 0 1 0 -4.069l2.643 -2.643a2.877 2.877 0 0 1 4.069 0z " +
+        "M15 9h.01",
+    modifier, size, tint,
+)
+
+/** tabler/download.svg, the settings rows' own download glyph (the web's
+ *  [DownloadIcon] is a different, thinner drawing). */
+@Composable
+fun TablerDownloadIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2 M7 11l5 5l5 -5 M12 4l0 12",
+    modifier, size, tint,
+)

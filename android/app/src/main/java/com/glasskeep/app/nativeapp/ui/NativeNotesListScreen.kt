@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -895,6 +896,9 @@ internal fun NoteCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // min-h-[54px] on .note-card (NoteCard.jsx:218): an almost
+                // empty note still reads as a card rather than a text line.
+                .heightIn(min = 54.dp)
                 .shadow(elevation = 2.dp, shape = shape, ambientColor = CardShadowTint.copy(alpha = 0.06f), spotColor = CardShadowTint.copy(alpha = 0.06f))
                 .clip(shape)
                 .background(noteColorFor(note.color, dark))

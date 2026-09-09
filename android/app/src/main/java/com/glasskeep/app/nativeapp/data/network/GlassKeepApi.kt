@@ -501,6 +501,11 @@ data class PasskeyLoginVerifyRequest(
     val challengeId: String,
 )
 
+/** Body for PATCH /api/passkeys/:id. The server trims and truncates to
+ *  64 characters itself, and rejects an empty name with a 400. */
+@Serializable
+data class PasskeyRenameRequest(val name: String)
+
 @Serializable
 data class PasskeyMutationResponse(val ok: Boolean = false)
 
@@ -698,8 +703,20 @@ interface GlassKeepApi {
     @POST("api/passkeys/register/verify")
     suspend fun passkeyRegisterVerify(@Body body: PasskeyRegisterVerifyRequest): Response<PasskeyRegisterVerifyResponse>
 
+    @PATCH("api/passkeys/{id}")
+    suspend fun renamePasskey(@Path("id") id: String, @Body body: PasskeyRenameRequest): Response<PasskeyMutationResponse>
+
     @DELETE("api/passkeys/{id}")
     suspend fun deletePasskey(@Path("id") id: String): Response<PasskeyMutationResponse>
+
+    // "Test this passkey": a full authentication ceremony scoped to one
+    // credential, whose only effect on success is the counter update. Same
+    // two-step options/verify shape as registration.
+    @POST("api/passkeys/{id}/test/options")
+    suspend fun passkeyTestOptions(@Path("id") id: String): Response<PasskeyCeremonyOptionsResponse>
+
+    @POST("api/passkeys/{id}/test/verify")
+    suspend fun passkeyTestVerify(@Path("id") id: String, @Body body: PasskeyLoginVerifyRequest): Response<PasskeyMutationResponse>
 
     // Deliberately no @Path/@Body auth here: both routes are pre-login by
     // design (see server/routes/passkeyRoutes.js's usernameless flow),
