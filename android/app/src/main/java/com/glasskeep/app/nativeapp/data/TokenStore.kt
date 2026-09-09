@@ -192,9 +192,10 @@ class TokenStore(context: Context) {
             prefs.edit().putString(KEY_BRANDING_LOGIN_THEME, value).apply()
         }
 
-    fun clear() {
+    /** Server switching must be durable before MainActivity is restarted. */
+    fun clear(): Boolean {
         NativeDebug.d("TokenStore.clear")
-        prefs.edit().clear().apply()
+        return prefs.edit().clear().commit()
     }
 
     /**

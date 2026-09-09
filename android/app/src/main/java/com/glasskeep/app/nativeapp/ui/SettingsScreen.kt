@@ -1040,19 +1040,20 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
         }
     }
 
-    /** Drops the stored address and restarts on the setup screen, the
-     *  same two prefs and the same CLEAR_TASK restart WebViewActivity's
-     *  own change-server dialog performs. */
+    /** Purges all state owned by this server, then restarts on setup. */
     fun changeServer() {
-        context.getSharedPreferences("glasskeep", Context.MODE_PRIVATE)
-            .edit()
-            .remove("server_url")
-            .remove(MainActivity.KEY_URL_VETTED)
-            .apply()
-        val intent = Intent(context, MainActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        context.startActivity(intent)
-        activity.finish()
+        scope.launch {
+            try {
+                container.clearForServerChange()
+                val intent = Intent(context, MainActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                context.startActivity(intent)
+                activity.finish()
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen changeServer failed", t)
+                toasts.error(context.getString(R.string.native_change_server_error))
+            }
+        }
     }
 
     fun checkForUpdate() {

@@ -1,7 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import com.glasskeep.app.MainActivity
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
+import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkCardBg
 import com.glasskeep.app.ui.DarkSubtextColor
@@ -54,6 +55,7 @@ import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightCardBg
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
+import kotlinx.coroutines.launch
 
 /** The four surface colours every screen inside [AuthShell] draws with,
  *  handed to [content] so it doesn't resolve them a second time. */
@@ -90,19 +92,23 @@ internal fun AuthShell(
     )
     val context = LocalContext.current
     val activity = LocalView.current.context as Activity
+    val scope = rememberCoroutineScope()
+    val toasts = LocalGkToasts.current
 
-    /** Same reset as Settings' own "change server": forget the vetted
-     *  address and restart into the setup screen. */
+    /** Same complete server-scoped purge as Settings' own action. */
     fun changeServer() {
-        context.getSharedPreferences("glasskeep", Context.MODE_PRIVATE)
-            .edit()
-            .remove("server_url")
-            .remove(MainActivity.KEY_URL_VETTED)
-            .apply()
-        val intent = Intent(context, MainActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        context.startActivity(intent)
-        activity.finish()
+        scope.launch {
+            try {
+                container.clearForServerChange()
+                val intent = Intent(context, MainActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                context.startActivity(intent)
+                activity.finish()
+            } catch (t: Throwable) {
+                NativeDebug.e("AuthShell changeServer failed", t)
+                toasts.error(context.getString(R.string.native_change_server_error))
+            }
+        }
     }
 
     // The signed-out screens wear the theme the admin picked for them, not

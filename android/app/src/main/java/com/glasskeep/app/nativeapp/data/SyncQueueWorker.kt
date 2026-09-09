@@ -194,5 +194,13 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 UNIQUE_PERIODIC_WORK, ExistingPeriodicWorkPolicy.KEEP, request,
             )
         }
+
+        /** Prevent an old server's queued writes from racing a server switch. */
+        fun cancelAll(context: Context) {
+            WorkManager.getInstance(context).apply {
+                cancelUniqueWork(UNIQUE_ONE_TIME_WORK)
+                cancelUniqueWork(UNIQUE_PERIODIC_WORK)
+            }
+        }
     }
 }

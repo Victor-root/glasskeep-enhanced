@@ -160,6 +160,7 @@
     <string name="native_settings_upload_avatar">Upload photo</string>
     <string name="native_settings_remove_avatar">Remove photo</string>
     <string name="native_settings_change_server">Change server</string>
+    <string name="native_change_server_error">Couldn\'t clear this server\'s local data. Please try again.</string>
     <string name="native_settings_show_on_login">Show on login screen</string>
     <string name="native_settings_language_section">Language</string>
     <string name="native_settings_language">Language</string>

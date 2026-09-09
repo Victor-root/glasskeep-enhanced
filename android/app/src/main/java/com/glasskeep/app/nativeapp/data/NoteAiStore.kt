@@ -43,5 +43,8 @@ class NoteAiStore(context: Context) {
         prefs.edit().remove(key(noteId)).apply()
     }
 
+    /** A kept conversation belongs to the server/account that created it. */
+    fun clearAll(): Boolean = prefs.edit().clear().commit()
+
     private fun key(noteId: String) = "note-ai-$noteId"
 }

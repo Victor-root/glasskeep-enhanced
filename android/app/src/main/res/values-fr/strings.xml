@@ -154,6 +154,7 @@
     <string name="native_settings_upload_avatar">Ajouter une photo</string>
     <string name="native_settings_remove_avatar">Supprimer la photo</string>
     <string name="native_settings_change_server">Changer de serveur</string>
+    <string name="native_change_server_error">Impossible d\'effacer les données locales de ce serveur. Veuillez réessayer.</string>
     <string name="native_settings_show_on_login">Afficher sur l\'écran de connexion</string>
     <string name="native_settings_language_section">Langue</string>
     <string name="native_settings_language">Langue</string>
