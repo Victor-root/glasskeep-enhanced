@@ -1,6 +1,7 @@
 package com.glasskeep.app.nativeapp.ui
 
 import android.app.Activity
+import android.content.ClipData
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -50,14 +51,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -117,7 +118,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val activity = LocalView.current.context as Activity
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
 
     var profile by remember { mutableStateOf<ProfileDto?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
@@ -766,8 +767,10 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                 },
                 confirmButton = {
                     TextButton(onClick = {
-                        clipboardManager.setText(AnnotatedString(key))
-                        Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("secret key", key)))
+                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                        }
                     }) {
                         Text(stringResource(R.string.native_settings_secret_key_copy))
                     }
