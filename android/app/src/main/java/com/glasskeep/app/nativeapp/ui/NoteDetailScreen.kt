@@ -266,6 +266,15 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
     // not a global one, since that's what the user editing THIS note cares
     // about seeing settle back to zero.
     val pendingSyncCount by repository.observePendingSyncCount(noteId).collectAsState(initial = 0)
+    // Server-computed permission for THIS user on this note (see NoteDto.access's
+    // own doc comment): gated here, proactively, rather than only reacting to a
+    // rejected write after the fact, both for a better experience and because a
+    // silently-queued edit (see SyncQueueWorker.kt) has no synchronous rejection
+    // to react to at all anymore. Archive/restore/permanent-delete are owner-only
+    // on the server, stricter than the read/write split that gates every other
+    // edit here (see server/index.js's getNote vs getNoteWithCollaboration).
+    val isReadOnlyAccess = note?.access == "read"
+    val isOwnerAccess = note?.access == "owner"
     val tagsWithCounts = remember(allNotes) {
         val counts = LinkedHashMap<String, Int>()
         for (n in allNotes) {
@@ -373,7 +382,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         scope.launch {
             try {
                 when (repository.trashNote(current.id)) {
-                    is SaveNoteResult.Saved -> {
+                    is SaveNoteResult.Saved, SaveNoteResult.Left -> {
                         NativeDebug.d("NoteDetailScreen trash OK id=${current.id}")
                         onBack()
                     }
@@ -737,7 +746,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
      *  button press but would be wrong here, autosave firing mid-drawing
      *  must never suddenly leave the screen. */
     suspend fun performDrawingSave() {
-        if (note == null) return
+        if (note == null || isReadOnlyAccess) return
         saveError = null
         try {
             val encoded = DrawingContent.encode(drawingPaths, drawingDimensions, drawingCaptionText)
@@ -803,7 +812,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
      *  different content shapes and there is no third note type waiting
      *  to reuse a unified version yet. */
     suspend fun performAudioSave() {
-        if (note == null) return
+        if (note == null || isReadOnlyAccess) return
         saveError = null
         try {
             val encoded = AudioContent.encode(audioClips, audioCaptionText.orEmpty())
@@ -1237,33 +1246,35 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                 KebabIcon(size = 20.dp, tint = titleColor)
                             }
                             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.native_note_detail_change_color)) },
-                                    leadingIcon = { PaletteIcon(size = 18.dp) },
-                                    onClick = { menuExpanded = false; showColorPicker = true },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.native_note_detail_tags)) },
-                                    leadingIcon = { TagIcon(size = 18.dp, tint = titleColor) },
-                                    trailingIcon = if (currentNote.tags.isNotEmpty()) {
-                                        {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(999.dp))
-                                                    .background(Indigo)
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                                            ) {
-                                                Text(
-                                                    currentNote.tags.size.toString(),
-                                                    color = Color.White,
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                )
+                                if (!isReadOnlyAccess) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.native_note_detail_change_color)) },
+                                        leadingIcon = { PaletteIcon(size = 18.dp) },
+                                        onClick = { menuExpanded = false; showColorPicker = true },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.native_note_detail_tags)) },
+                                        leadingIcon = { TagIcon(size = 18.dp, tint = titleColor) },
+                                        trailingIcon = if (currentNote.tags.isNotEmpty()) {
+                                            {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(999.dp))
+                                                        .background(Indigo)
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                                                ) {
+                                                    Text(
+                                                        currentNote.tags.size.toString(),
+                                                        color = Color.White,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                    )
+                                                }
                                             }
-                                        }
-                                    } else null,
-                                    onClick = { menuExpanded = false; tagInput = ""; showTagsPicker = true },
-                                )
+                                        } else null,
+                                        onClick = { menuExpanded = false; tagInput = ""; showTagsPicker = true },
+                                    )
+                                }
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.native_note_detail_reminder)) },
                                     leadingIcon = {
@@ -1302,41 +1313,55 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                         onClick = { menuExpanded = false; downloadNote() },
                                     )
                                 }
-                                if (currentNote.trashed) {
-                                    // A trashed note has no active/archived state to
-                                    // toggle: restoring it is the only option, same
-                                    // slot in the menu the web reuses for this
-                                    // (ModalFooter.jsx's isTrashed ? restoreFromTrash).
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.native_note_detail_restore)) },
-                                        leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
-                                        enabled = !restoring,
-                                        onClick = { menuExpanded = false; restoreNote() },
-                                    )
-                                } else {
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                stringResource(
-                                                    if (currentNote.archived) R.string.native_note_detail_unarchive
-                                                    else R.string.native_note_detail_archive
+                                // Archive/restore are owner-only on the server (see
+                                // NoteDto.access's own doc comment), stricter than
+                                // the read/write split gating everything above: no
+                                // collaborator, not even one with write access, can
+                                // invoke either.
+                                if (isOwnerAccess) {
+                                    if (currentNote.trashed) {
+                                        // A trashed note has no active/archived state to
+                                        // toggle: restoring it is the only option, same
+                                        // slot in the menu the web reuses for this
+                                        // (ModalFooter.jsx's isTrashed ? restoreFromTrash).
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.native_note_detail_restore)) },
+                                            leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
+                                            enabled = !restoring,
+                                            onClick = { menuExpanded = false; restoreNote() },
+                                        )
+                                    } else {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    stringResource(
+                                                        if (currentNote.archived) R.string.native_note_detail_unarchive
+                                                        else R.string.native_note_detail_archive
+                                                    )
                                                 )
-                                            )
-                                        },
-                                        leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
-                                        enabled = !archiving,
-                                        onClick = { menuExpanded = false; toggleArchive() },
-                                    )
+                                            },
+                                            leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
+                                            enabled = !archiving,
+                                            onClick = { menuExpanded = false; toggleArchive() },
+                                        )
+                                    }
                                 }
                                 if (currentNote.trashed) {
                                     // Same reuse on the web side: the trash button
                                     // itself becomes "permanently delete" once the
-                                    // note is already in the trash.
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.native_note_detail_delete_permanently)) },
-                                        leadingIcon = { TrashIcon(size = 18.dp, tint = trashMenuColor) },
-                                        onClick = { menuExpanded = false; showPermanentDeleteConfirm = true },
-                                    )
+                                    // note is already in the trash. Owner-only, same
+                                    // as archive/restore above; unlike those, trash
+                                    // itself (the "else" branch below) stays open to
+                                    // every collaborator, so there's still a way for
+                                    // a non-owner to leave a note from its own detail
+                                    // screen even though this entry isn't offered.
+                                    if (isOwnerAccess) {
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.native_note_detail_delete_permanently)) },
+                                            leadingIcon = { TrashIcon(size = 18.dp, tint = trashMenuColor) },
+                                            onClick = { menuExpanded = false; showPermanentDeleteConfirm = true },
+                                        )
+                                    }
                                 } else {
                                     DropdownMenuItem(
                                         text = { Text(stringResource(R.string.native_note_detail_move_to_trash)) },
@@ -1388,7 +1413,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                     NoteImagesSection(
                                         images = images,
                                         subtextColor = subtextColor,
-                                        enabled = !changingImages,
+                                        enabled = !changingImages && !isReadOnlyAccess,
                                         onImageClick = { index -> viewerIndex = index },
                                         onAddClick = {
                                             photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -1406,6 +1431,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                     label = { Text(stringResource(R.string.native_note_detail_title_label)) },
                                     textStyle = MaterialTheme.typography.titleMedium,
                                     singleLine = true,
+                                    readOnly = isReadOnlyAccess,
                                     colors = detailFieldColors(titleColor, subtextColor, borderColor),
                                     modifier = Modifier.fillMaxWidth(),
                                 )
@@ -1423,9 +1449,14 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                             }
                             Spacer(Modifier.height(14.dp))
 
+                            if (isReadOnlyAccess) {
+                                Text(readOnlyMessage, color = subtextColor, fontSize = 12.sp)
+                                Spacer(Modifier.height(14.dp))
+                            }
+
                             if (edit.isChecklistType) {
                                 val checklistItems = edit.checklistItems
-                                if (checklistItems == null) {
+                                if (checklistItems == null || isReadOnlyAccess) {
                                     // Has section markers: not natively editable
                                     // yet (see ChecklistItems.parseFlat), fall
                                     // back to the same read-only preview the
@@ -1565,6 +1596,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                         value = bodyText,
                                         onValueChange = { bodyText = it },
                                         label = { Text(stringResource(R.string.native_note_detail_body_label)) },
+                                        readOnly = isReadOnlyAccess,
                                         colors = detailFieldColors(titleColor, subtextColor, borderColor),
                                         modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
                                     )
@@ -1596,7 +1628,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null,
-                                        enabled = hasChanges && !saving,
+                                        enabled = hasChanges && !saving && !isReadOnlyAccess,
                                         role = Role.Button,
                                     ) { save() },
                                 contentAlignment = Alignment.Center,
@@ -1875,7 +1907,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
             FullscreenImageViewer(
                 images = images,
                 initialIndex = index,
-                removeEnabled = !changingImages,
+                removeEnabled = !changingImages && !isReadOnlyAccess,
                 onClose = { viewerIndex = null },
                 onRemove = { image -> removeImage(image) },
                 onDownload = { image -> downloadImage(image) },

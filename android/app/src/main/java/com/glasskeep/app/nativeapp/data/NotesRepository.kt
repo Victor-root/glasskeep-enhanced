@@ -43,6 +43,11 @@ sealed class SaveNoteResult {
     data class Saved(val note: NoteDto) : SaveNoteResult()
     data object Stale : SaveNoteResult()
     data object ReadOnly : SaveNoteResult()
+    /** Trash-only: the caller no longer has any version of the original
+     *  note to show (left a shared note, or an owner transferred it away
+     *  by leaving). See NotesRepository.trashNote() and
+     *  NoteMutationResponse's own doc comment. */
+    data object Left : SaveNoteResult()
 }
 
 /** Outcome of a permanent delete: unlike SaveNoteResult, success leaves no
@@ -330,6 +335,18 @@ class NotesRepository(
         if (body.stale) {
             NativeDebug.d("NotesRepository.trashNote id=$id: stale, not applied")
             return SaveNoteResult.Stale
+        }
+        // A shared note: this user left it (or, as owner, transferred it
+        // away by leaving), see NoteMutationResponse's own doc comment.
+        // There's no updated version of the original note to hand back,
+        // only a personal trashedCopy under a different id that this
+        // screen has no reason to load (the caller navigates back either
+        // way). Either branch means it's gone from this user's active
+        // list, same local cleanup as an ordinary trash below.
+        if (body.left) {
+            NativeDebug.d("NotesRepository.trashNote id=$id: left (no longer accessible to this user)")
+            noteDao.deleteById(id)
+            return SaveNoteResult.Left
         }
         val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/trash: ok response with no note")
         noteDao.deleteById(id)

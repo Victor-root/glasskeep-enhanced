@@ -69,6 +69,15 @@ data class NoteDto(
     @SerialName("client_updated_at") val clientUpdatedAt: String? = null,
     val archived: Boolean = false,
     val trashed: Boolean = false,
+    /** This user's access level on this note: "owner" | "write" | "read".
+     *  Computed server-side (see server/index.js's noteAccessFor), always
+     *  present on every note object the server returns, never sent by the
+     *  client. A "read" collaborator can still view/pin/set a reminder on
+     *  the note, but every other mutation (title/content/color/tags/
+     *  checklist/images, archive/restore/permanent-delete) must be blocked
+     *  client-side too, not just left to the server's own readOnly/403
+     *  rejection: see NoteDetailScreen.kt's isReadOnlyAccess/isOwnerAccess. */
+    val access: String,
     /** ISO-8601 UTC instant, or null when the note has no reminder. Plain
      *  columns server-side, never encrypted (see server/index.js's
      *  ensureNoteColumns migration), so unlike title/content this is
@@ -390,13 +399,25 @@ data class DeviceLinkActionResponse(val ok: Boolean = false)
 /** Shared response shape for PUT/PATCH on a note: `stale` means someone
  *  else changed it first (LWW lost, `note` is the server's current copy,
  *  nothing was written); `readOnly` means the caller isn't allowed to
- *  edit it right now (revoked access, or a federation mirror). */
+ *  edit it right now (revoked access, or a federation mirror).
+ *
+ *  `left`/`deletedForAll`/`trashedCopy` are trash-only outcomes for a
+ *  collaborative note (see server/index.js's POST /:id/trash): `left`
+ *  means the caller no longer has any access to the original note (they
+ *  left a shared note, or an owner transferred it away by leaving), with
+ *  `trashedCopy` their own personal trashed copy under a NEW id, never the
+ *  original one; `note` is absent in that case, there is no updated
+ *  version of the original to hand back. `deletedForAll` (owner-only) DOES
+ *  still carry `note`: the original note itself was trashed, not replaced. */
 @Serializable
 data class NoteMutationResponse(
     val ok: Boolean = false,
     val stale: Boolean = false,
     val readOnly: Boolean = false,
+    val left: Boolean = false,
+    val deletedForAll: Boolean = false,
     val note: NoteDto? = null,
+    val trashedCopy: NoteDto? = null,
 )
 
 interface GlassKeepApi {
