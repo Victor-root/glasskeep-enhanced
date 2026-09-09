@@ -54,6 +54,31 @@ val NOTE_COLOR_ORDER = listOf(
     "peach", "sage", "mint", "sky", "sand", "mauve",
 )
 
+/**
+ * audioAccentColor() from src/utils/colors.js: the one colour the whole
+ * audio interface is tinted with. A note with no colour of its own gets
+ * violet; otherwise the note's own swatch is lightened by 55% in dark
+ * mode and darkened to 45% in light mode, because in dark mode the note
+ * colour IS the background and reusing it as-is made every button
+ * disappear.
+ */
+fun audioAccentColor(colorKey: String?, dark: Boolean): Color {
+    val key = colorKey?.trim()?.lowercase()
+    if (key.isNullOrEmpty() || key == "default") {
+        return if (dark) Color(0xFFA78BFA) else Color(0xFF7C3AED)
+    }
+    val base = noteColorFor(key, dark)
+    return if (dark) {
+        Color(
+            red = base.red + (1f - base.red) * 0.55f,
+            green = base.green + (1f - base.green) * 0.55f,
+            blue = base.blue + (1f - base.blue) * 0.55f,
+        )
+    } else {
+        Color(red = base.red * 0.45f, green = base.green * 0.45f, blue = base.blue * 0.45f)
+    }
+}
+
 /** trColorName() from src/utils/colors.js: the translated swatch name,
  *  which the picker uses as each dot's label. */
 @Composable

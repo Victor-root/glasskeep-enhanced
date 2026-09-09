@@ -1028,6 +1028,38 @@ fun CheckFilledIcon(modifier: Modifier = Modifier, size: Dp = 20.dp, tint: Color
     }
 }
 
+/** The audio player's transport arrows (AudioPlayer.jsx:318-344): a
+ *  filled triangle against a bar. */
+@Composable
+fun PreviousTrackIcon(modifier: Modifier = Modifier, size: Dp = 18.dp, tint: Color = Color.Black) {
+    Canvas(modifier.size(size)) {
+        val unit = this.size.minDimension / 24f
+        drawRect(color = tint, topLeft = Offset(5f * unit, 6f * unit), size = Size(2f * unit, 12f * unit))
+        val triangle = Path().apply {
+            moveTo(19f * unit, 6f * unit)
+            lineTo(19f * unit, 18f * unit)
+            lineTo(9f * unit, 12f * unit)
+            close()
+        }
+        drawPath(triangle, color = tint)
+    }
+}
+
+@Composable
+fun NextTrackIcon(modifier: Modifier = Modifier, size: Dp = 18.dp, tint: Color = Color.Black) {
+    Canvas(modifier.size(size)) {
+        val unit = this.size.minDimension / 24f
+        drawRect(color = tint, topLeft = Offset(17f * unit, 6f * unit), size = Size(2f * unit, 12f * unit))
+        val triangle = Path().apply {
+            moveTo(5f * unit, 6f * unit)
+            lineTo(5f * unit, 18f * unit)
+            lineTo(15f * unit, 12f * unit)
+            close()
+        }
+        drawPath(triangle, color = tint)
+    }
+}
+
 /** The drawing toolbar's pen, a filled Material pencil
  *  (DrawingToolbar.jsx:78). */
 @Composable

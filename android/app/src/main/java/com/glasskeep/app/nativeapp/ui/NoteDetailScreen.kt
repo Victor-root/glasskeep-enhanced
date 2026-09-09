@@ -1433,6 +1433,7 @@ fun NoteDetailScreen(
                             } else if (edit.isAudioType) {
                                 AudioClipsSection(
                                     clips = audioClips,
+                                    accent = audioAccentColor(currentNote.color, dark),
                                     dark = dark,
                                     titleColor = titleColor,
                                     subtextColor = subtextColor,

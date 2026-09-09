@@ -15,11 +15,7 @@ import java.util.UUID
  * AAC-in-M4A (`audio/mp4`): universally supported for both recording and
  * playback across this app's whole minSdk 24 range, and already one of
  * the MIME types the server's own validateAudioContent() accepts (it's
- * what Safari's MediaRecorder produces on the web side too). Deliberately
- * does not support pausing mid-recording (see NoteDetailScreen's own
- * doc comment on AudioRecorderController usage): fewer MediaRecorder
- * states to get right, for a feature where "stop and start a new clip
- * instead" costs nothing (clips are cheap, unlimited in number).
+ * what Safari's MediaRecorder produces on the web side too).
  *
  * One instance records at most one clip at a time; call [cancel] or
  * [stopAndFinish] before [start]ing another.
@@ -93,6 +89,27 @@ class AudioRecorderController(private val context: Context) {
             null
         }
     }
+
+    /** Pauses the recording in place, keeping the same file. Supported
+     *  since API 24, this app's own minimum. Returns false when the
+     *  platform refused (nothing is left in a broken state either way). */
+    fun pause(): Boolean = try {
+        recorder?.pause() != null
+    } catch (t: Throwable) {
+        NativeDebug.e("AudioRecorderController.pause failed", t)
+        false
+    }
+
+    fun resume(): Boolean = try {
+        recorder?.resume() != null
+    } catch (t: Throwable) {
+        NativeDebug.e("AudioRecorderController.resume failed", t)
+        false
+    }
+
+    /** How many bytes the in-progress recording has written so far, for
+     *  the live storage gauge. Zero when nothing is recording. */
+    fun currentBytes(): Long = outputFile?.length() ?: 0L
 
     /** Discards an in-progress recording without saving anything. */
     fun cancel() {
