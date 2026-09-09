@@ -1208,9 +1208,9 @@ class NotesRepository(
 
     /** Every local (non-federated) user, or those matching [query] (name or
      *  email, case-insensitive substring), up to the server's own 500-row
-     *  cap: candidates for AddCollaboratorDialog's picker. Fetched once
+     *  cap: candidates for the collaboration screen's picker. Fetched once
      *  with an empty query and filtered client-side on every keystroke
-     *  after that (see AddCollaboratorDialog's own doc comment for why:
+     *  after that (see CollaboratorsScreen's own doc comment for why:
      *  this matches what the web itself actually ships, not a debounced
      *  live search), so [query] is usually "" here, not the live search
      *  box text. */

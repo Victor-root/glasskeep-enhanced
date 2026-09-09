@@ -465,8 +465,6 @@
     <string name="native_collaborators_add_action">Add a collaborator</string>
     <string name="native_collaborators_search_error">Couldn\'t load users: %1$s</string>
     <string name="native_collaborators_search_placeholder">Search by name or email</string>
-    <string name="native_collaborators_search_none_found">No matching users</string>
-    <string name="native_collaborators_access_label">Access</string>
     <string name="native_collaborators_add_confirm">Add (%1$d)</string>
     <string name="native_collaborators_added_success">Added %1$d collaborator(s)</string>
     <string name="native_collaborators_add_failed">%1$d couldn\'t be added</string>
@@ -477,6 +475,16 @@
     <string name="native_collaborators_remove_subtitle">Should this person keep an independent copy of the note?</string>
     <string name="native_collaborators_remove_keep_copy">Remove and keep a copy</string>
     <string name="native_collaborators_remove_no_copy">Remove without keeping a copy</string>
+    <string name="native_collaborators_current">Current collaborators:</string>
+    <string name="native_collaborators_select_hint">Select the people to share this note with.</string>
+    <string name="native_collaborators_searching">Searching…</string>
+    <string name="native_collaborators_none_available">No users to add.</string>
+    <string name="native_collaborators_letter_all">All</string>
+    <string name="native_collaborators_remote_server">Remote server</string>
+    <string name="native_collaborators_me">Me</string>
+    <string name="native_collaborators_access_for_new">Access for people you add</string>
+    <string name="native_collaborators_access_for_selected">Access for the %1$d selected</string>
+    <string name="native_collaborators_access_for_new_hint">Applied on add, changeable per person afterwards.</string>
 
     <string name="native_notifications_title">Notifications</string>
     <string name="native_notifications_error">Couldn\'t load notifications: %1$s</string>

@@ -453,8 +453,6 @@
     <string name="native_collaborators_add_action">Ajouter un collaborateur</string>
     <string name="native_collaborators_search_error">Impossible de charger les utilisateurs : %1$s</string>
     <string name="native_collaborators_search_placeholder">Rechercher par nom ou e-mail</string>
-    <string name="native_collaborators_search_none_found">Aucun utilisateur correspondant</string>
-    <string name="native_collaborators_access_label">Accès</string>
     <string name="native_collaborators_add_confirm">Ajouter (%1$d)</string>
     <string name="native_collaborators_added_success">%1$d collaborateur(s) ajouté(s)</string>
     <string name="native_collaborators_add_failed">%1$d n\'ont pas pu être ajoutés</string>
@@ -465,6 +463,16 @@
     <string name="native_collaborators_remove_subtitle">Souhaitez-vous laisser à cette personne une copie indépendante de la note ?</string>
     <string name="native_collaborators_remove_keep_copy">Retirer et laisser une copie</string>
     <string name="native_collaborators_remove_no_copy">Retirer sans laisser de copie</string>
+    <string name="native_collaborators_current">Collaborateurs actuels :</string>
+    <string name="native_collaborators_select_hint">Sélectionnez les personnes avec qui partager cette note.</string>
+    <string name="native_collaborators_searching">Recherche…</string>
+    <string name="native_collaborators_none_available">Aucun utilisateur à ajouter.</string>
+    <string name="native_collaborators_letter_all">Tous</string>
+    <string name="native_collaborators_remote_server">Serveur distant</string>
+    <string name="native_collaborators_me">Moi</string>
+    <string name="native_collaborators_access_for_new">Accès des personnes ajoutées</string>
+    <string name="native_collaborators_access_for_selected">Accès des %1$d sélectionnée(s)</string>
+    <string name="native_collaborators_access_for_new_hint">Appliqué à l\'ajout, modifiable ensuite pour chacun.</string>
 
     <string name="native_notifications_title">Notifications</string>
     <string name="native_notifications_error">Impossible de charger les notifications : %1$s</string>
