@@ -95,7 +95,6 @@ import com.glasskeep.app.nativeapp.data.RichBlockKind
 import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.RichMark
 import com.glasskeep.app.nativeapp.data.RichMarkType
-import com.glasskeep.app.nativeapp.data.SaveNoteResult
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.toEntity
@@ -295,7 +294,6 @@ fun NoteDetailScreen(
 
     val errorLoadTemplate = stringResource(R.string.native_note_detail_error)
     val errorSaveTemplate = stringResource(R.string.native_note_detail_save_error)
-    val staleMessage = stringResource(R.string.native_note_detail_stale)
     val readOnlyMessage = stringResource(R.string.native_note_detail_readonly)
     val syncingLabel = stringResource(R.string.native_note_detail_syncing)
     val actionErrorTemplate = stringResource(R.string.native_note_detail_action_error)
@@ -463,14 +461,10 @@ fun NoteDetailScreen(
         changingReminder = true
         scope.launch {
             try {
-                when (val result = repository.setReminder(current.id, reminderAtIso)) {
-                    is SaveNoteResult.Saved -> {
-                        NativeDebug.d("NoteDetailScreen setReminder OK id=${current.id}")
-                        note = result.note
-                    }
-                    SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
-                    SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
-                }
+                repository.setReminderQueued(current.toEntity(), reminderAtIso)
+                note = current.copy(reminderAt = reminderAtIso)
+                SyncQueueWorker.triggerNow(context)
+                NativeDebug.d("NoteDetailScreen setReminder queued id=${current.id}")
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen setReminder failed", t)
                 Toast.makeText(

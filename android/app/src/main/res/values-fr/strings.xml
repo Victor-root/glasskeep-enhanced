@@ -149,7 +149,6 @@
     <string name="native_note_detail_save">Enregistrer</string>
     <string name="native_note_detail_saving">Enregistrement…</string>
     <string name="native_note_detail_save_error">Impossible d\'enregistrer : %1$s</string>
-    <string name="native_note_detail_stale">Cette note a changé ailleurs. Rouvrez-la pour voir la dernière version.</string>
     <string name="native_note_detail_readonly">Cette note ne peut pas être modifiée pour le moment.</string>
     <string name="native_note_detail_syncing">Synchronisation…</string>
     <string name="native_note_detail_formatted_notice">Cette note utilise une mise en forme que l\'application ne sait pas encore modifier nativement (couleur, alignement, code...). Seul le texte brut est affiché ci-dessous.</string>

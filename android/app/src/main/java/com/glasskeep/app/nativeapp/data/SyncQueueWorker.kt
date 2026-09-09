@@ -25,6 +25,7 @@ import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
 import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
+import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
 import kotlinx.coroutines.delay
 import kotlinx.serialization.decodeFromString
@@ -131,6 +132,10 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
             SyncQueueType.PERMANENT_DELETE -> {
                 val body = Json.decodeFromString<ClientUpdatedAtRequest>(item.payloadJson)
                 repository.deleteNotePermanently(item.noteId, body.clientUpdatedAt)
+            }
+            SyncQueueType.REMINDER -> {
+                val body = Json.decodeFromString<SetReminderRequest>(item.payloadJson)
+                repository.setReminder(item.noteId, body.reminderAt, body.clientUpdatedAt)
             }
         }
     }

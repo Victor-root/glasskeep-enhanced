@@ -53,10 +53,10 @@ interface SyncQueueDao {
     fun observePendingCountForNote(noteId: String): Flow<Int>
 
     /** Notes with a not-yet-confirmed archive/trash/restore/permanent-delete/
-     *  pin: notes list screens with a live, replaceable snapshot (Room's
-     *  own observeAll() cache for NativeNotesListScreen.kt, or
+     *  pin/reminder: notes list screens with a live, replaceable snapshot
+     *  (Room's own observeAll() cache for NativeNotesListScreen.kt, or
      *  SecondaryNotesScreen.kt's own in-memory list) must not let a
-     *  same-moment refresh silently undo one of these five while it's
+     *  same-moment refresh silently undo one of these six while it's
      *  still in flight (see NotesRepository.refresh()'s and
      *  SecondaryNotesScreen.kt's own doc comments). One shared, wider
      *  query rather than one per caller: a type irrelevant to a given
@@ -68,7 +68,7 @@ interface SyncQueueDao {
      *  reference the enum directly the way STATUS_PENDING does above. */
     @Query(
         "SELECT DISTINCT noteId FROM sync_queue WHERE status = '${SyncQueueEntity.STATUS_PENDING}' " +
-            "AND type IN ('ARCHIVE', 'TRASH', 'RESTORE', 'PERMANENT_DELETE', 'PINNED')",
+            "AND type IN ('ARCHIVE', 'TRASH', 'RESTORE', 'PERMANENT_DELETE', 'PINNED', 'REMINDER')",
     )
     suspend fun getProtectedNoteIds(): List<String>
 

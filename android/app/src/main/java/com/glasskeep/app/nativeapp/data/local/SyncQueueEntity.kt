@@ -43,10 +43,14 @@ data class SyncQueueEntity(
 /** Which repository call SyncQueueWorker replays a given item with.
  *  Narrower than syncEngine.js's own type set (create/update/patch/
  *  archive/trash/restore/permanentDelete/reorder/reminder) on purpose:
- *  create/duplicate need their own client-id/reconciliation design and
- *  reminders are queued separately (see the follow-up tasks this and the
- *  next milestone's commit messages list). ARCHIVE/TRASH/RESTORE's note
+ *  create/duplicate need their own client-id/reconciliation design, not
+ *  yet built (see the follow-up tasks this milestone's commit message
+ *  lists). ARCHIVE/TRASH/RESTORE/PERMANENT_DELETE/PINNED/REMINDER's note
  *  ids are also read by SyncQueueDao.getProtectedNoteIds() (see
- *  NotesRepository.refresh()'s own doc comment) since, unlike the other
- *  types, they change which notes belong in the active-notes list. */
-enum class SyncQueueType { TITLE_CONTENT, COLOR, TAGS, CHECKLIST_ITEMS, IMAGES, PINNED, ARCHIVE, TRASH, RESTORE, PERMANENT_DELETE }
+ *  NotesRepository.refresh()'s own doc comment) since, unlike the
+ *  patch-style types above them, each changes something a same-moment
+ *  refresh() could otherwise silently clobber before the queue drains:
+ *  which notes belong in the active-notes list, for the first four, or a
+ *  single field a concurrent refresh() would overwrite back to its stale
+ *  value, for PINNED/REMINDER. */
+enum class SyncQueueType { TITLE_CONTENT, COLOR, TAGS, CHECKLIST_ITEMS, IMAGES, PINNED, ARCHIVE, TRASH, RESTORE, PERMANENT_DELETE, REMINDER }

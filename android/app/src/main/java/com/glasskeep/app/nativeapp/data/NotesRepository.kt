@@ -612,6 +612,24 @@ class NotesRepository(
         syncQueueDao.enqueue(id, SyncQueueType.PERMANENT_DELETE.name, Json.encodeToString(request), System.currentTimeMillis())
     }
 
+    /** Sets, moves, or clears (reminderAtIso == null) a note's reminder,
+     *  queued like the actions above rather than the still-direct,
+     *  synchronous setReminder() below (SyncQueueWorker's own replay
+     *  target for this type). Unlike the patch-style queued methods
+     *  (color/tags/...), this DOES mutate the local cache optimistically:
+     *  reminderAt is a real Room column, and NativeNavHost's alarm
+     *  reconciliation (see ReminderSync.kt's syncReminderAlarms) reacts to
+     *  THIS column via observeNotes()'s own Flow, never to a server
+     *  response. Since this call no longer waits on the network, arming
+     *  or cancelling the on-device alarm right away, offline included,
+     *  depends entirely on this optimistic write. */
+    suspend fun setReminderQueued(entity: NoteEntity, reminderAtIso: String?) {
+        NativeDebug.d("NotesRepository.setReminderQueued id=${entity.id} reminderAt=$reminderAtIso")
+        val request = SetReminderRequest(reminderAtIso, nowIso())
+        syncQueueDao.enqueue(entity.id, SyncQueueType.REMINDER.name, Json.encodeToString(request), System.currentTimeMillis())
+        noteDao.upsertAll(listOf(entity.copy(reminderAt = reminderAtIso)))
+    }
+
     /** How many of this note's edits are still waiting to reach the
      *  server; drives NoteDetailScreen's small "Syncing…" indicator. */
     fun observePendingSyncCount(noteId: String): Flow<Int> = syncQueueDao.observePendingCountForNote(noteId)
@@ -634,9 +652,9 @@ class NotesRepository(
      *  setColor()/setTags(). Mirrored into the local cache so the list
      *  card's reminder chip and NativeNavHost's alarm reconciliation (see
      *  ReminderSync.kt) see the change immediately, without a refresh(). */
-    suspend fun setReminder(id: String, reminderAtIso: String?): SaveNoteResult {
+    suspend fun setReminder(id: String, reminderAtIso: String?, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setReminder id=$id reminderAt=$reminderAtIso")
-        val response = api.setReminder(id, SetReminderRequest(reminderAtIso, nowIso()))
+        val response = api.setReminder(id, SetReminderRequest(reminderAtIso, clientUpdatedAt))
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             val error = "POST /api/notes/$id/reminder failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
