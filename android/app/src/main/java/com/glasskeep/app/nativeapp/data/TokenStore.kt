@@ -75,6 +75,22 @@ class TokenStore(context: Context) {
             prefs.edit().putBoolean(KEY_TASK_STRIKE, value).apply()
         }
 
+    /** Cached notification-pill placement ("top"/"bottom") and how long it
+     *  stays, in milliseconds, or -1 for "until dismissed". Same
+     *  first-frame reason as the two above: a message can be raised
+     *  before the settings read comes back. */
+    var toastPosition: String?
+        get() = prefs.getString(KEY_TOAST_POSITION, null)
+        set(value) {
+            prefs.edit().putString(KEY_TOAST_POSITION, value).apply()
+        }
+
+    var toastDurationMs: Long
+        get() = prefs.getLong(KEY_TOAST_DURATION, DEFAULT_TOAST_DURATION_MS)
+        set(value) {
+            prefs.edit().putLong(KEY_TOAST_DURATION, value).apply()
+        }
+
     fun clear() {
         NativeDebug.d("TokenStore.clear")
         prefs.edit().clear().apply()
@@ -87,5 +103,10 @@ class TokenStore(context: Context) {
         private const val KEY_TOOLBAR_MODE = "editor_toolbar_mode"
         private const val KEY_TYPOGRAPHY = "typography_presets"
         private const val KEY_TASK_STRIKE = "task_strike_checked"
+        private const val KEY_TOAST_POSITION = "toast_position"
+        private const val KEY_TOAST_DURATION = "toast_duration_ms"
+
+        /** notificationsDuration's own default (App.jsx:478-487). */
+        const val DEFAULT_TOAST_DURATION_MS = 10_000L
     }
 }

@@ -5,7 +5,6 @@ import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -149,6 +148,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val toasts = LocalGkToasts.current
     val activity = LocalView.current.context as Activity
     val clipboard = LocalClipboard.current
 
@@ -245,7 +245,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     }
 
     fun reportActionError(t: Throwable) {
-        Toast.makeText(context, String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName), Toast.LENGTH_SHORT).show()
+        toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
     }
 
     fun addPasskey(name: String) {
@@ -292,17 +292,17 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                     is PasskeyCeremonyResult.Success -> {
                         repository.verifyPasskeyTest(credentialId, Json.parseToJsonElement(ceremony.responseJson), options.challengeId)
                         passkeys = repository.listPasskeys()
-                        Toast.makeText(context, passkeyTestOkMessage, Toast.LENGTH_SHORT).show()
+                        toasts.success(passkeyTestOkMessage)
                     }
                     is PasskeyCeremonyResult.Failed -> {
                         if (!ceremony.isUserCancellation()) {
-                            Toast.makeText(context, passkeyTestFailedMessage, Toast.LENGTH_SHORT).show()
+                            toasts.error(passkeyTestFailedMessage)
                         }
                     }
                 }
             } catch (t: Throwable) {
                 NativeDebug.e("SettingsScreen testPasskey failed", t)
-                Toast.makeText(context, passkeyTestFailedMessage, Toast.LENGTH_SHORT).show()
+                toasts.error(passkeyTestFailedMessage)
             } finally {
                 testingPasskeyId = null
             }
@@ -543,7 +543,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                         currentPasswordInput = ""
                         newPasswordInput = ""
                         confirmPasswordInput = ""
-                        Toast.makeText(context, passwordSuccessMessage, Toast.LENGTH_SHORT).show()
+                        toasts.success(passwordSuccessMessage)
                     }
                     is ChangePasswordResult.Rejected -> {
                         passwordDialogError = String.format(passwordErrorTemplate, result.httpCode)
@@ -574,19 +574,19 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     }
 
     fun checkForUpdate() {
-        Toast.makeText(context, updateCheckingMessage, Toast.LENGTH_SHORT).show()
+        toasts.show(updateCheckingMessage)
         UpdateManager.forceCheck(context) { release ->
             availableUpdate = release
             if (release == null) {
-                Toast.makeText(context, updateUpToDateMessage, Toast.LENGTH_LONG).show()
+                toasts.success(updateUpToDateMessage)
             }
         }
     }
 
     fun downloadUpdate(release: ReleaseInfo) {
-        Toast.makeText(context, updateDownloadingMessage, Toast.LENGTH_SHORT).show()
+        toasts.show(updateDownloadingMessage)
         UpdateManager.downloadAndInstall(context, release) { ok ->
-            if (!ok) Toast.makeText(context, updateDownloadFailedMessage, Toast.LENGTH_LONG).show()
+            if (!ok) toasts.error(updateDownloadFailedMessage)
         }
     }
 
@@ -1328,7 +1328,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                         onClick = {
                             scope.launch {
                                 clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("secret key", key)))
-                                Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                                toasts.success(copiedMessage)
                             }
                         },
                     )

@@ -391,6 +391,11 @@ data class UserSettingsDto(
     /** The three saved typography profiles and which one is active (see
      *  TypographyPresets.kt). */
     val typographyPresets: TypographyPresetsDto? = null,
+    /** Where the notification pill sits on a phone: "top" or "bottom". */
+    val notificationsPositionMobile: String? = null,
+    /** How long the pill stays, in milliseconds; null (or absent) means
+     *  it stays until dismissed. */
+    val notificationsDuration: Long? = null,
 )
 
 /** Body for a PATCH /api/user/settings that sets only the workspace theme.
@@ -420,6 +425,16 @@ data class SetEditorToolbarModeRequest(val editorToolbarMode: String)
  *  presets blob. */
 @Serializable
 data class SetTypographyPresetsRequest(val typographyPresets: TypographyPresetsDto)
+
+/** Body for a PATCH /api/user/settings that sets only where the
+ *  notification pill sits on a phone. */
+@Serializable
+data class SetToastPositionRequest(val notificationsPositionMobile: String)
+
+/** Body for a PATCH /api/user/settings that sets only how long the pill
+ *  stays; null means until dismissed. */
+@Serializable
+data class SetToastDurationRequest(val notificationsDuration: Long?)
 
 /** GET /api/user/profile response. Mirrors serializeNote()-adjacent
  *  server code (server/index.js) field for field; `name`/`email` are
@@ -756,6 +771,12 @@ interface GlassKeepApi {
 
     @PATCH("api/user/settings")
     suspend fun setTypographyPresets(@Body body: SetTypographyPresetsRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setToastPosition(@Body body: SetToastPositionRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setToastDuration(@Body body: SetToastDurationRequest): Response<UserSettingsDto>
 
     @GET("api/user/profile")
     suspend fun getProfile(): Response<ProfileDto>

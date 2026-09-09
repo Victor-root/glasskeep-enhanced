@@ -15,4 +15,8 @@ data class WorkspacePreferences(
     /** The account's interface language ("en", "fr"), or null to follow
      *  the device. Lives on the profile rather than the settings blob. */
     val language: String?,
+    /** Where the notification pill sits, and how long it stays (null =
+     *  until dismissed). */
+    val toastPosition: String?,
+    val toastDurationMs: Long?,
 )

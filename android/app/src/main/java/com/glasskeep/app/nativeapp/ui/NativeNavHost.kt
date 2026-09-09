@@ -3,13 +3,18 @@ package com.glasskeep.app.nativeapp.ui
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -178,114 +183,127 @@ fun NativeNavHost(
         }
     }
 
-    NavHost(navController = navController, startDestination = startDestination) {
-        composable("login") {
-            NativeLoginScreen(
-                container = container,
-                serverUrl = serverUrl,
-                onLoggedIn = { mustChangePassword -> handleLoggedIn(mustChangePassword) },
-                onForgotPassword = { navController.navigate("login-secret") },
-            )
-        }
-        composable("login-secret") {
-            SecretKeyLoginScreen(
-                container = container,
-                serverUrl = serverUrl,
-                onLoggedIn = { mustChangePassword -> handleLoggedIn(mustChangePassword) },
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable("force-change-password") {
-            ForceChangePasswordScreen(
-                container = container,
-                serverUrl = serverUrl,
-                onChanged = {
-                    navController.navigate("notes") {
-                        popUpTo("force-change-password") { inclusive = true }
-                    }
-                    pendingOpenNoteId?.let {
-                        navController.navigate("notes/$it")
-                        onPendingOpenNoteIdConsumed()
-                    }
-                },
-            )
-        }
-        composable("notes") {
-            NativeNotesListScreen(
-                container = container,
-                serverUrl = serverUrl,
-                onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
-                onOpenArchived = { navController.navigate("archived") },
-                onOpenTrash = { navController.navigate("trash") },
-                onOpenSettings = { navController.navigate("settings") },
-            )
-        }
-        // The web's settings panel is a full-width sheet that slides in
-        // from the right in 200ms (SettingsPanel.jsx:295), with nothing
-        // else animated; the route reproduces that entrance and its
-        // mirror image on the way out.
-        composable(
-            route = "settings",
-            enterTransition = {
-                slideInHorizontally(
-                    animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
-                    initialOffsetX = { it },
-                )
-            },
-            popExitTransition = {
-                slideOutHorizontally(
-                    animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
-                    targetOffsetX = { it },
-                )
-            },
-        ) {
-            SettingsScreen(
-                container = container,
-                serverUrl = serverUrl,
-                onBack = { navController.popBackStack() },
-                onOpenQrScanner = { navController.navigate("qr-scan") },
-            )
-        }
-        composable("qr-scan") {
-            QrScanScreen(
-                container = container,
-                serverUrl = serverUrl,
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable("notes/{noteId}") { backStackEntry ->
-            val noteId = backStackEntry.arguments?.getString("noteId") ?: return@composable
-            NoteDetailScreen(
-                container = container,
-                serverUrl = serverUrl,
-                noteId = noteId,
-                onBack = { navController.popBackStack() },
-                onOpenCollaborators = { navController.navigate("notes/$noteId/collaborators") },
-            )
-        }
-        composable("notes/{noteId}/collaborators") { backStackEntry ->
-            val noteId = backStackEntry.arguments?.getString("noteId") ?: return@composable
-            CollaboratorsScreen(
-                container = container,
-                serverUrl = serverUrl,
-                noteId = noteId,
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable("archived") {
-            ArchivedNotesScreen(
-                container = container,
-                serverUrl = serverUrl,
-                onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable("trash") {
-            TrashScreen(
-                container = container,
-                serverUrl = serverUrl,
-                onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
-                onBack = { navController.popBackStack() },
+    // One pill for the whole app, over every screen: the web has exactly
+    // one too, and it is what replaces the platform's own Toast here.
+    val toasts = rememberToastController()
+    CompositionLocalProvider(LocalGkToasts provides toasts) {
+        Box(Modifier.fillMaxSize()) {
+            NavHost(navController = navController, startDestination = startDestination) {
+                composable("login") {
+                    NativeLoginScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        onLoggedIn = { mustChangePassword -> handleLoggedIn(mustChangePassword) },
+                        onForgotPassword = { navController.navigate("login-secret") },
+                    )
+                }
+                composable("login-secret") {
+                    SecretKeyLoginScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        onLoggedIn = { mustChangePassword -> handleLoggedIn(mustChangePassword) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable("force-change-password") {
+                    ForceChangePasswordScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        onChanged = {
+                            navController.navigate("notes") {
+                                popUpTo("force-change-password") { inclusive = true }
+                            }
+                            pendingOpenNoteId?.let {
+                                navController.navigate("notes/$it")
+                                onPendingOpenNoteIdConsumed()
+                            }
+                        },
+                    )
+                }
+                composable("notes") {
+                    NativeNotesListScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
+                        onOpenArchived = { navController.navigate("archived") },
+                        onOpenTrash = { navController.navigate("trash") },
+                        onOpenSettings = { navController.navigate("settings") },
+                    )
+                }
+                // The web's settings panel is a full-width sheet that slides in
+                // from the right in 200ms (SettingsPanel.jsx:295), with nothing
+                // else animated; the route reproduces that entrance and its
+                // mirror image on the way out.
+                composable(
+                    route = "settings",
+                    enterTransition = {
+                        slideInHorizontally(
+                            animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
+                            initialOffsetX = { it },
+                        )
+                    },
+                    popExitTransition = {
+                        slideOutHorizontally(
+                            animationSpec = tween(durationMillis = 200, easing = GkStandardEasing),
+                            targetOffsetX = { it },
+                        )
+                    },
+                ) {
+                    SettingsScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        onBack = { navController.popBackStack() },
+                        onOpenQrScanner = { navController.navigate("qr-scan") },
+                    )
+                }
+                composable("qr-scan") {
+                    QrScanScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable("notes/{noteId}") { backStackEntry ->
+                    val noteId = backStackEntry.arguments?.getString("noteId") ?: return@composable
+                    NoteDetailScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        noteId = noteId,
+                        onBack = { navController.popBackStack() },
+                        onOpenCollaborators = { navController.navigate("notes/$noteId/collaborators") },
+                    )
+                }
+                composable("notes/{noteId}/collaborators") { backStackEntry ->
+                    val noteId = backStackEntry.arguments?.getString("noteId") ?: return@composable
+                    CollaboratorsScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        noteId = noteId,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable("archived") {
+                    ArchivedNotesScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable("trash") {
+                    TrashScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+            }
+            GkToastHost(
+                controller = toasts,
+                position = toastPositionOf(container.editorPrefs.toastPosition),
+                dark = isSystemInDarkTheme(),
+                durationMs = container.editorPrefs.toastDurationMs,
             )
         }
     }
@@ -300,4 +318,6 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     prefs.editorToolbarMode?.let { container.editorPrefs.applyToolbarMode(it) }
     container.editorPrefs.applyTypography(prefs.typography)
     AppLanguage.apply(prefs.language)
+    prefs.toastPosition?.let { container.editorPrefs.applyToastPosition(it) }
+    container.editorPrefs.applyToastDuration(prefs.toastDurationMs)
 }

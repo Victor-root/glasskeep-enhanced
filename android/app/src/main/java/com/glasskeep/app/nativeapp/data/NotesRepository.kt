@@ -40,6 +40,8 @@ import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderTimeChipsRequest
 import com.glasskeep.app.nativeapp.data.network.SetShellThemeRequest
+import com.glasskeep.app.nativeapp.data.network.SetToastDurationRequest
+import com.glasskeep.app.nativeapp.data.network.SetToastPositionRequest
 import com.glasskeep.app.nativeapp.data.network.SetTypographyPresetsRequest
 import com.glasskeep.app.nativeapp.data.network.SetShowOnLoginRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
@@ -936,6 +938,8 @@ class NotesRepository(
                     NativeDebug.e("NotesRepository.fetchWorkspacePreferences: profile read failed", t)
                     null
                 },
+                toastPosition = body.notificationsPositionMobile,
+                toastDurationMs = body.notificationsDuration,
             )
         } catch (t: Throwable) {
             NativeDebug.e("NotesRepository.fetchWorkspacePreferences failed", t)
@@ -951,6 +955,28 @@ class NotesRepository(
         val response = api.setEditorToolbarMode(SetEditorToolbarModeRequest(mode))
         if (!response.isSuccessful) {
             val error = "PATCH /api/user/settings (editorToolbarMode) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** Sets where the notification pill sits ("top" or "bottom"). */
+    suspend fun setToastPosition(position: String) {
+        NativeDebug.d("NotesRepository.setToastPosition position=$position")
+        val response = api.setToastPosition(SetToastPositionRequest(position))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (notificationsPositionMobile) failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** Sets how long the pill stays; null means until dismissed. */
+    suspend fun setToastDuration(durationMs: Long?) {
+        NativeDebug.d("NotesRepository.setToastDuration ms=$durationMs")
+        val response = api.setToastDuration(SetToastDurationRequest(durationMs))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (notificationsDuration) failed: HTTP ${response.code()}"
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }

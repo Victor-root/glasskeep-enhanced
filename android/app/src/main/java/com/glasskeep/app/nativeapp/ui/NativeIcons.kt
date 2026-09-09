@@ -1284,3 +1284,35 @@ fun QuoteIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Col
         "M3 9h1a1 1 0 1 1 -1 1v-2.5a2 2 0 0 1 2 -2",
     modifier, size, tint,
 )
+
+/** Same helper as [TablerIcon] for the FILLED variants (a solid glyph,
+ *  no stroke): the notification pill's own fallbacks. */
+@Composable
+private fun TablerFilledIcon(pathData: String, modifier: Modifier, size: Dp, tint: Color) {
+    val path = remember(pathData) { PathParser().parsePathString(pathData).toPath() }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint)
+        }
+    }
+}
+
+@Composable
+fun AlertFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M12 1.67c.955 0 1.845 .467 2.39 1.247l.105 .16l8.114 13.548a2.914 2.914 0 0 1 -2.307 4.363l-.195 .008" +
+        "h-16.225a2.914 2.914 0 0 1 -2.582 -4.2l.099 -.185l8.11 -13.538a2.914 2.914 0 0 1 2.491 -1.403z" +
+        "m.01 13.33l-.127 .007a1 1 0 0 0 0 1.986l.117 .007l.127 -.007a1 1 0 0 0 0 -1.986l-.117 -.007z" +
+        "m-.01 -7a1 1 0 0 0 -.993 .883l-.007 .117v4l.007 .117a1 1 0 0 0 1.986 0l.007 -.117v-4l-.007 -.117a1 1 0 0 0 -.993 -.883z",
+    modifier, size, tint,
+)
+
+@Composable
+fun InfoFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M12 2c5.523 0 10 4.477 10 10s-4.477 10 -10 10s-10 -4.477 -10 -10s4.477 -10 10 -10z" +
+        "m0 9h-1l-.117 .007a1 1 0 0 0 0 1.986l.117 .007v3l.007 .117a1 1 0 0 0 .876 .876l.117 .007h1" +
+        "l.117 -.007a1 1 0 0 0 .876 -.876l.007 -.117l-.007 -.117a1 1 0 0 0 -.764 -.857l-.112 -.02l-.117 -.006v-3" +
+        "l-.007 -.117a1 1 0 0 0 -.876 -.876l-.117 -.007z" +
+        "m.01 -3l-.127 .007a1 1 0 0 0 0 1.986l.117 .007l.127 -.007a1 1 0 0 0 0 -1.986l-.117 -.007z",
+    modifier, size, tint,
+)

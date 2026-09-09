@@ -1,6 +1,5 @@
 package com.glasskeep.app.nativeapp.ui
 
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -108,6 +107,7 @@ fun SecondaryNotesScreen(
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val toasts = LocalGkToasts.current
 
     var notes by remember { mutableStateOf<List<NoteEntity>>(emptyList()) }
     // Any type, any screen (see SyncQueueDao.observePendingNoteIds's own
@@ -173,7 +173,7 @@ fun SecondaryNotesScreen(
     fun reportOutcome(successTemplate: String, outcome: BulkOutcome) {
         val message = String.format(successTemplate, outcome.succeeded) +
             if (outcome.failed > 0) " " + String.format(partialFailureTemplate, outcome.failed) else ""
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        if (outcome.failed > 0) toasts.error(message) else toasts.success(message)
     }
 
     fun bulkUnarchive() {

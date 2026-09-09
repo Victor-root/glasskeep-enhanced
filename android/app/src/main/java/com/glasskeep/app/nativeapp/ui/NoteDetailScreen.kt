@@ -2,7 +2,6 @@ package com.glasskeep.app.nativeapp.ui
 
 import android.content.Context
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -207,6 +206,7 @@ fun NoteDetailScreen(
 ) {
     val dark = isSystemInDarkTheme()
     val context = LocalContext.current
+    val toasts = LocalGkToasts.current
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val scope = rememberCoroutineScope()
 
@@ -349,11 +349,7 @@ fun NoteDetailScreen(
                 NativeDebug.d("NoteDetailScreen togglePin queued id=${current.id}")
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen togglePin failed", t)
-                Toast.makeText(
-                    context,
-                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 pinning = false
             }
@@ -372,11 +368,7 @@ fun NoteDetailScreen(
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen toggleArchive failed", t)
-                Toast.makeText(
-                    context,
-                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 archiving = false
             }
@@ -398,11 +390,7 @@ fun NoteDetailScreen(
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen restoreNote failed", t)
-                Toast.makeText(
-                    context,
-                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 restoring = false
             }
@@ -422,11 +410,7 @@ fun NoteDetailScreen(
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen trash failed", t)
-                Toast.makeText(
-                    context,
-                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 trashing = false
             }
@@ -449,11 +433,7 @@ fun NoteDetailScreen(
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen deleteNotePermanently failed", t)
-                Toast.makeText(
-                    context,
-                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 deletingPermanently = false
             }
@@ -473,11 +453,7 @@ fun NoteDetailScreen(
                 NativeDebug.d("NoteDetailScreen changeColor queued id=${current.id}")
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen changeColor failed", t)
-                Toast.makeText(
-                    context,
-                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 changingColor = false
             }
@@ -503,11 +479,7 @@ fun NoteDetailScreen(
                 NativeDebug.d("NoteDetailScreen setReminder queued id=${current.id}")
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen setReminder failed", t)
-                Toast.makeText(
-                    context,
-                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 changingReminder = false
             }
@@ -528,11 +500,7 @@ fun NoteDetailScreen(
                 NativeDebug.d("NoteDetailScreen saveTags queued id=${current.id}")
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen saveTags failed", t)
-                Toast.makeText(
-                    context,
-                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 changingTags = false
             }
@@ -588,11 +556,7 @@ fun NoteDetailScreen(
                 NativeDebug.d("NoteDetailScreen saveChecklistItems queued id=${current.id}")
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen saveChecklistItems failed", t)
-                Toast.makeText(
-                    context,
-                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
             }
         }
     }
@@ -916,11 +880,7 @@ fun NoteDetailScreen(
             NativeDebug.d("NoteDetailScreen saveImages queued id=${current.id}")
         } catch (t: Throwable) {
             NativeDebug.e("NoteDetailScreen saveImages failed", t)
-            Toast.makeText(
-                context,
-                String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
-                Toast.LENGTH_SHORT,
-            ).show()
+            toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
         }
     }
 
@@ -942,7 +902,7 @@ fun NoteDetailScreen(
                     }
                 }
                 if (compressed.isEmpty()) {
-                    Toast.makeText(context, imageAddErrorMessage, Toast.LENGTH_SHORT).show()
+                    toasts.error(imageAddErrorMessage)
                     return@launch
                 }
                 saveImages(images + compressed)
@@ -969,7 +929,7 @@ fun NoteDetailScreen(
             val ok = NoteExporter.exportImage(context, image.src, image.name)
             if (!ok) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, downloadErrorMessage, Toast.LENGTH_SHORT).show()
+                    toasts.error(downloadErrorMessage)
                 }
             }
         }
@@ -988,11 +948,7 @@ fun NoteDetailScreen(
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen duplicateNote failed", t)
-                Toast.makeText(
-                    context,
-                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 duplicating = false
             }
@@ -1007,7 +963,7 @@ fun NoteDetailScreen(
             val ok = NoteExporter.exportText(context, current.title, edit.bodyPlainText)
             if (!ok) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, downloadErrorMessage, Toast.LENGTH_SHORT).show()
+                    toasts.error(downloadErrorMessage)
                 }
             }
         }
@@ -1298,18 +1254,10 @@ fun NoteDetailScreen(
                         checklistItems = editability?.checklistItems,
                     ),
                 )
-                Toast.makeText(
-                    context,
-                    if (toChecklist) convertedToChecklistMessage else convertedToTextMessage,
-                    Toast.LENGTH_SHORT,
-                ).show()
+                toasts.success(if (toChecklist) convertedToChecklistMessage else convertedToTextMessage)
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen convertNoteType failed", t)
-                Toast.makeText(
-                    context,
-                    String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                toasts.error(String.format(actionErrorTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 converting = false
             }

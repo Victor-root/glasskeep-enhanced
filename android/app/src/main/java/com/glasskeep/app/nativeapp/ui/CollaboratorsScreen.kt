@@ -1,6 +1,5 @@
 package com.glasskeep.app.nativeapp.ui
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -104,6 +103,7 @@ fun CollaboratorsScreen(
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val toasts = LocalGkToasts.current
 
     var collaborators by remember { mutableStateOf<List<CollaboratorDto>>(emptyList()) }
     var isOwner by remember { mutableStateOf(false) }
@@ -160,12 +160,12 @@ fun CollaboratorsScreen(
                     SetCollaboratorAccessResult.Updated -> load()
                     SetCollaboratorAccessResult.NotFound -> load()
                     is SetCollaboratorAccessResult.Rejected -> {
-                        Toast.makeText(context, String.format(accessFailedTemplate, "HTTP ${result.httpCode}"), Toast.LENGTH_SHORT).show()
+                        toasts.error(String.format(accessFailedTemplate, "HTTP ${result.httpCode}"))
                     }
                 }
             } catch (t: Throwable) {
                 NativeDebug.e("CollaboratorsScreen changeAccess failed", t)
-                Toast.makeText(context, String.format(accessFailedTemplate, t.message ?: t.javaClass.simpleName), Toast.LENGTH_SHORT).show()
+                toasts.error(String.format(accessFailedTemplate, t.message ?: t.javaClass.simpleName))
             }
         }
     }
@@ -177,12 +177,12 @@ fun CollaboratorsScreen(
                     is RemoveCollaboratorResult.Removed -> load()
                     RemoveCollaboratorResult.NotFound -> load()
                     is RemoveCollaboratorResult.Rejected -> {
-                        Toast.makeText(context, String.format(removeFailedTemplate, "HTTP ${result.httpCode}"), Toast.LENGTH_SHORT).show()
+                        toasts.error(String.format(removeFailedTemplate, "HTTP ${result.httpCode}"))
                     }
                 }
             } catch (t: Throwable) {
                 NativeDebug.e("CollaboratorsScreen removeCollaborator failed", t)
-                Toast.makeText(context, String.format(removeFailedTemplate, t.message ?: t.javaClass.simpleName), Toast.LENGTH_SHORT).show()
+                toasts.error(String.format(removeFailedTemplate, t.message ?: t.javaClass.simpleName))
             } finally {
                 pendingRemoval = null
             }
@@ -217,10 +217,10 @@ fun CollaboratorsScreen(
             submitting = false
             selected = emptyMap()
             if (added > 0) {
-                Toast.makeText(context, String.format(addedTemplate, added), Toast.LENGTH_SHORT).show()
+                toasts.success(String.format(addedTemplate, added))
             }
             if (failed > 0) {
-                Toast.makeText(context, String.format(addFailedTemplate, failed), Toast.LENGTH_SHORT).show()
+                toasts.error(String.format(addFailedTemplate, failed))
             }
             load()
         }

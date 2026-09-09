@@ -32,6 +32,13 @@ class EditorPrefsState(private val tokenStore: TokenStore) {
     var taskStrike: Boolean by mutableStateOf(tokenStore.taskStrikeChecked)
         private set
 
+    var toastPosition: String by mutableStateOf(tokenStore.toastPosition ?: "bottom")
+        private set
+
+    /** null means "stays until dismissed"; the cache stores that as -1. */
+    var toastDurationMs: Long? by mutableStateOf(tokenStore.toastDurationMs.takeIf { it > 0 })
+        private set
+
     fun applyTypography(presets: TypographyPresets) {
         typography = presets
         tokenStore.typographyPresetsJson = try {
@@ -51,6 +58,17 @@ class EditorPrefsState(private val tokenStore: TokenStore) {
     fun applyTaskStrike(on: Boolean) {
         taskStrike = on
         tokenStore.taskStrikeChecked = on
+    }
+
+    fun applyToastPosition(position: String) {
+        val resolved = if (position == "top") "top" else "bottom"
+        toastPosition = resolved
+        tokenStore.toastPosition = resolved
+    }
+
+    fun applyToastDuration(durationMs: Long?) {
+        toastDurationMs = durationMs
+        tokenStore.toastDurationMs = durationMs ?: -1L
     }
 
     private fun readCachedTypography(): TypographyPresets {

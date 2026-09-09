@@ -1,6 +1,5 @@
 package com.glasskeep.app.nativeapp.ui
 
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -245,6 +244,7 @@ fun NativeNotesListScreen(
     val pinLabel = stringResource(R.string.native_note_detail_pin)
     val colorLabel = stringResource(R.string.native_note_detail_change_color)
     val context = LocalContext.current
+    val toasts = LocalGkToasts.current
 
     val bgModifier = Modifier.background(WorkspaceTheme.appBackground(themeId, dark))
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
@@ -254,7 +254,7 @@ fun NativeNotesListScreen(
     fun reportOutcome(successTemplate: String, outcome: BulkOutcome) {
         val message = String.format(successTemplate, outcome.succeeded) +
             if (outcome.failed > 0) " " + String.format(partialFailureTemplate, outcome.failed) else ""
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        if (outcome.failed > 0) toasts.error(message) else toasts.success(message)
     }
 
     fun exitSelection() {
@@ -405,6 +405,10 @@ fun NativeNotesListScreen(
     // once on load and again every time the panel closes (opening it is
     // what marks them delivered).
     LaunchedEffect(serverUrl, notificationsOpen) {
+        // The floating pill is suppressed for as long as the panel is up,
+        // the same way the web hides it behind the notification centre
+        // (App.jsx:7933-7935).
+        toasts.suppressed = notificationsOpen
         if (notificationsOpen) return@LaunchedEffect
         unreadNotifications = repository.fetchPendingNotifications().size
     }

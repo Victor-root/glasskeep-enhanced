@@ -69,15 +69,6 @@ import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
-/** The web's four notification variants and the accent each one paints
- *  with (globalCSS.js:5009-5048). */
-private enum class NotifVariant(val accent: Color, val tintAlpha: Float) {
-    INFO(Color(0xFF3B82F6), 0.06f),
-    SUCCESS(Color(0xFF10B981), 0.06f),
-    WARNING(Color(0xFFF59E0B), 0.07f),
-    ERROR(Color(0xFFEF4444), 0.06f),
-}
-
 private val NotifSheetEasing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
 
 /** MOBILE_CLOSE_THRESHOLD_PX (NotificationCenter.jsx:28). */
