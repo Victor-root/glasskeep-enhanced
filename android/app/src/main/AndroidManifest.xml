@@ -103,13 +103,10 @@
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
 
-        <!-- Native rewrite (0-webview effort): reached only from debug
-             builds today, see MainActivity.launchApp. Not a launcher
-             entry point, MainActivity always decides which of this or
-             WebViewActivity to start. singleTask (same as WebViewActivity
-             above) so a reminder notification tap deep-links into the
-             already-running instance via onNewIntent instead of starting
-             a duplicate one. -->
+        <!-- Native app entry point. MainActivity supplies the configured
+             server URL; singleTask lets reminder notification taps deep-link
+             into the already-running instance via onNewIntent instead of
+             starting a duplicate one. -->
         <activity
             android:name=".nativeapp.NativeAppActivity"
             android:exported="false"
@@ -140,8 +137,8 @@
             android:exported="false" />
 
         <!-- Reminder alarm target: AlarmManager fires this when a note
-             reminder comes due; it posts the local notification (unless the
-             app is foregrounded, where the in-app notification handles it). -->
+             reminder comes due; it posts the local notification unless the
+             native app is foregrounded, where the in-app notification handles it. -->
         <receiver
             android:name=".reminders.ReminderAlarmReceiver"
             android:exported="false" />

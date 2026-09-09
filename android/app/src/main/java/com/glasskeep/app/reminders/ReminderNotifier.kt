@@ -8,18 +8,17 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.glasskeep.app.MainActivity
 import com.glasskeep.app.R
-import com.glasskeep.app.WebViewActivity
 import com.glasskeep.app.nativeapp.NativeAppActivity
 
 /**
  * Posts a local "reminder due" notification. Mirrors UpdateNotifier: a
  * HIGH-importance channel so it fires as a heads-up banner. Tapping the
- * notification (or its "Open" action) deep-links straight to the note: on
- * a release build it hands WebViewActivity the note id, which the web app
- * opens via its window.__glasskeepOpenNote hook; on a debug build (see
- * MainActivity.launchApp) it instead hands NativeAppActivity the note id,
- * which NativeNavHost opens directly (see buildOpenNoteIntent).
+ * notification (or its "Open" action) enters through MainActivity, which
+ * resolves the configured server and forwards the note id to the native
+ * activity. This works for cold starts, warm singleTask delivery, and the
+ * signed-out/setup path without ever falling back to the old WebView.
  *
  * This is a LOCAL notification raised by ReminderAlarmReceiver when an
  * AlarmManager alarm fires — no server push / Firebase involved, so it
@@ -39,11 +38,8 @@ internal object ReminderNotifier {
         ensureChannel(context)
         android.util.Log.i("GKReminders", "notifier: posting notification (note=$noteId)")
 
-        // Tapping the notification — or its explicit "Open" action — deep-links
-        // to the note: WebViewActivity gets the note id and the web app pops the
-        // modal via window.__glasskeepOpenNote once the page is ready. (It's
-        // singleTask, so an already-open app receives the id through onNewIntent
-        // rather than a cold relaunch.)
+        // Tapping the notification — or its explicit "Open" action — enters
+        // through MainActivity and reaches NativeAppActivity with the note id.
         val pendingIntent = buildOpenNoteIntent(context, noteId)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
@@ -73,26 +69,12 @@ internal object ReminderNotifier {
     }
 
     /**
-     * PendingIntent that re-opens the app on the given note, in
-     * NativeAppActivity, which is what every build runs now (see
-     * MainActivity.launchApp). Carries the note id as the Activity's own
-     * EXTRA_OPEN_NOTE_ID.
+     * MainActivity is the safe target even if setup is currently incomplete:
+     * it can obtain a server URL before forwarding this native deep link.
      */
     private fun buildOpenNoteIntent(context: Context, noteId: String): PendingIntent {
-        val nativeIntent = resolveNativeServerUrl(context)?.let { url ->
-            Intent(context, NativeAppActivity::class.java).apply {
-                putExtra(NativeAppActivity.EXTRA_SERVER_URL, url)
-                putExtra(NativeAppActivity.EXTRA_OPEN_NOTE_ID, noteId)
-            }
-        }
-        // NativeAppActivity requires EXTRA_SERVER_URL (see its onCreate) and
-        // has no fallback if one can't be resolved (e.g. no session was ever
-        // established on this device), so a tap in that state goes to the
-        // WebView rather than risking a crash. It is the only thing still
-        // reaching WebViewActivity, and only ever on a device with no
-        // usable native session at all.
-        val intent = nativeIntent ?: Intent(context, WebViewActivity::class.java).apply {
-            putExtra(WebViewActivity.EXTRA_OPEN_NOTE_ID, noteId)
+        val intent = Intent(context, MainActivity::class.java).apply {
+            putExtra(NativeAppActivity.EXTRA_OPEN_NOTE_ID, noteId)
         }
         intent.addFlags(
             Intent.FLAG_ACTIVITY_NEW_TASK or
@@ -105,23 +87,6 @@ internal object ReminderNotifier {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-    }
-
-    /** Best-effort server URL for the debug deep-link target, tried in the
-     *  same order ReminderSyncWorker resolves its own session: the
-     *  WebView-era shared prefs first, then native's own encrypted session
-     *  store, read only (never written here, see TokenStore's own doc
-     *  comment on why native and the WebView-era prefs must not cross-write).
-     *  Null when neither has one, e.g. no session was ever established. */
-    private fun resolveNativeServerUrl(context: Context): String? {
-        val legacy = context.getSharedPreferences("glasskeep", Context.MODE_PRIVATE)
-            .getString("server_url", null)?.trimEnd('/')
-        if (!legacy.isNullOrBlank()) return legacy
-        return try {
-            com.glasskeep.app.nativeapp.data.TokenStore(context).serverUrl?.trimEnd('/')?.ifBlank { null }
-        } catch (t: Throwable) {
-            null
-        }
     }
 
     private fun ensureChannel(context: Context) {

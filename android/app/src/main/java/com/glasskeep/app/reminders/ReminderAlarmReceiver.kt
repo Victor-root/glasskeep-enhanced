@@ -3,7 +3,7 @@ package com.glasskeep.app.reminders
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.glasskeep.app.WebViewActivity
+import com.glasskeep.app.nativeapp.NativeAppActivity
 
 /**
  * Fires when an AlarmManager reminder alarm goes off. Shows a local
@@ -21,7 +21,7 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
 
         android.util.Log.i(
             "GKReminders",
-            "alarm fired: note=$noteId (appForeground=${WebViewActivity.isForeground})",
+            "alarm fired: note=$noteId (appForeground=${NativeAppActivity.isForeground})",
         )
 
         // The alarm has fired once — drop it from the persisted set so a
@@ -29,7 +29,7 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
         ReminderScheduler.cancel(context, noteId)
 
         // App in foreground → the in-app notification already shows it.
-        if (WebViewActivity.isForeground) {
+        if (NativeAppActivity.isForeground) {
             android.util.Log.i("GKReminders", "alarm: app foreground -> skipping system notif (in-app handles it)")
             return
         }

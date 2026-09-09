@@ -33,11 +33,10 @@ import java.util.concurrent.TimeUnit
  * Services), so it survives reboots and cooperates with Doze on its own, with
  * zero Google dependency.
  *
- * Session comes from the WebView-era shared prefs (server_url/auth_token,
- * see setAuthToken) when present, else read-only from the native rewrite's
- * own encrypted store (see nativeFallback): that's what lets this same
- * worker also cover a native-only sign-in, which never populates those
- * legacy prefs at all.
+ * The encrypted native session is authoritative. The WebView-era prefs are
+ * accepted only as a one-time upgrade bridge before the native store has ever
+ * held session state; once native owns the session, its sign-out stays signed
+ * out and an obsolete WebView token can never take over again.
  */
 class ReminderSyncWorker(
     appContext: Context,
@@ -96,44 +95,37 @@ class ReminderSyncWorker(
         Result.success()
     }
 
-    /** (serverUrl, token, urlVetted), from the WebView-era shared prefs
-     *  when they hold a session, else read-only from native's own
-     *  encrypted store (see nativeFallback) for a native-only sign-in that
-     *  never populates those legacy prefs at all. urlVetted is the legacy
-     *  prefs' own vetted flag for those, or true for a native one (see
-     *  nativeFallback's doc comment for why that's not a guess). Null
-     *  when neither has a usable session. */
-    private fun resolveSession(prefs: android.content.SharedPreferences): Triple<String, String, Boolean>? {
+    /** Native wins as soon as its encrypted store contains any session state. */
+    private fun resolveSession(prefs: android.content.SharedPreferences): ReminderSession? {
+        val nativeState = try {
+            val native = com.glasskeep.app.nativeapp.data.TokenStore(applicationContext)
+            native.serverUrl to native.token
+        } catch (t: Throwable) {
+            // If the Keystore is temporarily unavailable, skipping a sync is
+            // safer than falling back to a potentially obsolete plaintext JWT.
+            android.util.Log.w("GKReminders", "sync: native session read failed", t)
+            return null
+        }
+
         val legacyUrl = prefs.getString("server_url", null)?.trimEnd('/')
         val legacyToken = prefs.getString(KEY_TOKEN, null)
-        if (!legacyUrl.isNullOrBlank() && !legacyToken.isNullOrBlank()) {
-            return Triple(legacyUrl, legacyToken, prefs.getBoolean(MainActivity.KEY_URL_VETTED, false))
-        }
-        val native = nativeFallback(applicationContext) ?: return null
-        return Triple(native.first, native.second, true)
-    }
-
-    /** Reads (serverUrl, token) from the native rewrite's own encrypted
-     *  session store, read only: this worker never writes to it. Any URL
-     *  found there already passed CleartextPolicy's vetting once, in
-     *  MainActivity, before native ever stored it (see NativeLoginScreen
-     *  -> NativeAppActivity.EXTRA_SERVER_URL): a debug build only ever
-     *  reaches native's login screen through that same gate MainActivity
-     *  already runs for the WebView flow, so re-vetting it here would just
-     *  repeat a check already made, not skip one. Null on anything
-     *  missing or unreadable (e.g. Keystore briefly unavailable): this
-     *  runs unattended, so a worse-case outcome is skipping this sync
-     *  rather than crashing it. */
-    private fun nativeFallback(context: Context): Pair<String, String>? {
-        return try {
-            val native = com.glasskeep.app.nativeapp.data.TokenStore(context)
-            val url = native.serverUrl?.trimEnd('/')
-            val token = native.token
-            if (url.isNullOrBlank() || token.isNullOrBlank()) null else url to token
-        } catch (t: Throwable) {
-            android.util.Log.w("GKReminders", "sync: native session fallback failed", t)
+        val legacySession = if (!legacyUrl.isNullOrBlank() && !legacyToken.isNullOrBlank()) {
+            ReminderSession(
+                serverUrl = legacyUrl,
+                token = legacyToken,
+                urlVetted = prefs.getBoolean(MainActivity.KEY_URL_VETTED, false),
+            )
+        } else {
             null
         }
+
+        val nativeOwnsSession = nativeState.first != null || nativeState.second != null
+        if (nativeOwnsSession && prefs.contains(KEY_TOKEN)) {
+            // The bridge has served its purpose. Do not leave an obsolete JWT
+            // in plaintext or let a later native sign-out reactivate it.
+            prefs.edit().remove(KEY_TOKEN).apply()
+        }
+        return selectReminderSession(nativeState.first, nativeState.second, legacySession)
     }
 
     /** GET with bearer auth. Returns the body; null on 401/403; throws on network error. */

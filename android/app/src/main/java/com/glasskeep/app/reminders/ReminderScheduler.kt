@@ -14,10 +14,10 @@ import org.json.JSONObject
  * SharedPreferences so ReminderBootReceiver can re-arm everything after a
  * reboot (alarms are cleared on reboot otherwise).
  *
- * Driven from the web app over the `AndroidReminders` JS bridge:
- *   - schedule / cancel when the user sets or clears a reminder;
- *   - syncAll on app load, to reconcile against the server's canonical set
- *     (covers reminders created on other devices and re-arming after boot).
+ * Driven by the native Room cache and ReminderSyncWorker now. The persisted
+ * format and PendingIntent identity deliberately stay compatible with alarms
+ * created by the former `AndroidReminders` WebView bridge, so an APK upgrade
+ * does not lose reminders that were already armed.
  */
 object ReminderScheduler {
     private const val PREFS = "glasskeep_reminders"

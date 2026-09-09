@@ -102,7 +102,22 @@ class NativeAppActivity : ComponentActivity() {
         intent.getStringExtra(EXTRA_NEW_NOTE_TYPE)?.let { pendingNewNoteType = it }
     }
 
+    override fun onResume() {
+        super.onResume()
+        isForeground = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isForeground = false
+    }
+
     companion object {
+        /** Read by ReminderAlarmReceiver, which may run on another thread. */
+        @Volatile
+        var isForeground: Boolean = false
+            private set
+
         const val EXTRA_SERVER_URL = "server_url"
         const val EXTRA_OPEN_NOTE_ID = "openNoteId"
         const val EXTRA_OPEN_QR_SCANNER = "openQrScanner"

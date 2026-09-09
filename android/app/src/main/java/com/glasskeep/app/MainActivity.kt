@@ -89,6 +89,9 @@ class MainActivity : ComponentActivity() {
     private fun launchApp(url: String) {
         val target = Intent(this, NativeAppActivity::class.java)
         target.putExtra(NativeAppActivity.EXTRA_SERVER_URL, url)
+        intent?.getStringExtra(NativeAppActivity.EXTRA_OPEN_NOTE_ID)?.let {
+            target.putExtra(NativeAppActivity.EXTRA_OPEN_NOTE_ID, it)
+        }
         val action = intent?.action
         if (action == SHORTCUT_ACTION_QR_SCAN) {
             target.putExtra(NativeAppActivity.EXTRA_OPEN_QR_SCANNER, true)

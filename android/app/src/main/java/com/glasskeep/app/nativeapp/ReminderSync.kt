@@ -19,7 +19,7 @@ import com.glasskeep.app.reminders.ReminderScheduler
  * is still covered, just not instantly: ReminderSyncWorker's periodic +
  * on-demand sync (see NativeNavHost) asks the server directly for that.
  */
-internal fun syncReminderAlarms(context: Context, notes: List<NoteEntity>) {
+internal fun syncReminderAlarms(context: Context, notes: List<NoteEntity>): Boolean {
     val now = System.currentTimeMillis()
     val title = context.getString(R.string.native_note_detail_reminder)
     val untitled = context.getString(R.string.native_reminder_untitled_note)
@@ -35,4 +35,5 @@ internal fun syncReminderAlarms(context: Context, notes: List<NoteEntity>) {
     }
     NativeDebug.d("syncReminderAlarms: reconciling ${items.size} upcoming reminder(s) from ${notes.size} cached note(s)")
     ReminderScheduler.syncAll(context, items)
+    return items.isNotEmpty()
 }

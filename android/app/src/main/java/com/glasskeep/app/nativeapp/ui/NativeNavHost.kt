@@ -1,5 +1,10 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -33,6 +38,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.core.content.ContextCompat
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
@@ -76,6 +82,15 @@ fun NativeNavHost(
     }
     val context = LocalContext.current
 
+    // Existing installs skip onboarding, so the first native reconciliation
+    // that finds a live reminder also inherits the WebView's old contextual
+    // POST_NOTIFICATIONS request. Without this, Android 13+ would arm the
+    // alarm correctly but silently suppress it when it fired.
+    var reminderPermissionAsked by remember { mutableStateOf(false) }
+    val reminderPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* The alarm stays scheduled if the user declines. */ }
+
     // Reminder alarms, kept in sync with this device's local note cache for
     // as long as the native app is running, same placement/lifetime as
     // App.jsx's own androidReminderSyncRef effect (the top-level app
@@ -85,7 +100,17 @@ fun NativeNavHost(
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val notes by repository.observeNotes().collectAsState(initial = null)
     LaunchedEffect(notes) {
-        notes?.let { syncReminderAlarms(context, it) }
+        val hasUpcomingReminder = notes?.let { syncReminderAlarms(context, it) } ?: false
+        if (
+            hasUpcomingReminder &&
+            !reminderPermissionAsked &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+        ) {
+            reminderPermissionAsked = true
+            reminderPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     // Realtime cross-device updates (see RealtimeClient.kt's own doc
