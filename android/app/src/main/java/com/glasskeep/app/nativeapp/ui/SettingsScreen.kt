@@ -87,6 +87,7 @@ import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NativePasskeys
 import com.glasskeep.app.nativeapp.PasskeyCeremonyResult
 import com.glasskeep.app.nativeapp.data.ChangePasswordResult
+import com.glasskeep.app.nativeapp.data.TypographyPresets
 import com.glasskeep.app.nativeapp.data.network.PasskeyDto
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
@@ -160,6 +161,8 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var changingLanguage by remember { mutableStateOf(false) }
     var changingTheme by remember { mutableStateOf(false) }
     var changingChecklistPosition by remember { mutableStateOf(false) }
+    var changingToolbarMode by remember { mutableStateOf(false) }
+    var showTypographyModal by remember { mutableStateOf(false) }
     var addingPasskey by remember { mutableStateOf(false) }
     var removingPasskeyId by remember { mutableStateOf<String?>(null) }
     var testingPasskeyId by remember { mutableStateOf<String?>(null) }
@@ -472,6 +475,41 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                 reportActionError(t)
             } finally {
                 changingChecklistPosition = false
+            }
+        }
+    }
+
+    fun changeToolbarMode(mode: String) {
+        if (changingToolbarMode || mode == container.editorPrefs.toolbarMode) return
+        changingToolbarMode = true
+        val previous = container.editorPrefs.toolbarMode
+        container.editorPrefs.applyToolbarMode(mode)
+        scope.launch {
+            try {
+                repository.setEditorToolbarMode(mode)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen setEditorToolbarMode failed", t)
+                container.editorPrefs.applyToolbarMode(previous)
+                reportActionError(t)
+            } finally {
+                changingToolbarMode = false
+            }
+        }
+    }
+
+    /** Saves the whole presets blob on every edit, same as the web's own
+     *  setPresets: the modal has no Save button, each control is applied
+     *  as it is touched. */
+    fun changeTypography(presets: TypographyPresets) {
+        val previous = container.editorPrefs.typography
+        container.editorPrefs.applyTypography(presets)
+        scope.launch {
+            try {
+                repository.setTypographyPresets(presets)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen setTypographyPresets failed", t)
+                container.editorPrefs.applyTypography(previous)
+                reportActionError(t)
             }
         }
     }
@@ -803,6 +841,74 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                     onToggle = { notesOpen = !notesOpen },
                                     contentSpacing = 16.dp,
                                 ) {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            SettingsRowIcon(themeId, dark) { tint -> TextColorIcon(size = 20.dp, tint = tint) }
+                                            Spacer(Modifier.width(12.dp))
+                                            Column {
+                                                Text(
+                                                    stringResource(R.string.native_settings_editor_toolbar_mode),
+                                                    color = titleColor,
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                )
+                                                Text(
+                                                    stringResource(
+                                                        if (container.editorPrefs.toolbarMode == "advanced") {
+                                                            R.string.native_settings_editor_toolbar_advanced_desc
+                                                        } else {
+                                                            R.string.native_settings_editor_toolbar_simple_desc
+                                                        },
+                                                    ),
+                                                    color = SettingsSubtleColor,
+                                                    fontSize = 14.sp,
+                                                    lineHeight = 20.sp,
+                                                )
+                                            }
+                                        }
+                                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                                            GkSegmented(
+                                                options = listOf(
+                                                    GkSegmentOption("simple", stringResource(R.string.native_settings_editor_toolbar_simple)),
+                                                    GkSegmentOption("advanced", stringResource(R.string.native_settings_editor_toolbar_advanced)),
+                                                ),
+                                                selectedId = container.editorPrefs.toolbarMode,
+                                                enabled = !changingToolbarMode,
+                                                themeId = themeId,
+                                                dark = dark,
+                                                onSelect = { changeToolbarMode(it) },
+                                            )
+                                        }
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            SettingsRowIcon(themeId, dark) { tint -> PaintRollerIcon(size = 20.dp, tint = tint) }
+                                            Spacer(Modifier.width(12.dp))
+                                            Column {
+                                                Text(
+                                                    stringResource(R.string.native_typography_title),
+                                                    color = titleColor,
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                )
+                                                Text(
+                                                    stringResource(R.string.native_typography_desc),
+                                                    color = SettingsSubtleColor,
+                                                    fontSize = 14.sp,
+                                                    lineHeight = 20.sp,
+                                                )
+                                            }
+                                        }
+                                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                                            GkGradientButton(
+                                                label = stringResource(R.string.native_typography_open),
+                                                themeId = themeId,
+                                                onClick = { showTypographyModal = true },
+                                            )
+                                        }
+                                    }
+
                                     SettingsSubHeading(stringResource(R.string.native_settings_checklist_group), dark)
                                     Column(
                                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
@@ -946,6 +1052,16 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                     }
                 }
             }
+        }
+
+        if (showTypographyModal) {
+            TypographyModal(
+                presets = container.editorPrefs.typography,
+                themeId = themeId,
+                dark = dark,
+                onChange = { changeTypography(it) },
+                onDismiss = { showTypographyModal = false },
+            )
         }
 
         if (showPasswordDialog) {

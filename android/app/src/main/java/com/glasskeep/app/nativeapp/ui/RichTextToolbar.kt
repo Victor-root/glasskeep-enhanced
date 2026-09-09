@@ -992,7 +992,7 @@ private fun headingSampleSize(level: Int): TextUnit = when (level) {
  * does on the web (Popover.jsx:35-79).
  */
 @Composable
-private fun RichPopover(dark: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun RichPopover(dark: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
     val density = LocalDensity.current
     val positionProvider = remember(density) {
         object : PopupPositionProvider {

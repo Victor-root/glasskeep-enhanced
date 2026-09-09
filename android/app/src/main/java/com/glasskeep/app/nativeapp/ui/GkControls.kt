@@ -757,6 +757,18 @@ internal fun Modifier.drawSectionAccent(color: Color, dark: Boolean): Modifier =
 }
 
 /** The dashed outline of the "add section" button. */
+/** `border-bottom: 1px dashed`: the rule under the typography modal's
+ *  live preview (globalCSS.js:4470-4476). */
+internal fun Modifier.dashedUnderline(color: Color): Modifier = drawBehind {
+    drawLine(
+        color = color,
+        start = Offset(0f, size.height),
+        end = Offset(size.width, size.height),
+        strokeWidth = 1.dp.toPx(),
+        pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx())),
+    )
+}
+
 internal fun Modifier.dashedBorder(color: Color, shape: Shape): Modifier = drawBehind {
     val stroke = Stroke(
         width = 1.dp.toPx(),
