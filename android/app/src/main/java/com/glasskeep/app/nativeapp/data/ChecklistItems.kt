@@ -239,4 +239,47 @@ object ChecklistItems {
         }
         return groups.values.flatten().filter { it.done }
     }
+
+    /**
+     * reorderSections() (checklist.js:383-423): rebuilds the flat array
+     * with the section blocks in [newOrderedSectionIds]'s order. Whatever
+     * sits before the first marker is the implicit default block and never
+     * moves, and any section the caller forgot to name is appended in its
+     * original order rather than dropped.
+     */
+    fun reorderSections(entries: List<ChecklistEntry>, newOrderedSectionIds: List<String>): List<ChecklistEntry> {
+        val firstMarker = entries.indexOfFirst { it is ChecklistSectionData }
+        if (firstMarker < 0) return entries.toList()
+        val prefix = entries.subList(0, firstMarker).toList()
+
+        val blocks = linkedMapOf<String, List<ChecklistEntry>>()
+        var i = firstMarker
+        while (i < entries.size) {
+            if (entries[i] !is ChecklistSectionData) {
+                i++
+                continue
+            }
+            var end = entries.size
+            for (j in i + 1 until entries.size) {
+                if (entries[j] is ChecklistSectionData) {
+                    end = j
+                    break
+                }
+            }
+            blocks[entries[i].id] = entries.subList(i, end).toList()
+            i = end
+        }
+
+        val ordered = mutableListOf<ChecklistEntry>()
+        val seen = mutableSetOf<String>()
+        for (id in newOrderedSectionIds) {
+            val block = blocks[id] ?: continue
+            if (!seen.add(id)) continue
+            ordered.addAll(block)
+        }
+        for ((id, block) in blocks) {
+            if (id !in seen) ordered.addAll(block)
+        }
+        return prefix + ordered
+    }
 }

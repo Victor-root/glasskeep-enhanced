@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -144,12 +145,32 @@ fun ChecklistEditorBody(
     var dragOffsetY by remember { mutableStateOf(0f) }
     val rowHeights = remember { mutableStateMapOf<String, Int>() }
 
+    // The same gesture one level up: dragging a section's own handle moves
+    // the whole block, header and rows together (useChecklistDrag.js's
+    // handleSectionPointerDown). Blocks have wildly different heights, so
+    // the drop target is computed from their measured ones rather than a
+    // single row height.
+    var draggingSectionId by remember { mutableStateOf<String?>(null) }
+    var sectionDragOffsetY by remember { mutableStateOf(0f) }
+    val blockHeights = remember { mutableStateMapOf<String, Int>() }
+
     val visibleIds = remember(blocks) {
         blocks.flatMap { block -> block.items.filterNot { it.done }.map { it.id } }
     }
     val draggedIndex = visibleIds.indexOf(draggingId)
     val dropIndex = remember(draggingId, dragOffsetY, visibleIds, rowHeights.toMap()) {
         if (draggedIndex < 0) -1 else dropTargetIndex(visibleIds, rowHeights, draggedIndex, dragOffsetY)
+    }
+
+    val blockGapPx = with(LocalDensity.current) { BlockGap.toPx() }
+    val blockKeys = remember(blocks) { blocks.map { it.section?.id ?: DefaultBlockKey } }
+    val draggedBlockIndex = blockKeys.indexOf(draggingSectionId)
+    val blockDropIndex = remember(draggingSectionId, sectionDragOffsetY, blockKeys, blockHeights.toMap()) {
+        if (draggedBlockIndex < 0) {
+            -1
+        } else {
+            blockDropTargetIndex(blockKeys, blockHeights, draggedBlockIndex, sectionDragOffsetY, blockGapPx)
+        }
     }
 
     fun commitEntries(updated: List<ChecklistEntry>, persist: Boolean = true) {
@@ -215,9 +236,39 @@ fun ChecklistEditorBody(
             blocks.forEachIndexed { blockIndex, block ->
                 val unchecked = block.items.filterNot { it.done }
                 if (block.section == null && unchecked.isEmpty() && blocks.size > 1) return@forEachIndexed
+                val blockKey = block.section?.id ?: DefaultBlockKey
                 ChecklistSectionBlock(
                     block = block,
                     entries = entries,
+                    blockDragging = draggingSectionId == blockKey,
+                    blockDragOffsetY = if (draggingSectionId == blockKey) sectionDragOffsetY else 0f,
+                    blockShift = blockNeighbourShift(
+                        blockIndex,
+                        draggedBlockIndex,
+                        blockDropIndex,
+                        blockKeys,
+                        blockHeights,
+                        blockGapPx,
+                    ),
+                    onBlockHeight = { height -> blockHeights[blockKey] = height },
+                    onSectionDragStart = {
+                        draggingSectionId = blockKey
+                        sectionDragOffsetY = 0f
+                    },
+                    onSectionDragDelta = { dy -> sectionDragOffsetY += dy },
+                    onSectionDragEnd = {
+                        val from = draggedBlockIndex
+                        val to = blockDropIndex
+                        draggingSectionId = null
+                        sectionDragOffsetY = 0f
+                        if (from >= 0 && to >= 0 && to != from) {
+                            val reordered = blockKeys.toMutableList().apply { add(to, removeAt(from)) }
+                            commitEntries(
+                                ChecklistItems.reorderSections(entries, reordered.filterNot { it == DefaultBlockKey }),
+                            )
+                        }
+                    },
+                    onSectionDragCancel = { draggingSectionId = null; sectionDragOffsetY = 0f },
                     dark = dark,
                     titleColor = titleColor,
                     subtextColor = subtextColor,
@@ -373,6 +424,14 @@ private fun moveItem(
 private fun ChecklistSectionBlock(
     block: ChecklistBlock,
     entries: List<ChecklistEntry>,
+    blockDragging: Boolean,
+    blockDragOffsetY: Float,
+    blockShift: Float,
+    onBlockHeight: (Int) -> Unit,
+    onSectionDragStart: () -> Unit,
+    onSectionDragDelta: (Float) -> Unit,
+    onSectionDragEnd: () -> Unit,
+    onSectionDragCancel: () -> Unit,
     dark: Boolean,
     titleColor: Color,
     subtextColor: Color,
@@ -409,6 +468,18 @@ private fun ChecklistSectionBlock(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .onGloballyPositioned { onBlockHeight(it.size.height) }
+            .zIndex(if (blockDragging) 1f else 0f)
+            .graphicsLayer {
+                translationY = if (blockDragging) blockDragOffsetY else blockShift
+                if (blockDragging) {
+                    scaleX = 1.02f
+                    scaleY = 1.02f
+                    shadowElevation = 12.dp.toPx()
+                    shape = RoundedCornerShape(8.dp)
+                    clip = false
+                }
+            }
             .padding(horizontal = if (section == null) 16.dp else 8.dp),
     ) {
         if (section != null) {
@@ -419,6 +490,10 @@ private fun ChecklistSectionBlock(
                 dark = dark,
                 titleColor = titleColor,
                 subtextColor = subtextColor,
+                onDragStart = onSectionDragStart,
+                onDragDelta = onSectionDragDelta,
+                onDragEnd = onSectionDragEnd,
+                onDragCancel = onSectionDragCancel,
                 onChange = onSectionChange,
                 onRemove = { onSectionRemove(section.id) },
             )
@@ -477,6 +552,62 @@ private fun ChecklistSectionBlock(
                 }
             }
         }
+    }
+}
+
+/** The implicit block holding everything above the first section marker.
+ *  It shows up in the drag order like any other block but is never itself
+ *  draggable, and reorderSections always keeps it first
+ *  (useChecklistDrag.js:520-524). */
+private const val DefaultBlockKey = "__default__"
+
+/** The 24dp gap the blocks column puts between two section blocks, in the
+ *  same units their measured heights come back in. */
+private val BlockGap = 24.dp
+
+/** Where a dragged section block would land: the last block whose middle
+ *  the dragged one's own middle has passed. Unlike rows, blocks have
+ *  heterogeneous heights, so the tops are summed rather than multiplied
+ *  (updateSectionDragPosition, useChecklistDrag.js:472-487). */
+private fun blockDropTargetIndex(
+    blockKeys: List<String>,
+    heights: Map<String, Int>,
+    draggedIndex: Int,
+    offsetY: Float,
+    gap: Float,
+): Int {
+    var top = 0f
+    val tops = FloatArray(blockKeys.size)
+    for (i in blockKeys.indices) {
+        tops[i] = top
+        top += (heights[blockKeys[i]] ?: 0) + gap
+    }
+    val draggedHeight = (heights[blockKeys[draggedIndex]] ?: 0).toFloat()
+    val draggedCenter = tops[draggedIndex] + offsetY + draggedHeight / 2f
+    var target = draggedIndex
+    for (i in blockKeys.indices) {
+        val middle = tops[i] + (heights[blockKeys[i]] ?: 0) / 2f
+        if (draggedCenter > middle) target = i
+    }
+    return target.coerceIn(0, blockKeys.lastIndex)
+}
+
+/** How far a block slides to make room, the dragged block's own height
+ *  plus the gap, exactly as the web shifts them. */
+private fun blockNeighbourShift(
+    index: Int,
+    draggedIndex: Int,
+    dropIndex: Int,
+    blockKeys: List<String>,
+    heights: Map<String, Int>,
+    gap: Float,
+): Float {
+    if (draggedIndex < 0 || dropIndex < 0 || index == draggedIndex) return 0f
+    val shift = (heights[blockKeys.getOrNull(draggedIndex)] ?: 0) + gap
+    return when {
+        draggedIndex < dropIndex && index > draggedIndex && index <= dropIndex -> -shift
+        draggedIndex > dropIndex && index >= dropIndex && index < draggedIndex -> shift
+        else -> 0f
     }
 }
 
@@ -694,6 +825,10 @@ private fun ChecklistSectionHeader(
     dark: Boolean,
     titleColor: Color,
     subtextColor: Color,
+    onDragStart: () -> Unit,
+    onDragDelta: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
     onChange: (ChecklistSectionData) -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -727,7 +862,21 @@ private fun ChecklistSectionHeader(
             .bottomHairline(accent?.copy(alpha = if (dark) 0.35f else 0.20f))
             .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
-        Box(Modifier.semantics { contentDescription = moveLabel }) {
+        Box(
+            modifier = Modifier
+                .semantics { contentDescription = moveLabel }
+                .pointerInput(section.id) {
+                    detectDragGestures(
+                        onDragStart = { onDragStart() },
+                        onDrag = { change, delta ->
+                            change.consume()
+                            onDragDelta(delta.y)
+                        },
+                        onDragEnd = { onDragEnd() },
+                        onDragCancel = { onDragCancel() },
+                    )
+                },
+        ) {
             ChecklistDragHandle(dark = dark, small = true)
         }
         Box {
