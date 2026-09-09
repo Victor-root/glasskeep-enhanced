@@ -328,6 +328,10 @@ fun NoteDetailScreen(
     // edit here (see server/index.js's getNote vs getNoteWithCollaboration).
     val isReadOnlyAccess = note?.access == "read"
     val isOwnerAccess = note?.access == "owner"
+    // isCollaborativeNote() (useModalState.js:223): shared with someone, or
+    // owned by someone else. The server already answers the second half in
+    // `access`, so this needs no separate user-id comparison.
+    val isCollaborativeNote = !note?.collaborators.isNullOrEmpty() || (note != null && !isOwnerAccess)
     val tagsWithCounts = remember(allNotes) {
         val counts = LinkedHashMap<String, Int>()
         for (n in allNotes) {
@@ -1580,6 +1584,39 @@ fun NoteDetailScreen(
                                     },
                                 )
                             }
+                        }
+
+                        // The two warnings that sit between the images and
+                        // the content on the web (NoteModal.jsx:750): a
+                        // shared note being edited with the server down,
+                        // and a mirrored note whose own server is away.
+                        if (isCollaborativeNote && container.syncStatus.serverReachable == false) {
+                            NoteWarningBanner(
+                                message = stringResource(R.string.native_offline_collab_warning),
+                                tone = NoteBannerTone.AMBER,
+                                dark = dark,
+                            ) { tint -> WifiOffIcon(size = 16.dp, tint = tint) }
+                        }
+                        currentNote.federation?.takeIf { it.readOnly }?.let { federation ->
+                            val peer = federation.peerLabel
+                                ?: stringResource(R.string.native_fed_remote_server)
+                            NoteWarningBanner(
+                                message = String.format(
+                                    stringResource(
+                                        when (federation.state) {
+                                            "offline" -> R.string.native_fed_read_only_offline
+                                            "locked" -> R.string.native_fed_read_only_locked
+                                            "incompatible" -> R.string.native_fed_read_only_incompatible
+                                            else -> R.string.native_fed_read_only_unknown
+                                        },
+                                    ),
+                                    peer,
+                                ),
+                                // Offline is red (the peer is down); locked
+                                // and out-of-date are amber (actionable).
+                                tone = if (federation.state == "offline") NoteBannerTone.ROSE else NoteBannerTone.AMBER,
+                                dark = dark,
+                            ) { tint -> ServerIcon(size = 16.dp, tint = tint) }
                         }
 
                         Column(
@@ -3220,5 +3257,56 @@ private fun FooterIconButton(
                 )
             }
         }
+    }
+}
+
+/** Which of the two tones OfflineCollabBanner.jsx and
+ *  FederationReadOnlyBanner.jsx paint their strip in. */
+private enum class NoteBannerTone { AMBER, ROSE }
+
+/**
+ * The warning strip both note banners are: an 8px-rounded, bordered box
+ * inset from the note's own margins, with a glyph and one line of text
+ * (OfflineCollabBanner.jsx:8, same box as its federation sibling).
+ */
+@Composable
+private fun NoteWarningBanner(
+    message: String,
+    tone: NoteBannerTone,
+    dark: Boolean,
+    icon: @Composable (Color) -> Unit,
+) {
+    val background = when {
+        tone == NoteBannerTone.ROSE && dark -> Color(0x4D881337)
+        tone == NoteBannerTone.ROSE -> Color(0xFFFFF1F2)
+        dark -> Color(0x4D78350F)
+        else -> Color(0xFFFFFBEB)
+    }
+    val border = when {
+        tone == NoteBannerTone.ROSE && dark -> Color(0xFFE11D48)
+        tone == NoteBannerTone.ROSE -> Color(0xFFFB7185)
+        dark -> Color(0xFFD97706)
+        else -> Color(0xFFFBBF24)
+    }
+    val textColor = when {
+        tone == NoteBannerTone.ROSE && dark -> Color(0xFFFECDD3)
+        tone == NoteBannerTone.ROSE -> Color(0xFF9F1239)
+        dark -> Color(0xFFFDE68A)
+        else -> Color(0xFF92400E)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 8.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(background)
+            .border(1.dp, border, RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        icon(textColor)
+        Text(message, color = textColor, fontSize = 14.sp, lineHeight = 18.sp)
     }
 }

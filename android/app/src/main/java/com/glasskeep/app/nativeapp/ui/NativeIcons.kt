@@ -1614,3 +1614,21 @@ fun LockIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Colo
         "M8 11v-4a4 4 0 1 1 8 0v4",
     modifier, size, tint,
 )
+
+/** The struck-through wifi arcs OfflineCollabBanner.jsx draws itself. */
+@Composable
+fun WifiOffIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M18.364 5.636a9 9 0 0 1 0 12.728 M5.636 18.364a9 9 0 0 1 0 -12.728 " +
+        "M8.464 15.536a5 5 0 0 1 0 -7.072 M15.536 8.464a5 5 0 0 1 0 7.072 " +
+        "M11.25 12a0.75 0.75 0 1 0 1.5 0a0.75 0.75 0 0 0 -1.5 0",
+    modifier, size, tint,
+)
+
+/** tabler/server.svg: the peer a mirrored note belongs to. */
+@Composable
+fun ServerIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 4m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z " +
+        "M3 12m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z " +
+        "M7 8l0 .01 M7 16l0 .01",
+    modifier, size, tint,
+)

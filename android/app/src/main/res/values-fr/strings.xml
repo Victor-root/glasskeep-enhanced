@@ -697,4 +697,13 @@
     <string name="native_sync_action_restore">Restauration</string>
     <string name="native_sync_action_delete">Suppression</string>
     <string name="native_sync_action_reorder">R\u00e9organisation</string>
+
+    <!-- Note banners: modal/OfflineCollabBanner.jsx and
+         modal/FederationReadOnlyBanner.jsx. -->
+    <string name="native_offline_collab_warning">Vous \u00eates hors ligne, les modifications sur cette note partag\u00e9e risquent d\'\u00eatre \u00e9cras\u00e9es \u00e0 la reconnexion.</string>
+    <string name="native_fed_remote_server">Serveur distant</string>
+    <string name="native_fed_read_only_offline">%1$s est hors ligne. La note passe en lecture seule jusqu\'\u00e0 son retour.</string>
+    <string name="native_fed_read_only_locked">%1$s est verrouill\u00e9. La note reste en lecture seule tant qu\'il n\'est pas d\u00e9verrouill\u00e9.</string>
+    <string name="native_fed_read_only_incompatible">%1$s n\'est pas \u00e0 jour. La note reste en lecture seule jusqu\'\u00e0 la mise \u00e0 jour des deux serveurs.</string>
+    <string name="native_fed_read_only_unknown">Connexion \u00e0 %1$s en cours. La note est temporairement en lecture seule.</string>
 </resources>

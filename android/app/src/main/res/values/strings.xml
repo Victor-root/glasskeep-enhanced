@@ -709,4 +709,13 @@
     <string name="native_sync_action_restore">Restore</string>
     <string name="native_sync_action_delete">Delete</string>
     <string name="native_sync_action_reorder">Reorder</string>
+
+    <!-- Note banners: modal/OfflineCollabBanner.jsx and
+         modal/FederationReadOnlyBanner.jsx. -->
+    <string name="native_offline_collab_warning">You\'re offline, edits to this shared note may be overwritten when you reconnect.</string>
+    <string name="native_fed_remote_server">Remote server</string>
+    <string name="native_fed_read_only_offline">%1$s is offline. This note is read-only until it\'s back.</string>
+    <string name="native_fed_read_only_locked">%1$s is locked. This note stays read-only until it\'s unlocked.</string>
+    <string name="native_fed_read_only_incompatible">%1$s is out of date. This note stays read-only until both servers are updated.</string>
+    <string name="native_fed_read_only_unknown">Connecting to %1$s. This note is temporarily read-only.</string>
 </resources>

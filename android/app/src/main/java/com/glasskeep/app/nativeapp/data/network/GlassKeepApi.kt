@@ -116,6 +116,22 @@ data class NoteDto(
      *  roster screen" for NoteDetailScreen.kt, reached from every list
      *  through the same GET /api/notes/:id. */
     val collaborators: List<CollaboratorDto>? = null,
+    /** Non-null only on a note mirrored from another GlassKeep server
+     *  (server/index.js:949). Editing a mirror is paused whenever its
+     *  authority peer can't be reached, which is what the detail screen's
+     *  own banner says (FederationReadOnlyBanner.jsx). */
+    val federation: NoteFederationDto? = null,
+)
+
+/** noteFederationInfo() (server/federation/notes.js:1468): why a mirrored
+ *  note is read-only right now, and which peer it belongs to. `state` is
+ *  one of "offline"/"locked"/"incompatible", anything else meaning the
+ *  link is still being established. */
+@Serializable
+data class NoteFederationDto(
+    val state: String? = null,
+    val readOnly: Boolean = false,
+    val peerLabel: String? = null,
 )
 
 /** One participant on a note: mirrors participantObj() (server/index.js)
