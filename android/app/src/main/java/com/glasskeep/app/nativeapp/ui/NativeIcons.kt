@@ -1012,6 +1012,21 @@ fun IndentIncreaseIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Co
     modifier, size, tint,
 )
 
+/** The colour picker's own check (`ColorPickerPanel.jsx:101-103`): a
+ *  filled glyph, not the stroked [CheckmarkIcon] used elsewhere. */
+@Composable
+fun CheckFilledIcon(modifier: Modifier = Modifier, size: Dp = 20.dp, tint: Color = Color.White) {
+    val path = remember {
+        PathParser().parsePathString("M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z").toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint)
+        }
+    }
+}
+
 @Composable
 fun RefreshIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
     "M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4 " +

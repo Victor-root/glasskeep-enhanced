@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,27 +47,36 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 
 /**
- * The web settings panel's own controls, rebuilt natively.
+ * The web app's own controls, rebuilt natively.
  *
- * SettingsPanel.jsx and SettingsAccordion.jsx hand-roll every control
- * (switch, segmented chip, accordion, row card) instead of using a
- * component library, so Material 3's Switch/Card/ListItem all miss by a
- * few pixels and a few milliseconds. These reproduce the markup's own
- * geometry and timings; they live in their own file because the
- * notifications and collaboration screens draw the same rows.
+ * The web hand-rolls every control (switch, segmented chip, accordion,
+ * row card, dialog, popover) instead of using a component library, so
+ * Material 3's Switch/Card/AlertDialog all miss by a few pixels and a
+ * few milliseconds. These reproduce the markup's own geometry and
+ * timings, and live in their own file because several screens draw the
+ * same pieces.
  *
  * Tailwind's default transition curve, `cubic-bezier(0.4, 0, 0.2, 1)`,
  * covers everything here except the accordion body, which is `ease-out`
@@ -489,6 +499,7 @@ internal fun GkDialog(
     dark: Boolean,
     borderColor: Color,
     dismissOnClickOutside: Boolean = true,
+    maxWidth: Dp = 448.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(
@@ -501,7 +512,7 @@ internal fun GkDialog(
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
-                .widthIn(max = 448.dp)
+                .widthIn(max = maxWidth)
                 .shadow(elevation = 24.dp, shape = RoundedCornerShape(12.dp))
                 .clip(RoundedCornerShape(12.dp))
                 .background(if (dark) DialogBgDark else Color.White)
@@ -621,6 +632,81 @@ internal fun GkTextField(
                 innerTextField()
             },
         )
+    }
+}
+
+/**
+ * The note footer's popovers (`ColorPickerPanel.jsx:14-65` and
+ * `ModalFooter.jsx:384-417`): a fixed-width card that opens upwards from
+ * the tapped footer button, kept 8px away from the screen edges, with a
+ * 12x6 arrow pointing back down at the button's centre. Neither panel
+ * has any open or close animation on the web.
+ *
+ * The caller places this inside the button's own Box: Compose hands the
+ * position provider that button's window bounds, which is exactly what
+ * the web reads from `getBoundingClientRect()`.
+ */
+@Composable
+internal fun FooterPopover(
+    width: Dp,
+    gap: Dp,
+    background: Color,
+    borderColor: Color,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val density = LocalDensity.current
+    var arrowLeft by remember { mutableStateOf(0.dp) }
+    val positionProvider = remember(density, width, gap) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset {
+                val widthPx = with(density) { width.roundToPx() }
+                val marginPx = with(density) { 8.dp.roundToPx() }
+                val gapPx = with(density) { gap.roundToPx() }
+                val left = minOf(anchorBounds.left, windowSize.width - widthPx - marginPx)
+                    .coerceAtLeast(marginPx)
+                // Half the arrow's width, so its tip lands on the
+                // button's centre.
+                val halfArrowPx = with(density) { 6.dp.roundToPx() }
+                arrowLeft = with(density) { (anchorBounds.center.x - left - halfArrowPx).toDp() }
+                return IntOffset(left, anchorBounds.top - gapPx - popupContentSize.height)
+            }
+        }
+    }
+    Popup(
+        popupPositionProvider = positionProvider,
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true),
+    ) {
+        Column(Modifier.width(width)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(elevation = 24.dp, shape = RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(background)
+                    .border(1.dp, borderColor, RoundedCornerShape(16.dp)),
+                content = content,
+            )
+            Canvas(
+                modifier = Modifier
+                    .padding(start = arrowLeft.coerceIn(12.dp, width - 24.dp))
+                    .size(width = 12.dp, height = 6.dp),
+            ) {
+                val arrow = Path().apply {
+                    moveTo(0f, 0f)
+                    lineTo(size.width, 0f)
+                    lineTo(size.width / 2f, size.height)
+                    close()
+                }
+                drawPath(arrow, color = background)
+            }
+        }
     }
 }
 

@@ -45,14 +45,12 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -65,10 +63,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -82,7 +83,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NativeAppContainer
@@ -1504,6 +1504,49 @@ fun NoteDetailScreen(
                         onCollaborateClick = { onOpenCollaborators() },
                         onTrashClick = { showTrashConfirm = true },
                         onKebabClick = { menuExpanded = true },
+                        colorPanel = {
+                            if (showColorPicker) {
+                                NoteColorPopover(
+                                    currentColorKey = currentNote.color,
+                                    dark = dark,
+                                    enabled = !changingColor,
+                                    onSelect = { colorKey -> changeColor(colorKey) },
+                                    onDismiss = { showColorPicker = false },
+                                )
+                            }
+                        },
+                        tagsPanel = {
+                            if (showTagsPicker) {
+                                NoteTagsPopover(
+                                    appliedTags = currentNote.tags,
+                                    allTags = tagsWithCounts,
+                                    input = tagInput,
+                                    enabled = !changingTags,
+                                    themeId = container.themeState.themeId,
+                                    dark = dark,
+                                    onInputChange = { value ->
+                                        // A comma commits everything before it as a
+                                        // tag, same trigger the web uses on
+                                        // keydown/paste (ModalFooter.jsx's
+                                        // handleTagKeyDown / handleTagPaste); Compose
+                                        // has no pre-insertion key intercept for a
+                                        // soft keyboard, so this reacts to the comma
+                                        // once it is in the text instead, which lands
+                                        // on the same end state.
+                                        if (value.contains(",")) {
+                                            val segments = value.split(",")
+                                            addTagsFromInput(segments.dropLast(1).joinToString(","))
+                                            tagInput = segments.last()
+                                        } else {
+                                            tagInput = value
+                                        }
+                                    },
+                                    onToggle = { tag -> toggleTag(tag) },
+                                    onCreate = { raw -> addTagsFromInput(raw); tagInput = "" },
+                                    onDismiss = { showTagsPicker = false; tagInput = "" },
+                                )
+                            }
+                        },
                         menu = {
                             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                                 if (!currentNote.trashed) {
@@ -1608,211 +1651,6 @@ fun NoteDetailScreen(
                 }
             }
         }
-        if (showColorPicker) {
-            val currentColorKey = note?.color ?: "default"
-            Dialog(onDismissRequest = { showColorPicker = false }) {
-                Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (dark) DarkBgColor else Color.White)
-                        .padding(20.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.native_note_detail_color_title),
-                        color = titleColor,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    NOTE_COLOR_ORDER.chunked(4).forEach { rowKeys ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                            rowKeys.forEach { colorKey ->
-                                val selected = colorKey == currentColorKey
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(CircleShape)
-                                        .background(noteColorFor(colorKey, dark))
-                                        .border(
-                                            width = if (selected) 3.dp else 1.dp,
-                                            color = if (selected) Indigo else borderColor,
-                                            shape = CircleShape,
-                                        )
-                                        .clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null,
-                                            enabled = !changingColor,
-                                            role = Role.Button,
-                                        ) { changeColor(colorKey) },
-                                ) {}
-                            }
-                        }
-                        Spacer(Modifier.height(14.dp))
-                    }
-                }
-            }
-        }
-
-        if (showTagsPicker) {
-            val currentTags = note?.tags ?: emptyList()
-            val trimmedInput = tagInput.trim()
-            val filteredTags = remember(tagsWithCounts, tagInput) {
-                if (trimmedInput.isEmpty()) tagsWithCounts
-                else tagsWithCounts.filter { it.tag.contains(trimmedInput, ignoreCase = true) }
-            }
-            val isNewTag = trimmedInput.isNotEmpty() &&
-                tagsWithCounts.none { it.tag.equals(trimmedInput, ignoreCase = true) }
-
-            Dialog(onDismissRequest = { showTagsPicker = false; tagInput = "" }) {
-                Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (dark) DarkBgColor else Color.White)
-                        // Unlike the fixed-size color grid above, this dialog's
-                        // content grows with however many tags exist, so it
-                        // gets its own outer scroll (the suggestion list below
-                        // is separately capped+scrollable at 200dp, this is
-                        // for the dialog as a whole on a short/landscape screen).
-                        .verticalScroll(rememberScrollState())
-                        .padding(20.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.native_note_detail_tags_title),
-                        color = titleColor,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                    )
-                    Spacer(Modifier.height(14.dp))
-
-                    OutlinedTextField(
-                        value = tagInput,
-                        onValueChange = { value ->
-                            // A comma commits everything before it as a tag,
-                            // same trigger the web uses on keydown/paste
-                            // (ModalFooter.jsx's handleTagKeyDown /
-                            // handleTagPaste); Compose has no pre-insertion
-                            // key intercept for a soft keyboard, so this
-                            // reacts to the comma once it's in the text
-                            // instead, which lands on the same end state.
-                            if (value.contains(",")) {
-                                val segments = value.split(",")
-                                addTagsFromInput(segments.dropLast(1).joinToString(","))
-                                tagInput = segments.last()
-                            } else {
-                                tagInput = value
-                            }
-                        },
-                        placeholder = { Text(stringResource(R.string.native_note_detail_tags_search_placeholder)) },
-                        singleLine = true,
-                        colors = detailFieldColors(titleColor, subtextColor, borderColor),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = {
-                            if (trimmedInput.isNotEmpty()) {
-                                addTagsFromInput(trimmedInput)
-                                tagInput = ""
-                            }
-                        }),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(12.dp))
-
-                    if (filteredTags.isNotEmpty()) {
-                        Text(
-                            stringResource(R.string.native_note_detail_tags_existing),
-                            color = subtextColor,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Column(modifier = Modifier.heightIn(max = 200.dp).verticalScroll(rememberScrollState())) {
-                            for (entry in filteredTags) {
-                                val checked = isTagApplied(entry.tag)
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null,
-                                            enabled = !changingTags,
-                                            role = Role.Button,
-                                        ) { toggleTag(entry.tag) }
-                                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(18.dp)
-                                            .clip(RoundedCornerShape(5.dp))
-                                            .background(if (checked) Indigo else Color.Transparent)
-                                            .border(
-                                                width = if (checked) 0.dp else 1.5.dp,
-                                                color = if (checked) Color.Transparent else borderColor,
-                                                shape = RoundedCornerShape(5.dp),
-                                            ),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        if (checked) CheckmarkIcon(size = 12.dp, tint = Color.White)
-                                    }
-                                    Spacer(Modifier.width(10.dp))
-                                    Text(
-                                        entry.tag,
-                                        color = titleColor,
-                                        fontSize = 14.sp,
-                                        fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Normal,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    Text(entry.count.toString(), color = subtextColor, fontSize = 11.sp)
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(8.dp))
-                    } else if (!isNewTag) {
-                        Text(
-                            stringResource(R.string.native_note_detail_tags_none_found),
-                            color = subtextColor,
-                            fontSize = 13.sp,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                    }
-
-                    if (isNewTag) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    enabled = !changingTags,
-                                    role = Role.Button,
-                                ) { addTagsFromInput(trimmedInput); tagInput = "" }
-                                .padding(horizontal = 8.dp, vertical = 8.dp),
-                        ) {
-                            PlusIcon(size = 14.dp, tint = Indigo)
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                String.format(stringResource(R.string.native_note_detail_tags_create), trimmedInput),
-                                color = Indigo,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                        Spacer(Modifier.height(8.dp))
-                    }
-
-                    if (currentTags.isNotEmpty()) {
-                        Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
-                        Spacer(Modifier.height(10.dp))
-                        TagChipsRow(tags = currentTags, enabled = !changingTags, onRemove = { toggleTag(it) })
-                    }
-                }
-            }
-        }
-
         if (showTrashConfirm) {
             // The owner of a note that has collaborators gets an explicit
             // choice (mirrors the web's own ConfirmDeleteDialog collabOwner
@@ -1829,39 +1667,27 @@ fun NoteDetailScreen(
                     onConfirm = { mode -> confirmTrash(mode) },
                 )
             } else {
-                AlertDialog(
-                    onDismissRequest = { showTrashConfirm = false },
-                    title = { Text(stringResource(R.string.native_note_detail_trash_confirm_title)) },
-                    text = { Text(stringResource(R.string.native_note_detail_trash_confirm_body)) },
-                    confirmButton = {
-                        TextButton(onClick = { confirmTrash() }, enabled = !trashing) {
-                            Text(stringResource(R.string.native_note_detail_move_to_trash), color = trashMenuColor)
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showTrashConfirm = false }) {
-                            Text(stringResource(R.string.native_note_detail_trash_confirm_cancel))
-                        }
-                    },
+                ConfirmDeleteDialog(
+                    title = stringResource(R.string.native_note_detail_trash_confirm_title),
+                    body = stringResource(R.string.native_note_detail_trash_confirm_body),
+                    confirmLabel = stringResource(R.string.native_note_detail_move_to_trash),
+                    dark = dark,
+                    enabled = !trashing,
+                    onDismiss = { showTrashConfirm = false },
+                    onConfirm = { confirmTrash() },
                 )
             }
         }
 
         if (showPermanentDeleteConfirm) {
-            AlertDialog(
-                onDismissRequest = { showPermanentDeleteConfirm = false },
-                title = { Text(stringResource(R.string.native_note_detail_permanent_delete_confirm_title)) },
-                text = { Text(stringResource(R.string.native_note_detail_permanent_delete_confirm_body)) },
-                confirmButton = {
-                    TextButton(onClick = { confirmPermanentDelete() }, enabled = !deletingPermanently) {
-                        Text(stringResource(R.string.native_note_detail_delete_permanently), color = trashMenuColor)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showPermanentDeleteConfirm = false }) {
-                        Text(stringResource(R.string.native_note_detail_trash_confirm_cancel))
-                    }
-                },
+            ConfirmDeleteDialog(
+                title = stringResource(R.string.native_note_detail_permanent_delete_confirm_title),
+                body = stringResource(R.string.native_note_detail_permanent_delete_confirm_body),
+                confirmLabel = stringResource(R.string.native_note_detail_delete_permanently),
+                dark = dark,
+                enabled = !deletingPermanently,
+                onDismiss = { showPermanentDeleteConfirm = false },
+                onConfirm = { confirmPermanentDelete() },
             )
         }
 
@@ -1899,10 +1725,20 @@ fun NoteDetailScreen(
  *  small composable rather than the whole screen. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TagChipsRow(tags: List<String>, enabled: Boolean, onRemove: (String) -> Unit) {
+private fun TagChipsRow(
+    tags: List<String>,
+    enabled: Boolean,
+    themeId: String?,
+    dark: Boolean,
+    onRemove: (String) -> Unit,
+) {
+    // .gk-tag-chip (globalCSS.js:6239-6246): accent at 12% behind, at 24%
+    // on the border, and the text in --gk-icon-fg rather than the accent.
+    val accent = WorkspaceTheme.accent(themeId, dark)
+    val chipFg = WorkspaceTheme.iconPillFg(themeId, dark)
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         for (tag in tags) {
             val removeLabel = String.format(stringResource(R.string.native_note_detail_tags_remove), tag)
@@ -1910,15 +1746,15 @@ private fun TagChipsRow(tags: List<String>, enabled: Boolean, onRemove: (String)
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
-                    .background(Indigo.copy(alpha = 0.14f))
-                    .border(width = 1.dp, color = Indigo.copy(alpha = 0.3f), shape = RoundedCornerShape(999.dp))
-                    .padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                    .background(accent.copy(alpha = 0.12f))
+                    .border(width = 1.dp, color = accent.copy(alpha = 0.24f), shape = RoundedCornerShape(999.dp))
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(tag, color = Indigo, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.width(4.dp))
+                Text(tag, color = chipFg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 Box(
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(12.dp)
                         .clip(CircleShape)
                         .semantics { contentDescription = removeLabel }
                         .clickable(
@@ -1929,8 +1765,357 @@ private fun TagChipsRow(tags: List<String>, enabled: Boolean, onRemove: (String)
                         ) { onRemove(tag) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    CloseIcon(size = 10.dp, tint = Indigo)
+                    CloseIcon(size = 8.dp, tint = accent.copy(alpha = 0.65f))
                 }
+            }
+        }
+    }
+}
+
+private val ColorPanelBgLight = Color(0xFAFFFFFF)
+private val ColorPanelBgDark = Color(0xFA111827)
+private val ColorPanelBorderLight = Color(0xCCF3F4F6)
+private val ColorPanelBorderDark = Color(0x80374151)
+private val ColorDotDefaultBorderLight = Color(0xFFD1D5DB)
+private val ColorDotDefaultBorderDark = Color(0xFF6B7280)
+private val ColorDotDefaultInnerDark = Color(0xFF1F2937)
+private val ColorSelectionRing = Color(0xFF6366F1)
+private val TagPanelBgLight = Color(0xFFFFFFFF)
+private val TagPanelBgDark = Color(0xFF111827)
+private val TagSearchBgLight = Color(0xFFF9FAFB)
+private val TagSearchBgDark = Color(0xCC1F2937)
+private val TagSearchBorderLight = Color(0xCCE5E7EB)
+private val TagSearchBorderDark = Color(0x99374151)
+private val TagMutedLight = Color(0xFF9CA3AF)
+private val TagMutedDark = Color(0xFF6B7280)
+private val TagRowFgLight = Color(0xFF374151)
+private val TagRowFgDark = Color(0xFFE5E7EB)
+private val TagDividerLight = Color(0xFFF3F4F6)
+private val TagDividerDark = Color(0xFF1F2937)
+private val TagCreateBgLight = Color(0xCCD1FAE5)
+private val TagCreateBgDark = Color(0x66065F46)
+private val TagCreateFgLight = Color(0xFF059669)
+private val TagCreateFgDark = Color(0xFF34D399)
+private val TagCreateIconLight = Color(0xFF10B981)
+
+/**
+ * ColorPickerPanel.jsx: a 256px card opening upward from the palette
+ * button, three rows of four 48px dots with 12px gaps, and no animation
+ * at all - it simply appears.
+ */
+@Composable
+private fun NoteColorPopover(
+    currentColorKey: String,
+    dark: Boolean,
+    enabled: Boolean,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    FooterPopover(
+        width = 256.dp,
+        gap = 8.dp,
+        background = if (dark) ColorPanelBgDark else ColorPanelBgLight,
+        borderColor = if (dark) ColorPanelBorderDark else ColorPanelBorderLight,
+        onDismiss = onDismiss,
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            NOTE_COLOR_ORDER.chunked(4).forEach { rowKeys ->
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    rowKeys.forEach { colorKey ->
+                        NoteColorDot(
+                            colorKey = colorKey,
+                            selected = colorKey == currentColorKey,
+                            dark = dark,
+                            enabled = enabled,
+                            onClick = { onSelect(colorKey) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One 48px dot. `default` is drawn as an empty ring with its own inner
+ *  disc and never carries the check mark, exactly as the web does. */
+@Composable
+private fun NoteColorDot(
+    colorKey: String,
+    selected: Boolean,
+    dark: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val isDefault = colorKey == "default"
+    val label = noteColorName(colorKey)
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            // ring-[3px] with ring-offset-2: the ring sits 2dp outside
+            // the dot, in the 12dp gap, and never moves the grid.
+            .drawBehind {
+                if (!selected) return@drawBehind
+                val stroke = 3.dp.toPx()
+                drawCircle(
+                    color = ColorSelectionRing,
+                    radius = size.minDimension / 2f + 2.dp.toPx() + stroke / 2f,
+                    style = Stroke(width = stroke),
+                )
+            }
+            .clip(CircleShape)
+            .background(if (isDefault) Color.Transparent else noteColorFor(colorKey, dark))
+            .then(
+                if (isDefault) {
+                    Modifier.border(
+                        width = 2.dp,
+                        color = if (dark) ColorDotDefaultBorderDark else ColorDotDefaultBorderLight,
+                        shape = CircleShape,
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .semantics { contentDescription = label }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+            ) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (isDefault) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(if (dark) ColorDotDefaultInnerDark else Color.White),
+            )
+        } else if (selected) {
+            CheckFilledIcon(size = 20.dp, tint = Color.White)
+        }
+    }
+}
+
+/**
+ * ModalFooter.jsx's tag menu: a 260px card opening 6px above the tag
+ * button, with a search pill, the existing tags with their usage counts,
+ * a create row, and the applied chips at the bottom. No animation.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun NoteTagsPopover(
+    appliedTags: List<String>,
+    allTags: List<TagCount>,
+    input: String,
+    enabled: Boolean,
+    themeId: String?,
+    dark: Boolean,
+    onInputChange: (String) -> Unit,
+    onToggle: (String) -> Unit,
+    onCreate: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val trimmed = input.trim()
+    val filtered = remember(allTags, trimmed) {
+        if (trimmed.isEmpty()) allTags else allTags.filter { it.tag.contains(trimmed, ignoreCase = true) }
+    }
+    val isNewTag = trimmed.isNotEmpty() && allTags.none { it.tag.equals(trimmed, ignoreCase = true) }
+    val muted = if (dark) TagMutedDark else TagMutedLight
+    val rowFg = if (dark) TagRowFgDark else TagRowFgLight
+    val divider = if (dark) TagDividerDark else TagDividerLight
+    val accent = WorkspaceTheme.accent(themeId, dark)
+
+    FooterPopover(
+        width = 260.dp,
+        gap = 6.dp,
+        background = if (dark) TagPanelBgDark else TagPanelBgLight,
+        // .gk-tag-popover overrides Tailwind's own border with the
+        // workspace accent at 22% (globalCSS.js:6213-6215).
+        borderColor = accent.copy(alpha = 0.22f),
+        onDismiss = onDismiss,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 6.dp),
+        ) {
+            var focused by remember { mutableStateOf(false) }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (dark) TagSearchBgDark else TagSearchBgLight)
+                    .border(
+                        width = 1.dp,
+                        color = if (focused) accent else if (dark) TagSearchBorderDark else TagSearchBorderLight,
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SearchIcon(size = 12.dp, tint = muted)
+                Spacer(Modifier.width(8.dp))
+                BasicTextField(
+                    value = input,
+                    onValueChange = onInputChange,
+                    singleLine = true,
+                    enabled = enabled,
+                    textStyle = TextStyle(color = rowFg, fontSize = 14.sp),
+                    cursorBrush = SolidColor(accent),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (isNewTag) onCreate(trimmed) }),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { focused = it.isFocused },
+                    decorationBox = { innerTextField ->
+                        if (input.isEmpty()) {
+                            Text(
+                                stringResource(R.string.native_note_detail_tags_search_placeholder),
+                                color = muted,
+                                fontSize = 14.sp,
+                            )
+                        }
+                        innerTextField()
+                    },
+                )
+            }
+        }
+
+        if (filtered.isNotEmpty()) {
+            Text(
+                stringResource(R.string.native_note_detail_tags_existing).uppercase(),
+                color = muted,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            )
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 208.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 6.dp)
+                    .padding(bottom = 6.dp),
+            ) {
+                filtered.forEach { entry ->
+                    val checked = appliedTags.any { it.equals(entry.tag, ignoreCase = true) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                enabled = enabled,
+                                role = Role.Checkbox,
+                            ) { onToggle(entry.tag) }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (checked) WorkspaceTheme.gradFrom(themeId) else Color.Transparent)
+                                .border(
+                                    width = 2.dp,
+                                    color = if (checked) {
+                                        WorkspaceTheme.gradFrom(themeId)
+                                    } else if (dark) {
+                                        ColorDotDefaultBorderDark
+                                    } else {
+                                        ColorDotDefaultBorderLight
+                                    },
+                                    shape = RoundedCornerShape(6.dp),
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (checked) CheckmarkIcon(size = 12.dp, tint = Color.White)
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        TagIcon(size = 12.dp, tint = rowFg.copy(alpha = 0.5f))
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            entry.tag,
+                            color = rowFg,
+                            fontSize = 14.sp,
+                            fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            entry.count.toString(),
+                            color = muted,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+            }
+        } else if (!isNewTag) {
+            Text(
+                stringResource(R.string.native_note_detail_tags_none_found),
+                color = muted,
+                fontSize = 14.sp,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
+                textAlign = TextAlign.Center,
+            )
+        }
+
+        if (isNewTag) {
+            if (filtered.isNotEmpty()) {
+                Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(1.dp).background(divider))
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp, vertical = 6.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        enabled = enabled,
+                        role = Role.Button,
+                    ) { onCreate(trimmed) }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (dark) TagCreateBgDark else TagCreateBgLight),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PlusIcon(size = 12.dp, tint = if (dark) TagCreateFgDark else TagCreateIconLight)
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    String.format(stringResource(R.string.native_note_detail_tags_create), trimmed),
+                    color = if (dark) TagCreateFgDark else TagCreateFgLight,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        if (appliedTags.isNotEmpty()) {
+            Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(1.dp).background(divider))
+            Box(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                TagChipsRow(
+                    tags = appliedTags,
+                    enabled = enabled,
+                    themeId = themeId,
+                    dark = dark,
+                    onRemove = onToggle,
+                )
             }
         }
     }
@@ -2020,15 +2205,48 @@ internal fun detailFieldColors(textColor: Color, subtextColor: Color, borderColo
         cursorColor = Indigo,
     )
 
-/** Owner-of-a-shared-note trash confirmation: mirrors the web's own
- *  ConfirmDeleteDialog collabOwner variant (and this app's own
- *  CollaboratorsScreen.kt RemoveCollaboratorDialog, same three-choice
- *  vertical-stack shape) rather than Material3's AlertDialog, which only
- *  has room for two buttons. "Remove for me" leaves via ownership
- *  transfer (mode=remove_self, same as the plain single-button dialog's
- *  own default); "Delete for everyone" hard-deletes the note for every
- *  collaborator (mode=delete_for_all, owner-only server-side - see
- *  TrashNoteRequest's own doc comment). */
+/** ConfirmDeleteDialog.jsx's plain and trashed variants: a centred card,
+ *  title, one line of explanation, then Cancel and the red action side by
+ *  side at the bottom right. */
+@Composable
+private fun ConfirmDeleteDialog(
+    title: String,
+    body: String,
+    confirmLabel: String,
+    dark: Boolean,
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val titleColor = if (dark) DarkTitleColor else LightTitleColor
+    val borderColor = if (dark) DarkBorderColor else LightBorderColor
+    GkDialog(onDismissRequest = onDismiss, dark = dark, borderColor = borderColor, maxWidth = 384.dp) {
+        Text(title, color = titleColor, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+        Text(body, color = if (dark) DialogBodyDark else DialogBodyLight, fontSize = 14.sp, lineHeight = 20.sp)
+        Spacer(Modifier.height(20.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+        ) {
+            GkSecondaryButton(
+                label = stringResource(R.string.native_note_detail_trash_confirm_cancel),
+                borderColor = borderColor,
+                textColor = titleColor,
+                onClick = onDismiss,
+            )
+            GkDangerButton(label = confirmLabel, enabled = enabled, onClick = onConfirm)
+        }
+    }
+}
+
+/** ConfirmDeleteDialog.jsx's third variant, for the owner of a shared
+ *  note: the buttons become a full-width column, and there are three of
+ *  them. "Remove for me" leaves via ownership transfer
+ *  (mode=remove_self, same as the plain dialog's own default); "Delete
+ *  for everyone" hard-deletes the note for every collaborator
+ *  (mode=delete_for_all, owner-only server-side - see TrashNoteRequest's
+ *  own doc comment). */
 @Composable
 private fun DeleteSharedNoteDialog(
     dark: Boolean,
@@ -2036,81 +2254,61 @@ private fun DeleteSharedNoteDialog(
     onConfirm: (mode: String) -> Unit,
 ) {
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
-    val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
 
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
+    GkDialog(onDismissRequest = onDismiss, dark = dark, borderColor = borderColor, maxWidth = 384.dp) {
+        Text(
+            stringResource(R.string.native_note_detail_delete_shared_question),
+            color = titleColor,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(R.string.native_note_detail_delete_shared_subtitle),
+            color = if (dark) DialogBodyDark else DialogBodyLight,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+        )
+        Spacer(Modifier.height(20.dp))
+        GkSecondaryButton(
+            label = stringResource(R.string.native_note_detail_remove_for_me),
+            borderColor = borderColor,
+            textColor = titleColor,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { onConfirm("remove_self") },
+        )
+        Spacer(Modifier.height(8.dp))
+        GkDangerButton(
+            label = stringResource(R.string.native_note_detail_delete_for_all),
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { onConfirm("delete_for_all") },
+        )
+        Spacer(Modifier.height(8.dp))
+        Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(if (dark) DarkBgColor else Color.White)
-                .padding(20.dp),
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    role = Role.Button,
+                ) { onDismiss() }
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center,
         ) {
             Text(
-                stringResource(R.string.native_note_detail_delete_shared_question),
-                color = titleColor,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
+                stringResource(R.string.native_dialog_cancel),
+                color = if (dark) DialogBodyDark else DialogBodyLight,
+                fontSize = 14.sp,
             )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.native_note_detail_delete_shared_subtitle),
-                color = subtextColor,
-                fontSize = 13.sp,
-            )
-            Spacer(Modifier.height(16.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .border(1.dp, borderColor, RoundedCornerShape(10.dp))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        role = Role.Button,
-                    ) { onConfirm("remove_self") },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(stringResource(R.string.native_note_detail_remove_for_me), color = titleColor, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            }
-            Spacer(Modifier.height(8.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(ErrorColor)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        role = Role.Button,
-                    ) { onConfirm("delete_for_all") },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(stringResource(R.string.native_note_detail_delete_for_all), color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            }
-            Spacer(Modifier.height(8.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(40.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        role = Role.Button,
-                    ) { onDismiss() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(stringResource(R.string.native_dialog_cancel), color = subtextColor, fontSize = 14.sp)
-            }
         }
     }
 }
+
+/** `text-gray-600` / `dark:text-gray-300`, the dialog body colour. */
+private val DialogBodyLight = Color(0xFF4B5563)
+private val DialogBodyDark = Color(0xFFD1D5DB)
 
 /** Any newline the user manages to get into a title (IME, paste, drop) is
  *  flattened to a space, same guard ModalHeader.jsx keeps: titles are
@@ -2271,6 +2469,8 @@ private fun NoteModalFooter(
     onCollaborateClick: () -> Unit,
     onTrashClick: () -> Unit,
     onKebabClick: () -> Unit,
+    colorPanel: @Composable () -> Unit,
+    tagsPanel: @Composable () -> Unit,
     menu: @Composable () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
@@ -2285,11 +2485,14 @@ private fun NoteModalFooter(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (showColorButton) {
-                FooterIconButton(
-                    contentDescription = stringResource(R.string.native_note_detail_change_color),
-                    onClick = onColorClick,
-                ) {
-                    PaletteIcon(size = 18.dp)
+                Box {
+                    FooterIconButton(
+                        contentDescription = stringResource(R.string.native_note_detail_change_color),
+                        onClick = onColorClick,
+                    ) {
+                        PaletteIcon(size = 18.dp)
+                    }
+                    colorPanel()
                 }
             }
             if (showImageButton) {
@@ -2301,13 +2504,16 @@ private fun NoteModalFooter(
                 }
             }
             if (showTagsButton) {
-                FooterIconButton(
-                    contentDescription = stringResource(R.string.native_note_detail_tags),
-                    badgeCount = tagCount,
-                    badgeGradient = accentGradient,
-                    onClick = onTagsClick,
-                ) {
-                    TagIcon(size = 18.dp, tint = iconColor)
+                Box {
+                    FooterIconButton(
+                        contentDescription = stringResource(R.string.native_note_detail_tags),
+                        badgeCount = tagCount,
+                        badgeGradient = accentGradient,
+                        onClick = onTagsClick,
+                    ) {
+                        TagIcon(size = 18.dp, tint = iconColor)
+                    }
+                    tagsPanel()
                 }
             }
             if (showCollaborateButton) {

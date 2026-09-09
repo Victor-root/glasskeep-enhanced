@@ -1,6 +1,9 @@
 package com.glasskeep.app.nativeapp.ui
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import com.glasskeep.app.R
 
 /**
  * Same 12 note swatches as src/utils/colors.js (LIGHT_COLORS / DARK_COLORS),
@@ -49,6 +52,26 @@ fun noteColorFor(colorKey: String?, dark: Boolean): Color {
 val NOTE_COLOR_ORDER = listOf(
     "default", "red", "yellow", "green", "blue", "purple",
     "peach", "sage", "mint", "sky", "sand", "mauve",
+)
+
+/** trColorName() from src/utils/colors.js: the translated swatch name,
+ *  which the picker uses as each dot's label. */
+@Composable
+fun noteColorName(colorKey: String): String = stringResource(
+    when (colorKey) {
+        "red" -> R.string.native_note_color_red
+        "yellow" -> R.string.native_note_color_yellow
+        "green" -> R.string.native_note_color_green
+        "blue" -> R.string.native_note_color_blue
+        "purple" -> R.string.native_note_color_purple
+        "peach" -> R.string.native_note_color_peach
+        "sage" -> R.string.native_note_color_sage
+        "mint" -> R.string.native_note_color_mint
+        "sky" -> R.string.native_note_color_sky
+        "sand" -> R.string.native_note_color_sand
+        "mauve" -> R.string.native_note_color_mauve
+        else -> R.string.native_note_color_default
+    },
 )
 
 /**
