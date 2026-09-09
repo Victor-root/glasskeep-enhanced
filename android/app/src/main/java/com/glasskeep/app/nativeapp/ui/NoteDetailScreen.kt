@@ -9,10 +9,13 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,11 +25,14 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -35,6 +41,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -42,7 +49,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -59,16 +65,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -99,7 +109,6 @@ import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.toEntity
 import com.glasskeep.app.nativeapp.data.network.NoteDto
-import com.glasskeep.app.ui.ButtonGradient
 import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
@@ -108,8 +117,10 @@ import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
+import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -299,6 +310,7 @@ fun NoteDetailScreen(
     val duplicateSuffix = stringResource(R.string.native_note_detail_duplicate_suffix)
     val downloadErrorMessage = stringResource(R.string.native_note_detail_download_error)
     val imageAddErrorMessage = stringResource(R.string.native_note_detail_add_image_error)
+    val editedPrefix = stringResource(R.string.native_note_detail_edited_prefix)
 
     fun togglePin() {
         val current = note ?: return
@@ -1150,258 +1162,99 @@ fun NoteDetailScreen(
     // treatment routed through it explicitly.
     BackHandler(onBack = ::goBack)
 
-    val bgModifier = Modifier.background(WorkspaceTheme.appBackground(container.themeState.themeId, dark))
+    // The open note is painted in its own color, edge to edge: no card, no
+    // radius, no shadow, no page padding. NoteModal.jsx hardcodes
+    // `rounded-none shadow-none w-full max-w-none` plus `height: 100dvh` on
+    // phones, and fills the whole panel (sticky bar included) with
+    // modalBgFor(color), so the screen reads as one flat color.
+    val modalBg = noteModalBackground(note?.color, dark)
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
-    val cardBg = note?.let { noteColorFor(it.color, dark) } ?: (if (dark) DarkBgColor else Color.White)
-    // Same amber/red the web kebab menu uses for these two entries
-    // (ModalFooter.jsx), so "archive" and "delete" keep reading as
-    // distinct from the rest of the menu on native too.
+    val accentColor = WorkspaceTheme.accent(container.themeState.themeId, dark)
+    // .modal-icon-btn at rest (globalCSS.js:1343/1367).
+    val modalIconColor = if (dark) Color.White.copy(alpha = 0.65f) else Color(0xFF4B5563)
+    // .modal-footer-btn at rest (globalCSS.js:1797/1852).
+    val footerIconColor = if (dark) Color.White.copy(alpha = 0.92f) else Color.Black.copy(alpha = 0.54f)
+    // Same amber/red/orange the web kebab menu uses for these entries
+    // (ModalFooter.jsx), so they keep reading as distinct on native too.
     val archiveMenuColor = if (dark) Color(0xFFfbbf24) else Color(0xFFa16207)
     val trashMenuColor = if (dark) Color(0xFFf87171) else Color(0xFFdc2626)
-    // Same dedicated orange ModalFooter.jsx uses for its "Reminder" entry.
     val reminderMenuColor = if (dark) Color(0xFFfb923c) else Color(0xFFea580c)
+    val collaborateColor = if (dark) Color(0xFFc4b5fd) else Color(0xFF7c3aed)
+    val duplicateColor = if (dark) Color(0xFF67e8f9) else Color(0xFF0891b2)
+    val downloadColor = if (dark) Color(0xFF4ade80) else Color(0xFF16a34a)
+    val imageButtonColor = if (dark) Color(0xFF7dd3fc) else Color(0xFF0284c7)
 
-    Box(Modifier.fillMaxSize().then(bgModifier)) {
-        Column(Modifier.fillMaxSize()) {
-            Column {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(WorkspaceTheme.headerGradient(container.themeState.themeId, dark))
-                        .windowInsetsPadding(WindowInsets.statusBars)
-                        .padding(horizontal = 8.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+    Box(Modifier.fillMaxSize().background(modalBg)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .imePadding(),
+        ) {
+            // Sticky icon bar (ModalHeader.jsx's own mobile half): back on
+            // the left, pin then save on the right, 8dp/6dp padding, 32dp
+            // round buttons. There is deliberately no close cross: on a
+            // phone the back arrow is the only way out.
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ModalIconButton(
+                    contentDescription = stringResource(R.string.native_note_detail_back),
+                    onClick = { goBack() },
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                role = Role.Button,
-                            ) { goBack() }
-                            .padding(6.dp)
-                            .weight(1f),
-                    ) {
-                        BackArrowIcon(size = 22.dp, tint = titleColor)
-                        Text(
-                            stringResource(R.string.native_note_detail_back),
-                            color = subtextColor,
-                            fontSize = 14.sp,
-                            modifier = Modifier.padding(start = 6.dp),
-                        )
-                    }
-                    note?.let { currentNote ->
+                    ArrowLeftIcon(size = 20.dp, tint = modalIconColor)
+                }
+                Spacer(Modifier.weight(1f))
+                note?.let { currentNote ->
+                    // The web hides the pin while browsing the archived or
+                    // trashed list; native reaches the same notes through
+                    // their own screens, so it keys off the note's own state.
+                    if (!currentNote.archived && !currentNote.trashed) {
                         val pinLabel = stringResource(
                             if (currentNote.pinned) R.string.native_note_detail_unpin else R.string.native_note_detail_pin
                         )
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .semantics { contentDescription = pinLabel }
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    role = Role.Button,
-                                    enabled = !pinning,
-                                    onClick = { togglePin() },
-                                )
-                                .padding(6.dp),
+                        ModalIconButton(
+                            contentDescription = pinLabel,
+                            enabled = !pinning,
+                            activeBackground = if (currentNote.pinned) {
+                                if (dark) Color.White.copy(alpha = 0.16f) else Color(0xFF1E293B)
+                            } else {
+                                null
+                            },
+                            onClick = { togglePin() },
                         ) {
                             PinIcon(
                                 size = 20.dp,
-                                tint = if (currentNote.pinned) Indigo else subtextColor,
+                                tint = if (currentNote.pinned) Color.White else modalIconColor,
                                 filled = currentNote.pinned,
                             )
                         }
-                        Box {
-                            val moreLabel = stringResource(R.string.native_note_detail_more)
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .semantics { contentDescription = moreLabel }
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        role = Role.Button,
-                                        onClick = { menuExpanded = true },
-                                    )
-                                    .padding(6.dp),
-                            ) {
-                                KebabIcon(size = 20.dp, tint = titleColor)
-                            }
-                            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                                if (!isReadOnlyAccess) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.native_note_detail_change_color)) },
-                                        leadingIcon = { PaletteIcon(size = 18.dp) },
-                                        onClick = { menuExpanded = false; showColorPicker = true },
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.native_note_detail_tags)) },
-                                        leadingIcon = { TagIcon(size = 18.dp, tint = titleColor) },
-                                        trailingIcon = if (currentNote.tags.isNotEmpty()) {
-                                            {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(999.dp))
-                                                        .background(Indigo)
-                                                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                                                ) {
-                                                    Text(
-                                                        currentNote.tags.size.toString(),
-                                                        color = Color.White,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                    )
-                                                }
-                                            }
-                                        } else null,
-                                        onClick = { menuExpanded = false; tagInput = ""; showTagsPicker = true },
-                                    )
-                                }
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.native_note_detail_reminder)) },
-                                    leadingIcon = {
-                                        if (currentNote.reminderAt != null) {
-                                            BellRingingFilledIcon(size = 18.dp, tint = reminderMenuColor)
-                                        } else {
-                                            BellIcon(size = 18.dp, tint = titleColor)
-                                        }
-                                    },
-                                    enabled = !changingReminder,
-                                    onClick = {
-                                        menuExpanded = false
-                                        launchReminderPicker(context, currentNote.reminderAt) { picked ->
-                                            setReminder(formatIso(picked))
-                                        }
-                                    },
-                                )
-                                if (currentNote.reminderAt != null) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.native_note_detail_reminder_remove)) },
-                                        leadingIcon = { BellIcon(size = 18.dp, tint = titleColor) },
-                                        enabled = !changingReminder,
-                                        onClick = { menuExpanded = false; setReminder(null) },
-                                    )
-                                }
-                                // Any participant may VIEW the roster, not just the
-                                // owner (see CollaboratorsScreen.kt's own doc
-                                // comment), so read/write access isn't what gates
-                                // this entry. The owner also gets it even with zero
-                                // collaborators (collaborators == null then, not
-                                // just empty): CollaboratorsScreen's own "+" action
-                                // is the only way to add the very first one, so an
-                                // owner needs a way in before any exist yet.
-                                if (isOwnerAccess || !currentNote.collaborators.isNullOrEmpty()) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.native_collaborators_title)) },
-                                        leadingIcon = { PeopleIcon(size = 18.dp, tint = titleColor) },
-                                        trailingIcon = if (!currentNote.collaborators.isNullOrEmpty()) {
-                                            {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(999.dp))
-                                                        .background(Indigo)
-                                                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                                                ) {
-                                                    Text(
-                                                        currentNote.collaborators.size.toString(),
-                                                        color = Color.White,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                    )
-                                                }
-                                            }
-                                        } else null,
-                                        onClick = { menuExpanded = false; onOpenCollaborators() },
-                                    )
-                                }
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.native_note_detail_duplicate)) },
-                                    leadingIcon = { DuplicateIcon(size = 18.dp, tint = titleColor) },
-                                    enabled = !duplicating,
-                                    onClick = { menuExpanded = false; duplicateNote() },
-                                )
-                                if (editability?.isTextType == true) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.native_note_detail_download)) },
-                                        leadingIcon = { DownloadIcon(size = 18.dp, tint = titleColor) },
-                                        onClick = { menuExpanded = false; downloadNote() },
-                                    )
-                                }
-                                // Archive/restore are owner-only on the server (see
-                                // NoteDto.access's own doc comment), stricter than
-                                // the read/write split gating everything above: no
-                                // collaborator, not even one with write access, can
-                                // invoke either.
-                                if (isOwnerAccess) {
-                                    if (currentNote.trashed) {
-                                        // A trashed note has no active/archived state to
-                                        // toggle: restoring it is the only option, same
-                                        // slot in the menu the web reuses for this
-                                        // (ModalFooter.jsx's isTrashed ? restoreFromTrash).
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.native_note_detail_restore)) },
-                                            leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
-                                            enabled = !restoring,
-                                            onClick = { menuExpanded = false; restoreNote() },
-                                        )
-                                    } else {
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    stringResource(
-                                                        if (currentNote.archived) R.string.native_note_detail_unarchive
-                                                        else R.string.native_note_detail_archive
-                                                    )
-                                                )
-                                            },
-                                            leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
-                                            enabled = !archiving,
-                                            onClick = { menuExpanded = false; toggleArchive() },
-                                        )
-                                    }
-                                }
-                                if (currentNote.trashed) {
-                                    // Same reuse on the web side: the trash button
-                                    // itself becomes "permanently delete" once the
-                                    // note is already in the trash. Owner-only, same
-                                    // as archive/restore above; unlike those, trash
-                                    // itself (the "else" branch below) stays open to
-                                    // every collaborator, so there's still a way for
-                                    // a non-owner to leave a note from its own detail
-                                    // screen even though this entry isn't offered.
-                                    if (isOwnerAccess) {
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.native_note_detail_delete_permanently)) },
-                                            leadingIcon = { TrashIcon(size = 18.dp, tint = trashMenuColor) },
-                                            onClick = { menuExpanded = false; showPermanentDeleteConfirm = true },
-                                        )
-                                    }
-                                } else {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.native_note_detail_move_to_trash)) },
-                                        leadingIcon = { TrashIcon(size = 18.dp, tint = trashMenuColor) },
-                                        onClick = { menuExpanded = false; showTrashConfirm = true },
-                                    )
-                                }
-                            }
-                        }
                     }
+                    val edit = editability
+                    val hasUnsavedChanges = edit != null && (
+                        titleText != currentNote.title ||
+                            (edit.isRichEditableType && richBlocks != edit.originalRichBlocks) ||
+                            (edit.bodyEditable && bodyText != edit.bodyPlainText)
+                        )
+                    ModalSaveButton(
+                        dark = dark,
+                        enabled = hasUnsavedChanges && !saving && !isReadOnlyAccess,
+                        contentDescription = stringResource(R.string.native_note_detail_save),
+                        onClick = { save() },
+                    )
                 }
-                Box(Modifier.fillMaxWidth().height(1.dp).background(WorkspaceTheme.headerBorderColor(container.themeState.themeId, dark)))
             }
 
             when {
-                loadError != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                loadError != null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(loadError.orEmpty(), color = ErrorColor, modifier = Modifier.padding(24.dp))
                 }
-                note == null || editability == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                note == null || editability == null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = Indigo)
+                        CircularProgressIndicator(color = accentColor)
                         Spacer(Modifier.height(12.dp))
                         Text(stringResource(R.string.native_note_detail_loading), color = subtextColor)
                     }
@@ -1409,65 +1262,53 @@ fun NoteDetailScreen(
                 else -> {
                     val currentNote = note!!
                     val edit = editability!!
-                    val cardBorder = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
-                    val cardShape = RoundedCornerShape(16.dp)
                     Column(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .navigationBarsPadding()
-                            .padding(20.dp),
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
                     ) {
+                        // Outside the sticky bar on purpose: the title
+                        // scrolls away with the content, which is what
+                        // ModalHeader.jsx does on a phone (and only there).
+                        // Its 20dp side padding against the body's 24dp is
+                        // the web's own deliberate 4px offset.
+                        NoteTitleField(
+                            value = titleText,
+                            enabled = !isReadOnlyAccess &&
+                                (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType),
+                            titleColor = titleColor,
+                            placeholderColor = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
+                            onValueChange = { raw ->
+                                // Every incoming value gets its newlines
+                                // flattened, same defensive sanitising as
+                                // ModalHeader.jsx: a title is single-line
+                                // everywhere else in the app.
+                                titleText = raw.replace(TitleNewlines, " ")
+                                if (edit.isDrawType) scheduleDrawingAutosave()
+                                if (edit.isAudioType) scheduleAudioAutosave()
+                            },
+                        )
+
+                        if (edit.isTextType || edit.isChecklistType) {
+                            Box(Modifier.padding(horizontal = 8.dp).padding(bottom = 8.dp)) {
+                                NoteImagesSection(
+                                    images = images,
+                                    subtextColor = subtextColor,
+                                    enabled = !changingImages && !isReadOnlyAccess,
+                                    onImageClick = { index -> viewerIndex = index },
+                                    onAddClick = {
+                                        photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    },
+                                )
+                            }
+                        }
+
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .shadow(elevation = 3.dp, shape = cardShape, ambientColor = Color(0xFF8B5CF6), spotColor = Color(0xFF8B5CF6))
-                                .clip(cardShape)
-                                .background(cardBg)
-                                .border(width = 1.dp, color = cardBorder, shape = cardShape)
-                                .padding(20.dp),
+                                .padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 16.dp),
                         ) {
-                            if (edit.isTextType || edit.isChecklistType || edit.isDrawType || edit.isAudioType) {
-                                if (edit.isTextType || edit.isChecklistType) {
-                                    NoteImagesSection(
-                                        images = images,
-                                        subtextColor = subtextColor,
-                                        enabled = !changingImages && !isReadOnlyAccess,
-                                        onImageClick = { index -> viewerIndex = index },
-                                        onAddClick = {
-                                            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                        },
-                                    )
-                                    Spacer(Modifier.height(14.dp))
-                                }
-                                OutlinedTextField(
-                                    value = titleText,
-                                    onValueChange = {
-                                        titleText = it
-                                        if (edit.isDrawType) scheduleDrawingAutosave()
-                                        if (edit.isAudioType) scheduleAudioAutosave()
-                                    },
-                                    label = { Text(stringResource(R.string.native_note_detail_title_label)) },
-                                    textStyle = MaterialTheme.typography.titleMedium,
-                                    singleLine = true,
-                                    readOnly = isReadOnlyAccess,
-                                    colors = detailFieldColors(titleColor, subtextColor, borderColor),
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            } else {
-                                // Not an OutlinedTextField: nothing typed here could
-                                // ever be saved (no Save button renders below for an
-                                // unsupported type), so a field that looks editable
-                                // would just be a trap. Plain heading text instead.
-                                Text(
-                                    titleText.ifBlank { stringResource(R.string.native_notes_untitled) },
-                                    color = titleColor,
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            }
-                            Spacer(Modifier.height(14.dp))
-
                             if (isReadOnlyAccess) {
                                 Text(readOnlyMessage, color = subtextColor, fontSize = 12.sp)
                                 Spacer(Modifier.height(14.dp))
@@ -1540,14 +1381,6 @@ fun NoteDetailScreen(
                                     Spacer(Modifier.height(6.dp))
                                     Text(caption, color = titleColor, fontSize = 14.sp)
                                 }
-                                saveError?.let {
-                                    Spacer(Modifier.height(10.dp))
-                                    Text(it, color = ErrorColor, fontSize = 12.sp)
-                                }
-                                if (pendingSyncCount > 0) {
-                                    Spacer(Modifier.height(10.dp))
-                                    Text(syncingLabel, color = subtextColor, fontSize = 12.sp)
-                                }
                             } else if (edit.isAudioType) {
                                 AudioClipsSection(
                                     clips = audioClips,
@@ -1560,14 +1393,6 @@ fun NoteDetailScreen(
                                     onClipRemoved = { id -> removeAudioClip(id) },
                                     onClipRenamed = { id, newName -> renameAudioClip(id, newName) },
                                 )
-                                saveError?.let {
-                                    Spacer(Modifier.height(10.dp))
-                                    Text(it, color = ErrorColor, fontSize = 12.sp)
-                                }
-                                if (pendingSyncCount > 0) {
-                                    Spacer(Modifier.height(10.dp))
-                                    Text(syncingLabel, color = subtextColor, fontSize = 12.sp)
-                                }
                             } else if (!edit.isTextType) {
                                 Box(
                                     modifier = Modifier
@@ -1609,63 +1434,180 @@ fun NoteDetailScreen(
                                         fontSize = 12.sp,
                                     )
                                     Spacer(Modifier.height(10.dp))
-                                    Text(edit.bodyPlainText, color = titleColor, fontSize = 15.sp)
+                                    Text(edit.bodyPlainText, color = titleColor, fontSize = 16.sp)
                                 } else {
-                                    OutlinedTextField(
+                                    BasicTextField(
                                         value = bodyText,
                                         onValueChange = { bodyText = it },
-                                        label = { Text(stringResource(R.string.native_note_detail_body_label)) },
                                         readOnly = isReadOnlyAccess,
-                                        colors = detailFieldColors(titleColor, subtextColor, borderColor),
+                                        textStyle = TextStyle(color = titleColor, fontSize = 16.sp),
+                                        cursorBrush = SolidColor(accentColor),
                                         modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
                                     )
                                 }
                             }
-                        }
-
-                        if (edit.isTextType || edit.isChecklistType) {
-                            Spacer(Modifier.height(16.dp))
 
                             saveError?.let {
+                                Spacer(Modifier.height(10.dp))
                                 Text(it, color = ErrorColor, fontSize = 12.sp)
-                                Spacer(Modifier.height(8.dp))
                             }
                             if (pendingSyncCount > 0) {
+                                Spacer(Modifier.height(10.dp))
                                 Text(syncingLabel, color = subtextColor, fontSize = 12.sp)
-                                Spacer(Modifier.height(8.dp))
                             }
 
-                            val hasChanges = titleText != currentNote.title ||
-                                (edit.isRichEditableType && richBlocks != edit.originalRichBlocks) ||
-                                (edit.bodyEditable && bodyText != edit.bodyPlainText)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(ButtonGradient)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        enabled = hasChanges && !saving && !isReadOnlyAccess,
-                                        role = Role.Button,
-                                    ) { save() },
-                                contentAlignment = Alignment.Center,
-                            ) {
+                            // "Edited:" stamp, right-aligned at the end of the
+                            // content, 24dp above it (NoteModal.jsx's own
+                            // scrollable placement).
+                            currentNote.updatedAt?.let { updatedAt ->
+                                Spacer(Modifier.height(24.dp))
                                 Text(
-                                    stringResource(if (saving) R.string.native_note_detail_saving else R.string.native_note_detail_save),
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.White,
-                                    fontSize = 16.sp,
+                                    String.format(editedPrefix, formatEditedStamp(updatedAt)),
+                                    color = if (dark) Color(0xFFD1D5DB) else Color(0xFF4B5563),
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.End,
                                 )
                             }
-                            Spacer(Modifier.height(24.dp))
                         }
                     }
                 }
             }
-        }
 
+            note?.let { currentNote ->
+                editability?.let { edit ->
+                    NoteModalFooter(
+                        dark = dark,
+                        iconColor = footerIconColor,
+                        borderColor = borderColor,
+                        accentGradient = WorkspaceTheme.accentGradient(container.themeState.themeId),
+                        tagCount = currentNote.tags.size,
+                        collaboratorCount = currentNote.collaborators?.size ?: 0,
+                        imageButtonColor = imageButtonColor,
+                        collaborateColor = collaborateColor,
+                        trashColor = trashMenuColor,
+                        showColorButton = !isReadOnlyAccess,
+                        showImageButton = (edit.isTextType || edit.isChecklistType) && !isReadOnlyAccess,
+                        showTagsButton = !isReadOnlyAccess,
+                        // The web keeps Collaborate and Trash in the footer for
+                        // every type except a text note being edited, where they
+                        // move into the kebab. Native text notes are always in
+                        // edit mode, so that is exactly the split here.
+                        showCollaborateButton = !edit.isTextType &&
+                            (isOwnerAccess || !currentNote.collaborators.isNullOrEmpty()),
+                        showTrashButton = !edit.isTextType && !currentNote.trashed,
+                        onColorClick = { showColorPicker = true },
+                        onImageClick = {
+                            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        onTagsClick = { tagInput = ""; showTagsPicker = true },
+                        onCollaborateClick = { onOpenCollaborators() },
+                        onTrashClick = { showTrashConfirm = true },
+                        onKebabClick = { menuExpanded = true },
+                        menu = {
+                            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                if (!currentNote.trashed) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.native_note_detail_reminder)) },
+                                        leadingIcon = {
+                                            if (currentNote.reminderAt != null) {
+                                                BellRingingFilledIcon(size = 18.dp, tint = reminderMenuColor)
+                                            } else {
+                                                BellIcon(size = 18.dp, tint = reminderMenuColor)
+                                            }
+                                        },
+                                        enabled = !changingReminder,
+                                        onClick = {
+                                            menuExpanded = false
+                                            launchReminderPicker(context, currentNote.reminderAt) { picked ->
+                                                setReminder(formatIso(picked))
+                                            }
+                                        },
+                                    )
+                                    if (currentNote.reminderAt != null) {
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.native_note_detail_reminder_remove)) },
+                                            leadingIcon = { BellIcon(size = 18.dp, tint = reminderMenuColor) },
+                                            enabled = !changingReminder,
+                                            onClick = { menuExpanded = false; setReminder(null) },
+                                        )
+                                    }
+                                }
+                                // Archive/restore are owner-only on the server (see
+                                // NoteDto.access's own doc comment), stricter than
+                                // the read/write split gating everything above.
+                                if (isOwnerAccess) {
+                                    if (currentNote.trashed) {
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.native_note_detail_restore)) },
+                                            leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
+                                            enabled = !restoring,
+                                            onClick = { menuExpanded = false; restoreNote() },
+                                        )
+                                    } else {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    stringResource(
+                                                        if (currentNote.archived) R.string.native_note_detail_unarchive
+                                                        else R.string.native_note_detail_archive
+                                                    )
+                                                )
+                                            },
+                                            leadingIcon = { ArchiveIcon(size = 18.dp, tint = archiveMenuColor) },
+                                            enabled = !archiving,
+                                            onClick = { menuExpanded = false; toggleArchive() },
+                                        )
+                                    }
+                                }
+                                if (!currentNote.trashed) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.native_note_detail_duplicate)) },
+                                        leadingIcon = { DuplicateIcon(size = 18.dp, tint = duplicateColor) },
+                                        enabled = !duplicating,
+                                        onClick = { menuExpanded = false; duplicateNote() },
+                                    )
+                                }
+                                if (edit.isTextType) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.native_note_detail_download)) },
+                                        leadingIcon = { DownloadIcon(size = 18.dp, tint = downloadColor) },
+                                        onClick = { menuExpanded = false; downloadNote() },
+                                    )
+                                }
+                                // Any participant may VIEW the roster, not just the
+                                // owner (see CollaboratorsScreen.kt's own doc
+                                // comment). The owner also gets it with zero
+                                // collaborators: its "+" action is the only way to
+                                // add the very first one.
+                                if (edit.isTextType && (isOwnerAccess || !currentNote.collaborators.isNullOrEmpty())) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.native_collaborators_title)) },
+                                        leadingIcon = { CollaborateIcon(size = 18.dp, tint = collaborateColor) },
+                                        onClick = { menuExpanded = false; onOpenCollaborators() },
+                                    )
+                                }
+                                if (currentNote.trashed) {
+                                    if (isOwnerAccess) {
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.native_note_detail_delete_permanently)) },
+                                            leadingIcon = { TrashIcon(size = 18.dp, tint = trashMenuColor) },
+                                            onClick = { menuExpanded = false; showPermanentDeleteConfirm = true },
+                                        )
+                                    }
+                                } else if (edit.isTextType) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.native_note_detail_move_to_trash)) },
+                                        leadingIcon = { TrashIcon(size = 18.dp, tint = trashMenuColor) },
+                                        onClick = { menuExpanded = false; showTrashConfirm = true },
+                                    )
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+        }
         if (showColorPicker) {
             val currentColorKey = note?.color ?: "default"
             Dialog(onDismissRequest = { showColorPicker = false }) {
@@ -2165,6 +2107,287 @@ private fun DeleteSharedNoteDialog(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(stringResource(R.string.native_dialog_cancel), color = subtextColor, fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+/** Any newline the user manages to get into a title (IME, paste, drop) is
+ *  flattened to a space, same guard ModalHeader.jsx keeps: titles are
+ *  single-line everywhere else, and a stray "\n" silently breaks layout. */
+private val TitleNewlines = Regex("[\\r\\n]+")
+
+/** "Edited:" stamp value. The web prints a locale date-time; this is the
+ *  device-locale equivalent. */
+private fun formatEditedStamp(iso: String): String {
+    val ms = parseIsoToEpochMillis(iso) ?: return ""
+    return SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault()).format(Date(ms))
+}
+
+/**
+ * `.modal-icon-btn`: the 32dp round buttons of the note's sticky top bar.
+ * The only tactile feedback the web has here is `transform: scale(0.9)`
+ * over 0.08s on press (globalCSS.js:1362-1365) - hover effects never fire
+ * on a phone - so that is the one interaction ported.
+ */
+@Composable
+private fun ModalIconButton(
+    contentDescription: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    activeBackground: Color? = null,
+    content: @Composable () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.9f else 1f, tween(80), label = "modalIconPress")
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(CircleShape)
+            .then(if (activeBackground != null) Modifier.background(activeBackground) else Modifier)
+            .semantics { this.contentDescription = contentDescription }
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+            ) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
+    }
+}
+
+/**
+ * The save check in the top bar. Two states, both from globalCSS.js:
+ * armed is white on an emerald gradient (1411-1423), idle is a hollow
+ * ring in a very low-alpha emerald (1424-1432) rather than a greyed-out
+ * button.
+ */
+@Composable
+private fun ModalSaveButton(dark: Boolean, enabled: Boolean, contentDescription: String, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.9f else 1f, tween(80), label = "modalSavePress")
+    val idleTint = if (dark) Color(0xFF34D399).copy(alpha = 0.45f) else Color(0xFF10B981).copy(alpha = 0.25f)
+    val idleBorder = if (dark) Color(0xFF34D399).copy(alpha = 0.25f) else Color(0xFF10B981).copy(alpha = 0.15f)
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(CircleShape)
+            .then(
+                if (enabled) {
+                    Modifier.background(Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF059669))))
+                } else {
+                    Modifier.border(width = 1.5.dp, color = idleBorder, shape = CircleShape)
+                },
+            )
+            .semantics { this.contentDescription = contentDescription }
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+            ) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        SaveCheckIcon(size = 16.dp, tint = if (enabled) Color.White else idleTint)
+    }
+}
+
+/**
+ * The note title. Deliberately borderless and label-less: the web renders
+ * a bare textarea at 18.4px/700 with no focus ring at all, sitting in the
+ * scrollable flow rather than in the sticky bar.
+ */
+@Composable
+private fun NoteTitleField(
+    value: String,
+    enabled: Boolean,
+    titleColor: Color,
+    placeholderColor: Color,
+    onValueChange: (String) -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, bottom = 4.dp),
+    ) {
+        if (value.isEmpty()) {
+            Text(
+                stringResource(R.string.native_note_detail_title_label),
+                color = placeholderColor,
+                fontSize = 18.4.sp,
+                lineHeight = 23.9.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            readOnly = !enabled,
+            textStyle = TextStyle(
+                color = titleColor,
+                fontSize = 18.4.sp,
+                lineHeight = 23.9.sp,
+                fontWeight = FontWeight.Bold,
+            ),
+            cursorBrush = SolidColor(titleColor),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * `.modal-footer-toolbar`: the note's own bottom action bar, which native
+ * did not have at all (every action used to hide behind a top-right
+ * kebab). Under 1024px the web makes every button a 34dp circle, drops
+ * their labels, removes the left/right spacer and spreads them
+ * space-evenly (globalCSS.js:1863-1889), over a translucent black veil
+ * on top of the note color.
+ */
+@Composable
+private fun NoteModalFooter(
+    dark: Boolean,
+    iconColor: Color,
+    borderColor: Color,
+    accentGradient: Brush,
+    tagCount: Int,
+    collaboratorCount: Int,
+    imageButtonColor: Color,
+    collaborateColor: Color,
+    trashColor: Color,
+    showColorButton: Boolean,
+    showImageButton: Boolean,
+    showTagsButton: Boolean,
+    showCollaborateButton: Boolean,
+    showTrashButton: Boolean,
+    onColorClick: () -> Unit,
+    onImageClick: () -> Unit,
+    onTagsClick: () -> Unit,
+    onCollaborateClick: () -> Unit,
+    onTrashClick: () -> Unit,
+    onKebabClick: () -> Unit,
+    menu: @Composable () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(if (dark) Color.Black.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.04f))
+                .navigationBarsPadding()
+                .padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (showColorButton) {
+                FooterIconButton(
+                    contentDescription = stringResource(R.string.native_note_detail_change_color),
+                    onClick = onColorClick,
+                ) {
+                    PaletteIcon(size = 18.dp)
+                }
+            }
+            if (showImageButton) {
+                FooterIconButton(
+                    contentDescription = stringResource(R.string.native_note_detail_add_image),
+                    onClick = onImageClick,
+                ) {
+                    AddImageIcon(size = 20.dp, tint = imageButtonColor)
+                }
+            }
+            if (showTagsButton) {
+                FooterIconButton(
+                    contentDescription = stringResource(R.string.native_note_detail_tags),
+                    badgeCount = tagCount,
+                    badgeGradient = accentGradient,
+                    onClick = onTagsClick,
+                ) {
+                    TagIcon(size = 18.dp, tint = iconColor)
+                }
+            }
+            if (showCollaborateButton) {
+                FooterIconButton(
+                    contentDescription = stringResource(R.string.native_collaborators_title),
+                    badgeCount = collaboratorCount,
+                    badgeGradient = accentGradient,
+                    onClick = onCollaborateClick,
+                ) {
+                    CollaborateIcon(size = 18.dp, tint = collaborateColor)
+                }
+            }
+            if (showTrashButton) {
+                FooterIconButton(
+                    contentDescription = stringResource(R.string.native_note_detail_move_to_trash),
+                    onClick = onTrashClick,
+                ) {
+                    TrashIcon(size = 20.dp, tint = trashColor)
+                }
+            }
+            Box {
+                FooterIconButton(
+                    contentDescription = stringResource(R.string.native_note_detail_more),
+                    onClick = onKebabClick,
+                ) {
+                    KebabIcon(size = 20.dp, tint = iconColor)
+                }
+                menu()
+            }
+        }
+    }
+}
+
+/** One 34dp round button of the footer bar, with the optional counter
+ *  badge the web pins to its top-right corner (16dp, 10sp bold, filled
+ *  with the workspace theme's own gradient). */
+@Composable
+private fun FooterIconButton(
+    contentDescription: String,
+    onClick: () -> Unit,
+    badgeCount: Int = 0,
+    badgeGradient: Brush? = null,
+    content: @Composable () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.9f else 1f, tween(80), label = "footerIconPress")
+    Box {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .graphicsLayer { scaleX = scale; scaleY = scale }
+                .clip(CircleShape)
+                .semantics { this.contentDescription = contentDescription }
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    role = Role.Button,
+                ) { onClick() },
+            contentAlignment = Alignment.Center,
+        ) {
+            content()
+        }
+        if (badgeCount > 0 && badgeGradient != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 4.dp, y = (-4).dp)
+                    .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
+                    .clip(CircleShape)
+                    .background(badgeGradient)
+                    .padding(horizontal = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    badgeCount.toString(),
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                )
             }
         }
     }

@@ -735,6 +735,137 @@ fun PencilIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Co
     }
 }
 
+// The icons below back the note modal's own header and footer bars
+// (ModalHeader.jsx / ModalFooter.jsx). The web uses a different back
+// arrow and check glyph there than the ones already above, and several
+// of these are filled rather than stroked, so they are their own
+// entries rather than reused approximations.
+
+@Composable
+fun ArrowLeftIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/icons/index.jsx ArrowLeft, the note modal's own back button:
+    // a full-length arrow, not the chevron BackArrowIcon draws. viewBox
+    // 24x24, stroke, strokeWidth 2, round caps/joins.
+    val path = remember {
+        PathParser().parsePathString("M19 12H5 M12 19l-7-7 7-7").toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+@Composable
+fun SaveCheckIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // ModalHeader.jsx's save button glyph: viewBox 24x24, strokeWidth 3,
+    // round caps/joins. Thicker than the small CheckmarkIcon above.
+    val path = remember {
+        PathParser().parsePathString("M5 13l4 4L19 7").toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+@Composable
+fun AddImageIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // src/icons/index.jsx AddImageIcon, viewBox 24x24, filled.
+    val path = remember {
+        PathParser().parsePathString(
+            "M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2z" +
+                "M8.5 11.5L11 14.51 14.5 10l4.5 6H5l3.5-4.5z"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint)
+        }
+    }
+}
+
+@Composable
+fun UndoIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // ModalFooter.jsx's undo arrow, viewBox 24x24, strokeWidth 2.
+    val path = remember {
+        PathParser().parsePathString("M3 10h13a4 4 0 0 1 0 8H7 M3 10l4-4 M3 10l4 4").toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+@Composable
+fun RedoIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // ModalFooter.jsx's redo arrow: the mirror of UndoIcon above.
+    val path = remember {
+        PathParser().parsePathString("M21 10H8a4 4 0 0 0 0 8h10 M21 10l-4-4 M21 10l-4 4").toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+@Composable
+fun CollaborateIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // ModalFooter.jsx's collaborate glyph: viewBox 20x20 (not 24), filled.
+    val path = remember {
+        PathParser().parsePathString(
+            "M13 6a3 3 0 11-6 0 3 3 0 016 0z M18 8a2 2 0 11-4 0 2 2 0 014 0z M14 15a4 4 0 00-8 0v3h8v-3z"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 20f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint)
+        }
+    }
+}
+
+@Composable
+fun PencilFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // ModalFooter.jsx's "switch to edit" glyph, viewBox 24x24, filled.
+    val path = remember {
+        PathParser().parsePathString(
+            "M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25Z " +
+                "M14.06 4.94l3.75 3.75 1.41-1.41a1.5 1.5 0 0 0 0-2.12l-1.63-1.63a1.5 1.5 0 0 0-2.12 0l-1.41 1.41Z"
+        ).toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint)
+        }
+    }
+}
+
+@Composable
+fun EyeFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
+    // ModalFooter.jsx's "switch to read" glyph: stroked outline (1.8)
+    // plus a filled pupil, viewBox 24x24.
+    val outline = remember {
+        PathParser().parsePathString("M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Z").toPath()
+    }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(outline, color = tint, style = Stroke(width = 1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawCircle(color = tint, radius = 3.2f, center = Offset(12f, 12f))
+        }
+    }
+}
+
 // The three icons below back the notes drawer (TagSidebar.kt) and the
 // header's sync-status indicator. Same source discipline as the rest of
 // this file: exact path data from the web's own SVGs, not eyeballed.

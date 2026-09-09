@@ -51,6 +51,54 @@ val NOTE_COLOR_ORDER = listOf(
     "peach", "sage", "mint", "sky", "sand", "mauve",
 )
 
+/**
+ * modalBgFor() from src/utils/colors.js: the fill an OPEN note uses, which
+ * is not the same as the card fill above. Dark mode takes the note color
+ * at full opacity; light mode mixes 80% white into it, so an open note is
+ * a much paler wash of its own color. The web applies it to the whole
+ * modal, its sticky header and the format sheet at once, so the screen
+ * reads as one flat color.
+ *
+ * Kept as an explicit table rather than recomputed from [noteColorFor]:
+ * the web's own mix runs on its rgba strings and lands a channel or two
+ * away from a naive float mix, and these are the values it actually
+ * paints.
+ */
+private val LIGHT_MODAL: Map<String, Color> = mapOf(
+    "default" to Color(0xFFFFFFFF),
+    "red" to Color(0xFFFBE4E1),
+    "yellow" to Color(0xFFFFF7D1),
+    "green" to Color(0xFFE6FBEC),
+    "blue" to Color(0xFFE4F0FF),
+    "purple" to Color(0xFFF0EBFF),
+    "peach" to Color(0xFFFCE9E4),
+    "sage" to Color(0xFFF0F7F1),
+    "mint" to Color(0xFFE8FAF2),
+    "sky" to Color(0xFFEAF6FF),
+    "sand" to Color(0xFFFAF3E6),
+    "mauve" to Color(0xFFF7F0F9),
+)
+
+private val DARK_MODAL: Map<String, Color> = mapOf(
+    "default" to Color(0xFF282828),
+    "red" to Color(0xFF8C2424),
+    "yellow" to Color(0xFF8C6E19),
+    "green" to Color(0xFF1C6E3A),
+    "blue" to Color(0xFF2348A5),
+    "purple" to Color(0xFF52268C),
+    "peach" to Color(0xFFAA503E),
+    "sage" to Color(0xFF375A41),
+    "mint" to Color(0xFF236C52),
+    "sky" to Color(0xFF235F91),
+    "sand" to Color(0xFF87693C),
+    "mauve" to Color(0xFF644873),
+)
+
+fun noteModalBackground(colorKey: String?, dark: Boolean): Color {
+    val table = if (dark) DARK_MODAL else LIGHT_MODAL
+    return table[colorKey?.trim()?.lowercase()] ?: table.getValue("default")
+}
+
 // The header's own "glass chrome" gradient/border used to be hardcoded here
 // to the default GlassKeep theme's colors, with an explicit disclaimer that
 // there was no real per-user theme selection yet. Now that one exists (see
