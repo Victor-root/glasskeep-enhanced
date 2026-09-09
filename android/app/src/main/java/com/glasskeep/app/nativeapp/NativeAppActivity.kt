@@ -32,12 +32,18 @@ class NativeAppActivity : ComponentActivity() {
     // needs to react to that.
     private var pendingOpenNoteId by mutableStateOf<String?>(null)
 
+    // Same role, for the launcher's "Scan PC login" shortcut (see
+    // MainActivity.launchNativeApp): unlike a note id there's no content
+    // to identify, so this is just a one-shot flag.
+    private var pendingOpenQrScanner by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val serverUrl = intent.getStringExtra(EXTRA_SERVER_URL)
             ?: error("NativeAppActivity started without EXTRA_SERVER_URL")
         NativeDebug.d("NativeAppActivity.onCreate serverUrl=$serverUrl")
         pendingOpenNoteId = intent.getStringExtra(EXTRA_OPEN_NOTE_ID)
+        pendingOpenQrScanner = intent.getBooleanExtra(EXTRA_OPEN_QR_SCANNER, false)
 
         val container = NativeAppContainer(applicationContext)
 
@@ -64,6 +70,8 @@ class NativeAppActivity : ComponentActivity() {
                     serverUrl = serverUrl,
                     pendingOpenNoteId = pendingOpenNoteId,
                     onPendingOpenNoteIdConsumed = { pendingOpenNoteId = null },
+                    pendingOpenQrScanner = pendingOpenQrScanner,
+                    onPendingOpenQrScannerConsumed = { pendingOpenQrScanner = false },
                 )
             }
         }
@@ -76,10 +84,12 @@ class NativeAppActivity : ComponentActivity() {
         // WebViewActivity's own onNewIntent.
         setIntent(intent)
         intent.getStringExtra(EXTRA_OPEN_NOTE_ID)?.let { pendingOpenNoteId = it }
+        if (intent.getBooleanExtra(EXTRA_OPEN_QR_SCANNER, false)) pendingOpenQrScanner = true
     }
 
     companion object {
         const val EXTRA_SERVER_URL = "server_url"
         const val EXTRA_OPEN_NOTE_ID = "openNoteId"
+        const val EXTRA_OPEN_QR_SCANNER = "openQrScanner"
     }
 }

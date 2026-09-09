@@ -95,16 +95,16 @@ private val ErrorColor = Color(0xFFdc2626)
  * Milestone: a real Settings screen, reachable from the notes list's
  * hamburger menu. Scope is deliberately narrower than SettingsPanel.jsx's
  * full 9 sections (see each milestone's own commit message for the
- * itemized cut list: admin-only sections, QR sign-in (its own deferred
- * login task), push notifications (Web Push doesn't exist in a Kotlin
- * app), data import/export, typography, AI assistant): profile (avatar,
- * read-only name/email, language, show-on-login), security (change
- * password), passkeys (list/add/delete, see NativePasskeys.kt), appearance
- * (the six workspace themes), and the one already-half-wired Notes
- * preference (checklist insert position).
+ * itemized cut list: admin-only sections, push notifications (Web Push
+ * doesn't exist in a Kotlin app), data import/export, typography, AI
+ * assistant): profile (avatar, read-only name/email, language,
+ * show-on-login), security (change password, cross-device QR sign-in,
+ * see QrScanScreen.kt), passkeys (list/add/delete, see
+ * NativePasskeys.kt), appearance (the six workspace themes), and the one
+ * already-half-wired Notes preference (checklist insert position).
  */
 @Composable
-fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () -> Unit) {
+fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () -> Unit, onOpenQrScanner: () -> Unit) {
     val dark = isSystemInDarkTheme()
     val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
@@ -515,6 +515,19 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                         indication = null,
                                         role = Role.Button,
                                     ) { passwordDialogError = null; showPasswordDialog = true },
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                stringResource(R.string.native_settings_qr_signin),
+                                color = Indigo,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                modifier = Modifier
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        role = Role.Button,
+                                    ) { onOpenQrScanner() },
                             )
                         }
 

@@ -7,6 +7,8 @@ import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ChangePasswordRequest
 import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
 import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
+import com.glasskeep.app.nativeapp.data.network.DeviceLinkInfoResponse
+import com.glasskeep.app.nativeapp.data.network.DeviceLinkTokenRequest
 import com.glasskeep.app.nativeapp.data.network.GlassKeepApi
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.network.PasskeyCeremonyOptionsResponse
@@ -690,6 +692,38 @@ class NotesRepository(
         val response = api.deletePasskey(credentialId)
         if (!response.isSuccessful) {
             val error = "DELETE /api/passkeys/$credentialId failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    suspend fun fetchDeviceLinkInfo(token: String): DeviceLinkInfoResponse {
+        NativeDebug.d("NotesRepository.fetchDeviceLinkInfo")
+        val response = api.deviceLinkInfo(token)
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            val error = "GET /api/device-link/info failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+        return body
+    }
+
+    suspend fun approveDeviceLink(token: String) {
+        NativeDebug.d("NotesRepository.approveDeviceLink")
+        val response = api.approveDeviceLink(DeviceLinkTokenRequest(token))
+        if (!response.isSuccessful) {
+            val error = "POST /api/device-link/approve failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    suspend fun rejectDeviceLink(token: String) {
+        NativeDebug.d("NotesRepository.rejectDeviceLink")
+        val response = api.rejectDeviceLink(DeviceLinkTokenRequest(token))
+        if (!response.isSuccessful) {
+            val error = "POST /api/device-link/reject failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }

@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
             val urlToLoad = SHORTCUT_QUERY_PARAMS[intent?.action]
                 ?.let { (key, value) -> appendQueryParam(savedUrl, key, value) }
                 ?: savedUrl
-            launchApp(urlToLoad)
+            launchApp(webViewUrl = urlToLoad, nativeUrl = savedUrl)
             return
         }
 
@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
                             .putString("server_url", url)
                             .putBoolean(KEY_URL_VETTED, true)
                             .apply()
-                        launchApp(url)
+                        launchApp(webViewUrl = url, nativeUrl = url)
                     },
                 )
             }
@@ -93,13 +93,25 @@ class MainActivity : ComponentActivity() {
     // the native flow being built out in com.glasskeep.app.nativeapp,
     // release builds keep the WebView exactly as before until the native
     // side reaches feature parity. Nothing changes for real users yet.
-    private fun launchApp(url: String) {
-        if (BuildConfig.DEBUG) launchNativeApp(url) else launchWebView(url)
+    //
+    // webViewUrl carries the WebView-era shortcut mechanism (a query
+    // param the SPA reads at boot, see SHORTCUT_QUERY_PARAMS); the native
+    // side doesn't boot a URL at all, so a shortcut meant for it is
+    // instead passed down as its own separate Intent extra (see
+    // openQrScanner below), the same way EXTRA_OPEN_NOTE_ID already works
+    // for a reminder notification tap.
+    private fun launchApp(webViewUrl: String, nativeUrl: String) {
+        if (BuildConfig.DEBUG) {
+            launchNativeApp(nativeUrl, openQrScanner = intent?.action == SHORTCUT_ACTION_QR_SCAN)
+        } else {
+            launchWebView(webViewUrl)
+        }
     }
 
-    private fun launchNativeApp(url: String) {
+    private fun launchNativeApp(url: String, openQrScanner: Boolean) {
         val intent = Intent(this, NativeAppActivity::class.java)
         intent.putExtra(NativeAppActivity.EXTRA_SERVER_URL, url)
+        if (openQrScanner) intent.putExtra(NativeAppActivity.EXTRA_OPEN_QR_SCANNER, true)
         startActivity(intent)
         finish()
     }
@@ -139,10 +151,15 @@ class MainActivity : ComponentActivity() {
         // src/App.jsx (search for `params.get("qr")` /
         // `params.get("new")`).
         private val SHORTCUT_QUERY_PARAMS = mapOf(
-            "com.glasskeep.app.SHORTCUT_QR_SCAN"      to ("qr"  to "open"),
+            SHORTCUT_ACTION_QR_SCAN                    to ("qr"  to "open"),
             "com.glasskeep.app.SHORTCUT_NEW_TEXT"     to ("new" to "text"),
             "com.glasskeep.app.SHORTCUT_NEW_CHECKLIST" to ("new" to "checklist"),
             "com.glasskeep.app.SHORTCUT_NEW_AUDIO"    to ("new" to "audio"),
         )
+
+        // Pulled out of the table above (rather than a second inline
+        // literal) so launchApp's native-side dispatch below can't drift
+        // from the WebView-side one out of sheer typo risk.
+        private const val SHORTCUT_ACTION_QR_SCAN = "com.glasskeep.app.SHORTCUT_QR_SCAN"
     }
 }

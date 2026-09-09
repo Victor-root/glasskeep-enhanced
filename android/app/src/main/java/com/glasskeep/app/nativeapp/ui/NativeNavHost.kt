@@ -28,6 +28,8 @@ fun NativeNavHost(
     serverUrl: String,
     pendingOpenNoteId: String? = null,
     onPendingOpenNoteIdConsumed: () -> Unit = {},
+    pendingOpenQrScanner: Boolean = false,
+    onPendingOpenQrScannerConsumed: () -> Unit = {},
 ) {
     val navController: NavHostController = rememberNavController()
     val startDestination = if (container.tokenStore.token != null) "notes" else "login"
@@ -88,6 +90,19 @@ fun NativeNavHost(
         }
     }
 
+    // Same shape as the note deep-link above, but with no "resume after
+    // login" fallback: approving another device's sign-in requires this
+    // phone to already have a session (see GlassKeepApi.kt's device-link
+    // comment), so a shortcut tap while signed out has nothing to resume
+    // into and is simply dropped, same as the shortcut already silently
+    // doing nothing today.
+    LaunchedEffect(pendingOpenQrScanner, startDestination) {
+        if (pendingOpenQrScanner) {
+            if (startDestination == "notes") navController.navigate("qr-scan")
+            onPendingOpenQrScannerConsumed()
+        }
+    }
+
     val scope = rememberCoroutineScope()
 
     NavHost(navController = navController, startDestination = startDestination) {
@@ -121,6 +136,14 @@ fun NativeNavHost(
         }
         composable("settings") {
             SettingsScreen(
+                container = container,
+                serverUrl = serverUrl,
+                onBack = { navController.popBackStack() },
+                onOpenQrScanner = { navController.navigate("qr-scan") },
+            )
+        }
+        composable("qr-scan") {
+            QrScanScreen(
                 container = container,
                 serverUrl = serverUrl,
                 onBack = { navController.popBackStack() },

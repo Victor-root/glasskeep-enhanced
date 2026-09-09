@@ -11,6 +11,7 @@ import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 @Serializable
 data class LoginRequest(val email: String, val password: String)
@@ -353,6 +354,27 @@ data class PasskeyLoginVerifyRequest(
 @Serializable
 data class PasskeyMutationResponse(val ok: Boolean = false)
 
+/** Response for GET /api/device-link/info, the PC's own user-agent and a
+ *  masked IP (see deviceLinkRoutes.js's own maskIp()) so the phone can
+ *  show a confirmation card before approving. Requires the phone to
+ *  already be authenticated: this is never callable by an anonymous
+ *  scanner. */
+@Serializable
+data class DeviceLinkInfoResponse(
+    val status: String,
+    val createdAt: String? = null,
+    val expiresAt: String? = null,
+    val userAgent: String? = null,
+    val ip: String? = null,
+)
+
+/** Body shared by POST /api/device-link/approve and /reject. */
+@Serializable
+data class DeviceLinkTokenRequest(val token: String)
+
+@Serializable
+data class DeviceLinkActionResponse(val ok: Boolean = false)
+
 /** Shared response shape for PUT/PATCH on a note: `stale` means someone
  *  else changed it first (LWW lost, `note` is the server's current copy,
  *  nothing was written); `readOnly` means the caller isn't allowed to
@@ -471,4 +493,19 @@ interface GlassKeepApi {
     // it beyond the HTTP status this call already checks.
     @POST("api/passkeys/login/verify")
     suspend fun passkeyLoginVerify(@Body body: PasskeyLoginVerifyRequest): Response<LoginResponse>
+
+    // Cross-device QR sign-in, phone side only (see QrScanScreen.kt): the
+    // phone that already has a session scans a QR shown on a PC's login
+    // screen, fetches who is asking, then approves or rejects. The PC's
+    // own create/poll routes have no native caller: nothing in this app
+    // needs to display a QR for itself to sign in (see this milestone's
+    // commit message for why).
+    @GET("api/device-link/info")
+    suspend fun deviceLinkInfo(@Query("token") token: String): Response<DeviceLinkInfoResponse>
+
+    @POST("api/device-link/approve")
+    suspend fun approveDeviceLink(@Body body: DeviceLinkTokenRequest): Response<DeviceLinkActionResponse>
+
+    @POST("api/device-link/reject")
+    suspend fun rejectDeviceLink(@Body body: DeviceLinkTokenRequest): Response<DeviceLinkActionResponse>
 }
