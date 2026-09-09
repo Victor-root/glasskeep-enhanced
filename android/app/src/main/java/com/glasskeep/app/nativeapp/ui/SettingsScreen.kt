@@ -163,6 +163,8 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var changingTheme by remember { mutableStateOf(false) }
     var changingChecklistPosition by remember { mutableStateOf(false) }
     var changingToolbarMode by remember { mutableStateOf(false) }
+    var changingToastPrefs by remember { mutableStateOf(false) }
+    var toastDurationMenuOpen by remember { mutableStateOf(false) }
     var showTypographyModal by remember { mutableStateOf(false) }
     var addingPasskey by remember { mutableStateOf(false) }
     var removingPasskeyId by remember { mutableStateOf<String?>(null) }
@@ -195,6 +197,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     // route reachable from here.
     var securityOpen by rememberSaveable { mutableStateOf(false) }
     var uiOpen by rememberSaveable { mutableStateOf(false) }
+    var notificationsOpen by rememberSaveable { mutableStateOf(false) }
     var notesOpen by rememberSaveable { mutableStateOf(false) }
     var dataOpen by rememberSaveable { mutableStateOf(false) }
     var languageOpen by rememberSaveable { mutableStateOf(false) }
@@ -479,6 +482,42 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                 reportActionError(t)
             } finally {
                 changingChecklistPosition = false
+            }
+        }
+    }
+
+    fun changeToastPosition(position: String) {
+        if (changingToastPrefs || position == container.editorPrefs.toastPosition) return
+        changingToastPrefs = true
+        val previous = container.editorPrefs.toastPosition
+        container.editorPrefs.applyToastPosition(position)
+        scope.launch {
+            try {
+                repository.setToastPosition(position)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen setToastPosition failed", t)
+                container.editorPrefs.applyToastPosition(previous)
+                reportActionError(t)
+            } finally {
+                changingToastPrefs = false
+            }
+        }
+    }
+
+    fun changeToastDuration(durationMs: Long?) {
+        if (changingToastPrefs || durationMs == container.editorPrefs.toastDurationMs) return
+        changingToastPrefs = true
+        val previous = container.editorPrefs.toastDurationMs
+        container.editorPrefs.applyToastDuration(durationMs)
+        scope.launch {
+            try {
+                repository.setToastDuration(durationMs)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen setToastDuration failed", t)
+                container.editorPrefs.applyToastDuration(previous)
+                reportActionError(t)
+            } finally {
+                changingToastPrefs = false
             }
         }
     }
@@ -833,6 +872,86 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                         modifier = Modifier.padding(horizontal = 12.dp),
                                         onSelect = { changeTheme(it) },
                                     )
+                                }
+
+                                SettingsAccordionSection(
+                                    title = stringResource(R.string.native_settings_notifications_section),
+                                    expanded = notificationsOpen,
+                                    themeId = themeId,
+                                    dark = dark,
+                                    titleColor = titleColor,
+                                    icon = { tint -> BellIcon(size = 20.dp, tint = tint) },
+                                    onToggle = { notificationsOpen = !notificationsOpen },
+                                    contentSpacing = 16.dp,
+                                ) {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            SettingsRowIcon(themeId, dark) { tint -> BellIcon(size = 20.dp, tint = tint) }
+                                            Spacer(Modifier.width(12.dp))
+                                            Column {
+                                                Text(
+                                                    stringResource(R.string.native_settings_notif_position),
+                                                    color = titleColor,
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                )
+                                                Text(
+                                                    stringResource(R.string.native_settings_notif_position_desc),
+                                                    color = SettingsSubtleColor,
+                                                    fontSize = 14.sp,
+                                                    lineHeight = 20.sp,
+                                                )
+                                            }
+                                        }
+                                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                                            GkSegmented(
+                                                options = listOf(
+                                                    GkSegmentOption("top", stringResource(R.string.native_settings_notif_position_top)),
+                                                    GkSegmentOption("bottom", stringResource(R.string.native_settings_notif_position_bottom)),
+                                                ),
+                                                selectedId = container.editorPrefs.toastPosition,
+                                                enabled = !changingToastPrefs,
+                                                themeId = themeId,
+                                                dark = dark,
+                                                onSelect = { changeToastPosition(it) },
+                                            )
+                                        }
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            SettingsRowIcon(themeId, dark) { tint -> RefreshIcon(size = 20.dp, tint = tint) }
+                                            Spacer(Modifier.width(12.dp))
+                                            Column {
+                                                Text(
+                                                    stringResource(R.string.native_settings_notif_duration),
+                                                    color = titleColor,
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                )
+                                                Text(
+                                                    stringResource(R.string.native_settings_notif_duration_desc),
+                                                    color = SettingsSubtleColor,
+                                                    fontSize = 14.sp,
+                                                    lineHeight = 20.sp,
+                                                )
+                                            }
+                                        }
+                                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                                            ToastDurationPicker(
+                                                durationMs = container.editorPrefs.toastDurationMs,
+                                                menuOpen = toastDurationMenuOpen,
+                                                enabled = !changingToastPrefs,
+                                                themeId = themeId,
+                                                dark = dark,
+                                                titleColor = titleColor,
+                                                borderColor = borderColor,
+                                                onToggleMenu = { toastDurationMenuOpen = !toastDurationMenuOpen },
+                                                onDismissMenu = { toastDurationMenuOpen = false },
+                                                onSelect = { toastDurationMenuOpen = false; changeToastDuration(it) },
+                                            )
+                                        }
+                                    }
                                 }
 
                                 SettingsAccordionSection(
@@ -1496,6 +1615,80 @@ private fun UpdateAvailableCard(
 }
 
 /** The language row and its popover (`SettingsPanel.jsx:1506-1569`). */
+/** The five durations the web offers, "Persistent" included: a pill that
+ *  opens a small popover, same shape as the language row below. */
+@Composable
+private fun ToastDurationPicker(
+    durationMs: Long?,
+    menuOpen: Boolean,
+    enabled: Boolean,
+    themeId: String?,
+    dark: Boolean,
+    titleColor: Color,
+    borderColor: Color,
+    onToggleMenu: () -> Unit,
+    onDismissMenu: () -> Unit,
+    onSelect: (Long?) -> Unit,
+) {
+    val secondsTemplate = stringResource(R.string.native_settings_notif_duration_seconds)
+    val options = listOf(
+        5_000L to String.format(secondsTemplate, 5),
+        10_000L to String.format(secondsTemplate, 10),
+        20_000L to String.format(secondsTemplate, 20),
+        30_000L to String.format(secondsTemplate, 30),
+        null to stringResource(R.string.native_settings_notif_duration_persistent),
+    )
+    val selectedLabel = options.firstOrNull { it.first == durationMs }?.second ?: options[1].second
+    Box {
+        var buttonHeight by remember { mutableStateOf(0) }
+        val density = LocalDensity.current
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .alpha(if (enabled) 1f else 0.5f)
+                .clip(RoundedCornerShape(8.dp))
+                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                .onSizeChanged { buttonHeight = it.height }
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    enabled = enabled,
+                    role = Role.Button,
+                ) { onToggleMenu() }
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Text(selectedLabel, color = titleColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            ChevronDownIcon(
+                modifier = Modifier.rotate(if (menuOpen) 180f else 0f),
+                size = 14.dp,
+                tint = SettingsSubtleColor,
+            )
+        }
+        if (menuOpen) {
+            Popup(
+                alignment = Alignment.TopEnd,
+                offset = IntOffset(0, buttonHeight + with(density) { 6.dp.roundToPx() }),
+                onDismissRequest = onDismissMenu,
+                properties = PopupProperties(focusable = true),
+            ) {
+                SettingsPopoverCard(dark = dark, borderColor = borderColor) {
+                    for ((value, label) in options) {
+                        SettingsPopoverOption(
+                            label = label,
+                            selected = value == durationMs,
+                            themeId = themeId,
+                            dark = dark,
+                            titleColor = titleColor,
+                            onClick = { onSelect(value) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun LanguageRow(
     language: String?,

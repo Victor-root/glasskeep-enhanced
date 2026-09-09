@@ -182,6 +182,15 @@
     <string name="native_settings_theme_title">Workspace theme</string>
     <string name="native_settings_theme_desc">Recolours the header, sidebar and background. Notes are unaffected.</string>
     <string name="native_settings_notes_section">Notes</string>
+    <string name="native_settings_notifications_section">Notifications</string>
+    <string name="native_settings_notif_position">Notification position</string>
+    <string name="native_settings_notif_position_desc">Where in-app notifications appear</string>
+    <string name="native_settings_notif_position_top">Top</string>
+    <string name="native_settings_notif_position_bottom">Bottom</string>
+    <string name="native_settings_notif_duration">Default duration</string>
+    <string name="native_settings_notif_duration_desc">How long a notification stays on screen before auto-dismissing</string>
+    <string name="native_settings_notif_duration_seconds">%1$d s</string>
+    <string name="native_settings_notif_duration_persistent">Persistent</string>
     <string name="native_settings_checklist_group">Checklists</string>
     <string name="native_settings_checklist_insert_position">New items position</string>
     <string name="native_settings_checklist_insert_position_desc">Add new checklist items at the top or bottom of the list</string>

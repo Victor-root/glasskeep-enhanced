@@ -176,6 +176,15 @@
     <string name="native_settings_theme_title">Thème de l\'interface</string>
     <string name="native_settings_theme_desc">Recolore le header, la sidebar et le fond. Les notes ne changent pas.</string>
     <string name="native_settings_notes_section">Notes</string>
+    <string name="native_settings_notifications_section">Notifications</string>
+    <string name="native_settings_notif_position">Position des notifications</string>
+    <string name="native_settings_notif_position_desc">Emplacement des notifications dans l\'app</string>
+    <string name="native_settings_notif_position_top">Haut</string>
+    <string name="native_settings_notif_position_bottom">Bas</string>
+    <string name="native_settings_notif_duration">Durée par défaut</string>
+    <string name="native_settings_notif_duration_desc">Combien de temps une notification reste affichée avant de disparaître</string>
+    <string name="native_settings_notif_duration_seconds">%1$d s</string>
+    <string name="native_settings_notif_duration_persistent">Persistante</string>
     <string name="native_settings_checklist_group">Listes de tâches</string>
     <string name="native_settings_checklist_insert_position">Nouveaux éléments</string>
     <string name="native_settings_checklist_insert_position_desc">Ajouter les nouveaux éléments des listes de tâches en haut ou en bas de la liste.</string>
