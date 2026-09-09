@@ -34,6 +34,7 @@
     <string name="native_login_other_account">Autre compte</string>
     <string name="native_login_enter_password">Entrez le mot de passe</string>
     <string name="native_login_username">Nom d\'utilisateur</string>
+    <string name="native_login_toggle_theme">Changer de thème</string>
     <string name="native_login_slogan">Vos notes, votre serveur, vos règles.</string>
     <string name="native_settings_passkeys_section">Clés d\'accès</string>
     <string name="native_settings_passkeys_subtitle">Connexion sans mot de passe et déverrouillage d\'instance.</string>
@@ -90,7 +91,12 @@
     <string name="native_notes_search_placeholder">Rechercher dans les notes…</string>
     <string name="native_notes_search_close">Fermer la recherche</string>
     <string name="native_notes_search_empty">Aucune note ne correspond à votre recherche.</string>
-    <string name="native_notes_select_mode">Sélectionner des notes</string>
+    <string name="native_notes_select_mode">Sélection multiple</string>
+    <string name="native_notes_list_view">Vue liste</string>
+    <string name="native_notes_grid_view">Vue grille</string>
+    <string name="native_notes_light_mode">Mode clair</string>
+    <string name="native_notes_dark_mode">Mode sombre</string>
+    <string name="native_notes_sign_out">Se déconnecter</string>
     <string name="native_bulk_selected_count">%1$d sélectionnée(s)</string>
     <string name="native_bulk_exit">Quitter la sélection multiple</string>
     <string name="native_bulk_trashed_success">%1$d note(s) envoyée(s) à la corbeille</string>

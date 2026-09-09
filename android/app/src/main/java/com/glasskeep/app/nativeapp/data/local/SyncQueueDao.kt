@@ -40,6 +40,12 @@ interface SyncQueueDao {
     @Query("DELETE FROM sync_queue WHERE queueId = :queueId")
     suspend fun delete(queueId: Long)
 
+    /** Signing out drops everything still queued: the web purges its own
+     *  queue on an explicit sign-out for the same reason (App.jsx:4578-4583),
+     *  since the next session may well be a different account. */
+    @Query("DELETE FROM sync_queue")
+    suspend fun deleteAll()
+
     @Query("UPDATE sync_queue SET attempts = :attempts, lastError = :error WHERE queueId = :queueId")
     suspend fun recordFailure(queueId: Long, attempts: Int, error: String?)
 

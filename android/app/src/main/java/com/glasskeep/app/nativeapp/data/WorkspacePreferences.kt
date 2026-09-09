@@ -25,4 +25,6 @@ data class WorkspacePreferences(
      *  whether the sign-in screen animates its decorative cards. */
     val edgeToEdgeLandscape: Boolean?,
     val floatingCardsEnabled: Boolean?,
+    /** "list" or "grid": how the notes screen lays its cards out. */
+    val viewMode: String?,
 )

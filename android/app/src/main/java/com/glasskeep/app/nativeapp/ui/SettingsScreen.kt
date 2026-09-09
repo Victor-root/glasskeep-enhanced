@@ -13,7 +13,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -143,7 +142,7 @@ private val VersionBadgeDark = Color(0xFF4B5563)
  */
 @Composable
 fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () -> Unit, onOpenQrScanner: () -> Unit) {
-    val dark = isSystemInDarkTheme()
+    val dark = LocalGkDark.current
     val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val scope = rememberCoroutineScope()
@@ -2154,7 +2153,7 @@ private fun formatPasskeyDate(iso: String): String {
 // Kotlin's top-level `private` is file-scoped.
 @Composable
 internal fun AvatarCircle(avatarUrl: String?, name: String, size: Dp, onClick: () -> Unit) {
-    val dark = isSystemInDarkTheme()
+    val dark = LocalGkDark.current
     val bitmap = avatarUrl?.let { rememberDecodedImage(it) }
     val label = stringResource(R.string.native_settings_avatar_description)
     Box(

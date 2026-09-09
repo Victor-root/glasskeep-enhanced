@@ -37,6 +37,7 @@
     <string name="native_login_other_account">Other account</string>
     <string name="native_login_enter_password">Enter password</string>
     <string name="native_login_username">Username</string>
+    <string name="native_login_toggle_theme">Toggle theme</string>
     <string name="native_login_slogan">Your notes, your server, your rules.</string>
     <string name="native_settings_passkeys_section">Passkeys</string>
     <string name="native_settings_passkeys_subtitle">Sign in without a password and unlock the instance.</string>
@@ -96,7 +97,12 @@
     <string name="native_notes_search_placeholder">Search notes…</string>
     <string name="native_notes_search_close">Close search</string>
     <string name="native_notes_search_empty">No notes match your search.</string>
-    <string name="native_notes_select_mode">Select notes</string>
+    <string name="native_notes_select_mode">Multi select</string>
+    <string name="native_notes_list_view">List View</string>
+    <string name="native_notes_grid_view">Grid View</string>
+    <string name="native_notes_light_mode">Light mode</string>
+    <string name="native_notes_dark_mode">Dark mode</string>
+    <string name="native_notes_sign_out">Sign out</string>
     <string name="native_bulk_selected_count">%1$d selected</string>
     <string name="native_bulk_exit">Exit multi-select</string>
     <string name="native_bulk_trashed_success">%1$d note(s) moved to trash</string>

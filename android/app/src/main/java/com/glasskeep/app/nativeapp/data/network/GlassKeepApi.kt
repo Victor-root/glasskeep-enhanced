@@ -399,6 +399,8 @@ data class UserSettingsDto(
      *  decorative cards (AuthShell.jsx:57). */
     val edgeToEdgeLandscape: Boolean? = null,
     val floatingCardsEnabled: Boolean? = null,
+    /** "list" or "grid": how the notes screen lays its cards out. */
+    val viewMode: String? = null,
     /** Where the notification pill sits on a phone: "top" or "bottom". */
     val notificationsPositionMobile: String? = null,
     /** How long the pill stays, in milliseconds; null (or absent) means
@@ -446,6 +448,11 @@ data class SetEdgeToEdgeLandscapeRequest(val edgeToEdgeLandscape: Boolean)
 
 @Serializable
 data class SetFloatingCardsRequest(val floatingCardsEnabled: Boolean)
+
+/** Body for a PATCH /api/user/settings that sets only the notes screen's
+ *  layout ("list" or "grid"). */
+@Serializable
+data class SetViewModeRequest(val viewMode: String)
 
 /** Body for a PATCH /api/user/settings that sets only where the
  *  notification pill sits on a phone. */
@@ -801,6 +808,9 @@ interface GlassKeepApi {
 
     @PATCH("api/user/settings")
     suspend fun setFloatingCards(@Body body: SetFloatingCardsRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setViewMode(@Body body: SetViewModeRequest): Response<UserSettingsDto>
 
     @PATCH("api/user/settings")
     suspend fun setToastPosition(@Body body: SetToastPositionRequest): Response<UserSettingsDto>

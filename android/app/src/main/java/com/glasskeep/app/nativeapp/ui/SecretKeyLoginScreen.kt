@@ -3,7 +3,6 @@ package com.glasskeep.app.nativeapp.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -67,7 +66,7 @@ fun SecretKeyLoginScreen(
     onLoggedIn: (mustChangePassword: Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
-    val dark = isSystemInDarkTheme()
+    val dark = LocalGkDark.current
     var key by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }

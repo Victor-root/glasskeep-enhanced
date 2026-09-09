@@ -13,7 +13,6 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -110,7 +109,7 @@ private enum class QrScanPhase { STARTING, SCANNING, WRONG_ORIGIN, FETCHING, CON
 
 @Composable
 fun QrScanScreen(container: NativeAppContainer, serverUrl: String, onBack: () -> Unit) {
-    val dark = isSystemInDarkTheme()
+    val dark = LocalGkDark.current
     val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val scope = rememberCoroutineScope()

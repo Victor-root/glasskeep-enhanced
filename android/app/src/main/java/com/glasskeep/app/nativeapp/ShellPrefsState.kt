@@ -20,6 +20,27 @@ class ShellPrefsState(private val tokenStore: TokenStore) {
     var floatingCards: Boolean by mutableStateOf(tokenStore.floatingCardsEnabled)
         private set
 
+    var listView: Boolean by mutableStateOf(tokenStore.listView)
+        private set
+
+    /**
+     * The light/dark choice made from the header menu, or null to follow
+     * the system. Deliberately NOT cached: the web keeps this one in
+     * sessionStorage (App.jsx:2240), so it lasts the session and the
+     * device's own setting takes over again on the next launch.
+     */
+    var darkOverride: Boolean? by mutableStateOf(null)
+        private set
+
+    fun toggleDark(currentlyDark: Boolean) {
+        darkOverride = !currentlyDark
+    }
+
+    fun applyListView(list: Boolean) {
+        listView = list
+        tokenStore.listView = list
+    }
+
     fun applyEdgeToEdgeLandscape(enabled: Boolean) {
         edgeToEdgeLandscape = enabled
         tokenStore.edgeToEdgeLandscape = enabled

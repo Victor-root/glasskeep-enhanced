@@ -43,6 +43,7 @@ import com.glasskeep.app.nativeapp.data.network.SetReadModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderTimeChipsRequest
 import com.glasskeep.app.nativeapp.data.network.SetShellThemeRequest
+import com.glasskeep.app.nativeapp.data.network.SetViewModeRequest
 import com.glasskeep.app.nativeapp.data.network.SetToastDurationRequest
 import com.glasskeep.app.nativeapp.data.network.SetToastPositionRequest
 import com.glasskeep.app.nativeapp.data.network.SetTypographyPresetsRequest
@@ -167,6 +168,18 @@ class NotesRepository(
      * of IndexedDB.
      */
     fun observeNotes(): Flow<List<NoteEntity>> = noteDao.observeAll()
+
+    /**
+     * Signing out: the cached notes and everything still queued go, the
+     * account's preferences stay. Same split as the web's own
+     * cleanupClientSession(purgeQueue = true) (App.jsx:4571-4607), which
+     * drops the note cache and the queue but keeps the UI preferences.
+     */
+    suspend fun clearLocalSessionData() {
+        NativeDebug.d("NotesRepository.clearLocalSessionData")
+        syncQueueDao.deleteAll()
+        noteDao.deleteAll()
+    }
 
     /**
      * Pulls the current note list from the server and replaces the local
@@ -946,6 +959,7 @@ class NotesRepository(
                 readModeEnabled = body.readModeEnabled,
                 edgeToEdgeLandscape = body.edgeToEdgeLandscape,
                 floatingCardsEnabled = body.floatingCardsEnabled,
+                viewMode = body.viewMode,
             )
         } catch (t: Throwable) {
             NativeDebug.e("NotesRepository.fetchWorkspacePreferences failed", t)
@@ -983,6 +997,17 @@ class NotesRepository(
         val response = api.setEdgeToEdgeLandscape(SetEdgeToEdgeLandscapeRequest(enabled))
         if (!response.isSuccessful) {
             val error = "PATCH /api/user/settings (edgeToEdgeLandscape) failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** Sets how the notes screen lays its cards out ("list" or "grid"). */
+    suspend fun setViewMode(mode: String) {
+        NativeDebug.d("NotesRepository.setViewMode mode=$mode")
+        val response = api.setViewMode(SetViewModeRequest(mode))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (viewMode) failed: HTTP ${response.code()}"
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }

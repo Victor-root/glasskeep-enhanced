@@ -930,6 +930,56 @@ fun CloudPendingIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Colo
     }
 }
 
+/** The counterpart of [TablerIcon] for the web's own hand-drawn set
+ *  (src/icons/index.jsx), which draws at strokeWidth 2. */
+@Composable
+private fun WebIcon(pathData: String, modifier: Modifier, size: Dp, tint: Color) {
+    val path = remember(pathData) { PathParser().parsePathString(pathData).toPath() }
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 24f
+        scale(scale, scale, pivot = Offset.Zero) {
+            drawPath(path, color = tint, style = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+@Composable
+fun GridIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z" +
+        "M14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6z" +
+        "M4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z" +
+        "M14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z",
+    modifier, size, tint,
+)
+
+@Composable
+fun ListIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M4 6h16M4 10h16M4 14h16M4 18h16",
+    modifier, size, tint,
+)
+
+/** The web draws the sun's disc as an SVG <circle>, which has no path
+ *  syntax; two half-arcs are the same shape. */
+@Composable
+fun SunIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M12 7a5 5 0 1 0 0 10a5 5 0 1 0 0 -10 " +
+        "M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42" +
+        "M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42",
+    modifier, size, tint,
+)
+
+@Composable
+fun MoonIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9 9 0 008.354-5.646z",
+    modifier, size, tint,
+)
+
+@Composable
+fun LogOutIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
+    "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1",
+    modifier, size, tint,
+)
+
 // Tabler icons used by the settings panel's section headers and rows,
 // taken from the same src/icons/editor/tabler/*.svg files the web
 // imports. `.tabler-icon` renders them at strokeWidth 1.75 with round

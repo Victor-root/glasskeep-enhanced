@@ -5,12 +5,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
+import com.glasskeep.app.nativeapp.ui.LocalGkDark
 import com.glasskeep.app.nativeapp.ui.NativeNavHost
 import com.glasskeep.app.nativeapp.ui.WorkspaceTheme
 import com.glasskeep.app.ui.applyThemedSystemBars
@@ -48,7 +50,10 @@ class NativeAppActivity : ComponentActivity() {
         val container = NativeAppContainer(applicationContext)
 
         setContent {
-            val dark = isSystemInDarkTheme()
+            // The device setting, unless the header menu's light/dark entry
+            // overrode it for this session (the web's own toggleDark, which
+            // likewise only lasts the session — App.jsx:2240).
+            val dark = container.shellPrefs.darkOverride ?: isSystemInDarkTheme()
             val view = LocalView.current
             // Signed-in only: the login screen keeps the same fixed pair
             // onboarding uses (the web's own theme system explicitly never
@@ -65,14 +70,16 @@ class NativeAppActivity : ComponentActivity() {
                 (view.context as ComponentActivity).applyThemedSystemBars(dark, overrideColor)
             }
             GlassKeepTheme {
-                NativeNavHost(
-                    container = container,
-                    serverUrl = serverUrl,
-                    pendingOpenNoteId = pendingOpenNoteId,
-                    onPendingOpenNoteIdConsumed = { pendingOpenNoteId = null },
-                    pendingOpenQrScanner = pendingOpenQrScanner,
-                    onPendingOpenQrScannerConsumed = { pendingOpenQrScanner = false },
-                )
+                CompositionLocalProvider(LocalGkDark provides dark) {
+                    NativeNavHost(
+                        container = container,
+                        serverUrl = serverUrl,
+                        pendingOpenNoteId = pendingOpenNoteId,
+                        onPendingOpenNoteIdConsumed = { pendingOpenNoteId = null },
+                        pendingOpenQrScanner = pendingOpenQrScanner,
+                        onPendingOpenQrScannerConsumed = { pendingOpenQrScanner = false },
+                    )
+                }
             }
         }
     }

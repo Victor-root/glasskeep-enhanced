@@ -7,7 +7,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,16 +24,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -70,6 +71,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
@@ -79,9 +82,11 @@ import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.isReminderPast
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
+import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.Indigo
+import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
 import java.text.SimpleDateFormat
@@ -100,12 +105,13 @@ private val CardBorderLight = Color(0xFFD1D5DB).copy(alpha = 0.3f)
 private val CardBorderDark = Color(0xFF4B5563).copy(alpha = 0.3f)
 
 /**
- * Notes list: a two-column masonry grid with real card previews (text
- * snippet, or the first few unchecked checklist items), and a header
+ * Notes list: the web's own masonry grid with real card previews (text
+ * snippet, or the first few unchecked checklist items) - one column or
+ * two, depending on the view chosen from the header menu - and a header
  * carrying the app's own branding, same shape as NotesHeader.jsx /
- * NoteCard.jsx on the web side (AI search, view toggle, admin panel and
- * the rest of that header's icon cluster aren't native features yet, so
- * they're not faked here, only what's real is shown).
+ * NoteCard.jsx on the web side. The one thing that header has and this
+ * one does not is the admin cluster (AI search, the admin panel, the
+ * instance lock), none of which this app has a surface for.
  */
 @Composable
 fun NativeNotesListScreen(
@@ -115,8 +121,10 @@ fun NativeNotesListScreen(
     onOpenArchived: () -> Unit,
     onOpenTrash: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenQrScanner: () -> Unit,
+    onSignedOut: () -> Unit,
 ) {
-    val dark = isSystemInDarkTheme()
+    val dark = LocalGkDark.current
     val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val notes by repository.observeNotes().collectAsState(initial = emptyList())
@@ -312,6 +320,33 @@ fun NativeNotesListScreen(
         }
     }
 
+    /** Optimistic like every other preference here: the layout flips at
+     *  once and the server is told after, since a failed PATCH only costs
+     *  this device's own copy of a display choice. */
+    fun toggleViewMode() {
+        val next = !container.shellPrefs.listView
+        container.shellPrefs.applyListView(next)
+        scope.launch {
+            try {
+                repository.setViewMode(if (next) "list" else "grid")
+            } catch (t: Throwable) {
+                NativeDebug.e("Notes setViewMode failed", t)
+            }
+        }
+    }
+
+    fun signOut() {
+        scope.launch {
+            try {
+                repository.clearLocalSessionData()
+            } catch (t: Throwable) {
+                NativeDebug.e("Notes signOut: clearing local data failed", t)
+            }
+            container.tokenStore.clearSession()
+            onSignedOut()
+        }
+    }
+
     fun refresh() {
         refreshing = true
         errorMessage = null
@@ -436,6 +471,11 @@ fun NativeNotesListScreen(
                 searchQuery = searchQuery,
                 onSearchQueryChange = { searchQuery = it },
                 onEnterSelection = { selectionMode = true },
+                listView = container.shellPrefs.listView,
+                onToggleViewMode = { toggleViewMode() },
+                onToggleDark = { container.shellPrefs.toggleDark(dark) },
+                onOpenQrScanner = onOpenQrScanner,
+                onSignOut = { signOut() },
                 notificationsOpen = notificationsOpen,
                 hasUnreadNotifications = unreadNotifications > 0,
                 onOpenNotifications = { notificationsOpen = !notificationsOpen },
@@ -484,12 +524,16 @@ fun NativeNotesListScreen(
                         onDragCancel = { endDrag() },
                     )
                 }
+                // List view is the web's own single, wider column with
+                // 24px between cards (NotesSections.jsx:61, `space-y-6`);
+                // the grid keeps the masonry pair.
+                val listView = container.shellPrefs.listView
                 LazyVerticalStaggeredGrid(
-                    columns = StaggeredGridCells.Fixed(2),
+                    columns = StaggeredGridCells.Fixed(if (listView) 1 else 2),
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + navBarBottom),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalItemSpacing = 12.dp,
+                    verticalItemSpacing = if (listView) 24.dp else 12.dp,
                 ) {
                     if (pinnedNotes.isNotEmpty()) {
                         item(span = StaggeredGridItemSpan.FullLine, key = "section-pinned") {
@@ -622,6 +666,11 @@ private fun NativeHeader(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onEnterSelection: () -> Unit,
+    listView: Boolean,
+    onToggleViewMode: () -> Unit,
+    onToggleDark: () -> Unit,
+    onOpenQrScanner: () -> Unit,
+    onSignOut: () -> Unit,
     notificationsOpen: Boolean,
     hasUnreadNotifications: Boolean,
     onOpenNotifications: () -> Unit,
@@ -806,24 +855,144 @@ private fun NativeHeader(
                             ) { moreMenuExpanded = true }
                             .padding(8.dp),
                     ) {
-                        KebabIcon(size = 18.dp, tint = titleColor)
+                        // The dots step aside while the panel is open: on a
+                        // phone the web anchors it right over the button
+                        // (NotesHeader.jsx:624-627).
+                        if (!moreMenuExpanded) KebabIcon(size = 18.dp, tint = titleColor)
                     }
-                    DropdownMenu(expanded = moreMenuExpanded, onDismissRequest = { moreMenuExpanded = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.native_settings_title)) },
-                            leadingIcon = { SettingsIcon(size = 18.dp, tint = titleColor) },
-                            onClick = { moreMenuExpanded = false; onOpenSettings() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.native_notes_select_mode)) },
-                            leadingIcon = { CheckSquareIcon(size = 18.dp, tint = titleColor) },
-                            onClick = { moreMenuExpanded = false; onEnterSelection() },
-                        )
-                    }
+                    HeaderMenu(
+                        expanded = moreMenuExpanded,
+                        dark = dark,
+                        listView = listView,
+                        onDismiss = { moreMenuExpanded = false },
+                        onOpenSettings = { moreMenuExpanded = false; onOpenSettings() },
+                        onToggleViewMode = { moreMenuExpanded = false; onToggleViewMode() },
+                        onToggleDark = { moreMenuExpanded = false; onToggleDark() },
+                        onEnterSelection = { moreMenuExpanded = false; onEnterSelection() },
+                        onOpenQrScanner = { moreMenuExpanded = false; onOpenQrScanner() },
+                        onSignOut = { moreMenuExpanded = false; onSignOut() },
+                    )
                 }
             }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(WorkspaceTheme.headerBorderColor(themeId, dark)))
+    }
+}
+
+/**
+ * The header's own menu (NotesHeader.jsx:637-738). Deliberately not a
+ * Material DropdownMenu: the web's panel has its own geometry (it opens
+ * over the kebab rather than under it, hugs its widest row, and scrolls
+ * past 72% of the screen) and its own row shape (16sp label, 12dp gap,
+ * one accent colour per action). Everything an admin-only surface would
+ * add - the admin panel, the instance lock - is left out because this app
+ * has neither.
+ */
+@Composable
+private fun HeaderMenu(
+    expanded: Boolean,
+    dark: Boolean,
+    listView: Boolean,
+    onDismiss: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onToggleViewMode: () -> Unit,
+    onToggleDark: () -> Unit,
+    onEnterSelection: () -> Unit,
+    onOpenQrScanner: () -> Unit,
+    onSignOut: () -> Unit,
+) {
+    if (!expanded) return
+    val configuration = LocalConfiguration.current
+    Popup(
+        alignment = Alignment.TopEnd,
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true),
+    ) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = (configuration.screenWidthDp * 0.95f).dp)
+                .heightIn(max = (configuration.screenHeightDp * 0.72f).dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (dark) Color(0xFF222222) else Color.White)
+                .border(1.dp, if (dark) DarkBorderColor else LightBorderColor, RoundedCornerShape(8.dp))
+                .verticalScroll(rememberScrollState()),
+        ) {
+            HeaderMenuItem(
+                label = stringResource(R.string.native_settings_title),
+                iconTint = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
+                dark = dark,
+                onClick = onOpenSettings,
+            ) { tint -> SettingsIcon(size = 20.dp, tint = tint) }
+            HeaderMenuItem(
+                label = stringResource(
+                    if (listView) R.string.native_notes_grid_view else R.string.native_notes_list_view
+                ),
+                iconTint = if (dark) Color(0xFF60A5FA) else Color(0xFF2563EB),
+                dark = dark,
+                onClick = onToggleViewMode,
+            ) { tint ->
+                if (listView) GridIcon(size = 20.dp, tint = tint) else ListIcon(size = 20.dp, tint = tint)
+            }
+            HeaderMenuItem(
+                label = stringResource(
+                    if (dark) R.string.native_notes_light_mode else R.string.native_notes_dark_mode
+                ),
+                iconTint = if (dark) Color(0xFFFBBF24) else Color(0xFF4F46E5),
+                dark = dark,
+                onClick = onToggleDark,
+            ) { tint ->
+                if (dark) SunIcon(size = 20.dp, tint = tint) else MoonIcon(size = 20.dp, tint = tint)
+            }
+            HeaderMenuItem(
+                label = stringResource(R.string.native_notes_select_mode),
+                iconTint = if (dark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
+                dark = dark,
+                onClick = onEnterSelection,
+            ) { tint -> CheckSquareIcon(size = 20.dp, tint = tint) }
+            HeaderMenuItem(
+                label = stringResource(R.string.native_qr_scan_title),
+                iconTint = if (dark) Color(0xFF2DD4BF) else Color(0xFF0D9488),
+                dark = dark,
+                onClick = onOpenQrScanner,
+            ) { tint -> QrCodeIcon(size = 20.dp, tint = tint) }
+            // The whole row is red on the web, glyph and label alike.
+            val signOutColor = if (dark) Color(0xFFF87171) else Color(0xFFDC2626)
+            HeaderMenuItem(
+                label = stringResource(R.string.native_notes_sign_out),
+                iconTint = signOutColor,
+                labelColor = signOutColor,
+                dark = dark,
+                onClick = onSignOut,
+            ) { tint -> LogOutIcon(size = 20.dp, tint = tint) }
+        }
+    }
+}
+
+/** One row of [HeaderMenu]: px-4 py-3.5, 12dp gap, 16sp label. */
+@Composable
+private fun HeaderMenuItem(
+    label: String,
+    iconTint: Color,
+    dark: Boolean,
+    onClick: () -> Unit,
+    labelColor: Color? = null,
+    icon: @Composable (Color) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        icon(iconTint)
+        Spacer(Modifier.width(12.dp))
+        Text(
+            label,
+            color = labelColor ?: if (dark) Color(0xFFF3F4F6) else Color(0xFF1F2937),
+            fontSize = 16.sp,
+            maxLines = 1,
+        )
     }
 }
 

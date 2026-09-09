@@ -116,9 +116,29 @@ class TokenStore(context: Context) {
             prefs.edit().putBoolean(KEY_FLOATING_CARDS, value).apply()
         }
 
+    /** Cached "one note per row" preference. Grid by default, same as the
+     *  web's own localStorage["viewMode"] (App.jsx:1153-1155). */
+    var listView: Boolean
+        get() = prefs.getBoolean(KEY_LIST_VIEW, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_LIST_VIEW, value).apply()
+        }
+
     fun clear() {
         NativeDebug.d("TokenStore.clear")
         prefs.edit().clear().apply()
+    }
+
+    /**
+     * Signing out: drops the session and nothing else. The look of the app
+     * (theme, editor and shell preferences) is a per-device cache the web
+     * deliberately keeps too, "preserve UI prefs like dark mode"
+     * (App.jsx:4607), and the server URL is what the login screen this
+     * lands on talks to.
+     */
+    fun clearSession() {
+        NativeDebug.d("TokenStore.clearSession")
+        prefs.edit().remove(KEY_TOKEN).apply()
     }
 
     companion object {
@@ -129,6 +149,7 @@ class TokenStore(context: Context) {
         private const val KEY_TYPOGRAPHY = "typography_presets"
         private const val KEY_TASK_STRIKE = "task_strike_checked"
         private const val KEY_READ_MODE = "read_mode_enabled"
+        private const val KEY_LIST_VIEW = "list_view"
         private const val KEY_EDGE_TO_EDGE_LANDSCAPE = "edge_to_edge_landscape"
         private const val KEY_FLOATING_CARDS = "floating_cards_enabled"
         private const val KEY_TOAST_POSITION = "toast_position"

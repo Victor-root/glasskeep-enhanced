@@ -17,7 +17,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -204,7 +203,7 @@ fun NoteDetailScreen(
     onBack: () -> Unit,
     onOpenCollaborators: () -> Unit = {},
 ) {
-    val dark = isSystemInDarkTheme()
+    val dark = LocalGkDark.current
     val context = LocalContext.current
     val toasts = LocalGkToasts.current
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }

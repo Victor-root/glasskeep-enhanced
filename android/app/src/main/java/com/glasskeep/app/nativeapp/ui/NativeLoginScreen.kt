@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -97,9 +96,6 @@ private val ErrorColor = Color(0xFFdc2626)
  * AuthShell stacks them.
  *
  * Deliberately not ported, disclosed rather than silently dropped: the
- * light/dark toggle at the foot of the web screen (this app follows
- * Android's own system-wide setting, which is the platform's answer to
- * the same question, and has no in-app override to flip), the
  * admin-configured custom background image, and account creation (the
  * server holds new registrations for an admin to approve, which needs an
  * admin surface this app does not have). QR sign-in lives on its own
@@ -113,7 +109,7 @@ fun NativeLoginScreen(
     onLoggedIn: (mustChangePassword: Boolean) -> Unit,
     onForgotPassword: () -> Unit,
 ) {
-    val dark = isSystemInDarkTheme()
+    val dark = LocalGkDark.current
     var profiles by remember { mutableStateOf<List<LoginProfileDto>>(emptyList()) }
     var mode by remember { mutableStateOf(LoginMode.PROFILES) }
     var selectedProfile by remember { mutableStateOf<LoginProfileDto?>(null) }
@@ -473,6 +469,27 @@ fun NativeLoginScreen(
                 }
             }
 
+            // mt-6, above the slogan pill (AuthShell.jsx:303-311). The
+            // glyph shows the current mode, not the one the tap switches
+            // to, unlike the header menu's own entry.
+            Spacer(Modifier.height(24.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    role = Role.Button,
+                ) { container.shellPrefs.toggleDark(dark) },
+            ) {
+                val toggleColor = if (dark) Color(0xFFD1D5DB) else Color(0xFF374151)
+                if (dark) {
+                    SunIcon(size = 20.dp, tint = toggleColor)
+                } else {
+                    MoonIcon(size = 20.dp, tint = toggleColor)
+                }
+                Text(stringResource(R.string.native_login_toggle_theme), color = toggleColor, fontSize = 14.sp)
+            }
             Spacer(Modifier.height(16.dp))
             Box(
                 modifier = Modifier

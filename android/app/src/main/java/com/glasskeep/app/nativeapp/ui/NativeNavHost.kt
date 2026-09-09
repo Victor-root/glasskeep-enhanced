@@ -3,7 +3,6 @@ package com.glasskeep.app.nativeapp.ui
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -242,6 +241,13 @@ fun NativeNavHost(
                         onOpenArchived = { navController.navigate("archived") },
                         onOpenTrash = { navController.navigate("trash") },
                         onOpenSettings = { navController.navigate("settings") },
+                        onOpenQrScanner = { navController.navigate("qr-scan") },
+                        onSignedOut = {
+                            realtimeClient.stop()
+                            navController.navigate("login") {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
+                        },
                     )
                 }
                 // The web's settings panel is a full-width sheet that slides in
@@ -316,7 +322,7 @@ fun NativeNavHost(
             GkToastHost(
                 controller = toasts,
                 position = toastPositionOf(container.editorPrefs.toastPosition),
-                dark = isSystemInDarkTheme(),
+                dark = LocalGkDark.current,
                 durationMs = container.editorPrefs.toastDurationMs,
             )
         }
@@ -337,4 +343,5 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     prefs.readModeEnabled?.let { container.editorPrefs.applyReadMode(it) }
     prefs.edgeToEdgeLandscape?.let { container.shellPrefs.applyEdgeToEdgeLandscape(it) }
     prefs.floatingCardsEnabled?.let { container.shellPrefs.applyFloatingCards(it) }
+    prefs.viewMode?.let { container.shellPrefs.applyListView(it == "list") }
 }

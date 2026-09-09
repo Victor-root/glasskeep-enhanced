@@ -1,8 +1,18 @@
 package com.glasskeep.app.nativeapp.ui
 
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+
+/**
+ * Whether the app is currently painting dark. Every screen reads this
+ * rather than the device setting directly, because the header menu's
+ * light/dark entry can override that setting for the session
+ * (ShellPrefsState.darkOverride, the web's own toggleDark). Provided once
+ * at the root, in NativeAppActivity.
+ */
+val LocalGkDark = staticCompositionLocalOf { false }
 
 /**
  * The six "workspace" shell themes, ported token for token from
