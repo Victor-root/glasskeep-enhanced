@@ -1,7 +1,6 @@
 package com.glasskeep.app
 
 import android.content.Intent
-import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -38,21 +37,12 @@ class MainActivity : ComponentActivity() {
             CleartextPolicy.isUsableAtStartup(it, prefs.getBoolean(KEY_URL_VETTED, false))
         }
 
-        // Fast path: onboarding done AND URL configured → straight to
-        // the WebView, same as the previous behaviour.
+        // Fast path: onboarding done AND URL configured, straight into
+        // the app. A launcher shortcut (long-press the icon: "Scan QR",
+        // or a new text / checklist / audio note) rides along as an
+        // Intent extra, see launchApp.
         if (welcomeDone && savedUrl != null) {
-            // App-shortcut entry point: long-press launcher → one of
-            // five shortcuts ("Scan QR" / new text / checklist / draw
-            // / audio). Each shortcut sends a distinct action; we map
-            // it to a one-shot query parameter and append it to the
-            // configured server URL. The SPA picks it up at boot, runs
-            // the matching action (only if the user already has a
-            // valid session), and strips the param from the URL so a
-            // refresh doesn't loop the action indefinitely.
-            val urlToLoad = SHORTCUT_QUERY_PARAMS[intent?.action]
-                ?.let { (key, value) -> appendQueryParam(savedUrl, key, value) }
-                ?: savedUrl
-            launchApp(webViewUrl = urlToLoad, nativeUrl = savedUrl)
+            launchApp(savedUrl)
             return
         }
 
@@ -82,56 +72,33 @@ class MainActivity : ComponentActivity() {
                             .putString("server_url", url)
                             .putBoolean(KEY_URL_VETTED, true)
                             .apply()
-                        launchApp(webViewUrl = url, nativeUrl = url)
+                        launchApp(url)
                     },
                 )
             }
         }
     }
 
-    // Native rewrite (0-webview effort): debug builds boot straight into
-    // the native flow being built out in com.glasskeep.app.nativeapp,
-    // release builds keep the WebView exactly as before until the native
-    // side reaches feature parity. Nothing changes for real users yet.
+    // Every build boots the native app now (com.glasskeep.app.nativeapp);
+    // WebViewActivity is no longer an entry point at all.
     //
-    // webViewUrl carries the WebView-era shortcut mechanism (a query
-    // param the SPA reads at boot, see SHORTCUT_QUERY_PARAMS); the native
-    // side doesn't boot a URL at all, so a shortcut meant for it is
-    // instead passed down as its own separate Intent extra (see
-    // openQrScanner below), the same way EXTRA_OPEN_NOTE_ID already works
-    // for a reminder notification tap.
-    private fun launchApp(webViewUrl: String, nativeUrl: String) {
-        if (BuildConfig.DEBUG) {
-            launchNativeApp(nativeUrl, openQrScanner = intent?.action == SHORTCUT_ACTION_QR_SCAN)
+    // A launcher shortcut travels as its own Intent extra rather than as
+    // the boot-URL query parameter the WebView era used, since nothing
+    // boots a URL any more. Same mechanism EXTRA_OPEN_NOTE_ID already
+    // uses for a reminder notification tap.
+    private fun launchApp(url: String) {
+        val target = Intent(this, NativeAppActivity::class.java)
+        target.putExtra(NativeAppActivity.EXTRA_SERVER_URL, url)
+        val action = intent?.action
+        if (action == SHORTCUT_ACTION_QR_SCAN) {
+            target.putExtra(NativeAppActivity.EXTRA_OPEN_QR_SCANNER, true)
         } else {
-            launchWebView(webViewUrl)
+            SHORTCUT_NOTE_TYPES[action]?.let {
+                target.putExtra(NativeAppActivity.EXTRA_NEW_NOTE_TYPE, it)
+            }
         }
-    }
-
-    private fun launchNativeApp(url: String, openQrScanner: Boolean) {
-        val intent = Intent(this, NativeAppActivity::class.java)
-        intent.putExtra(NativeAppActivity.EXTRA_SERVER_URL, url)
-        if (openQrScanner) intent.putExtra(NativeAppActivity.EXTRA_OPEN_QR_SCANNER, true)
-        startActivity(intent)
+        startActivity(target)
         finish()
-    }
-
-    private fun launchWebView(url: String) {
-        val intent = Intent(this, WebViewActivity::class.java)
-        intent.putExtra("url", url)
-        startActivity(intent)
-        finish()
-    }
-
-    // Tack a query parameter onto a URL without dragging in a full URI
-    // parser. Handles both "no existing query" and "already has ?foo"
-    // cases. Values are URL-encoded so a future caller can pass
-    // anything safely.
-    private fun appendQueryParam(url: String, key: String, value: String): String {
-        val sep = if (url.contains("?")) "&" else "?"
-        val encodedKey = java.net.URLEncoder.encode(key, "UTF-8")
-        val encodedValue = java.net.URLEncoder.encode(value, "UTF-8")
-        return "$url$sep$encodedKey=$encodedValue"
     }
 
     companion object {
@@ -140,26 +107,23 @@ class MainActivity : ComponentActivity() {
         private const val KEY_WELCOME_DONE = "welcome_done"
 
         // Set when the setup screen accepted an address after examining
-        // where it actually points. WebViewActivity clears it along with
-        // the address itself when the user switches server.
+        // where it actually points. The app's own "change server" clears
+        // it along with the address itself (see AuthShell and the
+        // Settings screen; WebViewActivity still does the same for the
+        // one path that can still reach it).
         const val KEY_URL_VETTED = "server_url_vetted"
 
-        // Action strings must match res/xml/shortcuts.xml. Each maps
-        // to the (queryParamKey, queryParamValue) pair MainActivity
-        // appends to the configured server URL — keep this table in
-        // lockstep with the SPA's boot-time param dispatch in
-        // src/App.jsx (search for `params.get("qr")` /
-        // `params.get("new")`).
-        private val SHORTCUT_QUERY_PARAMS = mapOf(
-            SHORTCUT_ACTION_QR_SCAN                    to ("qr"  to "open"),
-            "com.glasskeep.app.SHORTCUT_NEW_TEXT"     to ("new" to "text"),
-            "com.glasskeep.app.SHORTCUT_NEW_CHECKLIST" to ("new" to "checklist"),
-            "com.glasskeep.app.SHORTCUT_NEW_AUDIO"    to ("new" to "audio"),
+        // Action strings must match res/xml/shortcuts.xml. Each of the
+        // three "new note" shortcuts names the type the notes screen
+        // creates on arrival (see NativeNotesListScreen's own
+        // pendingNewNoteType); the fourth, below, opens the QR scanner
+        // instead and so has no type to carry.
+        private val SHORTCUT_NOTE_TYPES = mapOf(
+            "com.glasskeep.app.SHORTCUT_NEW_TEXT" to "text",
+            "com.glasskeep.app.SHORTCUT_NEW_CHECKLIST" to "checklist",
+            "com.glasskeep.app.SHORTCUT_NEW_AUDIO" to "audio",
         )
 
-        // Pulled out of the table above (rather than a second inline
-        // literal) so launchApp's native-side dispatch below can't drift
-        // from the WebView-side one out of sheer typo risk.
         private const val SHORTCUT_ACTION_QR_SCAN = "com.glasskeep.app.SHORTCUT_QR_SCAN"
     }
 }

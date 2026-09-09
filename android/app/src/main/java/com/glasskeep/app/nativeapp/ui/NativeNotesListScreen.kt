@@ -132,6 +132,11 @@ fun NativeNotesListScreen(
     onOpenTrash: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenQrScanner: () -> Unit,
+    /** Set when the launcher's "new text/checklist/audio note" shortcut
+     *  started the app (see MainActivity's own shortcut table): the note
+     *  is created and opened as soon as this screen is up. */
+    pendingNewNoteType: String? = null,
+    onPendingNewNoteTypeConsumed: () -> Unit = {},
     onSignedOut: () -> Unit,
 ) {
     val dark = LocalGkDark.current
@@ -519,6 +524,19 @@ fun NativeNotesListScreen(
     }
 
     LaunchedEffect(serverUrl) { refresh() }
+
+    // The launcher shortcut, once: consumed straight away so coming back
+    // to this screen later doesn't create a second note.
+    LaunchedEffect(pendingNewNoteType) {
+        when (pendingNewNoteType) {
+            null -> return@LaunchedEffect
+            "text" -> createTextNote()
+            "checklist" -> createChecklistNote()
+            "audio" -> createAudioNote()
+            else -> NativeDebug.e("Unknown launcher note type: $pendingNewNoteType")
+        }
+        onPendingNewNoteTypeConsumed()
+    }
 
     // The bell's red dot: how many notifications are still pending, read
     // once on load and again every time the panel closes (opening it is

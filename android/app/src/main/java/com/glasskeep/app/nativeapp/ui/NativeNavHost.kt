@@ -60,6 +60,8 @@ fun NativeNavHost(
     onPendingOpenNoteIdConsumed: () -> Unit = {},
     pendingOpenQrScanner: Boolean = false,
     onPendingOpenQrScannerConsumed: () -> Unit = {},
+    pendingNewNoteType: String? = null,
+    onPendingNewNoteTypeConsumed: () -> Unit = {},
 ) {
     val navController: NavHostController = rememberNavController()
     // Set when the unlock screen signs an admin in (its passkey path does)
@@ -248,6 +250,16 @@ fun NativeNavHost(
         }
     }
 
+    // Same rule for the three "new note" shortcuts, which the notes
+    // screen itself acts on: a tap while signed out is dropped rather
+    // than kept for whenever the user next signs in, exactly as the web
+    // only runs a shortcut when there is already a valid session.
+    LaunchedEffect(pendingNewNoteType, startDestination) {
+        if (pendingNewNoteType != null && startDestination != "notes") {
+            onPendingNewNoteTypeConsumed()
+        }
+    }
+
     val scope = rememberCoroutineScope()
 
     // Shared by every login path (password, passkey, secret key): same
@@ -408,6 +420,8 @@ fun NativeNavHost(
                         onOpenTrash = { navController.navigate("trash") },
                         onOpenSettings = { navController.navigate("settings") },
                         onOpenQrScanner = { navController.navigate("qr-scan") },
+                        pendingNewNoteType = pendingNewNoteType,
+                        onPendingNewNoteTypeConsumed = onPendingNewNoteTypeConsumed,
                         onSignedOut = {
                             realtimeClient.stop()
                             navController.navigate("login") {

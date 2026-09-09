@@ -8,7 +8,6 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.glasskeep.app.BuildConfig
 import com.glasskeep.app.R
 import com.glasskeep.app.WebViewActivity
 import com.glasskeep.app.nativeapp.NativeAppActivity
@@ -74,27 +73,24 @@ internal object ReminderNotifier {
     }
 
     /**
-     * PendingIntent that re-opens the app on the given note. Debug builds
-     * (see MainActivity.launchApp) deep-link into NativeAppActivity
-     * instead of WebViewActivity, since that's the flow actually running
-     * there; release builds are unchanged. Carries the note id as each
-     * Activity's own EXTRA_OPEN_NOTE_ID.
+     * PendingIntent that re-opens the app on the given note, in
+     * NativeAppActivity, which is what every build runs now (see
+     * MainActivity.launchApp). Carries the note id as the Activity's own
+     * EXTRA_OPEN_NOTE_ID.
      */
     private fun buildOpenNoteIntent(context: Context, noteId: String): PendingIntent {
-        val nativeIntent = if (BuildConfig.DEBUG) {
-            resolveNativeServerUrl(context)?.let { url ->
-                Intent(context, NativeAppActivity::class.java).apply {
-                    putExtra(NativeAppActivity.EXTRA_SERVER_URL, url)
-                    putExtra(NativeAppActivity.EXTRA_OPEN_NOTE_ID, noteId)
-                }
+        val nativeIntent = resolveNativeServerUrl(context)?.let { url ->
+            Intent(context, NativeAppActivity::class.java).apply {
+                putExtra(NativeAppActivity.EXTRA_SERVER_URL, url)
+                putExtra(NativeAppActivity.EXTRA_OPEN_NOTE_ID, noteId)
             }
-        } else {
-            null
         }
         // NativeAppActivity requires EXTRA_SERVER_URL (see its onCreate) and
         // has no fallback if one can't be resolved (e.g. no session was ever
-        // established on this device), so this falls back to the same
-        // WebView target release builds always use rather than risk a crash.
+        // established on this device), so a tap in that state goes to the
+        // WebView rather than risking a crash. It is the only thing still
+        // reaching WebViewActivity, and only ever on a device with no
+        // usable native session at all.
         val intent = nativeIntent ?: Intent(context, WebViewActivity::class.java).apply {
             putExtra(WebViewActivity.EXTRA_OPEN_NOTE_ID, noteId)
         }

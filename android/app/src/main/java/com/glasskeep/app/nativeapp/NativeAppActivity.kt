@@ -22,8 +22,8 @@ import com.glasskeep.app.ui.theme.GlassKeepTheme
  * Entry point for the native (0-webview) app: every screen in
  * com.glasskeep.app.nativeapp hangs off the nav graph this hosts.
  *
- * Which of the two entry points a build actually reaches is
- * MainActivity.launchApp's call, still gated on BuildConfig.DEBUG there.
+ * Every build reaches this one now: MainActivity.launchApp no longer
+ * boots WebViewActivity at all.
  */
 class NativeAppActivity : ComponentActivity() {
     // Deep-link target when launched from a reminder notification (see
@@ -39,6 +39,10 @@ class NativeAppActivity : ComponentActivity() {
     // to identify, so this is just a one-shot flag.
     private var pendingOpenQrScanner by mutableStateOf(false)
 
+    // And for the launcher's three "new note" shortcuts, which name the
+    // type to create ("text", "checklist", "audio").
+    private var pendingNewNoteType by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val serverUrl = intent.getStringExtra(EXTRA_SERVER_URL)
@@ -46,6 +50,7 @@ class NativeAppActivity : ComponentActivity() {
         NativeDebug.d("NativeAppActivity.onCreate serverUrl=$serverUrl")
         pendingOpenNoteId = intent.getStringExtra(EXTRA_OPEN_NOTE_ID)
         pendingOpenQrScanner = intent.getBooleanExtra(EXTRA_OPEN_QR_SCANNER, false)
+        pendingNewNoteType = intent.getStringExtra(EXTRA_NEW_NOTE_TYPE)
 
         val container = NativeAppContainer(applicationContext)
 
@@ -78,6 +83,8 @@ class NativeAppActivity : ComponentActivity() {
                         onPendingOpenNoteIdConsumed = { pendingOpenNoteId = null },
                         pendingOpenQrScanner = pendingOpenQrScanner,
                         onPendingOpenQrScannerConsumed = { pendingOpenQrScanner = false },
+                        pendingNewNoteType = pendingNewNoteType,
+                        onPendingNewNoteTypeConsumed = { pendingNewNoteType = null },
                     )
                 }
             }
@@ -92,11 +99,13 @@ class NativeAppActivity : ComponentActivity() {
         setIntent(intent)
         intent.getStringExtra(EXTRA_OPEN_NOTE_ID)?.let { pendingOpenNoteId = it }
         if (intent.getBooleanExtra(EXTRA_OPEN_QR_SCANNER, false)) pendingOpenQrScanner = true
+        intent.getStringExtra(EXTRA_NEW_NOTE_TYPE)?.let { pendingNewNoteType = it }
     }
 
     companion object {
         const val EXTRA_SERVER_URL = "server_url"
         const val EXTRA_OPEN_NOTE_ID = "openNoteId"
         const val EXTRA_OPEN_QR_SCANNER = "openQrScanner"
+        const val EXTRA_NEW_NOTE_TYPE = "newNoteType"
     }
 }
