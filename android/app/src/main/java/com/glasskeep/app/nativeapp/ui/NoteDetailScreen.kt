@@ -373,16 +373,16 @@ fun NoteDetailScreen(
         }
     }
 
-    fun confirmTrash() {
+    fun confirmTrash(mode: String? = null) {
         val current = note ?: return
         showTrashConfirm = false
         if (trashing) return
         trashing = true
         scope.launch {
             try {
-                repository.trashNoteQueued(current.id)
+                repository.trashNoteQueued(current.id, mode)
                 SyncQueueWorker.triggerNow(context)
-                NativeDebug.d("NoteDetailScreen trash queued id=${current.id}")
+                NativeDebug.d("NoteDetailScreen trash queued id=${current.id} mode=$mode")
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen trash failed", t)
@@ -1873,21 +1873,37 @@ fun NoteDetailScreen(
         }
 
         if (showTrashConfirm) {
-            AlertDialog(
-                onDismissRequest = { showTrashConfirm = false },
-                title = { Text(stringResource(R.string.native_note_detail_trash_confirm_title)) },
-                text = { Text(stringResource(R.string.native_note_detail_trash_confirm_body)) },
-                confirmButton = {
-                    TextButton(onClick = { confirmTrash() }, enabled = !trashing) {
-                        Text(stringResource(R.string.native_note_detail_move_to_trash), color = trashMenuColor)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showTrashConfirm = false }) {
-                        Text(stringResource(R.string.native_note_detail_trash_confirm_cancel))
-                    }
-                },
-            )
+            // The owner of a note that has collaborators gets an explicit
+            // choice (mirrors the web's own ConfirmDeleteDialog collabOwner
+            // variant): leaving via ownership transfer vs. hard-deleting
+            // for every participant. Everyone else (a plain note, or a
+            // collaborator leaving) keeps the simple single-button dialog
+            // unchanged - the server's own default mode already does the
+            // right thing for both of those without native needing to say
+            // so explicitly (see TrashNoteRequest's own doc comment).
+            if (isOwnerAccess && !currentNote.collaborators.isNullOrEmpty()) {
+                DeleteSharedNoteDialog(
+                    dark = dark,
+                    onDismiss = { showTrashConfirm = false },
+                    onConfirm = { mode -> confirmTrash(mode) },
+                )
+            } else {
+                AlertDialog(
+                    onDismissRequest = { showTrashConfirm = false },
+                    title = { Text(stringResource(R.string.native_note_detail_trash_confirm_title)) },
+                    text = { Text(stringResource(R.string.native_note_detail_trash_confirm_body)) },
+                    confirmButton = {
+                        TextButton(onClick = { confirmTrash() }, enabled = !trashing) {
+                            Text(stringResource(R.string.native_note_detail_move_to_trash), color = trashMenuColor)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showTrashConfirm = false }) {
+                            Text(stringResource(R.string.native_note_detail_trash_confirm_cancel))
+                        }
+                    },
+                )
+            }
         }
 
         if (showPermanentDeleteConfirm) {
@@ -2062,3 +2078,95 @@ internal fun detailFieldColors(textColor: Color, subtextColor: Color, borderColo
         unfocusedLabelColor = subtextColor,
         cursorColor = Indigo,
     )
+
+/** Owner-of-a-shared-note trash confirmation: mirrors the web's own
+ *  ConfirmDeleteDialog collabOwner variant (and this app's own
+ *  CollaboratorsScreen.kt RemoveCollaboratorDialog, same three-choice
+ *  vertical-stack shape) rather than Material3's AlertDialog, which only
+ *  has room for two buttons. "Remove for me" leaves via ownership
+ *  transfer (mode=remove_self, same as the plain single-button dialog's
+ *  own default); "Delete for everyone" hard-deletes the note for every
+ *  collaborator (mode=delete_for_all, owner-only server-side - see
+ *  TrashNoteRequest's own doc comment). */
+@Composable
+private fun DeleteSharedNoteDialog(
+    dark: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (mode: String) -> Unit,
+) {
+    val titleColor = if (dark) DarkTitleColor else LightTitleColor
+    val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
+    val borderColor = if (dark) DarkBorderColor else LightBorderColor
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(if (dark) DarkBgColor else Color.White)
+                .padding(20.dp),
+        ) {
+            Text(
+                stringResource(R.string.native_note_detail_delete_shared_question),
+                color = titleColor,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.native_note_detail_delete_shared_subtitle),
+                color = subtextColor,
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(16.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, borderColor, RoundedCornerShape(10.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onConfirm("remove_self") },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(stringResource(R.string.native_note_detail_remove_for_me), color = titleColor, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(ErrorColor)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onConfirm("delete_for_all") },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(stringResource(R.string.native_note_detail_delete_for_all), color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onDismiss() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(stringResource(R.string.native_dialog_cancel), color = subtextColor, fontSize = 14.sp)
+            }
+        }
+    }
+}

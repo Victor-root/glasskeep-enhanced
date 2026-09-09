@@ -162,6 +162,10 @@
     <string name="native_note_detail_trash_confirm_title">Mettre à la corbeille ?</string>
     <string name="native_note_detail_trash_confirm_body">Vous la retrouverez dans la corbeille de l\'application web.</string>
     <string name="native_note_detail_trash_confirm_cancel">Annuler</string>
+    <string name="native_note_detail_delete_shared_question">Supprimer cette note partagée ?</string>
+    <string name="native_note_detail_delete_shared_subtitle">Choisissez ce qui doit être supprimé.</string>
+    <string name="native_note_detail_remove_for_me">Retirer pour moi</string>
+    <string name="native_note_detail_delete_for_all">Supprimer pour tous</string>
     <string name="native_note_detail_action_error">Action impossible : %1$s</string>
     <string name="native_note_detail_change_color">Changer la couleur</string>
     <string name="native_note_detail_color_title">Couleur de la note</string>

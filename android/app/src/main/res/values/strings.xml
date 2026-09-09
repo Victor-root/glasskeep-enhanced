@@ -168,6 +168,10 @@
     <string name="native_note_detail_trash_confirm_title">Move to trash?</string>
     <string name="native_note_detail_trash_confirm_body">You\'ll find it in the trash on the web app.</string>
     <string name="native_note_detail_trash_confirm_cancel">Cancel</string>
+    <string name="native_note_detail_delete_shared_question">Delete this shared note?</string>
+    <string name="native_note_detail_delete_shared_subtitle">Choose what you want to delete.</string>
+    <string name="native_note_detail_remove_for_me">Remove for me</string>
+    <string name="native_note_detail_delete_for_all">Delete for everyone</string>
     <string name="native_note_detail_action_error">Action failed: %1$s</string>
     <string name="native_note_detail_change_color">Change color</string>
     <string name="native_note_detail_color_title">Note color</string>

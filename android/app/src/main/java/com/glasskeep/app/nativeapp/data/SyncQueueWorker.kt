@@ -28,6 +28,7 @@ import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
+import com.glasskeep.app.nativeapp.data.network.TrashNoteRequest
 import kotlinx.coroutines.delay
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -123,8 +124,8 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 repository.setArchived(item.noteId, body.archived, body.clientUpdatedAt)
             }
             SyncQueueType.TRASH -> {
-                val body = Json.decodeFromString<ClientUpdatedAtRequest>(item.payloadJson)
-                repository.trashNote(item.noteId, body.clientUpdatedAt)
+                val body = Json.decodeFromString<TrashNoteRequest>(item.payloadJson)
+                repository.trashNote(item.noteId, body.clientUpdatedAt, body.mode)
             }
             SyncQueueType.RESTORE -> {
                 val body = Json.decodeFromString<ClientUpdatedAtRequest>(item.payloadJson)

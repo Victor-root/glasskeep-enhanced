@@ -258,6 +258,20 @@ data class ArchiveNoteRequest(
 @Serializable
 data class ClientUpdatedAtRequest(@SerialName("client_updated_at") val clientUpdatedAt: String)
 
+/** Body for POST /api/notes/:id/trash specifically: like
+ *  ClientUpdatedAtRequest, but with an extra optional [mode] the other
+ *  three routes that share that plain DTO have no equivalent for. Absent
+ *  (null) or "remove_self" both mean the same thing server-side (see
+ *  server/index.js's own `mode` handling on this route): a collaborator
+ *  leaves the note, or its owner leaves via ownership transfer -
+ *  whichever this caller is. "delete_for_all" is owner-only: every
+ *  collaborator loses the note outright, not just this caller. */
+@Serializable
+data class TrashNoteRequest(
+    @SerialName("client_updated_at") val clientUpdatedAt: String,
+    val mode: String? = null,
+)
+
 /** Body for a color-only PATCH /api/notes/:id. Separate from
  *  PatchNoteRequest (title/content) so title/content stay untouched: the
  *  server only writes fields actually present in the JSON body, and color
@@ -625,7 +639,7 @@ interface GlassKeepApi {
     suspend fun archiveNote(@Path("id") id: String, @Body body: ArchiveNoteRequest): Response<NoteMutationResponse>
 
     @POST("api/notes/{id}/trash")
-    suspend fun trashNote(@Path("id") id: String, @Body body: ClientUpdatedAtRequest): Response<NoteMutationResponse>
+    suspend fun trashNote(@Path("id") id: String, @Body body: TrashNoteRequest): Response<NoteMutationResponse>
 
     @POST("api/notes/{id}/restore")
     suspend fun restoreNote(@Path("id") id: String, @Body body: ClientUpdatedAtRequest): Response<NoteMutationResponse>

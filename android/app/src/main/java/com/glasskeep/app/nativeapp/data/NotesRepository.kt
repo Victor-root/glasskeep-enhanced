@@ -22,9 +22,12 @@ import com.glasskeep.app.nativeapp.data.network.PasskeyDto
 import com.glasskeep.app.nativeapp.data.network.PasskeyRegisterVerifyRequest
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ProfileDto
+import com.glasskeep.app.nativeapp.data.network.RemoveCollaboratorRequest
+import com.glasskeep.app.nativeapp.data.network.ReorderNotesRequest
 import com.glasskeep.app.nativeapp.data.network.SetAvatarRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistInsertPositionRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
+import com.glasskeep.app.nativeapp.data.network.SetCollaboratorAccessRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
 import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
 import com.glasskeep.app.nativeapp.data.network.SetLanguageRequest
@@ -33,6 +36,7 @@ import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetShellThemeRequest
 import com.glasskeep.app.nativeapp.data.network.SetShowOnLoginRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
+import com.glasskeep.app.nativeapp.data.network.TrashNoteRequest
 import com.glasskeep.app.nativeapp.data.network.UserDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -401,9 +405,9 @@ class NotesRepository(
      * longer an active note. The trash screen itself doesn't read this
      * cache at all, it always fetches fresh (see fetchTrashedNotes()).
      */
-    suspend fun trashNote(id: String, clientUpdatedAt: String = nowIso()): SaveNoteResult {
-        NativeDebug.d("NotesRepository.trashNote id=$id")
-        val response = api.trashNote(id, ClientUpdatedAtRequest(clientUpdatedAt))
+    suspend fun trashNote(id: String, clientUpdatedAt: String = nowIso(), mode: String? = null): SaveNoteResult {
+        NativeDebug.d("NotesRepository.trashNote id=$id mode=$mode")
+        val response = api.trashNote(id, TrashNoteRequest(clientUpdatedAt, mode))
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             val error = "POST /api/notes/$id/trash failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
@@ -714,9 +718,13 @@ class NotesRepository(
         if (archived) noteDao.deleteById(entity.id) else noteDao.upsertAll(listOf(entity))
     }
 
-    suspend fun trashNoteQueued(id: String) {
-        NativeDebug.d("NotesRepository.trashNoteQueued id=$id")
-        val request = ClientUpdatedAtRequest(nowIso())
+    /** [mode] is only ever meaningful for the owner of a note that has
+     *  collaborators (see TrashNoteRequest's own doc comment): null for
+     *  every other trash - a plain note, or a collaborator leaving one -
+     *  where the server's own default already does the right thing. */
+    suspend fun trashNoteQueued(id: String, mode: String? = null) {
+        NativeDebug.d("NotesRepository.trashNoteQueued id=$id mode=$mode")
+        val request = TrashNoteRequest(nowIso(), mode)
         syncQueueDao.enqueue(id, SyncQueueType.TRASH.name, Json.encodeToString(request), System.currentTimeMillis())
         noteDao.deleteById(id)
     }
