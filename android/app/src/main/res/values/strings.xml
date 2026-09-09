@@ -179,6 +179,10 @@
     <string name="native_settings_secret_key_desc">Replaces the old key with a new one, shown once so you can save it</string>
     <string name="native_settings_data_section">Data Management</string>
     <string name="native_settings_ui_section">UI Preferences</string>
+    <string name="native_settings_edge_to_edge_landscape">Edge-to-edge in landscape</string>
+    <string name="native_settings_edge_to_edge_landscape_desc">Extend content under the status bar in landscape mode. Disable if the notch interferes with the display.</string>
+    <string name="native_settings_animations">Enable background animations</string>
+    <string name="native_settings_animations_desc">Shows floating card animations in the background. May cause slowdowns on low-end devices.</string>
     <string name="native_settings_theme_title">Workspace theme</string>
     <string name="native_settings_theme_desc">Recolours the header, sidebar and background. Notes are unaffected.</string>
     <string name="native_settings_notes_section">Notes</string>

@@ -173,6 +173,10 @@
     <string name="native_settings_secret_key_desc">Remplace l\'ancienne clé par une nouvelle, affichée une seule fois pour que vous la conserviez</string>
     <string name="native_settings_data_section">Gestion des données</string>
     <string name="native_settings_ui_section">Préférences d\'interface</string>
+    <string name="native_settings_edge_to_edge_landscape">Bord à bord en paysage</string>
+    <string name="native_settings_edge_to_edge_landscape_desc">Étend le contenu sous la barre d\'état en mode paysage. Désactiver si l\'encoche gêne l\'affichage.</string>
+    <string name="native_settings_animations">Activer les animations de fond</string>
+    <string name="native_settings_animations_desc">Affiche les animations de cartes flottantes en arrière-plan. Peut ralentir les équipements moins performants.</string>
     <string name="native_settings_theme_title">Thème de l\'interface</string>
     <string name="native_settings_theme_desc">Recolore le header, la sidebar et le fond. Les notes ne changent pas.</string>
     <string name="native_settings_notes_section">Notes</string>

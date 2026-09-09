@@ -1157,6 +1157,15 @@ fun RefreshIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = C
     modifier, size, tint,
 )
 
+/** tabler/device-mobile-rotated.svg. */
+@Composable
+fun DeviceMobileRotatedIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M3 6m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z " +
+        "M20 11v2 " +
+        "M7 12h.01",
+    modifier, size, tint,
+)
+
 @Composable
 fun SparklesIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
     "M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2z " +

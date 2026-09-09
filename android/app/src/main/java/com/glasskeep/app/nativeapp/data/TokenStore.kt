@@ -99,6 +99,23 @@ class TokenStore(context: Context) {
             prefs.edit().putBoolean(KEY_READ_MODE, value).apply()
         }
 
+    /** Cached "let the content run under the left cutout in landscape"
+     *  preference, on by default like the web's own (App.jsx:333-341). */
+    var edgeToEdgeLandscape: Boolean
+        get() = prefs.getBoolean(KEY_EDGE_TO_EDGE_LANDSCAPE, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_EDGE_TO_EDGE_LANDSCAPE, value).apply()
+        }
+
+    /** Cached "animated cards on the sign-in screen" preference. Off by
+     *  default: the web's own default is `(pointer: fine)`, which is
+     *  false on every phone (App.jsx:277-285). */
+    var floatingCardsEnabled: Boolean
+        get() = prefs.getBoolean(KEY_FLOATING_CARDS, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_FLOATING_CARDS, value).apply()
+        }
+
     fun clear() {
         NativeDebug.d("TokenStore.clear")
         prefs.edit().clear().apply()
@@ -112,6 +129,8 @@ class TokenStore(context: Context) {
         private const val KEY_TYPOGRAPHY = "typography_presets"
         private const val KEY_TASK_STRIKE = "task_strike_checked"
         private const val KEY_READ_MODE = "read_mode_enabled"
+        private const val KEY_EDGE_TO_EDGE_LANDSCAPE = "edge_to_edge_landscape"
+        private const val KEY_FLOATING_CARDS = "floating_cards_enabled"
         private const val KEY_TOAST_POSITION = "toast_position"
         private const val KEY_TOAST_DURATION = "toast_duration_ms"
 

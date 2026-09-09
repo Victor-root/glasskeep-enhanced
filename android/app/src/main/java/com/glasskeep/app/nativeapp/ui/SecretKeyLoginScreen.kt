@@ -111,7 +111,7 @@ fun SecretKeyLoginScreen(
     }
 
     Box(Modifier.fillMaxSize().then(bgModifier), contentAlignment = Alignment.Center) {
-        FloatingCardsBackground(dark)
+        if (container.shellPrefs.floatingCards) FloatingCardsBackground(dark)
 
         Column(
             modifier = Modifier.safeDrawingPadding().padding(horizontal = 32.dp),

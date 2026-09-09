@@ -359,6 +359,57 @@ internal fun SettingsSubHeading(label: String, dark: Boolean) {
     }
 }
 
+/** The panel's plain preference row: coloured glyph, title, optional
+ *  description, and a switch pinned to the right edge
+ *  (`SettingsPanel.jsx:1067-1090` and every row shaped like it). */
+@Composable
+internal fun SettingsSwitchRow(
+    title: String,
+    subtitle: String?,
+    checked: Boolean,
+    themeId: String?,
+    dark: Boolean,
+    titleColor: Color,
+    icon: @Composable (Color) -> Unit,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            SettingsRowIcon(themeId, dark, icon)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    title,
+                    color = titleColor,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                if (subtitle != null) {
+                    Text(
+                        subtitle,
+                        color = SettingsSubtleColor,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        GkSwitch(
+            checked = checked,
+            enabled = enabled,
+            themeId = themeId,
+            dark = dark,
+            onCheckedChange = onCheckedChange,
+        )
+    }
+}
+
 /** The full-width bordered row card the panel uses for every action that
  *  opens something else (`SettingsPanel.jsx:400-412`). */
 @Composable
@@ -832,7 +883,6 @@ internal fun Modifier.topHairline(color: Color): Modifier = drawBehind {
     drawRect(color = color, size = Size(size.width, stroke))
 }
 
-/** The dashed outline of the "add section" button. */
 /** `border-bottom: 1px dashed`: the rule under the typography modal's
  *  live preview (globalCSS.js:4470-4476). */
 internal fun Modifier.dashedUnderline(color: Color): Modifier = drawBehind {

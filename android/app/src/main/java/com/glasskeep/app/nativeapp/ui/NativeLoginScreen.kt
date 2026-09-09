@@ -280,7 +280,7 @@ fun NativeLoginScreen(
     }
 
     Box(Modifier.fillMaxSize().then(bgModifier)) {
-        FloatingCardsBackground(dark)
+        if (container.shellPrefs.floatingCards) FloatingCardsBackground(dark)
 
         Column(
             modifier = Modifier

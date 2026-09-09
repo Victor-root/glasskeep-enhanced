@@ -394,6 +394,11 @@ data class UserSettingsDto(
     /** Whether a note opens in read mode, with an edit toggle in its
      *  footer, or straight in edit mode. On by default (App.jsx:245-252). */
     val readModeEnabled: Boolean? = null,
+    /** Whether the content runs under the left cutout in landscape
+     *  (App.jsx:1702-1703), and whether the sign-in screen animates its
+     *  decorative cards (AuthShell.jsx:57). */
+    val edgeToEdgeLandscape: Boolean? = null,
+    val floatingCardsEnabled: Boolean? = null,
     /** Where the notification pill sits on a phone: "top" or "bottom". */
     val notificationsPositionMobile: String? = null,
     /** How long the pill stays, in milliseconds; null (or absent) means
@@ -433,6 +438,14 @@ data class SetTypographyPresetsRequest(val typographyPresets: TypographyPresetsD
  *  in read mode. */
 @Serializable
 data class SetReadModeRequest(val readModeEnabled: Boolean)
+
+/** Bodies for the two PATCH /api/user/settings that set only one of the
+ *  shell's own interface switches. */
+@Serializable
+data class SetEdgeToEdgeLandscapeRequest(val edgeToEdgeLandscape: Boolean)
+
+@Serializable
+data class SetFloatingCardsRequest(val floatingCardsEnabled: Boolean)
 
 /** Body for a PATCH /api/user/settings that sets only where the
  *  notification pill sits on a phone. */
@@ -782,6 +795,12 @@ interface GlassKeepApi {
 
     @PATCH("api/user/settings")
     suspend fun setReadMode(@Body body: SetReadModeRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setEdgeToEdgeLandscape(@Body body: SetEdgeToEdgeLandscapeRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setFloatingCards(@Body body: SetFloatingCardsRequest): Response<UserSettingsDto>
 
     @PATCH("api/user/settings")
     suspend fun setToastPosition(@Body body: SetToastPositionRequest): Response<UserSettingsDto>

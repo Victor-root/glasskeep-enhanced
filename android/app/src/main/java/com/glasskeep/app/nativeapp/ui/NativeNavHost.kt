@@ -5,7 +5,12 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -186,8 +191,17 @@ fun NativeNavHost(
     // One pill for the whole app, over every screen: the web has exactly
     // one too, and it is what replaces the platform's own Toast here.
     val toasts = rememberToastController()
+    // "Edge-to-edge in landscape" off means the whole shell stays clear of
+    // the left cutout, exactly what the web does by putting --safe-left
+    // back on <body> (App.jsx:1703). Left only: the other three edges are
+    // always padded there, and each screen already handles its own.
+    val safeLeft = if (container.shellPrefs.edgeToEdgeLandscape) {
+        Modifier
+    } else {
+        Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Left))
+    }
     CompositionLocalProvider(LocalGkToasts provides toasts) {
-        Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().then(safeLeft)) {
             NavHost(navController = navController, startDestination = startDestination) {
                 composable("login") {
                     NativeLoginScreen(
@@ -321,4 +335,6 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     prefs.toastPosition?.let { container.editorPrefs.applyToastPosition(it) }
     container.editorPrefs.applyToastDuration(prefs.toastDurationMs)
     prefs.readModeEnabled?.let { container.editorPrefs.applyReadMode(it) }
+    prefs.edgeToEdgeLandscape?.let { container.shellPrefs.applyEdgeToEdgeLandscape(it) }
+    prefs.floatingCardsEnabled?.let { container.shellPrefs.applyFloatingCards(it) }
 }

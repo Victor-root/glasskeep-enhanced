@@ -164,6 +164,8 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var changingChecklistPosition by remember { mutableStateOf(false) }
     var changingToolbarMode by remember { mutableStateOf(false) }
     var changingReadMode by remember { mutableStateOf(false) }
+    var changingEdgeToEdge by remember { mutableStateOf(false) }
+    var changingFloatingCards by remember { mutableStateOf(false) }
     var changingToastPrefs by remember { mutableStateOf(false) }
     var toastDurationMenuOpen by remember { mutableStateOf(false) }
     var showTypographyModal by remember { mutableStateOf(false) }
@@ -523,6 +525,42 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
         }
     }
 
+    fun toggleEdgeToEdgeLandscape(enabled: Boolean) {
+        if (changingEdgeToEdge) return
+        changingEdgeToEdge = true
+        val previous = container.shellPrefs.edgeToEdgeLandscape
+        container.shellPrefs.applyEdgeToEdgeLandscape(enabled)
+        scope.launch {
+            try {
+                repository.setEdgeToEdgeLandscape(enabled)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen setEdgeToEdgeLandscape failed", t)
+                container.shellPrefs.applyEdgeToEdgeLandscape(previous)
+                reportActionError(t)
+            } finally {
+                changingEdgeToEdge = false
+            }
+        }
+    }
+
+    fun toggleFloatingCards(enabled: Boolean) {
+        if (changingFloatingCards) return
+        changingFloatingCards = true
+        val previous = container.shellPrefs.floatingCards
+        container.shellPrefs.applyFloatingCards(enabled)
+        scope.launch {
+            try {
+                repository.setFloatingCards(enabled)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen setFloatingCards failed", t)
+                container.shellPrefs.applyFloatingCards(previous)
+                reportActionError(t)
+            } finally {
+                changingFloatingCards = false
+            }
+        }
+    }
+
     fun toggleReadMode(enabled: Boolean) {
         if (changingReadMode) return
         changingReadMode = true
@@ -780,30 +818,17 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                     icon = { tint -> ShieldLockIcon(size = 20.dp, tint = tint) },
                                     onToggle = { securityOpen = !securityOpen },
                                 ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                            SettingsRowIcon(themeId, dark) { tint -> EyeIcon(size = 20.dp, tint = tint) }
-                                            Spacer(Modifier.width(12.dp))
-                                            Text(
-                                                stringResource(R.string.native_settings_show_on_login),
-                                                color = titleColor,
-                                                fontSize = 16.sp,
-                                                fontWeight = FontWeight.Medium,
-                                            )
-                                        }
-                                        Spacer(Modifier.width(12.dp))
-                                        GkSwitch(
-                                            checked = current.showOnLogin,
-                                            enabled = !changingShowOnLogin,
-                                            themeId = themeId,
-                                            dark = dark,
-                                            onCheckedChange = { toggleShowOnLogin(it) },
-                                        )
-                                    }
+                                    SettingsSwitchRow(
+                                        title = stringResource(R.string.native_settings_show_on_login),
+                                        subtitle = null,
+                                        checked = current.showOnLogin,
+                                        enabled = !changingShowOnLogin,
+                                        themeId = themeId,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        icon = { tint -> EyeIcon(size = 20.dp, tint = tint) },
+                                        onCheckedChange = { toggleShowOnLogin(it) },
+                                    )
 
                                     SettingsCardButton(
                                         title = stringResource(R.string.native_settings_change_password),
@@ -860,8 +885,37 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                     onToggle = { uiOpen = !uiOpen },
                                     contentSpacing = 12.dp,
                                 ) {
+                                    SettingsSwitchRow(
+                                        title = stringResource(R.string.native_settings_edge_to_edge_landscape),
+                                        subtitle = stringResource(R.string.native_settings_edge_to_edge_landscape_desc),
+                                        checked = container.shellPrefs.edgeToEdgeLandscape,
+                                        enabled = !changingEdgeToEdge,
+                                        themeId = themeId,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        icon = { tint -> DeviceMobileRotatedIcon(size = 20.dp, tint = tint) },
+                                        onCheckedChange = { toggleEdgeToEdgeLandscape(it) },
+                                    )
+                                    SettingsSwitchRow(
+                                        title = stringResource(R.string.native_settings_animations),
+                                        subtitle = stringResource(R.string.native_settings_animations_desc),
+                                        checked = container.shellPrefs.floatingCards,
+                                        enabled = !changingFloatingCards,
+                                        themeId = themeId,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        icon = { tint -> SparklesIcon(size = 20.dp, tint = tint) },
+                                        onCheckedChange = { toggleFloatingCards(it) },
+                                    )
+                                    // The web fences the theme picker off from
+                                    // the switches above with a hairline
+                                    // (SettingsPanel.jsx:655-657).
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .topHairline(borderColor)
+                                            .padding(top = 8.dp)
+                                            .padding(horizontal = 12.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         SettingsRowIcon(themeId, dark) { tint -> PaintRollerIcon(size = 20.dp, tint = tint) }
@@ -987,38 +1041,17 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                                         verticalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                                SettingsRowIcon(themeId, dark) { tint -> EyeIcon(size = 20.dp, tint = tint) }
-                                                Spacer(Modifier.width(12.dp))
-                                                Column {
-                                                    Text(
-                                                        stringResource(R.string.native_settings_read_mode),
-                                                        color = titleColor,
-                                                        fontSize = 16.sp,
-                                                        fontWeight = FontWeight.Medium,
-                                                    )
-                                                    Text(
-                                                        stringResource(R.string.native_settings_read_mode_desc),
-                                                        color = SettingsSubtleColor,
-                                                        fontSize = 14.sp,
-                                                        lineHeight = 20.sp,
-                                                    )
-                                                }
-                                            }
-                                            Spacer(Modifier.width(12.dp))
-                                            GkSwitch(
-                                                checked = container.editorPrefs.readModeEnabled,
-                                                enabled = !changingReadMode,
-                                                themeId = themeId,
-                                                dark = dark,
-                                                onCheckedChange = { toggleReadMode(it) },
-                                            )
-                                        }
+                                        SettingsSwitchRow(
+                                            title = stringResource(R.string.native_settings_read_mode),
+                                            subtitle = stringResource(R.string.native_settings_read_mode_desc),
+                                            checked = container.editorPrefs.readModeEnabled,
+                                            enabled = !changingReadMode,
+                                            themeId = themeId,
+                                            dark = dark,
+                                            titleColor = titleColor,
+                                            icon = { tint -> EyeIcon(size = 20.dp, tint = tint) },
+                                            onCheckedChange = { toggleReadMode(it) },
+                                        )
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             SettingsRowIcon(themeId, dark) { tint -> TextColorIcon(size = 20.dp, tint = tint) }
                                             Spacer(Modifier.width(12.dp))
@@ -1145,29 +1178,6 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                 }
 
                                 SettingsAccordionSection(
-                                    title = stringResource(R.string.native_settings_language_section),
-                                    expanded = languageOpen,
-                                    themeId = themeId,
-                                    dark = dark,
-                                    titleColor = titleColor,
-                                    icon = { tint -> WorldIcon(size = 20.dp, tint = tint) },
-                                    onToggle = { languageOpen = !languageOpen },
-                                ) {
-                                    LanguageRow(
-                                        language = current.language,
-                                        menuOpen = languageMenuOpen,
-                                        enabled = !changingLanguage,
-                                        themeId = themeId,
-                                        dark = dark,
-                                        titleColor = titleColor,
-                                        borderColor = borderColor,
-                                        onToggleMenu = { languageMenuOpen = !languageMenuOpen },
-                                        onDismissMenu = { languageMenuOpen = false },
-                                        onSelect = { languageMenuOpen = false; changeLanguage(it) },
-                                    )
-                                }
-
-                                SettingsAccordionSection(
                                     title = stringResource(R.string.native_settings_app_section),
                                     expanded = appOpen,
                                     themeId = themeId,
@@ -1212,6 +1222,29 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                             footer = { VersionLine(dark) },
                                         )
                                     }
+                                }
+
+                                SettingsAccordionSection(
+                                    title = stringResource(R.string.native_settings_language_section),
+                                    expanded = languageOpen,
+                                    themeId = themeId,
+                                    dark = dark,
+                                    titleColor = titleColor,
+                                    icon = { tint -> WorldIcon(size = 20.dp, tint = tint) },
+                                    onToggle = { languageOpen = !languageOpen },
+                                ) {
+                                    LanguageRow(
+                                        language = current.language,
+                                        menuOpen = languageMenuOpen,
+                                        enabled = !changingLanguage,
+                                        themeId = themeId,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        borderColor = borderColor,
+                                        onToggleMenu = { languageMenuOpen = !languageMenuOpen },
+                                        onDismissMenu = { languageMenuOpen = false },
+                                        onSelect = { languageMenuOpen = false; changeLanguage(it) },
+                                    )
                                 }
                             }
 

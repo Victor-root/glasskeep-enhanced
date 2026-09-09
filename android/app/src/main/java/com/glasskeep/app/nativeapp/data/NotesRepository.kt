@@ -33,7 +33,9 @@ import com.glasskeep.app.nativeapp.data.network.SetChecklistInsertPositionReques
 import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
 import com.glasskeep.app.nativeapp.data.network.SetCollaboratorAccessRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
+import com.glasskeep.app.nativeapp.data.network.SetEdgeToEdgeLandscapeRequest
 import com.glasskeep.app.nativeapp.data.network.SetEditorToolbarModeRequest
+import com.glasskeep.app.nativeapp.data.network.SetFloatingCardsRequest
 import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
 import com.glasskeep.app.nativeapp.data.network.SetLanguageRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
@@ -942,6 +944,8 @@ class NotesRepository(
                 toastPosition = body.notificationsPositionMobile,
                 toastDurationMs = body.notificationsDuration,
                 readModeEnabled = body.readModeEnabled,
+                edgeToEdgeLandscape = body.edgeToEdgeLandscape,
+                floatingCardsEnabled = body.floatingCardsEnabled,
             )
         } catch (t: Throwable) {
             NativeDebug.e("NotesRepository.fetchWorkspacePreferences failed", t)
@@ -968,6 +972,28 @@ class NotesRepository(
         val response = api.setReadMode(SetReadModeRequest(enabled))
         if (!response.isSuccessful) {
             val error = "PATCH /api/user/settings (readModeEnabled) failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** Sets whether the content runs under the left cutout in landscape. */
+    suspend fun setEdgeToEdgeLandscape(enabled: Boolean) {
+        NativeDebug.d("NotesRepository.setEdgeToEdgeLandscape enabled=$enabled")
+        val response = api.setEdgeToEdgeLandscape(SetEdgeToEdgeLandscapeRequest(enabled))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (edgeToEdgeLandscape) failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    /** Sets whether the sign-in screen animates its decorative cards. */
+    suspend fun setFloatingCards(enabled: Boolean) {
+        NativeDebug.d("NotesRepository.setFloatingCards enabled=$enabled")
+        val response = api.setFloatingCards(SetFloatingCardsRequest(enabled))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (floatingCardsEnabled) failed: HTTP ${response.code()}"
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }

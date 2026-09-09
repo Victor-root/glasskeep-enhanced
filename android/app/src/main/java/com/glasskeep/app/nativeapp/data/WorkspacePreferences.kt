@@ -21,4 +21,8 @@ data class WorkspacePreferences(
     val toastDurationMs: Long?,
     /** Whether notes open in read mode (the web's own default). */
     val readModeEnabled: Boolean?,
+    /** Whether the content runs under the left cutout in landscape, and
+     *  whether the sign-in screen animates its decorative cards. */
+    val edgeToEdgeLandscape: Boolean?,
+    val floatingCardsEnabled: Boolean?,
 )
