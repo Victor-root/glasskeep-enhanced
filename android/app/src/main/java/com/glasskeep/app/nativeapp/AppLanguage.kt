@@ -21,6 +21,17 @@ object AppLanguage {
      *  anything else, including null, means "follow the system". */
     private val Supported = setOf("en", "fr")
 
+    /** The language tag the AI is told to answer in, the app's own
+     *  interface language falling back to the device's
+     *  (detectLang(), ai.js). */
+    fun currentTag(): String {
+        val chosen = AppCompatDelegate.getApplicationLocales()
+            .toLanguageTags().substringBefore('-').takeIf { it.isNotEmpty() }
+        if (chosen != null) return chosen
+        val device = LocaleListCompat.getAdjustedDefault()
+        return device.toLanguageTags().substringBefore('-').takeIf { it.isNotEmpty() } ?: "en"
+    }
+
     fun apply(language: String?) {
         val tag = language?.takeIf { it in Supported }
         val current = AppCompatDelegate.getApplicationLocales()

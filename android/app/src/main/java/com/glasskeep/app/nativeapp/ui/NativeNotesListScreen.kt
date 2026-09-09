@@ -33,6 +33,8 @@ import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -52,6 +54,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
@@ -68,14 +71,17 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.glasskeep.app.R
+import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.data.AiClient
 import com.glasskeep.app.nativeapp.data.ChecklistPreview
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.TagsJson
@@ -149,6 +155,11 @@ fun NativeNotesListScreen(
     var bulkActionRunning by remember { mutableStateOf(false) }
     var sidebarOpen by remember { mutableStateOf(false) }
     var activeTagFilter by remember { mutableStateOf<String?>(null) }
+    var aiAnswer by remember { mutableStateOf<String?>(null) }
+    var aiCitedNoteIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var aiLoading by remember { mutableStateOf(false) }
+    val aiClient = remember(serverUrl) { AiClient(serverUrl, container.tokenStore) }
+    val aiErrorMessage = stringResource(R.string.native_notes_ai_error)
     val scope = rememberCoroutineScope()
 
     // Tag list + per-tag note count for the drawer (TagSidebar.kt), same
@@ -320,6 +331,29 @@ fun NativeNotesListScreen(
         }
     }
 
+    /** handleAiSearch() (App.jsx:2826-2851): the whole active list is
+     *  sent as context and the server picks what is relevant, so the
+     *  question is answered against every note, not the filtered view. */
+    fun askAi(question: String) {
+        val trimmed = question.trim()
+        if (trimmed.length < 3 || aiLoading) return
+        aiLoading = true
+        aiAnswer = null
+        aiCitedNoteIds = emptyList()
+        scope.launch {
+            val result = aiClient.ask(trimmed, notes, AppLanguage.currentTag())
+            if (result.error != null) {
+                NativeDebug.e("Notes askAi failed: ${result.error}")
+                aiAnswer = aiErrorMessage
+                aiCitedNoteIds = emptyList()
+            } else {
+                aiAnswer = result.answer
+                aiCitedNoteIds = result.citedNoteIds
+            }
+            aiLoading = false
+        }
+    }
+
     /** Optimistic like every other preference here: the layout flips at
      *  once and the server is told after, since a failed PATCH only costs
      *  this device's own copy of a display choice. */
@@ -471,6 +505,8 @@ fun NativeNotesListScreen(
                 searchQuery = searchQuery,
                 onSearchQueryChange = { searchQuery = it },
                 onEnterSelection = { selectionMode = true },
+                aiAssistantEnabled = container.shellPrefs.aiAssistantEnabled,
+                onAskAi = { question -> askAi(question) },
                 listView = container.shellPrefs.listView,
                 onToggleViewMode = { toggleViewMode() },
                 onToggleDark = { container.shellPrefs.toggleDark(dark) },
@@ -483,6 +519,22 @@ fun NativeNotesListScreen(
 
             errorMessage?.let {
                 Text(it, color = ErrorColor, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
+
+            if (aiLoading || aiAnswer != null) {
+                AiAnswerCard(
+                    answer = aiAnswer,
+                    loading = aiLoading,
+                    dark = dark,
+                    titleColor = titleColor,
+                    citedNotes = notes.filter { it.id in aiCitedNoteIds },
+                    onOpenNote = onOpenNote,
+                    onDismiss = {
+                        aiAnswer = null
+                        aiCitedNoteIds = emptyList()
+                        searchQuery = ""
+                    },
+                )
             }
 
             if (notes.isEmpty() && !refreshing && errorMessage == null) {
@@ -666,6 +718,8 @@ private fun NativeHeader(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onEnterSelection: () -> Unit,
+    aiAssistantEnabled: Boolean,
+    onAskAi: (String) -> Unit,
     listView: Boolean,
     onToggleViewMode: () -> Unit,
     onToggleDark: () -> Unit,
@@ -702,7 +756,10 @@ private fun NativeHeader(
                 Box(modifier = Modifier.weight(1f)) {
                     if (searchQuery.isEmpty()) {
                         Text(
-                            stringResource(R.string.native_notes_search_placeholder),
+                            stringResource(
+                                if (aiAssistantEnabled) R.string.native_notes_search_or_ask
+                                else R.string.native_notes_search_placeholder
+                            ),
                             color = subtextColor,
                             fontSize = 16.sp,
                         )
@@ -713,8 +770,31 @@ private fun NativeHeader(
                         textStyle = TextStyle(color = titleColor, fontSize = 16.sp),
                         singleLine = true,
                         cursorBrush = SolidColor(Indigo),
+                        // Enter sends the question rather than just
+                        // dismissing the keyboard, same as the web.
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(
+                            onSearch = { if (aiAssistantEnabled && searchQuery.isNotBlank()) onAskAi(searchQuery) },
+                        ),
                         modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                     )
+                }
+                if (aiAssistantEnabled && searchQuery.isNotBlank()) {
+                    val askAiLabel = stringResource(R.string.native_notes_ask_ai)
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .semantics { contentDescription = askAiLabel }
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Button,
+                            ) { onAskAi(searchQuery) }
+                            .padding(6.dp),
+                    ) {
+                        FileAiIcon(size = 20.dp, tint = if (dark) Color(0xFF818CF8) else Color(0xFF4F46E5))
+                    }
                 }
                 Spacer(Modifier.width(8.dp))
                 Box(
@@ -876,6 +956,120 @@ private fun NativeHeader(
             }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(WorkspaceTheme.headerBorderColor(themeId, dark)))
+    }
+}
+
+/**
+ * The assistant's answer, above the grid (NotesComposer.jsx:89-160): a
+ * card with an indigo edge and a faint indigo-to-purple wash, the
+ * "thinking" line while the model is working, and the notes the answer
+ * actually leant on underneath.
+ */
+@Composable
+private fun AiAnswerCard(
+    answer: String?,
+    loading: Boolean,
+    dark: Boolean,
+    titleColor: Color,
+    citedNotes: List<NoteEntity>,
+    onOpenNote: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val accent = if (dark) Color(0xFF818CF8) else Color(0xFF4F46E5)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 12.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                Brush.linearGradient(
+                    if (dark) {
+                        listOf(Color(0x4D1E1B4B), Color(0x4D2E1065))
+                    } else {
+                        listOf(Color(0x80EEF2FF), Color(0x80FAF5FF))
+                    },
+                ),
+            )
+            .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .padding(20.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SparklesIcon(size = 20.dp, tint = accent)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                stringResource(R.string.native_notes_ai_assistant),
+                color = if (dark) Color(0xFFA5B4FC) else Color(0xFF4338CA),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            if (!loading && answer != null) {
+                val clearLabel = stringResource(R.string.native_notes_ai_clear)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .semantics { contentDescription = clearLabel }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onDismiss() }
+                        .padding(4.dp),
+                ) {
+                    CloseIcon(size = 18.dp, tint = titleColor)
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        if (loading) {
+            Text(
+                stringResource(R.string.native_notes_ai_thinking),
+                color = if (dark) DarkSubtextColor else LightSubtextColor,
+                fontSize = 14.sp,
+            )
+        } else if (answer != null) {
+            MarkdownText(
+                markdown = answer,
+                color = titleColor,
+                dark = dark,
+            )
+        }
+        if (!loading && citedNotes.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(accent.copy(alpha = 0.2f)),
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                stringResource(R.string.native_notes_ai_cited).uppercase(),
+                color = accent.copy(alpha = 0.8f),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.6.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            for (note in citedNotes) {
+                Text(
+                    note.title.ifBlank { stringResource(R.string.native_notes_untitled) },
+                    color = titleColor,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onOpenNote(note.id) }
+                        .padding(vertical = 6.dp),
+                )
+            }
+        }
     }
 }
 

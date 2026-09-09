@@ -351,4 +351,11 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     prefs.notificationsFilterTypes?.let { container.editorPrefs.applyNotificationsFilterTypes(NotifCategoryFlags(it)) }
     prefs.checklistInsertPosition?.let { container.editorPrefs.applyChecklistInsertPosition(it) }
     prefs.checklistRemoveSectionBehavior?.let { container.editorPrefs.applyChecklistRemoveSectionBehavior(it) }
+
+    // The AI assistant's own availability lives on its own endpoint, not
+    // in the settings blob, but it is needed at exactly the same moment:
+    // the notes screen's search field asks about it on its first frame.
+    repository.fetchUserAiSettings()?.let {
+        container.shellPrefs.applyAiAssistant(it.enabled && it.adminAiEnabled)
+    }
 }

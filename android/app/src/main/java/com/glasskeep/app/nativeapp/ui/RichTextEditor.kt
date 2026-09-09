@@ -56,12 +56,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
+import com.glasskeep.app.nativeapp.data.MarkdownDoc
 import com.glasskeep.app.nativeapp.data.RichAlign
 import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichBlockKind
 import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.RichMark
 import com.glasskeep.app.nativeapp.data.RichMarkType
+import com.glasskeep.app.nativeapp.data.TypographyPresets
 import com.glasskeep.app.nativeapp.data.TypographyProfile
 import com.glasskeep.app.nativeapp.data.isHeading
 import com.glasskeep.app.ui.DarkBgColor
@@ -888,4 +890,23 @@ fun RichLinkDialog(
             }
         }
     }
+}
+
+/**
+ * Markdown rendered read-only, for text the app receives rather than
+ * edits: the AI's answers, which the web puts through renderSafeMarkdown
+ * (utils/markdown.jsx). Reads with [MarkdownDoc] and paints with the
+ * same reader the notes themselves use, so an answer's headings, lists
+ * and emphasis look like a note's.
+ */
+@Composable
+fun MarkdownText(markdown: String, color: Color, dark: Boolean) {
+    val blocks = remember(markdown) { MarkdownDoc.toRichBlocks(markdown) }
+    RichTextReader(
+        blocks = blocks,
+        typography = TypographyPresets.DEFAULT.activeProfile,
+        taskStrike = false,
+        dark = dark,
+        titleColor = color,
+    )
 }

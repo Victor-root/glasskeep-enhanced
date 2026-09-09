@@ -23,6 +23,18 @@ class ShellPrefsState(private val tokenStore: TokenStore) {
     var listView: Boolean by mutableStateOf(tokenStore.listView)
         private set
 
+    /** Whether this account's AI assistant is on AND the administrator
+     *  has not switched AI off server-wide. Cached for the same
+     *  first-frame reason as the rest: the search field's own placeholder
+     *  changes with it. */
+    var aiAssistantEnabled: Boolean by mutableStateOf(tokenStore.aiAssistantEnabled)
+        private set
+
+    fun applyAiAssistant(enabled: Boolean) {
+        aiAssistantEnabled = enabled
+        tokenStore.aiAssistantEnabled = enabled
+    }
+
     /**
      * The light/dark choice made from the header menu, or null to follow
      * the system. Deliberately NOT cached: the web keeps this one in

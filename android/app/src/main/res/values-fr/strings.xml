@@ -88,6 +88,13 @@
     <string name="native_fab_audio_note">Note audio</string>
     <string name="native_fab_audio_note_desc">Mémo vocal au microphone</string>
     <string name="native_notes_search">Rechercher</string>
+    <string name="native_notes_search_or_ask">Rechercher ou demander à l\'IA…</string>
+    <string name="native_notes_ask_ai">Demander à l\'IA</string>
+    <string name="native_notes_ai_assistant">Assistant IA</string>
+    <string name="native_notes_ai_thinking">L\'assistant IA réfléchit…</string>
+    <string name="native_notes_ai_cited">Notes utilisées</string>
+    <string name="native_notes_ai_clear">Effacer la réponse</string>
+    <string name="native_notes_ai_error">Désolé, une erreur s\'est produite lors du traitement de votre requête.</string>
     <string name="native_notes_search_placeholder">Rechercher dans les notes…</string>
     <string name="native_notes_search_close">Fermer la recherche</string>
     <string name="native_notes_search_empty">Aucune note ne correspond à votre recherche.</string>

@@ -310,6 +310,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
      *  honest (applyConfig, UserAiSettingsSection.jsx:63-80). */
     fun applyAiSettings(config: UserAiSettingsDto) {
         aiSettings = config
+        container.shellPrefs.applyAiAssistant(config.enabled && config.adminAiEnabled)
         aiDraft = AiSettingsDraft(
             baseUrl = config.baseUrl,
             model = config.model,
