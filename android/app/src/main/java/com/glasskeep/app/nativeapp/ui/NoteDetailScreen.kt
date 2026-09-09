@@ -12,9 +12,9 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -88,10 +88,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
+import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.NoteExporter
+import com.glasskeep.app.nativeapp.data.AiClient
+import com.glasskeep.app.nativeapp.data.AiMessage
+import com.glasskeep.app.nativeapp.data.AiNoteDto
 import com.glasskeep.app.nativeapp.data.AudioClipDto
 import com.glasskeep.app.nativeapp.data.AudioContent
 import com.glasskeep.app.nativeapp.data.ChecklistEntry
@@ -102,20 +106,20 @@ import com.glasskeep.app.nativeapp.data.DrawingDimensionsDto
 import com.glasskeep.app.nativeapp.data.DrawingStrokeDto
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.NoteConversion
-import com.glasskeep.app.nativeapp.data.formatIso
-import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.nativeapp.data.NoteImageData
 import com.glasskeep.app.nativeapp.data.NoteImages
-import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichAlign
+import com.glasskeep.app.nativeapp.data.RichBlock
 import com.glasskeep.app.nativeapp.data.RichBlockKind
 import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.RichMark
 import com.glasskeep.app.nativeapp.data.RichMarkType
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
-import com.glasskeep.app.nativeapp.data.toEntity
+import com.glasskeep.app.nativeapp.data.formatIso
 import com.glasskeep.app.nativeapp.data.network.NoteDto
+import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
+import com.glasskeep.app.nativeapp.data.toEntity
 import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
@@ -268,6 +272,16 @@ fun NoteDetailScreen(
     // footer toggle flips it for this note only (ModalFooter.jsx:860).
     var viewMode by remember { mutableStateOf(container.editorPrefs.readModeEnabled) }
     var converting by remember { mutableStateOf(false) }
+    // The note's own AI conversation. Thrown away when the note closes
+    // unless the panel's save button kept it, exactly like the web's own
+    // (App.jsx:304-312).
+    var noteAiOpen by remember { mutableStateOf(false) }
+    var noteAiMessages by remember { mutableStateOf<List<AiMessage>>(emptyList()) }
+    var noteAiLoading by remember { mutableStateOf(false) }
+    var noteAiError by remember { mutableStateOf<String?>(null) }
+    var noteAiSaved by remember { mutableStateOf(false) }
+    var noteAiJob by remember { mutableStateOf<Job?>(null) }
+    val aiClient = remember(serverUrl) { AiClient(serverUrl, container.tokenStore) }
     var showLinkDialog by remember { mutableStateOf(false) }
     var linkDialogTarget by remember { mutableStateOf<LinkTarget?>(null) }
 
@@ -335,6 +349,7 @@ fun NoteDetailScreen(
     val convertedToTextMessage = stringResource(R.string.native_note_detail_converted_to_text)
     val duplicateSuffix = stringResource(R.string.native_note_detail_duplicate_suffix)
     val downloadErrorMessage = stringResource(R.string.native_note_detail_download_error)
+    val aiErrorMessage = stringResource(R.string.native_note_ai_error)
     val imageAddErrorMessage = stringResource(R.string.native_note_detail_add_image_error)
     val editedPrefix = stringResource(R.string.native_note_detail_edited_prefix)
 
@@ -956,6 +971,77 @@ fun NoteDetailScreen(
         }
     }
 
+    /** The note as the AI should see it: the live editor state, not the
+     *  last-saved copy, so a question is asked about what is on screen
+     *  (App.jsx:2734-2754). */
+    fun noteAiSnapshot(): AiNoteDto? {
+        val current = note ?: return null
+        val edit = editability ?: return null
+        val body = when {
+            edit.isChecklistType -> edit.checklistItems.orEmpty()
+                .filterIsInstance<ChecklistItemData>()
+                .joinToString("\n") { "- ${if (it.done) "[x]" else "[ ]"} ${it.text}" }
+            edit.isRichEditableType -> NoteConversion.richBlocksToPlainText(
+                richBlocks ?: edit.originalRichBlocks.orEmpty(),
+            )
+            edit.isDrawType -> drawingCaptionText.orEmpty()
+            else -> bodyText
+        }
+        return AiNoteDto(id = current.id, title = titleText, content = body, tags = current.tags)
+    }
+
+    fun openNoteAi() {
+        noteAiOpen = true
+        noteAiError = null
+        if (noteAiMessages.isNotEmpty()) return
+        // Re-open a kept conversation, or start a fresh one.
+        val stored = container.noteAiStore.load(noteId)
+        if (stored.isNotEmpty()) {
+            noteAiMessages = stored
+            noteAiSaved = true
+        }
+    }
+
+    fun sendNoteAiMessage(question: String) {
+        val snapshot = noteAiSnapshot() ?: return
+        if (noteAiLoading || question.isBlank()) return
+        val history = noteAiMessages
+        noteAiMessages = history + AiMessage("user", question)
+        noteAiError = null
+        noteAiLoading = true
+        noteAiJob = scope.launch {
+            var answer = ""
+            var started = false
+            val failure = aiClient.askAboutNote(snapshot, history, question, AppLanguage.currentTag()) { delta ->
+                answer += delta
+                // The first chunk seeds the answer; every one after it
+                // replaces that same last message so it grows in place.
+                noteAiMessages = if (!started) {
+                    started = true
+                    noteAiMessages + AiMessage("assistant", answer)
+                } else {
+                    noteAiMessages.dropLast(1) + AiMessage("assistant", answer)
+                }
+            }
+            if (failure != null) {
+                noteAiError = failure
+            } else if (!started) {
+                noteAiError = aiErrorMessage
+            }
+            noteAiLoading = false
+            noteAiJob = null
+            if (noteAiSaved) container.noteAiStore.save(noteId, noteAiMessages)
+        }
+    }
+
+    fun stopNoteAi() {
+        // Whatever already streamed stays on screen, the web's own
+        // abort behaviour.
+        noteAiJob?.cancel()
+        noteAiJob = null
+        noteAiLoading = false
+    }
+
     fun downloadNote() {
         val current = note ?: return
         val edit = editability ?: return
@@ -1333,9 +1419,13 @@ fun NoteDetailScreen(
     // Back closes the topmost overlay first, the note last, the same
     // fixed order App.jsx's own popstate stack walks (the colour and tag
     // popovers dismiss themselves, being focusable popups).
-    BackHandler(enabled = showReminderPicker) { showReminderPicker = false }
-    BackHandler(enabled = !showReminderPicker && showFormatSheet) { showFormatSheet = false }
-    BackHandler(enabled = !showReminderPicker && !showFormatSheet, onBack = ::goBack)
+    BackHandler(enabled = noteAiOpen) { noteAiOpen = false }
+    BackHandler(enabled = !noteAiOpen && showReminderPicker) { showReminderPicker = false }
+    BackHandler(enabled = !noteAiOpen && !showReminderPicker && showFormatSheet) { showFormatSheet = false }
+    BackHandler(
+        enabled = !noteAiOpen && !showReminderPicker && !showFormatSheet,
+        onBack = ::goBack,
+    )
 
     // The open note is painted in its own color, edge to edge: no card, no
     // radius, no shadow, no page padding. NoteModal.jsx hardcodes
@@ -1360,6 +1450,11 @@ fun NoteDetailScreen(
     val duplicateColor = if (dark) Color(0xFF67e8f9) else Color(0xFF0891b2)
     val convertColor = if (dark) Color(0xFFc4b5fd) else Color(0xFF7c3aed)
     val downloadColor = if (dark) Color(0xFF4ade80) else Color(0xFF16a34a)
+    val aiColor = if (dark) Color(0xFFA5B4FC) else Color(0xFF4F46E5)
+    // Neither a raw recording nor a drawing being drawn has anything to
+    // ask about, so neither offers the panel (NoteModal.jsx:522-525).
+    val noteAiAvailable = container.shellPrefs.aiAssistantEnabled &&
+        editability?.isAudioType != true && editability?.isDrawType != true
     val imageButtonColor = if (dark) Color(0xFF7dd3fc) else Color(0xFF0284c7)
 
     Box(Modifier.fillMaxSize().background(modalBg)) {
@@ -1872,6 +1967,19 @@ fun NoteDetailScreen(
                                             DownloadIcon(size = 20.dp, tint = downloadColor)
                                         }
                                     }
+                                    // Audio notes deliberately have no AI entry: there
+                                    // is nothing to ask about a raw recording, and a
+                                    // drawing being drawn has no text either
+                                    // (NoteModal.jsx:522-525).
+                                    if (noteAiAvailable) {
+                                        PopoverMenuItem(
+                                            label = stringResource(R.string.native_note_ai_menu),
+                                            color = aiColor,
+                                            onClick = { menuExpanded = false; openNoteAi() },
+                                        ) {
+                                            MessageSearchIcon(size = 18.dp, tint = aiColor)
+                                        }
+                                    }
                                     // Any participant may VIEW the roster, not just the
                                     // owner (see CollaboratorsScreen.kt's own doc
                                     // comment). The owner also gets it with zero
@@ -2019,6 +2127,44 @@ fun NoteDetailScreen(
                     showReminderPicker = false
                 },
                 onDismiss = { showReminderPicker = false },
+            )
+        }
+
+        // Over the whole note, the web's own `.note-ai-panel-mobile`
+        // (a fixed inset-0 layer, NoteModal.jsx:1131-1143).
+        if (noteAiOpen && noteAiAvailable) {
+            NoteAiChatPanel(
+                messages = noteAiMessages,
+                loading = noteAiLoading,
+                error = noteAiError,
+                saved = noteAiSaved,
+                background = modalBg,
+                dark = dark,
+                titleColor = titleColor,
+                borderColor = borderColor,
+                onSend = { question -> sendNoteAiMessage(question) },
+                onStop = { stopNoteAi() },
+                // Back keeps the thread, the X throws it away unless it
+                // was explicitly kept.
+                onHide = { noteAiOpen = false },
+                onClose = {
+                    stopNoteAi()
+                    noteAiOpen = false
+                    if (!noteAiSaved) {
+                        noteAiMessages = emptyList()
+                        noteAiError = null
+                    }
+                },
+                onSave = {
+                    noteAiSaved = true
+                    container.noteAiStore.save(noteId, noteAiMessages)
+                },
+                onReset = {
+                    noteAiSaved = false
+                    noteAiMessages = emptyList()
+                    noteAiError = null
+                    container.noteAiStore.remove(noteId)
+                },
             )
         }
     }

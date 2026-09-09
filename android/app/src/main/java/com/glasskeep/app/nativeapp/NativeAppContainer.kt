@@ -1,6 +1,7 @@
 package com.glasskeep.app.nativeapp
 
 import android.content.Context
+import com.glasskeep.app.nativeapp.data.NoteAiStore
 import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.TokenStore
 import com.glasskeep.app.nativeapp.data.local.AppDatabase
@@ -18,6 +19,7 @@ class NativeAppContainer(context: Context) {
     val themeState = ThemeState(tokenStore)
     val editorPrefs = EditorPrefsState(tokenStore)
     val shellPrefs = ShellPrefsState(tokenStore)
+    val noteAiStore = NoteAiStore(context)
     private val db = AppDatabase.get(context)
     private val syncQueueDb = SyncQueueDatabase.get(context)
 

@@ -1207,6 +1207,65 @@ fun RefreshIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = C
     modifier, size, tint,
 )
 
+/** tabler/message-search.svg: the note's own AI conversation. */
+@Composable
+fun MessageSearchIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M8 9h8 M8 13h5 " +
+        "M11.008 19.195l-3.008 1.805v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v4.5 " +
+        "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0 " +
+        "M20.2 20.2l1.8 1.8",
+    modifier, size, tint,
+)
+
+/** tabler/message-2-down.svg and tabler/message-2-x.svg: keep this
+ *  conversation for next time, and throw the kept one away. */
+@Composable
+fun MessageSaveIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M8 9h8 M8 13h6 " +
+        "M12.5 20.5l-.5 .5l-3 -3h-3a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v5.5 " +
+        "M19 16v6 M22 19l-3 3l-3 -3",
+    modifier, size, tint,
+)
+
+@Composable
+fun MessageResetIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M8 9h8 M8 13h6 " +
+        "M13.5 19.5l-1.5 1.5l-3 -3h-3a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6 " +
+        "M22 22l-5 -5 M17 22l5 -5",
+    modifier, size, tint,
+)
+
+/** tabler/arrow-down.svg. */
+@Composable
+fun ArrowDownIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M12 5l0 14 M18 13l-6 6 M6 13l6 6",
+    modifier, size, tint,
+)
+
+/** tabler/chevron-left.svg. */
+@Composable
+fun ChevronLeftIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M15 6l-6 6l6 6",
+    modifier, size, tint,
+)
+
+/** tabler/player-stop-filled.svg. */
+@Composable
+fun StopFilledIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerFilledIcon(
+    "M17 4h-10a3 3 0 0 0 -3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3 -3v-10a3 3 0 0 0 -3 -3z",
+    modifier, size, tint,
+)
+
+/** tabler/file-text-spark.svg: the second of the two quick prompts. */
+@Composable
+fun FileTextSparkIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = TablerIcon(
+    "M14 3v4a1 1 0 0 0 1 1h4 " +
+        "M12 21h-5a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v3.5 " +
+        "M9 9h1 M9 13h6 M9 17h3 " +
+        "M19 22.5a4.75 4.75 0 0 1 3.5 -3.5a4.75 4.75 0 0 1 -3.5 -3.5a4.75 4.75 0 0 1 -3.5 3.5a4.75 4.75 0 0 1 3.5 3.5",
+    modifier, size, tint,
+)
+
 /** tabler/file-ai.svg: the glyph in the search field that sends the
  *  question to the assistant instead of filtering with it. */
 @Composable
