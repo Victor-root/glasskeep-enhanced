@@ -303,7 +303,7 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         pinning = true
         scope.launch {
             try {
-                repository.setPinnedQueued(current.id, !current.pinned)
+                repository.setPinnedQueued(current.toEntity(), !current.pinned)
                 note = current.copy(pinned = !current.pinned)
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen togglePin queued id=${current.id}")

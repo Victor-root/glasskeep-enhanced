@@ -40,6 +40,7 @@
     <string name="native_settings_passkeys_delete_confirm_body">Vous devrez vous connecter autrement si c\'était votre seule clé d\'accès.</string>
     <string name="native_header_notes_label">Notes</string>
     <string name="native_notes_refresh">Actualiser</string>
+    <string name="native_notes_syncing_count">%1$d en synchronisation…</string>
     <string name="native_notes_empty">Aucune note pour le moment.</string>
     <string name="native_notes_error_sync">Synchronisation impossible : %1$s</string>
     <string name="native_notes_create_error">Impossible de créer la note : %1$s</string>

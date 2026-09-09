@@ -43,6 +43,7 @@
     <string name="native_settings_passkeys_delete_confirm_body">You\'ll need to sign in another way if this was your only one.</string>
     <string name="native_header_notes_label">Notes</string>
     <string name="native_notes_refresh">Refresh</string>
+    <string name="native_notes_syncing_count">%1$d syncing…</string>
     <string name="native_notes_empty">No notes yet.</string>
     <string name="native_notes_error_sync">Couldn\'t sync: %1$s</string>
     <string name="native_notes_create_error">Couldn\'t create the note: %1$s</string>

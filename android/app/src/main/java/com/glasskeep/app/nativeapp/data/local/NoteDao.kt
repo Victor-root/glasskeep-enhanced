@@ -34,12 +34,13 @@ interface NoteDao {
      * [protectedIds] (see SyncQueueDao.getProtectedNoteIds()) are excluded
      * from both sides of the replace: a note there is neither upserted from
      * [notes] (a fresh GET /api/notes that hasn't caught up with an
-     * in-flight queued archive/trash yet would otherwise silently undo that
-     * optimistic local removal) nor treated as missing (a queued restore's
-     * optimistic local insert would otherwise be deleted immediately,
-     * since a not-yet-processed restore is still absent from [notes]).
-     * Self-heals on the very next refresh() either way, once the queued
-     * item is no longer PENDING (succeeded, or gave up after retrying).
+     * in-flight queued archive/trash/pin yet would otherwise silently undo
+     * that optimistic local change) nor treated as missing (a queued
+     * restore's optimistic local insert would otherwise be deleted
+     * immediately, since a not-yet-processed restore is still absent from
+     * [notes]). Self-heals on the very next refresh() either way, once the
+     * queued item is no longer PENDING (succeeded, or gave up after
+     * retrying).
      */
     @Transaction
     suspend fun replaceAll(notes: List<NoteEntity>, protectedIds: Set<String> = emptySet()) {

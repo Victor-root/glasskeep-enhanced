@@ -28,6 +28,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,9 +49,7 @@ import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
-import com.glasskeep.app.nativeapp.data.DeleteResult
 import com.glasskeep.app.nativeapp.data.NotesRepository
-import com.glasskeep.app.nativeapp.data.SaveNoteResult
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.network.NoteDto
 import com.glasskeep.app.nativeapp.data.toEntity
@@ -112,6 +111,11 @@ fun SecondaryNotesScreen(
     val context = LocalContext.current
 
     var notes by remember { mutableStateOf<List<NoteEntity>>(emptyList()) }
+    // Any type, any screen (see SyncQueueDao.observePendingNoteIds's own
+    // doc comment): drives the same per-card spinner and header count as
+    // NativeNotesListScreen.kt's own.
+    val pendingSyncNoteIds by repository.observePendingSyncNoteIds().collectAsState(initial = emptySet())
+    val syncingCount = remember(pendingSyncNoteIds, notes) { notes.count { it.id in pendingSyncNoteIds } }
     var loading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var selectionMode by remember { mutableStateOf(false) }
@@ -133,7 +137,17 @@ fun SecondaryNotesScreen(
         errorMessage = null
         scope.launch {
             try {
-                notes = fetchNotes(repository).map { it.toEntity() }
+                // Merge, don't blind-replace: a note this screen's own bulk
+                // actions just optimistically patched (see bulkUnarchive/
+                // bulkTrash/bulkRestore/bulkDeletePermanently below) may not
+                // be reflected by the server yet if a refresh lands first,
+                // same race NoteDao.replaceAll's own protectedIds guards
+                // against for the Room-backed main list, reimplemented here
+                // over a plain list since this screen has no Room table to
+                // delegate to (see this composable's own doc comment).
+                val fresh = fetchNotes(repository).map { it.toEntity() }
+                val protectedIds = repository.getProtectedNoteIds()
+                notes = fresh.filterNot { it.id in protectedIds } + notes.filter { it.id in protectedIds }
             } catch (t: Throwable) {
                 NativeDebug.e("SecondaryNotesScreen refresh failed ($title)", t)
                 errorMessage = String.format(errorTemplate, t.message ?: t.javaClass.simpleName)
@@ -167,8 +181,11 @@ fun SecondaryNotesScreen(
         if (bulkActionRunning || selectedIds.isEmpty()) return
         bulkActionRunning = true
         val ids = selectedIds
+        val entities = notes.associateBy { it.id }
         scope.launch {
-            val outcome = runBulkAction(ids) { id -> repository.setArchived(id, false) is SaveNoteResult.Saved }
+            val outcome = runBulkAction(context, ids) { id ->
+                repository.setArchivedQueued(entities.getValue(id), false)
+            }
             notes = notes.filterNot { it.id in outcome.succeededIds }
             bulkActionRunning = false
             reportOutcome(unarchivedSuccessTemplate, outcome)
@@ -182,7 +199,7 @@ fun SecondaryNotesScreen(
         bulkActionRunning = true
         val ids = selectedIds
         scope.launch {
-            val outcome = runBulkAction(ids) { id -> repository.trashNote(id) is SaveNoteResult.Saved }
+            val outcome = runBulkAction(context, ids) { id -> repository.trashNoteQueued(id) }
             notes = notes.filterNot { it.id in outcome.succeededIds }
             bulkActionRunning = false
             reportOutcome(trashedSuccessTemplate, outcome)
@@ -194,8 +211,11 @@ fun SecondaryNotesScreen(
         if (bulkActionRunning || selectedIds.isEmpty()) return
         bulkActionRunning = true
         val ids = selectedIds
+        val entities = notes.associateBy { it.id }
         scope.launch {
-            val outcome = runBulkAction(ids) { id -> repository.restoreNote(id) is SaveNoteResult.Saved }
+            val outcome = runBulkAction(context, ids) { id ->
+                repository.restoreNoteQueued(entities.getValue(id))
+            }
             notes = notes.filterNot { it.id in outcome.succeededIds }
             bulkActionRunning = false
             reportOutcome(restoredSuccessTemplate, outcome)
@@ -209,7 +229,7 @@ fun SecondaryNotesScreen(
         bulkActionRunning = true
         val ids = selectedIds
         scope.launch {
-            val outcome = runBulkAction(ids) { id -> repository.deleteNotePermanently(id) is DeleteResult.Deleted }
+            val outcome = runBulkAction(context, ids) { id -> repository.deleteNotePermanentlyQueued(id) }
             notes = notes.filterNot { it.id in outcome.succeededIds }
             bulkActionRunning = false
             reportOutcome(deletedSuccessTemplate, outcome)
@@ -223,7 +243,7 @@ fun SecondaryNotesScreen(
         bulkActionRunning = true
         val ids = selectedIds
         scope.launch {
-            val outcome = runBulkAction(ids) { id -> repository.setColor(id, colorKey) is SaveNoteResult.Saved }
+            val outcome = runBulkAction(context, ids) { id -> repository.setColorQueued(id, colorKey) }
             notes = notes.map { if (it.id in outcome.succeededIds) it.copy(color = colorKey) else it }
             bulkActionRunning = false
         }
@@ -285,6 +305,14 @@ fun SecondaryNotesScreen(
                             CheckSquareIcon(size = 18.dp, tint = titleColor)
                         }
                     }
+                    if (syncingCount > 0) {
+                        Text(
+                            String.format(stringResource(R.string.native_notes_syncing_count), syncingCount),
+                            color = subtextColor,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(end = 4.dp),
+                        )
+                    }
                     Text(
                         stringResource(R.string.native_notes_refresh),
                         color = if (loading) subtextColor else Indigo,
@@ -339,6 +367,7 @@ fun SecondaryNotesScreen(
                             onToggleSelect = {
                                 selectedIds = if (note.id in selectedIds) selectedIds - note.id else selectedIds + note.id
                             },
+                            syncing = note.id in pendingSyncNoteIds,
                         )
                     }
                 }

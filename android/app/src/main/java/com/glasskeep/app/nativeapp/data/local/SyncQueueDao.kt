@@ -52,15 +52,36 @@ interface SyncQueueDao {
     @Query("SELECT COUNT(*) FROM sync_queue WHERE noteId = :noteId AND status = '${SyncQueueEntity.STATUS_PENDING}'")
     fun observePendingCountForNote(noteId: String): Flow<Int>
 
-    /** Notes with a not-yet-confirmed archive/trash/restore: see
-     *  NotesRepository.refresh()'s own doc comment for why these three
-     *  (and only these three) need protecting from a same-moment refresh.
-     *  The literal type names must keep matching SyncQueueType's own
-     *  entries: Room requires a compile-time constant here, so this can't
+    /** Notes with a not-yet-confirmed archive/trash/restore/permanent-delete/
+     *  pin: notes list screens with a live, replaceable snapshot (Room's
+     *  own observeAll() cache for NativeNotesListScreen.kt, or
+     *  SecondaryNotesScreen.kt's own in-memory list) must not let a
+     *  same-moment refresh silently undo one of these five while it's
+     *  still in flight (see NotesRepository.refresh()'s and
+     *  SecondaryNotesScreen.kt's own doc comments). One shared, wider
+     *  query rather than one per caller: a type irrelevant to a given
+     *  caller (e.g. PERMANENT_DELETE for Room, which never cached a
+     *  trashed note to begin with) is a harmless no-op there, cheaper
+     *  than keeping two near-duplicate queries in sync by hand. The
+     *  literal type names must keep matching SyncQueueType's own entries:
+     *  Room requires a compile-time constant here, so this can't
      *  reference the enum directly the way STATUS_PENDING does above. */
     @Query(
         "SELECT DISTINCT noteId FROM sync_queue WHERE status = '${SyncQueueEntity.STATUS_PENDING}' " +
-            "AND type IN ('ARCHIVE', 'TRASH', 'RESTORE')",
+            "AND type IN ('ARCHIVE', 'TRASH', 'RESTORE', 'PERMANENT_DELETE', 'PINNED')",
     )
     suspend fun getProtectedNoteIds(): List<String>
+
+    /** Every note with anything still pending, of any type: drives a
+     *  list-level "still syncing" indicator (see NativeNotesListScreen.kt/
+     *  SecondaryNotesScreen.kt), deliberately untyped unlike
+     *  getProtectedNoteIds() above. A note queued from one screen (e.g. a
+     *  RESTORE queued from the trash screen) can legitimately need this
+     *  badge on a DIFFERENT screen (the active list it just got
+     *  optimistically reinserted into), so filtering by type per screen
+     *  would mean remembering to keep two lists in sync by hand; each
+     *  screen instead intersects this set against the note ids it's
+     *  actually rendering. */
+    @Query("SELECT DISTINCT noteId FROM sync_queue WHERE status = '${SyncQueueEntity.STATUS_PENDING}'")
+    fun observePendingNoteIds(): Flow<List<String>>
 }

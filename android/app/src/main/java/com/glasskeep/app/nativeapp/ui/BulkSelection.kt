@@ -1,5 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,37 +39,44 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.Indigo
 
-/** One bulk-selection run over several note ids: which ones succeeded
- *  (network error, or a stale/read-only result the repository already
- *  detected, both count as not-succeeded) and how many failed. Mirrors
- *  what each SaveNoteResult/DeleteResult already encodes per note, just
- *  tallied across the whole selection. succeededIds lets a caller that
- *  isn't Room-backed (SecondaryNotesScreen.kt) patch its own local list
- *  precisely instead of guessing which ones actually went through. */
+/** One bulk-selection run over several note ids: which ones succeeded and
+ *  how many failed. Every action() call now enqueues onto the offline
+ *  sync queue (see SyncQueueWorker.kt) rather than waiting on the server,
+ *  so "succeeded" means enqueued, not server-confirmed, same as a single
+ *  note's own queued actions (NoteDetailScreen.kt never waits on a server
+ *  verdict either). "Failed" is a genuine local error (e.g. a Room write
+ *  that threw), not a stale/read-only rejection: those aren't visible
+ *  synchronously anymore. succeededIds lets a caller that isn't Room-backed
+ *  (SecondaryNotesScreen.kt) patch its own local list precisely instead of
+ *  guessing which ones actually went through. */
 data class BulkOutcome(val succeededIds: List<String>, val failed: Int) {
     val succeeded: Int get() = succeededIds.size
 }
 
-/** Sequential, one request at a time, same as the web app's own sync
- *  queue actually sends them (see this milestone's commit message):
- *  there is no batch endpoint on the server, and native has no offline
- *  queue yet to hide a failure behind (that's its own later milestone),
- *  so a failed note is counted and reported rather than silently lost. */
-suspend fun runBulkAction(ids: Collection<String>, action: suspend (String) -> Boolean): BulkOutcome {
+/** Sequential, one enqueue at a time: there is no batch endpoint on the
+ *  server, but unlike before this only ever costs a local Room write per
+ *  note, not a real network round trip, so sequential adds negligible
+ *  latency over the whole selection. Triggers one SyncQueueWorker drain
+ *  at the end (not per item, see SyncQueueWorker.triggerNow's own
+ *  ExistingWorkPolicy.KEEP) rather than requiring every call site to
+ *  remember it, the way NoteDetailScreen.kt's single-note actions do. */
+suspend fun runBulkAction(context: Context, ids: Collection<String>, action: suspend (String) -> Unit): BulkOutcome {
     val succeededIds = mutableListOf<String>()
     var failed = 0
     for (id in ids) {
-        val ok = try {
+        try {
             action(id)
+            succeededIds.add(id)
         } catch (t: Throwable) {
             NativeDebug.e("Bulk action failed for note $id", t)
-            false
+            failed++
         }
-        if (ok) succeededIds.add(id) else failed++
     }
+    if (succeededIds.isNotEmpty()) SyncQueueWorker.triggerNow(context)
     return BulkOutcome(succeededIds, failed)
 }
 

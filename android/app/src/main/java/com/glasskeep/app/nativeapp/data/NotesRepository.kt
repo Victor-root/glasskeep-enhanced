@@ -31,6 +31,7 @@ import com.glasskeep.app.nativeapp.data.network.SetShowOnLoginRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
 import com.glasskeep.app.nativeapp.data.network.UserDto
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -94,10 +95,10 @@ class NotesRepository(
         val notes = response.body().orEmpty()
         NativeDebug.d("NotesRepository.refresh: got ${notes.size} note(s)")
         // See NoteDao.replaceAll's own doc comment: a note with a queued,
-        // not-yet-confirmed archive/trash/restore (see the *Queued methods
-        // below) must not have this refresh's now-stale server snapshot
-        // silently undo its optimistic local state.
-        noteDao.replaceAll(notes.map { it.toEntity() }, syncQueueDao.getProtectedNoteIds().toSet())
+        // not-yet-confirmed archive/trash/restore/pin (see the *Queued
+        // methods below) must not have this refresh's now-stale server
+        // snapshot silently undo its optimistic local state.
+        noteDao.replaceAll(notes.map { it.toEntity() }, getProtectedNoteIds())
     }
 
     /**
@@ -544,14 +545,21 @@ class NotesRepository(
 
     /** Per-user state, no LWW/stale concept (see setPinned's own doc
      *  comment): queued only for offline parity, not for any conflict this
-     *  note's other fields need guarding against. No noteDao mutation
-     *  either, same reasoning: the caller (NoteDetailScreen.togglePin)
-     *  already updates its own on-screen state directly and stays on the
-     *  same screen, unlike the four actions below. */
-    suspend fun setPinnedQueued(id: String, pinned: Boolean) {
-        NativeDebug.d("NotesRepository.setPinnedQueued id=$id pinned=$pinned")
+     *  note's other fields need guarding against. Unlike the patch-style
+     *  methods above (color/tags/...), this DOES mutate the local cache
+     *  optimistically: pin is a real Room column that also drives sort
+     *  order (NoteDao.observeAll()'s own "ORDER BY pinned DESC"), and a
+     *  bulk pin's caller (NativeNotesListScreen.kt) never navigates away
+     *  the way archive/trash/restore's callers do, so the user is looking
+     *  straight at the icon/ordering that would otherwise sit stale until
+     *  the queue drains. NoteDetailScreen.togglePin() already updates its
+     *  own on-screen state directly (not read from Room at all there), so
+     *  this is purely for the list screens' benefit. */
+    suspend fun setPinnedQueued(entity: NoteEntity, pinned: Boolean) {
+        NativeDebug.d("NotesRepository.setPinnedQueued id=${entity.id} pinned=$pinned")
         val request = SetPinnedRequest(pinned)
-        syncQueueDao.enqueue(id, SyncQueueType.PINNED.name, Json.encodeToString(request), System.currentTimeMillis())
+        syncQueueDao.enqueue(entity.id, SyncQueueType.PINNED.name, Json.encodeToString(request), System.currentTimeMillis())
+        noteDao.upsertAll(listOf(entity.copy(pinned = pinned)))
     }
 
     /** Unlike the patch-style methods above, this one (and trashNoteQueued/
@@ -604,6 +612,18 @@ class NotesRepository(
     /** How many of this note's edits are still waiting to reach the
      *  server; drives NoteDetailScreen's small "Syncing…" indicator. */
     fun observePendingSyncCount(noteId: String): Flow<Int> = syncQueueDao.observePendingCountForNote(noteId)
+
+    /** See NoteDao.replaceAll's own doc comment; exposed (not just used
+     *  internally by refresh()) so a non-Room-backed screen with its own
+     *  in-memory list (SecondaryNotesScreen.kt) can guard its own refresh
+     *  the same way. */
+    suspend fun getProtectedNoteIds(): Set<String> = syncQueueDao.getProtectedNoteIds().toSet()
+
+    /** Every note with anything still pending, of any type: drives a
+     *  list-level "still syncing" indicator (see SyncQueueDao.
+     *  observePendingNoteIds's own doc comment for why this is
+     *  deliberately untyped, unlike getProtectedNoteIds above). */
+    fun observePendingSyncNoteIds(): Flow<Set<String>> = syncQueueDao.observePendingNoteIds().map { it.toSet() }
 
     /** Sets, moves, or clears (reminderAtIso == null) a note's reminder.
      *  Its own dedicated route (see GlassKeepApi.setReminder), not the

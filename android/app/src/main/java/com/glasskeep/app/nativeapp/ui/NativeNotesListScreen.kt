@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -66,7 +67,6 @@ import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.ChecklistPreview
 import com.glasskeep.app.nativeapp.data.NoteContent
-import com.glasskeep.app.nativeapp.data.SaveNoteResult
 import com.glasskeep.app.nativeapp.data.isReminderPast
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
@@ -106,6 +106,12 @@ fun NativeNotesListScreen(
     val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val notes by repository.observeNotes().collectAsState(initial = emptyList())
+    // Notes with a queued edit still waiting to reach the server (any
+    // type, any screen, see SyncQueueDao.observePendingNoteIds's own doc
+    // comment): drives both a per-card spinner and this header's own
+    // aggregate count below.
+    val pendingSyncNoteIds by repository.observePendingSyncNoteIds().collectAsState(initial = emptySet())
+    val syncingCount = remember(pendingSyncNoteIds, notes) { notes.count { it.id in pendingSyncNoteIds } }
     var refreshing by remember { mutableStateOf(false) }
     var creatingNote by remember { mutableStateOf(false) }
     var fabOpen by remember { mutableStateOf(false) }
@@ -162,8 +168,11 @@ fun NativeNotesListScreen(
         if (bulkActionRunning || selectedIds.isEmpty()) return
         bulkActionRunning = true
         val ids = selectedIds
+        val entities = notes.associateBy { it.id }
         scope.launch {
-            val outcome = runBulkAction(ids) { id -> repository.setArchived(id, true) is SaveNoteResult.Saved }
+            val outcome = runBulkAction(context, ids) { id ->
+                repository.setArchivedQueued(entities.getValue(id), true)
+            }
             bulkActionRunning = false
             reportOutcome(archivedSuccessTemplate, outcome)
             exitSelection()
@@ -176,7 +185,7 @@ fun NativeNotesListScreen(
         bulkActionRunning = true
         val ids = selectedIds
         scope.launch {
-            val outcome = runBulkAction(ids) { id -> repository.trashNote(id) is SaveNoteResult.Saved }
+            val outcome = runBulkAction(context, ids) { id -> repository.trashNoteQueued(id) }
             bulkActionRunning = false
             reportOutcome(trashedSuccessTemplate, outcome)
             exitSelection()
@@ -187,8 +196,9 @@ fun NativeNotesListScreen(
         if (bulkActionRunning || selectedIds.isEmpty()) return
         bulkActionRunning = true
         val ids = selectedIds
+        val entities = notes.associateBy { it.id }
         scope.launch {
-            runBulkAction(ids) { id -> repository.setPinned(id, true); true }
+            runBulkAction(context, ids) { id -> repository.setPinnedQueued(entities.getValue(id), true) }
             bulkActionRunning = false
         }
     }
@@ -199,7 +209,7 @@ fun NativeNotesListScreen(
         bulkActionRunning = true
         val ids = selectedIds
         scope.launch {
-            runBulkAction(ids) { id -> repository.setColor(id, colorKey) is SaveNoteResult.Saved }
+            runBulkAction(context, ids) { id -> repository.setColorQueued(id, colorKey) }
             bulkActionRunning = false
         }
     }
@@ -303,6 +313,7 @@ fun NativeNotesListScreen(
                 titleColor = titleColor,
                 subtextColor = subtextColor,
                 refreshing = refreshing,
+                syncingCount = syncingCount,
                 onRefresh = { refresh() },
                 onOpenArchived = onOpenArchived,
                 onOpenTrash = onOpenTrash,
@@ -350,6 +361,7 @@ fun NativeNotesListScreen(
                             onToggleSelect = {
                                 selectedIds = if (note.id in selectedIds) selectedIds - note.id else selectedIds + note.id
                             },
+                            syncing = note.id in pendingSyncNoteIds,
                         )
                     }
                 }
@@ -431,6 +443,7 @@ private fun NativeHeader(
     titleColor: Color,
     subtextColor: Color,
     refreshing: Boolean,
+    syncingCount: Int,
     onRefresh: () -> Unit,
     onOpenArchived: () -> Unit,
     onOpenTrash: () -> Unit,
@@ -570,6 +583,14 @@ private fun NativeHeader(
                 ) {
                     SearchIcon(size = 18.dp, tint = titleColor)
                 }
+                if (syncingCount > 0) {
+                    Text(
+                        String.format(stringResource(R.string.native_notes_syncing_count), syncingCount),
+                        color = subtextColor,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(end = 4.dp),
+                    )
+                }
                 Text(
                     stringResource(R.string.native_notes_refresh),
                     color = if (refreshing) subtextColor else Indigo,
@@ -609,6 +630,7 @@ internal fun NoteCard(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onToggleSelect: (() -> Unit)? = null,
+    syncing: Boolean = false,
 ) {
     val borderColor = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
     val shape = RoundedCornerShape(12.dp)
@@ -636,6 +658,10 @@ internal fun NoteCard(
                     fontSize = 15.sp,
                     modifier = Modifier.weight(1f).padding(end = if (selectionMode) 30.dp else 0.dp),
                 )
+                if (syncing && !selectionMode) {
+                    CircularProgressIndicator(modifier = Modifier.size(12.dp), color = Indigo, strokeWidth = 1.5.dp)
+                    Spacer(Modifier.width(6.dp))
+                }
                 if (note.pinned && !selectionMode) {
                     PinIcon(size = 14.dp, tint = Indigo, filled = true)
                 }
