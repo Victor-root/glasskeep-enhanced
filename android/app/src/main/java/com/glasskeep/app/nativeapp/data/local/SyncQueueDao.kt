@@ -51,4 +51,16 @@ interface SyncQueueDao {
      *  doesn't show as perpetually "still syncing". */
     @Query("SELECT COUNT(*) FROM sync_queue WHERE noteId = :noteId AND status = '${SyncQueueEntity.STATUS_PENDING}'")
     fun observePendingCountForNote(noteId: String): Flow<Int>
+
+    /** Notes with a not-yet-confirmed archive/trash/restore: see
+     *  NotesRepository.refresh()'s own doc comment for why these three
+     *  (and only these three) need protecting from a same-moment refresh.
+     *  The literal type names must keep matching SyncQueueType's own
+     *  entries: Room requires a compile-time constant here, so this can't
+     *  reference the enum directly the way STATUS_PENDING does above. */
+    @Query(
+        "SELECT DISTINCT noteId FROM sync_queue WHERE status = '${SyncQueueEntity.STATUS_PENDING}' " +
+            "AND type IN ('ARCHIVE', 'TRASH', 'RESTORE')",
+    )
+    suspend fun getProtectedNoteIds(): List<String>
 }

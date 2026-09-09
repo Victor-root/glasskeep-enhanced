@@ -93,7 +93,11 @@ class NotesRepository(
         }
         val notes = response.body().orEmpty()
         NativeDebug.d("NotesRepository.refresh: got ${notes.size} note(s)")
-        noteDao.replaceAll(notes.map { it.toEntity() })
+        // See NoteDao.replaceAll's own doc comment: a note with a queued,
+        // not-yet-confirmed archive/trash/restore (see the *Queued methods
+        // below) must not have this refresh's now-stale server snapshot
+        // silently undo its optimistic local state.
+        noteDao.replaceAll(notes.map { it.toEntity() }, syncQueueDao.getProtectedNoteIds().toSet())
     }
 
     /**
@@ -292,9 +296,9 @@ class NotesRepository(
     /** Archive or unarchive. Archived notes stay in the local cache (they
      *  still exist, just hidden from the active list by the server's own
      *  listing query), same as how patchNote() mirrors edits. */
-    suspend fun setArchived(id: String, archived: Boolean): SaveNoteResult {
+    suspend fun setArchived(id: String, archived: Boolean, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setArchived id=$id archived=$archived")
-        val response = api.archiveNote(id, ArchiveNoteRequest(archived, nowIso()))
+        val response = api.archiveNote(id, ArchiveNoteRequest(archived, clientUpdatedAt))
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             val error = "POST /api/notes/$id/archive failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
@@ -323,9 +327,9 @@ class NotesRepository(
      * longer an active note. The trash screen itself doesn't read this
      * cache at all, it always fetches fresh (see fetchTrashedNotes()).
      */
-    suspend fun trashNote(id: String): SaveNoteResult {
+    suspend fun trashNote(id: String, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.trashNote id=$id")
-        val response = api.trashNote(id, ClientUpdatedAtRequest(nowIso()))
+        val response = api.trashNote(id, ClientUpdatedAtRequest(clientUpdatedAt))
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             val error = "POST /api/notes/$id/trash failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
@@ -361,9 +365,9 @@ class NotesRepository(
      *  here, same as setArchived(): restoring your own trashed note isn't
      *  a shared-content permission concern. Mirrors the restored note back
      *  into the local cache so it shows up in the main list right away. */
-    suspend fun restoreNote(id: String): SaveNoteResult {
+    suspend fun restoreNote(id: String, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.restoreNote id=$id")
-        val response = api.restoreNote(id, ClientUpdatedAtRequest(nowIso()))
+        val response = api.restoreNote(id, ClientUpdatedAtRequest(clientUpdatedAt))
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             val error = "POST /api/notes/$id/restore failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
@@ -385,9 +389,9 @@ class NotesRepository(
      *  in the local cache to begin with (trashed notes aren't cached, see
      *  fetchTrashedNotes()), so there's nothing to clean up locally on
      *  success. */
-    suspend fun deleteNotePermanently(id: String): DeleteResult {
+    suspend fun deleteNotePermanently(id: String, clientUpdatedAt: String = nowIso()): DeleteResult {
         NativeDebug.d("NotesRepository.deleteNotePermanently id=$id")
-        val response = api.deleteNotePermanently(id, ClientUpdatedAtRequest(nowIso()))
+        val response = api.deleteNotePermanently(id, ClientUpdatedAtRequest(clientUpdatedAt))
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             val error = "DELETE /api/notes/$id/permanent failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
@@ -495,19 +499,19 @@ class NotesRepository(
     }
 
     // ---- Offline sync queue (see SyncQueueWorker.kt) ------------------
-    // NoteDetailScreen.kt calls these instead of the five direct methods
-    // above: the intended request body is written to Room's own
-    // sync_queue table immediately (see SyncQueueDao.enqueue, which
-    // collapses a second edit to the same note+field into the still-
-    // pending one rather than stacking a duplicate) and the caller
-    // updates its own on-screen state optimistically, the same
-    // local-first shape autoSaveTextNote() uses on the web.
-    // SyncQueueWorker drains this in the background, replaying each item
-    // with ITS captured clientUpdatedAt (not a fresh one at replay time,
-    // which would corrupt the LWW comparison the timestamp exists for).
-    // The direct methods above are unchanged and still used by every
-    // other screen this milestone doesn't cover yet (see this milestone's
-    // commit message for the follow-up tasks).
+    // NoteDetailScreen.kt calls these instead of the direct methods above:
+    // the intended request body is written to Room's own sync_queue table
+    // immediately (see SyncQueueDao.enqueue, which collapses a second edit
+    // to the same note+field into the still-pending one rather than
+    // stacking a duplicate) and the caller updates its own on-screen state
+    // optimistically, the same local-first shape autoSaveTextNote() uses
+    // on the web. SyncQueueWorker drains this in the background, replaying
+    // each item with ITS captured clientUpdatedAt (not a fresh one at
+    // replay time, which would corrupt the LWW comparison the timestamp
+    // exists for). The direct methods above are unchanged and still used
+    // by SyncQueueWorker's own replay, and by every screen besides
+    // NoteDetailScreen.kt, which don't queue yet (see this and the
+    // milestone-1 commit messages for the follow-up tasks).
     suspend fun patchNoteQueued(id: String, title: String, content: String) {
         NativeDebug.d("NotesRepository.patchNoteQueued id=$id")
         val request = PatchNoteRequest(title, content, nowIso())
@@ -536,6 +540,63 @@ class NotesRepository(
         NativeDebug.d("NotesRepository.setImagesQueued id=$id count=${images.size}")
         val request = SetImagesRequest(images = images, clientUpdatedAt = nowIso())
         syncQueueDao.enqueue(id, SyncQueueType.IMAGES.name, Json.encodeToString(request), System.currentTimeMillis())
+    }
+
+    /** Per-user state, no LWW/stale concept (see setPinned's own doc
+     *  comment): queued only for offline parity, not for any conflict this
+     *  note's other fields need guarding against. No noteDao mutation
+     *  either, same reasoning: the caller (NoteDetailScreen.togglePin)
+     *  already updates its own on-screen state directly and stays on the
+     *  same screen, unlike the four actions below. */
+    suspend fun setPinnedQueued(id: String, pinned: Boolean) {
+        NativeDebug.d("NotesRepository.setPinnedQueued id=$id pinned=$pinned")
+        val request = SetPinnedRequest(pinned)
+        syncQueueDao.enqueue(id, SyncQueueType.PINNED.name, Json.encodeToString(request), System.currentTimeMillis())
+    }
+
+    /** Unlike the patch-style methods above, this one (and trashNoteQueued/
+     *  restoreNoteQueued/deleteNotePermanentlyQueued below) also mutates
+     *  the local cache optimistically, immediately: their callers navigate
+     *  back to the notes list right after enqueueing, and that list
+     *  refreshes itself on every return (see NativeNotesListScreen.kt),
+     *  which would otherwise race the still-pending queued item and
+     *  silently undo this action until it actually reaches the server
+     *  (see NoteDao.replaceAll's own doc comment for the other half of
+     *  this fix). [note] provides the full row: unarchiving needs it to
+     *  reinsert the note into the active-list cache, not just archiving's
+     *  own removal. */
+    suspend fun setArchivedQueued(note: NoteDto, archived: Boolean) {
+        NativeDebug.d("NotesRepository.setArchivedQueued id=${note.id} archived=$archived")
+        val request = ArchiveNoteRequest(archived, nowIso())
+        syncQueueDao.enqueue(note.id, SyncQueueType.ARCHIVE.name, Json.encodeToString(request), System.currentTimeMillis())
+        if (archived) noteDao.deleteById(note.id) else noteDao.upsertAll(listOf(note.toEntity()))
+    }
+
+    suspend fun trashNoteQueued(id: String) {
+        NativeDebug.d("NotesRepository.trashNoteQueued id=$id")
+        val request = ClientUpdatedAtRequest(nowIso())
+        syncQueueDao.enqueue(id, SyncQueueType.TRASH.name, Json.encodeToString(request), System.currentTimeMillis())
+        noteDao.deleteById(id)
+    }
+
+    /** [note] is the trashed note being restored (as loaded by
+     *  NoteDetailScreen, still carrying its pre-trash fields): reinserted
+     *  into the active-list cache optimistically, same reasoning as
+     *  setArchivedQueued's unarchive branch. */
+    suspend fun restoreNoteQueued(note: NoteDto) {
+        NativeDebug.d("NotesRepository.restoreNoteQueued id=${note.id}")
+        val request = ClientUpdatedAtRequest(nowIso())
+        syncQueueDao.enqueue(note.id, SyncQueueType.RESTORE.name, Json.encodeToString(request), System.currentTimeMillis())
+        noteDao.upsertAll(listOf(note.toEntity()))
+    }
+
+    /** No noteDao mutation: a trashed note was never cached locally to
+     *  begin with (see deleteNotePermanently's own doc comment), so
+     *  there's nothing here to optimistically remove. */
+    suspend fun deleteNotePermanentlyQueued(id: String) {
+        NativeDebug.d("NotesRepository.deleteNotePermanentlyQueued id=$id")
+        val request = ClientUpdatedAtRequest(nowIso())
+        syncQueueDao.enqueue(id, SyncQueueType.PERMANENT_DELETE.name, Json.encodeToString(request), System.currentTimeMillis())
     }
 
     /** How many of this note's edits are still waiting to reach the

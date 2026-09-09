@@ -30,14 +30,25 @@ interface NoteDao {
      * Empty lists go through deleteAll() directly: `NOT IN ()` with no
      * arguments is invalid SQL, and an empty server response is exactly
      * what a brand-new account looks like.
+     *
+     * [protectedIds] (see SyncQueueDao.getProtectedNoteIds()) are excluded
+     * from both sides of the replace: a note there is neither upserted from
+     * [notes] (a fresh GET /api/notes that hasn't caught up with an
+     * in-flight queued archive/trash yet would otherwise silently undo that
+     * optimistic local removal) nor treated as missing (a queued restore's
+     * optimistic local insert would otherwise be deleted immediately,
+     * since a not-yet-processed restore is still absent from [notes]).
+     * Self-heals on the very next refresh() either way, once the queued
+     * item is no longer PENDING (succeeded, or gave up after retrying).
      */
     @Transaction
-    suspend fun replaceAll(notes: List<NoteEntity>) {
-        if (notes.isEmpty()) {
+    suspend fun replaceAll(notes: List<NoteEntity>, protectedIds: Set<String> = emptySet()) {
+        val filtered = if (protectedIds.isEmpty()) notes else notes.filterNot { it.id in protectedIds }
+        if (filtered.isEmpty() && protectedIds.isEmpty()) {
             deleteAll()
         } else {
-            upsertAll(notes)
-            deleteMissing(notes.map { it.id })
+            upsertAll(filtered)
+            deleteMissing(filtered.map { it.id } + protectedIds)
         }
     }
 }

@@ -43,7 +43,10 @@ data class SyncQueueEntity(
 /** Which repository call SyncQueueWorker replays a given item with.
  *  Narrower than syncEngine.js's own type set (create/update/patch/
  *  archive/trash/restore/permanentDelete/reorder/reminder) on purpose:
- *  this milestone only queues the patch-shaped edits NoteDetailScreen.kt
- *  already sends directly, see this milestone's commit message for the
- *  follow-up tasks that queue the rest. */
-enum class SyncQueueType { TITLE_CONTENT, COLOR, TAGS, CHECKLIST_ITEMS, IMAGES }
+ *  create/duplicate need their own client-id/reconciliation design and
+ *  reminders are queued separately (see the follow-up tasks this and the
+ *  next milestone's commit messages list). ARCHIVE/TRASH/RESTORE's note
+ *  ids are also read by SyncQueueDao.getProtectedNoteIds() (see
+ *  NotesRepository.refresh()'s own doc comment) since, unlike the other
+ *  types, they change which notes belong in the active-notes list. */
+enum class SyncQueueType { TITLE_CONTENT, COLOR, TAGS, CHECKLIST_ITEMS, IMAGES, PINNED, ARCHIVE, TRASH, RESTORE, PERMANENT_DELETE }

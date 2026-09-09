@@ -82,7 +82,6 @@ import com.glasskeep.app.nativeapp.data.AudioClipDto
 import com.glasskeep.app.nativeapp.data.AudioContent
 import com.glasskeep.app.nativeapp.data.ChecklistItemData
 import com.glasskeep.app.nativeapp.data.ChecklistItems
-import com.glasskeep.app.nativeapp.data.DeleteResult
 import com.glasskeep.app.nativeapp.data.DrawingContent
 import com.glasskeep.app.nativeapp.data.DrawingDimensionsDto
 import com.glasskeep.app.nativeapp.data.DrawingStrokeDto
@@ -303,7 +302,10 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         pinning = true
         scope.launch {
             try {
-                note = repository.setPinned(current.id, !current.pinned)
+                repository.setPinnedQueued(current.id, !current.pinned)
+                note = current.copy(pinned = !current.pinned)
+                SyncQueueWorker.triggerNow(context)
+                NativeDebug.d("NoteDetailScreen togglePin queued id=${current.id}")
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen togglePin failed", t)
                 Toast.makeText(
@@ -323,14 +325,10 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         archiving = true
         scope.launch {
             try {
-                when (repository.setArchived(current.id, !current.archived)) {
-                    is SaveNoteResult.Saved -> {
-                        NativeDebug.d("NoteDetailScreen toggleArchive OK id=${current.id}")
-                        onBack()
-                    }
-                    SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
-                    SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
-                }
+                repository.setArchivedQueued(current, !current.archived)
+                SyncQueueWorker.triggerNow(context)
+                NativeDebug.d("NoteDetailScreen toggleArchive queued id=${current.id}")
+                onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen toggleArchive failed", t)
                 Toast.makeText(
@@ -353,14 +351,10 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         restoring = true
         scope.launch {
             try {
-                when (repository.restoreNote(current.id)) {
-                    is SaveNoteResult.Saved -> {
-                        NativeDebug.d("NoteDetailScreen restoreNote OK id=${current.id}")
-                        onBack()
-                    }
-                    SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
-                    SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
-                }
+                repository.restoreNoteQueued(current)
+                SyncQueueWorker.triggerNow(context)
+                NativeDebug.d("NoteDetailScreen restoreNote queued id=${current.id}")
+                onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen restoreNote failed", t)
                 Toast.makeText(
@@ -381,14 +375,10 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         trashing = true
         scope.launch {
             try {
-                when (repository.trashNote(current.id)) {
-                    is SaveNoteResult.Saved, SaveNoteResult.Left -> {
-                        NativeDebug.d("NoteDetailScreen trash OK id=${current.id}")
-                        onBack()
-                    }
-                    SaveNoteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
-                    SaveNoteResult.ReadOnly -> Toast.makeText(context, readOnlyMessage, Toast.LENGTH_SHORT).show()
-                }
+                repository.trashNoteQueued(current.id)
+                SyncQueueWorker.triggerNow(context)
+                NativeDebug.d("NoteDetailScreen trash queued id=${current.id}")
+                onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen trash failed", t)
                 Toast.makeText(
@@ -412,13 +402,10 @@ fun NoteDetailScreen(container: NativeAppContainer, serverUrl: String, noteId: S
         deletingPermanently = true
         scope.launch {
             try {
-                when (repository.deleteNotePermanently(current.id)) {
-                    DeleteResult.Deleted -> {
-                        NativeDebug.d("NoteDetailScreen deleteNotePermanently OK id=${current.id}")
-                        onBack()
-                    }
-                    DeleteResult.Stale -> Toast.makeText(context, staleMessage, Toast.LENGTH_SHORT).show()
-                }
+                repository.deleteNotePermanentlyQueued(current.id)
+                SyncQueueWorker.triggerNow(context)
+                NativeDebug.d("NoteDetailScreen deleteNotePermanently queued id=${current.id}")
+                onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen deleteNotePermanently failed", t)
                 Toast.makeText(

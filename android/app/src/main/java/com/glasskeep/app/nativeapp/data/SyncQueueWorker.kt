@@ -18,10 +18,13 @@ import com.glasskeep.app.nativeapp.data.local.SyncQueueDatabase
 import com.glasskeep.app.nativeapp.data.local.SyncQueueEntity
 import com.glasskeep.app.nativeapp.data.local.SyncQueueType
 import com.glasskeep.app.nativeapp.data.network.ApiClientFactory
+import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
+import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
 import com.glasskeep.app.nativeapp.data.network.SetColorRequest
 import com.glasskeep.app.nativeapp.data.network.SetImagesRequest
+import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetTagsRequest
 import kotlinx.coroutines.delay
 import kotlinx.serialization.decodeFromString
@@ -108,6 +111,26 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
             SyncQueueType.IMAGES -> {
                 val body = Json.decodeFromString<SetImagesRequest>(item.payloadJson)
                 repository.setImages(item.noteId, body.images, body.clientUpdatedAt)
+            }
+            SyncQueueType.PINNED -> {
+                val body = Json.decodeFromString<SetPinnedRequest>(item.payloadJson)
+                repository.setPinned(item.noteId, body.pinned)
+            }
+            SyncQueueType.ARCHIVE -> {
+                val body = Json.decodeFromString<ArchiveNoteRequest>(item.payloadJson)
+                repository.setArchived(item.noteId, body.archived, body.clientUpdatedAt)
+            }
+            SyncQueueType.TRASH -> {
+                val body = Json.decodeFromString<ClientUpdatedAtRequest>(item.payloadJson)
+                repository.trashNote(item.noteId, body.clientUpdatedAt)
+            }
+            SyncQueueType.RESTORE -> {
+                val body = Json.decodeFromString<ClientUpdatedAtRequest>(item.payloadJson)
+                repository.restoreNote(item.noteId, body.clientUpdatedAt)
+            }
+            SyncQueueType.PERMANENT_DELETE -> {
+                val body = Json.decodeFromString<ClientUpdatedAtRequest>(item.payloadJson)
+                repository.deleteNotePermanently(item.noteId, body.clientUpdatedAt)
             }
         }
     }
