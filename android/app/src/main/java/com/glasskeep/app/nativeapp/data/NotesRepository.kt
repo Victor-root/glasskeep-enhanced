@@ -204,6 +204,16 @@ class NotesRepository(
         noteDao.upsertNotesAndDetails(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() })
     }
 
+    /**
+     * The note's own local copy, if any - same data [fetchNoteDetail] falls
+     * back to on a network error, exposed so a caller can render it
+     * immediately (no spinner) while a fresh [fetchNoteDetail] call
+     * reconciles in the background. A note already visible in the notes
+     * list came from this same local cache, so it is always available
+     * here the instant the user taps it open.
+     */
+    suspend fun cachedNoteDetailOrNull(id: String): NoteDto? = cachedNote(id)
+
     private suspend fun cachedNote(id: String): NoteDto? {
         noteDao.getDetailById(id)?.let { detail ->
             val decoded = runCatching { detail.toNoteDto() }

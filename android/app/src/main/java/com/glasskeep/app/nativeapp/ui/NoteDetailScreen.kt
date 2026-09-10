@@ -1232,8 +1232,15 @@ fun NoteDetailScreen(
     }
 
     LaunchedEffect(noteId) {
-        try {
-            val fetched = repository.fetchNoteDetail(noteId)
+        // A note already visible in the notes list came from this same
+        // local cache (NotesRepository's Room-backed store), so it's
+        // available the instant the user taps it open - no reason to
+        // block the whole screen behind fetchNoteDetail's own
+        // network-first round-trip first. Render the cached copy
+        // immediately, then let the network call reconcile quietly in
+        // the background; only a note with no cache at all (a fresh
+        // deep link before its first sync) still shows the spinner.
+        fun applyFetchedNote(fetched: NoteDto) {
             note = fetched
             titleText = fetched.title
             images = NoteImages.parse(fetched.images)
@@ -1335,9 +1342,42 @@ fun NoteDetailScreen(
                     checklistItems = editability?.checklistItems,
                 ),
             )
+        }
+
+        fun currentSnapshot() = NoteSnapshot(
+            title = titleText,
+            body = bodyText,
+            richBlocks = richBlocks,
+            checklistItems = editability?.checklistItems,
+        )
+
+        var cacheBaseline: NoteSnapshot? = null
+        repository.cachedNoteDetailOrNull(noteId)?.let { cached ->
+            runCatching { applyFetchedNote(cached) }
+                .onSuccess { cacheBaseline = currentSnapshot() }
+                .onFailure { NativeDebug.e("NoteDetailScreen cached render failed id=$noteId", it) }
+        }
+        try {
+            val fetched = repository.fetchNoteDetail(noteId)
+            val baseline = cacheBaseline
+            if (baseline == null || baseline == currentSnapshot()) {
+                applyFetchedNote(fetched)
+            } else {
+                // The user already started typing in the gap between the
+                // instant cache render above and this network round-trip
+                // landing - never clobber that with a reconcile. Still
+                // pick up fresher metadata (tags, pin, collaborators),
+                // which doesn't touch any editable state.
+                NativeDebug.d("NoteDetailScreen: skipped reconcile, already editing id=$noteId")
+                note = fetched
+            }
         } catch (t: Throwable) {
-            NativeDebug.e("NoteDetailScreen load failed", t)
-            loadError = String.format(errorLoadTemplate, t.message ?: t.javaClass.simpleName)
+            if (note == null) {
+                NativeDebug.e("NoteDetailScreen load failed", t)
+                loadError = String.format(errorLoadTemplate, t.message ?: t.javaClass.simpleName)
+            } else {
+                NativeDebug.e("NoteDetailScreen background refresh failed id=$noteId", t)
+            }
         }
     }
 
