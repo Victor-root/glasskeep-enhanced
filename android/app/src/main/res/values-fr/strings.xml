@@ -153,7 +153,7 @@
     <string name="native_trash_empty">La corbeille est vide.</string>
     <string name="native_trash_error">Impossible de charger la corbeille : %1$s</string>
 
-    <string name="native_settings_title">Réglages</string>
+    <string name="native_settings_title">Paramètres</string>
     <string name="native_settings_loading">Chargement…</string>
     <string name="native_settings_error">Impossible de charger les réglages : %1$s</string>
     <string name="native_settings_action_error">Impossible d\'enregistrer : %1$s</string>

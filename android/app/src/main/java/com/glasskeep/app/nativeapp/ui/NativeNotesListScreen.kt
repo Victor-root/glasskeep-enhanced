@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -1423,8 +1424,14 @@ private fun HeaderMenu(
     ) {
         Column(
             modifier = Modifier
+                // Hugs the widest row's own intrinsic width (NotesHeader.jsx's
+                // own w-max) instead of stretching to the cap below: without
+                // IntrinsicSize.Max here, each row's fillMaxWidth() would pull
+                // the Column out to the full cap regardless of content length.
+                .width(IntrinsicSize.Max)
                 // The mobile web popover is a compact, right-aligned card;
-                // it does not turn into a near full-width dialog.
+                // it does not turn into a near full-width dialog. This is
+                // only a ceiling now, not the width itself.
                 .widthIn(max = minOf(298.dp, (configuration.screenWidthDp - 26).dp))
                 .heightIn(max = (configuration.screenHeightDp * 0.72f).dp)
                 .shadow(6.dp, RoundedCornerShape(12.dp), clip = false)

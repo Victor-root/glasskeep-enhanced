@@ -407,11 +407,29 @@ fun TrashIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Col
 @Composable
 fun SettingsIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
     // src/icons/index.jsx SettingsIcon, viewBox 24x24, stroke (not
-    // filled), strokeWidth 2, round caps/joins.
+    // filled), strokeWidth 2, round caps/joins. Spelled out with explicit
+    // arc flags/coordinates rather than SVG's concatenated-flag shorthand
+    // ("...0 002.573...") - see MoonIcon's own note on why that shorthand
+    // doesn't survive this PathParser.
     val path = remember {
         PathParser().parsePathString(
-            "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z " +
-                "M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+            "M10.325 4.317 c.426 -1.756 2.924 -1.756 3.35 0" +
+                " a1.724 1.724 0 0 0 2.573 1.066" +
+                " c1.543 -.94 3.31 .826 2.37 2.37" +
+                " a1.724 1.724 0 0 0 1.065 2.572" +
+                " c1.756 .426 1.756 2.924 0 3.35" +
+                " a1.724 1.724 0 0 0 -1.066 2.573" +
+                " c.94 1.543 -.826 3.31 -2.37 2.37" +
+                " a1.724 1.724 0 0 0 -2.572 1.065" +
+                " c-.426 1.756 -2.924 1.756 -3.35 0" +
+                " a1.724 1.724 0 0 0 -2.573 -1.066" +
+                " c-1.543 .94 -3.31 -.826 -2.37 -2.37" +
+                " a1.724 1.724 0 0 0 -1.065 -2.572" +
+                " c-1.756 -.426 -1.756 -2.924 0 -3.35" +
+                " a1.724 1.724 0 0 0 1.066 -2.573" +
+                " c-.94 -1.543 .826 -3.31 2.37 -2.37" +
+                " c.996 .608 2.296 .07 2.572 -1.065 z " +
+                "M15 12 a3 3 0 1 1 -6 0 a3 3 0 0 1 6 0 z"
         ).toPath()
     }
     Canvas(modifier.size(size)) {
@@ -995,7 +1013,12 @@ fun SunIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color
 
 @Composable
 fun MoonIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) = WebIcon(
-    "M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9 9 0 008.354-5.646z",
+    // Same crescent as the web (icons/index.jsx's MoonIcon), spelled out
+    // with explicit flags/coordinates rather than SVG's concatenated-flag
+    // shorthand ("...018.646...") - PathParser mis-split that digit run,
+    // which is what made this render as a garbled blob instead of a
+    // clean half-moon.
+    "M20.354 15.354 A9 9 0 0 1 8.646 3.646 A9.003 9.003 0 0 0 12 21 A9 9 0 0 0 20.354 15.354 Z",
     modifier, size, tint,
 )
 
