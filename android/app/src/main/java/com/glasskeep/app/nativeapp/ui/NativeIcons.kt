@@ -826,9 +826,15 @@ fun RedoIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Colo
 @Composable
 fun CollaborateIcon(modifier: Modifier = Modifier, size: Dp = 24.dp, tint: Color = Color.Black) {
     // ModalFooter.jsx's collaborate glyph: viewBox 20x20 (not 24), filled.
+    // Same explicit-flags rewrite as MoonIcon/SettingsIcon: the original
+    // SVG's concatenated arc flags ("a3 3 0 11-6 0") - unambiguous to a
+    // real SVG parser, but this codebase's PathParser mis-split that
+    // digit run, garbling the two head circles and the body silhouette.
     val path = remember {
         PathParser().parsePathString(
-            "M13 6a3 3 0 11-6 0 3 3 0 016 0z M18 8a2 2 0 11-4 0 2 2 0 014 0z M14 15a4 4 0 00-8 0v3h8v-3z"
+            "M13 6 A3 3 0 1 1 7 6 A3 3 0 0 1 13 6 Z " +
+                "M18 8 A2 2 0 1 1 14 8 A2 2 0 0 1 18 8 Z " +
+                "M14 15 A4 4 0 0 0 6 15 V18 H14 V15 Z"
         ).toPath()
     }
     Canvas(modifier.size(size)) {
