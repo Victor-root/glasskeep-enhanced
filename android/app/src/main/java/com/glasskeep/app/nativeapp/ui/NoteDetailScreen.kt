@@ -2161,9 +2161,9 @@ fun NoteDetailScreen(
                                             onClick = { menuExpanded = false; showReminderPicker = true },
                                         ) {
                                             if (currentNote.reminderAt != null) {
-                                                BellRingingFilledIcon(size = 18.dp, tint = reminderMenuColor)
+                                                BellRingingFilledIcon(size = 20.dp, tint = reminderMenuColor)
                                             } else {
-                                                BellIcon(size = 18.dp, tint = reminderMenuColor)
+                                                BellIcon(size = 20.dp, tint = reminderMenuColor)
                                             }
                                         }
                                         if (currentNote.reminderAt != null) {
@@ -2173,7 +2173,7 @@ fun NoteDetailScreen(
                                                 enabled = !changingReminder,
                                                 onClick = { menuExpanded = false; setReminder(null) },
                                             ) {
-                                                BellIcon(size = 18.dp, tint = reminderMenuColor)
+                                                BellIcon(size = 20.dp, tint = reminderMenuColor)
                                             }
                                         }
                                     }
@@ -2188,7 +2188,7 @@ fun NoteDetailScreen(
                                                 enabled = !restoring,
                                                 onClick = { menuExpanded = false; restoreNote() },
                                             ) {
-                                                ArchiveIcon(size = 16.dp, tint = archiveMenuColor)
+                                                ArchiveIcon(size = 18.dp, tint = archiveMenuColor)
                                             }
                                         } else {
                                             PopoverMenuItem(
@@ -2200,7 +2200,7 @@ fun NoteDetailScreen(
                                                 enabled = !archiving,
                                                 onClick = { menuExpanded = false; toggleArchive() },
                                             ) {
-                                                ArchiveIcon(size = 16.dp, tint = archiveMenuColor)
+                                                ArchiveIcon(size = 18.dp, tint = archiveMenuColor)
                                             }
                                         }
                                     }
@@ -2211,7 +2211,7 @@ fun NoteDetailScreen(
                                             enabled = !duplicating,
                                             onClick = { menuExpanded = false; duplicateNote() },
                                         ) {
-                                            DuplicateIcon(size = 16.dp, tint = duplicateColor)
+                                            DuplicateIcon(size = 18.dp, tint = duplicateColor)
                                         }
                                     }
                                     if (!currentNote.trashed && !isReadOnlyAccess &&
@@ -2227,9 +2227,9 @@ fun NoteDetailScreen(
                                             onClick = { menuExpanded = false; showConvertConfirm = true },
                                         ) {
                                             if (edit.isTextType) {
-                                                ChecklistIcon(size = 16.dp, tint = convertColor)
+                                                ChecklistIcon(size = 18.dp, tint = convertColor)
                                             } else {
-                                                TextNoteIcon(size = 16.dp, tint = convertColor)
+                                                TextNoteIcon(size = 18.dp, tint = convertColor)
                                             }
                                         }
                                     }
@@ -2241,7 +2241,7 @@ fun NoteDetailScreen(
                                             color = downloadColor,
                                             onClick = { menuExpanded = false; downloadNote() },
                                         ) {
-                                            DownloadIcon(size = 20.dp, tint = downloadColor)
+                                            DownloadIcon(size = 22.dp, tint = downloadColor)
                                         }
                                     }
                                     // Audio notes deliberately have no AI entry: there
@@ -2254,7 +2254,7 @@ fun NoteDetailScreen(
                                             color = aiColor,
                                             onClick = { menuExpanded = false; openNoteAi() },
                                         ) {
-                                            MessageSearchIcon(size = 18.dp, tint = aiColor)
+                                            MessageSearchIcon(size = 20.dp, tint = aiColor)
                                         }
                                     }
                                     // Any participant may VIEW the roster, not just the
@@ -2274,7 +2274,7 @@ fun NoteDetailScreen(
                                             color = collaborateColor,
                                             onClick = { menuExpanded = false; onOpenCollaborators() },
                                         ) {
-                                            CollaborateIcon(size = 16.dp, tint = collaborateColor)
+                                            CollaborateIcon(size = 18.dp, tint = collaborateColor)
                                         }
                                     }
                                     if (currentNote.trashed) {
@@ -2284,7 +2284,7 @@ fun NoteDetailScreen(
                                                 color = trashMenuColor,
                                                 onClick = { menuExpanded = false; showPermanentDeleteConfirm = true },
                                             ) {
-                                                TrashIcon(size = 20.dp, tint = trashMenuColor)
+                                                TrashIcon(size = 22.dp, tint = trashMenuColor)
                                             }
                                         }
                                     } else if (!viewMode && edit.isTextType) {
@@ -2293,7 +2293,7 @@ fun NoteDetailScreen(
                                             color = trashMenuColor,
                                             onClick = { menuExpanded = false; showTrashConfirm = true },
                                         ) {
-                                            TrashIcon(size = 20.dp, tint = trashMenuColor)
+                                            TrashIcon(size = 22.dp, tint = trashMenuColor)
                                         }
                                     }
                                 }

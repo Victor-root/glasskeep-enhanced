@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -58,6 +59,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -844,6 +846,7 @@ internal fun FooterPopover(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val density = LocalDensity.current
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     var arrowLeft by remember { mutableStateOf(0.dp) }
     var panelWidth by remember { mutableStateOf(width ?: minWidth) }
     val positionProvider = remember(density, width, gap) {
@@ -873,7 +876,20 @@ internal fun FooterPopover(
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
-        Column(if (width != null) Modifier.width(width) else Modifier.widthIn(min = minWidth)) {
+        Column(
+            if (width != null) {
+                Modifier.width(width)
+            } else {
+                // No fixed width means "hug the widest row" (the note
+                // kebab's own case): without IntrinsicSize.Max here, each
+                // row's fillMaxWidth() would pull this out to the full
+                // available width instead of its content's actual size,
+                // same fix as the notes-list header's own kebab menu. The
+                // max keeps a very long label (a longer translation) from
+                // ever spanning edge to edge.
+                Modifier.width(IntrinsicSize.Max).widthIn(min = minWidth, max = screenWidth - 32.dp)
+            },
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1024,9 +1040,10 @@ internal fun ToolbarPopover(
     }
 }
 
-/** One entry of the note footer's kebab menu (`ModalFooter.jsx:700-807`):
- *  12/8px padding, an 8px gap, and the entry's own colour on the label
- *  as much as on the icon. */
+/** One entry of the note footer's kebab menu (`ModalFooter.jsx:700-807`).
+ *  Sized up a step past the web's own 12/8px padding, 8px gap and 14px
+ *  text: a touch target this dense on a real phone risked hitting the
+ *  wrong row. */
 @Composable
 internal fun PopoverMenuItem(
     label: String,
@@ -1045,12 +1062,12 @@ internal fun PopoverMenuItem(
                 enabled = enabled,
                 role = Role.Button,
             ) { onClick() }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         icon()
-        Text(label, color = color, fontSize = 14.sp)
+        Text(label, color = color, fontSize = 15.sp)
     }
 }
 
