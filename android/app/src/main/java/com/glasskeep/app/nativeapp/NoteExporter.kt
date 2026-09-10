@@ -7,6 +7,7 @@ import androidx.core.content.FileProvider
 import com.glasskeep.app.nativeapp.data.ChecklistItemData
 import com.glasskeep.app.nativeapp.data.ChecklistItems
 import com.glasskeep.app.nativeapp.data.ChecklistSectionData
+import com.glasskeep.app.nativeapp.data.AudioClipDto
 import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
@@ -84,6 +85,44 @@ object NoteExporter {
         } catch (e: Exception) {
             NativeDebug.e("NoteExporter.exportImage failed", e)
             false
+        }
+    }
+
+    /** Shares one clip in its original encoding. Android's platform
+     *  decoders cannot reliably transcode every WebM/Opus source to MP3 or
+     *  WAV, but the lossless original option is always equivalent to the
+     *  web player's first download choice. */
+    fun exportAudio(context: Context, clip: AudioClipDto, displayName: String): Boolean {
+        val match = Regex("^data:(audio/[a-zA-Z0-9.+-]+)(?:;[^,]*)?;base64,(.*)$", RegexOption.DOT_MATCHES_ALL)
+            .find(clip.audioDataUrl)
+        if (match == null) {
+            NativeDebug.e("NoteExporter.exportAudio: not a base64 audio data URL")
+            return false
+        }
+        val mimeType = clip.mimeType.ifBlank { match.groupValues[1] }
+        val extension = audioExtension(mimeType)
+        val requested = displayName.ifBlank { clip.name }.ifBlank { "recording" }
+        val baseName = requested.substringBeforeLast('.', requested).ifBlank { "recording" }
+        val file = File(File(context.cacheDir, "exports").apply { mkdirs() }, "${sanitizeFilename(baseName)}.$extension")
+        return try {
+            file.writeBytes(Base64.decode(match.groupValues[2], Base64.DEFAULT))
+            shareFile(context, file, mimeType)
+            true
+        } catch (e: Exception) {
+            NativeDebug.e("NoteExporter.exportAudio failed", e)
+            false
+        }
+    }
+
+    internal fun audioExtension(mimeType: String): String {
+        val mime = mimeType.lowercase()
+        return when {
+            "webm" in mime -> "webm"
+            "ogg" in mime -> "ogg"
+            "mp4" in mime || "aac" in mime -> "m4a"
+            "mpeg" in mime -> "mp3"
+            "wav" in mime -> "wav"
+            else -> "webm"
         }
     }
 

@@ -93,13 +93,10 @@ private val AudioButtonGradient = Brush.horizontalGradient(listOf(Color(0xFF6366
  * three callbacks for how it changes, never the ephemeral "currently
  * recording"/"currently playing" state.
  *
- * Deliberately not ported from the web editor, disclosed rather than
- * silently dropped: the reserved-but-never-actually-used note-level
- * caption field (the web itself has never shipped any UI for it either,
- * see AudioContent.kt), and exporting/downloading a clip (the web's own
- * download menu also offers MP3/WAV re-encoding, a bigger feature than
- * this milestone's scope; a recorded clip still round-trips losslessly,
- * it just can't be saved out to the device's own files from here yet).
+ * The reserved note-level caption field remains intentionally hidden, as
+ * it is in the web UI. Each clip can be shared in its original encoding;
+ * MP3/WAV transcoding is only offered by the browser when its codecs can
+ * decode the source, so native keeps the always-lossless common option.
  *
  * Playing back a clip this app itself just recorded (AAC/M4A) is safe,
  * standard Android territory. A clip recorded by the *web* app is very
@@ -123,6 +120,7 @@ fun AudioClipsSection(
     onClipAdded: (AudioClipDto) -> Unit,
     onClipRemoved: (id: String) -> Unit,
     onClipRenamed: (id: String, newName: String) -> Unit,
+    onClipDownload: (AudioClipDto) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -363,6 +361,7 @@ fun AudioClipsSection(
                     onNext = { clips.getOrNull(currentIndex + 1)?.let { playClip(it) } },
                     onSeek = { ms -> player.seekTo(ms); positionMs = ms },
                     onAddRecording = { startRecording() },
+                    onDownload = { onClipDownload(current) },
                 )
                 AudioClipList(
                     clips = clips,
@@ -587,6 +586,7 @@ private fun AudioHeroPlayer(
     onNext: () -> Unit,
     onSeek: (Int) -> Unit,
     onAddRecording: () -> Unit,
+    onDownload: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -681,26 +681,44 @@ private fun AudioHeroPlayer(
             Text(formatDuration(positionMs / 1000f), color = titleColor.copy(alpha = 0.9f), fontSize = 12.sp)
             Text(formatDuration(durationMs / 1000f), color = titleColor.copy(alpha = 0.9f), fontSize = 12.sp)
         }
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(if (dark) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.7f))
-                .border(
-                    width = 1.dp,
-                    color = if (dark) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.1f),
-                    shape = CircleShape,
-                )
-                .semantics { contentDescription = "" }
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                ) { onAddRecording() },
-            contentAlignment = Alignment.Center,
-        ) {
-            MicIcon(size = 20.dp, tint = accent)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            AudioRoundAction(
+                label = stringResource(R.string.native_audio_download_original),
+                dark = dark,
+                onClick = onDownload,
+            ) { DownloadIcon(size = 20.dp, tint = accent) }
+            AudioRoundAction(
+                label = stringResource(R.string.native_audio_add_recording),
+                dark = dark,
+                onClick = onAddRecording,
+            ) { MicIcon(size = 20.dp, tint = accent) }
         }
+    }
+}
+
+@Composable
+private fun AudioRoundAction(
+    label: String,
+    dark: Boolean,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(if (dark) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.7f))
+            .border(1.dp, if (dark) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.1f), CircleShape)
+            .semantics { contentDescription = label }
+            .gkTooltip(label)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+            ) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        icon()
     }
 }
 

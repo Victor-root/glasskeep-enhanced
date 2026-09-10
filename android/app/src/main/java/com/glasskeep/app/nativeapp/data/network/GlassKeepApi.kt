@@ -538,8 +538,8 @@ data class RemoveCollaboratorRequest(val mode: String? = null)
 data class RemoveCollaboratorResponse(val ok: Boolean = false, val message: String? = null, val copyNoteId: String? = null)
 
 /**
- * Body for PATCH /api/notes/:id. Deliberately narrow: only title/content
- * are ever sent from the native note-detail screen today. The server only
+ * Body for the title/content PATCH. Other fields use their own narrow
+ * request DTOs so the server only
  * touches fields actually present in the request (see server/index.js,
  * the `p` object in the PATCH handler defaults everything else to null),
  * so items/images/tags/color/type on the note are left exactly as they
@@ -747,6 +747,9 @@ data class UserSettingsDto(
     /** How long the pill stays, in milliseconds; null (or absent) means
      *  it stays until dismissed. */
     val notificationsDuration: Long? = null,
+    /** Strike completed rich-text task rows, synced across devices. */
+    val taskStrikeEnabled: Boolean? = null,
+    val qrQuickEnabled: Boolean? = null,
 )
 
 /** Body for a PATCH /api/user/settings that sets only the workspace theme.
@@ -781,6 +784,12 @@ data class SetTypographyPresetsRequest(val typographyPresets: TypographyPresetsD
  *  in read mode. */
 @Serializable
 data class SetReadModeRequest(val readModeEnabled: Boolean)
+
+@Serializable
+data class SetTaskStrikeRequest(val taskStrikeEnabled: Boolean)
+
+@Serializable
+data class SetQrQuickRequest(val qrQuickEnabled: Boolean)
 
 /** Bodies for the two PATCH /api/user/settings that set only one of the
  *  shell's own interface switches. */
@@ -1449,6 +1458,12 @@ interface GlassKeepApi {
     suspend fun setReadMode(@Body body: SetReadModeRequest): Response<UserSettingsDto>
 
     @PATCH("api/user/settings")
+    suspend fun setTaskStrike(@Body body: SetTaskStrikeRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
+    suspend fun setQrQuick(@Body body: SetQrQuickRequest): Response<UserSettingsDto>
+
+    @PATCH("api/user/settings")
     suspend fun setEdgeToEdgeLandscape(@Body body: SetEdgeToEdgeLandscapeRequest): Response<UserSettingsDto>
 
     @PATCH("api/user/settings")
@@ -1595,12 +1610,9 @@ interface GlassKeepApi {
     @POST("api/device-link/reject")
     suspend fun rejectDeviceLink(@Body body: DeviceLinkTokenRequest): Response<DeviceLinkActionResponse>
 
-    // Notifications inbox (share/collaboration events only, see
-    // NotificationDto's own doc comment): no background polling anywhere
-    // in native (see NotificationsScreen.kt's own doc comment for why),
-    // fetched fresh whenever the inbox screen opens, same "always hits the
-    // server, no local cache" tradeoff as fetchArchivedNotes()/
-    // fetchTrashedNotes(). Pending ones have no delivered_at yet; history
+    // Notifications inbox. Realtime raises live cards while the app is in
+    // foreground; these reads reconcile the durable server history when
+    // the panel opens. Pending ones have no delivered_at yet; history
     // is capped at the 100 most-recent server-side, already sorted newest
     // first.
     @GET("api/notifications/pending")

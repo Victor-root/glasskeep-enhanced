@@ -142,6 +142,7 @@ fun NativeNotesListScreen(
     onOpenSettings: () -> Unit,
     onOpenAdmin: () -> Unit,
     onOpenQrScanner: () -> Unit,
+    onOpenSideBySide: (String, String) -> Unit,
     /** Set when the launcher's "new text/checklist/audio note" shortcut
      *  started the app (see MainActivity's own shortcut table): the note
      *  is created and opened as soon as this screen is up. */
@@ -299,6 +300,7 @@ fun NativeNotesListScreen(
     val logoLabel = stringResource(R.string.native_add_logo)
     val exportZipLabel = stringResource(R.string.native_bulk_export_zip)
     val selectAllLabel = stringResource(R.string.native_bulk_select_all)
+    val sideBySideLabel = stringResource(R.string.native_bulk_side_by_side)
     val deselectAllLabel = stringResource(R.string.native_bulk_deselect_all)
     val bulkIconSuccessTemplate = stringResource(R.string.native_bulk_icon_success)
     val bulkIconErrorTemplate = stringResource(R.string.native_bulk_icon_error)
@@ -688,6 +690,7 @@ fun NativeNotesListScreen(
                 onToggleViewMode = { toggleViewMode() },
                 onToggleDark = { container.shellPrefs.toggleDark(dark) },
                 onOpenQrScanner = onOpenQrScanner,
+                qrQuickEnabled = container.shellPrefs.qrQuickEnabled,
                 // NotesHeader.jsx:100's own two conditions.
                 showLockInstance = container.shellPrefs.isAdmin && container.lockState.status?.enabled == true,
                 onLockInstance = { lockInstance() },
@@ -815,6 +818,16 @@ fun NativeNotesListScreen(
             SelectionActionBar(
                 selectedCount = selectedIds.size,
                 actions = listOf(
+                    BulkActionButton(
+                        label = sideBySideLabel,
+                        tone = BulkTone.SLATE,
+                        icon = { EyeFilledIcon(size = 18.dp, tint = BulkTone.SLATE.foreground(dark)) },
+                        enabled = !bulkActionRunning && selectedIds.size == 2,
+                        onClick = {
+                            val ids = selectedIds.toList()
+                            if (ids.size == 2) onOpenSideBySide(ids[0], ids[1])
+                        },
+                    ),
                     BulkActionButton(
                         label = archiveLabel,
                         tone = BulkTone.BLUE,
@@ -979,6 +992,7 @@ private fun NativeHeader(
     onToggleViewMode: () -> Unit,
     onToggleDark: () -> Unit,
     onOpenQrScanner: () -> Unit,
+    qrQuickEnabled: Boolean,
     showLockInstance: Boolean,
     onLockInstance: () -> Unit,
     onSignOut: () -> Unit,
@@ -1142,6 +1156,23 @@ private fun NativeHeader(
                     SearchIcon(size = 18.dp, tint = titleColor)
                 }
                 val notificationsLabel = stringResource(R.string.native_notifications_title)
+                if (qrQuickEnabled) {
+                    val qrLabel = stringResource(R.string.native_qr_scan_title)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .semantics { contentDescription = qrLabel }
+                            .gkTooltip(qrLabel)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Button,
+                            ) { onOpenQrScanner() }
+                            .padding(8.dp),
+                    ) {
+                        QrCodeIcon(size = 18.dp, tint = titleColor)
+                    }
+                }
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))

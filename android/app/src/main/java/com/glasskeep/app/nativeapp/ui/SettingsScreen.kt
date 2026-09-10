@@ -153,12 +153,8 @@ private val VersionBadgeDark = Color(0xFF4B5563)
  * Five of those eight sections are ported (Security, UI Preferences,
  * Notes, Data Management, Language) plus the Android-only Application
  * section. Deliberately left out, because nothing native sits behind
- * them: Notifications (its six settings drive the web's own toast
- * system and Web Push, neither of which exists here), the AI assistant,
- * the desktop-only sidebar preferences, editor typography, and the
- * import/export rows that need a document picker and SAF writes. The
- * passkey rows also drop the admin-only "can unlock the instance"
- * toggle, which needs the admin panel and instance encryption.
+ * them, including notification filters, AI, typography, transfers,
+ * native passkeys and their administrator unlock authorization.
  */
 @Composable
 fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () -> Unit, onOpenQrScanner: () -> Unit) {
@@ -185,6 +181,7 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     var changingReadMode by remember { mutableStateOf(false) }
     var changingEdgeToEdge by remember { mutableStateOf(false) }
     var changingFloatingCards by remember { mutableStateOf(false) }
+    var changingQrQuick by remember { mutableStateOf(false) }
     var changingToastPrefs by remember { mutableStateOf(false) }
     var changingNotifPrefs by remember { mutableStateOf(false) }
     var notifSoundTypesOpen by rememberSaveable { mutableStateOf(false) }
@@ -226,9 +223,8 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
     val installedFromFdroid = remember { UpdateManager.isFdroidInstall(context) }
 
     // Sections are collapsed on first open, exactly like the web's empty
-    // `settingsOpenSections` map. Saved across configuration changes
-    // only: the web syncs them to the server, which has no equivalent
-    // route reachable from here.
+    // `settingsOpenSections` map. Saved across configuration changes only;
+    // current web intentionally does not sync accordion open state.
     var securityOpen by rememberSaveable { mutableStateOf(false) }
     var uiOpen by rememberSaveable { mutableStateOf(false) }
     var notificationsOpen by rememberSaveable { mutableStateOf(false) }
@@ -1056,6 +1052,24 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
         }
     }
 
+    fun toggleQrQuick(enabled: Boolean) {
+        if (changingQrQuick) return
+        changingQrQuick = true
+        val previous = container.shellPrefs.qrQuickEnabled
+        container.shellPrefs.applyQrQuick(enabled)
+        scope.launch {
+            try {
+                repository.setQrQuick(enabled)
+            } catch (t: Throwable) {
+                NativeDebug.e("SettingsScreen setQrQuick failed", t)
+                container.shellPrefs.applyQrQuick(previous)
+                reportActionError(t)
+            } finally {
+                changingQrQuick = false
+            }
+        }
+    }
+
     fun checkForUpdate() {
         toasts.show(updateCheckingMessage)
         UpdateManager.forceCheck(context) { release ->
@@ -1241,6 +1255,17 @@ fun SettingsScreen(container: NativeAppContainer, serverUrl: String, onBack: () 
                                         icon = { tint -> QrCodeIcon(size = 20.dp, tint = tint) },
                                         onClick = onOpenQrScanner,
                                         modifier = Modifier.padding(top = 8.dp),
+                                    )
+                                    SettingsSwitchRow(
+                                        title = stringResource(R.string.native_settings_qr_quick),
+                                        subtitle = stringResource(R.string.native_settings_qr_quick_desc),
+                                        checked = container.shellPrefs.qrQuickEnabled,
+                                        enabled = !changingQrQuick,
+                                        themeId = themeId,
+                                        dark = dark,
+                                        titleColor = titleColor,
+                                        icon = { tint -> QrCodeIcon(size = 20.dp, tint = tint) },
+                                        onCheckedChange = { toggleQrQuick(it) },
                                     )
 
                                     PasskeysCard(

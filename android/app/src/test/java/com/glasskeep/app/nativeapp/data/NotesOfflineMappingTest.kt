@@ -64,6 +64,25 @@ class NotesOfflineMappingTest {
     }
 
     @Test
+    fun roomSummaryKeepsArchiveAndTrashStatus() {
+        val archived = NoteDto(
+            id = "archived-1",
+            userId = 7,
+            type = "text",
+            title = "Archive",
+            content = "body",
+            color = "default",
+            archived = true,
+            trashed = false,
+            access = "owner",
+        ).toEntity()
+
+        assertEquals(true, archived.archived)
+        assertEquals(false, archived.trashed)
+        assertEquals(true, archived.toOfflineDetail().archived)
+    }
+
+    @Test
     fun duplicateRegeneratesEveryObjectIdWithoutChangingSource() {
         val source = listOf(
             Json.parseToJsonElement("""{"id":"old-1","text":"One"}"""),

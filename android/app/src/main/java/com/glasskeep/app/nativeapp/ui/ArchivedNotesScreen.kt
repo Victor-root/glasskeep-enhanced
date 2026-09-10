@@ -6,13 +6,13 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.data.NotesRepository
 
-/** Archived notes, via the shared SecondaryNotesScreen shell. See that
- *  composable's own doc comment for why this isn't Room-backed. */
+/** Archived notes, via the shared Room-backed secondary shell. */
 @Composable
 fun ArchivedNotesScreen(
     container: NativeAppContainer,
     serverUrl: String,
     onOpenNote: (String) -> Unit,
+    onOpenSideBySide: (String, String) -> Unit,
     onBack: () -> Unit,
 ) {
     SecondaryNotesScreen(
@@ -22,7 +22,9 @@ fun ArchivedNotesScreen(
         emptyMessage = stringResource(R.string.native_archived_empty),
         errorTemplate = stringResource(R.string.native_archived_error),
         fetchNotes = NotesRepository::fetchArchivedNotes,
+        observeNotes = NotesRepository::observeArchivedNotes,
         onOpenNote = onOpenNote,
+        onOpenSideBySide = onOpenSideBySide,
         onBack = onBack,
         capabilities = setOf(
             SecondaryBulkCapability.UNARCHIVE,

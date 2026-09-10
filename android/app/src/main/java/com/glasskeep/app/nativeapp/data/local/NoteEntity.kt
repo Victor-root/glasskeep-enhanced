@@ -54,4 +54,9 @@ data class NoteEntity(
      *  rest of the note so the badge is right on the first frame. */
     val iconSrc: String? = null,
     val iconName: String? = null,
+    /** Status columns keep archive and trash as first-class offline views.
+     *  The active list query excludes both, while the two secondary
+     *  screens observe their own disjoint Room query. */
+    val archived: Boolean = false,
+    val trashed: Boolean = false,
 )

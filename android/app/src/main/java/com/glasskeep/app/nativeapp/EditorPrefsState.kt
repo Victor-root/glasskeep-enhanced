@@ -22,10 +22,8 @@ private val FlagMapSerializer = MapSerializer(String.serializer(), Boolean.seria
  * NativeNavHost then reconciles it against the server's own settings blob
  * once per session.
  *
- * [taskStrike] is the exception, and deliberately so: on the web it is a
- * per-device reading preference in localStorage, never synced to the
- * account (see theme/taskListStrike.js), so it only ever lives in the
- * local cache here too.
+ * Completed-task strike is cached locally for first-frame consistency and
+ * reconciled with the account settings like the current web app.
  */
 class EditorPrefsState(private val tokenStore: TokenStore) {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }

@@ -127,6 +127,8 @@ fun NativeNavHost(
     // on trust: it only pokes that read into running now instead of on its
     // next tick, same as the web's own listener calling refresh().
     var lockPokes by remember { mutableIntStateOf(0) }
+    var preferencePokes by remember { mutableIntStateOf(0) }
+    var brandingPokes by remember { mutableIntStateOf(0) }
     // The last share/revoke frame the server pushed, waiting to become a
     // pill (the web's own showShareNotificationToast, App.jsx:3841).
     var liveNotification by remember { mutableStateOf<NotificationDto?>(null) }
@@ -138,6 +140,12 @@ fun NativeNavHost(
             onInstanceLocked = { container.lockState.markLocked() },
             onInstanceUnlocked = { lockPokes++ },
             onLiveNotification = { liveNotification = it },
+            onAuxiliaryEvent = { type ->
+                when (type) {
+                    "admin_settings_updated", "logo_added", "logo_deleted" -> brandingPokes++
+                    else -> preferencePokes++
+                }
+            },
         )
     }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -160,7 +168,7 @@ fun NativeNavHost(
     // session, unauthenticated, so the sign-in screen gets it too; the
     // cached copy already painted the right one on the first frame, this
     // just reconciles it (BrandingContext.jsx's own load-then-cache shape).
-    LaunchedEffect(serverUrl) {
+    LaunchedEffect(serverUrl, brandingPokes) {
         runCatching { container.api(serverUrl).getBranding() }
             .getOrNull()
             ?.takeIf { it.isSuccessful }
@@ -243,7 +251,7 @@ fun NativeNavHost(
     // server's own copy, the source of truth, exactly once per session,
     // same "fetch on load, apply if different" shape as the web's own
     // applyStoredShellTheme()-then-server-sync design.
-    LaunchedEffect(startDestination) {
+    LaunchedEffect(startDestination, preferencePokes) {
         if (startDestination != "login") {
             applyWorkspacePreferences(container, repository)
         }
@@ -463,6 +471,7 @@ fun NativeNavHost(
                         onOpenSettings = { navController.navigate("settings") },
                         onOpenAdmin = { navController.navigate("admin") },
                         onOpenQrScanner = { navController.navigate("qr-scan") },
+                        onOpenSideBySide = { first, second -> navController.navigate("compare/$first/$second") },
                         pendingNewNoteType = pendingNewNoteType,
                         onPendingNewNoteTypeConsumed = onPendingNewNoteTypeConsumed,
                         onSignedOut = {
@@ -523,6 +532,20 @@ fun NativeNavHost(
                         onOpenCollaborators = { navController.navigate("notes/$noteId/collaborators") },
                     )
                 }
+                composable("compare/{firstId}/{secondId}") { backStackEntry ->
+                    val firstId = backStackEntry.arguments?.getString("firstId") ?: return@composable
+                    val secondId = backStackEntry.arguments?.getString("secondId") ?: return@composable
+                    SideBySideNotesScreen(
+                        container = container,
+                        serverUrl = serverUrl,
+                        firstId = firstId,
+                        secondId = secondId,
+                        onKeepOnly = { survivor ->
+                            navController.popBackStack()
+                            navController.navigate("notes/$survivor")
+                        },
+                    )
+                }
                 composable("notes/{noteId}/collaborators") { backStackEntry ->
                     val noteId = backStackEntry.arguments?.getString("noteId") ?: return@composable
                     CollaboratorsScreen(
@@ -537,6 +560,7 @@ fun NativeNavHost(
                         container = container,
                         serverUrl = serverUrl,
                         onOpenNote = { noteId -> navController.navigate("notes/$noteId") },
+                        onOpenSideBySide = { first, second -> navController.navigate("compare/$first/$second") },
                         onBack = { navController.popBackStack() },
                     )
                 }
@@ -574,6 +598,8 @@ private suspend fun applyWorkspacePreferences(container: NativeAppContainer, rep
     prefs.toastPosition?.let { container.editorPrefs.applyToastPosition(it) }
     container.editorPrefs.applyToastDuration(prefs.toastDurationMs)
     prefs.readModeEnabled?.let { container.editorPrefs.applyReadMode(it) }
+    prefs.taskStrikeEnabled?.let { container.editorPrefs.applyTaskStrike(it) }
+    prefs.qrQuickEnabled?.let { container.shellPrefs.applyQrQuick(it) }
     prefs.edgeToEdgeLandscape?.let { container.shellPrefs.applyEdgeToEdgeLandscape(it) }
     prefs.floatingCardsEnabled?.let { container.shellPrefs.applyFloatingCards(it) }
     prefs.viewMode?.let { container.shellPrefs.applyListView(it == "list") }

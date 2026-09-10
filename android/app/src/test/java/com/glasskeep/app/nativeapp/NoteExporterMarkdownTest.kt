@@ -2,9 +2,18 @@ package com.glasskeep.app.nativeapp
 
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class NoteExporterMarkdownTest {
+    @Test
+    fun audioMimeTypesKeepTheWebDownloadExtensions() {
+        assertEquals("webm", NoteExporter.audioExtension("audio/webm;codecs=opus"))
+        assertEquals("m4a", NoteExporter.audioExtension("audio/mp4"))
+        assertEquals("mp3", NoteExporter.audioExtension("audio/mpeg"))
+        assertEquals("wav", NoteExporter.audioExtension("audio/wav"))
+    }
+
     @Test
     fun zipMarkdownIncludesChecklistTagsAndImageNames() {
         val note = NoteEntity(

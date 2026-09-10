@@ -126,6 +126,7 @@
     <string name="native_bulk_restored_success">%1$d note(s) restaurée(s)</string>
     <string name="native_bulk_partial_failure">%1$d ont échoué</string>
     <string name="native_bulk_select_all">Tout sélectionner</string>
+    <string name="native_bulk_side_by_side">Côte à côte</string>
     <string name="native_bulk_deselect_all">Tout désélectionner</string>
     <string name="native_bulk_export_zip">Télécharger (.zip)</string>
     <string name="native_bulk_export_success">ZIP prêt à partager</string>
@@ -179,6 +180,8 @@
     <string name="native_settings_password_success">Mot de passe changé.</string>
     <string name="native_settings_qr_signin">Connecter un autre appareil</string>
     <string name="native_settings_qr_signin_desc">Touchez pour scanner le QR code affiché sur l\'écran de connexion d\'un autre PC et l\'authentifier.</string>
+    <string name="native_settings_qr_quick">Raccourci dans l’en-tête (mobile)</string>
+    <string name="native_settings_qr_quick_desc">Afficher directement le scanner QR dans l’en-tête des notes.</string>
     <string name="native_qr_scan_title">Scanner un QR code</string>
     <string name="native_qr_scan_explain">Visez le QR code affiché sur l\'écran de connexion de l\'autre appareil.</string>
     <string name="native_qr_scan_confirm_explain">Vérifiez que c\'est bien votre appareil avant d\'approuver la connexion.</string>
@@ -527,9 +530,13 @@
     <string name="native_drawing_size_medium">Moyen</string>
     <string name="native_drawing_size_thick">Épais</string>
     <string name="native_drawing_size_large">Large</string>
-    <string name="native_drawing_caption_notice">Légende (pas encore modifiable nativement) :</string>
+    <string name="native_drawing_caption_notice">Légende</string>
+    <string name="native_drawing_enter_mode">Mode dessin</string>
+    <string name="native_drawing_exit_mode">Mode lecture</string>
     <string name="native_audio_too_large">L\'enregistrement est trop volumineux. Essayez un enregistrement plus court.</string>
     <string name="native_audio_empty_hint">Enregistrez un mémo vocal, il sera conservé avec cette note.</string>
+    <string name="native_audio_download_original">Télécharger l’original</string>
+    <string name="native_audio_add_recording">Ajouter un enregistrement</string>
     <string name="native_audio_start_recording">Démarrer l\'enregistrement</string>
     <string name="native_audio_state_recording">Enregistrement…</string>
     <string name="native_audio_state_paused">En pause</string>
@@ -697,6 +704,7 @@
     <string name="native_sync_ago_hours">%1$dh</string>
     <string name="native_sync_ago_days">%1$dj</string>
     <string name="native_sync_action_update">Mise \u00e0 jour</string>
+    <string name="native_sync_action_create">Création</string>
     <string name="native_sync_action_patch">Modification</string>
     <string name="native_sync_action_archive">Archivage</string>
     <string name="native_sync_action_trash">Corbeille</string>

@@ -53,6 +53,8 @@ import com.glasskeep.app.nativeapp.data.network.SetNotificationsSoundRequest
 import com.glasskeep.app.nativeapp.data.network.SetNotificationsSoundTypesRequest
 import com.glasskeep.app.nativeapp.data.network.SetPinnedRequest
 import com.glasskeep.app.nativeapp.data.network.SetReadModeRequest
+import com.glasskeep.app.nativeapp.data.network.SetQrQuickRequest
+import com.glasskeep.app.nativeapp.data.network.SetTaskStrikeRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderRequest
 import com.glasskeep.app.nativeapp.data.network.SetReminderTimeChipsRequest
 import com.glasskeep.app.nativeapp.data.network.SetShellThemeRequest
@@ -193,15 +195,13 @@ class NotesRepository(
      */
     fun observeNotes(): Flow<List<NoteEntity>> = noteDao.observeAll()
 
+    fun observeArchivedNotes(): Flow<List<NoteEntity>> = noteDao.observeArchived()
+
+    fun observeTrashedNotes(): Flow<List<NoteEntity>> = noteDao.observeTrashed()
+
     /** Writes the lightweight list row and full offline detail together. */
     private suspend fun cacheNotes(notes: List<NoteDto>) {
         noteDao.upsertNotesAndDetails(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() })
-    }
-
-    /** Stores full payloads without making archived/trashed notes appear
-     *  in the active-list table. */
-    private suspend fun cacheDetails(notes: List<NoteDto>) {
-        noteDao.upsertDetails(notes.map { it.toDetailEntity() })
     }
 
     private suspend fun cachedNote(id: String): NoteDto? {
@@ -388,35 +388,60 @@ class NotesRepository(
         }
     }
 
-    /** Archived notes only. Their complete payload is retained separately
-     *  from the active list so an offline unarchive can restore the real
-     *  note instead of reconstructing it from a lightweight card row. */
+    private suspend fun cachedSecondaryNotes(entities: List<NoteEntity>): List<NoteDto> =
+        entities.mapNotNull { entity -> cachedNote(entity.id) ?: entity.toOfflineDetail() }
+
+    /** Archived notes only. A successful request refreshes their complete
+     *  Room-backed view; transport and temporary server failures fall back
+     *  to that view so archive browsing and unarchive keep working offline. */
     suspend fun fetchArchivedNotes(): List<NoteDto> {
         NativeDebug.d("NotesRepository.fetchArchivedNotes")
-        val response = api.getArchivedNotes()
-        val notes = response.body()
-        if (!response.isSuccessful || notes == null) {
-            val error = "GET /api/notes/archived failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
+        try {
+            val response = api.getArchivedNotes()
+            val notes = response.body()
+            if (response.isSuccessful && notes != null) {
+                noteDao.replaceArchived(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() }, getProtectedNoteIds())
+                return notes
+            }
+            val code = response.code()
+            val error = "GET /api/notes/archived failed: HTTP $code ${response.errorBody()?.string()}"
+            if (code == 408 || code == 423 || code == 429 || code >= 500) {
+                val cached = cachedSecondaryNotes(noteDao.getArchived())
+                if (cached.isNotEmpty()) return cached
+            }
             throw IllegalStateException(error)
+        } catch (t: Throwable) {
+            if (t is IllegalStateException && t.message?.startsWith("GET /api/notes/archived failed:") == true) throw t
+            val cached = cachedSecondaryNotes(noteDao.getArchived())
+            if (cached.isNotEmpty()) return cached
+            throw t
         }
-        cacheDetails(notes)
-        return notes
     }
 
-    /** Trashed notes only. Same detail-only cache as archived notes, used
-     *  when a restore is queued without connectivity. */
+    /** Trashed notes use the same local-first secondary-view policy as
+     *  archived notes, including complete payloads for offline restore. */
     suspend fun fetchTrashedNotes(): List<NoteDto> {
         NativeDebug.d("NotesRepository.fetchTrashedNotes")
-        val response = api.getTrashedNotes()
-        val notes = response.body()
-        if (!response.isSuccessful || notes == null) {
-            val error = "GET /api/notes/trashed failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
+        try {
+            val response = api.getTrashedNotes()
+            val notes = response.body()
+            if (response.isSuccessful && notes != null) {
+                noteDao.replaceTrashed(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() }, getProtectedNoteIds())
+                return notes
+            }
+            val code = response.code()
+            val error = "GET /api/notes/trashed failed: HTTP $code ${response.errorBody()?.string()}"
+            if (code == 408 || code == 423 || code == 429 || code >= 500) {
+                val cached = cachedSecondaryNotes(noteDao.getTrashed())
+                if (cached.isNotEmpty()) return cached
+            }
             throw IllegalStateException(error)
+        } catch (t: Throwable) {
+            if (t is IllegalStateException && t.message?.startsWith("GET /api/notes/trashed failed:") == true) throw t
+            val cached = cachedSecondaryNotes(noteDao.getTrashed())
+            if (cached.isNotEmpty()) return cached
+            throw t
         }
-        cacheDetails(notes)
-        return notes
     }
 
     /**
@@ -466,8 +491,8 @@ class NotesRepository(
         return note
     }
 
-    /** Archive or unarchive. The full archived payload remains available
-     *  offline, while its lightweight row is removed from the active list. */
+    /** Archive or unarchive. The row stays in Room and moves between the
+     *  status-filtered active/archive views atomically. */
     suspend fun setArchived(id: String, archived: Boolean, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setArchived id=$id archived=$archived")
         val response = api.archiveNote(id, ArchiveNoteRequest(archived, clientUpdatedAt))
@@ -482,12 +507,7 @@ class NotesRepository(
             return SaveNoteResult.Stale
         }
         val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/archive: ok response with no note")
-        if (saved.archived) {
-            noteDao.deleteNoteById(id)
-            cacheDetails(listOf(saved))
-        } else {
-            cacheNotes(listOf(saved))
-        }
+        cacheNotes(listOf(saved))
         return SaveNoteResult.Saved(saved)
     }
 
@@ -497,9 +517,7 @@ class NotesRepository(
      * an owner can remove the note for everyone. `left` deliberately has
      * no updated original note to cache; an ordinary trash returns one.
      *
-     * Removed from the local (active-list) cache immediately: it's no
-     * longer an active note. The trash screen itself doesn't read this
-     * cache at all, it always fetches fresh (see fetchTrashedNotes()).
+     * The saved row moves to the Room-backed trash view immediately.
      */
     suspend fun trashNote(id: String, clientUpdatedAt: String = nowIso(), mode: String? = null): SaveNoteResult {
         NativeDebug.d("NotesRepository.trashNote id=$id mode=$mode")
@@ -527,7 +545,7 @@ class NotesRepository(
             return SaveNoteResult.Left
         }
         val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/trash: ok response with no note")
-        noteDao.deleteById(id)
+        cacheNotes(listOf(saved))
         return SaveNoteResult.Saved(saved)
     }
 
@@ -860,13 +878,7 @@ class NotesRepository(
         val request = ArchiveNoteRequest(archived, nowIso())
         syncQueueDao.enqueue(entity.id, SyncQueueType.ARCHIVE.name, Json.encodeToString(request), System.currentTimeMillis())
         val full = cachedNote(entity.id) ?: entity.toOfflineDetail()
-        if (archived) {
-            // Keep the full payload: only the active-list row disappears.
-            cacheDetails(listOf(full.copy(archived = true)))
-            noteDao.deleteNoteById(entity.id)
-        } else {
-            cacheNotes(listOf(full.copy(archived = false, trashed = false)))
-        }
+        cacheNotes(listOf(full.copy(archived = archived, trashed = false)))
     }
 
     /** [mode] is only ever meaningful for the owner of a note that has
@@ -877,8 +889,7 @@ class NotesRepository(
         NativeDebug.d("NotesRepository.trashNoteQueued id=$id mode=$mode")
         val request = TrashNoteRequest(nowIso(), mode)
         syncQueueDao.enqueue(id, SyncQueueType.TRASH.name, Json.encodeToString(request), System.currentTimeMillis())
-        cachedNote(id)?.let { cacheDetails(listOf(it.copy(trashed = true))) }
-        noteDao.deleteNoteById(id)
+        cachedNote(id)?.let { cacheNotes(listOf(it.copy(trashed = true))) }
     }
 
     /** [entity] is the trashed note being restored, reinserted into the
@@ -1073,6 +1084,8 @@ class NotesRepository(
                 checklistRemoveSectionBehavior = body.checklistRemoveSectionBehavior,
                 toastDurationMs = body.notificationsDuration,
                 readModeEnabled = body.readModeEnabled,
+                taskStrikeEnabled = body.taskStrikeEnabled,
+                qrQuickEnabled = body.qrQuickEnabled,
                 edgeToEdgeLandscape = body.edgeToEdgeLandscape,
                 floatingCardsEnabled = body.floatingCardsEnabled,
                 viewMode = body.viewMode,
@@ -1557,6 +1570,26 @@ class NotesRepository(
         return body
     }
 
+    suspend fun setTaskStrike(enabled: Boolean) {
+        NativeDebug.d("NotesRepository.setTaskStrike enabled=$enabled")
+        val response = api.setTaskStrike(SetTaskStrikeRequest(enabled))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (taskStrikeEnabled) failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
+    suspend fun setQrQuick(enabled: Boolean) {
+        NativeDebug.d("NotesRepository.setQrQuick enabled=$enabled")
+        val response = api.setQrQuick(SetQrQuickRequest(enabled))
+        if (!response.isSuccessful) {
+            val error = "PATCH /api/user/settings (qrQuickEnabled) failed: HTTP ${response.code()}"
+            NativeDebug.e(error)
+            throw IllegalStateException(error)
+        }
+    }
+
     /** Real users advertised by every paired federation peer. An offline
      * peer is omitted by the server, so a partial list is still success. */
     suspend fun searchFederatedUsers(query: String = ""): List<FederatedUserDto> {
@@ -1741,6 +1774,8 @@ internal fun NoteDto.toEntity() = NoteEntity(
     imageNamesJson = TagsJson.encode(NoteImages.parse(images).map { it.name }),
     iconSrc = icon?.src,
     iconName = icon?.name,
+    archived = archived,
+    trashed = trashed,
 )
 
 private val cacheJson = Json {
@@ -1776,6 +1811,8 @@ internal fun NoteEntity.toOfflineDetail() = NoteDto(
     clientUpdatedAt = updatedAt,
     access = "read",
     reminderAt = reminderAt,
+    archived = archived,
+    trashed = trashed,
     icon = iconSrc?.let { NoteIconDto(src = it, name = iconName) },
 )
 

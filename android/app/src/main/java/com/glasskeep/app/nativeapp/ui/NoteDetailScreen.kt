@@ -294,6 +294,9 @@ fun NoteDetailScreen(
     var drawingPaths by remember { mutableStateOf<List<DrawingStrokeDto>>(emptyList()) }
     var drawingDimensions by remember { mutableStateOf<DrawingDimensionsDto?>(null) }
     var drawingCaptionText by remember { mutableStateOf<String?>(null) }
+    // Web opens drawings on their reading face. The dedicated mode button
+    // enters the full canvas; outside it, read/edit applies to the caption.
+    var drawingCanvasMode by remember { mutableStateOf(false) }
     var drawingUndoStack by remember { mutableStateOf<List<List<DrawingStrokeDto>>>(emptyList()) }
     var drawingRedoStack by remember { mutableStateOf<List<List<DrawingStrokeDto>>>(emptyList()) }
     var drawingSaveJob by remember { mutableStateOf<Job?>(null) }
@@ -365,6 +368,58 @@ fun NoteDetailScreen(
     val iconErrorMessage = stringResource(R.string.native_note_icon_error)
     val editedPrefix = stringResource(R.string.native_note_detail_edited_prefix)
 
+    /** Materializes exactly what is on screen. Lifecycle actions and
+     *  duplication must not use the last server snapshot while a title,
+     *  rich block, checklist row, stroke, or recording is still local. */
+    fun liveNoteSnapshot(): NoteDto? {
+        val current = note ?: return null
+        val edit = editability ?: return current.copy(title = titleText)
+        val content = when {
+            edit.isChecklistType -> ""
+            edit.isRichEditableType -> RichDoc.encode(richBlocks ?: edit.originalRichBlocks.orEmpty())
+            edit.isDrawType -> DrawingContent.encode(
+                drawingPaths,
+                drawingDimensions,
+                RichDoc.encode(richBlocks ?: listOf(RichDoc.newBlock())),
+            )
+            edit.isAudioType -> AudioContent.encode(audioClips, audioCaptionText.orEmpty())
+            !edit.bodyEditable -> current.content
+            edit.isLegacyPlain -> bodyText
+            else -> NoteContent.plainTextToRichContent(bodyText)
+        }
+        val currentItems = if (edit.isChecklistType) {
+            ChecklistItems.encode(edit.checklistItems.orEmpty())
+        } else {
+            current.items
+        }
+        return current.copy(
+            title = titleText,
+            content = content,
+            items = currentItems,
+            images = NoteImages.encode(images),
+        )
+    }
+
+    /** Commits the live editor state to the offline queue before an exit
+     *  or status transition. This closes the debounce/blur race for every
+     *  note type and gives Android the web editor's save-on-close safety. */
+    suspend fun flushLiveEdits(): NoteDto? {
+        val current = note ?: return null
+        val live = liveNoteSnapshot() ?: return current
+        drawingSaveJob?.cancel()
+        audioSaveJob?.cancel()
+        if (!isReadOnlyAccess) {
+            if (live.title != current.title || live.content != current.content) {
+                repository.patchNoteQueued(current.id, live.title, live.content)
+            }
+            if (live.items != current.items) {
+                repository.setChecklistItemsQueued(current.id, live.items)
+            }
+        }
+        note = live
+        return live
+    }
+
     fun togglePin() {
         val current = note ?: return
         if (pinning) return
@@ -390,7 +445,8 @@ fun NoteDetailScreen(
         archiving = true
         scope.launch {
             try {
-                repository.setArchivedQueued(current.toEntity(), !current.archived)
+                val live = flushLiveEdits() ?: current
+                repository.setArchivedQueued(live.toEntity(), !current.archived)
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen toggleArchive queued id=${current.id}")
                 onBack()
@@ -432,6 +488,7 @@ fun NoteDetailScreen(
         trashing = true
         scope.launch {
             try {
+                flushLiveEdits()
                 repository.trashNoteQueued(current.id, mode)
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen trash queued id=${current.id} mode=$mode")
@@ -790,7 +847,11 @@ fun NoteDetailScreen(
         if (note == null || isReadOnlyAccess) return
         saveError = null
         try {
-            val encoded = DrawingContent.encode(drawingPaths, drawingDimensions, drawingCaptionText)
+            val encoded = DrawingContent.encode(
+                drawingPaths,
+                drawingDimensions,
+                RichDoc.encode(richBlocks ?: listOf(RichDoc.newBlock())),
+            )
             repository.patchNoteQueued(noteId, titleText, encoded)
             SyncQueueWorker.triggerNow(context)
             NativeDebug.d("NoteDetailScreen drawing autosave queued id=$noteId")
@@ -889,6 +950,16 @@ fun NoteDetailScreen(
         scheduleAudioAutosave()
     }
 
+    // The drawing caption is the same rich document as a text note. It
+    // follows the drawing's debounce instead of waiting for an explicit
+    // Save, matching App.jsx's title+caption drawing autosave.
+    LaunchedEffect(richBlocks, editability?.isDrawType) {
+        val edit = editability ?: return@LaunchedEffect
+        if (!edit.isDrawType || richBlocks == edit.originalRichBlocks || note == null) return@LaunchedEffect
+        delay(600)
+        performDrawingSave()
+    }
+
     // ---------- Content images (text/checklist notes only) ----------
 
     /** Persists the given image list and, on success, resyncs local state
@@ -967,11 +1038,12 @@ fun NoteDetailScreen(
         val current = note ?: return
         if (duplicating) return
         duplicating = true
-        val baseTitle = current.title.trim()
+        val baseTitle = titleText.trim()
         val newTitle = if (baseTitle.isNotEmpty()) "$baseTitle $duplicateSuffix" else duplicateSuffix
         scope.launch {
             try {
-                val created = repository.duplicateNote(current, newTitle)
+                val source = flushLiveEdits() ?: current
+                val created = repository.duplicateNote(source, newTitle)
                 NativeDebug.d("NoteDetailScreen duplicateNote OK newId=${created.id}")
                 SyncQueueWorker.triggerNow(context)
                 onBack()
@@ -997,7 +1069,7 @@ fun NoteDetailScreen(
             edit.isRichEditableType -> NoteConversion.richBlocksToPlainText(
                 richBlocks ?: edit.originalRichBlocks.orEmpty(),
             )
-            edit.isDrawType -> drawingCaptionText.orEmpty()
+            edit.isDrawType -> NoteConversion.richBlocksToPlainText(richBlocks.orEmpty())
             else -> bodyText
         }
         return AiNoteDto(id = current.id, title = titleText, content = body, tags = current.tags)
@@ -1057,10 +1129,19 @@ fun NoteDetailScreen(
 
     fun downloadNote() {
         val current = note ?: return
-        val edit = editability ?: return
-        if (!edit.isTextType) return
+        val live = liveNoteSnapshot() ?: current
         scope.launch(Dispatchers.IO) {
-            val ok = NoteExporter.exportText(context, current.title, edit.bodyPlainText)
+            val ok = if (live.type == "audio") {
+                val clip = AudioContent.parse(live.content)?.clips?.firstOrNull()
+                clip != null && NoteExporter.exportAudio(context, clip, clip.name.ifBlank { live.title })
+            } else {
+                NoteExporter.exportTextFile(
+                    context,
+                    NoteExporter.sanitizeFilename(live.title.ifBlank { "note" }) + ".md",
+                    NoteExporter.noteMarkdown(live.toEntity()),
+                    "text/markdown",
+                )
+            }
             if (!ok) {
                 withContext(Dispatchers.Main) {
                     toasts.error(downloadErrorMessage)
@@ -1194,6 +1275,11 @@ fun NoteDetailScreen(
                 "draw" -> {
                     val drawing = DrawingContent.parse(fetched.content)
                     if (drawing != null) {
+                        val captionBlocks = (RichDoc.parse(drawing.text)
+                            ?: drawing.text?.takeIf { it.isNotBlank() }?.let {
+                                RichDoc.parse(NoteContent.plainTextToRichContent(it))
+                            }).orEmpty()
+                            .ifEmpty { listOf(RichDoc.newBlock()) }
                         Editability(
                             isTextType = false,
                             bodyEditable = false,
@@ -1203,6 +1289,7 @@ fun NoteDetailScreen(
                             originalDrawingPaths = drawing.paths,
                             originalDrawingDimensions = drawing.dimensions,
                             originalDrawingCaptionText = drawing.text,
+                            originalRichBlocks = captionBlocks,
                         )
                     } else {
                         Editability(isTextType = false, bodyEditable = false, isLegacyPlain = false, bodyPlainText = "")
@@ -1231,6 +1318,11 @@ fun NoteDetailScreen(
             drawingPaths = editability?.originalDrawingPaths.orEmpty()
             drawingDimensions = editability?.originalDrawingDimensions
             drawingCaptionText = editability?.originalDrawingCaptionText
+            if (editability?.isDrawType == true) {
+                richBlocks = editability?.originalRichBlocks
+                drawingCanvasMode = false
+                viewMode = container.editorPrefs.readModeEnabled
+            }
             audioClips = editability?.originalAudioClips.orEmpty()
             audioCaptionText = editability?.originalAudioCaptionText
             history.reset(
@@ -1438,23 +1530,12 @@ fun NoteDetailScreen(
     }
 
     fun save() {
-        val current = note ?: return
-        val edit = editability ?: return
+        if (note == null || editability == null) return
         saving = true
         saveError = null
         scope.launch {
             try {
-                val contentToSend = when {
-                    // A checklist note's content is always empty, its body
-                    // lives entirely in items (saved separately, see
-                    // saveChecklistItems); this only ever saves the title.
-                    edit.isChecklistType -> ""
-                    edit.isRichEditableType -> RichDoc.encode(richBlocks ?: edit.originalRichBlocks.orEmpty())
-                    !edit.bodyEditable -> current.content
-                    edit.isLegacyPlain -> bodyText
-                    else -> NoteContent.plainTextToRichContent(bodyText)
-                }
-                repository.patchNoteQueued(noteId, titleText, contentToSend)
+                flushLiveEdits()
                 SyncQueueWorker.triggerNow(context)
                 NativeDebug.d("NoteDetailScreen save queued id=$noteId")
                 onBack()
@@ -1467,36 +1548,13 @@ fun NoteDetailScreen(
         }
     }
 
-    /** What both the header's own Back row and the system back
-     *  gesture/button (see the BackHandler below) actually trigger: a
-     *  drawing/audio note autosaves on a debounce
-     *  (scheduleDrawingAutosave/scheduleAudioAutosave), so the very last
-     *  stroke or recording before backing out could still be sitting in
-     *  that debounce window, about to be cancelled along with everything
-     *  else once this screen leaves composition. Flushing the pending save
-     *  here first, and only actually navigating back once it resolves,
-     *  closes that gap for the two exit paths a user actually backs out
-     *  through. Other exits (archive/trash/duplicate right in that same
-     *  instant) don't get this treatment, a narrower, disclosed gap rather
-     *  than threading it through every action that also calls onBack(). */
+    /** Header and system back both flush the complete live editor state,
+     *  including changes still inside a debounce or checklist row focus. */
     fun goBack() {
-        val edit = editability
-        when {
-            edit?.isDrawType == true -> {
-                drawingSaveJob?.cancel()
-                scope.launch {
-                    performDrawingSave()
-                    onBack()
-                }
-            }
-            edit?.isAudioType == true -> {
-                audioSaveJob?.cancel()
-                scope.launch {
-                    performAudioSave()
-                    onBack()
-                }
-            }
-            else -> onBack()
+        scope.launch {
+            flushLiveEdits()
+            SyncQueueWorker.triggerNow(context)
+            onBack()
         }
     }
 
@@ -1596,6 +1654,7 @@ fun NoteDetailScreen(
                     val hasUnsavedChanges = edit != null && (
                         titleText != currentNote.title ||
                             (edit.isRichEditableType && richBlocks != edit.originalRichBlocks) ||
+                            (edit.isDrawType && richBlocks != edit.originalRichBlocks) ||
                             (edit.bodyEditable && bodyText != edit.bodyPlainText)
                         )
                     ModalSaveButton(
@@ -1642,6 +1701,7 @@ fun NoteDetailScreen(
                             // documented exception: their body stays
                             // interactive, so their title does too.
                             asText = (edit.isRichEditableType && viewMode) ||
+                                (edit.isDrawType && !drawingCanvasMode && viewMode) ||
                                 (isReadOnlyAccess && !edit.isChecklistType),
                             titleColor = titleColor,
                             placeholderColor = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
@@ -1656,7 +1716,7 @@ fun NoteDetailScreen(
                             },
                         )
 
-                        if (edit.isTextType || edit.isChecklistType) {
+                        if (edit.isTextType || edit.isChecklistType || (edit.isDrawType && !drawingCanvasMode)) {
                             Box(Modifier.padding(horizontal = 8.dp).padding(bottom = 8.dp)) {
                                 NoteImagesSection(
                                     images = images,
@@ -1738,6 +1798,34 @@ fun NoteDetailScreen(
                                     )
                                 }
                             } else if (edit.isDrawType) {
+                                if (!drawingCanvasMode) {
+                                    if (viewMode) {
+                                        RichTextReader(
+                                            blocks = richBlocks.orEmpty(),
+                                            typography = container.editorPrefs.typography.activeProfile,
+                                            taskStrike = container.editorPrefs.taskStrike,
+                                            dark = dark,
+                                            titleColor = titleColor,
+                                        )
+                                    } else {
+                                        RichTextEditor(
+                                            blocks = richBlocks.orEmpty(),
+                                            state = richEditorState,
+                                            typography = container.editorPrefs.typography.activeProfile,
+                                            taskStrike = container.editorPrefs.taskStrike,
+                                            dark = dark,
+                                            titleColor = titleColor,
+                                            subtextColor = subtextColor,
+                                            focusRequesterFor = { id -> richFocusRequesters.getOrPut(id) { FocusRequester() } },
+                                            onTextEdited = { id, newText, newMarks -> changeRichBlockText(id, newText, newMarks) },
+                                            onEnter = { id, position -> splitRichBlock(id, position) },
+                                            onToggleChecked = { id -> toggleRichChecked(id) },
+                                            onRemoveBlock = { id -> removeRichBlock(id) },
+                                            onAddBlock = { addRichBlockAtEnd() },
+                                        )
+                                    }
+                                    if (richBlocks.orEmpty().any { it.text.isNotBlank() }) Spacer(Modifier.height(14.dp))
+                                }
                                 DrawingEditor(
                                     paths = drawingPaths,
                                     canvasWidthDp = drawingDimensions?.width,
@@ -1751,26 +1839,8 @@ fun NoteDetailScreen(
                                     onCommit = { newPaths, w, h -> commitDrawingChange(newPaths, w, h) },
                                     onUndo = { undoDrawing() },
                                     onRedo = { redoDrawing() },
+                                    readOnly = !drawingCanvasMode || isReadOnlyAccess,
                                 )
-                                val captionPlainText = remember(drawingCaptionText) {
-                                    val text = drawingCaptionText
-                                    if (text.isNullOrBlank()) {
-                                        null
-                                    } else {
-                                        val doc = NoteContent.parseRichDoc(text)
-                                        (if (doc != null) NoteContent.docToPlainText(doc) else text).ifBlank { null }
-                                    }
-                                }
-                                captionPlainText?.let { caption ->
-                                    Spacer(Modifier.height(14.dp))
-                                    Text(
-                                        stringResource(R.string.native_drawing_caption_notice),
-                                        color = subtextColor,
-                                        fontSize = 12.sp,
-                                    )
-                                    Spacer(Modifier.height(6.dp))
-                                    Text(caption, color = titleColor, fontSize = 14.sp)
-                                }
                             } else if (edit.isAudioType) {
                                 AudioClipsSection(
                                     clips = audioClips,
@@ -1783,6 +1853,18 @@ fun NoteDetailScreen(
                                     onClipAdded = { clip -> addAudioClip(clip) },
                                     onClipRemoved = { id -> removeAudioClip(id) },
                                     onClipRenamed = { id, newName -> renameAudioClip(id, newName) },
+                                    onClipDownload = { clip ->
+                                        scope.launch(Dispatchers.IO) {
+                                            val ok = NoteExporter.exportAudio(
+                                                context,
+                                                clip,
+                                                clip.name.ifBlank { titleText },
+                                            )
+                                            if (!ok) withContext(Dispatchers.Main) {
+                                                toasts.error(downloadErrorMessage)
+                                            }
+                                        }
+                                    },
                                 )
                             } else if (!edit.isTextType) {
                                 Box(
@@ -1876,7 +1958,7 @@ fun NoteDetailScreen(
             // and the footer (NoteModal.jsx:927-948), so opening it shrinks
             // the note above instead of covering it.
             editability?.let { edit ->
-                if (edit.isRichEditableType && !isReadOnlyAccess) {
+                if ((edit.isRichEditableType || (edit.isDrawType && !drawingCanvasMode)) && !isReadOnlyAccess) {
                     FormatSheet(
                         open = showFormatSheet,
                         dark = dark,
@@ -1890,7 +1972,16 @@ fun NoteDetailScreen(
                             dark = dark,
                             titleColor = titleColor,
                             taskStrike = container.editorPrefs.taskStrike,
-                            onTaskStrikeChange = { container.editorPrefs.applyTaskStrike(it) },
+                            onTaskStrikeChange = { enabled ->
+                                container.editorPrefs.applyTaskStrike(enabled)
+                                scope.launch {
+                                    try {
+                                        repository.setTaskStrike(enabled)
+                                    } catch (t: Throwable) {
+                                        NativeDebug.e("Task strike preference sync failed", t)
+                                    }
+                                }
+                            },
                             actions = richToolbarActions,
                         )
                     }
@@ -1910,7 +2001,8 @@ fun NoteDetailScreen(
                         collaborateColor = collaborateColor,
                         trashColor = trashMenuColor,
                         showColorButton = !isReadOnlyAccess,
-                        showImageButton = (edit.isTextType || edit.isChecklistType) && !isReadOnlyAccess,
+                        showImageButton = (edit.isTextType || edit.isChecklistType ||
+                            (edit.isDrawType && !drawingCanvasMode && !viewMode)) && !isReadOnlyAccess,
                         // ModalFooter.jsx:297: an audio note has no image
                         // affordance, so its logo gets a button of its own.
                         showLogoButton = edit.isAudioType && !isReadOnlyAccess,
@@ -1919,16 +2011,20 @@ fun NoteDetailScreen(
                         // are hidden for the two types whose content they
                         // don't cover (ModalFooter.jsx:562): audio, and a
                         // drawing's own canvas.
-                        showHistoryButtons = !edit.isDrawType && !edit.isAudioType && !isReadOnlyAccess,
+                        showHistoryButtons = (!edit.isDrawType || !drawingCanvasMode) &&
+                            !edit.isAudioType && !isReadOnlyAccess && !viewMode,
                         canUndo = history.canUndo,
                         canRedo = history.canRedo,
-                        showFormatButton = edit.isRichEditableType && !isReadOnlyAccess && !viewMode,
+                        showFormatButton = (edit.isRichEditableType || (edit.isDrawType && !drawingCanvasMode)) &&
+                            !isReadOnlyAccess && !viewMode,
                         formatOpen = showFormatSheet,
                         // The web only offers the toggle when the read-mode
                         // preference is on, and only for a text note.
-                        showModeButton = edit.isTextType && !isReadOnlyAccess &&
+                        showModeButton = (edit.isTextType || (edit.isDrawType && !drawingCanvasMode)) && !isReadOnlyAccess &&
                             container.editorPrefs.readModeEnabled,
                         viewMode = viewMode,
+                        showDrawModeButton = edit.isDrawType && !isReadOnlyAccess,
+                        drawingCanvasMode = drawingCanvasMode,
                         // The web keeps Collaborate and Trash in the footer for
                         // every type except a text note being edited, where they
                         // move into the kebab. Native text notes are always in
@@ -1943,6 +2039,10 @@ fun NoteDetailScreen(
                         onUndoClick = { undoNote() },
                         onRedoClick = { redoNote() },
                         onModeClick = { viewMode = !viewMode },
+                        onDrawModeClick = {
+                            drawingCanvasMode = !drawingCanvasMode
+                            showFormatSheet = false
+                        },
                         onFormatClick = { showFormatSheet = !showFormatSheet },
                         onCollaborateClick = { onOpenCollaborators() },
                         onTrashClick = { showTrashConfirm = true },
@@ -2102,7 +2202,9 @@ fun NoteDetailScreen(
                                             }
                                         }
                                     }
-                                    if (edit.isTextType) {
+                                    if (edit.isTextType || edit.isChecklistType || edit.isDrawType ||
+                                        (edit.isAudioType && audioClips.isNotEmpty())
+                                    ) {
                                         PopoverMenuItem(
                                             label = stringResource(R.string.native_note_detail_download),
                                             color = downloadColor,
@@ -3028,6 +3130,8 @@ private fun NoteModalFooter(
     formatOpen: Boolean,
     showModeButton: Boolean,
     viewMode: Boolean,
+    showDrawModeButton: Boolean,
+    drawingCanvasMode: Boolean,
     showCollaborateButton: Boolean,
     showTrashButton: Boolean,
     onColorClick: () -> Unit,
@@ -3038,6 +3142,7 @@ private fun NoteModalFooter(
     onRedoClick: () -> Unit,
     onFormatClick: () -> Unit,
     onModeClick: () -> Unit,
+    onDrawModeClick: () -> Unit,
     onCollaborateClick: () -> Unit,
     onTrashClick: () -> Unit,
     onKebabClick: () -> Unit,
@@ -3155,6 +3260,18 @@ private fun NoteModalFooter(
                     } else {
                         EyeFilledIcon(size = 18.dp, tint = iconColor)
                     }
+                }
+            }
+            if (showDrawModeButton) {
+                FooterIconButton(
+                    contentDescription = stringResource(
+                        if (drawingCanvasMode) R.string.native_drawing_exit_mode
+                        else R.string.native_drawing_enter_mode
+                    ),
+                    onClick = onDrawModeClick,
+                ) {
+                    if (drawingCanvasMode) EyeFilledIcon(size = 18.dp, tint = iconColor)
+                    else PencilFilledIcon(size = 18.dp, tint = iconColor)
                 }
             }
             if (showCollaborateButton) {

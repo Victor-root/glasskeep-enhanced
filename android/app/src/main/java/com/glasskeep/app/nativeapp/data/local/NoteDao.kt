@@ -14,8 +14,20 @@ interface NoteDao {
     // tie-break for notes that have never been manually reordered
     // (position 0.0 for all of them), same role it already played alone
     // before manual reordering existed.
-    @Query("SELECT * FROM notes ORDER BY pinned DESC, position DESC, updatedAt DESC")
+    @Query("SELECT * FROM notes WHERE archived = 0 AND trashed = 0 ORDER BY pinned DESC, position DESC, updatedAt DESC")
     fun observeAll(): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes WHERE archived = 1 AND trashed = 0 ORDER BY position DESC, updatedAt DESC")
+    fun observeArchived(): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes WHERE trashed = 1 ORDER BY position DESC, updatedAt DESC")
+    fun observeTrashed(): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes WHERE archived = 1 AND trashed = 0 ORDER BY position DESC, updatedAt DESC")
+    suspend fun getArchived(): List<NoteEntity>
+
+    @Query("SELECT * FROM notes WHERE trashed = 1 ORDER BY position DESC, updatedAt DESC")
+    suspend fun getTrashed(): List<NoteEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(notes: List<NoteEntity>)
@@ -66,18 +78,29 @@ interface NoteDao {
         deleteDetailById(id)
     }
 
-    @Query("DELETE FROM notes WHERE id NOT IN (:keepIds)")
-    suspend fun deleteMissing(keepIds: List<String>)
+    @Query("DELETE FROM notes WHERE archived = 0 AND trashed = 0 AND id NOT IN (:keepIds)")
+    suspend fun deleteMissingActive(keepIds: List<String>)
 
-    @Query("DELETE FROM note_details WHERE noteId NOT IN (:keepIds)")
-    suspend fun deleteMissingDetails(keepIds: List<String>)
+    @Query("DELETE FROM notes WHERE archived = 0 AND trashed = 0")
+    suspend fun deleteAllActive()
+
+    @Query("DELETE FROM notes WHERE archived = 1 AND trashed = 0 AND id NOT IN (:keepIds)")
+    suspend fun deleteMissingArchived(keepIds: List<String>)
+
+    @Query("DELETE FROM notes WHERE archived = 1 AND trashed = 0")
+    suspend fun deleteAllArchived()
+
+    @Query("DELETE FROM notes WHERE trashed = 1 AND id NOT IN (:keepIds)")
+    suspend fun deleteMissingTrashed(keepIds: List<String>)
+
+    @Query("DELETE FROM notes WHERE trashed = 1")
+    suspend fun deleteAllTrashed()
 
     /**
      * Replace the whole cache with the server's current list in one go, so
      * a screen observing observeAll() never sees a half-updated state.
-     * Empty lists go through deleteAll() directly: `NOT IN ()` with no
-     * arguments is invalid SQL, and an empty server response is exactly
-     * what a brand-new account looks like.
+     * Only active rows are replaced. Archived and trashed rows are separate
+     * offline views and must survive an ordinary active-list refresh.
      *
      * [protectedIds] (see SyncQueueDao.getProtectedNoteIds()) are excluded
      * from both sides of the replace: a note there is neither upserted from
@@ -99,14 +122,38 @@ interface NoteDao {
         val filtered = if (protectedIds.isEmpty()) notes else notes.filterNot { it.id in protectedIds }
         val filteredDetails = if (protectedIds.isEmpty()) details else details.filterNot { it.noteId in protectedIds }
         if (filtered.isEmpty() && protectedIds.isEmpty()) {
-            deleteAllNotes()
-            deleteAllDetails()
+            deleteAllActive()
         } else {
             upsertAll(filtered)
             upsertDetails(filteredDetails)
             val keepIds = filtered.map { it.id } + protectedIds
-            deleteMissing(keepIds)
-            deleteMissingDetails(keepIds)
+            deleteMissingActive(keepIds)
         }
+    }
+
+    @Transaction
+    suspend fun replaceArchived(
+        notes: List<NoteEntity>,
+        details: List<NoteDetailEntity>,
+        protectedIds: Set<String> = emptySet(),
+    ) {
+        val filtered = notes.filterNot { it.id in protectedIds }
+        upsertAll(filtered)
+        upsertDetails(details.filterNot { it.noteId in protectedIds })
+        val keepIds = filtered.map { it.id } + protectedIds
+        if (keepIds.isEmpty()) deleteAllArchived() else deleteMissingArchived(keepIds)
+    }
+
+    @Transaction
+    suspend fun replaceTrashed(
+        notes: List<NoteEntity>,
+        details: List<NoteDetailEntity>,
+        protectedIds: Set<String> = emptySet(),
+    ) {
+        val filtered = notes.filterNot { it.id in protectedIds }
+        upsertAll(filtered)
+        upsertDetails(details.filterNot { it.noteId in protectedIds })
+        val keepIds = filtered.map { it.id } + protectedIds
+        if (keepIds.isEmpty()) deleteAllTrashed() else deleteMissingTrashed(keepIds)
     }
 }

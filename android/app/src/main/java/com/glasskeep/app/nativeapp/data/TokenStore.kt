@@ -162,6 +162,13 @@ class TokenStore(context: Context) {
             prefs.edit().putBoolean(KEY_LIST_VIEW, value).apply()
         }
 
+    /** Whether the scanner is pinned in the mobile notes header. */
+    var qrQuickEnabled: Boolean
+        get() = prefs.getBoolean(KEY_QR_QUICK, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_QR_QUICK, value).apply()
+        }
+
     /** Cached "the AI assistant is available to me" flag, off by default:
      *  most instances have no AI configured at all. */
     var aiAssistantEnabled: Boolean
@@ -219,6 +226,7 @@ class TokenStore(context: Context) {
         private const val KEY_TASK_STRIKE = "task_strike_checked"
         private const val KEY_READ_MODE = "read_mode_enabled"
         private const val KEY_LIST_VIEW = "list_view"
+        private const val KEY_QR_QUICK = "qr_quick_enabled"
         private const val KEY_AI_ASSISTANT = "ai_assistant_enabled"
         private const val KEY_EDGE_TO_EDGE_LANDSCAPE = "edge_to_edge_landscape"
         private const val KEY_FLOATING_CARDS = "floating_cards_enabled"

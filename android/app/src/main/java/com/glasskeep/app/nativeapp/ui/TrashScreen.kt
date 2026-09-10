@@ -11,8 +11,7 @@ import com.glasskeep.app.nativeapp.data.NotesRepository
  *  detail screen too (see NoteDetailScreen's trashed-aware kebab menu,
  *  same as the web reuses its note modal for the trash view); this
  *  screen adds the same two actions in bulk, for several notes at once.
- *  See SecondaryNotesScreen's own doc comment for why this isn't
- *  Room-backed. */
+ *  The list is Room-backed and remains browsable offline. */
 @Composable
 fun TrashScreen(
     container: NativeAppContainer,
@@ -27,6 +26,7 @@ fun TrashScreen(
         emptyMessage = stringResource(R.string.native_trash_empty),
         errorTemplate = stringResource(R.string.native_trash_error),
         fetchNotes = NotesRepository::fetchTrashedNotes,
+        observeNotes = NotesRepository::observeTrashedNotes,
         onOpenNote = onOpenNote,
         onBack = onBack,
         capabilities = setOf(

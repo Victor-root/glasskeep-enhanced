@@ -106,6 +106,7 @@ fun DrawingEditor(
     onCommit: (paths: List<DrawingStrokeDto>, canvasWidthDp: Float, canvasHeightDp: Float) -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
+    readOnly: Boolean = false,
 ) {
     var isEraser by remember { mutableStateOf(false) }
     // The default pen follows the theme, white on dark, black on light
@@ -130,7 +131,7 @@ fun DrawingEditor(
     val pageHeightDp = originalHeightDp ?: canvasHeightDp ?: DEFAULT_CANVAS_HEIGHT_DP
 
     Column {
-        DrawingToolbar(
+        if (!readOnly) DrawingToolbar(
             isEraser = isEraser,
             color = color,
             strokeSize = strokeSize,
@@ -182,7 +183,7 @@ fun DrawingEditor(
             },
             onTogglePageLines = { actionsPopoverOpen = false; showPageLines = !showPageLines },
         )
-        Spacer(Modifier.height(12.dp))
+        if (!readOnly) Spacer(Modifier.height(12.dp))
 
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val scale = maxWidth.value / widthDp
@@ -194,7 +195,7 @@ fun DrawingEditor(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(displayHeight)
-                    .pointerInput(isEraser, color, strokeSize, paths, scale) {
+                    .then(if (readOnly) Modifier else Modifier.pointerInput(isEraser, color, strokeSize, paths, scale) {
                         detectDragGestures(
                             onDragStart = { offset ->
                                 if (isEraser) {
@@ -245,7 +246,7 @@ fun DrawingEditor(
                                 eraseLivePaths = null
                             },
                         )
-                    },
+                    }),
             ) {
                 // Dashed guides between pages, painted under the strokes
                 // (DrawingCanvas.jsx:750-770).

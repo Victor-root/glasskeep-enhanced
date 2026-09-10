@@ -59,6 +59,9 @@ class RealtimeClient(
     private val onInstanceLocked: () -> Unit,
     private val onInstanceUnlocked: () -> Unit,
     private val onLiveNotification: (NotificationDto) -> Unit,
+    /** Settings/branding/admin events invalidate native secondary state.
+     *  The host performs the appropriately scoped re-read. */
+    private val onAuxiliaryEvent: (String) -> Unit,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -139,6 +142,8 @@ class RealtimeClient(
         val type = when (rawType) {
             "note_access_revoked_notification" -> str("notificationType") ?: return null
             "user_deleted_notification" -> "user_deleted"
+            "reminder_due" -> "reminder"
+            "test_notification" -> "test"
             else -> rawType
         }
         NotificationDto(
@@ -156,9 +161,15 @@ class RealtimeClient(
                 "user_deleted_notification" -> str("adminName").orEmpty()
                 else -> str("senderName").orEmpty()
             },
-            variant = if (rawType == "note_shared" && bool("readOnly")) "read_only" else null,
-            message = if (rawType == "pending_user_registered") str("pendingId") else null,
-            createdAt = nowIso(),
+            variant = if (rawType == "note_shared" && bool("readOnly")) "read_only" else str("variant"),
+            message = when (rawType) {
+                "pending_user_registered" -> str("pendingId")
+                "reminder_due", "test_notification" -> str("message")
+                else -> null
+            },
+            persistent = if (bool("persistent")) 1 else 0,
+            icon = str("icon"),
+            createdAt = str("createdAt") ?: nowIso(),
         )
     }.getOrNull()
 
@@ -201,6 +212,10 @@ class RealtimeClient(
                     NativeDebug.d("RealtimeClient live notification type=${it.type}")
                     onLiveNotification(it)
                 }
+            }
+            if (payloadType != null && payloadType in AUXILIARY_EVENT_TYPES) {
+                NativeDebug.d("RealtimeClient auxiliary event type=$payloadType")
+                onAuxiliaryEvent(payloadType)
             }
             // At-rest encryption's two lock-state frames, the one pair the
             // server sends to EVERY connected client rather than to one
@@ -265,6 +280,24 @@ class RealtimeClient(
             "note_access_revoked_notification",
             "pending_user_registered",
             "user_deleted_notification",
+            "reminder_due",
+            "test_notification",
+        )
+        private val AUXILIARY_EVENT_TYPES = setOf(
+            "admin_settings_updated",
+            "user_settings_updated",
+            "user_profile_updated",
+            "user_ai_settings_updated",
+            "admin_ai_settings_updated",
+            "logo_added",
+            "logo_deleted",
+            "pending_user_resolved",
+            "user_list_changed",
+            "notifications_cleared",
+            "notification_delivered",
+            "notification_removed",
+            "federation_peer_updated",
+            "federation_user_updated",
         )
         private const val RECONNECT_BASE_DELAY_MS = 1000L
         private const val RECONNECT_MAX_DELAY_MS = 30000L

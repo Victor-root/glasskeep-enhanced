@@ -552,12 +552,12 @@ private fun serverLine(state: SyncState, reachable: Boolean?, dark: Boolean): Tr
     )
 }
 
-/** actionTypeLabel() (SyncStatusIcon.jsx:139): the native queue's types
- *  are narrower than the web's, and the ones it does not have (create,
- *  duplicate) have no queue entry to name. */
+/** actionTypeLabel() (SyncStatusIcon.jsx:139): labels every durable
+ *  native queue operation; duplicates are idempotent CREATE entries. */
 @Composable
 private fun syncActionLabel(type: String): String = stringResource(
     when (runCatching { SyncQueueType.valueOf(type) }.getOrNull()) {
+        SyncQueueType.CREATE -> R.string.native_sync_action_create
         SyncQueueType.TITLE_CONTENT -> R.string.native_sync_action_update
         SyncQueueType.ARCHIVE -> R.string.native_sync_action_archive
         SyncQueueType.TRASH -> R.string.native_sync_action_trash

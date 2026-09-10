@@ -131,6 +131,7 @@
     <string name="native_bulk_restored_success">%1$d note(s) restored</string>
     <string name="native_bulk_partial_failure">%1$d failed</string>
     <string name="native_bulk_select_all">Select all</string>
+    <string name="native_bulk_side_by_side">Side by side</string>
     <string name="native_bulk_deselect_all">Deselect all</string>
     <string name="native_bulk_export_zip">Download (.zip)</string>
     <string name="native_bulk_export_success">ZIP ready to share</string>
@@ -184,6 +185,8 @@
     <string name="native_settings_password_success">Password changed.</string>
     <string name="native_settings_qr_signin">Sign in another device</string>
     <string name="native_settings_qr_signin_desc">Tap to scan the QR code shown on another PC\'s login screen and sign it in.</string>
+    <string name="native_settings_qr_quick">Header shortcut (mobile)</string>
+    <string name="native_settings_qr_quick_desc">Show the QR scanner directly in the notes header.</string>
     <string name="native_qr_scan_title">Scan a QR code</string>
     <string name="native_qr_scan_explain">Point the camera at the QR code shown on the other device\'s login screen.</string>
     <string name="native_qr_scan_confirm_explain">Confirm this is your device before approving the sign-in.</string>
@@ -532,9 +535,13 @@
     <string name="native_drawing_size_medium">Medium</string>
     <string name="native_drawing_size_thick">Thick</string>
     <string name="native_drawing_size_large">Large</string>
-    <string name="native_drawing_caption_notice">Caption (not yet editable natively):</string>
+    <string name="native_drawing_caption_notice">Caption</string>
+    <string name="native_drawing_enter_mode">Drawing mode</string>
+    <string name="native_drawing_exit_mode">Reading mode</string>
     <string name="native_audio_too_large">Recording is too large to save. Try a shorter recording.</string>
     <string name="native_audio_empty_hint">Record a voice memo and it will be saved with this note.</string>
+    <string name="native_audio_download_original">Download original</string>
+    <string name="native_audio_add_recording">Add recording</string>
     <string name="native_audio_start_recording">Start recording</string>
     <string name="native_audio_state_recording">Recording…</string>
     <string name="native_audio_state_paused">Paused</string>
@@ -708,6 +715,7 @@
     <string name="native_sync_ago_hours">%1$dh</string>
     <string name="native_sync_ago_days">%1$dd</string>
     <string name="native_sync_action_update">Update</string>
+    <string name="native_sync_action_create">Create</string>
     <string name="native_sync_action_patch">Patch</string>
     <string name="native_sync_action_archive">Archive</string>
     <string name="native_sync_action_trash">Trash</string>

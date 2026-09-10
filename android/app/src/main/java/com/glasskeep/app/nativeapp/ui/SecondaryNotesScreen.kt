@@ -1,6 +1,9 @@
 package com.glasskeep.app.nativeapp.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -48,10 +51,13 @@ import androidx.compose.ui.unit.sp
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.ImageCompression
+import com.glasskeep.app.nativeapp.NoteExporter
 import com.glasskeep.app.nativeapp.data.NotesRepository
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
+import com.glasskeep.app.nativeapp.data.network.LogoDto
 import com.glasskeep.app.nativeapp.data.network.NoteDto
-import com.glasskeep.app.nativeapp.data.toEntity
+import com.glasskeep.app.nativeapp.data.network.NoteIconDto
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
 import com.glasskeep.app.ui.DarkTitleColor
@@ -59,7 +65,10 @@ import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val ErrorColor = Color(0xFFdc2626)
 
@@ -82,13 +91,10 @@ enum class SecondaryBulkCapability { UNARCHIVE, TRASH, RESTORE, DELETE_PERMANENT
  * knows how to act on an archived or trashed note, this screen's job is
  * only to be a way in.
  *
- * Not backed by Room like the main list: that table only ever holds active
- * notes (see NotesRepository.refresh()), so this fetches fresh on entry and
- * on a manual refresh instead of risking either wiping this list on the
- * next refresh() or leaking these notes into the main grid. One
- * consequence worth knowing: acting on a note from its detail screen (e.g.
- * unarchiving, restoring) and coming back here doesn't drop it from this
- * list automatically, tap Refresh.
+ * The three note states share one Room table but use disjoint queries, so
+ * this screen paints its cached archive/trash immediately, works offline,
+ * and reacts to queued restore/delete operations while a network refresh
+ * reconciles that cache in the background.
  */
 @Composable
 fun SecondaryNotesScreen(
@@ -98,7 +104,9 @@ fun SecondaryNotesScreen(
     emptyMessage: String,
     errorTemplate: String,
     fetchNotes: suspend (NotesRepository) -> List<NoteDto>,
+    observeNotes: (NotesRepository) -> Flow<List<NoteEntity>>,
     onOpenNote: (String) -> Unit,
+    onOpenSideBySide: ((String, String) -> Unit)? = null,
     onBack: () -> Unit,
     capabilities: Set<SecondaryBulkCapability> = emptySet(),
 ) {
@@ -109,6 +117,7 @@ fun SecondaryNotesScreen(
     val toasts = LocalGkToasts.current
 
     var notes by remember { mutableStateOf<List<NoteEntity>>(emptyList()) }
+    val cachedNotes by observeNotes(repository).collectAsState(initial = emptyList())
     // Any type, any screen (see SyncQueueDao.observePendingNoteIds's own
     // doc comment): drives the same per-card spinner and header count as
     // NativeNotesListScreen.kt's own.
@@ -121,6 +130,8 @@ fun SecondaryNotesScreen(
     var showBulkTrashConfirm by remember { mutableStateOf(false) }
     var showBulkDeleteConfirm by remember { mutableStateOf(false) }
     var showBulkColorPicker by remember { mutableStateOf(false) }
+    var showBulkLogoPicker by remember { mutableStateOf(false) }
+    var bulkLogos by remember { mutableStateOf<List<LogoDto>>(emptyList()) }
     var bulkActionRunning by remember { mutableStateOf(false) }
 
     val partialFailureTemplate = stringResource(R.string.native_bulk_partial_failure)
@@ -135,17 +146,7 @@ fun SecondaryNotesScreen(
         errorMessage = null
         scope.launch {
             try {
-                // Merge, don't blind-replace: a note this screen's own bulk
-                // actions just optimistically patched (see bulkUnarchive/
-                // bulkTrash/bulkRestore/bulkDeletePermanently below) may not
-                // be reflected by the server yet if a refresh lands first,
-                // same race NoteDao.replaceAll's own protectedIds guards
-                // against for the Room-backed main list, reimplemented here
-                // over a plain list since this screen has no Room table to
-                // delegate to (see this composable's own doc comment).
-                val fresh = fetchNotes(repository).map { it.toEntity() }
-                val protectedIds = repository.getProtectedNoteIds()
-                notes = fresh.filterNot { it.id in protectedIds } + notes.filter { it.id in protectedIds }
+                fetchNotes(repository)
             } catch (t: Throwable) {
                 NativeDebug.e("SecondaryNotesScreen refresh failed ($title)", t)
                 errorMessage = String.format(errorTemplate, t.message ?: t.javaClass.simpleName)
@@ -168,6 +169,15 @@ fun SecondaryNotesScreen(
     val deleteConfirmTitle = stringResource(R.string.native_note_detail_permanent_delete_confirm_title)
     val deleteConfirmBodyText = stringResource(R.string.native_note_detail_permanent_delete_confirm_body)
     val colorLabel = stringResource(R.string.native_note_detail_change_color)
+    val logoLabel = stringResource(R.string.native_add_logo)
+    val exportZipLabel = stringResource(R.string.native_bulk_export_zip)
+    val selectAllLabel = stringResource(R.string.native_bulk_select_all)
+    val sideBySideLabel = stringResource(R.string.native_bulk_side_by_side)
+    val deselectAllLabel = stringResource(R.string.native_bulk_deselect_all)
+    val bulkIconSuccessTemplate = stringResource(R.string.native_bulk_icon_success)
+    val bulkIconErrorTemplate = stringResource(R.string.native_bulk_icon_error)
+    val bulkExportSuccess = stringResource(R.string.native_bulk_export_success)
+    val bulkExportError = stringResource(R.string.native_bulk_export_error)
 
     fun reportOutcome(successTemplate: String, outcome: BulkOutcome) {
         val message = String.format(successTemplate, outcome.succeeded) +
@@ -247,7 +257,76 @@ fun SecondaryNotesScreen(
         }
     }
 
+    fun toggleSelectAll() {
+        val visibleIds = notes.mapTo(linkedSetOf()) { it.id }
+        if (visibleIds.isEmpty()) return
+        selectedIds = if (visibleIds.all { it in selectedIds }) selectedIds - visibleIds else selectedIds + visibleIds
+    }
+
+    fun bulkSetIcon(icon: NoteIconDto) {
+        showBulkLogoPicker = false
+        if (bulkActionRunning || selectedIds.isEmpty()) return
+        bulkActionRunning = true
+        val ids = selectedIds.toList()
+        scope.launch {
+            var failed = 0
+            for (id in ids) {
+                try {
+                    repository.setNoteIcon(id, icon.copy(id = java.util.UUID.randomUUID().toString()))
+                } catch (t: Throwable) {
+                    NativeDebug.e("Secondary bulk icon failed for note $id", t)
+                    failed++
+                }
+            }
+            bulkActionRunning = false
+            if (failed == 0) toasts.success(String.format(bulkIconSuccessTemplate, ids.size))
+            else toasts.error(String.format(bulkIconErrorTemplate, failed))
+        }
+    }
+
+    fun openBulkLogoPicker() {
+        showBulkLogoPicker = true
+        scope.launch {
+            try {
+                bulkLogos = repository.fetchLogos()
+            } catch (t: Throwable) {
+                NativeDebug.e("Secondary bulk logo library load failed", t)
+            }
+        }
+    }
+
+    fun bulkExportZip() {
+        if (bulkActionRunning || selectedIds.isEmpty()) return
+        val chosen = notes.filter { it.id in selectedIds }
+        bulkActionRunning = true
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) { NoteExporter.exportNotesZip(context, chosen) }
+            bulkActionRunning = false
+            if (ok) toasts.success(bulkExportSuccess) else toasts.error(bulkExportError)
+        }
+    }
+
+    val bulkLogoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        val picked = uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val dataUrl = withContext(Dispatchers.IO) { ImageCompression.compressToDataUrl(context, picked) }
+                    ?: return@launch
+                val name = ImageCompression.displayNameFor(context, picked) ?: ""
+                val logo = repository.createLogo(name, dataUrl)
+                bulkLogos = repository.fetchLogos()
+                bulkSetIcon(NoteIconDto(id = logo?.id, src = logo?.src ?: dataUrl, name = logo?.name ?: name))
+            } catch (t: Throwable) {
+                NativeDebug.e("Secondary bulk logo upload failed", t)
+                toasts.error(String.format(bulkIconErrorTemplate, selectedIds.size))
+            }
+        }
+    }
+
     LaunchedEffect(serverUrl) { refresh() }
+    LaunchedEffect(cachedNotes) { notes = cachedNotes }
 
     BackHandler(enabled = selectionMode) { exitSelection() }
 
@@ -348,7 +427,7 @@ fun SecondaryNotesScreen(
             } else if (notes.isNotEmpty()) {
                 val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                 LazyVerticalStaggeredGrid(
-                    columns = StaggeredGridCells.Fixed(2),
+                    columns = StaggeredGridCells.Fixed(if (container.shellPrefs.listView) 1 else 2),
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + navBarBottom),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -374,7 +453,22 @@ fun SecondaryNotesScreen(
         }
 
         if (selectionMode) {
+            val allSelected = notes.isNotEmpty() && notes.all { it.id in selectedIds }
             val actions = buildList {
+                onOpenSideBySide?.let { openCompare ->
+                    add(
+                        BulkActionButton(
+                            label = sideBySideLabel,
+                            tone = BulkTone.SLATE,
+                            icon = { EyeFilledIcon(size = 18.dp, tint = BulkTone.SLATE.foreground(dark)) },
+                            enabled = !bulkActionRunning && selectedIds.size == 2,
+                            onClick = {
+                                val ids = selectedIds.toList()
+                                if (ids.size == 2) openCompare(ids[0], ids[1])
+                            },
+                        ),
+                    )
+                }
                 if (SecondaryBulkCapability.UNARCHIVE in capabilities) {
                     add(
                         BulkActionButton(
@@ -429,7 +523,34 @@ fun SecondaryNotesScreen(
                             onClick = { showBulkColorPicker = true },
                         ),
                     )
+                    add(
+                        BulkActionButton(
+                            label = logoLabel,
+                            tone = BulkTone.CYAN,
+                            icon = { LogoIcon(size = 18.dp, tint = BulkTone.CYAN.foreground(dark)) },
+                            enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                            onClick = { openBulkLogoPicker() },
+                        ),
+                    )
                 }
+                add(
+                    BulkActionButton(
+                        label = exportZipLabel,
+                        tone = BulkTone.GREEN,
+                        icon = { DownloadIcon(size = 18.dp, tint = BulkTone.GREEN.foreground(dark)) },
+                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                        onClick = { bulkExportZip() },
+                    ),
+                )
+                add(
+                    BulkActionButton(
+                        label = if (allSelected) deselectAllLabel else selectAllLabel,
+                        tone = BulkTone.SLATE,
+                        icon = { CheckSquareIcon(size = 18.dp, tint = BulkTone.SLATE.foreground(dark)) },
+                        enabled = !bulkActionRunning && notes.isNotEmpty(),
+                        onClick = { toggleSelectAll() },
+                    ),
+                )
             }
             SelectionActionBar(
                 selectedCount = selectedIds.size,
@@ -469,6 +590,26 @@ fun SecondaryNotesScreen(
                 borderColor = borderColor,
                 onPick = { colorKey -> bulkColor(colorKey) },
                 onDismiss = { showBulkColorPicker = false },
+            )
+        }
+
+        if (showBulkLogoPicker) {
+            BulkLogoPickerDialog(
+                logos = bulkLogos,
+                dark = dark,
+                onPick = { logo -> bulkSetIcon(NoteIconDto(id = logo.id, src = logo.src, name = logo.name)) },
+                onUploadNew = {
+                    showBulkLogoPicker = false
+                    bulkLogoPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                onDelete = { logo ->
+                    scope.launch {
+                        if (repository.deleteLogo(logo.id)) bulkLogos = bulkLogos.filterNot { it.id == logo.id }
+                    }
+                },
+                onDismiss = { showBulkLogoPicker = false },
             )
         }
     }

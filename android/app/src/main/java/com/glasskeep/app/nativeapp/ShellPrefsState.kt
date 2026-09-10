@@ -23,6 +23,9 @@ class ShellPrefsState(private val tokenStore: TokenStore) {
     var listView: Boolean by mutableStateOf(tokenStore.listView)
         private set
 
+    var qrQuickEnabled: Boolean by mutableStateOf(tokenStore.qrQuickEnabled)
+        private set
+
     /** Whether this account's AI assistant is on AND the administrator
      *  has not switched AI off server-wide. Cached for the same
      *  first-frame reason as the rest: the search field's own placeholder
@@ -65,6 +68,11 @@ class ShellPrefsState(private val tokenStore: TokenStore) {
     fun applyListView(list: Boolean) {
         listView = list
         tokenStore.listView = list
+    }
+
+    fun applyQrQuick(enabled: Boolean) {
+        qrQuickEnabled = enabled
+        tokenStore.qrQuickEnabled = enabled
     }
 
     fun applyEdgeToEdgeLandscape(enabled: Boolean) {

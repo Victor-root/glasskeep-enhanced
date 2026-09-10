@@ -37,10 +37,8 @@ data class DrawingDimensionsDto(
 data class DrawingContentDto(
     val paths: List<DrawingStrokeDto> = emptyList(),
     val dimensions: DrawingDimensionsDto? = null,
-    /** Rich-text caption, same envelope shape RichDoc.kt/NoteContent.kt
-     *  already parse for a text note's own content. Read-only in the
-     *  native editor for now (see NoteDetailScreen.kt's isDrawType
-     *  branch), but always preserved through parse -> encode untouched. */
+    /** Rich-text caption, edited through the same native RichDoc surface
+     *  as a text note while the canvas remains visible below it. */
     val text: String? = null,
 )
 
