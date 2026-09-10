@@ -16,13 +16,11 @@ import kotlinx.serialization.json.put
  *
  *     { "v": 1, "format": "tiptap", "doc": { "type": "doc", "content": [...] } }
  *
- * The native app has no rich-text editor yet (see the migration report:
- * it's the single hardest piece of this whole rewrite), so it must never
- * write back a doc that had real formatting, marks, headings, lists,
- * anything beyond plain paragraphs, or that formatting is gone for good.
- * [isDocPlainStructure] is the gate that decides whether native editing is
- * safe for a given note; when it says no, the detail screen shows the text
- * read-only instead of guessing.
+ * RichDoc owns the native rich editor's full supported schema. The helpers
+ * here remain the tolerant envelope/plain-text layer used for previews and
+ * as a conservative fallback when a future or unsupported node is found.
+ * [isDocPlainStructure] therefore guards only that fallback path; supported
+ * marks, headings and lists are edited through RichDoc instead.
  */
 object NoteContent {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }

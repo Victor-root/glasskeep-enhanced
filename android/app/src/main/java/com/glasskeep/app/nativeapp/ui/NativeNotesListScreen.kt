@@ -1,6 +1,9 @@
 package com.glasskeep.app.nativeapp.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -82,6 +85,8 @@ import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.AppLanguage
 import com.glasskeep.app.nativeapp.NativeAppContainer
 import com.glasskeep.app.nativeapp.NativeDebug
+import com.glasskeep.app.nativeapp.ImageCompression
+import com.glasskeep.app.nativeapp.NoteExporter
 import com.glasskeep.app.nativeapp.SyncState
 import com.glasskeep.app.nativeapp.data.AiClient
 import com.glasskeep.app.nativeapp.data.ChecklistPreview
@@ -89,8 +94,12 @@ import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
 import com.glasskeep.app.nativeapp.data.isReminderPast
+import com.glasskeep.app.nativeapp.data.matchesAnyTag
+import com.glasskeep.app.nativeapp.data.matchesSearchQuery
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.local.SyncQueueEntity
+import com.glasskeep.app.nativeapp.data.network.LogoDto
+import com.glasskeep.app.nativeapp.data.network.NoteIconDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
 import com.glasskeep.app.ui.DarkBorderColor
 import com.glasskeep.app.ui.DarkSubtextColor
@@ -103,7 +112,9 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val ErrorColor = Color(0xFFdc2626)
 
@@ -168,9 +179,12 @@ fun NativeNotesListScreen(
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showBulkTrashConfirm by remember { mutableStateOf(false) }
     var showBulkColorPicker by remember { mutableStateOf(false) }
+    var showBulkLogoPicker by remember { mutableStateOf(false) }
+    var bulkLogos by remember { mutableStateOf<List<LogoDto>>(emptyList()) }
     var bulkActionRunning by remember { mutableStateOf(false) }
     var sidebarOpen by remember { mutableStateOf(false) }
     var activeTagFilter by remember { mutableStateOf<String?>(null) }
+    var activeTagFilters by remember { mutableStateOf<Set<String>>(emptySet()) }
     var aiAnswer by remember { mutableStateOf<String?>(null) }
     var aiCitedNoteIds by remember { mutableStateOf<List<String>>(emptyList()) }
     var aiLoading by remember { mutableStateOf(false) }
@@ -197,7 +211,7 @@ fun NativeNotesListScreen(
     // and while searching or tag-filtered: filteredNotes is then a subset
     // of notes, and a reorder needs every id in each pinned/unpinned
     // group, not just what's currently visible.
-    val reorderEnabled = !selectionMode && searchQuery.isBlank() && activeTagFilter == null
+    val reorderEnabled = !selectionMode && searchQuery.isBlank() && activeTagFilter == null && activeTagFilters.isEmpty()
     // Last-reported on-screen bounds per card (see ReorderableNoteCard's
     // onGloballyPositioned), read only at drag-end to hit-test the drop
     // target - doesn't need to be a State, nothing should recompose when
@@ -256,11 +270,9 @@ fun NativeNotesListScreen(
         endDrag()
     }
 
-    // Client-side only, same fields the web app matches for a note without
-    // tags/items/images (title, content): those don't have a native data
-    // layer yet (see NoteEntity), so this is narrower than the web's own
-    // search until they do.
-    val filteredNotes = remember(notes, searchQuery, activeTagFilter) {
+    // Client-side parity with App.jsx: multi-tags are OR'ed, then search
+    // matches title/body/tags/checklist rows/image display names.
+    val filteredNotes = remember(notes, searchQuery, activeTagFilter, activeTagFilters) {
         // The drawer's two lenses are not folders: they narrow the list
         // already loaded, and the notes they hide are still in the plain
         // view (App.jsx:7063-7077).
@@ -268,11 +280,9 @@ fun NativeNotesListScreen(
             null -> notes
             SidebarAllImages -> notes.filter { it.hasImages }
             SidebarReminders -> notes.filter { !it.reminderAt.isNullOrBlank() }
-            else -> notes.filter { activeTagFilter in TagsJson.parse(it.tagsJson) }
+            else -> notes
         }
-        val q = searchQuery.trim()
-        if (q.isEmpty()) byTag
-        else byTag.filter { it.title.contains(q, ignoreCase = true) || it.content.contains(q, ignoreCase = true) }
+        byTag.filter { it.matchesAnyTag(activeTagFilters) && it.matchesSearchQuery(searchQuery) }
     }
 
     val errorSyncTemplate = stringResource(R.string.native_notes_error_sync)
@@ -286,6 +296,14 @@ fun NativeNotesListScreen(
     val archiveLabel = stringResource(R.string.native_note_detail_archive)
     val pinLabel = stringResource(R.string.native_note_detail_pin)
     val colorLabel = stringResource(R.string.native_note_detail_change_color)
+    val logoLabel = stringResource(R.string.native_add_logo)
+    val exportZipLabel = stringResource(R.string.native_bulk_export_zip)
+    val selectAllLabel = stringResource(R.string.native_bulk_select_all)
+    val deselectAllLabel = stringResource(R.string.native_bulk_deselect_all)
+    val bulkIconSuccessTemplate = stringResource(R.string.native_bulk_icon_success)
+    val bulkIconErrorTemplate = stringResource(R.string.native_bulk_icon_error)
+    val bulkExportSuccess = stringResource(R.string.native_bulk_export_success)
+    val bulkExportError = stringResource(R.string.native_bulk_export_error)
     val lockInstanceFailed = stringResource(R.string.native_lock_instance_failed)
     val context = LocalContext.current
     val toasts = LocalGkToasts.current
@@ -353,6 +371,77 @@ fun NativeNotesListScreen(
         scope.launch {
             runBulkAction(context, ids) { id -> repository.setColorQueued(id, colorKey) }
             bulkActionRunning = false
+        }
+    }
+
+    fun toggleSelectAllVisible() {
+        val visibleIds = filteredNotes.mapTo(linkedSetOf()) { it.id }
+        if (visibleIds.isEmpty()) return
+        selectedIds = if (visibleIds.all { it in selectedIds }) selectedIds - visibleIds else selectedIds + visibleIds
+    }
+
+    fun bulkSetIcon(icon: NoteIconDto) {
+        showBulkLogoPicker = false
+        if (bulkActionRunning || selectedIds.isEmpty()) return
+        bulkActionRunning = true
+        val ids = selectedIds.toList()
+        scope.launch {
+            val succeeded = mutableListOf<String>()
+            var failed = 0
+            for (id in ids) {
+                try {
+                    repository.setNoteIcon(id, icon.copy(id = java.util.UUID.randomUUID().toString()))
+                    succeeded += id
+                } catch (t: Throwable) {
+                    NativeDebug.e("Bulk icon failed for note $id", t)
+                    failed++
+                }
+            }
+            bulkActionRunning = false
+            if (failed == 0) toasts.success(String.format(bulkIconSuccessTemplate, succeeded.size))
+            else toasts.error(String.format(bulkIconErrorTemplate, failed))
+        }
+    }
+
+    fun openBulkLogoPicker() {
+        showBulkLogoPicker = true
+        scope.launch {
+            try {
+                bulkLogos = repository.fetchLogos()
+            } catch (t: Throwable) {
+                NativeDebug.e("Bulk logo library load failed", t)
+            }
+        }
+    }
+
+    fun bulkExportZip() {
+        if (bulkActionRunning || selectedIds.isEmpty()) return
+        val chosen = notes.filter { it.id in selectedIds }
+        bulkActionRunning = true
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) { NoteExporter.exportNotesZip(context, chosen) }
+            bulkActionRunning = false
+            if (ok) toasts.success(bulkExportSuccess) else toasts.error(bulkExportError)
+        }
+    }
+
+    val bulkLogoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        val picked = uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val dataUrl = withContext(Dispatchers.IO) {
+                    ImageCompression.compressToDataUrl(context, picked)
+                } ?: return@launch
+                val name = ImageCompression.displayNameFor(context, picked) ?: ""
+                val logo = repository.createLogo(name, dataUrl)
+                bulkLogos = repository.fetchLogos()
+                bulkSetIcon(NoteIconDto(id = logo?.id, src = logo?.src ?: dataUrl, name = logo?.name ?: name))
+            } catch (t: Throwable) {
+                NativeDebug.e("Bulk logo upload failed", t)
+                toasts.error(String.format(bulkIconErrorTemplate, selectedIds.size))
+            }
         }
     }
 
@@ -564,11 +653,15 @@ fun NativeNotesListScreen(
                 subtextColor = subtextColor,
                 // The two lenses read as their own names, not as the
                 // sentinels they are stored under.
-                activeTagLabel = when (activeTagFilter) {
-                    null -> null
+                activeTagLabel = when {
+                    activeTagFilters.size > 1 -> stringResource(R.string.native_sidebar_active_tags, activeTagFilters.size)
+                    activeTagFilters.size == 1 -> activeTagFilters.first()
+                    activeTagFilter == null -> null
+                    else -> when (activeTagFilter) {
                     SidebarAllImages -> stringResource(R.string.native_sidebar_all_images)
                     SidebarReminders -> stringResource(R.string.native_sidebar_reminders)
                     else -> activeTagFilter
+                    }
                 },
                 activeLens = activeTagFilter?.takeIf { it == SidebarAllImages || it == SidebarReminders },
                 appName = container.branding.appName ?: stringResource(R.string.app_name),
@@ -628,7 +721,7 @@ fun NativeNotesListScreen(
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.native_notes_empty), color = subtextColor)
                 }
-            } else if (filteredNotes.isEmpty() && (searchQuery.isNotBlank() || activeTagFilter != null)) {
+            } else if (filteredNotes.isEmpty() && (searchQuery.isNotBlank() || activeTagFilter != null || activeTagFilters.isNotEmpty())) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.native_notes_search_empty), color = subtextColor)
                 }
@@ -695,16 +788,30 @@ fun NativeNotesListScreen(
             dark = dark,
             tags = tagCounts,
             activeTag = activeTagFilter,
-            onSelectNotes = { activeTagFilter = null; sidebarOpen = false },
-            onSelectTag = { tag -> activeTagFilter = tag; sidebarOpen = false },
-            onSelectImages = { activeTagFilter = SidebarAllImages; sidebarOpen = false },
-            onSelectReminders = { activeTagFilter = SidebarReminders; sidebarOpen = false },
+            activeTags = activeTagFilters,
+            onSelectNotes = { activeTagFilter = null; activeTagFilters = emptySet(); sidebarOpen = false },
+            onSelectTag = { tag, additive ->
+                activeTagFilter = null
+                activeTagFilters = if (additive) {
+                    val current = activeTagFilters.firstOrNull { it.equals(tag, ignoreCase = true) }
+                    if (current != null) activeTagFilters - current else activeTagFilters + tag
+                } else {
+                    if (activeTagFilters.size == 1 && activeTagFilters.first().equals(tag, ignoreCase = true)) emptySet()
+                    else setOf(tag)
+                }
+                if (!additive) sidebarOpen = false
+            },
+            onClearTagFilters = { activeTagFilters = emptySet() },
+            onSelectImages = { activeTagFilter = SidebarAllImages; activeTagFilters = emptySet(); sidebarOpen = false },
+            onSelectReminders = { activeTagFilter = SidebarReminders; activeTagFilters = emptySet(); sidebarOpen = false },
             onOpenArchived = { sidebarOpen = false; onOpenArchived() },
             onOpenTrash = { sidebarOpen = false; onOpenTrash() },
             onClose = { sidebarOpen = false },
         )
 
         if (selectionMode) {
+            val visibleIds = filteredNotes.mapTo(linkedSetOf()) { it.id }
+            val allVisibleSelected = visibleIds.isNotEmpty() && visibleIds.all { it in selectedIds }
             SelectionActionBar(
                 selectedCount = selectedIds.size,
                 actions = listOf(
@@ -735,6 +842,27 @@ fun NativeNotesListScreen(
                         icon = { PaletteIcon(size = 18.dp) },
                         enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
                         onClick = { showBulkColorPicker = true },
+                    ),
+                    BulkActionButton(
+                        label = logoLabel,
+                        tone = BulkTone.CYAN,
+                        icon = { LogoIcon(size = 18.dp, tint = BulkTone.CYAN.foreground(dark)) },
+                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                        onClick = { openBulkLogoPicker() },
+                    ),
+                    BulkActionButton(
+                        label = exportZipLabel,
+                        tone = BulkTone.GREEN,
+                        icon = { DownloadIcon(size = 18.dp, tint = BulkTone.GREEN.foreground(dark)) },
+                        enabled = !bulkActionRunning && selectedIds.isNotEmpty(),
+                        onClick = { bulkExportZip() },
+                    ),
+                    BulkActionButton(
+                        label = if (allVisibleSelected) deselectAllLabel else selectAllLabel,
+                        tone = BulkTone.SLATE,
+                        icon = { CheckSquareIcon(size = 18.dp, tint = BulkTone.SLATE.foreground(dark)) },
+                        enabled = !bulkActionRunning && visibleIds.isNotEmpty(),
+                        onClick = { toggleSelectAllVisible() },
                     ),
                 ),
                 onClose = { exitSelection() },
@@ -771,6 +899,26 @@ fun NativeNotesListScreen(
                 borderColor = borderColor,
                 onPick = { colorKey -> bulkColor(colorKey) },
                 onDismiss = { showBulkColorPicker = false },
+            )
+        }
+
+        if (showBulkLogoPicker) {
+            BulkLogoPickerDialog(
+                logos = bulkLogos,
+                dark = dark,
+                onPick = { logo -> bulkSetIcon(NoteIconDto(id = logo.id, src = logo.src, name = logo.name)) },
+                onUploadNew = {
+                    showBulkLogoPicker = false
+                    bulkLogoPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                onDelete = { logo ->
+                    scope.launch {
+                        if (repository.deleteLogo(logo.id)) bulkLogos = bulkLogos.filterNot { it.id == logo.id }
+                    }
+                },
+                onDismiss = { showBulkLogoPicker = false },
             )
         }
 

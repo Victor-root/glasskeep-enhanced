@@ -556,8 +556,8 @@ data class PatchNoteRequest(
 /** Body for POST /api/notes. The server defaults every field but `type` to
  *  empty on its own, so creating a blank note only needs the type. The
  *  other fields exist for duplicateNote(), which fills them in from the
- *  note being copied; `items` stays opaque JSON (never inspected, just
- *  relayed) since native doesn't understand checklist item shape yet. */
+ *  note being copied. Items/images stay JsonElement on the wire so their
+ *  complete server shape survives the queued create unchanged. */
 @Serializable
 data class CreateNoteRequest(
     val id: String? = null,

@@ -4,7 +4,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +50,7 @@ import com.glasskeep.app.ui.DarkTitleColor
 import com.glasskeep.app.ui.LightCardBg
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
+import com.glasskeep.app.ui.Indigo
 
 private val SidebarActiveGradient = Brush.linearGradient(listOf(Color(0xFF6366f1), Color(0xFF7c3aed)))
 private val SidebarActiveShadowTint = Color(0xFF7C3AED)
@@ -55,8 +58,8 @@ private val SidebarActiveShadowTint = Color(0xFF7C3AED)
 /** The two entries that are not folders but lenses over the notes
  *  already loaded: only those carrying an image, and only those carrying
  *  a reminder (ALL_IMAGES / REMINDERS, utils/constants.js). Sentinels
- *  rather than an enum so they share [activeTag] with a real tag name,
- *  exactly as the web shares one `tagFilter`. */
+ *  rather than an enum so they share [activeTag] with the web's singular
+ *  `tagFilter`; ordinary tags use [activeTags] for single or multi-filter. */
 internal const val SidebarAllImages = "__ALL_IMAGES__"
 internal const val SidebarReminders = "__REMINDERS__"
 
@@ -72,8 +75,10 @@ fun TagSidebar(
     dark: Boolean,
     tags: List<Pair<String, Int>>,
     activeTag: String?,
+    activeTags: Set<String>,
     onSelectNotes: () -> Unit,
-    onSelectTag: (String) -> Unit,
+    onSelectTag: (tag: String, additive: Boolean) -> Unit,
+    onClearTagFilters: () -> Unit,
     onSelectImages: () -> Unit,
     onSelectReminders: () -> Unit,
     onOpenArchived: () -> Unit,
@@ -145,10 +150,36 @@ fun TagSidebar(
                     .verticalScroll(rememberScrollState())
                     .padding(8.dp),
             ) {
+                if (activeTags.size > 1) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 4.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Indigo.copy(alpha = if (dark) 0.18f else 0.12f))
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.native_sidebar_active_tags, activeTags.size),
+                            color = if (dark) Color(0xFFC7D2FE) else Color(0xFF3730A3),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            stringResource(R.string.native_sidebar_clear_tags),
+                            color = if (dark) Color(0xFFA5B4FC) else Color(0xFF4F46E5),
+                            fontSize = 12.sp,
+                            modifier = Modifier.clickable(role = Role.Button) { onClearTagFilters() },
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
                 SidebarNavItem(
                     icon = { tint -> NotesIcon(size = 20.dp, tint = tint) },
                     label = stringResource(R.string.native_header_notes_label),
-                    active = activeTag == null,
+                    active = activeTag == null && activeTags.isEmpty(),
                     titleColor = titleColor,
                     onClick = onSelectNotes,
                 )
@@ -199,10 +230,11 @@ fun TagSidebar(
                             icon = { tint -> TagIcon(size = 20.dp, tint = tint) },
                             label = tag,
                             count = count,
-                            active = tag == activeTag,
+                            active = activeTags.any { it.equals(tag, ignoreCase = true) },
                             titleColor = titleColor,
                             subtextColor = subtextColor,
-                            onClick = { onSelectTag(tag) },
+                            onClick = { onSelectTag(tag, false) },
+                            onLongClick = { onSelectTag(tag, true) },
                         )
                         if (index != tags.lastIndex) Spacer(Modifier.height(4.dp))
                     }
@@ -214,6 +246,7 @@ fun TagSidebar(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SidebarNavItem(
     icon: @Composable (tint: Color) -> Unit,
@@ -221,6 +254,7 @@ private fun SidebarNavItem(
     active: Boolean,
     titleColor: Color,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     count: Int? = null,
     subtextColor: Color = titleColor,
 ) {
@@ -239,11 +273,13 @@ private fun SidebarNavItem(
                     Modifier
                 },
             )
-            .clickable(
+            .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 role = Role.Button,
-            ) { onClick() }
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

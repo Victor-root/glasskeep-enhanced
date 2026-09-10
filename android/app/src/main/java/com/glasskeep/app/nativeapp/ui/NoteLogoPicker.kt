@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.data.network.LogoDto
 
@@ -134,7 +135,6 @@ private fun AddImageMenuRow(
  * photo picker, and a small x on each tile that drops it from the library
  * (notes already pointing at it keep their own copy).
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun LogoPickerPopover(
     logos: List<LogoDto>,
@@ -154,83 +154,133 @@ internal fun LogoPickerPopover(
         borderColor = if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.10f),
         onDismiss = onDismiss,
     ) {
-        Column(Modifier.padding(12.dp)) {
-            if (logos.isEmpty()) {
-                Text(
-                    stringResource(R.string.native_no_logos_yet),
-                    color = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
-                    fontSize = 12.sp,
-                )
-                Spacer(Modifier.size(8.dp))
-            }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                for (logo in logos) {
-                    Box {
-                        val selected = logo.src == selectedSrc
-                        Box(
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .border(
-                                    width = if (selected) 2.dp else 1.dp,
-                                    color = if (selected) accent else tileBorder,
-                                    shape = RoundedCornerShape(12.dp),
-                                )
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    role = Role.Button,
-                                ) { onPick(logo) }
-                                .padding(6.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            rememberDecodedImage(logo.src)?.let { bitmap ->
-                                Image(
-                                    bitmap = bitmap,
-                                    contentDescription = logo.name.ifBlank {
-                                        stringResource(R.string.native_note_icon)
-                                    },
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            }
-                        }
-                        val deleteLabel = stringResource(R.string.native_delete_logo)
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .size(18.dp)
-                                .clip(CircleShape)
-                                .background(if (dark) MenuRedDark else MenuRedLight)
-                                .gkTooltip(deleteLabel)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    role = Role.Button,
-                                ) { onDelete(logo) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CloseIcon(size = 12.dp, tint = Color.White)
+        LogoPickerGrid(logos, selectedSrc, dark, onPick, onUploadNew, onDelete)
+    }
+}
+
+/** Dialog-shaped host for the multi-selection toolbar, which has no
+ *  stable footer button to anchor the arrowed popover to. */
+@Composable
+internal fun BulkLogoPickerDialog(
+    logos: List<LogoDto>,
+    dark: Boolean,
+    onPick: (LogoDto) -> Unit,
+    onUploadNew: () -> Unit,
+    onDelete: (LogoDto) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .width(280.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(if (dark) MenuBgDark else Color.White)
+                .border(
+                    1.dp,
+                    if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.10f),
+                    RoundedCornerShape(18.dp),
+                ),
+        ) {
+            Text(
+                stringResource(R.string.native_note_icon),
+                color = if (dark) Color(0xFFF3F4F6) else Color(0xFF1F2937),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 16.dp, top = 14.dp),
+            )
+            LogoPickerGrid(logos, null, dark, onPick, onUploadNew, onDelete)
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LogoPickerGrid(
+    logos: List<LogoDto>,
+    selectedSrc: String?,
+    dark: Boolean,
+    onPick: (LogoDto) -> Unit,
+    onUploadNew: () -> Unit,
+    onDelete: (LogoDto) -> Unit,
+) {
+    val accent = if (dark) MenuVioletDark else MenuVioletLight
+    val tileBorder = if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f)
+    Column(Modifier.padding(12.dp)) {
+        if (logos.isEmpty()) {
+            Text(
+                stringResource(R.string.native_no_logos_yet),
+                color = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.size(8.dp))
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            for (logo in logos) {
+                Box {
+                    val selected = logo.src == selectedSrc
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(
+                                width = if (selected) 2.dp else 1.dp,
+                                color = if (selected) accent else tileBorder,
+                                shape = RoundedCornerShape(12.dp),
+                            )
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Button,
+                            ) { onPick(logo) }
+                            .padding(6.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        rememberDecodedImage(logo.src)?.let { bitmap ->
+                            Image(
+                                bitmap = bitmap,
+                                contentDescription = logo.name.ifBlank {
+                                    stringResource(R.string.native_note_icon)
+                                },
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
                     }
+                    val deleteLabel = stringResource(R.string.native_delete_logo)
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(if (dark) MenuRedDark else MenuRedLight)
+                            .gkTooltip(deleteLabel)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Button,
+                            ) { onDelete(logo) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CloseIcon(size = 12.dp, tint = Color.White)
+                    }
                 }
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .dashedBorder(tileBorder, RoundedCornerShape(12.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onUploadNew() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("+", color = accent, fontSize = 22.sp, fontWeight = FontWeight.Light)
-                }
+            }
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .dashedBorder(tileBorder, RoundedCornerShape(12.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onUploadNew() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("+", color = accent, fontSize = 22.sp, fontWeight = FontWeight.Light)
             }
         }
     }

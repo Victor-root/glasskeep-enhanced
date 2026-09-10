@@ -4,7 +4,21 @@ import android.content.Context
 import android.content.Intent
 import android.util.Base64
 import androidx.core.content.FileProvider
+import com.glasskeep.app.nativeapp.data.ChecklistItemData
+import com.glasskeep.app.nativeapp.data.ChecklistItems
+import com.glasskeep.app.nativeapp.data.ChecklistSectionData
+import com.glasskeep.app.nativeapp.data.NoteContent
+import com.glasskeep.app.nativeapp.data.TagsJson
+import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 
 /**
  * Exports a text note as a .md file, or a note image, and hands either to
@@ -71,6 +85,69 @@ object NoteExporter {
             NativeDebug.e("NoteExporter.exportImage failed", e)
             false
         }
+    }
+
+    /** One Markdown file per selected note, zipped exactly like the web's
+     *  multi-select download. The lightweight list cache already carries
+     *  every textual field and image name needed for this export. */
+    fun exportNotesZip(context: Context, notes: List<NoteEntity>): Boolean {
+        if (notes.isEmpty()) return false
+        val stamp = SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss-SSS'Z'", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }.format(Date())
+        val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+        val file = File(dir, "glass-keep-selected-$stamp.zip")
+        return try {
+            val usedNames = mutableMapOf<String, Int>()
+            ZipOutputStream(file.outputStream().buffered()).use { zip ->
+                notes.forEachIndexed { index, note ->
+                    val fallback = "note-${note.id.takeLast(6).ifBlank { index.plus(1).toString() }}"
+                    val base = sanitizeFilename(note.title.ifBlank { fallback }).ifBlank { "note-${index + 1}" }
+                    val occurrence = usedNames.getOrDefault(base, 0) + 1
+                    usedNames[base] = occurrence
+                    val uniqueBase = if (occurrence == 1) base else "$base-$occurrence"
+                    zip.putNextEntry(ZipEntry("$uniqueBase.md"))
+                    zip.write(noteMarkdown(note).toByteArray(Charsets.UTF_8))
+                    zip.closeEntry()
+                }
+            }
+            shareFile(context, file, "application/zip")
+            true
+        } catch (e: Exception) {
+            NativeDebug.e("NoteExporter.exportNotesZip failed", e)
+            false
+        }
+    }
+
+    internal fun noteMarkdown(note: NoteEntity): String = buildString {
+        if (note.title.isNotBlank()) append("# ").append(note.title).append("\n\n")
+        val tags = TagsJson.parse(note.tagsJson)
+        if (tags.isNotEmpty()) {
+            append("**Tags:** ").append(tags.joinToString(", ") { "`$it`" }).append("\n\n")
+        }
+        if (note.type == "text") {
+            append(NoteContent.previewPlainText(note.content, Int.MAX_VALUE))
+        } else {
+            val rawItems = runCatching {
+                (Json.parseToJsonElement(note.itemsJson) as? JsonArray)?.toList().orEmpty()
+            }.getOrDefault(emptyList())
+            for (entry in ChecklistItems.parse(rawItems)) {
+                when (entry) {
+                    is ChecklistSectionData -> append("\n## ").append(entry.title).append("\n\n")
+                    is ChecklistItemData -> {
+                        if (entry.indent > 0) append("  ")
+                        append("- [").append(if (entry.done) "x" else " ").append("] ")
+                            .append(entry.text).append('\n')
+                    }
+                }
+            }
+        }
+        val imageNames = TagsJson.parse(note.imageNamesJson)
+        if (imageNames.isNotEmpty()) {
+            append("\n> _").append(imageNames.size).append(" image(s) attached)_ ")
+                .append(imageNames.joinToString(", ") { it.ifBlank { "image" } })
+        }
+        append('\n')
     }
 
     private fun shareFile(context: Context, file: File, mimeType: String) {

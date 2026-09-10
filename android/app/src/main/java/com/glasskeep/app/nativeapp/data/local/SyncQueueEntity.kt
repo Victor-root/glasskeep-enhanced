@@ -7,12 +7,10 @@ import androidx.room.PrimaryKey
  * One not-yet-confirmed note edit, mirroring the shape of a syncEngine.js
  * queue item (src/sync/syncEngine.js / src/sync/localDb.js) closely enough
  * to reuse the same design, including idempotent client-ID creation and
- * the patch-style actions that may follow it (see SyncQueueType). Lives in
- * its own database (SyncQueueDatabase),
- * deliberately never AppDatabase: that one is a disposable server mirror
- * with a destructive-migration policy (see its own doc comment), which
- * would be actively dangerous for a table holding edits the server hasn't
- * seen yet.
+ * the patch-style actions that may follow it (see SyncQueueType). It lives
+ * in its own database (SyncQueueDatabase), keeping pending operations
+ * independently durable from the render cache and its legacy destructive
+ * migration fallback.
  */
 @Entity(tableName = "sync_queue")
 data class SyncQueueEntity(

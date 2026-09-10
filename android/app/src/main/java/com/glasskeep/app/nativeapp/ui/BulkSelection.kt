@@ -164,9 +164,8 @@ data class BulkActionButton(
  * One deliberate difference, disclosed rather than silently dropped: the
  * web measures its own width and folds whatever overflows into a kebab
  * menu. Native keeps every action on the row and lets it scroll
- * sideways if a very narrow screen ever needs it: the native action set
- * is four or five buttons, well inside the budget the web's own measure
- * computes, so a kebab here would be a menu that never opens.
+ * sideways if a very narrow screen needs it. This keeps select-all, logo
+ * and ZIP export directly reachable alongside the existing actions.
  */
 @Composable
 internal fun SelectionActionBar(

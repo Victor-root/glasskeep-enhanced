@@ -75,15 +75,16 @@ data class RichBlock(
  * strike, link, inline code, subscript, superscript, highlight, and the
  * three textStyle attributes (colour, font family, font size).
  *
- * The document is FLAT: a list, a blockquote or a task list becomes a run
- * of consecutive blocks of the matching kind, which [encode] regroups back
- * into the nested nodes Tiptap expects. That mirrors how this project's
- * own Indent extension already works (it never nests lists, see its source
- * comment), and keeps one editable text field per visible line.
+ * The editor model is flat: a list, blockquote or task list becomes a run
+ * of consecutive blocks. Structurally nested Tiptap lists are flattened
+ * into those blocks with increasing [RichBlock.indent], which the project's
+ * own Indent extension renders and [encode] preserves. This keeps one
+ * editable text field per visible line without degrading nested lists to
+ * the plain read-only fallback.
  *
  * [parse] still returns null rather than guess for anything outside that
- * vocabulary: a nested list or task list, a heading beyond level 5, a
- * table, an image node. NoteDetailScreen's existing "formatting not
+ * vocabulary: a heading beyond level 5, a table, an image node.
+ * NoteDetailScreen's existing "formatting not
  * available" fallback then opens the note read-only-ish in plain text, so
  * a round-trip through this editor can never quietly drop formatting.
  */
@@ -138,13 +139,16 @@ object RichDoc {
         return parseTextBlock(node, kind)
     }
 
-    /** `list -> listItem[] -> [paragraph]`: this project's Indent extension
-     *  never nests lists (see its own source comment), a listItem always
-     *  holds exactly one plain paragraph, so each listItem becomes one flat
-     *  block of the matching kind. A listItem with more than one child or a
-     *  nested list means "not this vocabulary". The indent lives on the
-     *  listItem, not on its paragraph (Indent.js:69-75). */
-    private fun parseList(node: JsonObject, itemKind: RichBlockKind): List<RichBlock>? {
+    /** `list -> listItem[] -> [paragraph, nestedList?]`. Nested children
+     *  are flattened in document order and gain one indent level. Existing
+     *  explicit indent attrs are additive, so older documents produced by
+     *  this app and standard structurally-nested Tiptap documents converge
+     *  on the same editable representation. */
+    private fun parseList(
+        node: JsonObject,
+        itemKind: RichBlockKind,
+        nestingDepth: Int = 0,
+    ): List<RichBlock>? {
         if (!attrsAreKnown(node["attrs"] as? JsonObject, extraAllowedKeys = setOf("start"))) return null
         val items = node["content"] as? JsonArray ?: return null
         val blocks = mutableListOf<RichBlock>()
@@ -154,20 +158,22 @@ object RichDoc {
             val itemAttrs = itemObj["attrs"] as? JsonObject
             if (!attrsAreKnown(itemAttrs)) return null
             val itemContent = itemObj["content"] as? JsonArray ?: return null
-            if (itemContent.size != 1) return null
+            if (itemContent.isEmpty()) return null
             val paragraphNode = itemContent[0] as? JsonObject ?: return null
             if (nodeType(paragraphNode) != "paragraph") return null
             val block = parseTextBlock(paragraphNode, itemKind) ?: return null
-            blocks.add(block.copy(indent = readIndent(itemAttrs)))
+            blocks.add(block.copy(indent = (readIndent(itemAttrs) + nestingDepth).coerceAtMost(MAX_INDENT)))
+            for (child in itemContent.drop(1)) {
+                val childObj = child as? JsonObject ?: return null
+                blocks.addAll(parseNestedList(childObj, nestingDepth + 1) ?: return null)
+            }
         }
         return blocks
     }
 
-    /** `taskList -> taskItem(checked) -> [paragraph]`. TaskItem is configured
-     *  `nested: true` on the web, but a task item holding another task list
-     *  has no flat representation here, so it rejects the whole doc rather
-     *  than flatten the nesting away. */
-    private fun parseTaskList(node: JsonObject): List<RichBlock>? {
+    /** TaskItem is configured `nested: true` on the web. It uses the same
+     *  flatten-to-indent representation as bullet and ordered lists. */
+    private fun parseTaskList(node: JsonObject, nestingDepth: Int = 0): List<RichBlock>? {
         if (!attrsAreKnown(node["attrs"] as? JsonObject)) return null
         val items = node["content"] as? JsonArray ?: return null
         val blocks = mutableListOf<RichBlock>()
@@ -178,14 +184,31 @@ object RichDoc {
             if (!attrsAreKnown(itemAttrs, extraAllowedKeys = setOf("checked"))) return null
             val checked = (itemAttrs?.get("checked") as? JsonPrimitive)?.booleanOrNull ?: false
             val itemContent = itemObj["content"] as? JsonArray ?: return null
-            if (itemContent.size != 1) return null
+            if (itemContent.isEmpty()) return null
             val paragraphNode = itemContent[0] as? JsonObject ?: return null
             if (nodeType(paragraphNode) != "paragraph") return null
             val block = parseTextBlock(paragraphNode, RichBlockKind.TASK_ITEM) ?: return null
-            blocks.add(block.copy(checked = checked, indent = readIndent(itemAttrs)))
+            blocks.add(
+                block.copy(
+                    checked = checked,
+                    indent = (readIndent(itemAttrs) + nestingDepth).coerceAtMost(MAX_INDENT),
+                ),
+            )
+            for (child in itemContent.drop(1)) {
+                val childObj = child as? JsonObject ?: return null
+                blocks.addAll(parseNestedList(childObj, nestingDepth + 1) ?: return null)
+            }
         }
         return blocks
     }
+
+    private fun parseNestedList(node: JsonObject, nestingDepth: Int): List<RichBlock>? =
+        when (nodeType(node)) {
+            "bulletList" -> parseList(node, RichBlockKind.BULLET_ITEM, nestingDepth)
+            "orderedList" -> parseList(node, RichBlockKind.NUMBERED_ITEM, nestingDepth)
+            "taskList" -> parseTaskList(node, nestingDepth)
+            else -> null
+        }
 
     /** A blockquote holding N paragraphs becomes N consecutive QUOTE blocks,
      *  each carrying the quote's own indent so [encode] can put it back. */

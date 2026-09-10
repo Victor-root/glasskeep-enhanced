@@ -490,7 +490,7 @@ fun NoteDetailScreen(
 
     /** Sets, moves, or clears (reminderAtIso == null) this note's reminder.
      *  The actual alarm isn't armed/cancelled from here: it follows from
-     *  the local cache update inside repository.setReminder(), which
+     *  the local cache update inside repository.setReminderQueued(), which
      *  NativeNavHost's own reconciliation reacts to (see ReminderSync.kt),
      *  same separation of concerns as the web, where the reminder-sync
      *  effect watches the notes array rather than being called inline from
@@ -559,7 +559,7 @@ fun NoteDetailScreen(
         if (merged != current) saveTags(merged)
     }
 
-    // ---------- Checklist item edits (flat, no-section case only) ----------
+    // ---------- Checklist item and section edits ----------
 
     /** Persists the given item list immediately, matching setTags()'s and
      *  changeColor()'s save-on-structural-change pattern rather than

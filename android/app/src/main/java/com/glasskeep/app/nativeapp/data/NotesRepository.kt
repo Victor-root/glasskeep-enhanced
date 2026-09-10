@@ -88,8 +88,8 @@ sealed class SaveNoteResult {
     data object Stale : SaveNoteResult()
     data object ReadOnly : SaveNoteResult()
     /** Trash-only: the caller no longer has any version of the original
-     *  note to show (left a shared note, or an owner transferred it away
-     *  by leaving). See NotesRepository.trashNote() and
+     *  note to show (left a shared note, transferred it away, or deleted
+     *  it for every participant). See NotesRepository.trashNote() and
      *  NoteMutationResponse's own doc comment. */
     data object Left : SaveNoteResult()
 }
@@ -492,13 +492,10 @@ class NotesRepository(
     }
 
     /**
-     * Soft-deletes (moves to trash). Scoped to the simple, non-collaborative
-     * case for now: the server's /trash route also handles leaving a shared
-     * note or deleting it for every collaborator, but native has no sharing
-     * UI at all yet, so those response shapes (`left`, `deletedForAll`,
-     * no `note` field) aren't something a real native user can trigger
-     * today. If one ever came back anyway, the null-note check below turns
-     * it into a clear error instead of silently mishandling it.
+     * Soft-deletes (moves to trash). Shared-note modes are chosen by the
+     * native collaboration confirmation UI: a participant can leave, and
+     * an owner can remove the note for everyone. `left` deliberately has
+     * no updated original note to cache; an ordinary trash returns one.
      *
      * Removed from the local (active-list) cache immediately: it's no
      * longer an active note. The trash screen itself doesn't read this
@@ -524,8 +521,8 @@ class NotesRepository(
         // screen has no reason to load (the caller navigates back either
         // way). Either branch means it's gone from this user's active
         // list, same local cleanup as an ordinary trash below.
-        if (body.left) {
-            NativeDebug.d("NotesRepository.trashNote id=$id: left (no longer accessible to this user)")
+        if (body.left || body.deletedForAll) {
+            NativeDebug.d("NotesRepository.trashNote id=$id: original no longer accessible")
             noteDao.deleteById(id)
             return SaveNoteResult.Left
         }
@@ -562,10 +559,8 @@ class NotesRepository(
 
     /** Permanently deletes a note already in trash. The trash screen is the
      *  only place this is offered from, so "note must be in trash" (the
-     *  server's own guard on this route) is never a real concern here. Not
-     *  in the local cache to begin with (trashed notes aren't cached, see
-     *  fetchTrashedNotes()), so there's nothing to clean up locally on
-     *  success. */
+     *  server's own guard on this route) is never a real concern here. Its
+     *  detail-only cache entry is removed on success too. */
     suspend fun deleteNotePermanently(id: String, clientUpdatedAt: String = nowIso()): DeleteResult {
         NativeDebug.d("NotesRepository.deleteNotePermanently id=$id")
         val response = api.deleteNotePermanently(id, ClientUpdatedAtRequest(clientUpdatedAt))
@@ -579,6 +574,7 @@ class NotesRepository(
             NativeDebug.d("NotesRepository.deleteNotePermanently id=$id: stale, not applied")
             return DeleteResult.Stale
         }
+        noteDao.deleteById(id)
         return DeleteResult.Deleted
     }
 
@@ -896,13 +892,13 @@ class NotesRepository(
         cacheNotes(listOf(full.copy(archived = false, trashed = false)))
     }
 
-    /** No noteDao mutation: a trashed note was never cached locally to
-     *  begin with (see deleteNotePermanently's own doc comment), so
-     *  there's nothing here to optimistically remove. */
+    /** Removes the cached trashed payload immediately while the permanent
+     *  delete waits in the durable queue. */
     suspend fun deleteNotePermanentlyQueued(id: String) {
         NativeDebug.d("NotesRepository.deleteNotePermanentlyQueued id=$id")
         val request = ClientUpdatedAtRequest(nowIso())
         syncQueueDao.enqueue(id, SyncQueueType.PERMANENT_DELETE.name, Json.encodeToString(request), System.currentTimeMillis())
+        noteDao.deleteById(id)
     }
 
     /** Sets, moves, or clears (reminderAtIso == null) a note's reminder,
@@ -1527,9 +1523,8 @@ class NotesRepository(
     }
 
     /** Full participant roster for CollaboratorsScreen.kt. Any
-     *  participant may call this, not just the owner. Always hits the
-     *  server, same "secondary screen, no local cache" tradeoff as
-     *  fetchArchivedNotes()/fetchTrashedNotes(). */
+     *  participant may call this, not just the owner. It is intentionally
+     *  fetched live because membership is not part of the offline queue. */
     suspend fun fetchNoteCollaborators(id: String): List<CollaboratorDto> {
         NativeDebug.d("NotesRepository.fetchNoteCollaborators id=$id")
         val response = api.getNoteCollaborators(id)
@@ -1743,6 +1738,7 @@ internal fun NoteDto.toEntity() = NoteEntity(
     reminderAt = reminderAt,
     position = position,
     hasImages = images.isNotEmpty(),
+    imageNamesJson = TagsJson.encode(NoteImages.parse(images).map { it.name }),
     iconSrc = icon?.src,
     iconName = icon?.name,
 )

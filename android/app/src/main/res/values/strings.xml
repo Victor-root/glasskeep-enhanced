@@ -130,12 +130,21 @@
     <string name="native_bulk_unarchived_success">%1$d note(s) unarchived</string>
     <string name="native_bulk_restored_success">%1$d note(s) restored</string>
     <string name="native_bulk_partial_failure">%1$d failed</string>
+    <string name="native_bulk_select_all">Select all</string>
+    <string name="native_bulk_deselect_all">Deselect all</string>
+    <string name="native_bulk_export_zip">Download (.zip)</string>
+    <string name="native_bulk_export_success">ZIP ready to share</string>
+    <string name="native_bulk_export_error">Couldn\'t create the ZIP export.</string>
+    <string name="native_bulk_icon_success">Icon applied to %1$d note(s)</string>
+    <string name="native_bulk_icon_error">Couldn\'t apply the icon to %1$d note(s)</string>
 
     <string name="native_sidebar_open">Open menu</string>
     <string name="native_sidebar_all_images">All Images</string>
     <string name="native_sidebar_reminders">Reminders</string>
     <string name="native_sidebar_tags_title">Tags</string>
     <string name="native_sidebar_tags_empty">No tags yet</string>
+    <string name="native_sidebar_active_tags">%1$d active tags</string>
+    <string name="native_sidebar_clear_tags">Clear</string>
     <string name="native_notes_more_options">More options</string>
 
     <string name="native_archived_title">Archived</string>
