@@ -1,6 +1,9 @@
 package com.glasskeep.app.nativeapp.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -10,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,8 +32,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -69,6 +75,11 @@ fun CreateNoteFab(
             Box(
                 Modifier
                     .fillMaxSize()
+                    // backdrop-blur-[2px] in MobileCreateFab.jsx. Modifier.blur
+                    // only actually blurs on API 31+ (RenderEffect); older
+                    // devices degrade gracefully to the plain tint below,
+                    // same as browsers without backdrop-filter support.
+                    .blur(2.dp)
                     .background(Color.Black.copy(alpha = 0.3f))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -85,61 +96,80 @@ fun CreateNoteFab(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AnimatedVisibility(
-                visible = open,
-                enter = fadeIn(animationSpec = tween(200)) + slideInVertically(animationSpec = tween(200)) { with(density) { 12.dp.roundToPx() } },
-                exit = fadeOut(animationSpec = tween(200)) + slideOutVertically(animationSpec = tween(200)) { with(density) { 12.dp.roundToPx() } },
-            ) {
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            val dialButtons = remember(dark) {
+                listOf<Triple<Int, Int, @Composable (Color) -> Unit>>(
+                    Triple(R.string.native_fab_audio_note, R.string.native_fab_audio_note_desc) { tint -> MicIcon(size = 20.dp, tint = tint) },
+                    Triple(R.string.native_fab_drawing, R.string.native_fab_drawing_desc) { tint -> BrushIcon(size = 20.dp, tint = tint) },
+                    Triple(R.string.native_fab_checklist, R.string.native_fab_checklist_desc) { tint -> ChecklistIcon(size = 20.dp, tint = tint) },
+                    Triple(R.string.native_fab_text_note, R.string.native_fab_text_note_desc) { tint -> TextNoteIcon(size = 20.dp, tint = tint) },
+                )
+            }
+            val dialColors = listOf(
+                if (dark) DialColors.AudioDark else DialColors.AudioLight,
+                if (dark) DialColors.DrawDark else DialColors.DrawLight,
+                if (dark) DialColors.ChecklistDark else DialColors.ChecklistLight,
+                if (dark) DialColors.TextDark else DialColors.TextLight,
+            )
+            val onClicks = listOf<() -> Unit>(
+                { onOpenChange(false); onCreateAudio() },
+                { onOpenChange(false); onCreateDrawing() },
+                { onOpenChange(false); onCreateChecklist() },
+                { onOpenChange(false); onCreateText() },
+            )
+
+            // Cascading reveal from the bottom tile up: a little native flair
+            // the web's single-group fade/slide doesn't have room for, each
+            // tile entering slightly after the one below it.
+            dialButtons.forEachIndexed { index, (titleRes, descRes, icon) ->
+                val delayMs = (dialButtons.size - 1 - index) * 30
+                AnimatedVisibility(
+                    visible = open,
+                    enter = fadeIn(animationSpec = tween(220, delayMillis = delayMs)) +
+                        slideInVertically(animationSpec = tween(220, delayMillis = delayMs)) { with(density) { 16.dp.roundToPx() } },
+                    exit = fadeOut(animationSpec = tween(150)) +
+                        slideOutVertically(animationSpec = tween(150)) { with(density) { 12.dp.roundToPx() } },
+                ) {
                     DialButton(
-                        title = stringResource(R.string.native_fab_audio_note),
-                        description = stringResource(R.string.native_fab_audio_note_desc),
-                        icon = { tint -> MicIcon(size = 20.dp, tint = tint) },
-                        colors = if (dark) DialColors.AudioDark else DialColors.AudioLight,
-                        onClick = { onOpenChange(false); onCreateAudio() },
-                    )
-                    DialButton(
-                        title = stringResource(R.string.native_fab_drawing),
-                        description = stringResource(R.string.native_fab_drawing_desc),
-                        icon = { tint -> BrushIcon(size = 20.dp, tint = tint) },
-                        colors = if (dark) DialColors.DrawDark else DialColors.DrawLight,
-                        onClick = { onOpenChange(false); onCreateDrawing() },
-                    )
-                    DialButton(
-                        title = stringResource(R.string.native_fab_checklist),
-                        description = stringResource(R.string.native_fab_checklist_desc),
-                        icon = { tint -> ChecklistIcon(size = 20.dp, tint = tint) },
-                        colors = if (dark) DialColors.ChecklistDark else DialColors.ChecklistLight,
-                        onClick = { onOpenChange(false); onCreateChecklist() },
-                    )
-                    DialButton(
-                        title = stringResource(R.string.native_fab_text_note),
-                        description = stringResource(R.string.native_fab_text_note_desc),
-                        icon = { tint -> TextNoteIcon(size = 20.dp, tint = tint) },
-                        colors = if (dark) DialColors.TextDark else DialColors.TextLight,
-                        onClick = { onOpenChange(false); onCreateText() },
+                        title = stringResource(titleRes),
+                        description = stringResource(descRes),
+                        icon = icon,
+                        colors = dialColors[index],
+                        onClick = onClicks[index],
                     )
                 }
             }
 
             val addNoteLabel = stringResource(R.string.native_fab_add_note)
+            val fabInteractionSource = remember { MutableInteractionSource() }
+            val fabPressed by fabInteractionSource.collectIsPressedAsState()
+            val fabScale by animateFloatAsState(
+                targetValue = if (fabPressed) 0.95f else 1f,
+                animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                label = "fabScale",
+            )
             Box(
                 modifier = Modifier
                     .size(56.dp)
+                    .scale(fabScale)
                     .clip(RoundedCornerShape(16.dp))
                     .background(FabGradient)
                     .semantics { contentDescription = addNoteLabel }
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = fabInteractionSource,
                         indication = null,
                         role = Role.Button,
                     ) { onOpenChange(!open) },
                 contentAlignment = Alignment.Center,
             ) {
+                val rotation by animateFloatAsState(
+                    targetValue = if (open) 45f else 0f,
+                    animationSpec = tween(200),
+                    label = "fabRotation",
+                )
                 PlusIcon(
                     size = 28.dp,
                     tint = Color.White,
-                    modifier = Modifier.rotate(if (open) 45f else 0f),
+                    modifier = Modifier.rotate(rotation),
                 )
             }
         }
