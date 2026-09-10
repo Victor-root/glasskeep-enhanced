@@ -79,7 +79,18 @@ class NativeAppActivity : ComponentActivity() {
             // itself cause this scope to recompose. See the snapshotFlow
             // below for that case.
             SideEffect {
-                val baseColor = if (signedIn) WorkspaceTheme.statusBarColor(themeId, dark).toArgb() else null
+                // NoteDetailScreen sets this while a note is open so the
+                // bars match that note's own color; this just needs to
+                // respect whatever it currently is when dark/theme changes
+                // trigger this SideEffect for their own reasons - the
+                // snapshotFlow below is what reacts to the override itself
+                // changing.
+                val overrideArgb = container.statusBarOverride.value
+                val baseColor = if (signedIn) {
+                    overrideArgb ?: WorkspaceTheme.statusBarColor(themeId, dark).toArgb()
+                } else {
+                    null
+                }
                 (view.context as ComponentActivity).applyThemedSystemBars(dark, baseColor)
             }
 
@@ -91,23 +102,25 @@ class NativeAppActivity : ComponentActivity() {
             val currentThemeId = rememberUpdatedState(themeId)
             val currentSignedIn = rememberUpdatedState(signedIn)
             LaunchedEffect(view) {
-                snapshotFlow { container.scrimActive.value }.collect { scrimActive ->
-                    val baseColor = if (currentSignedIn.value) {
-                        WorkspaceTheme.statusBarColor(currentThemeId.value, currentDark.value).toArgb()
-                    } else {
-                        null
+                snapshotFlow { container.scrimActive.value to container.statusBarOverride.value }
+                    .collect { (scrimActive, noteOverrideArgb) ->
+                        val baseColor = if (currentSignedIn.value) {
+                            noteOverrideArgb ?: WorkspaceTheme.statusBarColor(currentThemeId.value, currentDark.value).toArgb()
+                        } else {
+                            null
+                        }
+                        val overrideColor = if (scrimActive) {
+                            baseColor?.let { ColorUtils.blendARGB(it, android.graphics.Color.BLACK, 0.3f) }
+                        } else {
+                            baseColor
+                        }
+                        NativeDebug.d(
+                            "NativeAppActivity system bars: dark=${currentDark.value} signedIn=${currentSignedIn.value} " +
+                                "scrimActive=$scrimActive noteOverride=${noteOverrideArgb?.let { "#%08X".format(it) }} " +
+                                "baseColor=${baseColor?.let { "#%08X".format(it) }} overrideColor=${overrideColor?.let { "#%08X".format(it) }}",
+                        )
+                        (view.context as ComponentActivity).applyThemedSystemBars(currentDark.value, overrideColor)
                     }
-                    val overrideColor = if (scrimActive) {
-                        baseColor?.let { ColorUtils.blendARGB(it, android.graphics.Color.BLACK, 0.3f) }
-                    } else {
-                        baseColor
-                    }
-                    NativeDebug.d(
-                        "NativeAppActivity system bars: dark=${currentDark.value} signedIn=${currentSignedIn.value} scrimActive=$scrimActive " +
-                            "baseColor=${baseColor?.let { "#%08X".format(it) }} overrideColor=${overrideColor?.let { "#%08X".format(it) }}",
-                    )
-                    (view.context as ComponentActivity).applyThemedSystemBars(currentDark.value, overrideColor)
-                }
             }
             GlassKeepTheme {
                 CompositionLocalProvider(LocalGkDark provides dark) {

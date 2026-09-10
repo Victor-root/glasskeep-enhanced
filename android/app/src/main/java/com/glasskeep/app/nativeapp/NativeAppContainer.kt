@@ -35,6 +35,12 @@ class NativeAppContainer(context: Context) {
     // with it, instead of them staying at the flat theme color while the
     // content below them dims.
     val scrimActive = mutableStateOf(false)
+
+    // Set (as an ARGB Int) by NoteDetailScreen while a note is open, so the
+    // status/nav bars match that note's own background instead of staying
+    // on the workspace theme color underneath it. Null restores the normal
+    // theme color.
+    val statusBarOverride = mutableStateOf<Int?>(null)
     private val db = AppDatabase.get(appContext)
     private val syncQueueDb = SyncQueueDatabase.get(appContext)
 

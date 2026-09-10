@@ -50,6 +50,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -70,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -1594,6 +1596,13 @@ fun NoteDetailScreen(
     // phones, and fills the whole panel (sticky bar included) with
     // modalBgFor(color), so the screen reads as one flat color.
     val modalBg = noteModalBackground(note?.color, dark)
+    // The status/nav bars are a separate system-level surface from this
+    // Column's own background, so painting modalBg here alone never
+    // reached them - they stayed on the workspace theme color underneath
+    // this screen instead of following the note's own color the way the
+    // rest of the screen does.
+    LaunchedEffect(modalBg) { container.statusBarOverride.value = modalBg.toArgb() }
+    DisposableEffect(Unit) { onDispose { container.statusBarOverride.value = null } }
     val titleColor = if (dark) DarkTitleColor else LightTitleColor
     val subtextColor = if (dark) DarkSubtextColor else LightSubtextColor
     val borderColor = if (dark) DarkBorderColor else LightBorderColor
@@ -1664,6 +1673,10 @@ fun NoteDetailScreen(
                                 filled = currentNote.pinned,
                             )
                         }
+                        // ModalHeader.jsx groups pin+save with its own small
+                        // gap-0.5 (2px) rather than sitting them flush
+                        // against each other.
+                        Spacer(Modifier.width(4.dp))
                     }
                     val edit = editability
                     val hasUnsavedChanges = edit != null && (
@@ -1735,12 +1748,7 @@ fun NoteDetailScreen(
                             Box(Modifier.padding(horizontal = 8.dp).padding(bottom = 8.dp)) {
                                 NoteImagesSection(
                                     images = images,
-                                    subtextColor = subtextColor,
-                                    enabled = !changingImages && !isReadOnlyAccess,
                                     onImageClick = { index -> viewerIndex = index },
-                                    onAddClick = {
-                                        photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                    },
                                 )
                             }
                         }
@@ -2025,9 +2033,12 @@ fun NoteDetailScreen(
                         // Undo/redo track the title and the body, so they
                         // are hidden for the two types whose content they
                         // don't cover (ModalFooter.jsx:562): audio, and a
-                        // drawing's own canvas.
+                        // drawing's own canvas. A checklist stays interactive
+                        // in "view" mode (its checkboxes still toggle), so
+                        // ModalFooter.jsx's own `mType === "checklist" ||
+                        // !viewMode` keeps undo/redo there regardless.
                         showHistoryButtons = (!edit.isDrawType || !drawingCanvasMode) &&
-                            !edit.isAudioType && !isReadOnlyAccess && !viewMode,
+                            !edit.isAudioType && !isReadOnlyAccess && (edit.isChecklistType || !viewMode),
                         canUndo = history.canUndo,
                         canRedo = history.canRedo,
                         showFormatButton = (edit.isRichEditableType || (edit.isDrawType && !drawingCanvasMode)) &&
@@ -3174,8 +3185,12 @@ private fun NoteModalFooter(
                 .fillMaxWidth()
                 .background(if (dark) Color.Black.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.04f))
                 .navigationBarsPadding()
-                .padding(vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+                .padding(horizontal = 4.dp, vertical = 6.dp),
+            // ModalFooter.jsx spreads its buttons into two clusters - color/
+            // image/tags/undo/redo/format on the left, collaborate/trash/
+            // kebab/mode-toggle on the right - held apart by one flex-1
+            // spacer between them, not spaced evenly across the whole bar.
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (showColorButton) {
@@ -3262,33 +3277,10 @@ private fun NoteModalFooter(
                     TextColorIcon(size = 20.dp, tint = formatColor)
                 }
             }
-            if (showModeButton) {
-                FooterIconButton(
-                    contentDescription = stringResource(
-                        if (viewMode) R.string.native_note_detail_switch_to_edit
-                        else R.string.native_note_detail_switch_to_view
-                    ),
-                    onClick = onModeClick,
-                ) {
-                    if (viewMode) {
-                        PencilFilledIcon(size = 18.dp, tint = iconColor)
-                    } else {
-                        EyeFilledIcon(size = 18.dp, tint = iconColor)
-                    }
-                }
-            }
-            if (showDrawModeButton) {
-                FooterIconButton(
-                    contentDescription = stringResource(
-                        if (drawingCanvasMode) R.string.native_drawing_exit_mode
-                        else R.string.native_drawing_enter_mode
-                    ),
-                    onClick = onDrawModeClick,
-                ) {
-                    if (drawingCanvasMode) EyeFilledIcon(size = 18.dp, tint = iconColor)
-                    else PencilFilledIcon(size = 18.dp, tint = iconColor)
-                }
-            }
+            // ModalFooter.jsx's own flex-1 spacer: everything before this
+            // point is the left cluster, everything after is pinned to the
+            // right edge instead of spreading evenly across the whole bar.
+            Spacer(Modifier.weight(1f))
             if (showCollaborateButton) {
                 FooterIconButton(
                     contentDescription = stringResource(R.string.native_collaborators_title),
@@ -3315,6 +3307,36 @@ private fun NoteModalFooter(
                     KebabIcon(size = 20.dp, tint = iconColor)
                 }
                 menu()
+            }
+            // ModalFooter.jsx renders the view/edit toggle and the drawing
+            // mode group after the kebab (and its popover/reminder picker),
+            // not before it.
+            if (showModeButton) {
+                FooterIconButton(
+                    contentDescription = stringResource(
+                        if (viewMode) R.string.native_note_detail_switch_to_edit
+                        else R.string.native_note_detail_switch_to_view
+                    ),
+                    onClick = onModeClick,
+                ) {
+                    if (viewMode) {
+                        PencilFilledIcon(size = 18.dp, tint = iconColor)
+                    } else {
+                        EyeFilledIcon(size = 18.dp, tint = iconColor)
+                    }
+                }
+            }
+            if (showDrawModeButton) {
+                FooterIconButton(
+                    contentDescription = stringResource(
+                        if (drawingCanvasMode) R.string.native_drawing_exit_mode
+                        else R.string.native_drawing_enter_mode
+                    ),
+                    onClick = onDrawModeClick,
+                ) {
+                    if (drawingCanvasMode) EyeFilledIcon(size = 18.dp, tint = iconColor)
+                    else PencilFilledIcon(size = 18.dp, tint = iconColor)
+                }
             }
         }
     }

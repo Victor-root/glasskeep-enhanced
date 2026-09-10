@@ -38,7 +38,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -46,85 +45,60 @@ import androidx.compose.ui.window.DialogProperties
 import com.glasskeep.app.R
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.NoteImageData
-import com.glasskeep.app.ui.Indigo
 
 /**
- * Content-image grid + "add image" row, matching ModalImagesGrid.jsx's own
- * layout rule exactly: a single image goes full width, two or more wrap
- * two per row. Note icons aren't part of this: they're a separate
- * per-user, per-note feature server-side (its own table and endpoints),
- * not a native feature yet, see NoteImages.kt.
+ * Content-image grid, matching ModalImagesGrid.jsx's own layout rule
+ * exactly: a single image goes full width, two or more wrap two per row.
+ * ModalImagesGrid.jsx renders nothing at all when there are no images
+ * (`if (!images.length) return null`) - adding one is footer-only there,
+ * never an inline prompt in the note body, so this mirrors that instead
+ * of showing its own "add image" row. Note icons aren't part of this:
+ * they're a separate per-user, per-note feature server-side (its own
+ * table and endpoints), not a native feature yet, see NoteImages.kt.
  */
 @Composable
 fun NoteImagesSection(
     images: List<NoteImageData>,
-    subtextColor: Color,
-    enabled: Boolean,
     onImageClick: (Int) -> Unit,
-    onAddClick: () -> Unit,
 ) {
+    if (images.isEmpty()) return
     Column {
-        if (images.isNotEmpty()) {
-            if (images.size == 1) {
-                NoteImageThumbnail(
-                    image = images[0],
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 300.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Button,
-                        ) { onImageClick(0) },
-                )
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    images.chunked(2).forEachIndexed { rowIndex, pair ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            pair.forEachIndexed { colIndex, image ->
-                                val index = rowIndex * 2 + colIndex
-                                NoteImageThumbnail(
-                                    image = image,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(max = 180.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null,
-                                            role = Role.Button,
-                                        ) { onImageClick(index) },
-                                )
-                            }
-                            if (pair.size == 1) Spacer(Modifier.weight(1f))
+        if (images.size == 1) {
+            NoteImageThumbnail(
+                image = images[0],
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                    ) { onImageClick(0) },
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                images.chunked(2).forEachIndexed { rowIndex, pair ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        pair.forEachIndexed { colIndex, image ->
+                            val index = rowIndex * 2 + colIndex
+                            NoteImageThumbnail(
+                                image = image,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(max = 180.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        role = Role.Button,
+                                    ) { onImageClick(index) },
+                            )
                         }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
-            Spacer(Modifier.height(10.dp))
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    enabled = enabled,
-                    role = Role.Button,
-                ) { onAddClick() }
-                .padding(vertical = 8.dp),
-        ) {
-            PlusIcon(size = 16.dp, tint = if (enabled) Indigo else subtextColor)
-            Spacer(Modifier.width(10.dp))
-            Text(
-                stringResource(R.string.native_note_detail_add_image),
-                color = if (enabled) Indigo else subtextColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
         }
     }
 }
