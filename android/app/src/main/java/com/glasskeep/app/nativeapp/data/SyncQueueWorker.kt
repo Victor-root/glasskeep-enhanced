@@ -21,6 +21,7 @@ import com.glasskeep.app.nativeapp.data.network.ApiClientFactory
 import com.glasskeep.app.nativeapp.data.network.ArchiveNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ClientUpdatedAtRequest
 import com.glasskeep.app.nativeapp.data.network.ConvertNoteTypeRequest
+import com.glasskeep.app.nativeapp.data.network.CreateNoteRequest
 import com.glasskeep.app.nativeapp.data.network.PatchNoteRequest
 import com.glasskeep.app.nativeapp.data.network.ReorderNotesRequest
 import com.glasskeep.app.nativeapp.data.network.SetChecklistItemsRequest
@@ -80,13 +81,21 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
         )
 
         var anyOutstanding = false
+        val blockedNoteIds = mutableSetOf<String>()
         for ((index, item) in pending.withIndex()) {
+            // Preserve per-note ordering. In particular, no PATCH may run
+            // after this note's CREATE failed earlier in the same drain.
+            if (item.noteId in blockedNoteIds) {
+                anyOutstanding = true
+                continue
+            }
             try {
                 applyItem(repository, item)
                 queueDao.delete(item.queueId)
             } catch (t: Throwable) {
                 NativeDebug.e("SyncQueueWorker: item ${item.queueId} (${item.type}) for note ${item.noteId} failed", t)
                 anyOutstanding = true
+                blockedNoteIds += item.noteId
                 val attempts = item.attempts + 1
                 if (attempts >= MAX_ATTEMPTS) {
                     queueDao.markFailed(item.queueId, attempts, t.message)
@@ -101,6 +110,10 @@ class SyncQueueWorker(context: Context, params: WorkerParameters) : CoroutineWor
 
     private suspend fun applyItem(repository: NotesRepository, item: SyncQueueEntity) {
         when (SyncQueueType.valueOf(item.type)) {
+            SyncQueueType.CREATE -> {
+                val body = Json.decodeFromString<CreateNoteRequest>(item.payloadJson)
+                repository.createNoteOnline(body)
+            }
             SyncQueueType.TITLE_CONTENT -> {
                 val body = Json.decodeFromString<PatchNoteRequest>(item.payloadJson)
                 repository.patchNote(item.noteId, body.title, body.content, body.clientUpdatedAt)

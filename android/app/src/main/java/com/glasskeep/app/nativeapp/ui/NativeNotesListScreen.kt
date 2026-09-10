@@ -458,6 +458,7 @@ fun NativeNotesListScreen(
             try {
                 val note = repository.createTextNote()
                 NativeDebug.d("Created text note id=${note.id}")
+                SyncQueueWorker.triggerNow(context)
                 onOpenNote(note.id)
             } catch (t: Throwable) {
                 NativeDebug.e("Create text note failed", t)
@@ -476,6 +477,7 @@ fun NativeNotesListScreen(
             try {
                 val note = repository.createChecklistNote()
                 NativeDebug.d("Created checklist note id=${note.id}")
+                SyncQueueWorker.triggerNow(context)
                 onOpenNote(note.id)
             } catch (t: Throwable) {
                 NativeDebug.e("Create checklist note failed", t)
@@ -494,6 +496,7 @@ fun NativeNotesListScreen(
             try {
                 val note = repository.createDrawingNote()
                 NativeDebug.d("Created drawing note id=${note.id}")
+                SyncQueueWorker.triggerNow(context)
                 onOpenNote(note.id)
             } catch (t: Throwable) {
                 NativeDebug.e("Create drawing note failed", t)
@@ -512,6 +515,7 @@ fun NativeNotesListScreen(
             try {
                 val note = repository.createAudioNote()
                 NativeDebug.d("Created audio note id=${note.id}")
+                SyncQueueWorker.triggerNow(context)
                 onOpenNote(note.id)
             } catch (t: Throwable) {
                 NativeDebug.e("Create audio note failed", t)

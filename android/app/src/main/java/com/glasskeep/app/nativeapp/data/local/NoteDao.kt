@@ -20,24 +20,57 @@ interface NoteDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(notes: List<NoteEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertDetails(notes: List<NoteDetailEntity>)
+
+    @Transaction
+    suspend fun upsertNotesAndDetails(notes: List<NoteEntity>, details: List<NoteDetailEntity>) {
+        upsertAll(notes)
+        upsertDetails(details)
+    }
+
     /** One cached note, for the few writes that touch a single field and
      *  have to keep the rest of the row as-is (see the note-icon path in
      *  NotesRepository). */
     @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): NoteEntity?
 
+    @Query("SELECT * FROM note_details WHERE noteId = :id LIMIT 1")
+    suspend fun getDetailById(id: String): NoteDetailEntity?
+
     /** [upsertAll] for one note, same replace-on-conflict semantics. */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(note: NoteEntity)
 
     @Query("DELETE FROM notes")
-    suspend fun deleteAll()
+    suspend fun deleteAllNotes()
+
+    @Query("DELETE FROM note_details")
+    suspend fun deleteAllDetails()
+
+    @Transaction
+    suspend fun deleteAll() {
+        deleteAllNotes()
+        deleteAllDetails()
+    }
 
     @Query("DELETE FROM notes WHERE id = :id")
-    suspend fun deleteById(id: String)
+    suspend fun deleteNoteById(id: String)
+
+    @Query("DELETE FROM note_details WHERE noteId = :id")
+    suspend fun deleteDetailById(id: String)
+
+    @Transaction
+    suspend fun deleteById(id: String) {
+        deleteNoteById(id)
+        deleteDetailById(id)
+    }
 
     @Query("DELETE FROM notes WHERE id NOT IN (:keepIds)")
     suspend fun deleteMissing(keepIds: List<String>)
+
+    @Query("DELETE FROM note_details WHERE noteId NOT IN (:keepIds)")
+    suspend fun deleteMissingDetails(keepIds: List<String>)
 
     /**
      * Replace the whole cache with the server's current list in one go, so
@@ -58,13 +91,22 @@ interface NoteDao {
      * retrying).
      */
     @Transaction
-    suspend fun replaceAll(notes: List<NoteEntity>, protectedIds: Set<String> = emptySet()) {
+    suspend fun replaceAll(
+        notes: List<NoteEntity>,
+        details: List<NoteDetailEntity>,
+        protectedIds: Set<String> = emptySet(),
+    ) {
         val filtered = if (protectedIds.isEmpty()) notes else notes.filterNot { it.id in protectedIds }
+        val filteredDetails = if (protectedIds.isEmpty()) details else details.filterNot { it.noteId in protectedIds }
         if (filtered.isEmpty() && protectedIds.isEmpty()) {
-            deleteAll()
+            deleteAllNotes()
+            deleteAllDetails()
         } else {
             upsertAll(filtered)
-            deleteMissing(filtered.map { it.id } + protectedIds)
+            upsertDetails(filteredDetails)
+            val keepIds = filtered.map { it.id } + protectedIds
+            deleteMissing(keepIds)
+            deleteMissingDetails(keepIds)
         }
     }
 }

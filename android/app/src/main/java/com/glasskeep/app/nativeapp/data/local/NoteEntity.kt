@@ -7,8 +7,9 @@ import androidx.room.PrimaryKey
  * Local cache of a note, enough to render the list screen's card previews
  * offline (real content/checklist-item preview, not just the title), and to
  * compute the note detail screen's tag suggestions (every note's tags, not
- * just the open one). Images aren't modeled yet, nothing in the native UI
- * reads them from this cache so far.
+ * just the open one). The separate note_details table retains the complete
+ * serialized payload, including images and collaboration metadata, for
+ * opening and editing a note offline without bloating every list query.
  */
 @Entity(tableName = "notes")
 data class NoteEntity(

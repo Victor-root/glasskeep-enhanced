@@ -973,6 +973,7 @@ fun NoteDetailScreen(
             try {
                 val created = repository.duplicateNote(current, newTitle)
                 NativeDebug.d("NoteDetailScreen duplicateNote OK newId=${created.id}")
+                SyncQueueWorker.triggerNow(context)
                 onBack()
             } catch (t: Throwable) {
                 NativeDebug.e("NoteDetailScreen duplicateNote failed", t)

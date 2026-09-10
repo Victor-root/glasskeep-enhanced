@@ -14,6 +14,9 @@ interface SyncQueueDao {
     )
     suspend fun findPending(noteId: String, type: String): SyncQueueEntity?
 
+    @Query("SELECT COUNT(*) > 0 FROM sync_queue WHERE noteId = :noteId AND type = 'CREATE'")
+    suspend fun hasQueuedCreate(noteId: String): Boolean
+
     @Insert
     suspend fun insert(item: SyncQueueEntity)
 
@@ -34,7 +37,7 @@ interface SyncQueueDao {
         }
     }
 
-    @Query("SELECT * FROM sync_queue WHERE status = '${SyncQueueEntity.STATUS_PENDING}' ORDER BY createdAt ASC")
+    @Query("SELECT * FROM sync_queue WHERE status = '${SyncQueueEntity.STATUS_PENDING}' ORDER BY createdAt ASC, queueId ASC")
     suspend fun getPending(): List<SyncQueueEntity>
 
     @Query("DELETE FROM sync_queue WHERE queueId = :queueId")
@@ -58,11 +61,13 @@ interface SyncQueueDao {
     @Query("SELECT COUNT(*) FROM sync_queue WHERE noteId = :noteId AND status = '${SyncQueueEntity.STATUS_PENDING}'")
     fun observePendingCountForNote(noteId: String): Flow<Int>
 
-    /** Notes with a not-yet-confirmed archive/trash/restore/permanent-delete/
+    /** Locally-created notes until their CREATE row is removed (including
+     *  a failed row, so a refresh never erases unsynced user data), plus
+     *  notes with a not-yet-confirmed archive/trash/restore/permanent-delete/
      *  pin/reminder: notes list screens with a live, replaceable snapshot
      *  (Room's own observeAll() cache for NativeNotesListScreen.kt, or
      *  SecondaryNotesScreen.kt's own in-memory list) must not let a
-     *  same-moment refresh silently undo one of these six while it's
+     *  same-moment refresh silently undo one of these actions while it's
      *  still in flight (see NotesRepository.refresh()'s and
      *  SecondaryNotesScreen.kt's own doc comments). One shared, wider
      *  query rather than one per caller: a type irrelevant to a given
@@ -73,8 +78,10 @@ interface SyncQueueDao {
      *  Room requires a compile-time constant here, so this can't
      *  reference the enum directly the way STATUS_PENDING does above. */
     @Query(
-        "SELECT DISTINCT noteId FROM sync_queue WHERE status = '${SyncQueueEntity.STATUS_PENDING}' " +
-            "AND type IN ('ARCHIVE', 'TRASH', 'RESTORE', 'PERMANENT_DELETE', 'PINNED', 'REMINDER')",
+        "SELECT DISTINCT noteId FROM sync_queue WHERE " +
+            "(type = 'CREATE') OR " +
+            "(status = '${SyncQueueEntity.STATUS_PENDING}' AND " +
+            "type IN ('ARCHIVE', 'TRASH', 'RESTORE', 'PERMANENT_DELETE', 'PINNED', 'REMINDER'))",
     )
     suspend fun getProtectedNoteIds(): List<String>
 

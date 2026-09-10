@@ -6,9 +6,9 @@ import androidx.room.PrimaryKey
 /**
  * One not-yet-confirmed note edit, mirroring the shape of a syncEngine.js
  * queue item (src/sync/syncEngine.js / src/sync/localDb.js) closely enough
- * to reuse the same design, but only for the "patch"-style actions this
- * first milestone covers (title/content, color, tags, checklist items,
- * images; see SyncQueueType). Lives in its own database (SyncQueueDatabase),
+ * to reuse the same design, including idempotent client-ID creation and
+ * the patch-style actions that may follow it (see SyncQueueType). Lives in
+ * its own database (SyncQueueDatabase),
  * deliberately never AppDatabase: that one is a disposable server mirror
  * with a destructive-migration policy (see its own doc comment), which
  * would be actively dangerous for a table holding edits the server hasn't
@@ -41,11 +41,9 @@ data class SyncQueueEntity(
 }
 
 /** Which repository call SyncQueueWorker replays a given item with.
- *  Narrower than syncEngine.js's own type set (create/update/patch/
- *  archive/trash/restore/permanentDelete/reorder/reminder) on purpose:
- *  create/duplicate need their own client-id/reconciliation design, not
- *  yet built (see the follow-up tasks this milestone's commit message
- *  lists). ARCHIVE/TRASH/RESTORE/PERMANENT_DELETE/PINNED/REMINDER's note
+ *  CREATE covers both a blank note and a duplicate: the client-generated
+ *  UUID is replayed verbatim, relying on POST /api/notes' idempotent-ID
+ *  contract. ARCHIVE/TRASH/RESTORE/PERMANENT_DELETE/PINNED/REMINDER's note
  *  ids are also read by SyncQueueDao.getProtectedNoteIds() (see
  *  NotesRepository.refresh()'s own doc comment) since, unlike the
  *  patch-style types above them, each changes something a same-moment
@@ -58,4 +56,4 @@ data class SyncQueueEntity(
  *  not one, which doesn't fit getProtectedNoteIds()'s per-note-id
  *  design - see NotesRepository.reorderQueued's own doc comment for the
  *  accepted tradeoff. */
-enum class SyncQueueType { TITLE_CONTENT, COLOR, TAGS, CHECKLIST_ITEMS, IMAGES, PINNED, ARCHIVE, TRASH, RESTORE, PERMANENT_DELETE, REMINDER, REORDER, CONVERT_TYPE }
+enum class SyncQueueType { CREATE, TITLE_CONTENT, COLOR, TAGS, CHECKLIST_ITEMS, IMAGES, PINNED, ARCHIVE, TRASH, RESTORE, PERMANENT_DELETE, REMINDER, REORDER, CONVERT_TYPE }

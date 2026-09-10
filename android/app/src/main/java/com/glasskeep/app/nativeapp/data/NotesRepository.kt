@@ -2,6 +2,7 @@ package com.glasskeep.app.nativeapp.data
 
 import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.local.NoteDao
+import com.glasskeep.app.nativeapp.data.local.NoteDetailEntity
 import com.glasskeep.app.nativeapp.data.local.NoteEntity
 import com.glasskeep.app.nativeapp.data.local.SyncQueueDao
 import com.glasskeep.app.nativeapp.data.local.SyncQueueEntity
@@ -75,6 +76,9 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import java.util.UUID
 
 /** Outcome of a note save. Stale/ReadOnly are real, expected server
  *  answers (see PATCH /api/notes/:id), not bugs, the caller shows each
@@ -189,6 +193,33 @@ class NotesRepository(
      */
     fun observeNotes(): Flow<List<NoteEntity>> = noteDao.observeAll()
 
+    /** Writes the lightweight list row and full offline detail together. */
+    private suspend fun cacheNotes(notes: List<NoteDto>) {
+        noteDao.upsertNotesAndDetails(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() })
+    }
+
+    /** Stores full payloads without making archived/trashed notes appear
+     *  in the active-list table. */
+    private suspend fun cacheDetails(notes: List<NoteDto>) {
+        noteDao.upsertDetails(notes.map { it.toDetailEntity() })
+    }
+
+    private suspend fun cachedNote(id: String): NoteDto? {
+        noteDao.getDetailById(id)?.let { detail ->
+            val decoded = runCatching { detail.toNoteDto() }
+            decoded.onFailure { NativeDebug.e("NotesRepository cached detail decode failed id=$id", it) }
+            decoded.getOrNull()?.let { return it }
+        }
+        // Version-7 installs have list rows but no detail rows immediately
+        // after migration. They remain safely readable offline until the
+        // next successful refresh fills the complete detail cache.
+        return noteDao.getById(id)?.toOfflineDetail()
+    }
+
+    private suspend fun updateCachedNote(id: String, transform: (NoteDto) -> NoteDto) {
+        cachedNote(id)?.let { cacheNotes(listOf(transform(it))) }
+    }
+
     /**
      * Signing out: the cached notes and everything still queued go, the
      * account's preferences stay. Same split as the web's own
@@ -220,71 +251,74 @@ class NotesRepository(
         // not-yet-confirmed archive/trash/restore/pin (see the *Queued
         // methods below) must not have this refresh's now-stale server
         // snapshot silently undo its optimistic local state.
-        noteDao.replaceAll(notes.map { it.toEntity() }, getProtectedNoteIds())
+        noteDao.replaceAll(notes.map { it.toEntity() }, notes.map { it.toDetailEntity() }, getProtectedNoteIds())
     }
 
     /**
-     * Creates a new blank text note and mirrors it into the local list
-     * cache immediately, so it shows up without waiting for the next
-     * refresh().
+     * Materializes a note locally first, then queues its idempotent POST.
+     * The generated UUID is both the visible local id and the eventual
+     * server id, so navigation and every edit queued behind CREATE keep
+     * referring to the same note through an offline/online transition.
      */
+    private suspend fun createNoteQueued(request: CreateNoteRequest, userId: Int = 0): NoteDto {
+        val id = request.id ?: error("Queued note creation requires a client id")
+        val local = request.toLocalNote(userId)
+        syncQueueDao.enqueue(id, SyncQueueType.CREATE.name, Json.encodeToString(request), System.currentTimeMillis())
+        cacheNotes(listOf(local))
+        return local
+    }
+
+    private suspend fun createBlankNote(type: String): NoteDto {
+        val instant = nowIso()
+        return createNoteQueued(
+            CreateNoteRequest(
+                id = UUID.randomUUID().toString(),
+                type = type,
+                position = System.currentTimeMillis().toDouble(),
+                timestamp = instant,
+                clientUpdatedAt = instant,
+            ),
+        )
+    }
+
     suspend fun createTextNote(): NoteDto {
-        NativeDebug.d("NotesRepository.createTextNote")
-        val response = api.createNote(CreateNoteRequest(type = "text"))
+        NativeDebug.d("NotesRepository.createTextNote queued")
+        return createBlankNote("text")
+    }
+
+    /** Direct idempotent POST used only by [SyncQueueWorker]. */
+    internal suspend fun createNoteOnline(request: CreateNoteRequest): NoteDto {
+        val response = api.createNote(request)
         val note = response.body()
         if (!response.isSuccessful || note == null) {
             val error = "POST /api/notes failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }
-        noteDao.upsertAll(listOf(note.toEntity()))
+        cacheNotes(listOf(note))
         return note
     }
 
     /** Creates a new, empty checklist note (no seeded item: matches the
      *  web's own fresh checklist draft, see useDraftNote.js). */
     suspend fun createChecklistNote(): NoteDto {
-        NativeDebug.d("NotesRepository.createChecklistNote")
-        val response = api.createNote(CreateNoteRequest(type = "checklist"))
-        val note = response.body()
-        if (!response.isSuccessful || note == null) {
-            val error = "POST /api/notes (checklist) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        noteDao.upsertAll(listOf(note.toEntity()))
-        return note
+        NativeDebug.d("NotesRepository.createChecklistNote queued")
+        return createBlankNote("checklist")
     }
 
     /** Creates a new, empty drawing note (no content at all: DrawingEditor
      *  treats a blank canvas the same way DrawingContent.parse treats a
      *  blank/new note, no seeded strokes needed). */
     suspend fun createDrawingNote(): NoteDto {
-        NativeDebug.d("NotesRepository.createDrawingNote")
-        val response = api.createNote(CreateNoteRequest(type = "draw"))
-        val note = response.body()
-        if (!response.isSuccessful || note == null) {
-            val error = "POST /api/notes (draw) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        noteDao.upsertAll(listOf(note.toEntity()))
-        return note
+        NativeDebug.d("NotesRepository.createDrawingNote queued")
+        return createBlankNote("draw")
     }
 
     /** Creates a new, empty audio note (no clips yet: AudioContent.parse
      *  treats a blank/new note the same way, no seeded content needed). */
     suspend fun createAudioNote(): NoteDto {
-        NativeDebug.d("NotesRepository.createAudioNote")
-        val response = api.createNote(CreateNoteRequest(type = "audio"))
-        val note = response.body()
-        if (!response.isSuccessful || note == null) {
-            val error = "POST /api/notes (audio) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        noteDao.upsertAll(listOf(note.toEntity()))
-        return note
+        NativeDebug.d("NotesRepository.createAudioNote queued")
+        return createBlankNote("audio")
     }
 
     /**
@@ -293,55 +327,70 @@ class NotesRepository(
      * with a "(copy)" suffix), same fields duplicateActiveNote() in
      * App.jsx copies. Safe for every note type, not just text: unlike
      * creating a blank note of an unsupported type, a duplicate is just
-     * another fully-formed note of a type native can already view
-     * (read-only, same as the original), never a dead end. Images aren't
-     * carried over yet, native has no data layer for them.
+     * another fully-formed note of a type native can already view. Item
+     * and image ids are regenerated like the web duplicate flow, and the
+     * full result is cached and queued without requiring connectivity.
      */
     suspend fun duplicateNote(source: NoteDto, newTitle: String): NoteDto {
-        NativeDebug.d("NotesRepository.duplicateNote id=${source.id}")
-        val response = api.createNote(
+        NativeDebug.d("NotesRepository.duplicateNote queued id=${source.id}")
+        val instant = nowIso()
+        return createNoteQueued(
             CreateNoteRequest(
+                id = UUID.randomUUID().toString(),
                 type = source.type,
                 title = newTitle,
                 content = source.content,
                 color = source.color,
-                items = source.items,
+                items = regenerateElementIds(source.items),
                 tags = source.tags,
-            )
+                images = regenerateElementIds(source.images),
+                pinned = false,
+                position = System.currentTimeMillis().toDouble(),
+                timestamp = instant,
+                clientUpdatedAt = instant,
+            ),
+            userId = source.userId,
         )
-        val note = response.body()
-        if (!response.isSuccessful || note == null) {
-            val error = "POST /api/notes (duplicate) failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
-            NativeDebug.e(error)
-            throw IllegalStateException(error)
-        }
-        noteDao.upsertAll(listOf(note.toEntity()))
-        return note
     }
 
-    /** Full detail for one note (content/items included, unlike the
-     *  cached list entries). Always goes to the server, no local cache for
-     *  detail yet, so opening a note requires connectivity for now. */
+    /** Full detail for one note. A locally-created note returns immediately;
+     *  otherwise the server is preferred and refreshes the cache, with the
+     *  cached full payload used on transport/temporary-server failures. */
     suspend fun fetchNoteDetail(id: String): NoteDto {
         NativeDebug.d("NotesRepository.fetchNoteDetail id=$id")
-        val response = api.getNote(id)
-        val note = response.body()
-        if (!response.isSuccessful || note == null) {
-            val error = "GET /api/notes/$id failed: HTTP ${response.code()} ${response.errorBody()?.string()}"
+        if (syncQueueDao.hasQueuedCreate(id)) {
+            cachedNote(id)?.let { return it }
+        }
+        try {
+            val response = api.getNote(id)
+            val note = response.body()
+            if (response.isSuccessful && note != null) {
+                cacheNotes(listOf(note))
+                return note
+            }
+            val code = response.code()
+            val error = "GET /api/notes/$id failed: HTTP $code ${response.errorBody()?.string()}"
+            if (code == 408 || code == 423 || code == 429 || code >= 500) {
+                cachedNote(id)?.let {
+                    NativeDebug.d("NotesRepository.fetchNoteDetail id=$id: using cached detail after HTTP $code")
+                    return it
+                }
+            }
             NativeDebug.e(error)
             throw IllegalStateException(error)
+        } catch (t: Throwable) {
+            if (t is IllegalStateException && t.message?.startsWith("GET /api/notes/$id failed:") == true) throw t
+            cachedNote(id)?.let {
+                NativeDebug.d("NotesRepository.fetchNoteDetail id=$id: using cached detail after ${t.javaClass.simpleName}")
+                return it
+            }
+            throw t
         }
-        return note
     }
 
-    /** Archived notes only (GET /api/notes/archived), server-only, no local
-     *  cache: the main list's Room table is only ever populated from
-     *  GET /api/notes, which already excludes archived notes, so caching
-     *  archived ones there too would either get wiped by the very next
-     *  refresh() or leak into the main grid's query. Same "always hits the
-     *  server" tradeoff as fetchNoteDetail(), for the same reason: a
-     *  secondary, occasionally-viewed screen doesn't need offline support
-     *  as much as the main list does. */
+    /** Archived notes only. Their complete payload is retained separately
+     *  from the active list so an offline unarchive can restore the real
+     *  note instead of reconstructing it from a lightweight card row. */
     suspend fun fetchArchivedNotes(): List<NoteDto> {
         NativeDebug.d("NotesRepository.fetchArchivedNotes")
         val response = api.getArchivedNotes()
@@ -351,12 +400,12 @@ class NotesRepository(
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }
+        cacheDetails(notes)
         return notes
     }
 
-    /** Trashed notes only (GET /api/notes/trashed). Same server-only, no
-     *  local cache tradeoff as fetchArchivedNotes(), for the same reason:
-     *  the main list's Room table only ever holds active notes. */
+    /** Trashed notes only. Same detail-only cache as archived notes, used
+     *  when a restore is queued without connectivity. */
     suspend fun fetchTrashedNotes(): List<NoteDto> {
         NativeDebug.d("NotesRepository.fetchTrashedNotes")
         val response = api.getTrashedNotes()
@@ -366,6 +415,7 @@ class NotesRepository(
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }
+        cacheDetails(notes)
         return notes
     }
 
@@ -393,7 +443,7 @@ class NotesRepository(
             return SaveNoteResult.ReadOnly
         }
         val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id: ok response with no note")
-        noteDao.upsertAll(listOf(saved.toEntity()))
+        cacheNotes(listOf(saved))
         return SaveNoteResult.Saved(saved)
     }
 
@@ -412,13 +462,12 @@ class NotesRepository(
             NativeDebug.e(error)
             throw IllegalStateException(error)
         }
-        noteDao.upsertAll(listOf(note.toEntity()))
+        cacheNotes(listOf(note))
         return note
     }
 
-    /** Archive or unarchive. Archived notes stay in the local cache (they
-     *  still exist, just hidden from the active list by the server's own
-     *  listing query), same as how patchNote() mirrors edits. */
+    /** Archive or unarchive. The full archived payload remains available
+     *  offline, while its lightweight row is removed from the active list. */
     suspend fun setArchived(id: String, archived: Boolean, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setArchived id=$id archived=$archived")
         val response = api.archiveNote(id, ArchiveNoteRequest(archived, clientUpdatedAt))
@@ -433,7 +482,12 @@ class NotesRepository(
             return SaveNoteResult.Stale
         }
         val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/archive: ok response with no note")
-        noteDao.upsertAll(listOf(saved.toEntity()))
+        if (saved.archived) {
+            noteDao.deleteNoteById(id)
+            cacheDetails(listOf(saved))
+        } else {
+            cacheNotes(listOf(saved))
+        }
         return SaveNoteResult.Saved(saved)
     }
 
@@ -502,7 +556,7 @@ class NotesRepository(
             return SaveNoteResult.Stale
         }
         val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/restore: ok response with no note")
-        noteDao.upsertAll(listOf(saved.toEntity()))
+        cacheNotes(listOf(saved))
         return SaveNoteResult.Saved(saved)
     }
 
@@ -545,7 +599,7 @@ class NotesRepository(
             return SaveNoteResult.Stale
         }
         val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (color): ok response with no note")
-        noteDao.upsertAll(listOf(saved.toEntity()))
+        cacheNotes(listOf(saved))
         return SaveNoteResult.Saved(saved)
     }
 
@@ -569,7 +623,7 @@ class NotesRepository(
             return SaveNoteResult.Stale
         }
         val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (tags): ok response with no note")
-        noteDao.upsertAll(listOf(saved.toEntity()))
+        cacheNotes(listOf(saved))
         return SaveNoteResult.Saved(saved)
     }
 
@@ -592,7 +646,7 @@ class NotesRepository(
             return SaveNoteResult.Stale
         }
         val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (items): ok response with no note")
-        noteDao.upsertAll(listOf(saved.toEntity()))
+        cacheNotes(listOf(saved))
         return SaveNoteResult.Saved(saved)
     }
 
@@ -622,24 +676,27 @@ class NotesRepository(
             return SaveNoteResult.Stale
         }
         val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (convert): ok response with no note")
-        noteDao.upsertAll(listOf(saved.toEntity()))
+        cacheNotes(listOf(saved))
         return SaveNoteResult.Saved(saved)
     }
 
     suspend fun convertNoteTypeQueued(id: String, type: String, content: String, items: List<JsonElement>) {
         NativeDebug.d("NotesRepository.convertNoteTypeQueued id=$id type=$type")
-        val request = ConvertNoteTypeRequest(type, content, items, nowIso())
+        val instant = nowIso()
+        val request = ConvertNoteTypeRequest(type, content, items, instant)
         syncQueueDao.enqueue(id, SyncQueueType.CONVERT_TYPE.name, Json.encodeToString(request), System.currentTimeMillis())
+        updateCachedNote(id) {
+            it.copy(type = type, content = content, items = items, updatedAt = instant, clientUpdatedAt = instant)
+        }
     }
 
     /** Replaces a note's image list. Same narrow-body PATCH pattern as
      *  setColor()/setTags()/setChecklistItems(); the web instead folds
      *  images into a general metadata-autosave payload, but the server
      *  accepts any subset of fields in a PATCH either way (see
-     *  SetImagesRequest). Not cached into Room: the main list's local
-     *  cache deliberately doesn't carry full-resolution image data for
-     *  every note (see NoteEntity), so this only updates `note` in the
-     *  caller, same as how checklist items are handled. */
+     *  SetImagesRequest). The full payload is cached in note_details;
+     *  NoteEntity still carries only hasImages, keeping the card list
+     *  lightweight while offline detail retains the actual images. */
     suspend fun setImages(id: String, images: List<JsonElement>, clientUpdatedAt: String = nowIso()): SaveNoteResult {
         NativeDebug.d("NotesRepository.setImages id=$id count=${images.size}")
         val response = api.setImages(id, SetImagesRequest(images = images, clientUpdatedAt = clientUpdatedAt))
@@ -654,6 +711,7 @@ class NotesRepository(
             return SaveNoteResult.Stale
         }
         val saved = body.note ?: throw IllegalStateException("PATCH /api/notes/$id (images): ok response with no note")
+        cacheNotes(listOf(saved))
         return SaveNoteResult.Saved(saved)
     }
 
@@ -662,41 +720,51 @@ class NotesRepository(
     // the intended request body is written to Room's own sync_queue table
     // immediately (see SyncQueueDao.enqueue, which collapses a second edit
     // to the same note+field into the still-pending one rather than
-    // stacking a duplicate) and the caller updates its own on-screen state
-    // optimistically, the same local-first shape autoSaveTextNote() uses
-    // on the web. SyncQueueWorker drains this in the background, replaying
+    // stacking a duplicate). The same desired state is also written to the
+    // full detail cache, so a process restart while offline reopens the
+    // edited note rather than its pre-edit snapshot. SyncQueueWorker replays
     // each item with ITS captured clientUpdatedAt (not a fresh one at
     // replay time, which would corrupt the LWW comparison the timestamp
     // exists for). The direct methods above are unchanged and still used
     // by SyncQueueWorker's own replay.
     suspend fun patchNoteQueued(id: String, title: String, content: String) {
         NativeDebug.d("NotesRepository.patchNoteQueued id=$id")
-        val request = PatchNoteRequest(title, content, nowIso())
+        val instant = nowIso()
+        val request = PatchNoteRequest(title, content, instant)
         syncQueueDao.enqueue(id, SyncQueueType.TITLE_CONTENT.name, Json.encodeToString(request), System.currentTimeMillis())
+        updateCachedNote(id) { it.copy(title = title, content = content, updatedAt = instant, clientUpdatedAt = instant) }
     }
 
     suspend fun setColorQueued(id: String, color: String) {
         NativeDebug.d("NotesRepository.setColorQueued id=$id color=$color")
-        val request = SetColorRequest(color, nowIso())
+        val instant = nowIso()
+        val request = SetColorRequest(color, instant)
         syncQueueDao.enqueue(id, SyncQueueType.COLOR.name, Json.encodeToString(request), System.currentTimeMillis())
+        updateCachedNote(id) { it.copy(color = color, updatedAt = instant, clientUpdatedAt = instant) }
     }
 
     suspend fun setTagsQueued(id: String, tags: List<String>) {
         NativeDebug.d("NotesRepository.setTagsQueued id=$id tags=$tags")
-        val request = SetTagsRequest(tags, nowIso())
+        val instant = nowIso()
+        val request = SetTagsRequest(tags, instant)
         syncQueueDao.enqueue(id, SyncQueueType.TAGS.name, Json.encodeToString(request), System.currentTimeMillis())
+        updateCachedNote(id) { it.copy(tags = tags, updatedAt = instant, clientUpdatedAt = instant) }
     }
 
     suspend fun setChecklistItemsQueued(id: String, items: List<JsonElement>) {
         NativeDebug.d("NotesRepository.setChecklistItemsQueued id=$id count=${items.size}")
-        val request = SetChecklistItemsRequest(items = items, clientUpdatedAt = nowIso())
+        val instant = nowIso()
+        val request = SetChecklistItemsRequest(items = items, clientUpdatedAt = instant)
         syncQueueDao.enqueue(id, SyncQueueType.CHECKLIST_ITEMS.name, Json.encodeToString(request), System.currentTimeMillis())
+        updateCachedNote(id) { it.copy(items = items, updatedAt = instant, clientUpdatedAt = instant) }
     }
 
     suspend fun setImagesQueued(id: String, images: List<JsonElement>) {
         NativeDebug.d("NotesRepository.setImagesQueued id=$id count=${images.size}")
-        val request = SetImagesRequest(images = images, clientUpdatedAt = nowIso())
+        val instant = nowIso()
+        val request = SetImagesRequest(images = images, clientUpdatedAt = instant)
         syncQueueDao.enqueue(id, SyncQueueType.IMAGES.name, Json.encodeToString(request), System.currentTimeMillis())
+        updateCachedNote(id) { it.copy(images = images, updatedAt = instant, clientUpdatedAt = instant) }
     }
 
     /** Per-user state, no LWW/stale concept (see setPinned's own doc
@@ -715,7 +783,7 @@ class NotesRepository(
         NativeDebug.d("NotesRepository.setPinnedQueued id=${entity.id} pinned=$pinned")
         val request = SetPinnedRequest(pinned)
         syncQueueDao.enqueue(entity.id, SyncQueueType.PINNED.name, Json.encodeToString(request), System.currentTimeMillis())
-        noteDao.upsertAll(listOf(entity.copy(pinned = pinned)))
+        updateCachedNote(entity.id) { it.copy(pinned = pinned) }
     }
 
     /** Direct (non-optimistic) call to POST /api/notes/reorder: only ever
@@ -774,6 +842,7 @@ class NotesRepository(
         val now = System.currentTimeMillis().toDouble()
         val repositioned = (pinnedEntities + otherEntities).mapIndexed { index, entity -> entity.copy(position = now - index) }
         noteDao.upsertAll(repositioned)
+        repositioned.forEach { entity -> updateCachedNote(entity.id) { it.copy(position = entity.position) } }
     }
 
     /** Unlike the patch-style methods above, this one (and trashNoteQueued/
@@ -794,7 +863,14 @@ class NotesRepository(
         NativeDebug.d("NotesRepository.setArchivedQueued id=${entity.id} archived=$archived")
         val request = ArchiveNoteRequest(archived, nowIso())
         syncQueueDao.enqueue(entity.id, SyncQueueType.ARCHIVE.name, Json.encodeToString(request), System.currentTimeMillis())
-        if (archived) noteDao.deleteById(entity.id) else noteDao.upsertAll(listOf(entity))
+        val full = cachedNote(entity.id) ?: entity.toOfflineDetail()
+        if (archived) {
+            // Keep the full payload: only the active-list row disappears.
+            cacheDetails(listOf(full.copy(archived = true)))
+            noteDao.deleteNoteById(entity.id)
+        } else {
+            cacheNotes(listOf(full.copy(archived = false, trashed = false)))
+        }
     }
 
     /** [mode] is only ever meaningful for the owner of a note that has
@@ -805,7 +881,8 @@ class NotesRepository(
         NativeDebug.d("NotesRepository.trashNoteQueued id=$id mode=$mode")
         val request = TrashNoteRequest(nowIso(), mode)
         syncQueueDao.enqueue(id, SyncQueueType.TRASH.name, Json.encodeToString(request), System.currentTimeMillis())
-        noteDao.deleteById(id)
+        cachedNote(id)?.let { cacheDetails(listOf(it.copy(trashed = true))) }
+        noteDao.deleteNoteById(id)
     }
 
     /** [entity] is the trashed note being restored, reinserted into the
@@ -815,7 +892,8 @@ class NotesRepository(
         NativeDebug.d("NotesRepository.restoreNoteQueued id=${entity.id}")
         val request = ClientUpdatedAtRequest(nowIso())
         syncQueueDao.enqueue(entity.id, SyncQueueType.RESTORE.name, Json.encodeToString(request), System.currentTimeMillis())
-        noteDao.upsertAll(listOf(entity))
+        val full = cachedNote(entity.id) ?: entity.toOfflineDetail()
+        cacheNotes(listOf(full.copy(archived = false, trashed = false)))
     }
 
     /** No noteDao mutation: a trashed note was never cached locally to
@@ -840,9 +918,10 @@ class NotesRepository(
      *  depends entirely on this optimistic write. */
     suspend fun setReminderQueued(entity: NoteEntity, reminderAtIso: String?) {
         NativeDebug.d("NotesRepository.setReminderQueued id=${entity.id} reminderAt=$reminderAtIso")
-        val request = SetReminderRequest(reminderAtIso, nowIso())
+        val instant = nowIso()
+        val request = SetReminderRequest(reminderAtIso, instant)
         syncQueueDao.enqueue(entity.id, SyncQueueType.REMINDER.name, Json.encodeToString(request), System.currentTimeMillis())
-        noteDao.upsertAll(listOf(entity.copy(reminderAt = reminderAtIso)))
+        updateCachedNote(entity.id) { it.copy(reminderAt = reminderAtIso, reminderFiredAt = null, updatedAt = instant, clientUpdatedAt = instant) }
     }
 
     /** How many of this note's edits are still waiting to reach the
@@ -878,9 +957,7 @@ class NotesRepository(
             throw IllegalStateException(error)
         }
         val stored = response.body()?.icon ?: icon.takeIf { response.body()?.ok == true && icon != null }
-        noteDao.getById(id)?.let { entity ->
-            noteDao.upsert(entity.copy(iconSrc = stored?.src, iconName = stored?.name))
-        }
+        updateCachedNote(id) { it.copy(icon = stored) }
     }
 
     /** The account's own logo library, which the icon picker lists. */
@@ -920,7 +997,7 @@ class NotesRepository(
             return SaveNoteResult.Stale
         }
         val saved = body.note ?: throw IllegalStateException("POST /api/notes/$id/reminder: ok response with no note")
-        noteDao.upsertAll(listOf(saved.toEntity()))
+        cacheNotes(listOf(saved))
         return SaveNoteResult.Saved(saved)
     }
 
@@ -1669,3 +1746,73 @@ internal fun NoteDto.toEntity() = NoteEntity(
     iconSrc = icon?.src,
     iconName = icon?.name,
 )
+
+private val cacheJson = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+}
+
+internal fun NoteDto.toDetailEntity() = NoteDetailEntity(
+    noteId = id,
+    payloadJson = cacheJson.encodeToString(this),
+)
+
+internal fun NoteDetailEntity.toNoteDto(): NoteDto = cacheJson.decodeFromString(payloadJson)
+
+/** Compatibility view for the first launch after the v7 -> v8 migration,
+ * before a successful refresh has populated note_details. */
+internal fun NoteEntity.toOfflineDetail() = NoteDto(
+    id = id,
+    userId = 0,
+    type = type,
+    title = title,
+    content = content,
+    items = runCatching {
+        (Json.parseToJsonElement(itemsJson) as? JsonArray)?.toList().orEmpty()
+    }.getOrDefault(emptyList()),
+    tags = TagsJson.parse(tagsJson),
+    images = emptyList(),
+    color = color,
+    pinned = pinned,
+    position = position,
+    timestamp = updatedAt,
+    updatedAt = updatedAt,
+    clientUpdatedAt = updatedAt,
+    access = "read",
+    reminderAt = reminderAt,
+    icon = iconSrc?.let { NoteIconDto(src = it, name = iconName) },
+)
+
+internal fun CreateNoteRequest.toLocalNote(userId: Int): NoteDto {
+    val localId = requireNotNull(id) { "Offline note creation requires an id" }
+    val instant = clientUpdatedAt ?: timestamp ?: nowIso()
+    return NoteDto(
+        id = localId,
+        userId = userId,
+        type = type,
+        title = title.orEmpty(),
+        content = content.orEmpty(),
+        items = items.orEmpty(),
+        tags = tags.orEmpty(),
+        images = images.orEmpty(),
+        color = color ?: "default",
+        pinned = pinned ?: false,
+        position = position ?: 0.0,
+        timestamp = timestamp ?: instant,
+        updatedAt = instant,
+        clientUpdatedAt = instant,
+        access = "owner",
+    )
+}
+
+/** Duplicates checklist/image objects without reusing their server ids. */
+internal fun regenerateElementIds(
+    elements: List<JsonElement>,
+    newId: () -> String = { UUID.randomUUID().toString() },
+): List<JsonElement> = elements.map { element ->
+    if (element is JsonObject) {
+        JsonObject(element + ("id" to JsonPrimitive(newId())))
+    } else {
+        element
+    }
+}

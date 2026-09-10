@@ -560,12 +560,18 @@ data class PatchNoteRequest(
  *  relayed) since native doesn't understand checklist item shape yet. */
 @Serializable
 data class CreateNoteRequest(
+    val id: String? = null,
     val type: String = "text",
     val title: String? = null,
     val content: String? = null,
     val color: String? = null,
     val items: List<JsonElement>? = null,
     val tags: List<String>? = null,
+    val images: List<JsonElement>? = null,
+    val pinned: Boolean? = null,
+    val position: Double? = null,
+    val timestamp: String? = null,
+    @SerialName("client_updated_at") val clientUpdatedAt: String? = null,
 )
 
 /** Body for a pin-only PATCH /api/notes/:id. Pin is per-user state, not
