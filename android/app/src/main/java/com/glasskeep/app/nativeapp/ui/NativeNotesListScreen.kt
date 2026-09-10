@@ -668,6 +668,14 @@ fun NativeNotesListScreen(
     }
 
     BackHandler(enabled = selectionMode) { exitSelection() }
+    // These three paint their own scrim/content directly (no Dialog/Popup
+    // window backing them), so unlike the confirm dialogs and popovers
+    // elsewhere in this screen, they get no back-dismissal for free -
+    // without this, back either fell through to the previous nav
+    // destination or, on this being the start destination, closed the app.
+    BackHandler(enabled = sidebarOpen) { sidebarOpen = false }
+    BackHandler(enabled = fabOpen) { fabOpen = false }
+    BackHandler(enabled = searchOpen) { searchOpen = false; searchQuery = "" }
 
     Box(Modifier.fillMaxSize().then(bgModifier)) {
         if (container.shellPrefs.floatingCards) {
