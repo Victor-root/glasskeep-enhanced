@@ -165,8 +165,7 @@ fun NotificationCenter(
     )
 
     val maxHeight = configuration.screenHeightDp.dp
-    val chrome = WorkspaceTheme.colorsFor(themeId, dark)
-    val statusBar = chrome.statusBar
+    val statusBar = WorkspaceTheme.statusBarColor(themeId, dark)
     val shape = RoundedCornerShape(bottomStart = 14.dp, bottomEnd = 14.dp)
     val titleColor = if (dark) Color(0xFFF0F0F5) else Color(0xFF1D1D1F)
 
@@ -181,11 +180,10 @@ fun NotificationCenter(
                 }
                 .clip(shape)
                 .background(statusBar)
-                .border(
-                    width = 1.dp,
-                    color = chrome.chromeBorder,
-                    shape = shape,
-                ),
+                // The phone web sheet explicitly removes its top/side
+                // borders. A full Compose border left a visible seam between
+                // the Android status bar and this matching status-bar fill.
+                // The grabber keeps its own lower separator.
         ) {
             NotificationCenterHeader(
                 titleColor = titleColor,
