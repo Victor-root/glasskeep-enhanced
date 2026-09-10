@@ -37,6 +37,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -46,6 +47,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -175,6 +177,8 @@ fun NativeNotesListScreen(
     var refreshing by remember { mutableStateOf(false) }
     var creatingNote by remember { mutableStateOf(false) }
     var fabOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(fabOpen) { container.scrimActive.value = fabOpen }
+    DisposableEffect(Unit) { onDispose { container.scrimActive.value = false } }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var searchOpen by remember { mutableStateOf(false) }
     var notificationsOpen by remember { mutableStateOf(false) }
@@ -654,7 +658,15 @@ fun NativeNotesListScreen(
         if (container.shellPrefs.floatingCards) {
             FloatingCardsBackground(dark = dark, workspace = true)
         }
-        Column(Modifier.fillMaxSize()) {
+        Column(
+            // Compose has no real "blur what's behind this layer" primitive
+            // (unlike CSS backdrop-filter), so the FAB's backdrop-blur-[2px]
+            // is reproduced by blurring this content layer itself instead of
+            // the empty scrim drawn on top of it in CreateNoteFab.
+            Modifier
+                .fillMaxSize()
+                .blur(if (fabOpen) 2.dp else 0.dp),
+        ) {
             NativeHeader(
                 dark = dark,
                 themeId = themeId,

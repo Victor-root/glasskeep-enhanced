@@ -33,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -76,11 +75,10 @@ fun CreateNoteFab(
             Box(
                 Modifier
                     .fillMaxSize()
-                    // backdrop-blur-[2px] in MobileCreateFab.jsx. Modifier.blur
-                    // only actually blurs on API 31+ (RenderEffect); older
-                    // devices degrade gracefully to the plain tint below,
-                    // same as browsers without backdrop-filter support.
-                    .blur(2.dp)
+                    // The backdrop-blur-[2px] itself is applied to the
+                    // content layer below (NativeNotesListScreen's own
+                    // Column), since a Modifier.blur here would blur this
+                    // Box's own (empty) content, not what's behind it.
                     .background(Color.Black.copy(alpha = 0.3f))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -211,11 +209,16 @@ private fun DialButton(
         }
         Spacer(Modifier.width(10.dp))
         Column {
-            Text(title, color = colors.text, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            // Explicit lineHeight matters here: Text() without one inherits
+            // LocalTextStyle's (Material3 body) line height as-is rather
+            // than scaling it to this fontSize, which was stretching these
+            // two rows well past the web's leading-tight/leading-snug.
+            Text(title, color = colors.text, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 17.sp)
             Text(
                 description,
                 color = colors.text.copy(alpha = 0.8f),
                 fontSize = 11.sp,
+                lineHeight = 15.sp,
                 modifier = Modifier.padding(top = 2.dp),
             )
         }

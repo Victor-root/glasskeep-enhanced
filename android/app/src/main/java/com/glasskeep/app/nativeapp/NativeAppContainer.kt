@@ -1,6 +1,7 @@
 package com.glasskeep.app.nativeapp
 
 import android.content.Context
+import androidx.compose.runtime.mutableStateOf
 import com.glasskeep.app.MainActivity
 import com.glasskeep.app.nativeapp.data.NoteAiStore
 import com.glasskeep.app.nativeapp.data.NotesRepository
@@ -28,6 +29,12 @@ class NativeAppContainer(context: Context) {
     val syncStatus = SyncStatusState()
     val branding = BrandingState(tokenStore)
     val noteAiStore = NoteAiStore(appContext)
+
+    // Set by any full-screen dimming overlay (currently CreateNoteFab's
+    // speed dial) so NativeAppActivity can darken the status/nav bars along
+    // with it, instead of them staying at the flat theme color while the
+    // content below them dims.
+    val scrimActive = mutableStateOf(false)
     private val db = AppDatabase.get(appContext)
     private val syncQueueDb = SyncQueueDatabase.get(appContext)
 

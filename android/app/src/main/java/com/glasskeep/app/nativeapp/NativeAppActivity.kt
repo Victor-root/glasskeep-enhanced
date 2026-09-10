@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
+import androidx.core.graphics.ColorUtils
 import com.glasskeep.app.nativeapp.ui.LocalGkDark
 import com.glasskeep.app.nativeapp.ui.NativeNavHost
 import com.glasskeep.app.nativeapp.ui.WorkspaceTheme
@@ -66,8 +67,17 @@ class NativeAppActivity : ComponentActivity() {
             // behind before catching up, a narrow, cosmetic-only gap.
             val themeId = container.themeState.themeId
             val signedIn = container.tokenStore.token != null
+            // Follows any full-screen dimming overlay (the create-note FAB's
+            // speed dial today) so the bars darken along with the content
+            // instead of staying at the flat theme color under a dimmed app.
+            val scrimActive by container.scrimActive
             SideEffect {
-                val overrideColor = if (signedIn) WorkspaceTheme.statusBarColor(themeId, dark).toArgb() else null
+                val baseColor = if (signedIn) WorkspaceTheme.statusBarColor(themeId, dark).toArgb() else null
+                val overrideColor = if (scrimActive) {
+                    baseColor?.let { ColorUtils.blendARGB(it, android.graphics.Color.BLACK, 0.3f) }
+                } else {
+                    baseColor
+                }
                 (view.context as ComponentActivity).applyThemedSystemBars(dark, overrideColor)
             }
             GlassKeepTheme {
