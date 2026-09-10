@@ -78,6 +78,10 @@ class NativeAppActivity : ComponentActivity() {
                 } else {
                     baseColor
                 }
+                NativeDebug.d(
+                    "NativeAppActivity system bars: dark=$dark signedIn=$signedIn scrimActive=$scrimActive " +
+                        "baseColor=${baseColor?.let { "#%08X".format(it) }} overrideColor=${overrideColor?.let { "#%08X".format(it) }}",
+                )
                 (view.context as ComponentActivity).applyThemedSystemBars(dark, overrideColor)
             }
             GlassKeepTheme {
