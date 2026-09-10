@@ -4,6 +4,17 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -1052,7 +1063,32 @@ private fun NativeHeader(
                 .padding(horizontal = 10.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (searchOpen) {
+            AnimatedContent(
+                targetState = searchOpen,
+                modifier = Modifier.weight(1f),
+                // A little "ripple" pop instead of a hard cut: the
+                // incoming side fades and expands outward from the
+                // centre with a soft spring overshoot (like a wave
+                // settling), the outgoing side fades and contracts in.
+                transitionSpec = {
+                    (
+                        fadeIn(animationSpec = tween(220, easing = LinearOutSlowInEasing)) +
+                            scaleIn(
+                                initialScale = 0.85f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                            )
+                        ).togetherWith(
+                        fadeOut(animationSpec = tween(140)) +
+                            scaleOut(targetScale = 0.9f, animationSpec = tween(140)),
+                    ).using(SizeTransform(clip = false))
+                },
+                label = "headerSearchToggle",
+            ) { showSearch ->
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            if (showSearch) {
                 val focusRequester = remember { FocusRequester() }
                 val keyboard = LocalSoftwareKeyboardController.current
                 val closeSearchLabel = stringResource(R.string.native_notes_search_close)
@@ -1284,6 +1320,8 @@ private fun NativeHeader(
                         onSignOut = { moreMenuExpanded = false; onSignOut() },
                     )
                 }
+            }
+            }
             }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(WorkspaceTheme.headerBorderColor(themeId, dark)))
