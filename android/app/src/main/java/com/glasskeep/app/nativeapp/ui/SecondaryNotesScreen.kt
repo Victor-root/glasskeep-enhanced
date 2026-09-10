@@ -118,9 +118,8 @@ fun SecondaryNotesScreen(
 
     var notes by remember { mutableStateOf<List<NoteEntity>>(emptyList()) }
     val cachedNotes by observeNotes(repository).collectAsState(initial = emptyList())
-    // Any type, any screen (see SyncQueueDao.observePendingNoteIds's own
-    // doc comment): drives the same per-card spinner and header count as
-    // NativeNotesListScreen.kt's own.
+    // The header still exposes the web's global pending-sync state. The
+    // per-card spinner was the non-web indicator removed below.
     val pendingSyncNoteIds by repository.observePendingSyncNoteIds().collectAsState(initial = emptySet())
     val syncingCount = remember(pendingSyncNoteIds, notes) { notes.count { it.id in pendingSyncNoteIds } }
     var loading by remember { mutableStateOf(true) }
@@ -445,7 +444,6 @@ fun SecondaryNotesScreen(
                             onToggleSelect = {
                                 selectedIds = if (note.id in selectedIds) selectedIds - note.id else selectedIds + note.id
                             },
-                            syncing = note.id in pendingSyncNoteIds,
                         )
                     }
                 }

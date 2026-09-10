@@ -13,7 +13,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -29,17 +28,12 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
-import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,13 +46,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -89,10 +88,14 @@ import com.glasskeep.app.nativeapp.ImageCompression
 import com.glasskeep.app.nativeapp.NoteExporter
 import com.glasskeep.app.nativeapp.SyncState
 import com.glasskeep.app.nativeapp.data.AiClient
-import com.glasskeep.app.nativeapp.data.ChecklistPreview
-import com.glasskeep.app.nativeapp.data.NoteContent
+import com.glasskeep.app.nativeapp.data.ChecklistItems
+import com.glasskeep.app.nativeapp.data.ChecklistItemData
+import com.glasskeep.app.nativeapp.data.MarkdownDoc
+import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
+import com.glasskeep.app.nativeapp.data.TypographyPresets
+import com.glasskeep.app.nativeapp.data.TypographyProfile
 import com.glasskeep.app.nativeapp.data.isReminderPast
 import com.glasskeep.app.nativeapp.data.matchesAnyTag
 import com.glasskeep.app.nativeapp.data.matchesSearchQuery
@@ -108,6 +111,7 @@ import com.glasskeep.app.ui.Indigo
 import com.glasskeep.app.ui.LightBorderColor
 import com.glasskeep.app.ui.LightSubtextColor
 import com.glasskeep.app.ui.LightTitleColor
+import com.glasskeep.app.ui.FloatingCardsBackground
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -154,10 +158,6 @@ fun NativeNotesListScreen(
     val themeId = container.themeState.themeId
     val repository = remember(serverUrl) { container.notesRepository(serverUrl) }
     val notes by repository.observeNotes().collectAsState(initial = emptyList())
-    // Notes with a queued edit still waiting to reach the server (any
-    // type, any screen, see SyncQueueDao.observePendingNoteIds's own doc
-    // comment): drives the per-card spinner.
-    val pendingSyncNoteIds by repository.observePendingSyncNoteIds().collectAsState(initial = emptySet())
     // The whole queue, for the header's cloud icon and its panel: the set
     // above is per-note, this one is per queued action, which is the
     // number the web's own badge shows.
@@ -647,6 +647,9 @@ fun NativeNotesListScreen(
     BackHandler(enabled = selectionMode) { exitSelection() }
 
     Box(Modifier.fillMaxSize().then(bgModifier)) {
+        if (container.shellPrefs.floatingCards) {
+            FloatingCardsBackground(dark = dark, workspace = true)
+        }
         Column(Modifier.fillMaxSize()) {
             NativeHeader(
                 dark = dark,
@@ -666,7 +669,7 @@ fun NativeNotesListScreen(
                     }
                 },
                 activeLens = activeTagFilter?.takeIf { it == SidebarAllImages || it == SidebarReminders },
-                appName = container.branding.appName ?: stringResource(R.string.app_name),
+                appName = container.branding.appName ?: stringResource(R.string.native_default_app_name),
                 brandingLogo = container.branding.logo,
                 syncState = syncState,
                 queuedCount = syncQueue.size,
@@ -744,7 +747,8 @@ fun NativeNotesListScreen(
                         onToggleSelect = {
                             selectedIds = if (note.id in selectedIds) selectedIds - note.id else selectedIds + note.id
                         },
-                        syncing = note.id in pendingSyncNoteIds,
+                        typography = container.editorPrefs.typography.activeProfile,
+                        taskStrike = container.editorPrefs.taskStrike,
                         reorderEnabled = reorderEnabled,
                         isDragged = note.id == draggedNoteId,
                         dragOffset = if (note.id == draggedNoteId) dragOffset else Offset.Zero,
@@ -759,29 +763,29 @@ fun NativeNotesListScreen(
                         onDragCancel = { endDrag() },
                     )
                 }
-                // List view is the web's own single, wider column with
-                // 24px between cards (NotesSections.jsx:61, `space-y-6`);
-                // the grid keeps the masonry pair.
+                // react-masonry-css distributes by index (0/2/4 in the
+                // left column, 1/3/5 in the right). Compose's staggered
+                // grid instead picks the currently shortest lane, visibly
+                // reordering cards. Use the web's real column algorithm.
                 val listView = container.shellPrefs.listView
-                LazyVerticalStaggeredGrid(
-                    columns = StaggeredGridCells.Fixed(if (listView) 1 else 2),
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + navBarBottom),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalItemSpacing = if (listView) 24.dp else 12.dp,
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(start = 16.dp, top = 24.dp, end = 16.dp, bottom = 16.dp + navBarBottom),
                 ) {
                     if (pinnedNotes.isNotEmpty()) {
-                        item(span = StaggeredGridItemSpan.FullLine, key = "section-pinned") {
-                            SectionLabel(stringResource(R.string.native_notes_section_pinned), subtextColor)
-                        }
+                        SectionLabel(stringResource(R.string.native_notes_section_pinned), subtextColor)
+                        NotesMasonry(notes = pinnedNotes, listView = listView, renderNoteCard = renderNoteCard)
                     }
-                    items(pinnedNotes, key = { it.id }) { note -> renderNoteCard(note) }
-                    if (pinnedNotes.isNotEmpty()) {
-                        item(span = StaggeredGridItemSpan.FullLine, key = "section-others") {
+                    if (pinnedNotes.isNotEmpty() && otherNotes.isNotEmpty()) Spacer(Modifier.height(40.dp))
+                    if (otherNotes.isNotEmpty()) {
+                        if (pinnedNotes.isNotEmpty()) {
                             SectionLabel(stringResource(R.string.native_notes_section_others), subtextColor)
                         }
+                        NotesMasonry(notes = otherNotes, listView = listView, renderNoteCard = renderNoteCard)
                     }
-                    items(otherNotes, key = { it.id }) { note -> renderNoteCard(note) }
                 }
             }
         }
@@ -1009,7 +1013,14 @@ private fun NativeHeader(
     // stays in use for TagSidebar's own header row below, for the same
     // reason it never applied here to begin with.
     val accentColor = if (dark) Color(0xFF818cf8) else Color(0xFF4f46e5)
-    Column {
+    Column(
+        modifier = Modifier.shadow(
+            elevation = 3.dp,
+            shape = RectangleShape,
+            ambientColor = WorkspaceTheme.colorsFor(themeId, dark).chromeShadow,
+            spotColor = WorkspaceTheme.colorsFor(themeId, dark).chromeShadow,
+        ),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1098,9 +1109,9 @@ private fun NativeHeader(
                             indication = null,
                             role = Role.Button,
                         ) { onOpenSidebar() }
-                        .padding(6.dp),
+                        .padding(8.dp),
                 ) {
-                    HamburgerIcon(size = 22.dp, tint = titleColor)
+                    HamburgerIcon(size = 24.dp, tint = titleColor)
                 }
                 Spacer(Modifier.width(12.dp))
                 // Same split as AuthShell: a custom logo is drawn raw, the
@@ -1120,7 +1131,7 @@ private fun NativeHeader(
                         modifier = Modifier.size(28.dp).clip(RoundedCornerShape(12.dp)),
                     )
                 }
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(appName, color = titleColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1153,7 +1164,7 @@ private fun NativeHeader(
                         ) { onSearchOpenChange(true) }
                         .padding(8.dp),
                 ) {
-                    SearchIcon(size = 18.dp, tint = titleColor)
+                    SearchIcon(size = 20.dp, tint = subtextColor)
                 }
                 val notificationsLabel = stringResource(R.string.native_notifications_title)
                 if (qrQuickEnabled) {
@@ -1186,9 +1197,9 @@ private fun NativeHeader(
                         .padding(8.dp),
                 ) {
                     if (notificationsOpen) {
-                        BellRingingFilledIcon(size = 18.dp, tint = titleColor)
+                        BellRingingFilledIcon(size = 20.dp, tint = if (dark) Color(0xFF9C9DDB) else Color(0xFF6366F1))
                     } else {
-                        BellIcon(size = 18.dp, tint = titleColor)
+                        BellIcon(size = 20.dp, tint = if (dark) Color(0xFF9C9DDB) else Color(0xFF6366F1))
                     }
                     // .gk-notif-bell-dot: a plain red dot, never a count
                     // (the web dropped the counter with the read/unread
@@ -1231,7 +1242,7 @@ private fun NativeHeader(
                         // The dots step aside while the panel is open: on a
                         // phone the web anchors it right over the button
                         // (NotesHeader.jsx:624-627).
-                        if (!moreMenuExpanded) KebabIcon(size = 18.dp, tint = titleColor)
+                        if (!moreMenuExpanded) KebabIcon(size = 20.dp, tint = titleColor)
                     }
                     HeaderMenu(
                         expanded = moreMenuExpanded,
@@ -1522,6 +1533,41 @@ private fun SectionLabel(text: String, color: Color) {
     )
 }
 
+/** Mobile branch of react-masonry-css's `items.map((item, index) =>
+ * column[index % 2])`. Keeping the columns in one shared scroll surface
+ * reproduces both its order and its independent vertical packing. */
+@Composable
+private fun NotesMasonry(
+    notes: List<NoteEntity>,
+    listView: Boolean,
+    renderNoteCard: @Composable (NoteEntity) -> Unit,
+) {
+    if (listView) {
+        Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            for (note in notes) renderNoteCard(note)
+        }
+        return
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            notes.forEachIndexed { index, note -> if (index % 2 == 0) renderNoteCard(note) }
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            notes.forEachIndexed { index, note -> if (index % 2 == 1) renderNoteCard(note) }
+        }
+    }
+}
+
 // Violet-tinted card shadow, standing in for the web card's own
 // `box-shadow: 0 2px 8px rgba(139, 92, 246, 0.06)`. Compose's shadow
 // API doesn't take a CSS-style low-alpha shadow color directly, so this
@@ -1554,7 +1600,8 @@ private fun ReorderableNoteCard(
     selectionMode: Boolean,
     selected: Boolean,
     onToggleSelect: () -> Unit,
-    syncing: Boolean,
+    typography: TypographyProfile,
+    taskStrike: Boolean,
     reorderEnabled: Boolean,
     isDragged: Boolean,
     dragOffset: Offset,
@@ -1605,7 +1652,8 @@ private fun ReorderableNoteCard(
             selectionMode = selectionMode,
             selected = selected,
             onToggleSelect = onToggleSelect,
-            syncing = syncing,
+            typography = typography,
+            taskStrike = taskStrike,
         )
     }
 }
@@ -1623,7 +1671,8 @@ internal fun NoteCard(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onToggleSelect: (() -> Unit)? = null,
-    syncing: Boolean = false,
+    typography: TypographyProfile = TypographyPresets.DEFAULT.activeProfile,
+    taskStrike: Boolean = false,
 ) {
     val borderColor = if (dark) CardBorderDark else CardBorderLight
     val shape = RoundedCornerShape(12.dp)
@@ -1646,23 +1695,16 @@ internal fun NoteCard(
                 )
                 .padding(8.dp),
         ) {
-            Row(verticalAlignment = Alignment.Top) {
+            if (note.title.isNotBlank()) {
                 Text(
-                    note.title.ifBlank { stringResource(R.string.native_notes_untitled) },
+                    note.title,
                     color = titleColor,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    modifier = Modifier.weight(1f).padding(end = if (selectionMode) 30.dp else 0.dp),
+                    modifier = Modifier.padding(end = if (selectionMode || note.iconSrc != null) 30.dp else 0.dp),
                 )
-                if (syncing && !selectionMode) {
-                    CircularProgressIndicator(modifier = Modifier.size(12.dp), color = Indigo, strokeWidth = 1.5.dp)
-                    Spacer(Modifier.width(6.dp))
-                }
-                if (note.pinned && !selectionMode) {
-                    PinIcon(size = 14.dp, tint = Indigo, filled = true)
-                }
+                Spacer(Modifier.height(8.dp))
             }
-            Spacer(Modifier.height(6.dp))
 
             if (note.type == "checklist") {
                 ChecklistCardPreview(note = note, titleColor = titleColor, subtextColor = subtextColor)
@@ -1677,9 +1719,22 @@ internal fun NoteCard(
                 // its own native preview renderer.
                 Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
             } else {
-                val preview = remember(note.content) { NoteContent.previewPlainText(note.content) }
-                if (preview.isNotBlank()) {
-                    Text(preview, color = titleColor, fontSize = 14.sp, lineHeight = 20.sp)
+                val previewBlocks = remember(note.content) {
+                    RichDoc.parse(note.content)?.take(8) ?: run {
+                        val source = if (note.content.length > 350) note.content.take(350).trimEnd() + "…" else note.content
+                        MarkdownDoc.toRichBlocks(source).take(8)
+                    }
+                }
+                if (previewBlocks.any { it.text.isNotBlank() || it.kind == com.glasskeep.app.nativeapp.data.RichBlockKind.DIVIDER }) {
+                    RichTextReader(
+                        blocks = previewBlocks,
+                        typography = typography,
+                        taskStrike = taskStrike,
+                        dark = dark,
+                        titleColor = titleColor,
+                        compact = true,
+                        modifier = Modifier.heightIn(max = 280.dp).clipToBounds(),
+                    )
                 } else if (note.type != "text") {
                     Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
                 }
@@ -1785,24 +1840,74 @@ private fun formatReminderLabel(reminderAt: String): String {
  *  count toward the "done/total" footer. */
 @Composable
 private fun ChecklistCardPreview(note: NoteEntity, titleColor: Color, subtextColor: Color) {
-    val items = remember(note.itemsJson) { ChecklistPreview.parse(note.itemsJson) }
+    val entries = remember(note.itemsJson) { ChecklistItems.parseJson(note.itemsJson) }
+    val items = remember(entries) { entries.filterIsInstance<ChecklistItemData>() }
     val total = items.size
     val done = items.count { it.done }
-    val unchecked = items.filter { !it.done }
-    val shown = unchecked.take(5)
-    val extra = unchecked.size - shown.size
+    val uncheckedTotal = items.count { !it.done }
+    val previewBlocks = remember(entries) {
+        var remaining = 4 // NotesSections.jsx: mobile maxPreviewItems
+        buildList {
+            for (block in ChecklistItems.blocks(entries)) {
+                if (remaining <= 0) break
+                val section = block.section
+                val shown = if (section?.collapsed == true) emptyList() else block.items.filterNot { it.done }.take(remaining)
+                remaining -= shown.size
+                if (shown.isNotEmpty() || (section != null && section.title.isNotBlank())) add(block.copy(items = shown))
+            }
+        }
+    }
+    val shownCount = previewBlocks.sumOf { it.items.size }
+    val extra = (uncheckedTotal - shownCount).coerceAtLeast(0)
+    val hasTitledSection = previewBlocks.any { it.section?.title?.isNotBlank() == true }
 
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        for (item in shown) {
-            Row(modifier = if (item.indented) Modifier.padding(start = 14.dp) else Modifier) {
-                Text("☐ ", color = subtextColor, fontSize = 13.sp)
-                Text(
-                    item.text,
-                    color = titleColor,
-                    fontSize = 13.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (block in previewBlocks) {
+            val section = block.section
+            val accent = ChecklistSectionColors.firstOrNull { it.first == section?.color }?.second
+            if (hasTitledSection && section != null && section.title.isNotBlank()) {
+                ChecklistSectionCardHeader(section.title, section.collapsed, accent, subtextColor)
+            }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = if (accent != null && block.items.isNotEmpty()) {
+                    Modifier
+                        .fillMaxWidth()
+                        .background(accent.copy(alpha = 0.04f))
+                        .drawBehind {
+                            drawRect(
+                                color = accent.copy(alpha = 0.60f),
+                                size = Size(3.dp.toPx(), size.height),
+                            )
+                        }
+                        .padding(start = 8.dp)
+                } else Modifier,
+            ) {
+                for (item in block.items) {
+                    Row(
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = if (item.indent == 1) Modifier.padding(start = 20.dp) else Modifier,
+                    ) {
+                        Box(
+                            Modifier
+                                .padding(top = 3.dp)
+                                .size(14.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Color.White.copy(alpha = 0.65f))
+                                .border(1.dp, Color(0xFF9CA3AF).copy(alpha = 0.65f), RoundedCornerShape(3.dp)),
+                        )
+                        Text(
+                            item.text,
+                            color = titleColor,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             }
         }
         if (extra > 0) {
@@ -1812,13 +1917,46 @@ private fun ChecklistCardPreview(note: NoteEntity, titleColor: Color, subtextCol
                 fontSize = 12.sp,
             )
         }
-        if (total > 0) {
-            Text(
-                String.format(stringResource(R.string.native_notes_completed_fraction), done, total),
-                color = subtextColor,
-                fontSize = 12.sp,
-            )
-        }
+        Text(
+            String.format(stringResource(R.string.native_notes_completed_fraction), done, total),
+            color = subtextColor,
+            fontSize = 12.sp,
+        )
+    }
+}
+
+@Composable
+private fun ChecklistSectionCardHeader(title: String, collapsed: Boolean, accent: Color?, fallback: Color) {
+    val tint = accent ?: fallback
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .background(accent?.copy(alpha = 0.10f) ?: Color.Transparent)
+            .drawBehind {
+                if (accent != null) {
+                    drawRect(
+                        color = accent.copy(alpha = 0.35f),
+                        size = Size(2.dp.toPx(), size.height),
+                    )
+                }
+            }
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        ChevronDownIcon(
+            size = 10.dp,
+            tint = tint,
+            modifier = Modifier.rotate(if (collapsed) -90f else 0f),
+        )
+        Text(
+            title,
+            color = tint,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

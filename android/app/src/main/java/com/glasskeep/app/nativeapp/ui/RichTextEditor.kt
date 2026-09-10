@@ -69,7 +69,6 @@ import com.glasskeep.app.nativeapp.data.isHeading
 import com.glasskeep.app.ui.DarkBgColor
 import com.glasskeep.app.ui.Indigo
 
-private val NumberedListColor = Color(0xFF0ea5e9)
 
 /** `1rem` in the web's own root font size, the unit every ported measure
  *  below is expressed in. */
@@ -274,6 +273,8 @@ fun RichTextReader(
     taskStrike: Boolean,
     dark: Boolean,
     titleColor: Color,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val numberedPositions = remember(blocks) {
         val map = mutableMapOf<String, Int>()
@@ -290,9 +291,9 @@ fun RichTextReader(
         }
         map
     }
-    Column(Modifier.fillMaxWidth()) {
+    Column(modifier.fillMaxWidth()) {
         for (block in blocks) {
-            val style = richBlockTextStyle(block, typography, taskStrike, dark, titleColor)
+            val style = richBlockTextStyle(block, typography, taskStrike, dark, titleColor, compact)
             val indent = (block.indent * IndentStepEm * style.fontSize.value).dp
             when (block.kind) {
                 RichBlockKind.DIVIDER -> Box(Modifier.padding(start = indent)) { RichDividerBlock(dark) }
@@ -333,7 +334,9 @@ fun RichTextReader(
                 }
                 else -> Row(
                     verticalAlignment = Alignment.Top,
-                    modifier = Modifier.fillMaxWidth().padding(start = indent, top = 3.dp, bottom = 3.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = indent, top = if (compact) 0.dp else 3.dp, bottom = if (compact) 0.dp else 3.dp),
                 ) {
                     RichBlockPrefix(
                         block = block,
@@ -680,9 +683,10 @@ private fun RichBlockPrefix(
             val numbered = block.kind == RichBlockKind.NUMBERED_ITEM
             Text(
                 if (numbered) "${numberedPosition ?: 1}." else "•",
-                color = if (numbered) NumberedListColor else Indigo,
+                color = style.color,
                 fontSize = style.fontSize,
                 fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.width((1.1f * RemPx).dp).padding(top = 2.dp, end = 2.dp),
             )
         }
@@ -706,10 +710,12 @@ private fun richBlockTextStyle(
     taskStrike: Boolean,
     dark: Boolean,
     titleColor: Color,
+    compact: Boolean = false,
 ): TextStyle {
     val preset = typography.forKind(block.kind)
     val code = block.kind == RichBlockKind.CODE_BLOCK
-    val fontSize = if (code) (preset.size * RemPx * 0.9f).sp else (preset.size * RemPx).sp
+    val baseSize = if (compact && !block.kind.isHeading) 14f else preset.size * RemPx
+    val fontSize = if (code) (baseSize * 0.9f).sp else baseSize.sp
     val lineHeightFactor = when {
         block.kind.isHeading -> 1.5f
         block.kind == RichBlockKind.QUOTE -> 1.6f

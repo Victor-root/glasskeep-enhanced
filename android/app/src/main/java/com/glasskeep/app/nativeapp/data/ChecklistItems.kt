@@ -1,5 +1,7 @@
 package com.glasskeep.app.nativeapp.data
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -50,6 +52,20 @@ data class ChecklistBlock(
  */
 object ChecklistItems {
     const val SECTION_KIND = "section"
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+
+    /** Room stores the wire array as text. Keep this tolerant entry point
+     * next to the canonical parser so card previews retain section markers
+     * instead of going through the older item-only preview projection. */
+    fun parseJson(itemsJson: String): List<ChecklistEntry> {
+        if (itemsJson.isBlank()) return emptyList()
+        val array = try {
+            json.parseToJsonElement(itemsJson) as? JsonArray ?: return emptyList()
+        } catch (_: Exception) {
+            return emptyList()
+        }
+        return parse(array)
+    }
 
     /** Reads the note's items, applying the web's own normalisation:
      *  duplicate ids dropped, missing fields defaulted, and the first row

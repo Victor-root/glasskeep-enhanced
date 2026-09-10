@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">GlassKeep</string>
+    <string name="native_default_app_name">Glass Keep</string>
     <string name="setup_subtitle">Connect to your server</string>
     <string name="setup_label">Server address</string>
     <string name="setup_placeholder">https://your-server.com</string>
