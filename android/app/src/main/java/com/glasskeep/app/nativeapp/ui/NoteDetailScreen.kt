@@ -2052,12 +2052,17 @@ fun NoteDetailScreen(
                         showDrawModeButton = edit.isDrawType && !isReadOnlyAccess,
                         drawingCanvasMode = drawingCanvasMode,
                         // The web keeps Collaborate and Trash in the footer for
-                        // every type except a text note being edited, where they
-                        // move into the kebab. Native text notes are always in
-                        // edit mode, so that is exactly the split here.
-                        showCollaborateButton = !edit.isTextType &&
+                        // every type except a text note actually being edited
+                        // (ModalFooter.jsx's own `isDesktop || viewMode ||
+                        // mType !== "text"`) - a text note being VIEWED still
+                        // gets them here, they only move into the kebab while
+                        // editing. A drawing being actively drawn hides
+                        // Collaborate the same way (moves into its own kebab
+                        // entry below); Trash has no such exception.
+                        showCollaborateButton = (viewMode || !edit.isTextType) &&
+                            !(edit.isDrawType && !drawingCanvasMode && !viewMode) &&
                             (isOwnerAccess || !currentNote.collaborators.isNullOrEmpty()),
-                        showTrashButton = !edit.isTextType && !currentNote.trashed,
+                        showTrashButton = (viewMode || !edit.isTextType) && !currentNote.trashed,
                         onColorClick = { showColorPicker = true },
                         onImageClick = { showImageMenu = true },
                         onLogoClick = { openLogoPicker() },
@@ -2256,8 +2261,14 @@ fun NoteDetailScreen(
                                     // owner (see CollaboratorsScreen.kt's own doc
                                     // comment). The owner also gets it with zero
                                     // collaborators: its "+" action is the only way to
-                                    // add the very first one.
-                                    if (edit.isTextType && (isOwnerAccess || !currentNote.collaborators.isNullOrEmpty())) {
+                                    // add the very first one. Mirrors the footer's own
+                                    // showCollaborateButton exactly inverted: this only
+                                    // takes over while actually editing (mobile web only
+                                    // folds it into the kebab then), not while viewing.
+                                    if (((!viewMode && edit.isTextType) ||
+                                            (edit.isDrawType && !drawingCanvasMode && !viewMode)) &&
+                                        (isOwnerAccess || !currentNote.collaborators.isNullOrEmpty())
+                                    ) {
                                         PopoverMenuItem(
                                             label = stringResource(R.string.native_collaborators_title),
                                             color = collaborateColor,
@@ -2276,7 +2287,7 @@ fun NoteDetailScreen(
                                                 TrashIcon(size = 20.dp, tint = trashMenuColor)
                                             }
                                         }
-                                    } else if (edit.isTextType) {
+                                    } else if (!viewMode && edit.isTextType) {
                                         PopoverMenuItem(
                                             label = stringResource(R.string.native_note_detail_move_to_trash),
                                             color = trashMenuColor,
