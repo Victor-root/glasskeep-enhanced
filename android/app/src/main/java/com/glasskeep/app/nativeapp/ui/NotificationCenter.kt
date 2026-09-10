@@ -1,7 +1,7 @@
 package com.glasskeep.app.nativeapp.ui
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -158,11 +158,19 @@ fun NotificationCenter(
     }
     if (!mounted && !open) return
 
-    val slide by animateFloatAsState(
-        targetValue = if (open) 0f else -1f,
-        animationSpec = tween(durationMillis = 600, easing = TopSheetEasing),
-        label = "notifCenterSlide",
-    )
+    // A plain animateFloatAsState here would reset on every open: this
+    // whole composable is skipped (not just hidden) while `!mounted &&
+    // !open`, so its remembered Animatable gets disposed and recreated
+    // fresh - starting straight at the "open" target with no transition,
+    // while a close always finds the composable already mounted and
+    // animates properly. Animatable + LaunchedEffect(open) sidesteps that:
+    // it explicitly starts at -1f (off-screen) every time this is
+    // recreated, so the very first open after a remount still slides in.
+    val slideAnim = remember { Animatable(-1f) }
+    LaunchedEffect(open) {
+        slideAnim.animateTo(if (open) 0f else -1f, animationSpec = tween(durationMillis = 600, easing = TopSheetEasing))
+    }
+    val slide = slideAnim.value
 
     val maxHeight = configuration.screenHeightDp.dp
     val statusBar = WorkspaceTheme.statusBarColor(themeId, dark)
