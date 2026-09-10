@@ -3,7 +3,6 @@ package com.glasskeep.app.nativeapp.ui
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -143,6 +142,7 @@ internal fun SyncStatusSheet(
     serverUrl: String,
     open: Boolean,
     dark: Boolean,
+    themeId: String?,
     onDismiss: () -> Unit,
     onSyncNow: () -> Unit,
 ) {
@@ -182,8 +182,9 @@ internal fun SyncStatusSheet(
 
     val titleColor = if (dark) Color(0xFFF0F0F5) else Color(0xFF1D1D1F)
     val subtext = if (dark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
-    val divider = if (dark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.06f)
-    val statusBarBg = if (dark) Color(0xFF171F30) else Color(0xFFDCE1FB)
+    val chrome = WorkspaceTheme.colorsFor(themeId, dark)
+    val divider = chrome.chromeBorder
+    val statusBarBg = chrome.statusBar
     val shape = RoundedCornerShape(bottomStart = 14.dp, bottomEnd = 14.dp)
 
     Box(Modifier.fillMaxSize()) {
@@ -194,8 +195,7 @@ internal fun SyncStatusSheet(
                 .heightIn(max = configuration.screenHeightDp.dp)
                 .graphicsLayer { translationY = slide * size.height + dragOffset }
                 .clip(shape)
-                .background(statusBarBg)
-                .border(1.dp, divider, shape),
+                .background(statusBarBg),
         ) {
             SyncSheetHeader(
                 face = face,
@@ -253,10 +253,11 @@ internal fun SyncStatusSheet(
                     label = stringResource(
                         if (status.syncing) R.string.native_sync_server_checking else R.string.native_sync_now,
                     ),
-                    themeId = container.themeState.themeId,
+                    themeId = themeId,
                     enabled = !status.syncing,
                     modifier = Modifier.fillMaxWidth(),
                     verticalPadding = 8.dp,
+                    leading = { RefreshIcon(size = 20.dp, tint = Color.White) },
                     onClick = onSyncNow,
                 )
             }

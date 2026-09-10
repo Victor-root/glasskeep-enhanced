@@ -520,6 +520,7 @@ internal fun GkGradientButton(
     // Non-null only for the semantic variants that must not follow the
     // workspace accent (see GkConfirmVariant).
     gradient: Brush? = null,
+    leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
 ) {
@@ -546,6 +547,10 @@ internal fun GkGradientButton(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = if (trailing == null) Arrangement.Center else Arrangement.SpaceBetween,
     ) {
+        if (leading != null) {
+            leading()
+            Spacer(Modifier.width(8.dp))
+        }
         Text(
             label,
             color = Color.White,

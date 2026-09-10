@@ -958,6 +958,7 @@ fun NativeNotesListScreen(
             serverUrl = serverUrl,
             open = syncSheetOpen,
             dark = dark,
+            themeId = themeId,
             onDismiss = { syncSheetOpen = false },
             onSyncNow = { refresh() },
         )

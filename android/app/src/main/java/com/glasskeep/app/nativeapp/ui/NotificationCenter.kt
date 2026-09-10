@@ -392,7 +392,6 @@ internal fun TopSheetGrabber(
         modifier = Modifier
             .fillMaxWidth()
             .height(18.dp)
-            .topHairline(if (dark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.06f))
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
                     onDragStart = { pressed = true },
