@@ -762,6 +762,16 @@ fun NativeNotesListScreen(
                 )
             }
 
+            // Hoisted above the empty/search-empty/list branches below on
+            // purpose: it used to live inline on the scrollable Column in
+            // the last of those branches, so if the list ever rendered the
+            // empty branch for even a single frame (e.g. a brief refetch
+            // right after returning from a note), Compose tore down that
+            // branch's group - ScrollState included - and the next return
+            // to the list branch started a fresh one at the top. Keeping
+            // it in a stable slot regardless of which branch is showing is
+            // what actually guarantees the scroll position survives.
+            val notesScrollState = rememberScrollState()
             if (notes.isEmpty() && !refreshing && errorMessage == null) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.native_notes_empty), color = subtextColor)
@@ -811,7 +821,7 @@ fun NativeNotesListScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(notesScrollState)
                         .padding(start = 16.dp, top = 24.dp, end = 16.dp, bottom = 16.dp + navBarBottom),
                 ) {
                     if (pinnedNotes.isNotEmpty()) {

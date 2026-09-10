@@ -1594,8 +1594,17 @@ fun NoteDetailScreen(
      *  including changes still inside a debounce or checklist row focus. */
     fun goBack() {
         scope.launch {
-            flushLiveEdits()
-            SyncQueueWorker.triggerNow(context)
+            // Never let a flush/enqueue failure strand the user on this
+            // screen with no way out and no explanation - leaving must
+            // always succeed. Whatever went wrong already logged from
+            // inside flushLiveEdits/patchNoteQueued; still queued edits
+            // catch up next time SyncQueueWorker runs regardless.
+            try {
+                flushLiveEdits()
+                SyncQueueWorker.triggerNow(context)
+            } catch (t: Throwable) {
+                NativeDebug.e("NoteDetailScreen goBack: flush failed, leaving anyway", t)
+            }
             onBack()
         }
     }
