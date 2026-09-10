@@ -949,6 +949,7 @@ fun NativeNotesListScreen(
             serverUrl = serverUrl,
             open = notificationsOpen,
             dark = dark,
+            themeId = themeId,
             onOpenNote = { id -> notificationsOpen = false; onOpenNote(id) },
             onDismiss = { notificationsOpen = false },
         )

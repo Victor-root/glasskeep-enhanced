@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -45,6 +44,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -68,6 +69,7 @@ import com.glasskeep.app.nativeapp.NativeDebug
 import com.glasskeep.app.nativeapp.data.NotifCategory
 import com.glasskeep.app.nativeapp.data.network.NotificationDto
 import com.glasskeep.app.nativeapp.data.parseIsoToEpochMillis
+import androidx.compose.foundation.Image
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
@@ -101,6 +103,7 @@ fun NotificationCenter(
     serverUrl: String,
     open: Boolean,
     dark: Boolean,
+    themeId: String?,
     onOpenNote: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -162,7 +165,8 @@ fun NotificationCenter(
     )
 
     val maxHeight = configuration.screenHeightDp.dp
-    val statusBar = if (dark) Color(0xFF171F30) else Color(0xFFDCE1FB)
+    val chrome = WorkspaceTheme.colorsFor(themeId, dark)
+    val statusBar = chrome.statusBar
     val shape = RoundedCornerShape(bottomStart = 14.dp, bottomEnd = 14.dp)
     val titleColor = if (dark) Color(0xFFF0F0F5) else Color(0xFF1D1D1F)
 
@@ -179,13 +183,14 @@ fun NotificationCenter(
                 .background(statusBar)
                 .border(
                     width = 1.dp,
-                    color = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f),
+                    color = chrome.chromeBorder,
                     shape = shape,
                 ),
         ) {
             NotificationCenterHeader(
                 titleColor = titleColor,
                 dark = dark,
+                brandingLogo = container.branding.logo,
                 showClear = notifications.isNotEmpty(),
                 onClear = {
                     notifications = emptyList()
@@ -285,6 +290,7 @@ fun NotificationCenter(
 private fun NotificationCenterHeader(
     titleColor: Color,
     dark: Boolean,
+    brandingLogo: String?,
     showClear: Boolean,
     onClear: () -> Unit,
     onClose: () -> Unit,
@@ -300,14 +306,20 @@ private fun NotificationCenterHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Brush.horizontalGradient(listOf(Color(0xFF6366F1), Color(0xFF7C3AED)))),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    BellIcon(size = 14.dp, tint = Color.White)
+                val customLogo = brandingLogo?.let { rememberDecodedImage(it) }
+                if (customLogo != null) {
+                    Image(
+                        bitmap = customLogo,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(24.dp),
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(R.drawable.glasskeep_logo),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)),
+                    )
                 }
                 Text(
                     stringResource(R.string.native_notifications_title),
@@ -348,7 +360,7 @@ private fun NotificationCenterHeader(
                     ) { onClose() },
                 contentAlignment = Alignment.Center,
             ) {
-                CloseIcon(size = 13.dp, tint = titleColor)
+                CloseIcon(size = 20.dp, tint = titleColor)
             }
         }
         Box(
@@ -381,7 +393,6 @@ internal fun TopSheetGrabber(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .windowInsetsPadding(WindowInsets.systemBars)
             .height(18.dp)
             .topHairline(if (dark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.06f))
             .pointerInput(Unit) {
