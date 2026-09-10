@@ -1,6 +1,6 @@
 package com.glasskeep.app.nativeapp.ui
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -166,11 +166,16 @@ internal fun SyncStatusSheet(
     }
     if (!mounted && !open) return
 
-    val slide by animateFloatAsState(
-        targetValue = if (open) 0f else -1f,
-        animationSpec = tween(durationMillis = 600, easing = TopSheetEasing),
-        label = "syncSheetSlide",
-    )
+    // See NotificationCenter's identical fix: animateFloatAsState's
+    // remembered Animatable gets disposed while this whole composable is
+    // skipped (!mounted && !open), so a fresh open recreated one already
+    // sitting at the open target with nothing to animate from. Animatable
+    // + LaunchedEffect(open) always starts at -1f (off-screen) instead.
+    val slideAnim = remember { Animatable(-1f) }
+    LaunchedEffect(open) {
+        slideAnim.animateTo(if (open) 0f else -1f, animationSpec = tween(durationMillis = 600, easing = TopSheetEasing))
+    }
+    val slide = slideAnim.value
 
     val status = container.syncStatus
     val retrying = queue.filter { it.status == SyncQueueEntity.STATUS_PENDING && it.attempts > 0 }
