@@ -1565,13 +1565,28 @@ fun NoteDetailScreen(
     // Back closes the topmost overlay first, the note last, the same
     // fixed order App.jsx's own popstate stack walks (the colour and tag
     // popovers dismiss themselves, being focusable popups).
-    BackHandler(enabled = noteAiOpen) { noteAiOpen = false }
-    BackHandler(enabled = !noteAiOpen && showReminderPicker) { showReminderPicker = false }
-    BackHandler(enabled = !noteAiOpen && !showReminderPicker && showFormatSheet) { showFormatSheet = false }
-    BackHandler(
-        enabled = !noteAiOpen && !showReminderPicker && !showFormatSheet,
-        onBack = ::goBack,
-    )
+    //
+    // This is an if/else chain rather than four always-mounted
+    // BackHandler(enabled = ...) calls on purpose: a plain `enabled` flag
+    // only toggles an already-registered callback, so with two
+    // NoteDetailScreens side by side (SideBySideNotesScreen) every
+    // handler for both notes would still register once, in a fixed
+    // left-then-right order, up front - back would always resolve to
+    // whichever pane composed last, regardless of which one the user
+    // actually opened something in most recently. Only entering the
+    // branch that is actually open, per note, mounts/unmounts each
+    // BackHandler exactly when that overlay opens/closes, so the two
+    // notes' callbacks interleave in real chronological order (same
+    // mechanism the colour/tag popups already get for free from Popup).
+    if (noteAiOpen) {
+        BackHandler { noteAiOpen = false }
+    } else if (showReminderPicker) {
+        BackHandler { showReminderPicker = false }
+    } else if (showFormatSheet) {
+        BackHandler { showFormatSheet = false }
+    } else {
+        BackHandler(onBack = ::goBack)
+    }
 
     // The open note is painted in its own color, edge to edge: no card, no
     // radius, no shadow, no page padding. NoteModal.jsx hardcodes
