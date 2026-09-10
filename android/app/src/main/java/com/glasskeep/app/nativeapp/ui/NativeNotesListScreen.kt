@@ -91,6 +91,7 @@ import com.glasskeep.app.nativeapp.data.AiClient
 import com.glasskeep.app.nativeapp.data.ChecklistItems
 import com.glasskeep.app.nativeapp.data.ChecklistItemData
 import com.glasskeep.app.nativeapp.data.MarkdownDoc
+import com.glasskeep.app.nativeapp.data.NoteContent
 import com.glasskeep.app.nativeapp.data.RichDoc
 import com.glasskeep.app.nativeapp.data.SyncQueueWorker
 import com.glasskeep.app.nativeapp.data.TagsJson
@@ -1720,8 +1721,10 @@ internal fun NoteCard(
                 Text(noteTypeLabel(note.type), color = subtextColor, fontSize = 12.sp)
             } else {
                 val previewBlocks = remember(note.content) {
-                    RichDoc.parse(note.content)?.take(8) ?: run {
-                        val source = if (note.content.length > 350) note.content.take(350).trimEnd() + "…" else note.content
+                    RichDoc.parsePreview(note.content, maxBlocks = 8) ?: run {
+                        val richDoc = NoteContent.parseRichDoc(note.content)
+                        val raw = richDoc?.let { NoteContent.docToPlainText(it) } ?: note.content
+                        val source = if (raw.length > 350) raw.take(350).trimEnd() + "…" else raw
                         MarkdownDoc.toRichBlocks(source).take(8)
                     }
                 }

@@ -17,10 +17,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -91,32 +93,32 @@ internal fun syncStatusFace(state: SyncState, dark: Boolean): SyncStatusFace = w
     SyncState.CHECKING -> SyncStatusFace(
         color = if (dark) SyncGrayDark else SyncGrayLight,
         label = stringResource(R.string.native_sync_server_checking),
-        icon = { tint -> CloudPendingIcon(size = 18.dp, tint = tint) },
+        icon = { tint -> CloudPendingIcon(size = 20.dp, tint = tint) },
     )
     SyncState.SYNCED -> SyncStatusFace(
         color = if (dark) SyncGreenDark else SyncGreenLight,
         label = stringResource(R.string.native_sync_status_synced),
-        icon = { tint -> CloudCheckIcon(size = 18.dp, tint = tint) },
+        icon = { tint -> CloudCheckIcon(size = 20.dp, tint = tint) },
     )
     SyncState.PENDING -> SyncStatusFace(
         color = if (dark) SyncAmberDark else SyncAmberLight,
         label = stringResource(R.string.native_sync_status_pending),
-        icon = { tint -> CloudPendingIcon(size = 18.dp, tint = tint) },
+        icon = { tint -> CloudPendingIcon(size = 20.dp, tint = tint) },
     )
     SyncState.SYNCING -> SyncStatusFace(
         color = if (dark) SyncBlueDark else SyncBlueLight,
         label = stringResource(R.string.native_sync_status_syncing),
-        icon = { tint -> CloudSyncIcon(size = 18.dp, tint = tint) },
+        icon = { tint -> CloudSyncIcon(size = 20.dp, tint = tint) },
     )
     SyncState.OFFLINE -> SyncStatusFace(
         color = if (dark) SyncGrayDark else SyncGrayLight,
         label = stringResource(R.string.native_sync_status_offline),
-        icon = { tint -> CloudOffIcon(size = 18.dp, tint = tint) },
+        icon = { tint -> CloudOffIcon(size = 20.dp, tint = tint) },
     )
     SyncState.ERROR -> SyncStatusFace(
         color = if (dark) SyncRedDark else SyncRedLight,
         label = stringResource(R.string.native_sync_status_error),
-        icon = { tint -> CloudErrorIcon(size = 18.dp, tint = tint) },
+        icon = { tint -> CloudErrorIcon(size = 20.dp, tint = tint) },
     )
 }
 
@@ -489,31 +491,44 @@ internal fun SyncStatusButton(
     val face = syncStatusFace(state, dark)
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
             .gkTooltip(face.label)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Button,
-            ) { onClick() }
-            .padding(8.dp),
+            // p-2 + a 20px glyph in SyncStatusIcon.jsx: the badge must
+            // align against this whole 36px button, not against the glyph's
+            // content box (which made it sit squarely over the cloud).
+            .size(36.dp),
     ) {
-        face.icon(face.color)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(CircleShape)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    role = Role.Button,
+                ) { onClick() },
+            contentAlignment = Alignment.Center,
+        ) {
+            face.icon(face.color)
+        }
         if (queued > 0 && state != SyncState.SYNCED && !locked) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .heightIn(min = 14.dp)
-                    .width(if (queued > 9) 18.dp else 14.dp)
+                    // Web: -top-0.5/-right-0.5, h-4, min-w-4, px-1.
+                    .offset(x = 2.dp, y = (-2).dp)
+                    .height(16.dp)
+                    .widthIn(min = 16.dp)
                     .clip(RoundedCornerShape(999.dp))
-                    .background(SyncBadgeAmber),
+                    .background(SyncBadgeAmber)
+                    .padding(horizontal = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     if (queued > 99) "99+" else "$queued",
                     color = Color.White,
-                    fontSize = 9.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
+                    lineHeight = 10.sp,
                 )
             }
         }
@@ -521,7 +536,7 @@ internal fun SyncStatusButton(
             LockIcon(
                 size = 12.dp,
                 tint = SyncRedLight,
-                modifier = Modifier.align(Alignment.TopEnd),
+                modifier = Modifier.align(Alignment.TopEnd).offset(x = 1.dp, y = (-1).dp),
             )
         }
     }

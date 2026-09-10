@@ -50,6 +50,19 @@ class RichDocNestedListTest {
         assertEquals(listOf(RichBlockKind.TASK_ITEM, RichBlockKind.TASK_ITEM), blocks.map { it.kind })
     }
 
+    @Test
+    fun cardPreviewDoesNotExposeJsonWhenUnsupportedContentIsBelowVisibleBlocks() {
+        val paragraphs = (1..8).joinToString(",") {
+            """{"type":"paragraph","content":[{"type":"text","text":"Line $it"}]}"""
+        }
+        val content = """{"v":1,"format":"tiptap","doc":{"type":"doc","content":[$paragraphs,{"type":"table"}]}}"""
+
+        val preview = requireNotNull(RichDoc.parsePreview(content, maxBlocks = 8))
+
+        assertEquals((1..8).map { "Line $it" }, preview.map { it.text })
+        assertEquals(null, RichDoc.parse(content))
+    }
+
     private fun envelope(node: String): String =
         """{"v":1,"format":"tiptap","doc":{"type":"doc","content":[$node]}}"""
 }

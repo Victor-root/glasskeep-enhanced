@@ -102,10 +102,25 @@ object RichDoc {
         }
     }
 
-    private fun parseDoc(doc: JsonObject): List<RichBlock>? {
+    /** Card previews only paint their first few blocks. Stop parsing once
+     *  that visible budget is filled, just like contentToHTMLPreview() on
+     *  the web, so an unsupported node much later in the document cannot
+     *  turn the whole closed card into its raw JSON envelope. */
+    fun parsePreview(content: String?, maxBlocks: Int = 8): List<RichBlock>? {
+        if (maxBlocks <= 0) return emptyList()
+        val doc = NoteContent.parseRichDoc(content) ?: return null
+        return try {
+            parseDoc(doc, maxBlocks)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun parseDoc(doc: JsonObject, maxBlocks: Int = Int.MAX_VALUE): List<RichBlock>? {
         val topLevel = doc["content"] as? JsonArray ?: return null
         val blocks = mutableListOf<RichBlock>()
         for (node in topLevel) {
+            if (blocks.size >= maxBlocks) break
             val obj = node as? JsonObject ?: return null
             when (nodeType(obj)) {
                 "paragraph" -> blocks.add(parseTextBlock(obj, RichBlockKind.PARAGRAPH) ?: return null)
@@ -119,7 +134,7 @@ object RichDoc {
                 else -> return null
             }
         }
-        return blocks.ifEmpty { null }
+        return blocks.take(maxBlocks).ifEmpty { null }
     }
 
     private fun nodeType(node: JsonObject): String? = (node["type"] as? JsonPrimitive)?.contentOrNull
